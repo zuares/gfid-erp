@@ -1190,6 +1190,102 @@
             cursor: default;
         }
     }
+
+    /* =========================================================
+       SELARAS DENGAN HALAMAN DETAIL CUTTING JOB (show.blade)
+       Override append-only, aman: tidak mengubah markup/logika,
+       hanya menyamakan look (kartu, header, tabel, input).
+       ========================================================= */
+    .qc-cutting-page .page-wrap { max-width: 1100px; padding: .75rem .75rem 4.5rem; }
+
+    .qcs-breadcrumb { padding: 12px 0 8px; font-size: 12px; font-weight: 500; }
+
+    /* Header seperti kartu di halaman detail */
+    .qcs-page-head {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 12px;
+        align-items: flex-start;
+    }
+    .qcs-page-title {
+        font-size: 1.02rem; font-weight: 900; letter-spacing: -.01em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas;
+    }
+    .qcs-page-title code { font-weight: 900; font-size: .95em; }
+    .qcs-page-meta { gap: 8px; margin-top: 6px; }
+    .qcs-meta-item { font-size: .8rem; font-weight: 500; color: var(--muted); }
+
+    /* Badge status soft (mirip bg-* di detail) */
+    .qcs-badge {
+        height: auto; padding: .18rem .55rem; border-radius: 999px;
+        font-size: .66rem; font-weight: 800; letter-spacing: .03em;
+    }
+
+    /* Chip aksi header → pill konsisten */
+    .qcs-link-chip { height: auto; padding: .34rem .85rem; border-radius: 999px; font-size: .8rem; font-weight: 700; }
+
+    /* Section = kartu radius 14 seperti .card p-3 */
+    .qcs-section {
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        padding: 1rem 1.25rem;
+        box-shadow: none;
+    }
+    .qcs-section-title { font-size: .72rem; letter-spacing: .06em; }
+
+    /* Tabel bundle ala .table-sm (lebih ringan, konsisten dengan detail) */
+    .qcs-table { font-size: .86rem; }
+    .qcs-table thead th {
+        font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+        background: transparent; color: var(--muted);
+        padding: .55rem .6rem; border-bottom: 1px solid var(--line);
+        border-radius: 0 !important;
+    }
+    .qcs-table tbody td { padding: .55rem .6rem; }
+    .qcs-table tbody tr { border-bottom-color: rgba(148,163,184,.16); }
+
+    /* Field tanggal/operator ala form-control-sm */
+    .qcs-field-input {
+        height: 32px; border-radius: 8px; border: 1px solid var(--line);
+        font-weight: 600; font-size: .9rem; padding: .2rem .5rem; box-shadow: none;
+    }
+    /* Input OK/Reject sama persis dengan .input-ok / .input-reject di halaman detail:
+       form-control-sm, TERPUSAT, .8rem, lebar 68px, bobot normal (bukan mono tebal). */
+    .qcs-qty-input {
+        width: 68px !important; height: auto; min-height: 31px;
+        text-align: center;
+        font-size: .8rem; font-weight: 600;
+        padding: .2rem .3rem; border-radius: 6px; border: 1px solid var(--line);
+        box-shadow: none;
+    }
+    .qcs-qty-input.is-reject { color: inherit; }
+    .qcs-qty-input:focus,
+    .qcs-field-input:focus {
+        border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.15);
+    }
+    .qcs-qty-input.is-reject:focus { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220,38,38,.15); }
+
+    /* Kode item jadi focal point (seperti di halaman detail): besar, gelap, tebal.
+       Nama item turun jadi teks sekunder muted. */
+    .qcs-item-code {
+        font-size: .92rem; font-weight: 800; letter-spacing: .01em;
+        color: var(--gf-ink);
+    }
+    .qcs-item-name {
+        font-size: .78rem; font-weight: 500; color: var(--gf-mid);
+    }
+
+    @media (max-width: 767.98px) {
+        .qc-cutting-page .page-wrap { padding-top: 0; }
+        .qcs-item-code { font-size: .9rem; }
+        /* Header tetap ringkas & menempel; kartu dipertahankan tapi rapat */
+        .qcs-page-head { padding: .7rem .85rem !important; border-radius: 12px; margin: 0 0 10px !important; }
+        .qcs-page-title { font-size: 1rem; }
+        .qcs-section { padding: .7rem .85rem; border-radius: 12px; }
+        .qcs-qty-input { width: 64px !important; min-height: 34px; }
+    }
 </style>
 @endpush
 

@@ -218,40 +218,6 @@
             }
         }
 
-        /* Info LOT (mobile) */
-        .cj-lot-mobile { font-size: .82rem }
-        .cj-lot-hero { margin-bottom: .55rem; padding-bottom: .5rem; border-bottom: 1px solid rgba(148,163,184,.2) }
-        .cj-lot-kain { font-size: 1.1rem; font-weight: 900; letter-spacing: -.01em; line-height: 1.1 }
-        .cj-lot-sub { font-size: .72rem; color: var(--muted); font-weight: 700; margin-top: .1rem }
-        .cj-lot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem .75rem }
-        .cj-lot-grid > div { display: flex; flex-direction: column; gap: .12rem; min-width: 0 }
-        .cj-lot-lbl { font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted) }
-        .cj-lot-val { font-size: .86rem; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-
-        /* Action bar bawah: Selesai Cutting */
-        .cj-action-bar { display: flex; justify-content: flex-end }
-        .cj-finish-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: .3rem;
-            border: none;
-            border-radius: 10px;              /* tidak terlalu rounded */
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            color: #fff;
-            font-weight: 800;
-            font-size: .9rem;
-            padding: .6rem 1.15rem;
-            box-shadow: 0 8px 20px rgba(22, 163, 74, .28);
-            transition: filter .15s;
-        }
-        .cj-finish-btn:hover { filter: brightness(1.04) }
-        .cj-finish-btn:active { transform: translateY(1px) }
-        @media (max-width: 767.98px) {
-            .cj-action-bar { position: sticky; bottom: .5rem; z-index: 5 }
-            .cj-finish-btn { width: 100%; padding: .75rem 1rem; font-size: .95rem; border-radius: 12px }
-        }
-
         /* actions */
         .cutting-actions .btn {
             border-radius: 999px
@@ -548,8 +514,16 @@
                         '</a>';
                 }
 
-                // ⤵ Tombol "Selesai Cutting & Siap Jahit" dipindah ke action bar bawah
-                //   (lihat di bawah Detail Bundles), tidak lagi di header.
+                if ($canQuickOkCutting) {
+                    // Form finalize (di-submit oleh JS setelah sisa kain dikonfirmasi di modal)
+                    echo '<form id="formQuickOk" action="' .
+                        e(route('production.qc.cutting.quick_ok', $job)) .
+                        '" method="post" class="d-inline">';
+                    echo csrf_field();
+                    // Tombol membuka modal konfirmasi (detail bundle + kain LOT + catat sisa)
+                    echo '<button type="button" class="' . e($btn) . ' btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting">Selesai Cutting &amp; Siap Jahit</button>';
+                    echo '</form>';
+                }
 
                 // Cancel QC (owner + QC ada)
                 if ($canCancelQc) {
@@ -662,29 +636,24 @@
                 </div>
             </div>
 
-            {{-- Mobile: kartu info rapi (kain sebagai fokus + grid label/value) --}}
-            <div class="d-md-none cj-lot-mobile">
-                <div class="cj-lot-hero">
-                    <div class="cj-lot-kain mono">{{ $job->lot?->item?->code ?? '-' }}</div>
-                    <div class="cj-lot-sub mono">LOT {{ $job->lot?->code ?? '-' }}</div>
+            {{-- Mobile: satu baris compact --}}
+            <div class="d-flex d-md-none flex-column gap-1" style="font-size:.82rem">
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="fw-semibold mono">{{ $job->lot?->code ?? '-' }}</span>
+                    <span class="text-muted">{{ $job->lot?->item?->code ?? '-' }}</span>
+                    <span class="text-muted">•</span>
+                    <span class="mono">{{ $job->warehouse?->code ?? '-' }}</span>
                 </div>
-                <div class="cj-lot-grid">
-                    <div>
-                        <span class="cj-lot-lbl">Gudang</span>
-                        <span class="cj-lot-val mono">{{ $job->warehouse?->code ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="cj-lot-lbl">Tanggal</span>
-                        <span class="cj-lot-val">{{ $job->date?->format('d/m/Y') ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="cj-lot-lbl">Operator Cut</span>
-                        <span class="cj-lot-val mono">{{ $bundleOperator?->code ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="cj-lot-lbl">Operator QC</span>
-                        <span class="cj-lot-val mono">{{ $qcOperator?->code ?? '-' }}</span>
-                    </div>
+                <div class="d-flex gap-2 flex-wrap text-muted">
+                    <span>Cut: {{ $bundleOperator?->code ?? '-' }}</span>
+                    @if ($qcOperator)
+                        <span>•</span>
+                        <span>QC: {{ $qcOperator->code }}</span>
+                    @endif
+                    @if ($job->date)
+                        <span>•</span>
+                        <span>{{ $job->date?->format('d/m/Y') }}</span>
+                    @endif
                 </div>
             </div>
 
@@ -926,19 +895,6 @@
             @endif
         </div>
 
-        {{-- ===========================
-            ACTION BAR: Selesai Cutting (dipindah dari header)
-        ============================ --}}
-        @if (($canQuickOkCutting ?? false))
-        <div class="cj-action-bar mb-3">
-            <form id="formQuickOk" action="{{ route('production.qc.cutting.quick_ok', $job) }}" method="post" class="mb-0">
-                @csrf
-            </form>
-            <button type="button" class="cj-finish-btn" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting">
-                <i class="bi bi-scissors me-1"></i>Selesai Cutting &amp; Siap Jahit
-            </button>
-        </div>
-        @endif
 
         {{-- ===========================
             SUMMARY
@@ -1176,9 +1132,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        {{-- ══ Fase 1: Detail Bundle ══ --}}
-                        <div id="cj-phase-bundles">
-                        <div class="text-muted small mb-3">Periksa detail bundle. Klik <b>Lanjut</b> untuk mencatat sisa kain per LOT.</div>
+                        <div class="text-muted small mb-3">Periksa detail bundle &amp; catat sisa kain per LOT sebelum menyelesaikan cutting. Semua bundle akan dianggap OK dan masuk WIP-CUT.</div>
 
                         <h6 class="mb-2">Detail Bundle</h6>
                         <div class="table-responsive mb-3">
@@ -1204,10 +1158,6 @@
                             </table>
                         </div>
 
-                        </div>{{-- /cj-phase-bundles --}}
-
-                        {{-- ══ Fase 2: Catat Sisa Kain per LOT ══ --}}
-                        <div id="cj-phase-sisa" style="display:none">
                         @php $modalLots = $lotsNeedSisa ?? collect(); @endphp
                         @if ($modalLots->isNotEmpty())
                         <h6 class="mb-1">Catat Sisa Kain <span class="text-danger">*</span></h6>
@@ -1259,13 +1209,10 @@
                         @endif
 
                         <div id="modalSisaError" class="alert alert-danger py-2 px-3 mt-3 mb-0" style="display:none;font-size:.8rem;"></div>
-                        </div>{{-- /cj-phase-sisa --}}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="button" id="btn-cj-back" class="btn btn-sm btn-outline-secondary" style="display:none"><i class="bi bi-arrow-left me-1"></i>Kembali</button>
-                        <button type="button" id="btn-cj-next" class="btn btn-sm btn-primary">Lanjut<i class="bi bi-arrow-right ms-1"></i></button>
-                        <button type="button" id="btnConfirmSelesai" class="btn btn-sm btn-success" style="display:none"><i class="bi bi-check-lg me-1"></i>Simpan &amp; Selesai</button>
+                        <button type="button" id="btnConfirmSelesai" class="btn btn-sm btn-success">Simpan &amp; Selesai Cutting</button>
                     </div>
                 </div>
             </div>
@@ -1298,23 +1245,6 @@
                 scrapI.addEventListener('input', recalc);
                 recalc();
             });
-
-            // ── Navigasi 2 fase: Detail Bundle → Lanjut → Sisa Kain → Simpan ──
-            const phaseBundles = document.getElementById('cj-phase-bundles');
-            const phaseSisa    = document.getElementById('cj-phase-sisa');
-            const btnNext      = document.getElementById('btn-cj-next');
-            const btnBack      = document.getElementById('btn-cj-back');
-            function goPhase(step) {
-                const onSisa = step === 'sisa';
-                if (phaseBundles) phaseBundles.style.display = onSisa ? 'none' : '';
-                if (phaseSisa)    phaseSisa.style.display    = onSisa ? '' : 'none';
-                btnNext.style.display = onSisa ? 'none' : '';
-                btnBack.style.display = onSisa ? '' : 'none';
-                btn.style.display     = onSisa ? '' : 'none';
-            }
-            btnNext.addEventListener('click', function () { goPhase('sisa'); });
-            btnBack.addEventListener('click', function () { clearErr(); goPhase('bundles'); });
-            modal.addEventListener('show.bs.modal', function () { clearErr(); goPhase('bundles'); });
 
             btn.addEventListener('click', async function () {
                 clearErr();
