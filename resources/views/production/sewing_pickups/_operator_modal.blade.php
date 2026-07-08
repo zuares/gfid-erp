@@ -2,6 +2,8 @@
 @php
 $isOwner = auth()->user()?->isOwner()
     || in_array(auth()->user()?->role ?? '', ['admin', 'operating'], true);
+// Strict: hanya owner sungguhan yang boleh melihat kolom "Kebutuhan" (kebutuhan + stok RM).
+$isOwnerStrict = (bool) (auth()->user()?->isOwner());
 @endphp
 
 @push('head')
@@ -23,6 +25,9 @@ $isOwner = auth()->user()?->isOwner()
         .sc-supply-cols,
         .sc-row { display:grid; grid-template-columns:22px minmax(100px,1fr) 88px 58px 66px;
                   align-items:center; gap:.4rem; }
+        /* Non-owner: tanpa kolom Kebutuhan → 4 kolom, lebih lega. */
+        .sc-supply-cols.no-need,
+        .sc-row.no-need { grid-template-columns:24px minmax(120px,1fr) 66px 78px; }
         .sc-supply-cols { padding:0 .6rem .25rem; color:var(--muted); font-size:.58rem;
                           font-weight:900; text-transform:uppercase; letter-spacing:.04em; }
         .sc-row {
@@ -50,13 +55,19 @@ $isOwner = auth()->user()?->isOwner()
                         font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
         @media (max-width:575.98px) {
             .sc-supply-cols,
-            .sc-row { grid-template-columns:20px minmax(78px,1fr) 72px 50px 58px; gap:.25rem; }
-            .sc-supply-cols { padding-left:.35rem; padding-right:.35rem; font-size:.52rem; }
-            .sc-row { padding:.4rem .35rem; }
-            .sc-label { font-size:.7rem; }
-            .sc-need { font-size:.65rem; }
-            .sc-pcs { font-size:.7rem; }
-            .sc-input { width:58px; font-size:.72rem; }
+            .sc-row { grid-template-columns:22px minmax(72px,1fr) 66px 48px 62px; gap:.3rem; }
+            /* Non-owner (mobile): 4 kolom, kolom Dibawa lebih lebar untuk jari. */
+            .sc-supply-cols.no-need,
+            .sc-row.no-need { grid-template-columns:22px minmax(92px,1fr) 54px 68px; }
+            .sc-supply-cols { padding-left:.35rem; padding-right:.35rem; font-size:.54rem; }
+            .sc-row { padding:.55rem .4rem; margin-bottom:.45rem; }
+            .sc-label { font-size:.74rem; }
+            .sc-sub { font-size:.62rem; }
+            .sc-need { font-size:.66rem; }
+            .sc-pcs { font-size:.74rem; }
+            /* Sasaran sentuh lebih besar & nyaman di mobile */
+            .sc-chk { width:1.3rem; height:1.3rem; }
+            .sc-input { width:100%; min-width:52px; height:2.1rem; font-size:.9rem; padding:.25rem .3rem; }
         }
 
         #btn-confirm-submit,
@@ -198,6 +209,8 @@ $isOwner = auth()->user()?->isOwner()
 document.addEventListener('DOMContentLoaded', function () {
     const bomSuppliesByItem  = @json($bomSuppliesByItem ?? []);
     const isOwner            = {{ json_encode($isOwner) }};
+    // Hanya owner yang melihat kolom "Kebutuhan" (kebutuhan qty + stok RM).
+    const isOwnerStrict      = {{ json_encode($isOwnerStrict) }};
 
     const operatorHidden     = document.getElementById('operator_id_hidden');
     const operatorSelect     = document.getElementById('operator_select_modal');
@@ -391,11 +404,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        // Non-owner: sembunyikan kolom "Kebutuhan" (kebutuhan qty + stok RM) → grid 4 kolom.
+        const needCls = isOwnerStrict ? '' : ' no-need';
+
         supplyChecklist.innerHTML = `
-            <div class="sc-supply-cols" aria-hidden="true">
+            <div class="sc-supply-cols${needCls}" aria-hidden="true">
                 <span></span>
                 <span>Material</span>
-                <span class="text-end">Kebutuhan</span>
+                ${isOwnerStrict ? '<span class="text-end">Kebutuhan</span>' : ''}
                 <span class="text-end">PCS</span>
                 <span class="text-end">Dibawa</span>
             </div>
@@ -403,17 +419,18 @@ document.addEventListener('DOMContentLoaded', function () {
             const isOk = sup.issued >= sup.qty - 0.0001;
             const needQty = sup.qty * sup.qtyPerPiece;
             const stockIsZero = sup.stockAvailable <= 0.0001;
+            const needCell = isOwnerStrict ? `
+                    <div class="sc-need">
+                        ${fmt(needQty)} ${esc(sup.uom)}
+                        <span class="sc-stock ${stockIsZero ? 'is-zero' : ''}">Stok ${fmt(sup.stockAvailable)}</span>
+                    </div>` : '';
             return `
-                <div class="sc-row ${isOk ? 'is-ok' : ''}" data-si="${si}">
+                <div class="sc-row${needCls} ${isOk ? 'is-ok' : ''}" data-si="${si}">
                     <input type="checkbox" class="sc-chk js-chk" data-si="${si}" ${isOk ? 'checked' : ''}>
                     <div>
                         <div class="sc-label">${esc(sup.name)}</div>
                         <div class="sc-sub">${esc(sup.code)}</div>
-                    </div>
-                    <div class="sc-need">
-                        ${fmt(needQty)} ${esc(sup.uom)}
-                        <span class="sc-stock ${stockIsZero ? 'is-zero' : ''}">Stok ${fmt(sup.stockAvailable)}</span>
-                    </div>
+                    </div>${needCell}
                     <div class="sc-pcs">${fmt(sup.qty)} pcs</div>
                     <input type="number" step="1" min="0" inputmode="numeric"
                            class="sc-input js-inp" data-si="${si}"

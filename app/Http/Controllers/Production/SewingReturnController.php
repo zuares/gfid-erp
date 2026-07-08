@@ -1799,29 +1799,10 @@ class SewingReturnController extends Controller
                     ->whereNull('voided_at')
                     ->get();
 
-                $totalRemaining = (float) $pls->sum(function (SewingPickupLine $pl) {
-                    $qtyBundle = (float) ($pl->qty_bundle ?? 0);
-                    $returnedOk = (float) ($pl->qty_returned_ok ?? 0);
-                    $returnedRej = (float) ($pl->qty_returned_reject ?? 0);
-                    $directPick = (float) ($pl->qty_direct_picked ?? 0);
-                    $progressAdj = (float) ($pl->qty_progress_adjusted ?? 0);
-
-                    return max($qtyBundle - ($returnedOk + $returnedRej + $directPick + $progressAdj), 0);
-                });
-
-                $totalProgress = (float) $pls->sum(function (SewingPickupLine $pl) {
-                    return (float) ($pl->qty_returned_ok ?? 0)
-                     + (float) ($pl->qty_returned_reject ?? 0)
-                     + (float) ($pl->qty_direct_picked ?? 0)
-                     + (float) ($pl->qty_progress_adjusted ?? 0);
-                });
-
                 if ($pickup->isFillable('status')) {
-                    if ($totalRemaining <= 0.000001) {
-                        $pickup->status = 'completed';
-                    } else {
-                        $pickup->status = ($totalProgress > 0.000001) ? 'partial' : 'draft';
-                    }
+                    // Satu sumber kebenaran: recalcStatus() (sudah menghitung qty_closed).
+                    $pickup->setRelation('lines', $pls);
+                    $pickup->status = $pickup->recalcStatus();
                     $pickup->save();
                 }
             }

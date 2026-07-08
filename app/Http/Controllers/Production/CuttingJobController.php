@@ -79,14 +79,22 @@ class CuttingJobController extends Controller
 
         // Source type mutasi & jurnal milik alur produksi (lihat JournalService::SRC_*)
         $prodSources = [
-            'cutting_job', 'cutting_job_void', 'cutting_job_sisa',
+            'cutting_job', 'cutting_job_void', 'cutting_job_sisa', 'cutting_job_scrap', 'cutting_job_wage',
             'cutting_qc_adjust_in', 'cutting_qc_adjust_out', 'cutting_reject', 'cutting_wip',
+            // ✅ Reversal/void QC cutting — WAJIB ikut dihapus. Kalau tertinggal (originalnya
+            // 'cutting_wip' terhapus di atas), mutasi ini jadi yatim & bikin saldo WIP-CUT negatif.
+            'cutting_qc_void',
             'sewing_qc_in', 'sewing_qc_out', 'sewing_qc_reject',
             'sewing_reject_rework_ok', 'sewing_return_ok', 'sewing_return_reject',
-            'sewing_pickup_supply', 'sewing_pickup_supply_followup', 'sewing_pickup_supply_void_line',
+            'sewing_pickup_wage',
+            'sewing_pickup_supply', 'sewing_pickup_supply_followup',
+            'sewing_pickup_supply_void', 'sewing_pickup_supply_void_line',
             'finishing_bom', 'finishing_job', 'finishing_qc_in_fg', 'finishing_qc_out',
             'finishing_qc_reject', 'finishing_reject_convert', 'finishing_repair',
             'production_movement', 'wip_fin_adjustment',
+            // WIP normalize / cleanup beserta void-nya (agar tak menyisakan saldo yatim).
+            'wip_normalization', 'wip_normalization_reversal',
+            'wip_cleanup', 'wip_cleanup_void',
             \App\Models\CuttingJob::class,
             \App\Models\SewingPickup::class,
             'App\\Models\\SewingReturn',
@@ -161,6 +169,17 @@ class CuttingJobController extends Controller
                     $deleted[$table] = $count;
                 }
             }
+
+            // 4b) Jaring pengaman: hapus mutasi yatim yang masih menunjuk bundle cutting
+            //     yang sudah terhapus di langkah 4 (mis. cutting_qc_void yang originalnya
+            //     ikut terhapus). Tanpa ini, recompute di langkah 5 meninggalkan saldo
+            //     WIP-CUT negatif yang memblok pickup jahit.
+            $deleted['mutasi yatim (bundle terhapus)'] = DB::table('inventory_mutations')
+                ->whereNotNull('cutting_job_bundle_id')
+                ->whereNotIn('cutting_job_bundle_id', function ($q) {
+                    $q->select('id')->from('cutting_job_bundles');
+                })
+                ->delete();
 
             // 5) Recompute stok gudang dari mutasi tersisa
             DB::statement("
@@ -1822,7 +1841,17 @@ class CuttingJobController extends Controller
         });
 
         if ($processed === 0) {
+            // Dipanggil via AJAX (mis. modal konfirmasi selesai cutting): balas JSON
+            // agar langkah berikutnya (finalize QC) bisa lanjut walau tak ada yang dicatat.
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => true, 'processed' => 0, 'message' => 'Tidak ada sisa/scrap yang perlu dicatat.']);
+            }
+
             return back()->with('warning', 'Tidak ada sisa/scrap yang perlu dicatat (semua qty = 0).');
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'processed' => $processed, 'message' => "Sisa kain tercatat ({$processed} LOT)."]);
         }
 
         return redirect()

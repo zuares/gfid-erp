@@ -37,7 +37,7 @@ Tiga risiko struktural yang wajib disadari sebelum ngoding:
 
 1. **WIP-CUT dicatat ganda**: di level bundle (`cutting_job_bundles.cut_wip_qty`)
    **dan** di level item (`inventory_stocks` gudang WIP-CUT). Keduanya bisa
-   *drift*. Normalisasi harus lewat service yang menjaga dua-duanya sinkron.
+   _drift_. Normalisasi harus lewat service yang menjaga dua-duanya sinkron.
 2. **`inventory_stocks` tidak punya `ref_type`/`ref_id`**, padahal
    `WipAdjustmentController` jalur WIP-CUT mereferensikannya → kemungkinan besar
    **jalur itu error/dead** dan tidak boleh dijadikan pola.
@@ -66,18 +66,18 @@ Rencana ──► Cutting ──► WIP-CUT ──► (ambil jahit) ──► WI
 
 Detail per tahap (gudang & pemicu):
 
-| Tahap | Dari → Ke | Pemicu (kode) | Stok |
-|---|---|---|---|
-| Cutting | RM → WIP-CUT | `CuttingJobController` + `CuttingService` | `inventory_mutations` + bundle `cut_wip_qty`/`wip_qty` |
-| QC Cutting | dalam WIP-CUT | `QcController` (+ `postCuttingWip`) | update `qty_qc_ok/reject` bundle |
-| Ambil Jahit | WIP-CUT → WIP-SEW | `SewingPickupController` | `sewing_pickup_lines`, `sewing_picked_qty` bundle |
-| Setor Jahit OK | WIP-SEW → WIP-FIN | `SewingReturnController` | `sewing_return_lines` |
-| Setor Jahit Reject | WIP-SEW → REJ-SEW/Cacat | `SewingReturnController` | idem |
-| Rework/Repair | Cacat → WIP | `SewingReturnController` / `FinishingRepairController` | `finishing_repairs` |
-| Finishing | WIP-FIN → FG/WH-PRD | `FinishingJobController` | `finishing_job_lines`, `destination_warehouse_id` |
-| Packing | WIP-PACK | `PackingJobController` | `packing_jobs` |
-| Transfer ke RTS | WH-PRD → WH-RTS | stock request / transfer | `inventory_transfers` / `stock_requests` |
-| Movement manual antar status | any → any | `ProductionFlowService::move()` | `production_movements` + `inventory_mutations` |
+| Tahap                        | Dari → Ke               | Pemicu (kode)                                          | Stok                                                   |
+| ---------------------------- | ----------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
+| Cutting                      | RM → WIP-CUT            | `CuttingJobController` + `CuttingService`              | `inventory_mutations` + bundle `cut_wip_qty`/`wip_qty` |
+| QC Cutting                   | dalam WIP-CUT           | `QcController` (+ `postCuttingWip`)                    | update `qty_qc_ok/reject` bundle                       |
+| Ambil Jahit                  | WIP-CUT → WIP-SEW       | `SewingPickupController`                               | `sewing_pickup_lines`, `sewing_picked_qty` bundle      |
+| Setor Jahit OK               | WIP-SEW → WIP-FIN       | `SewingReturnController`                               | `sewing_return_lines`                                  |
+| Setor Jahit Reject           | WIP-SEW → REJ-SEW/Cacat | `SewingReturnController`                               | idem                                                   |
+| Rework/Repair                | Cacat → WIP             | `SewingReturnController` / `FinishingRepairController` | `finishing_repairs`                                    |
+| Finishing                    | WIP-FIN → FG/WH-PRD     | `FinishingJobController`                               | `finishing_job_lines`, `destination_warehouse_id`      |
+| Packing                      | WIP-PACK                | `PackingJobController`                                 | `packing_jobs`                                         |
+| Transfer ke RTS              | WH-PRD → WH-RTS         | stock request / transfer                               | `inventory_transfers` / `stock_requests`               |
+| Movement manual antar status | any → any               | `ProductionFlowService::move()`                        | `production_movements` + `inventory_mutations`         |
 
 Gudang WIP yang ada: **WIP-CUT, WIP-SEW, WIP-FIN, WIP-PACK** (+ reject: REJ-CUT,
 REJ-SEW, REJ-FIN, REJECT).
@@ -88,15 +88,16 @@ REJ-SEW, REJ-FIN, REJECT).
 
 **Kombinasi beberapa tabel — tidak tunggal.** Inilah akar kerumitan hanging WIP.
 
-| Stage WIP | Sumber qty utama | Sumber sekunder / jejak |
-|---|---|---|
-| **WIP-CUT** | `cutting_job_bundles.cut_wip_qty` (per bundle, "kebal" hilir) | `inventory_stocks` (WIP-CUT, per item) + `inventory_mutations` |
-| **WIP-SEW** | `inventory_stocks` (WIP-SEW, per item) | `sewing_pickup_lines` (qty_bundle vs qty_returned_*) |
-| **WIP-FIN** | `inventory_stocks` (WIP-FIN, per item) | `finishing_job_lines` |
-| **WIP-PACK** | `inventory_stocks` (WIP-PACK, per item) | `packing_jobs` |
-| Progress antar tahap | — | `sewing_pickups/returns`, `qc_results`, `production_movements` |
+| Stage WIP            | Sumber qty utama                                              | Sumber sekunder / jejak                                        |
+| -------------------- | ------------------------------------------------------------- | -------------------------------------------------------------- |
+| **WIP-CUT**          | `cutting_job_bundles.cut_wip_qty` (per bundle, "kebal" hilir) | `inventory_stocks` (WIP-CUT, per item) + `inventory_mutations` |
+| **WIP-SEW**          | `inventory_stocks` (WIP-SEW, per item)                        | `sewing_pickup_lines` (qty*bundle vs qty_returned*\*)          |
+| **WIP-FIN**          | `inventory_stocks` (WIP-FIN, per item)                        | `finishing_job_lines`                                          |
+| **WIP-PACK**         | `inventory_stocks` (WIP-PACK, per item)                       | `packing_jobs`                                                 |
+| Progress antar tahap | —                                                             | `sewing_pickups/returns`, `qc_results`, `production_movements` |
 
 Catatan penting:
+
 - `cutting_job_bundles` menyimpan **tiga** angka: `wip_qty` (bisa ditimpa hilir),
   `cut_wip_qty` (stok WIP cutting murni), `sewing_picked_qty` (sudah ditarik jahit).
   Outstanding siap-jahit = `cut_wip_qty − sewing_picked_qty` (scope
@@ -116,18 +117,18 @@ stage**: WIP-CUT dari bundle, WIP-SEW/FIN/PACK dari `inventory_stocks`.
 
 Sudah cukup lengkap, tersebar per tabel:
 
-| Field diminta | Ada? | Lokasi |
-|---|---|---|
-| cutting_by | ✅ | `cutting_jobs.operator_id`, `.created_by`, `.updated_by`; `cutting_job_bundles.operator_id` |
-| sewing_operator_id | ✅ | `sewing_pickups.operator_id`; `finishing_job_lines.sewing_operator_id` (+`sewing_operator_name`) |
-| qc_by | ✅ | `qc_results.operator_id` |
-| packing_by | ✅ | `packing_jobs.created_by`/`updated_by` |
-| created_by | ✅ | cutting_jobs, finishing_jobs, packing_jobs, production_orders, inventory_adjustments, production_movements |
-| approved_by | ✅ | `inventory_adjustments.approved_by`, `wip_opname_periods.approved_by` |
-| process_date | ⚠️ sebagian | ada `date`/`qc_date`/`processed_at`, **tidak ada kolom "tanggal proses asli" khusus** untuk normalisasi |
-| completed_at | ⚠️ | `finishing_jobs.posted_at`, `cutting_job_bundles.wip_posted_at`; belum seragam |
-| returned_at | ⚠️ | pakai `sewing_returns.date` (bukan timestamp khusus) |
-| checked_at | ✅ | `qc_results.qc_date`; `finishing_job_lines.processed_at` |
+| Field diminta      | Ada?        | Lokasi                                                                                                     |
+| ------------------ | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| cutting_by         | ✅          | `cutting_jobs.operator_id`, `.created_by`, `.updated_by`; `cutting_job_bundles.operator_id`                |
+| sewing_operator_id | ✅          | `sewing_pickups.operator_id`; `finishing_job_lines.sewing_operator_id` (+`sewing_operator_name`)           |
+| qc_by              | ✅          | `qc_results.operator_id`                                                                                   |
+| packing_by         | ✅          | `packing_jobs.created_by`/`updated_by`                                                                     |
+| created_by         | ✅          | cutting_jobs, finishing_jobs, packing_jobs, production_orders, inventory_adjustments, production_movements |
+| approved_by        | ✅          | `inventory_adjustments.approved_by`, `wip_opname_periods.approved_by`                                      |
+| process_date       | ⚠️ sebagian | ada `date`/`qc_date`/`processed_at`, **tidak ada kolom "tanggal proses asli" khusus** untuk normalisasi    |
+| completed_at       | ⚠️          | `finishing_jobs.posted_at`, `cutting_job_bundles.wip_posted_at`; belum seragam                             |
+| returned_at        | ⚠️          | pakai `sewing_returns.date` (bukan timestamp khusus)                                                       |
+| checked_at         | ✅          | `qc_results.qc_date`; `finishing_job_lines.processed_at`                                                   |
 
 Gap: **belum ada satu kolom "process_date / original process date" yang eksplisit
 untuk kebutuhan normalisasi**, dan beberapa timestamp masih tersebar. Untuk
@@ -138,15 +139,15 @@ kolom `process_date` perlu ditambahkan di level baris normalisasi.
 
 ## D. Movement log / audit trail
 
-| Kebutuhan log | Sudah ada? | Tabel |
-|---|---|---|
-| WIP masuk / keluar | ✅ | `inventory_mutations` (`direction` in/out, `total_cost`) |
-| Pindah lokasi WIP | ✅ | `production_movements` (from/to warehouse+status) + mutasi |
-| Reject | ✅ | `qc_results`, `sewing_return_lines`, mutasi ke REJ-*/Cacat |
-| Repair | ⚠️ | `finishing_repairs` (0 baris, jarang dipakai) |
-| Finished → WH-PRD | ✅ | `finishing_jobs.destination_warehouse_id` + mutasi |
-| Adjustment | ✅ | `inventory_adjustments` + `inventory_adjustment_lines` (ber-approval) |
-| Write-off | ⚠️ | secara teknis bisa via `inventory_adjustments`, **tapi belum ada action/label khusus write-off & belum berjurnal** |
+| Kebutuhan log      | Sudah ada? | Tabel                                                                                                              |
+| ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| WIP masuk / keluar | ✅         | `inventory_mutations` (`direction` in/out, `total_cost`)                                                           |
+| Pindah lokasi WIP  | ✅         | `production_movements` (from/to warehouse+status) + mutasi                                                         |
+| Reject             | ✅         | `qc_results`, `sewing_return_lines`, mutasi ke REJ-\*/Cacat                                                        |
+| Repair             | ⚠️         | `finishing_repairs` (0 baris, jarang dipakai)                                                                      |
+| Finished → WH-PRD  | ✅         | `finishing_jobs.destination_warehouse_id` + mutasi                                                                 |
+| Adjustment         | ✅         | `inventory_adjustments` + `inventory_adjustment_lines` (ber-approval)                                              |
+| Write-off          | ⚠️         | secara teknis bisa via `inventory_adjustments`, **tapi belum ada action/label khusus write-off & belum berjurnal** |
 
 Kesimpulan D: **audit trail stok sudah kuat** (ledger + movement + adjustment).
 Yang belum: (1) **konsep "action" bertingkat** untuk cleanup (keep/move/finish/
@@ -191,6 +192,7 @@ Semua bisa dideteksi dari kolom yang ADA sekarang:
 ## F. Rekomendasi desain fitur
 
 ### F.1 WIP Normalization (opname WIP)
+
 Perluas konsep `wip_opname_*` yang sudah ada (jangan bikin baru):
 
 - Header periode + baris hitung fisik (sudah ada di `wip_opname_periods/lines`).
@@ -205,20 +207,21 @@ Perluas konsep `wip_opname_*` yang sudah ada (jangan bikin baru):
   qty bundle/stock mengikuti mutasi.
 
 ### F.2 WIP Cleanup (tutup WIP menggantung)
+
 - **List** dari query kandidat E (halaman preview, read-only dulu).
 - **Action per baris** → tiap action = movement/adjustment berjenis, **wajib
   `reason`**, action besar **wajib approval owner/admin**:
 
-  | Action | Efek | Vehicle |
-  |---|---|---|
-  | Keep Open | tidak ada perubahan, hanya catatan | log ringan |
-  | Move Location | pindah gudang WIP | `ProductionFlowService::move()` |
-  | Mark as Finished / WH-PRD | WIP → FG/WH-PRD | pola `postFinishingJob` / `move()` + jurnal |
-  | Send to Repair | WIP/Cacat → WIP repair | `finishing_repairs` + movement |
-  | Mark Reject | WIP → REJ-*/Cacat | adjustment + jurnal (6120) |
-  | Write Off | fisik hilang → keluar WIP | `inventory_adjustment` + jurnal (6120/6115) |
-  | Link to Batch/Bundle | tautkan stok item ke bundle | update ref + movement (tanpa ubah qty) |
-  | Close as Legacy | tandai legacy, keluar dari WIP aktif | adjustment + jurnal (6116) + flag legacy |
+    | Action                    | Efek                                 | Vehicle                                     |
+    | ------------------------- | ------------------------------------ | ------------------------------------------- |
+    | Keep Open                 | tidak ada perubahan, hanya catatan   | log ringan                                  |
+    | Move Location             | pindah gudang WIP                    | `ProductionFlowService::move()`             |
+    | Mark as Finished / WH-PRD | WIP → FG/WH-PRD                      | pola `postFinishingJob` / `move()` + jurnal |
+    | Send to Repair            | WIP/Cacat → WIP repair               | `finishing_repairs` + movement              |
+    | Mark Reject               | WIP → REJ-\*/Cacat                   | adjustment + jurnal (6120)                  |
+    | Write Off                 | fisik hilang → keluar WIP            | `inventory_adjustment` + jurnal (6120/6115) |
+    | Link to Batch/Bundle      | tautkan stok item ke bundle          | update ref + movement (tanpa ubah qty)      |
+    | Close as Legacy           | tandai legacy, keluar dari WIP aktif | adjustment + jurnal (6116) + flag legacy    |
 
 - **Data lama tetap tersimpan**: tidak menghapus baris; cukup tandai
   `status`/`is_legacy` supaya tidak muncul lagi sebagai WIP aktif.
@@ -232,6 +235,7 @@ Perluas konsep `wip_opname_*` yang sudah ada (jangan bikin baru):
 prinsip #6 (redundan). Sebaliknya:
 
 **Pakai ulang:**
+
 - `inventory_mutations` → engine stok (jangan pernah tulis qty langsung).
 - `production_movements` → log perpindahan (sudah punya operator/date/from-to/
   created_by/mutation link). Tambah `source_type`/`source_id` bila perlu menaut
@@ -243,6 +247,7 @@ prinsip #6 (redundan). Sebaliknya:
 **Tambah kolom minimal (aditif) — bukan tabel baru:**
 
 Pada `inventory_adjustments`:
+
 ```
 action           varchar  NULL   -- keep|move|finish|repair|reject|writeoff|link|legacy|normalize
 process_date     date     NULL   -- tanggal proses asli (untuk legacy)
@@ -250,55 +255,61 @@ from_location_id fk warehouses NULL
 to_location_id   fk warehouses NULL
 is_legacy        boolean  default 0
 ```
+
 Pada `inventory_adjustment_lines` (kalau perlu granular per baris):
+
 ```
 action           varchar NULL
 process_date     date    NULL
 ```
+
 Pada `wip_opname_lines` (untuk normalisasi kaya-konteks):
+
 ```
 wip_stage        varchar NULL
 operator_id      fk employees NULL
 process_date     date    NULL
 reason           varchar NULL
 ```
+
 Dan pastikan hasil approve menaut ke movement: simpan `inventory_mutation_id` /
 `production_movement_id` sebagai `movement_log_id`.
 
 **Tabel baru hanya bila benar-benar perlu**: kalau workflow cleanup (satu batch
 banyak baris dengan action berbeda + approval) tidak nyaman dipetakan ke
 `inventory_adjustments`, boleh tambah **satu** header tipis `wip_cleanup_batches`
-+ `wip_cleanup_lines` yang **tetap men-generate** `inventory_adjustments` /
-`production_movements` di belakang (bukan menyimpan stok sendiri). Prinsipnya:
-**tabel cleanup = workflow/UI, stok tetap di ledger existing.**
+
+- `wip_cleanup_lines` yang **tetap men-generate** `inventory_adjustments` /
+  `production_movements` di belakang (bukan menyimpan stok sendiri). Prinsipnya:
+  **tabel cleanup = workflow/UI, stok tetap di ledger existing.**
 
 Pemetaan field usulanmu → existing:
 
-| Usulan | Sudah ada di |
-|---|---|
+| Usulan                                | Sudah ada di                                                         |
+| ------------------------------------- | -------------------------------------------------------------------- |
 | item_id, qty_system/physical/adjusted | `inventory_adjustment_lines` (qty_before/after/change) + opname line |
-| from_location/to_location | tambah `from_location_id`/`to_location_id` |
-| action | **kolom baru** `action` |
-| operator_id | `inventory_adjustments.operator_id` |
-| process_date | **kolom baru** `process_date` |
-| reason, notes, status | `inventory_adjustments.reason/notes/status` |
-| created_by, approved_by, approved_at | `inventory_adjustments.*` (sudah ada) |
-| source_type, source_id | `inventory_adjustments.reference_type/reference_id` |
-| movement_log_id | link ke `production_movements.id` / `inventory_mutations.id` |
+| from_location/to_location             | tambah `from_location_id`/`to_location_id`                           |
+| action                                | **kolom baru** `action`                                              |
+| operator_id                           | `inventory_adjustments.operator_id`                                  |
+| process_date                          | **kolom baru** `process_date`                                        |
+| reason, notes, status                 | `inventory_adjustments.reason/notes/status`                          |
+| created_by, approved_by, approved_at  | `inventory_adjustments.*` (sudah ada)                                |
+| source_type, source_id                | `inventory_adjustments.reference_type/reference_id`                  |
+| movement_log_id                       | link ke `production_movements.id` / `inventory_mutations.id`         |
 
 ---
 
 ## H. Risiko implementasi
 
-| Risiko | Akar masalah di kode | Cara cegah |
-|---|---|---|
-| **Stok dobel** | WIP-CUT ada di bundle **dan** `inventory_stocks`; `move()`/`adjustByDifference` vs update bundle manual | Semua perubahan lewat `InventoryService` (+ domain updater bundle), **tidak** tulis `inventory_stocks`/`cut_wip_qty` mentah |
-| **Histori hilang** | `wip_opname.approve` menimpa `cut_wip_qty` tanpa mutasi | Selalu buat `inventory_adjustment` + `inventory_mutations` + `production_movements`; jangan hard-update |
-| **HPP rusak** | qty tanpa `total_cost`; WIP-CUT jalur `ref_type/ref_id` yang kolomnya tak ada | Nilai dari `LotCostService`/`unit_cost`; blokir movement bernilai 0 (fallback standar cost + review) |
-| **WIP aktif tertutup padahal masih proses** | tidak ada pembeda aged vs in-progress | Kandidat cleanup pakai umur + status; action besar wajib approval owner/admin |
-| **Operator tracking tak lengkap** | legacy tanpa `operator_id`/bundle | Wajibkan `operator_id`+`process_date` di baris normalisasi; untuk legacy tandai eksplisit |
-| **Data legacy tercampur** | tidak ada penanda legacy | `is_legacy`/status khusus; laporan WIP aktif memfilter legacy |
-| **Jurnal salah/dobel** | sebagian adjustment WIP belum berjurnal; `JournalService` idempotent per (source_type,source_id) | Reuse `JournalService` + akun baru (1204/6115/6116/6120 dari fase lalu); satu source unik per aksi |
+| Risiko                                      | Akar masalah di kode                                                                                    | Cara cegah                                                                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Stok dobel**                              | WIP-CUT ada di bundle **dan** `inventory_stocks`; `move()`/`adjustByDifference` vs update bundle manual | Semua perubahan lewat `InventoryService` (+ domain updater bundle), **tidak** tulis `inventory_stocks`/`cut_wip_qty` mentah |
+| **Histori hilang**                          | `wip_opname.approve` menimpa `cut_wip_qty` tanpa mutasi                                                 | Selalu buat `inventory_adjustment` + `inventory_mutations` + `production_movements`; jangan hard-update                     |
+| **HPP rusak**                               | qty tanpa `total_cost`; WIP-CUT jalur `ref_type/ref_id` yang kolomnya tak ada                           | Nilai dari `LotCostService`/`unit_cost`; blokir movement bernilai 0 (fallback standar cost + review)                        |
+| **WIP aktif tertutup padahal masih proses** | tidak ada pembeda aged vs in-progress                                                                   | Kandidat cleanup pakai umur + status; action besar wajib approval owner/admin                                               |
+| **Operator tracking tak lengkap**           | legacy tanpa `operator_id`/bundle                                                                       | Wajibkan `operator_id`+`process_date` di baris normalisasi; untuk legacy tandai eksplisit                                   |
+| **Data legacy tercampur**                   | tidak ada penanda legacy                                                                                | `is_legacy`/status khusus; laporan WIP aktif memfilter legacy                                                               |
+| **Jurnal salah/dobel**                      | sebagian adjustment WIP belum berjurnal; `JournalService` idempotent per (source_type,source_id)        | Reuse `JournalService` + akun baru (1204/6115/6116/6120 dari fase lalu); satu source unik per aksi                          |
 
 ---
 
@@ -307,7 +318,8 @@ Pemetaan field usulanmu → existing:
 1. **Backup** DB (`database_dev.sqlite`) + tag git sebelum mulai.
 2. **Audit tabel** (dokumen ini) — konfirmasi sumber qty per stage (B) & kandidat (E).
 3. **Query kandidat WIP menggantung** — tulis sebagai read-only query/scope
-   (pakai definisi di bagian E), belum ada aksi.
+   (pakai definisi di bagian E), be
+   lum ada aksi.
 4. **Halaman preview** (read-only) — daftar WIP menggantung + sumbernya, tanpa
    tombol aksi. Validasi angkanya cocok dengan dashboard `ProductionFlowService`.
 5. **Draft normalisasi** — perluas `wip_opname` ke semua stage + kolom
@@ -333,7 +345,7 @@ Pemetaan field usulanmu → existing:
 ## Catatan penutup
 
 - **Tidak menghapus data**: semua aksi = tambah record (adjustment/movement/jurnal)
-  + penanda status/legacy. Baris lama tetap ada.
+    - penanda status/legacy. Baris lama tetap ada.
 - **Tidak update qty tanpa log**: satu-satunya jalan ubah stok = `InventoryService`
   (menulis `inventory_mutations`).
 - **Tidak redundan**: fitur baru = lapisan workflow/UI di atas

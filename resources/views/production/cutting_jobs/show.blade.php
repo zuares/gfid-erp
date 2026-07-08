@@ -515,12 +515,13 @@
                 }
 
                 if ($canQuickOkCutting) {
-                    echo '<form action="' .
+                    // Form finalize (di-submit oleh JS setelah sisa kain dikonfirmasi di modal)
+                    echo '<form id="formQuickOk" action="' .
                         e(route('production.qc.cutting.quick_ok', $job)) .
-                        '" method="post" class="d-inline"
-                            onsubmit="return confirm(\'Selesai Cutting & Siap Jahit?\\n\\nSemua bundle akan dianggap OK dan langsung masuk WIP-CUT.\')">';
+                        '" method="post" class="d-inline">';
                     echo csrf_field();
-                    echo '<button type="submit" class="' . e($btn) . ' btn-success">Selesai Cutting & Siap Jahit</button>';
+                    // Tombol membuka modal konfirmasi (detail bundle + kain LOT + catat sisa)
+                    echo '<button type="button" class="' . e($btn) . ' btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting">Selesai Cutting &amp; Siap Jahit</button>';
                     echo '</form>';
                 }
 
@@ -585,7 +586,10 @@
                         <span class="badge bg-{{ $statusClass }} d-none d-md-inline-flex">{{ $statusLabel }}</span>
                         <a href="{{ route('production.cutting_jobs.index') }}"
                            class="btn btn-sm btn-outline-secondary btn-header-link">← Kembali</a>
-                        {!! $renderActions(false) !!}
+                        {{-- Role 'operating' hanya boleh melihat (read-only): sembunyikan semua tombol aksi, sisakan Kembali. --}}
+                        @if (strtolower((string) (auth()->user()->role ?? '')) !== 'operating')
+                            {!! $renderActions(false) !!}
+                        @endif
                     </div>
                 </div>
                 <div class="status-stepper mt-2">
@@ -656,215 +660,6 @@
             @if (!empty($job->notes))
                 <div class="mt-2 text-muted small">{{ $job->notes }}</div>
             @endif
-        </div>
-
-        {{-- ===========================
-            SISA KAIN PER LOT
-        ============================ --}}
-        @if ($job->lots && $job->lots->count() > 0)
-        @php
-            $lotsWithSisa = $job->lots->filter(fn($l) => $l->sisa_recorded_at);
-            $lotsNeedSisa = $job->lots->filter(fn($l) => !$l->sisa_recorded_at && (float)($l->used_fabric_qty ?? 0) > 0);
-        @endphp
-        <div class="card p-3 mb-3">
-            <h2 class="h6 mb-2">Sisa Kain per LOT</h2>
-
-            {{-- Sudah tercatat --}}
-            @if ($lotsWithSisa->isNotEmpty())
-            <div class="table-responsive mb-3">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>LOT</th>
-                            <th class="text-end">Terpakai</th>
-                            <th class="text-end">Sisa Layak</th>
-                            <th class="text-end">Scrap</th>
-                            <th>Dicatat</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($lotsWithSisa as $cjl)
-                        <tr>
-                            <td class="mono">{{ $cjl->lot?->code ?? '-' }}</td>
-                            <td class="text-end mono">{{ number_format((float)$cjl->used_fabric_qty, 2, ',', '.') }}</td>
-                            <td class="text-end mono fw-semibold text-success">{{ number_format((float)$cjl->qty_sisa_fabric, 2, ',', '.') }}</td>
-                            <td class="text-end mono fw-semibold {{ (float)($cjl->qty_scrap ?? 0) > 0 ? 'text-danger' : 'text-muted' }}">{{ number_format((float)($cjl->qty_scrap ?? 0), 2, ',', '.') }}</td>
-                            <td class="small text-muted">{{ \Carbon\Carbon::parse($cjl->sisa_recorded_at)->format('d/m/Y H:i') }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            {{-- ── EVALUASI SCRAP% AKTUAL vs BOM ── --}}
-            @php
-                $evalUsed  = $lotsWithSisa->sum(fn($l) => (float) $l->used_fabric_qty);
-                $evalSisa  = $lotsWithSisa->sum(fn($l) => (float) $l->qty_sisa_fabric);
-                $evalScrap = $lotsWithSisa->sum(fn($l) => (float) ($l->qty_scrap ?? 0));
-                $evalNet   = $evalUsed - $evalSisa;          // benar-benar terkonsumsi
-                $evalGood  = $evalNet - $evalScrap;          // jadi potongan
-                $scrapActualPct = $evalGood > 0.0001 ? round($evalScrap / $evalGood * 100, 2) : null;
-            @endphp
-            @if ($evalScrap > 0.0001 && $scrapActualPct !== null && !empty($bomScrapTargets ?? []))
-            <div class="mb-3" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:.7rem .9rem;">
-                <div style="font-size:.78rem;font-weight:800;color:#92400e;">
-                    Scrap aktual job ini: <span class="mono">{{ number_format($scrapActualPct, 2) }}%</span>
-                    <span class="text-muted fw-normal">({{ number_format($evalScrap, 2, ',', '.') }} kg dari {{ number_format($evalGood, 2, ',', '.') }} kg jadi potongan)</span>
-                </div>
-                <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
-                    @foreach ($bomScrapTargets as $tItemId => $t)
-                        <div class="d-inline-flex align-items-center gap-1" style="font-size:.74rem;">
-                            <span class="mono">{{ $t['item_code'] }}</span>
-                            <span class="text-muted">scrap BOM {{ number_format($t['scrap_pct'], 2) }}%</span>
-                            @if (abs($t['scrap_pct'] - $scrapActualPct) > 0.05)
-                                <button type="button" class="btn btn-sm btn-outline-warning btn-update-scrap py-0"
-                                        style="font-size:.7rem;"
-                                        data-url="{{ $t['quick_url'] }}"
-                                        data-material="{{ (int) $job->fabric_item_id }}"
-                                        data-scrap="{{ $scrapActualPct }}">
-                                    → {{ number_format($scrapActualPct, 2) }}%
-                                </button>
-                            @else
-                                <span class="badge bg-success-subtle text-success border">sesuai</span>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-            @endif
-            @endif
-
-            {{-- Form catat sisa --}}
-            @if ($lotsNeedSisa->isNotEmpty())
-            <form method="POST" action="{{ route('production.cutting_jobs.sisa_fabric', $job) }}">
-                @csrf
-                <div class="table-responsive mb-2">
-                    <table class="table table-sm mb-0">
-                        <thead>
-                            <tr>
-                                <th>LOT</th>
-                                <th class="text-end">Dipakai (kg)</th>
-                                <th class="text-end" style="width:150px">Sisa Layak (kg)
-                                    <div class="fw-normal text-muted" style="font-size:.62rem;">kembali ke stok</div>
-                                </th>
-                                <th class="text-end" style="width:150px">Scrap (kg)
-                                    <div class="fw-normal text-muted" style="font-size:.62rem;">perca / terbuang</div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($lotsNeedSisa as $i => $cjl)
-                            @php
-                                // Kain yang benar-benar jadi potongan (estimasi standar):
-                                // Σ (qty_pcs × BOM qty tanpa scrap) untuk bundle di LOT ini.
-                                $lotUsed = (float) $cjl->used_fabric_qty;
-                                $lotGood = $job->bundles
-                                    ->where('lot_id', $cjl->lot_id)
-                                    ->sum(function ($b) use ($bomScrapTargets) {
-                                        $t = $bomScrapTargets[(int) $b->finished_item_id] ?? null;
-                                        return $t ? (float) $b->qty_pcs * (float) $t['bom_qty'] : 0.0;
-                                    });
-                                // Sisa fisik LOT (ujung gulungan yang masih tercatat sebagai stok)
-                                $lotRemnant = max((float) ($cjl->lot?->qty_onhand ?? 0), 0);
-                                // Prefill scrap = kelebihan pakai + sisa fisik LOT
-                                // (asumsi sisa layak 0) — JS menyesuaikan saat sisa diketik
-                                $scrapPrefill = $lotGood > 0
-                                    ? round(max($lotUsed - $lotGood, 0) + $lotRemnant, 2)
-                                    : ($lotRemnant > 0 ? round($lotRemnant, 2) : null);
-                            @endphp
-                            <input type="hidden" name="lots[{{ $i }}][lot_id]" value="{{ $cjl->lot_id }}">
-                            <tr class="js-sisa-row" data-used="{{ $lotUsed }}" data-good="{{ $lotGood }}" data-remnant="{{ $lotRemnant }}">
-                                <td class="mono">{{ $cjl->lot?->code ?? '-' }}
-                                    <div class="small text-muted">{{ $cjl->lot?->item?->code ?? '' }}</div>
-                                </td>
-                                <td class="text-end mono">{{ number_format($lotUsed, 2, ',', '.') }}</td>
-                                <td class="text-end">
-                                    <input type="number" name="lots[{{ $i }}][qty_sisa]"
-                                           class="form-control form-control-sm text-end mono js-sisa-input"
-                                           step="0.01" min="0" value="0"
-                                           style="max-width:120px;margin-left:auto">
-                                </td>
-                                <td class="text-end">
-                                    <input type="number" name="lots[{{ $i }}][qty_scrap]"
-                                           class="form-control form-control-sm text-end mono js-scrap-input"
-                                           step="0.01" min="0" placeholder="0"
-                                           value="{{ $scrapPrefill !== null ? $scrapPrefill : '' }}"
-                                           data-auto="1"
-                                           style="max-width:120px;margin-left:auto;border-color:#fca5a5;">
-                                    @if ($lotGood > 0 || $lotRemnant > 0)
-                                        <div class="text-muted" style="font-size:.62rem;">
-                                            auto: kelebihan pakai{{ $lotRemnant > 0 ? ' + sisa LOT ' . number_format($lotRemnant, 2, ',', '.') . ' kg' : '' }}
-                                        </div>
-                                    @endif
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-                <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-box-arrow-in-down me-1"></i>Catat Sisa → Kembalikan ke RM
-                    </button>
-                </div>
-            </form>
-            @elseif ($lotsWithSisa->isEmpty())
-            <div class="text-muted small">Belum ada pemakaian kain yang tercatat untuk LOT ini.</div>
-            @else
-            <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Semua sisa kain sudah dicatat.</div>
-            @endif
-        </div>
-        @endif
-
-        {{-- ===========================
-            SUMMARY
-        ============================ --}}
-        <div class="card p-3 mb-3 d-none d-md-block">
-            <h2 class="h6 mb-2">Ringkasan Output</h2>
-
-            <div class="row g-3">
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Jumlah Bundle</div>
-                    <div class="mono">{{ $totalBundles }}</div>
-                </div>
-
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Total Qty Cutting (pcs)</div>
-                    <div class="mono">{{ number_format($totalQtyPcs, 2, ',', '.') }}</div>
-                </div>
-
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Total Pemakaian Kain</div>
-                    <div class="mono">{{ number_format($totalUsedFabric, 2, ',', '.') }}</div>
-                </div>
-
-                @if ($hasQcCutting)
-                    <div class="col-md-3 col-6">
-                        <div class="help mb-1">Total OK Produksi / Reject QC</div>
-                        <div class="mono">
-                            OK: {{ number_format($qcTotalOk, 2, ',', '.') }}
-                            /
-                            <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
-                                Reject: {{ number_format($qcTotalReject, 2, ',', '.') }}
-                            </span>
-                        </div>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <div class="card p-2 mb-3 d-block d-md-none">
-            <div class="summary-bar-mobile">
-                <span>{{ $totalBundles }} bundle</span>
-                <span>{{ number_format($totalQtyPcs, 0, ',', '.') }} pcs</span>
-                <span>{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg kain</span>
-                @if ($hasQcCutting)
-                    <span>OK {{ number_format($qcTotalOk, 0, ',', '.') }}</span>
-                    <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
-                        Reject {{ number_format($qcTotalReject, 0, ',', '.') }}
-                    </span>
-                @endif
-            </div>
         </div>
 
         {{-- ===========================
@@ -1100,6 +895,406 @@
             @endif
         </div>
 
+
+        {{-- ===========================
+            SUMMARY
+        ============================ --}}
+        <div class="card p-3 mb-3 d-none d-md-block">
+            <h2 class="h6 mb-2">Ringkasan Output</h2>
+
+            <div class="row g-3">
+                <div class="col-md-3 col-6">
+                    <div class="help mb-1">Jumlah Bundle</div>
+                    <div class="mono">{{ $totalBundles }}</div>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="help mb-1">Total Qty Cutting (pcs)</div>
+                    <div class="mono">{{ number_format($totalQtyPcs, 2, ',', '.') }}</div>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="help mb-1">Total Pemakaian Kain</div>
+                    <div class="mono">{{ number_format($totalUsedFabric, 2, ',', '.') }}</div>
+                </div>
+
+                @if ($hasQcCutting)
+                    <div class="col-md-3 col-6">
+                        <div class="help mb-1">Total OK Produksi / Reject QC</div>
+                        <div class="mono">
+                            OK: {{ number_format($qcTotalOk, 2, ',', '.') }}
+                            /
+                            <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
+                                Reject: {{ number_format($qcTotalReject, 2, ',', '.') }}
+                            </span>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <div class="card p-2 mb-3 d-block d-md-none">
+            <div class="summary-bar-mobile">
+                <span>{{ $totalBundles }} bundle</span>
+                <span>{{ number_format($totalQtyPcs, 0, ',', '.') }} pcs</span>
+                <span>{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg kain</span>
+                @if ($hasQcCutting)
+                    <span>OK {{ number_format($qcTotalOk, 0, ',', '.') }}</span>
+                    <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
+                        Reject {{ number_format($qcTotalReject, 0, ',', '.') }}
+                    </span>
+                @endif
+            </div>
+        </div>
+
+        {{-- ===========================
+            SISA KAIN PER LOT
+        ============================ --}}
+        @if ($job->lots && $job->lots->count() > 0)
+        @php
+            $lotsWithSisa = $job->lots->filter(fn($l) => $l->sisa_recorded_at);
+            $lotsNeedSisa = $job->lots->filter(fn($l) => !$l->sisa_recorded_at && (float)($l->used_fabric_qty ?? 0) > 0);
+        @endphp
+        <div class="card p-3 mb-3">
+            <h2 class="h6 mb-2">Sisa Kain per LOT</h2>
+
+            {{-- Sudah tercatat --}}
+            @if ($lotsWithSisa->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Kain / LOT</th>
+                            <th class="text-end">Total Pemakaian
+                                <div class="fw-normal text-muted" style="font-size:.62rem;">kain terpakai (kg)</div>
+                            </th>
+                            <th class="text-end">Sisa Layak</th>
+                            <th class="text-end">Scrap</th>
+                            <th>Dicatat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($lotsWithSisa as $cjl)
+                        <tr>
+                            <td>
+                                <div class="mono fw-semibold">{{ $cjl->lot?->item?->code ?? '-' }}</div>
+                                <div class="small text-muted mono">{{ $cjl->lot?->code ?? '-' }}</div>
+                            </td>
+                            <td class="text-end mono">{{ number_format((float)$cjl->used_fabric_qty, 2, ',', '.') }}</td>
+                            <td class="text-end mono fw-semibold text-success">{{ number_format((float)$cjl->qty_sisa_fabric, 2, ',', '.') }}</td>
+                            <td class="text-end mono fw-semibold {{ (float)($cjl->qty_scrap ?? 0) > 0 ? 'text-danger' : 'text-muted' }}">{{ number_format((float)($cjl->qty_scrap ?? 0), 2, ',', '.') }}</td>
+                            <td class="small text-muted">{{ \Carbon\Carbon::parse($cjl->sisa_recorded_at)->format('d/m/Y H:i') }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- ── EVALUASI SCRAP% AKTUAL vs BOM ── --}}
+            @php
+                $evalUsed  = $lotsWithSisa->sum(fn($l) => (float) $l->used_fabric_qty);
+                $evalSisa  = $lotsWithSisa->sum(fn($l) => (float) $l->qty_sisa_fabric);
+                $evalScrap = $lotsWithSisa->sum(fn($l) => (float) ($l->qty_scrap ?? 0));
+                $evalNet   = $evalUsed - $evalSisa;          // benar-benar terkonsumsi
+                $evalGood  = $evalNet - $evalScrap;          // jadi potongan
+                $scrapActualPct = $evalGood > 0.0001 ? round($evalScrap / $evalGood * 100, 2) : null;
+            @endphp
+            @if ($evalScrap > 0.0001 && $scrapActualPct !== null && !empty($bomScrapTargets ?? []))
+            <div class="mb-3" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:.7rem .9rem;">
+                <div style="font-size:.78rem;font-weight:800;color:#92400e;">
+                    Scrap aktual job ini: <span class="mono">{{ number_format($scrapActualPct, 2) }}%</span>
+                    <span class="text-muted fw-normal">({{ number_format($evalScrap, 2, ',', '.') }} kg dari {{ number_format($evalGood, 2, ',', '.') }} kg jadi potongan)</span>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
+                    @foreach ($bomScrapTargets as $tItemId => $t)
+                        <div class="d-inline-flex align-items-center gap-1" style="font-size:.74rem;">
+                            <span class="mono">{{ $t['item_code'] }}</span>
+                            <span class="text-muted">scrap BOM {{ number_format($t['scrap_pct'], 2) }}%</span>
+                            @if (abs($t['scrap_pct'] - $scrapActualPct) > 0.05)
+                                <button type="button" class="btn btn-sm btn-outline-warning btn-update-scrap py-0"
+                                        style="font-size:.7rem;"
+                                        data-url="{{ $t['quick_url'] }}"
+                                        data-material="{{ (int) $job->fabric_item_id }}"
+                                        data-scrap="{{ $scrapActualPct }}">
+                                    → {{ number_format($scrapActualPct, 2) }}%
+                                </button>
+                            @else
+                                <span class="badge bg-success-subtle text-success border">sesuai</span>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+            @endif
+
+            {{-- Form catat sisa --}}
+            @if ($lotsNeedSisa->isNotEmpty())
+            <form method="POST" action="{{ route('production.cutting_jobs.sisa_fabric', $job) }}">
+                @csrf
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Kain / LOT</th>
+                                <th class="text-end">Total Pemakaian (kg)
+                                    <div class="fw-normal text-muted" style="font-size:.62rem;">kain terpakai</div>
+                                </th>
+                                <th class="text-end" style="width:150px">Sisa Layak (kg)
+                                    <div class="fw-normal text-muted" style="font-size:.62rem;">kembali ke stok</div>
+                                </th>
+                                <th class="text-end" style="width:150px">Scrap (kg)
+                                    <div class="fw-normal text-muted" style="font-size:.62rem;">perca / terbuang</div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($lotsNeedSisa as $i => $cjl)
+                            @php
+                                // Kain yang benar-benar jadi potongan (estimasi standar):
+                                // Σ (qty_pcs × BOM qty tanpa scrap) untuk bundle di LOT ini.
+                                $lotUsed = (float) $cjl->used_fabric_qty;
+                                $lotGood = $job->bundles
+                                    ->where('lot_id', $cjl->lot_id)
+                                    ->sum(function ($b) use ($bomScrapTargets) {
+                                        $t = $bomScrapTargets[(int) $b->finished_item_id] ?? null;
+                                        return $t ? (float) $b->qty_pcs * (float) $t['bom_qty'] : 0.0;
+                                    });
+                                // Sisa fisik LOT (ujung gulungan yang masih tercatat sebagai stok)
+                                $lotRemnant = max((float) ($cjl->lot?->qty_onhand ?? 0), 0);
+                                // Kelebihan pemakaian (dipakai melebihi kebutuhan standar potongan)
+                                $lotExcess  = $lotGood > 0 ? round(max($lotUsed - $lotGood, 0), 2) : 0.0;
+                                // ✅ Default: sisa layak = sisa fisik LOT, scrap = kelebihan pemakaian.
+                                $sisaPrefill  = $lotRemnant > 0 ? round($lotRemnant, 2) : null;
+                                $scrapPrefill = $lotExcess > 0 ? $lotExcess : null;
+                            @endphp
+                            <input type="hidden" name="lots[{{ $i }}][lot_id]" value="{{ $cjl->lot_id }}">
+                            <tr class="js-sisa-row" data-used="{{ $lotUsed }}" data-good="{{ $lotGood }}" data-remnant="{{ $lotRemnant }}">
+                                <td>
+                                    <div class="mono fw-semibold">{{ $cjl->lot?->item?->code ?? '-' }}</div>
+                                    <div class="small text-muted mono">{{ $cjl->lot?->code ?? '-' }}</div>
+                                </td>
+                                <td class="text-end mono">{{ number_format($lotUsed, 2, ',', '.') }}</td>
+                                <td class="text-end">
+                                    <input type="number" name="lots[{{ $i }}][qty_sisa]"
+                                           class="form-control form-control-sm text-end mono js-sisa-input"
+                                           step="0.01" min="0"
+                                           value="{{ $sisaPrefill !== null ? $sisaPrefill : '0' }}"
+                                           data-auto="1"
+                                           style="max-width:120px;margin-left:auto;border-color:#86efac;">
+                                    @if ($lotRemnant > 0)
+                                        <div class="text-muted" style="font-size:.62rem;">
+                                            auto: sisa fisik LOT {{ number_format($lotRemnant, 2, ',', '.') }} kg
+                                        </div>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    <input type="number" name="lots[{{ $i }}][qty_scrap]"
+                                           class="form-control form-control-sm text-end mono js-scrap-input"
+                                           step="0.01" min="0" placeholder="0"
+                                           value="{{ $scrapPrefill !== null ? $scrapPrefill : '' }}"
+                                           data-auto="1"
+                                           style="max-width:120px;margin-left:auto;border-color:#fca5a5;">
+                                    @if ($lotExcess > 0)
+                                        <div class="text-muted" style="font-size:.62rem;">
+                                            auto: kelebihan pakai {{ number_format($lotExcess, 2, ',', '.') }} kg
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-box-arrow-in-down me-1"></i>Catat Sisa → Kembalikan ke RM
+                    </button>
+                </div>
+            </form>
+            @elseif ($lotsWithSisa->isEmpty())
+            <div class="text-muted small">Belum ada pemakaian kain yang tercatat untuk LOT ini.</div>
+            @else
+            <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Semua sisa kain sudah dicatat.</div>
+            @endif
+        </div>
+        @endif
+
+        {{-- =========================================================
+            MODAL KONFIRMASI SELESAI CUTTING + CATAT SISA (wajib)
+        ========================================================= --}}
+        @if (($canQuickOkCutting ?? false))
+        <div class="modal fade" id="modalSelesaiCutting" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Selesai Cutting — {{ $job->code }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-muted small mb-3">Periksa detail bundle &amp; catat sisa kain per LOT sebelum menyelesaikan cutting. Semua bundle akan dianggap OK dan masuk WIP-CUT.</div>
+
+                        <h6 class="mb-2">Detail Bundle</h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Kain / Item</th>
+                                        <th>LOT</th>
+                                        <th class="text-end">Qty (pcs)</th>
+                                        <th class="text-end">Kain terpakai</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($job->bundles as $b)
+                                    <tr>
+                                        <td class="mono fw-semibold">{{ $b->finishedItem?->code ?? '-' }}</td>
+                                        <td class="mono small text-muted">{{ $b->lot?->code ?? '-' }}</td>
+                                        <td class="text-end mono">{{ number_format((float) $b->qty_pcs, 0, ',', '.') }}</td>
+                                        <td class="text-end mono">{{ number_format((float) ($b->qty_used_fabric ?? 0), 2, ',', '.') }}</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @php $modalLots = $lotsNeedSisa ?? collect(); @endphp
+                        @if ($modalLots->isNotEmpty())
+                        <h6 class="mb-1">Catat Sisa Kain <span class="text-danger">*</span></h6>
+                        <div class="text-muted mb-2" style="font-size:.72rem;">Total kain sebelum dipotong = pemakaian + sisa layak + scrap.</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Kain / LOT</th>
+                                        <th class="text-end">Pemakaian</th>
+                                        <th class="text-end" style="width:110px">Sisa Layak</th>
+                                        <th class="text-end" style="width:110px">Scrap</th>
+                                        <th class="text-end">Total sblm potong</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($modalLots as $cjl)
+                                    @php
+                                        $lotUsed = (float) $cjl->used_fabric_qty;
+                                        $lotGood = $job->bundles->where('lot_id', $cjl->lot_id)->sum(function ($b) use ($bomScrapTargets) {
+                                            $t = ($bomScrapTargets ?? [])[(int) $b->finished_item_id] ?? null;
+                                            return $t ? (float) $b->qty_pcs * (float) $t['bom_qty'] : 0.0;
+                                        });
+                                        $lotRemnant = max((float) ($cjl->lot?->qty_onhand ?? 0), 0);
+                                        $lotExcess  = $lotGood > 0 ? round(max($lotUsed - $lotGood, 0), 2) : 0.0;
+                                        $mSisa  = $lotRemnant > 0 ? round($lotRemnant, 2) : 0;
+                                        $mScrap = $lotExcess > 0 ? $lotExcess : 0;
+                                    @endphp
+                                    <tr class="modal-sisa-row" data-lot="{{ $cjl->lot_id }}" data-used="{{ $lotUsed }}">
+                                        <td>
+                                            <div class="mono fw-semibold">{{ $cjl->lot?->item?->code ?? '-' }}</div>
+                                            <div class="small text-muted mono">{{ $cjl->lot?->code ?? '-' }}</div>
+                                        </td>
+                                        <td class="text-end mono">{{ number_format($lotUsed, 2, ',', '.') }}</td>
+                                        <td class="text-end">
+                                            <input type="number" class="form-control form-control-sm text-end mono m-sisa" step="0.01" min="0" value="{{ $mSisa }}" style="max-width:100px;margin-left:auto;border-color:#86efac;">
+                                        </td>
+                                        <td class="text-end">
+                                            <input type="number" class="form-control form-control-sm text-end mono m-scrap" step="0.01" min="0" value="{{ $mScrap }}" style="max-width:100px;margin-left:auto;border-color:#fca5a5;">
+                                        </td>
+                                        <td class="text-end mono fw-semibold m-total">0</td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @else
+                        <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Semua sisa kain LOT sudah dicatat.</div>
+                        @endif
+
+                        <div id="modalSisaError" class="alert alert-danger py-2 px-3 mt-3 mb-0" style="display:none;font-size:.8rem;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" id="btnConfirmSelesai" class="btn btn-sm btn-success">Simpan &amp; Selesai Cutting</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @push('scripts')
+        <script>
+        (function () {
+            const modal = document.getElementById('modalSelesaiCutting');
+            if (!modal) return;
+            const sisaUrl = "{{ route('production.cutting_jobs.sisa_fabric', $job) }}";
+            const token = "{{ csrf_token() }}";
+            const errBox = document.getElementById('modalSisaError');
+            const btn = document.getElementById('btnConfirmSelesai');
+
+            function showErr(m) { errBox.textContent = m; errBox.style.display = 'block'; }
+            function clearErr() { errBox.style.display = 'none'; }
+
+            modal.querySelectorAll('.modal-sisa-row').forEach(function (row) {
+                const used = parseFloat(row.dataset.used || '0') || 0;
+                const sisaI = row.querySelector('.m-sisa');
+                const scrapI = row.querySelector('.m-scrap');
+                const totalC = row.querySelector('.m-total');
+                function recalc() {
+                    const s = parseFloat(sisaI.value || '0') || 0;
+                    const k = parseFloat(scrapI.value || '0') || 0;
+                    totalC.textContent = (used + s + k).toFixed(2);
+                }
+                sisaI.addEventListener('input', recalc);
+                scrapI.addEventListener('input', recalc);
+                recalc();
+            });
+
+            btn.addEventListener('click', async function () {
+                clearErr();
+                const rows = Array.from(modal.querySelectorAll('.modal-sisa-row'));
+                for (const r of rows) {
+                    const s = r.querySelector('.m-sisa').value;
+                    const k = r.querySelector('.m-scrap').value;
+                    if (s === '' || k === '') { showErr('Isi Sisa Layak & Scrap untuk semua LOT (boleh 0).'); return; }
+                }
+                btn.disabled = true;
+                try {
+                    if (rows.length) {
+                        const lots = rows.map(function (r) {
+                            return {
+                                lot_id: r.dataset.lot,
+                                qty_sisa: parseFloat(r.querySelector('.m-sisa').value || '0'),
+                                qty_scrap: parseFloat(r.querySelector('.m-scrap').value || '0')
+                            };
+                        });
+                        const res = await fetch(sisaUrl, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': token,
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({ lots: lots })
+                        });
+                        if (!res.ok) {
+                            let msg = 'Gagal mencatat sisa kain.';
+                            try {
+                                const j = await res.json();
+                                msg = j.message || (j.errors ? Object.values(j.errors).flat().join(' ') : msg);
+                            } catch (e) {}
+                            showErr(msg);
+                            btn.disabled = false;
+                            return;
+                        }
+                    }
+                    document.getElementById('formQuickOk').submit();
+                } catch (e) {
+                    showErr('Terjadi kesalahan jaringan. Coba lagi.');
+                    btn.disabled = false;
+                }
+            });
+        })();
+        </script>
+        @endpush
+        @endif
 
     </div>
 

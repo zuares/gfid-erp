@@ -964,6 +964,8 @@
                     </div>
                 </div>
 
+                {{-- Ringkasan kelengkapan RM: hanya untuk owner (menyingkap kebutuhan & stok). --}}
+                @if (auth()->user()?->isOwner())
                 <div class="sewing-supply-summary d-none" id="sewing-supply-summary">
                     <div class="sewing-supply-head">
                         <span class="sewing-supply-title">Kelengkapan jahit dari RM</span>
@@ -981,6 +983,7 @@
                         </table>
                     </div>
                 </div>
+                @endif
             </div>
             @error('lines')
                 <div class="alert alert-danger py-1 small mb-2">

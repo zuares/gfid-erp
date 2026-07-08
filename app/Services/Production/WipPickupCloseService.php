@@ -236,9 +236,16 @@ class WipPickupCloseService
                             $bundle = CuttingJobBundle::query()->lockForUpdate()->find($line->cutting_job_bundle_id);
                             if ($bundle) {
                                 $bundle->sewing_picked_qty = (float) $bundle->sewing_picked_qty + $qty;
+                                // ✅ Cancel dibatalkan → pick aktif lagi, kembalikan status ke 'in_sewing'.
+                                if ((float) $bundle->sewing_picked_qty > 0.0000001) {
+                                    $bundle->status = 'in_sewing';
+                                }
                                 $bundle->save();
                             }
                         }
+
+                        // ✅ Sinkronkan status header pickup setelah penutupan dibatalkan.
+                        $this->syncPickupStatus((int) $line->sewing_pickup_id);
                     }
                 }
             }
@@ -247,6 +254,26 @@ class WipPickupCloseService
             $adj->status = InventoryAdjustment::STATUS_VOID;
             $adj->save();
         });
+    }
+
+    /**
+     * Set ulang status header pickup (draft/partial/completed/closed) dari kondisi
+     * line terkini. Dipanggil setelah aksi close/void agar list pickup akurat.
+     */
+    private function syncPickupStatus(int $pickupId): void
+    {
+        if ($pickupId <= 0) {
+            return;
+        }
+
+        $pickup = \App\Models\SewingPickup::query()->find($pickupId);
+        if (!$pickup || !$pickup->isFillable('status')) {
+            return;
+        }
+
+        $pickup->unsetRelation('lines');
+        $pickup->status = $pickup->recalcStatus();
+        $pickup->save();
     }
 
     private function outstanding(SewingPickupLine $line): float
