@@ -993,6 +993,28 @@
         <span class="lot-refresh-status" id="lot-refresh-status"></span>
     </div>
 
+    {{-- Target vs Picked Indicator --}}
+    <div id="lot-target-indicator" style="display:none; margin-bottom: .75rem; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: .65rem .8rem;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: .4rem;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span style="font-size: .65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;">Kebutuhan vs Terpilih</span>
+                <span id="lot-target-text" style="font-size: .82rem; font-weight: 600; color: var(--text);">
+                    Target: <span class="mono text-primary" id="lot-target-needed">0.00</span> kg
+                </span>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: .65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;">Terpilih</span>
+                <div id="lot-target-picked" class="mono" style="font-size: 1.1rem; font-weight: 800; color: #2563eb; line-height: 1;">0.00 <span style="font-size: .7rem;">kg</span></div>
+            </div>
+        </div>
+        <div style="height: 6px; background: rgba(148, 163, 184, 0.15); border-radius: 999px; overflow: hidden; position: relative;">
+            <div id="lot-target-bar" style="height: 100%; width: 0%; background: #2563eb; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease;"></div>
+        </div>
+        <div id="lot-target-warning" style="display:none; font-size: .68rem; color: #dc2626; margin-top: .35rem; font-weight: 600;">
+            ⚠️ Stok yang dipilih masih kurang <span id="lot-target-shortage" class="mono">0.00</span> kg!
+        </div>
+    </div>
+
     @if ($lotStocks->isEmpty())
         <div class="lot-empty-hint">
             Belum ada LOT bahan baku utama yang siap dipakai. Cek stok kain utama di GRN / gudang RM.
@@ -1329,6 +1351,9 @@
                         card.classList.toggle('lot-selected', checkbox.checked);
                         const group = card.closest('.lot-item-group');
                         if (group) updateGroupBadge(group);
+                        if (typeof window.updateLotTargetIndicator === 'function') {
+                            window.updateLotTargetIndicator();
+                        }
                     }
 
                     if (card.dataset.bound !== '1') {

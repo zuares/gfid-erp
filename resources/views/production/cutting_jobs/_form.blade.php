@@ -1416,7 +1416,64 @@
                         bomBtn.onclick = null;
                     }
                 }
+
+                if (typeof window.updateLotTargetIndicator === 'function') {
+                    window.updateLotTargetIndicator();
+                }
             }
+
+            window.updateLotTargetIndicator = function() {
+                const pickerInd = document.getElementById('lot-target-indicator');
+                if (!pickerInd) return;
+
+                let totalUsed = 0;
+                const bundlesTbody = document.getElementById('bundle-rows');
+                if (bundlesTbody) {
+                    bundlesTbody.querySelectorAll('.bundle-qty-fabric').forEach(inp => {
+                        totalUsed += parseFloat(inp.value || '0');
+                    });
+                }
+
+                if (totalUsed <= 0) {
+                    pickerInd.style.display = 'none';
+                    return;
+                }
+
+                let totalStock = 0;
+                document.querySelectorAll('.lot-checkbox:checked').forEach(cb => {
+                    const card = cb.closest('.lot-card-item');
+                    if (card) {
+                        totalStock += parseFloat(card.dataset.balance || '0');
+                    }
+                });
+
+                pickerInd.style.display = '';
+                document.getElementById('lot-target-needed').textContent = totalUsed.toFixed(2);
+                document.getElementById('lot-target-picked').textContent = totalStock.toFixed(2);
+                
+                let pct = (totalStock / totalUsed) * 100;
+                if (pct > 100) pct = 100;
+                const barEl = document.getElementById('lot-target-bar');
+                if (barEl) barEl.style.width = pct + '%';
+                
+                const warnEl = document.getElementById('lot-target-warning');
+                const shortage = totalUsed - totalStock;
+                const pickedEl = document.getElementById('lot-target-picked');
+                
+                if (shortage > 0.05) {
+                    if (barEl) barEl.style.backgroundColor = '#dc2626';
+                    if (pickedEl) pickedEl.style.color = '#dc2626';
+                    if (warnEl) {
+                        warnEl.style.display = '';
+                        const shortSpan = document.getElementById('lot-target-shortage');
+                        if (shortSpan) shortSpan.textContent = shortage.toFixed(2);
+                    }
+                } else {
+                    if (barEl) barEl.style.backgroundColor = '#16a34a';
+                    if (pickedEl) pickedEl.style.color = '#16a34a';
+                    if (warnEl) warnEl.style.display = 'none';
+                }
+            };
 
             function getShortageBomCandidates() {
                 const fabricItemId = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
