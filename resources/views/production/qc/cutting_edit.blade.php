@@ -49,7 +49,6 @@
     }
 
     .qc-cutting-page {
-        min-height: 100vh;
         font-family: var(--gf-font);
         -webkit-font-smoothing: antialiased;
     }
@@ -453,9 +452,10 @@
         margin-top: 2px;
     }
     .qcs-qty-display {
-        font-family: var(--gf-mono);
-        font-size: 14px;
-        font-weight: 900;
+        font-family: monospace;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: .02em;
         color: var(--gf-ink);
     }
 
@@ -1074,7 +1074,8 @@
         .qcs-hide-mobile { display: none !important; }
 
         .qcs-table-wrap {
-            overflow-x: visible;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .qcs-table {
             font-size: 12px;
@@ -1093,17 +1094,18 @@
             text-align: right !important;
             padding-right: 8px;
         }
-        .qcs-table thead th:nth-child(6),
-        .qcs-table tbody td:nth-child(6),
-        .qcs-table thead th:nth-child(8),
-        .qcs-table tbody td:nth-child(8) {
+        .qcs-table thead th:nth-child(7),
+        .qcs-table tbody td:nth-child(7),
+        .qcs-table thead th:nth-child(9),
+        .qcs-table tbody td:nth-child(9) {
             display: none;
         }
-        .qcs-table thead th:nth-child(1) { width: 42px; }
-        .qcs-table thead th:nth-child(2) { width: auto; }
-        .qcs-table thead th:nth-child(3),
-        .qcs-table thead th:nth-child(4) { width: 46px; }
-        .qcs-table thead th:nth-child(5) { width: 92px; }
+        .qcs-table thead th:nth-child(1) { width: 36px; }
+        .qcs-table thead th:nth-child(2) { width: 42px; }
+        .qcs-table thead th:nth-child(3) { width: auto; }
+        .qcs-table thead th:nth-child(4),
+        .qcs-table thead th:nth-child(5) { width: 46px; }
+        .qcs-table thead th:nth-child(6) { width: 92px; }
         .qcs-bundle-pill {
             height: 24px;
             padding: 0 7px;
@@ -1119,7 +1121,7 @@
             display: none;
         }
         .qcs-qty-display {
-            font-size: 12px;
+            font-size: .95rem;
         }
         .qcs-qty-input {
             width: 86px;
@@ -1189,6 +1191,13 @@
             border-color: var(--gf-line);
             cursor: default;
         }
+        
+        .qcs-action-bar {
+            padding: 10px 12px calc(10px + 72px + env(safe-area-inset-bottom, 0px));
+        }
+        .page-wrap {
+            padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+        }
     }
 
     /* =========================================================
@@ -1242,6 +1251,23 @@
         background: transparent; color: var(--muted);
         padding: .55rem .6rem; border-bottom: 1px solid var(--line);
         border-radius: 0 !important;
+    }
+    .qcs-item-code {
+        font-family: monospace;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        color: var(--gf-ink);
+        text-align: left;
+        display: block;
+    }
+    .qcs-item-name {
+        font-size: .88rem;
+        font-weight: 500;
+        color: var(--gf-mid);
+        line-height: 1.3;
+        text-align: left;
+        display: block;
     }
     .qcs-table tbody td { padding: .55rem .6rem; }
     .qcs-table tbody tr { border-bottom-color: rgba(148,163,184,.16); }
@@ -1504,6 +1530,7 @@
                         <table class="qcs-table">
                             <thead>
                                 <tr>
+                                    <th style="width:36px; text-align:center;"><input type="checkbox" id="checkAllBundles" class="form-check-input" style="cursor:pointer"></th>
                                     <th style="text-align:left">No</th>
                                     <th style="text-align:left">Item</th>
                                     <th style="text-align:right">Cut</th>
@@ -1560,11 +1587,13 @@
                                     @endphp
 
                                     <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}" data-bundle-id="{{ $bundleId }}">
-                                        <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
-                                            value="{{ $bundleId }}">
-                                        <input type="hidden" name="results[{{ $i }}][qty_ok]"
-                                            class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOkCalc) }}">
-
+                                        <td style="text-align:center; vertical-align:middle;">
+                                            <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
+                                                value="{{ $bundleId }}">
+                                            <input type="hidden" name="results[{{ $i }}][qty_ok]"
+                                                class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOkCalc) }}">
+                                            <input type="checkbox" class="form-check-input bundle-check" style="cursor:pointer">
+                                        </td>
                                         <td>
                                             <span class="qcs-bundle-pill">#{{ $i + 1 }}</span>
                                             <div class="qcs-lot-ref qcs-hide-mobile">
@@ -1594,7 +1623,8 @@
                                                 pattern="\d*" name="results[{{ $i }}][qty_reject]"
                                                 class="qcs-qty-input is-reject input-reject {{ $rejectError ? 'is-invalid' : '' }}"
                                                 value="{{ old("results.$i.qty_reject", $qtyReject) }}"
-                                                data-bundle="{{ $bundleQty }}">
+                                                data-bundle="{{ $bundleQty }}"
+                                                onfocus="this.select()">
                                             @if ($rejectError)
                                                 <div class="qcs-error-text" style="font-size:10px;">{{ $rejectError }}</div>
                                             @endif
@@ -1615,16 +1645,9 @@
                                             @endif
                                         </td>
 
-                                        {{-- AKSI: Simpan inline + Adjust (owner) --}}
+                                        {{-- AKSI: Adjust (owner) --}}
                                         <td>
                                             <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
-                                                <button type="button"
-                                                        class="qcs-row-btn qcs-row-btn-ok btn-save-bundle-edit"
-                                                        title="Simpan"
-                                                        data-id="{{ $bundleId }}"
-                                                        data-code="{{ $row['bundle_code'] ?? '' }}">
-                                                    ✓
-                                                </button>
                                                 @if ($canAdjustQc)
                                                 <button type="button" class="qcs-row-btn qcs-row-btn-adjust"
                                                     title="Adjust"
@@ -1884,51 +1907,7 @@
 
             </form>
 
-            {{-- Modal Alasan Reject (shared, per bundle via JS) --}}
-            <div class="modal fade qcs-modal" id="modalAlasanReject" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <div>
-                                <div class="modal-title-main" id="modalAlasanTitle">Simpan QC Bundle</div>
-                                <div class="modal-title-sub" id="modalAlasanMeta"></div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div style="margin-bottom:12px;">
-                                <span style="font-size:13px;font-weight:700;">Reject: </span>
-                                <span id="modalAlasanRejectQty" style="font-family:var(--gf-mono);font-weight:900;color:var(--gf-rej);">0</span>
-                                <span style="font-size:12px;font-weight:600;color:var(--gf-mid);"> pcs</span>
-                            </div>
-                            <label class="qcs-field-label">
-                                Alasan Reject
-                                <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--gf-mid);">(opsional jika tidak ada reject)</span>
-                            </label>
-                            <input type="text" id="modalAlasanInput" class="qcs-modal-field"
-                                   placeholder="mis: bolong, kotor, salah ukuran">
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="qcs-modal-btn qcs-modal-btn-outline" data-bs-dismiss="modal">Batal</button>
-                            <button type="button" class="qcs-modal-btn qcs-modal-btn-ok" id="modalAlasanConfirm">Simpan</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {{-- Hidden forms per bundle untuk Simpan inline --}}
-            @foreach ($rows as $row)
-                <form id="bqfe-{{ $row['cutting_job_bundle_id'] }}"
-                      action="{{ route('production.qc.cutting.bundle_save_edit', [$cuttingJob, $row['cutting_job_bundle_id']]) }}"
-                      method="post" style="display:none">
-                    @csrf
-                    <input type="hidden" name="qc_date"       value="{{ $defaultQcDate }}">
-                    <input type="hidden" name="operator_id"   value="{{ $defaultOperatorId }}">
-                    <input type="hidden" name="qty_reject"    value="0">
-                    <input type="hidden" name="reject_reason" value="">
-                    <input type="hidden" name="notes"         value="">
-                </form>
-            @endforeach
 
         </div>
     </div>
@@ -2089,78 +2068,85 @@
                 clampAdjust();
             });
 
-            // ===== SIMPAN PER BUNDLE — via Modal Alasan =====
-            let _pendingBundleId = null;
+            // ===== CHECKBOX LOGIC =====
+            const checkAll = document.getElementById('checkAllBundles');
+            const bundleChecks = document.querySelectorAll('.bundle-check');
+            const btnSave = document.getElementById('btn-bulk-save');
+            const bulkForm = btnSave ? btnSave.closest('form') : null;
 
-            const modalAlasan     = document.getElementById('modalAlasanReject');
-            const modalAlasanBS   = modalAlasan ? new bootstrap.Modal(modalAlasan) : null;
-            const modalTitle      = document.getElementById('modalAlasanTitle');
-            const modalMeta       = document.getElementById('modalAlasanMeta');
-            const modalRejectQty  = document.getElementById('modalAlasanRejectQty');
-            const modalInput      = document.getElementById('modalAlasanInput');
-            const modalConfirmBtn = document.getElementById('modalAlasanConfirm');
-
-            document.querySelectorAll('.btn-save-bundle-edit').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const bundleId = this.dataset.id;
-                    const code     = this.dataset.code || ('#' + bundleId);
-                    const tr       = this.closest('tr');
-                    const form     = document.getElementById('bqfe-' + bundleId);
-                    if (!form || !tr) return;
-
-                    // Siapkan nilai dari baris
-                    const rejInput   = tr.querySelector('.input-reject');
-                    const notesInput = tr.querySelector('input[name*="[notes]"]');
-                    const rej        = parseFloat(rejInput?.value || '0');
-
-                    // Isi form hidden dulu (kecuali reason — akan diisi di modal)
-                    const mainDate = document.querySelector('input[name="qc_date"]')?.value;
-                    const mainOp   = document.querySelector('input[name="operator_id"]')?.value;
-                    if (mainDate) form.querySelector('[name="qc_date"]').value    = mainDate;
-                    if (mainOp)   form.querySelector('[name="operator_id"]').value = mainOp;
-                    form.querySelector('[name="qty_reject"]').value = isNaN(rej) ? 0 : rej;
-                    form.querySelector('[name="notes"]').value      = notesInput?.value || '';
-                    form.querySelector('[name="reject_reason"]').value = '';
-
-                    // Kalau tidak ada reject → langsung submit tanpa modal
-                    if (!rej || rej <= 0) {
-                        form.submit();
-                        return;
-                    }
-
-                    _pendingBundleId = bundleId;
-
-                    // Isi modal
-                    if (modalTitle)     modalTitle.textContent     = 'Simpan QC — ' + code;
-                    if (modalMeta)      modalMeta.textContent      = 'Reject: ' + Math.round(rej) + ' pcs';
-                    if (modalRejectQty) modalRejectQty.textContent = Math.round(rej);
-                    if (modalInput)     modalInput.value           = '';
-
-                    if (modalAlasanBS) {
-                        modalAlasanBS.show();
-                        setTimeout(() => modalInput?.focus(), 300);
-                    }
+            function updateSaveBtnState() {
+                if (!btnSave) return;
+                let allChecked = true;
+                bundleChecks.forEach(chk => {
+                    if (!chk.checked) allChecked = false;
                 });
-            });
+                
+                if (checkAll) {
+                    checkAll.checked = allChecked && bundleChecks.length > 0;
+                }
 
-            if (modalConfirmBtn) {
-                modalConfirmBtn.addEventListener('click', function () {
-                    if (!_pendingBundleId) return;
-                    const form   = document.getElementById('bqfe-' + _pendingBundleId);
-                    const reason = modalInput?.value?.trim() || '';
-                    if (form) {
-                        form.querySelector('[name="reject_reason"]').value = reason;
-                        if (modalAlasanBS) modalAlasanBS.hide();
-                        form.submit();
-                    }
-                    _pendingBundleId = null;
+                if (bundleChecks.length === 0) {
+                    btnSave.disabled = true;
+                    btnSave.style.opacity = '0.5';
+                    btnSave.style.cursor = 'not-allowed';
+                    return;
+                }
+
+                if (allChecked) {
+                    btnSave.disabled = false;
+                    btnSave.style.opacity = '1';
+                    btnSave.style.cursor = 'pointer';
+                } else {
+                    btnSave.disabled = true;
+                    btnSave.style.opacity = '0.5';
+                    btnSave.style.cursor = 'not-allowed';
+                }
+            }
+
+            if (checkAll) {
+                checkAll.addEventListener('change', function() {
+                    const isChecked = this.checked;
+                    bundleChecks.forEach(chk => {
+                        chk.checked = isChecked;
+                    });
+                    updateSaveBtnState();
                 });
             }
 
-            // Enter di input alasan → confirm
-            if (modalInput) {
-                modalInput.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') { e.preventDefault(); modalConfirmBtn?.click(); }
+            bundleChecks.forEach(chk => {
+                chk.addEventListener('change', updateSaveBtnState);
+            });
+            updateSaveBtnState();
+
+            // ===== FORM VALIDATION: Reject Notes =====
+            if (bulkForm) {
+                bulkForm.addEventListener('submit', function(e) {
+                    let isValid = true;
+                    let firstInvalidInput = null;
+
+                    inputsReject.forEach(rejInput => {
+                        const tr = rejInput.closest('tr');
+                        const notesInput = tr.querySelector('.qcs-notes-input');
+                        const rej = parseFloat(rejInput.value || '0');
+                        
+                        if (rej > 0) {
+                            if (!notesInput || notesInput.value.trim() === '') {
+                                isValid = false;
+                                notesInput.classList.add('is-invalid');
+                                if (!firstInvalidInput) firstInvalidInput = notesInput;
+                            } else {
+                                notesInput.classList.remove('is-invalid');
+                            }
+                        } else {
+                            if (notesInput) notesInput.classList.remove('is-invalid');
+                        }
+                    });
+
+                    if (!isValid) {
+                        e.preventDefault();
+                        alert('Catatan wajib diisi jika terdapat barang Reject.');
+                        if (firstInvalidInput) firstInvalidInput.focus();
+                    }
                 });
             }
         });

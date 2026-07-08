@@ -471,92 +471,66 @@
                 $canVoid,
                 $canRevertToRaw,
             ) {
-                $btn = $isMobile ? 'btn btn-sm' : 'btn btn-sm';
-                $wrapClass = $isMobile ? '' : 'cutting-actions';
+                $btn = $isMobile ? 'btn btn-sm w-100 mb-2' : 'btn btn-sm';
+                $wrapClass = $isMobile ? 'd-block' : 'd-flex gap-2 align-items-center';
 
-                echo '<div class="d-flex gap-2 flex-wrap ' . e($wrapClass) . '">';
+                echo '<div class="' . e($wrapClass) . '">';
 
-
-                // Edit Cutting (boleh sampai sent_to_qc selama QC belum ada)
-                if ($canEditCutting) {
-                    echo '<a href="' .
-                        e(route('production.cutting_jobs.edit', $job)) .
-                        '"
-                            class="' .
-                        e($btn) .
-                        ' btn-outline-primary"
-                            onclick="return confirm(\'Edit Cutting?\\n\\nStatus: ' .
-                        e($status) .
-                        '\\nPastikan QC belum diinput.\')">
-                            Edit Cutting
-                          </a>';
+                // Selesai Cutting (Quick OK)
+                if ($canQuickOkCutting) {
+                    echo '<button type="button" class="' . e($btn) . ' btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting"><i class="bi bi-check-circle me-1"></i>Simpan & Konfirmasi</button>';
+                    echo '<form id="formQuickOk" action="' . e(route('production.qc.cutting.quick_ok', $job)) . '" method="post" style="display:none;">' . csrf_field() . '</form>';
                 }
 
-                // Kirim ke QC (draft/cut)
-                if ($canSendToQc) {
-                    echo '<form action="' .
-                        e(route('production.cutting_jobs.send_to_qc', $job)) .
-                        '" method="post" class="d-inline">';
+                // Input QC / Kirim QC
+                if ($canInputQc) {
+                    $label = $hasQcCutting ? 'Lihat / Edit QC' : 'Input QC';
+                    echo '<a href="' . e(route('production.qc.cutting.edit', $job)) . '" class="' . e($btn) . ' btn-primary">' . $label . '</a>';
+                } elseif ($canSendToQc) {
+                    echo '<form action="' . e(route('production.cutting_jobs.send_to_qc', $job)) . '" method="post" class="d-inline m-0 p-0">';
                     echo csrf_field();
                     echo '<button type="submit" class="' . e($btn) . ' btn-primary">Kirim QC</button>';
                     echo '</form>';
                 }
 
-                // Input/lihat QC (saat terkirim / atau QC sudah ada)
-                if ($canInputQc) {
-                    $label = $hasQcCutting ? 'Lihat / Edit QC' : 'Input QC';
-                    echo '<a href="' .
-                        e(route('production.qc.cutting.edit', $job)) .
-                        '" class="' .
-                        e($btn) .
-                        ' btn-primary">' .
-                        $label .
-                        '</a>';
+                // Edit Cutting
+                if ($canEditCutting && !$hasQcCutting) {
+                    echo '<a href="' . e(route('production.cutting_jobs.edit', $job)) . '" class="' . e($btn) . ' btn-outline-primary" onclick="return confirm(\'Edit Cutting?\\n\\nStatus: ' . e($status) . '\\nPastikan QC belum diinput.\')">Edit Cutting</a>';
                 }
 
-                if ($canQuickOkCutting) {
-                    // Form finalize (di-submit oleh JS setelah sisa kain dikonfirmasi di modal)
-                    echo '<form id="formQuickOk" action="' .
-                        e(route('production.qc.cutting.quick_ok', $job)) .
-                        '" method="post" class="d-inline">';
-                    echo csrf_field();
-                    // Tombol membuka modal konfirmasi (detail bundle + kain LOT + catat sisa)
-                    echo '<button type="button" class="' . e($btn) . ' btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting">Selesai Cutting &amp; Siap Jahit</button>';
-                    echo '</form>';
-                }
+                // Aksi Lainnya (Dropdown)
+                $hasSecondary = $canCancelQc || $canVoid || $canRevertToRaw;
+                if ($hasSecondary) {
+                    if (!$isMobile) {
+                        echo '<div class="dropdown d-inline-block ms-1">';
+                        echo '<button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>';
+                        echo '<ul class="dropdown-menu dropdown-menu-end shadow-sm">';
+                    } else {
+                        echo '<div class="w-100 my-1"></div>'; // Break line in flex
+                        echo '<div class="w-100 text-muted small fw-bold mb-1 mt-3">Aksi Lainnya:</div>';
+                    }
 
-                // Cancel QC (owner + QC ada)
-                if ($canCancelQc) {
-                    echo '<form action="' .
-                        e(route('production.qc.cutting.cancel', $job)) .
-                        '" method="post" class="d-inline"
-                            onsubmit="return confirm(\'Batalkan QC Cutting?\\n\\nJika sudah dipakai sewing, aksi ini akan ditolak.\')">';
-                    echo csrf_field();
-                    echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">Batalkan QC</button>';
-                    echo '</form>';
-                }
+                    if ($canCancelQc) {
+                        $el = '<form action="' . e(route('production.qc.cutting.cancel', $job)) . '" method="post" class="m-0 p-0" onsubmit="return confirm(\'Batalkan QC Cutting?\\n\\nJika sudah dipakai sewing, aksi ini akan ditolak.\')">' . csrf_field() . '<button type="submit" class="dropdown-item text-danger">Batalkan QC</button></form>';
+                        if ($isMobile) { $el = str_replace('dropdown-item', 'btn btn-sm btn-outline-danger w-100 mb-1', $el); }
+                        echo $isMobile ? $el : '<li>' . $el . '</li>';
+                    }
 
-                // Void Cutting Job (owner, belum QC, belum sewing)
-                if ($canVoid) {
-                    echo '<form action="' .
-                        e(route('production.cutting_jobs.void', $job)) .
-                        '" method="post" class="d-inline"
-                            onsubmit="return confirm(\'⚠️ VOID Cutting Job ' . e($job->code) . '?\\n\\nStok kain akan dikembalikan ke LOT semula.\\nAksi ini tidak bisa dibatalkan.\')">';
-                    echo csrf_field();
-                    echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">🗑 Void</button>';
-                    echo '</form>';
-                }
+                    if ($canVoid) {
+                        $el = '<form action="' . e(route('production.cutting_jobs.void', $job)) . '" method="post" class="m-0 p-0" onsubmit="return confirm(\'⚠️ VOID Cutting Job ' . e($job->code) . '?\\n\\nStok kain akan dikembalikan ke LOT semula.\\nAksi ini tidak bisa dibatalkan.\')">' . csrf_field() . '<button type="submit" class="dropdown-item text-danger">🗑 Void</button></form>';
+                        if ($isMobile) { $el = str_replace('dropdown-item', 'btn btn-sm btn-outline-danger w-100 mb-1', $el); }
+                        echo $isMobile ? $el : '<li>' . $el . '</li>';
+                    }
 
-                // Kembalikan ke Bahan Baku (owner, QC sudah diposting, belum ditarik jahit)
-                // = Batalkan QC + Void dalam satu klik.
-                if ($canRevertToRaw) {
-                    echo '<form action="' .
-                        e(route('production.cutting_jobs.revert_to_raw', $job)) .
-                        '" method="post" class="d-inline"
-                            onsubmit="return confirm(\'↩️ Kembalikan ' . e($job->code) . ' ke Bahan Baku?\\n\\nQC dibatalkan, WIP-CUT dibalik, dan kain kembali ke RM/LOT. Jurnal ikut ter-void.\\nDitolak jika bundle sudah ditarik jahit.\')">';
-                    echo csrf_field();
-                    echo '<button type="submit" class="' . e($btn) . ' btn-outline-danger">↩️ Kembalikan ke Bahan Baku</button>';
-                    echo '</form>';
+                    if ($canRevertToRaw) {
+                        $el = '<form action="' . e(route('production.cutting_jobs.revert_to_raw', $job)) . '" method="post" class="m-0 p-0" onsubmit="return confirm(\'↩️ Kembalikan ' . e($job->code) . ' ke Bahan Baku?\\n\\nQC dibatalkan, WIP-CUT dibalik, dan kain kembali ke RM/LOT. Jurnal ikut ter-void.\\nDitolak jika bundle sudah ditarik jahit.\')">' . csrf_field() . '<button type="submit" class="dropdown-item text-danger">↩️ Kembalikan ke Bahan Baku</button></form>';
+                        if ($isMobile) { $el = str_replace('dropdown-item', 'btn btn-sm btn-outline-danger w-100 mb-1', $el); }
+                        echo $isMobile ? $el : '<li>' . $el . '</li>';
+                    }
+
+                    if (!$isMobile) {
+                        echo '</ul></div>';
+                    }
                 }
 
                 echo '</div>';
@@ -1028,94 +1002,8 @@
             @endif
             @endif
 
-            {{-- Form catat sisa --}}
-            @if ($lotsNeedSisa->isNotEmpty())
-            <form method="POST" action="{{ route('production.cutting_jobs.sisa_fabric', $job) }}">
-                @csrf
-                <div class="table-responsive mb-2">
-                    <table class="table table-sm mb-0">
-                        <thead>
-                            <tr>
-                                <th>Kain / LOT</th>
-                                <th class="text-end">Total Pemakaian (kg)
-                                    <div class="fw-normal text-muted" style="font-size:.62rem;">kain terpakai</div>
-                                </th>
-                                <th class="text-end" style="width:150px">Sisa Layak (kg)
-                                    <div class="fw-normal text-muted" style="font-size:.62rem;">kembali ke stok</div>
-                                </th>
-                                <th class="text-end" style="width:150px">Scrap (kg)
-                                    <div class="fw-normal text-muted" style="font-size:.62rem;">perca / terbuang</div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($lotsNeedSisa as $i => $cjl)
-                            @php
-                                // Kain yang benar-benar jadi potongan (estimasi standar):
-                                // Σ (qty_pcs × BOM qty tanpa scrap) untuk bundle di LOT ini.
-                                $lotUsed = (float) $cjl->used_fabric_qty;
-                                $lotGood = $job->bundles
-                                    ->where('lot_id', $cjl->lot_id)
-                                    ->sum(function ($b) use ($bomScrapTargets) {
-                                        $t = $bomScrapTargets[(int) $b->finished_item_id] ?? null;
-                                        return $t ? (float) $b->qty_pcs * (float) $t['bom_qty'] : 0.0;
-                                    });
-                                // Sisa fisik LOT (ujung gulungan yang masih tercatat sebagai stok)
-                                $lotRemnant = max((float) ($cjl->lot?->qty_onhand ?? 0), 0);
-                                // Kelebihan pemakaian (dipakai melebihi kebutuhan standar potongan)
-                                $lotExcess  = $lotGood > 0 ? round(max($lotUsed - $lotGood, 0), 2) : 0.0;
-                                // ✅ Default: sisa layak = sisa fisik LOT, scrap = kelebihan pemakaian.
-                                $sisaPrefill  = $lotRemnant > 0 ? round($lotRemnant, 2) : null;
-                                $scrapPrefill = $lotExcess > 0 ? $lotExcess : null;
-                            @endphp
-                            <input type="hidden" name="lots[{{ $i }}][lot_id]" value="{{ $cjl->lot_id }}">
-                            <tr class="js-sisa-row" data-used="{{ $lotUsed }}" data-good="{{ $lotGood }}" data-remnant="{{ $lotRemnant }}">
-                                <td>
-                                    <div class="mono fw-semibold">{{ $cjl->lot?->item?->code ?? '-' }}</div>
-                                    <div class="small text-muted mono">{{ $cjl->lot?->code ?? '-' }}</div>
-                                </td>
-                                <td class="text-end mono">{{ number_format($lotUsed, 2, ',', '.') }}</td>
-                                <td class="text-end">
-                                    <input type="number" name="lots[{{ $i }}][qty_sisa]"
-                                           class="form-control form-control-sm text-end mono js-sisa-input"
-                                           step="0.01" min="0"
-                                           value="{{ $sisaPrefill !== null ? $sisaPrefill : '0' }}"
-                                           data-auto="1"
-                                           style="max-width:120px;margin-left:auto;border-color:#86efac;">
-                                    @if ($lotRemnant > 0)
-                                        <div class="text-muted" style="font-size:.62rem;">
-                                            auto: sisa fisik LOT {{ number_format($lotRemnant, 2, ',', '.') }} kg
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="text-end">
-                                    <input type="number" name="lots[{{ $i }}][qty_scrap]"
-                                           class="form-control form-control-sm text-end mono js-scrap-input"
-                                           step="0.01" min="0" placeholder="0"
-                                           value="{{ $scrapPrefill !== null ? $scrapPrefill : '' }}"
-                                           data-auto="1"
-                                           style="max-width:120px;margin-left:auto;border-color:#fca5a5;">
-                                    @if ($lotExcess > 0)
-                                        <div class="text-muted" style="font-size:.62rem;">
-                                            auto: kelebihan pakai {{ number_format($lotExcess, 2, ',', '.') }} kg
-                                        </div>
-                                    @endif
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-                <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-sm btn-outline-success">
-                        <i class="bi bi-box-arrow-in-down me-1"></i>Catat Sisa → Kembalikan ke RM
-                    </button>
-                </div>
-            </form>
-            @elseif ($lotsWithSisa->isEmpty())
-            <div class="text-muted small">Belum ada pemakaian kain yang tercatat untuk LOT ini.</div>
-            @else
-            <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Semua sisa kain sudah dicatat.</div>
+            @if ($lotsWithSisa->isEmpty())
+            <div class="text-muted small">Kain sisa belum dicatat atau digunakan penuh. Sisa kain bisa dicatat melalui tombol Simpan & Konfirmasi.</div>
             @endif
         </div>
         @endif
@@ -1193,10 +1081,10 @@
                                         </td>
                                         <td class="text-end mono">{{ number_format($lotUsed, 2, ',', '.') }}</td>
                                         <td class="text-end">
-                                            <input type="number" class="form-control form-control-sm text-end mono m-sisa" step="0.01" min="0" value="{{ $mSisa }}" style="max-width:100px;margin-left:auto;border-color:#86efac;">
+                                            <input type="number" class="form-control form-control-sm text-end mono m-sisa" step="0.01" min="0" value="{{ $mSisa }}" style="max-width:100px;margin-left:auto;border-color:#86efac;" onfocus="this.select()">
                                         </td>
                                         <td class="text-end">
-                                            <input type="number" class="form-control form-control-sm text-end mono m-scrap" step="0.01" min="0" value="{{ $mScrap }}" style="max-width:100px;margin-left:auto;border-color:#fca5a5;">
+                                            <input type="number" class="form-control form-control-sm text-end mono m-scrap" step="0.01" min="0" value="{{ $mScrap }}" style="max-width:100px;margin-left:auto;border-color:#fca5a5;" onfocus="this.select()">
                                         </td>
                                         <td class="text-end mono fw-semibold m-total">0</td>
                                     </tr>
