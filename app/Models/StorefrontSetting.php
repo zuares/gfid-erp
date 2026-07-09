@@ -107,7 +107,7 @@ class StorefrontSetting extends Model
             'categories.eyebrow', 'categories.title', 'categories.copy',
             'categories.all_label', 'categories.limit',
             // Channels
-            'channels.shopee_url', 'channels.tokopedia_url', 'channels.tiktok_url',
+            'channels.list', 'channels.shopee_url', 'channels.tokopedia_url', 'channels.tiktok_url',
             // Sections
             'sections.order',
             'sections.hero_visible', 'sections.categories_visible', 'sections.channels_visible',

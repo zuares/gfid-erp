@@ -30,7 +30,12 @@ class LoginController extends Controller
 
             $request->session()->regenerate();
 
-            $landingRoute = $request->user()?->preferredLandingRouteName() ?? 'dashboard';
+            // Dashboard jadi halaman awal. Kalau role tidak boleh membuka
+            // dashboard, pakai halaman modul terdekat sebagai fallback.
+            $user = $request->user();
+            $landingRoute = ($user && $user->canAccessModule('dashboard'))
+                ? 'dashboard'
+                : ($user?->preferredLandingRouteName() ?? 'dashboard');
 
             return redirect()->intended(route($landingRoute, [], false));
 

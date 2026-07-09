@@ -31,6 +31,12 @@
                 <label class="form-label fw-bold" style="font-size:.72rem;color:#64748b;text-transform:uppercase">SAMPAI</label>
                 <input type="date" class="form-control" id="syncTo" style="border-radius:12px;font-size:.83rem">
             </div>
+            <div style="flex:0 0 120px; align-self: center; margin-bottom: 5px;" class="ms-1">
+                <div class="form-check form-switch mt-4" title="Jalankan sync tanpa menyimpan ke database">
+                    <input class="form-check-input" type="checkbox" role="switch" id="syncDryRun" style="cursor:pointer">
+                    <label class="form-check-label fw-bold" for="syncDryRun" style="font-size:.75rem;color:#64748b;cursor:pointer">Dry Run</label>
+                </div>
+            </div>
             <div>
                 <button class="btn btn-dark fw-bold" id="runSyncBtn" style="border-radius:999px;min-width:130px" onclick="runSync()">
                     ↓ Jalankan Sync
@@ -168,6 +174,7 @@
                     time_from: Math.floor(from / 1000),
                     time_to:   Math.floor(to / 1000),
                     page_size: 50,
+                    dry_run:   $('syncDryRun').checked ? 1 : 0,
                 }),
             });
 

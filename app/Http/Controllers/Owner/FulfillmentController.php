@@ -565,6 +565,7 @@ class FulfillmentController extends Controller
                 'order_status'     => $f->order->order_status,
                 'total_amount'     => $f->order->total_amount,
                 'ordered_at'       => $f->order->ordered_at?->toISOString(),
+                'shipping_carrier' => $f->order->shipping_carrier,
                 'store'            => $f->order->store ? [
                     'name'    => $f->order->store->name,
                     'channel' => $f->order->store->channel?->name,

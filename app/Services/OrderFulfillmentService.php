@@ -502,6 +502,37 @@ class OrderFulfillmentService
         $scannedMap      = collect($scannedItems)->keyBy('item_id');
         $hasScannedItems = count($scannedItems) > 0;
 
+        // Validasi ketat scan items:
+        if ($hasScannedItems) {
+            $scannedTotals = collect($scannedItems)->groupBy('item_id')->map->sum('qty');
+            $activeItemIds = $fulfillment->lines->where('is_split_parent', false)->pluck('item_id')->toArray();
+            
+            foreach ($scannedTotals as $itemId => $qty) {
+                if (!in_array($itemId, $activeItemIds)) {
+                    throw new \RuntimeException("SKU tidak sesuai dengan pesanan.");
+                }
+            }
+
+            foreach ($fulfillment->lines->where('is_split_parent', false) as $line) {
+                $scannedQty = $scannedTotals->get($line->item_id) ?? 0;
+                if ($scannedQty < $line->qty_ordered) {
+                    throw new \RuntimeException("Barang belum lengkap, cek kembali hasil scan.");
+                }
+                if ($scannedQty > $line->qty_ordered) {
+                    throw new \RuntimeException("Jumlah scan melebihi pesanan.");
+                }
+            }
+        } else {
+            foreach ($fulfillment->lines->where('is_split_parent', false) as $line) {
+                if ($line->qty_fulfilled < $line->qty_ordered) {
+                    throw new \RuntimeException("Barang belum lengkap, cek kembali hasil scan.");
+                }
+                if ($line->qty_fulfilled > $line->qty_ordered) {
+                    throw new \RuntimeException("Jumlah scan melebihi pesanan.");
+                }
+            }
+        }
+
         // Build scan_log: raw scan list + enriched item metadata
         $scanLog = null;
         if ($hasScannedItems) {
@@ -578,6 +609,13 @@ class OrderFulfillmentService
 
         $fulfillment->loadMissing(['lines.item', 'order']);
 
+        // Validasi ketat sebelum potong stok
+        foreach ($fulfillment->lines->where('is_split_parent', false) as $line) {
+            if ($line->qty_fulfilled < $line->qty_ordered) {
+                throw new \RuntimeException("Order belum siap dikonfirmasi.");
+            }
+        }
+
         $orderId = $fulfillment->marketplace_order_id;
 
         // lot_id lookup: item_id → lot_id dari order lines (untuk mutation)
@@ -628,6 +666,7 @@ class OrderFulfillmentService
                 if (! $itemId || $qty <= 0) continue;
 
                 if ($fulfillment->warehouse_id) {
+                    // TODO: Ambil nilai cost dari HPP item untuk unit_cost dan total_cost (Jangan hardcode 0)
                     InventoryMutation::create([
                         'date'         => now()->toDateString(),
                         'warehouse_id' => $fulfillment->warehouse_id,

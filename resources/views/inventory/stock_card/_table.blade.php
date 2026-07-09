@@ -5,9 +5,9 @@
 @endphp
 
 <div id="sc_table_wrap">
-    <div class="card" id="sc_table_card">
+    <div class="card-main" id="sc_table_card">
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-list mb-0">
                 <thead>
                     @if (!$itemId)
                         <tr>
@@ -18,7 +18,9 @@
                             <th style="width:160px">Sumber</th>
                             <th class="text-center" style="width:130px">IN</th>
                             <th class="text-center" style="width:130px">OUT</th>
-                            <th class="text-end hide-sm" style="width:150px">Nilai</th>
+                            @if ($canViewCost ?? false)
+                                <th class="text-end hide-sm" style="width:150px">Nilai</th>
+                            @endif
                             <th class="hide-sm">Catatan</th>
                         </tr>
                     @else
@@ -30,8 +32,10 @@
                             <th class="text-center" style="width:130px">IN</th>
                             <th class="text-center" style="width:130px">OUT</th>
                             <th class="text-end" style="width:140px">Saldo</th>
-                            <th class="text-end hide-sm" style="width:150px">Nilai</th>
-                            <th class="text-end" style="width:160px">Saldo Nilai</th>
+                            @if ($canViewCost ?? false)
+                                <th class="text-end hide-sm" style="width:150px">Nilai</th>
+                                <th class="text-end" style="width:160px">Saldo Nilai</th>
+                            @endif
                             <th class="hide-sm">Catatan</th>
                         </tr>
                     @endif
@@ -55,9 +59,11 @@
                             </td>
 
                             <td class="text-end mono">{{ number_format($openingQty ?? 0, 2, ',', '.') }}</td>
-                            <td class="text-end mono hide-sm muted">0</td>
-                            <td class="text-end mono {{ ($openingValue ?? 0) < 0 ? 'text-danger' : '' }}">
-                                {{ number_format($openingValue ?? 0, 0, ',', '.') }}</td>
+                            @if ($canViewCost ?? false)
+                                <td class="text-end mono hide-sm muted">0</td>
+                                <td class="text-end mono {{ ($openingValue ?? 0) < 0 ? 'text-danger' : '' }}">
+                                    {{ number_format($openingValue ?? 0, 0, ',', '.') }}</td>
+                            @endif
                             <td class="muted hide-sm">—</td>
                         </tr>
                     @endif
@@ -72,29 +78,42 @@
 
                             $val = (float) ($m->line_value ?? ($m->total_cost ?? 0));
 
-                            $wh = $m->warehouse ? $m->warehouse->code . ' — ' . $m->warehouse->name : '-';
+                            $wh = $m->warehouse ? $m->warehouse->code : '-';
                             $lot = $m->lot?->code ?? '-';
-                            $srcLabel = $availableSourceTypes[$m->source_type] ?? $m->source_type;
+                            
+                            $srcLabelMap = [
+                                'purchase_receipt' => 'GRN Masuk',
+                                'purchase_receipt_reverse' => 'Batal GRN',
+                                'transfer_out' => 'TF Keluar',
+                                'transfer_in' => 'TF Masuk',
+                                'adjustment' => 'Opname',
+                                'cutting_issue' => 'Ke Cutting',
+                                'cutting_receive' => 'Dr Cutting',
+                                'sewing_issue' => 'Ke Sewing',
+                                'sewing_receive' => 'Dr Sewing',
+                            ];
+                            $cleanSrc = $srcLabelMap[$m->source_type] ?? ($availableSourceTypes[$m->source_type] ?? $m->source_type);
 
                             $rowUnit = $itemId ? $unit : $m->item->unit ?? '';
                         @endphp
 
                         <tr>
-                            <td class="mono muted">{{ optional($m->date)->format('d M Y') ?? $m->date }}</td>
+                            <td class="mono muted">{{ optional($m->date)->format('d/m/y') ?? $m->date }}</td>
 
                             @if (!$itemId)
                                 <td class="mono">
                                     {{ $m->item->code ?? '-' }}
-                                    <div class="small muted">{{ $m->item->name ?? '' }}</div>
                                 </td>
                             @endif
 
-                            <td><span class="small muted">{{ $wh }}</span></td>
+                            <td><span class="sub-badge mono">{{ $wh }}</span></td>
                             <td class="mono">{{ $lot }}</td>
 
                             <td>
-                                <span class="badge bg-light text-dark mono">{{ $srcLabel }}</span>
-                                <div class="small muted">#{{ $m->source_id ?? '-' }}</div>
+                                <span class="badge bg-light text-dark mono">{{ $cleanSrc }}</span>
+                                @if($m->source_id)
+                                    <div class="small muted mt-1">#{{ $m->source_id }}</div>
+                                @endif
                             </td>
 
                             <td class="text-end">
@@ -117,21 +136,30 @@
                                 </td>
                             @endif
 
-                            <td class="text-end mono hide-sm {{ $val < 0 ? 'text-danger' : '' }}">
-                                {{ number_format($val, 0, ',', '.') }}</td>
+                            @if ($canViewCost ?? false)
+                                <td class="text-end mono hide-sm {{ $val < 0 ? 'text-danger' : '' }}">
+                                    {{ number_format($val, 0, ',', '.') }}</td>
 
-                            @if ($itemId)
-                                <td
-                                    class="text-end mono fw-semibold {{ (float) ($m->running_value ?? 0) < 0 ? 'text-danger' : '' }}">
-                                    {{ number_format((float) ($m->running_value ?? 0), 0, ',', '.') }}
-                                </td>
+                                @if ($itemId)
+                                    <td
+                                        class="text-end mono fw-semibold {{ (float) ($m->running_value ?? 0) < 0 ? 'text-danger' : '' }}">
+                                        {{ number_format((float) ($m->running_value ?? 0), 0, ',', '.') }}
+                                    </td>
+                                @endif
                             @endif
 
                             <td class="hide-sm small muted">{{ $m->notes ?: '-' }}</td>
                         </tr>
                     @empty
+                        @php
+                            $colspan = 7;
+                            if ($itemId) $colspan += 1;
+                            if ($canViewCost ?? false) {
+                                $colspan += ($itemId ? 2 : 1);
+                            }
+                        @endphp
                         <tr>
-                            <td colspan="{{ $itemId ? 10 : 9 }}" class="p-3 text-center muted">Tidak ada data.</td>
+                            <td colspan="{{ $colspan }}" class="p-3 text-center muted">Tidak ada data.</td>
                         </tr>
                     @endforelse
                 </tbody>

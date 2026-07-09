@@ -1,0 +1,79 @@
+    // ── Bulk Arrange Shipment ─────────────────────────────────────────────
+    let pendingShipOrders = [];
+
+    window.openBulkArrangeShipment = function () {
+        const rows = activeTab === 'urgent' ? getProcessRows() : window.allOrders;
+        pendingShipOrders = (rows || []).filter(o => o.order_status === 'READY_TO_SHIP');
+        
+        if (!pendingShipOrders.length) {
+            alert('Tidak ada order yang berstatus Belum Diproses (READY_TO_SHIP) di tampilan saat ini.');
+            return;
+        }
+
+        $('basConfirmView').style.display  = 'block';
+        $('basProgressView').style.display = 'none';
+        $('basDoneView').style.display     = 'none';
+        $('basStartBtn').disabled = false;
+        $('basStartBtn').textContent = '📦 Proses Sekarang';
+
+        $('basSummaryText').innerHTML = `<strong>${pendingShipOrders.length} order</strong> siap diatur pengirimannya ke pihak Marketplace.`;
+
+        new bootstrap.Modal($('bulkArrangeShipmentModal')).show();
+    };
+
+    window.startBulkArrangeShipment = async function () {
+        if (!pendingShipOrders.length) return;
+
+        $('basConfirmView').style.display  = 'none';
+        $('basProgressView').style.display = 'block';
+        
+        const methodEl = document.querySelector('input[name="basMethod"]:checked');
+        const method = methodEl ? methodEl.value : 'dropoff';
+        
+        const logEl = $('basLog');
+        logEl.innerHTML = '';
+        
+        const logMsg = (msg, color = '#475569') => {
+            logEl.innerHTML += `<div style="color:${color};margin-bottom:2px">${msg}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        };
+
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (let i = 0; i < pendingShipOrders.length; i++) {
+            const o = pendingShipOrders[i];
+            const pct = Math.round((i / pendingShipOrders.length) * 100);
+            
+            $('basProgressText').textContent = `Memproses ${i + 1} dari ${pendingShipOrders.length} order...`;
+            $('basProgressBar').style.width = pct + '%';
+            
+            logMsg(`[${o.channel_order_id}] Memulai...`);
+            
+            try {
+                let params = {};
+                if (method === 'dropoff') params = { dropoff: {} };
+                else if (method === 'pickup') params = { pickup: {} };
+                
+                await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/ship`, {
+                    method: 'POST',
+                    body: JSON.stringify(params)
+                });
+                
+                logMsg(`[${o.channel_order_id}] Berhasil!`, '#16a34a');
+                successCount++;
+            } catch (e) {
+                logMsg(`[${o.channel_order_id}] Gagal: ${e.message}`, '#dc2626');
+                failCount++;
+            }
+        }
+        
+        $('basProgressBar').style.width = '100%';
+        $('basProgressView').style.display = 'none';
+        $('basDoneView').style.display = 'block';
+        
+        let resHtml = `Selesai memproses ${pendingShipOrders.length} order.<br>`;
+        if (successCount > 0) resHtml += `<span style="color:#16a34a;font-weight:bold">✅ ${successCount} berhasil.</span><br>`;
+        if (failCount > 0) resHtml += `<span style="color:#dc2626;font-weight:bold">❌ ${failCount} gagal.</span>`;
+        $('basResultText').innerHTML = resHtml;
+    };

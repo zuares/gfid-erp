@@ -466,6 +466,26 @@
         $hasHppIndex = $hasProdCostPeriodsIndex = false;
     }
 
+    if ($isAdmin) {
+        $hasMarketplaceSalesReport = false;
+        $hasMarketplaceReconcileQueue = false;
+        $hasMarketplaceReconcileItemsIndex = false;
+        
+        $hasAdminCrmDashboard = false;
+        $hasAdminCrmVisitors = false;
+        $hasAdminCrmOrders = false;
+        $hasAdminCrmProspects = false;
+        $hasAdminCrmCustomers = false;
+        $hasAdminCrmSegments = false;
+        
+        $hasPoIndex = false;
+        $hasGrnIndex = false;
+
+        $hasProdSewRejectReturnsIndex = false;
+        
+        $hasInvAdjustmentsIndex = $router->has('inventory.adjustments.index');
+    }
+
     // OPEN STATES (match desktop)
     $masterOpen = request()->routeIs('master.*');
     $poOpen = request()->routeIs('purchasing.purchase_orders.*');
@@ -667,7 +687,7 @@
                                 @if ($hasAdminCrmDashboard)
                                     <a href="{{ route('admin.crm.dashboard') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.dashboard') ? 'active' : '' }}">
-                                        <span class="icon">📊</span><span>Dashboard</span>
+                                        <span class="icon">📊</span><span>Dasbor</span>
                                     </a>
                                 @endif
 
@@ -681,7 +701,7 @@
                                 @if ($hasAdminCrmCustomers)
                                     <a href="{{ route('admin.crm.customers') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.customers*') ? 'active' : '' }}">
-                                        <span class="icon">👥</span><span>Customer</span>
+                                        <span class="icon">👥</span><span>Pelanggan</span>
                                     </a>
                                 @endif
 
@@ -695,14 +715,14 @@
                                 @if ($hasAdminCrmVisitors)
                                     <a href="{{ route('admin.crm.visitors') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.visitors*') ? 'active' : '' }}">
-                                        <span class="icon">👣</span><span>Visitor</span>
+                                        <span class="icon">👣</span><span>Pengunjung</span>
                                     </a>
                                 @endif
 
                                 @if ($hasAdminCrmSegments)
                                     <a href="{{ route('admin.crm.segments') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.segments*') ? 'active' : '' }}">
-                                        <span class="icon">🔖</span><span>Segmentasi</span>
+                                        <span class="icon">🔖</span><span>Segmen</span>
                                     </a>
                                 @endif
                             </div>
@@ -725,28 +745,28 @@
                                 @if ($hasMarketplaceIndex)
                                     <a href="{{ route('marketplace.orders') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*') ? 'active' : '' }}">
-                                        <span class="icon">📋</span><span>Orders</span>
+                                        <span class="icon">📋</span><span>Pesanan</span>
                                     </a>
                                 @endif
 
                                 @if ($hasMarketplaceSalesReport)
                                     <a href="{{ route('marketplace.reports.sales') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
-                                        <span class="icon">📈</span><span>Sales Summary</span>
+                                        <span class="icon">📈</span><span>Ringkasan Penjualan</span>
                                     </a>
                                 @endif
 
                                 @if ($hasMarketplaceReconcileQueue)
                                     <a href="{{ route('marketplace.reconcile.queue') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*') ? 'active' : '' }}">
-                                        <span class="icon">🧩</span><span>Reconcile Queue</span>
+                                        <span class="icon">🧩</span><span>Antrean Rekonsiliasi</span>
                                     </a>
                                 @endif
 
                                 @if ($hasMarketplaceReconcileItemsIndex)
                                     <a href="{{ route('marketplace.reconcile.items') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.items*') ? 'active' : '' }}">
-                                        <span class="icon">🧾</span><span>Reconcile Items</span>
+                                        <span class="icon">🧾</span><span>Pencocokan Barang</span>
                                     </a>
                                 @endif
                             </div>
@@ -764,11 +784,29 @@
                         </li>
                     @endif
 
+                    @if ($hasInvStockCard)
+                        <li>
+                            <a href="{{ route('inventory.stock_card.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
+                                <span class="icon">📋</span><span>Kartu Stok</span>
+                            </a>
+                        </li>
+                    @endif
+
                     @if ($hasInvOpnamesIndex)
                         <li>
                             <a href="{{ route('inventory.stock_opnames.index') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.stock_opnames.*') ? 'active' : '' }}">
                                 <span class="icon">📊</span><span>Stok Opname</span>
+                            </a>
+                        </li>
+                    @endif
+
+                    @if ($hasInvAdjustmentsIndex)
+                        <li>
+                            <a href="{{ route('inventory.adjustments.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('inventory.adjustments.*') ? 'active' : '' }}">
+                                <span class="icon">📝</span><span>Koreksi Persediaan</span>
                             </a>
                         </li>
                     @endif
@@ -1091,7 +1129,7 @@
                                 @if ($hasAdminCrmCustomers)
                                     <a href="{{ route('admin.crm.customers') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.customers*') ? 'active' : '' }}">
-                                        <span class="icon">👥</span><span>Customer</span>
+                                        <span class="icon">👥</span><span>Pelanggan</span>
                                     </a>
                                 @endif
 
@@ -1105,14 +1143,14 @@
                                 @if ($hasAdminCrmVisitors)
                                     <a href="{{ route('admin.crm.visitors') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.visitors*') ? 'active' : '' }}">
-                                        <span class="icon">👣</span><span>Visitor</span>
+                                        <span class="icon">👣</span><span>Pengunjung</span>
                                     </a>
                                 @endif
 
                                 @if ($hasAdminCrmSegments)
                                     <a href="{{ route('admin.crm.segments') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('admin.crm.segments*') ? 'active' : '' }}">
-                                        <span class="icon">🔖</span><span>Segmentasi</span>
+                                        <span class="icon">🔖</span><span>Segmen</span>
                                     </a>
                                 @endif
                             </div>
@@ -1532,7 +1570,7 @@
                             @if ($hasInvAdjustmentsIndex)
                                 <a href="{{ route('inventory.adjustments.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.adjustments.*') ? 'active' : '' }}">
-                                    <span class="icon">⚖️</span><span>Koreksi Persediaan</span>
+                                    <span class="icon">📝</span><span>Koreksi Persediaan</span>
                                 </a>
                             @endif
 

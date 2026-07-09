@@ -19,7 +19,24 @@ class StockCardController extends Controller
 
         $itemId = $request->input('item_id'); // optional
         $qItem = trim((string) $request->input('q_item', '')); // keyword item (code/name)
-        $warehouseId = $request->input('warehouse_id');
+        $warehouses = Warehouse::orderBy('name')->get();
+
+        if ($request->has('warehouse_id')) {
+            $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
+        } else {
+            $role = strtolower(trim((string) (auth()->user()->role ?? '')));
+            if ($role === 'admin') {
+                $rts = $warehouses->firstWhere('code', 'WH-RTS');
+                $warehouseId = $rts ? $rts->id : null;
+            } else {
+                $warehouseId = null;
+            }
+        }
+
+        if ($warehouseId && !$warehouses->firstWhere('id', $warehouseId)) {
+            $warehouseId = null;
+        }
+
         $lotId = $request->input('lot_id');
 
         // Default from_date = cut-off date (jika belum diisi user dan cut-off sudah di-set)
@@ -38,8 +55,6 @@ class StockCardController extends Controller
             $sortDir = 'desc';
         }
 
-        $warehouses = Warehouse::orderBy('name')->get();
-
         $availableSourceTypes = [
             '' => 'Semua sumber',
             'purchase_receipt' => 'Goods Receipt (GRN)',
@@ -53,14 +68,21 @@ class StockCardController extends Controller
             'sewing_receive' => 'Receive dari Sewing',
         ];
 
+        $role = strtolower(trim((string) (auth()->user()->role ?? '')));
+        $isOwner = $role === 'owner';
+        $canViewCost = $isOwner;
+
         // helper response
-        $respond = function (array $payload) use ($isAjax, $cutoffDate, $cutoffActive, $showLegacy) {
+        $respond = function (array $payload) use ($isAjax, $cutoffDate, $cutoffActive, $showLegacy, $role, $isOwner, $canViewCost) {
             // Tambahkan info cut-off ke semua view
             $payload['cutoff'] = [
                 'date'   => $cutoffDate,
                 'active' => $cutoffActive,
                 'legacy' => $showLegacy,
             ];
+            $payload['role'] = $role;
+            $payload['isOwner'] = $isOwner;
+            $payload['canViewCost'] = $canViewCost;
 
             if ($isAjax) {
                 return response()->json([

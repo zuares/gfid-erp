@@ -70,7 +70,14 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::get('supplier-price', [PurchaseOrderController::class, 'getSupplierLastPrice'])
                 ->name('supplier_price');
 
+            Route::get('purchase-orders/{purchase_order}/print-raw', [PurchaseOrderController::class, 'printRaw'])
+                ->name('purchase_orders.print_raw');
+
+            Route::get('purchase-orders/{purchase_order}/print-dot-matrix', [PurchaseOrderController::class, 'printDotMatrix'])
+                ->name('purchase_orders.print_dot_matrix');
+
             // PAYMENTS — standalone module
+
             Route::get('purchase-payments', [PurchasePaymentController::class, 'index'])
                 ->name('purchase_payments.index');
 

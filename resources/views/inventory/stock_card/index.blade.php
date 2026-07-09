@@ -5,136 +5,110 @@
 @push('head')
     <style>
         :root {
-            --radius: 12px;
-            --line: color-mix(in srgb, var(--bs-border-color) 78%, var(--bs-body-bg) 22%);
-            --muted: var(--bs-secondary-color);
+            --shp-accent:#334155;
+            --shp-accent-2:#1f2937;
+            --shp-border:rgba(148,163,184,.18);
+            --shp-border-strong:rgba(148,163,184,.30);
+            --shp-muted:#64748b;
             --in: var(--bs-teal);
             --out: var(--bs-orange);
         }
 
-        .wrap {
-            max-width: 1120px;
-            margin-inline: auto;
-        }
+        .page-wrap { max-width:1120px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
 
-        .card {
+        .card-main {
             background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid var(--shp-border);
+            box-shadow: none;
+            overflow:hidden;
+        }
+        body[data-theme="dark"] .card-main {
+            border-color: rgba(51,65,85,.85);
+            box-shadow: none;
         }
 
-        .soft {
-            border-color: color-mix(in srgb, var(--line) 70%, transparent 30%);
+        .ship-topbar {
+            position:sticky;
+            top:0;
+            z-index:300;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:.6rem;
+            flex-wrap:wrap;
+            padding:.45rem .75rem;
+            margin-inline:-.75rem;
+            margin-bottom:.65rem;
+            background:var(--card,#fff);
+            border-bottom:1px solid var(--shp-border);
         }
+        body[data-theme="dark"] .ship-topbar { background:var(--card,#0f172a); }
+
+        .title { font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+        .sub { color:var(--shp-muted); font-size:.78rem; }
+        body[data-theme="dark"] .sub { color:#9ca3af; }
+
+        .kpis { display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+        .kpi {
+            display:inline-flex; align-items:baseline; gap:.45rem;
+            border-radius:7px; padding:.2rem .48rem;
+            border:1px solid rgba(148,163,184,.28);
+            background: transparent;
+            font-size:.72rem;
+        }
+        body[data-theme="dark"] .kpi {
+            background: rgba(15, 23, 42, 0.96);
+            border-color: rgba(51, 65, 85, 0.85);
+        }
+        .kpi .lbl { text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
+        body[data-theme="dark"] .kpi .lbl { color:#6b7280; }
+        .kpi .val { font-weight:650; color:var(--shp-accent); }
+        body[data-theme="dark"] .kpi .val { color:#e2e8f0; }
+
+        .controls { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+        .filter-label { font-size:.8rem; color:#6b7280; margin-bottom:.2rem; display:block; }
+        body[data-theme="dark"] .filter-label { color:#9ca3af; }
+        .filter-select { border-radius:7px; padding-left:.75rem; padding-right:2rem; font-size:.82rem; }
+        .btn-pill { border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+        
+        .table-responsive { max-height: calc(100vh - 220px); overflow-y: auto; }
+        .table-list { margin-bottom:0; }
+        .table-list thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom-width:1px;
+            font-size:.68rem;
+            text-transform:none;
+            letter-spacing:0;
+            color:#64748b;
+            background: var(--card,#fff);
+            padding:.52rem .62rem;
+            white-space:nowrap;
+        }
+        body[data-theme="dark"] .table-list thead th {
+            background: rgba(15, 23, 42, 0.98);
+            color:#9ca3af;
+            border-bottom-color: rgba(30, 64, 175, 0.6);
+        }
+        .table-list tbody td {
+            vertical-align:middle;
+            border-top-color: rgba(148, 163, 184, 0.16);
+            padding:.52rem .62rem;
+        }
+        body[data-theme="dark"] .table-list tbody td { border-top-color: rgba(51, 65, 85, 0.85); }
 
         .mono {
             font-variant-numeric: tabular-nums;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
 
-        .muted {
-            color: var(--muted);
-        }
-
-        .btn-ghost {
-            border: 1px solid var(--line);
-            background: transparent;
-        }
-
-        /* Compact filter */
-        .filter .form-control,
-        .filter .form-select {
-            border-radius: 10px;
-            background: transparent;
-            border: 1px solid var(--line);
-            padding-top: .42rem;
-            padding-bottom: .42rem;
-        }
-
-        /* Compact KPI strip */
-        .kpi-strip {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .4rem .6rem;
-            align-items: center;
-        }
-
-        .kpi-pill {
-            display: inline-flex;
-            gap: .4rem;
-            align-items: baseline;
-            padding: .22rem .6rem;
-            border-radius: 999px;
-            border: 1px solid var(--line);
-            background: color-mix(in srgb, var(--card) 92%, var(--bs-primary) 8%);
-            font-size: .78rem;
-            color: var(--muted);
-            line-height: 1.1;
-        }
-
-        .kpi-pill strong {
-            color: var(--bs-body-color);
-            font-weight: 600;
-        }
-
-        .kpi-in {
-            color: var(--in) !important;
-        }
-
-        .kpi-out {
-            color: var(--out) !important;
-        }
-
-        /* Quick chips (tight) */
-        .chips .btn {
-            border-color: var(--line);
-            padding: .25rem .55rem;
-            font-size: .78rem;
-        }
-
-        .chips .btn.active {
-            background: color-mix(in srgb, var(--bs-primary) 8%, transparent);
-            border-color: var(--bs-primary);
-        }
-
-        /* Table compact */
-        .table {
-            margin: 0;
-        }
-
-        .table thead th {
-            font-weight: 600;
-            color: var(--muted);
-            background: var(--card);
-            position: sticky;
-            top: 0;
-            z-index: 1;
-            border-bottom: 1px solid var(--line);
-            text-transform: uppercase;
-            font-size: .72rem;
-            letter-spacing: .03em;
-            white-space: nowrap;
-            padding: .45rem .55rem;
-        }
-
-        .table td {
-            border: 0;
-            vertical-align: middle;
-            padding: .45rem .55rem;
-        }
-
-        .table tbody tr+tr td {
-            border-top: 1px dashed color-mix(in srgb, var(--line) 80%, transparent 20%);
-        }
-
-        .table tbody tr:hover {
-            background: color-mix(in srgb, var(--bs-primary) 4%, var(--bs-body-bg) 96%);
-        }
+        .muted { color: var(--shp-muted); }
 
         .sub-badge {
             background: color-mix(in srgb, var(--bs-primary) 10%, var(--bs-body-bg) 90%);
-            border: 1px solid var(--line);
+            border: 1px solid var(--shp-border);
             border-radius: 999px;
             padding: .14rem .5rem;
             font-size: .78rem;
@@ -150,31 +124,12 @@
             white-space: nowrap;
             font-variant-numeric: tabular-nums
         }
+        .qty-num { min-width: 5.2rem; text-align: right; }
+        .qty-unit { color: var(--shp-muted); }
+        .qty-in-num { color: var(--in); font-weight: 600; }
+        .qty-out-num { color: var(--out); font-weight: 600; }
+        .qty-zero { color: var(--shp-muted); }
 
-        .qty-num {
-            min-width: 5.2rem;
-            text-align: right;
-        }
-
-        .qty-unit {
-            color: var(--muted);
-        }
-
-        .qty-in-num {
-            color: var(--in);
-            font-weight: 600;
-        }
-
-        .qty-out-num {
-            color: var(--out);
-            font-weight: 600;
-        }
-
-        .qty-zero {
-            color: var(--muted);
-        }
-
-        /* Search clear */
         .search-clear {
             position: absolute;
             right: .5rem;
@@ -182,33 +137,17 @@
             transform: translateY(-50%);
             border: 0;
             background: transparent;
-            color: var(--muted);
+            color: var(--shp-muted);
             padding: .1rem .25rem;
             border-radius: 8px;
         }
-
-        .search-clear:hover {
-            background: color-mix(in srgb, var(--bs-primary) 8%, transparent);
-            color: var(--bs-body-color);
-        }
-
-        .loading {
-            opacity: .65;
-            pointer-events: none;
-        }
+        .search-clear:hover { background: rgba(148,163,184,.18); color: inherit; }
+        .loading { opacity: .65; pointer-events: none; }
 
         @media(max-width:768px) {
-            .hide-sm {
-                display: none;
-            }
-
-            .qty-cell {
-                grid-template-columns: auto minmax(4.8rem, auto) auto;
-            }
-
-            .qty-num {
-                min-width: 4.8rem;
-            }
+            .hide-sm { display: none; }
+            .qty-cell { grid-template-columns: auto minmax(4.8rem, auto) auto; }
+            .qty-num { min-width: 4.8rem; }
         }
     </style>
 @endpush
@@ -221,27 +160,28 @@
         $sourceType = $filters['source_type'] ?? '';
     @endphp
 
-    <div class="wrap py-3">
+    <div class="page-wrap">
 
         {{-- Header --}}
-        <div class="d-flex align-items-start justify-content-between mb-2 gap-2">
+        <div class="ship-topbar">
             <div>
-                <div class="fw-semibold">Inventory • Kartu Stok</div>
-                <div class="small muted" id="sc_subtitle">
-                    {{ $itemId && $selectedItem ? 'Kartu stok item (running saldo).' : 'Semua mutasi (filter via keyword).' }}
+                <h1 class="title">Kartu Stok</h1>
+                <div class="sub" id="sc_subtitle">
+                    {{ $itemId && $selectedItem ? 'Riwayat saldo per item.' : 'Semua transaksi stok (filter via kata kunci).' }}
                 </div>
-                <div class="small muted mt-1" id="sc_item_label"
-                    @if (!($itemId && $selectedItem)) style="display:none" @endif>
-                    Item: <span class="mono fw-semibold">{{ $selectedItem->code ?? '' }}</span> —
-                    {{ $selectedItem->name ?? '' }}
+                <div class="sub mt-1" id="sc_item_label" @if (!($itemId && $selectedItem)) style="display:none" @endif>
+                    Item terpilih: <span class="mono fw-semibold">{{ $selectedItem->code ?? '' }}</span> — {{ $selectedItem->name ?? '' }}
                 </div>
             </div>
 
-            <div class="d-flex gap-2">
-                <a class="btn btn-ghost btn-sm" href="{{ route('inventory.stock_card.index') }}">Reset</a>
+            <div class="controls">
+                <a class="btn btn-ship-outline btn-pill btn-sm" href="{{ route('inventory.stock_card.index') }}">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </a>
                 @if ($itemId)
-                    <a class="btn btn-success btn-sm"
-                        href="{{ route('inventory.stock_card.export', request()->query()) }}">Export</a>
+                    <a class="btn btn-ship-primary btn-pill btn-sm" href="{{ route('inventory.stock_card.export', request()->query()) }}">
+                        <i class="bi bi-file-earmark-excel"></i> Export
+                    </a>
                 @endif
             </div>
         </div>
@@ -252,30 +192,13 @@
         </div>
 
         {{-- Quick chips (AJAX via intercept link) --}}
-        <div class="d-flex flex-wrap gap-2 mb-2 chips" id="sc_quick_chips">
-            <a class="btn btn-sm btn-outline-secondary {{ $direction === '' ? 'active' : '' }}"
-                href="{{ request()->fullUrlWithQuery(['direction' => null]) }}">Semua</a>
-            <a class="btn btn-sm btn-outline-secondary {{ $direction === 'in' ? 'active' : '' }}"
-                href="{{ request()->fullUrlWithQuery(['direction' => 'in']) }}">IN</a>
-            <a class="btn btn-sm btn-outline-secondary {{ $direction === 'out' ? 'active' : '' }}"
-                href="{{ request()->fullUrlWithQuery(['direction' => 'out']) }}">OUT</a>
-            @foreach ($availableSourceTypes as $key => $label)
-                @continue($key === '')
-                <a class="btn btn-sm btn-outline-secondary {{ $sourceType === $key ? 'active' : '' }}"
-                    href="{{ request()->fullUrlWithQuery(['source_type' => $key]) }}">
-                    {{ $label }}
-                </a>
-            @endforeach
-        </div>
-
         {{-- Filter (compact) --}}
-        <form method="GET" action="{{ route('inventory.stock_card.index') }}" class="card soft p-2 mb-2 filter"
-            id="stockCardFilter">
+        <form method="GET" action="{{ route('inventory.stock_card.index') }}" id="stockCardFilter" class="mb-3">
             <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-4">
-                    <label class="small muted mb-1 d-block">Cari Item</label>
+                <div class="col-12 col-md-3">
+                    <label class="filter-label">Cari Item</label>
                     <div class="position-relative">
-                        <input type="text" name="q_item" value="{{ $qItem }}" class="form-control"
+                        <input type="text" name="q_item" value="{{ $qItem }}" class="form-control filter-select"
                             id="q_item_input" placeholder="Kode / nama… (Enter)" autocomplete="off">
                         <button type="button" class="search-clear" id="q_item_clear"
                             style="{{ $qItem ? '' : 'display:none' }}">✕</button>
@@ -285,9 +208,9 @@
                 <input type="hidden" name="item_id" value="{{ $itemId }}">
 
                 <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">Gudang</label>
-                    <select name="warehouse_id" class="form-select">
-                        <option value="">All</option>
+                    <label class="filter-label">Gudang</label>
+                    <select name="warehouse_id" class="form-select filter-select">
+                        <option value="">Semua</option>
                         @foreach ($warehouses as $w)
                             <option value="{{ $w->id }}" @selected(($filters['warehouse_id'] ?? null) == $w->id)>{{ $w->name }}</option>
                         @endforeach
@@ -295,9 +218,9 @@
                 </div>
 
                 <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">LOT</label>
-                    <select name="lot_id" class="form-select" @disabled(!$itemId)>
-                        <option value="">All</option>
+                    <label class="filter-label">LOT</label>
+                    <select name="lot_id" class="form-select filter-select" @disabled(!$itemId)>
+                        <option value="">Semua</option>
                         @foreach ($lots as $l)
                             <option value="{{ $l->id }}" @selected(($filters['lot_id'] ?? null) == $l->id)>{{ $l->code }}</option>
                         @endforeach
@@ -305,27 +228,29 @@
                 </div>
 
                 <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">Dari</label>
-                    <input type="date" name="from_date" value="{{ $filters['from_date'] ?? '' }}" class="form-control">
+                    <label class="filter-label">Dari</label>
+                    <input type="date" name="from_date" value="{{ $filters['from_date'] ?? '' }}" class="form-control filter-select">
                 </div>
 
                 <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">Sampai</label>
-                    <input type="date" name="to_date" value="{{ $filters['to_date'] ?? '' }}" class="form-control">
+                    <label class="filter-label">Sampai</label>
+                    <input type="date" name="to_date" value="{{ $filters['to_date'] ?? '' }}" class="form-control filter-select">
                 </div>
+            </div>
 
+            <div class="row g-2 mt-1 align-items-end">
                 <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">Arah</label>
-                    <select name="direction" class="form-select">
-                        <option value="">All</option>
-                        <option value="in" @selected(($filters['direction'] ?? null) === 'in')>IN</option>
-                        <option value="out" @selected(($filters['direction'] ?? null) === 'out')>OUT</option>
+                    <label class="filter-label">Arah</label>
+                    <select name="direction" class="form-select filter-select">
+                        <option value="">Semua</option>
+                        <option value="in" @selected(($filters['direction'] ?? null) === 'in')>IN (Masuk)</option>
+                        <option value="out" @selected(($filters['direction'] ?? null) === 'out')>OUT (Keluar)</option>
                     </select>
                 </div>
 
-                <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">Sumber</label>
-                    <select name="source_type" class="form-select">
+                <div class="col-6 col-md-3">
+                    <label class="filter-label">Sumber</label>
+                    <select name="source_type" class="form-select filter-select">
                         @foreach ($availableSourceTypes as $key => $label)
                             <option value="{{ $key }}" @selected(($filters['source_type'] ?? '') === $key)>{{ $label }}</option>
                         @endforeach
@@ -333,20 +258,22 @@
                 </div>
 
                 <div class="col-6 col-md-2">
-                    <label class="small muted mb-1 d-block">Sort</label>
-                    <select name="sort" class="form-select">
-                        <option value="desc" @selected(($filters['sort'] ?? 'desc') === 'desc')>New</option>
-                        <option value="asc" @selected(($filters['sort'] ?? 'desc') === 'asc')>Old</option>
+                    <label class="filter-label">Urutkan</label>
+                    <select name="sort" class="form-select filter-select">
+                        <option value="desc" @selected(($filters['sort'] ?? 'desc') === 'desc')>Terbaru</option>
+                        <option value="asc" @selected(($filters['sort'] ?? 'desc') === 'asc')>Terlama</option>
                     </select>
                 </div>
 
-                <div class="col-12 col-md-4 d-flex align-items-center">
-                    <div class="form-check mt-2 mt-md-0">
+                @if ($canViewCost ?? false)
+                <div class="col-6 col-md-2 d-flex align-items-center mb-1">
+                    <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="has_cost" name="has_cost" value="1"
                             @checked(!empty($filters['has_cost']))>
-                        <label class="form-check-label small muted" for="has_cost">Has value</label>
+                        <label class="form-check-label filter-label mb-0" for="has_cost" style="cursor:pointer">Ada Nilai</label>
                     </div>
                 </div>
+                @endif
             </div>
         </form>
 

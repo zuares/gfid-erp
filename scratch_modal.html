@@ -1,0 +1,30 @@
+{{-- Arrange Shipment Modal --}}
+<div class="modal fade" id="arrangeShipmentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:450px">
+        <div class="modal-content" style="border-radius:20px">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-black" style="font-size:1rem">🚚 Atur Pengiriman</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <div id="asLoading" style="text-align:center;padding:1.5rem;color:#64748b;font-size:0.85rem;">
+                    ⏳ Sedang memeriksa opsi pengiriman dari Marketplace...
+                </div>
+                <div id="asContent" style="display:none;">
+                    <div class="alert alert-info py-2" style="font-size:0.75rem" id="asAlert">
+                        Silakan pilih metode pengiriman untuk order ini.
+                    </div>
+                    
+                    <div id="asOptions" class="d-flex flex-column gap-2 mb-3">
+                        <!-- Options will be injected here -->
+                    </div>
+                    
+                    <input type="hidden" id="asStoreId">
+                    <input type="hidden" id="asOrderSn">
+                    
+                    <button class="btn btn-primary w-100 fw-bold rounded-pill" id="asSubmitBtn" onclick="submitArrangeShipment()">Konfirmasi Pengiriman</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

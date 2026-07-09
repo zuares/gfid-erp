@@ -8,7 +8,7 @@ interface MarketplaceChannel
 {
     public function getShopInfo(Store $store): array;
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20): array;
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array;
 
     public function getOrderDetail(Store $store, array $orderSnList): array;
 
@@ -53,4 +53,15 @@ interface MarketplaceChannel
     ): array;
 
     public function refreshToken(Store $store): array;
+
+    /**
+     * Logistics / Fulfillment
+     */
+    public function getShippingParameter(Store $store, string $orderSn): array;
+
+    public function shipOrder(Store $store, string $orderSn, array $params = []): array;
+
+    public function createShippingDocument(Store $store, array $orderSnList): array;
+
+    public function getShippingDocument(Store $store, array $orderSnList): array;
 }

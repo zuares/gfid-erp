@@ -792,6 +792,13 @@
                     </x-sidebar.simple-link>
                 @endif
 
+                @if ($hasInvStockCard)
+                    <x-sidebar.simple-link href="{{ route('inventory.stock_card.index') }}" icon="bi bi-list-ul"
+                        :active="request()->routeIs('inventory.stock_card.*')">
+                        Kartu Stok
+                    </x-sidebar.simple-link>
+                @endif
+
                 @if ($hasInvBarcodes)
                     <x-sidebar.simple-link href="{{ route('inventory.barcodes.create') }}" icon="bi bi-upc-scan"
                         :active="request()->routeIs('inventory.barcodes.*')">

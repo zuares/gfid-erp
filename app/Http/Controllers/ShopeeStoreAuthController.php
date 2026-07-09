@@ -41,10 +41,7 @@ class ShopeeStoreAuthController extends Controller
         $shopId = $request->query('shop_id');
 
         if (!$code || !$shopId) {
-            return response()->json([
-                'error' => 'Shopee callback gagal. code atau shop_id tidak ditemukan.',
-                'raw' => $request->query(),
-            ], 422);
+            return redirect('/marketplace/toko')->with('error', 'Shopee callback gagal. code atau shop_id tidak ditemukan.');
         }
 
         $partnerId = trim((string) config('shopee.partner_id'));
@@ -70,10 +67,7 @@ class ShopeeStoreAuthController extends Controller
         $token = $response->json() ?? [];
 
         if (!empty($token['error'])) {
-            return response()->json([
-                'error' => 'Gagal tukar code ke token Shopee.',
-                'token_response' => $token,
-            ], 422);
+            return redirect('/marketplace/toko')->with('error', 'Gagal tukar code ke token Shopee. ' . ($token['message'] ?? ''));
         }
 
         $channel = Channel::firstOrCreate(
@@ -90,25 +84,32 @@ class ShopeeStoreAuthController extends Controller
             'base_url' => $baseUrl,
         ];
 
-        Store::updateOrCreate(
-            [
-                'code' => 'shopee_' . $shopId,
-            ],
-            [
-                'channel_id' => $channel->id,
-                'external_shop_id' => (string) $shopId,
-                'name' => 'Shopee Store ' . $shopId,
-                'region' => 'ID',
-                'status' => 'active',
-                'is_active' => true,
-                'credentials' => $credentials,
-                'token_expires_at' => now()->addSeconds((int) ($token['expire_in'] ?? 0)),
-                'meta' => [
-                    'auth_source' => 'shopee_oauth',
-                    'raw_token_response' => $token,
+        try {
+            Store::updateOrCreate(
+                [
+                    'code' => 'shopee_' . $shopId,
                 ],
-            ]
-        );
+                [
+                    'channel_id' => $channel->id,
+                    'external_shop_id' => (string) $shopId,
+                    'name' => 'Shopee Store ' . $shopId,
+                    'region' => 'ID',
+                    'status' => 'active',
+                    'is_active' => true,
+                    'credentials' => $credentials,
+                    'token_expires_at' => now()->addSeconds((int) ($token['expire_in'] ?? 0)),
+                    'meta' => [
+                        'auth_source' => 'shopee_oauth',
+                        'raw_token_response' => $token,
+                    ],
+                ]
+            );
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            // Jika APP_KEY berubah dan tidak bisa mendeskripsi token lama yang ada di database
+            return redirect('/marketplace/toko')->with('error', 'Gagal menghubungkan toko Shopee. Data enkripsi lama tidak valid karena perubahan APP_KEY. Silakan hapus data toko lama Anda dan coba hubungkan kembali.');
+        } catch (\Throwable $e) {
+            return redirect('/marketplace/toko')->with('error', 'Terjadi kesalahan sistem saat menyimpan otentikasi toko: ' . $e->getMessage());
+        }
 
         // Try to fetch real shop name from Shopee API
         try {

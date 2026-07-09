@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\StorefrontCrmController;
 use App\Http\Controllers\Admin\StorefrontCustomerController;
 use App\Http\Controllers\Admin\StorefrontProductCatalogController;
@@ -104,21 +105,24 @@ Route::middleware(['track.storefront'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
 
-    Route::get('/dashboard', function () {
+    Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
         $user = auth()->user();
 
         if (!$user) {
             return redirect()->route('login');
         }
 
-        $landingRoute = $user->preferredLandingRouteName();
-        if ($landingRoute && $landingRoute !== 'dashboard') {
-            return redirect()->to(route($landingRoute, [], false));
+        // Dashboard = halaman awal tiap role. Kalau user tidak diizinkan membuka
+        // modul dashboard, arahkan ke halaman modul terdekat sebagai fallback.
+        if (!$user->canAccessModule('dashboard')) {
+            $landingRoute = $user->preferredLandingRouteName();
+            if ($landingRoute && $landingRoute !== 'dashboard') {
+                return redirect()->to(route($landingRoute, [], false));
+            }
+            abort(403, 'Akses dashboard belum diizinkan.');
         }
 
-        abort_unless($user->canAccessModule('dashboard'), 403, 'Akses dashboard belum diizinkan.');
-
-        return view('dashboard.index');
+        return app(DashboardController::class)->index($request);
     })->name('dashboard');
 
     // ======================

@@ -100,11 +100,22 @@ class TikTokShopChannel implements MarketplaceChannel
             ])
             ->get($this->baseUrl($store) . $path, $query);
 
-        return $response->json() ?? [
-            'code'    => -1,
-            'message' => $response->body(),
-            'status'  => $response->status(),
-        ];
+        $json = $response->json();
+        if ($json === null) {
+            return [
+                'error'   => true,
+                'code'    => -1,
+                'message' => $response->body(),
+                'status'  => $response->status(),
+            ];
+        }
+
+        // TikTok Shop API v202309 usually returns code != 0 for errors
+        if (isset($json['code']) && $json['code'] !== 0) {
+            $json['error'] = true;
+        }
+
+        return $json;
     }
 
     // ─── MarketplaceChannel interface ─────────────────────────────────────────
@@ -114,13 +125,39 @@ class TikTokShopChannel implements MarketplaceChannel
         return $this->get($store, '/seller/202309/shops');
     }
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20): array
+    // ─── Logistics / Fulfillment ──────────────────────────────────────────────
+
+    public function getShippingParameter(Store $store, string $orderSn): array
     {
-        return $this->get($store, '/order/202309/orders', [
-            'create_time_ge' => $timeFrom,
-            'create_time_lt' => $timeTo,
+        return ['error' => 'not_implemented', 'message' => 'Fitur Atur Pengiriman untuk TikTok Shop belum tersedia.'];
+    }
+
+    public function shipOrder(Store $store, string $orderSn, array $params = []): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur Atur Pengiriman untuk TikTok Shop belum tersedia.'];
+    }
+
+    public function createShippingDocument(Store $store, array $orderSnList): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur Cetak Resi untuk TikTok Shop belum tersedia.'];
+    }
+
+    public function getShippingDocument(Store $store, array $orderSnList): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur Cetak Resi untuk TikTok Shop belum tersedia.'];
+    }
+
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array
+    {
+        $params = [
+            'update_time_ge' => $timeFrom,
+            'update_time_lt' => $timeTo,
             'page_size'      => $pageSize,
-        ]);
+        ];
+        if ($cursor) {
+            $params['cursor'] = $cursor;
+        }
+        return $this->get($store, '/order/202309/orders', $params);
     }
 
     public function getOrderDetail(Store $store, array $orderSnList): array

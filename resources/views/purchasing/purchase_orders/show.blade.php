@@ -529,6 +529,10 @@
                     Kembali
                 </a>
 
+                <a href="{{ route('purchasing.purchase_orders.print_dot_matrix', $order->id) }}" class="btn btn-outline-dark btn-sm">
+                    <i class="bi bi-printer"></i> Cetak (Dot Matrix)
+                </a>
+
                 @if ($status === 'draft')
                     <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
                        class="btn btn-outline-primary btn-sm">
@@ -1431,6 +1435,8 @@
         </div>
     </div>
 
+
+
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
@@ -1694,6 +1700,8 @@
                 }
             });
         </script>
+
+
     @endpush
     @endif
 @endsection

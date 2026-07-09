@@ -618,7 +618,23 @@
                 <div class="shop-copy">Website {{ $sfBrandName }} atau marketplace favorit, pilih yang paling nyaman.</div>
             </div>
             <div class="chs">
-                @foreach($channels as $ch)
+                @php
+                    $channelsList = json_decode(storefront_setting('channels.list', '[]'), true);
+                    if (!is_array($channelsList) || empty($channelsList)) {
+                        // Fallback to legacy channels if any
+                        $legacyChannels = [];
+                        if (storefront_setting('channels.shopee_url')) $legacyChannels[] = ['label' => 'Shopee', 'url' => storefront_setting('channels.shopee_url'), 'dark' => false];
+                        if (storefront_setting('channels.tokopedia_url')) $legacyChannels[] = ['label' => 'Tokopedia', 'url' => storefront_setting('channels.tokopedia_url'), 'dark' => false];
+                        if (storefront_setting('channels.tiktok_url')) $legacyChannels[] = ['label' => 'TikTok Shop', 'url' => storefront_setting('channels.tiktok_url'), 'dark' => false];
+                        if (empty($legacyChannels)) {
+                            // Default fallback
+                            $channelsList = $channels ?? [];
+                        } else {
+                            $channelsList = $legacyChannels;
+                        }
+                    }
+                @endphp
+                @foreach($channelsList as $ch)
                 @php
                     $label     = $ch['label'] ?? 'Store';
                     $isWebsite = (bool) ($ch['dark'] ?? false);

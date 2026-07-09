@@ -162,6 +162,7 @@ class MarketplaceController extends Controller
                 (int) $request->time_from,
                 (int) $request->time_to,
                 (int) ($request->page_size ?? 50),
+                (bool) $request->dry_run
             );
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
@@ -206,6 +207,9 @@ class MarketplaceController extends Controller
             $arr['has_data_issues'] = $o->items->contains(
                 fn ($item) => ($item->data_status ?? 'incomplete') !== 'valid'
             );
+
+            // Logistics status dari raw_json (untuk order Shopee)
+            $arr['logistics_status'] = $o->raw_json['package_list'][0]['logistics_status'] ?? null;
 
             // Item terscan untuk tab Sedang Packing & Sudah Proses
             // Priority: scan_log (raw scan baru) → picked_at lines (lama/manual) → null

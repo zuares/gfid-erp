@@ -88,6 +88,29 @@ body[data-theme="dark"] .shp-scan-wrap { background:rgba(15,23,42,.7); border-co
 .shp-scan-status.ok { color:#15803d; }
 .shp-scan-status.err { color:#b91c1c; }
 
+.shp-suggest {
+    display: none; position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+    z-index: 400; max-height: 108px; overflow-y: auto;
+    background: var(--card, #fff); border: 1px solid rgba(148,163,184,.28);
+    border-radius: 8px; box-shadow: 0 6px 18px rgba(15,23,42,.1);
+    padding: .18rem; scrollbar-width: thin;
+}
+body[data-theme="dark"] .shp-suggest { background: #0f172a; border-color: rgba(51,65,85,.8); box-shadow: 0 8px 22px rgba(0,0,0,.5); }
+.shp-suggest.is-open { display: block; }
+.shp-suggest-item {
+    display: flex; align-items: baseline; gap: .5rem;
+    padding: .32rem .5rem; border-radius: 6px; cursor: pointer; line-height: 1.2;
+}
+.shp-suggest-item:hover, .shp-suggest-item.is-active { background: rgba(148,163,184,.14); }
+body[data-theme="dark"] .shp-suggest-item:hover, body[data-theme="dark"] .shp-suggest-item.is-active { background: rgba(148,163,184,.16); }
+.shp-suggest-code { font-family: monospace; font-weight: 700; font-size: .8rem; letter-spacing: 0; white-space: nowrap; color: #334155; }
+body[data-theme="dark"] .shp-suggest-code { color: #e2e8f0; }
+.shp-suggest-name { font-size: .74rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
+.shp-suggest-cat { margin-left: auto; font-size: .64rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
+.shp-suggest-empty { padding: .42rem .5rem; font-size: .76rem; color: #94a3b8; }
+.shp-suggest mark { background: rgba(250,204,21,.4); color: inherit; padding: 0; border-radius: 2px; }
+
 .shp-lines-scroll { max-height:48vh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.5) transparent; }
 .shp-lines-scroll::-webkit-scrollbar { width:5px; }
 .shp-lines-scroll::-webkit-scrollbar-thumb { background:rgba(148,163,184,.5); border-radius:99px; }
@@ -184,11 +207,11 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
 
             <div class="shp-scan">
                 <div class="shp-scan-label">Tambah / Scan Kode Barang</div>
-                <div class="shp-scan-wrap">
+                <div class="shp-scan-wrap" style="position: relative;">
                     <input id="scanInput" type="text" autocomplete="off" autofocus
-                           placeholder="Scan barcode atau ketik kode item lalu Enter"
-                           onkeydown="if(event.key==='Enter'){event.preventDefault();window.__doScan()}">
+                           placeholder="Scan barcode atau ketik kode/nama item lalu Enter">
                     <button type="button" class="shp-scan-btn" id="scanBtn" onclick="window.__doScan()">Tambah</button>
+                    <div id="suggestBox" class="shp-suggest" role="listbox"></div>
                 </div>
                 <div class="shp-scan-status" id="scanStatus"></div>
             </div>
@@ -230,6 +253,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
     const linesEl = document.getElementById('summaryLines');
     const scanInput  = document.getElementById('scanInput');
     const scanStatus = document.getElementById('scanStatus');
+    const suggestBox = document.getElementById('suggestBox');
     const EMPTY_HTML = '<tr class="empty-row" id="emptyRow"><td colspan="5">Belum ada barang.</td></tr>';
 
     function num(v){ const n = parseInt((v ?? '').toString(),10); return isNaN(n)?0:n; }
@@ -306,10 +330,140 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
                 const item = data.find(x=>(x.code||'').toUpperCase()===up) || data[0];
                 scanAddItem(item);
                 setStatus('✅ '+(item.code||'').toUpperCase()+' ditambahkan','ok');
-                scanInput.value=''; scanInput.focus();
+                scanInput.value='';
+                hideSuggest();
+                scanInput.focus();
             })
             .catch(()=> setStatus('❌ Gagal memuat data','err'));
     };
+
+    /* ── Auto-Suggest logic ── */
+    let suggestTimeout;
+    let suggestItems = [];
+    let activeSuggestIndex = -1;
+
+    scanInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (!val) {
+            hideSuggest();
+            return;
+        }
+        clearTimeout(suggestTimeout);
+        suggestTimeout = setTimeout(() => {
+            fetchSuggest(val);
+        }, 300);
+    });
+
+    scanInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeSuggestIndex >= 0 && suggestItems[activeSuggestIndex]) {
+                selectSuggest(suggestItems[activeSuggestIndex]);
+            } else {
+                window.__doScan();
+                hideSuggest();
+            }
+        } else if (e.key === 'ArrowDown') {
+            if (suggestItems.length > 0) {
+                e.preventDefault();
+                activeSuggestIndex++;
+                if (activeSuggestIndex >= suggestItems.length) activeSuggestIndex = 0;
+                updateSuggestActive();
+            }
+        } else if (e.key === 'ArrowUp') {
+            if (suggestItems.length > 0) {
+                e.preventDefault();
+                activeSuggestIndex--;
+                if (activeSuggestIndex < 0) activeSuggestIndex = suggestItems.length - 1;
+                updateSuggestActive();
+            }
+        } else if (e.key === 'Escape') {
+            hideSuggest();
+        }
+    });
+
+    function hideSuggest() {
+        if (suggestBox) {
+            suggestBox.classList.remove('is-open');
+            suggestBox.innerHTML = '';
+        }
+        suggestItems = [];
+        activeSuggestIndex = -1;
+    }
+
+    function fetchSuggest(query) {
+        // limit 2 agar maksimal 2 baris item auto suggest
+        fetch('/api/v1/items/suggest?q=' + encodeURIComponent(query) + '&limit=2', { headers: { 'Accept': 'application/json' } })
+            .then(r => r.json())
+            .then(json => {
+                const data = json?.data || [];
+                if (!data.length) {
+                    suggestBox.innerHTML = '<div class="shp-suggest-empty">Tidak ada barang cocok.</div>';
+                    suggestBox.classList.add('is-open');
+                    return;
+                }
+                suggestItems = data;
+                activeSuggestIndex = -1;
+                renderSuggest(data, query);
+            })
+            .catch(() => hideSuggest());
+    }
+
+    function highlight(text, term) {
+        const safe = esc(text);
+        const t = (term || '').trim();
+        if (!t) return safe;
+        try {
+            const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+            return safe.replace(re, '<mark>$1</mark>');
+        } catch (e) { return safe; }
+    }
+
+    function renderSuggest(data, term) {
+        suggestBox.innerHTML = '';
+        data.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'shp-suggest-item';
+            div.setAttribute('role', 'option');
+            div.innerHTML = `
+                <span class="shp-suggest-code">${highlight(item.code, term)}</span>
+                <span class="shp-suggest-name">${highlight(item.name, term)}</span>
+                ${item.item_category ? '<span class="shp-suggest-cat">' + esc(item.item_category) + '</span>' : ''}
+            `;
+            div.addEventListener('click', () => {
+                selectSuggest(item);
+            });
+            suggestBox.appendChild(div);
+        });
+        suggestBox.classList.add('is-open');
+    }
+
+    function selectSuggest(item) {
+        scanAddItem(item);
+        setStatus('✅ ' + (item.code || '').toUpperCase() + ' ditambahkan', 'ok');
+        scanInput.value = '';
+        hideSuggest();
+        scanInput.focus();
+    }
+
+    function updateSuggestActive() {
+        const items = suggestBox.querySelectorAll('.shp-suggest-item');
+        items.forEach((el, idx) => {
+            if (idx === activeSuggestIndex) el.classList.add('is-active');
+            else el.classList.remove('is-active');
+        });
+        
+        if (activeSuggestIndex >= 0) {
+            const code = suggestItems[activeSuggestIndex]?.code;
+            if (code) scanInput.value = code;
+        }
+    }
+    
+    document.addEventListener('click', (e) => {
+        if (!scanInput.contains(e.target) && !suggestBox.contains(e.target)) {
+            hideSuggest();
+        }
+    });
 
     // stepper +/- & select-all
     tbody.addEventListener('click', (e)=>{

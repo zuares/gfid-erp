@@ -592,6 +592,93 @@ class PurchaseOrderController extends Controller
             ->route('purchasing.purchase_orders.show', $purchase_order->id)
             ->with('success', 'PO berhasil dibatalkan.');
     }
+    public function printDotMatrix(PurchaseOrder $purchase_order)
+    {
+        return view('purchasing.purchase_orders.print_dot_matrix', [
+            'order' => $purchase_order
+        ]);
+    }
+
+    public function printRaw(PurchaseOrder $purchase_order)
+    {
+        $purchase_order->load(['supplier', 'lines.item', 'paymentMethod']);
+
+        $width = 45; // lebar approx untuk 12cm
+        $lines = [];
+
+        // Header
+        $companyName = "G R E A T F I T . I D";
+        $lines[] = str_pad($companyName, $width, " ", STR_PAD_BOTH);
+        $lines[] = str_pad("PURCHASE ORDER", $width, " ", STR_PAD_BOTH);
+        $lines[] = str_repeat("=", $width);
+        
+        // Info PO (kiri-kanan)
+        $noPoStr = "No : " . $purchase_order->code;
+        $tglStr = "Tgl: " . date('d/m/Y', strtotime($purchase_order->date));
+        $lines[] = $noPoStr . str_repeat(" ", max(0, $width - strlen($noPoStr) - strlen($tglStr))) . $tglStr;
+        
+        $lines[] = "Kpd: " . substr(optional($purchase_order->supplier)->name ?? '-', 0, $width - 5);
+        $lines[] = str_repeat("-", $width);
+
+        // Header Tabel
+        // Barang (19) | Qty (5) | Harga (8) | Tot (9)
+        $lines[] = str_pad("Deskripsi Barang", 19) . " " . str_pad("Qty", 5, " ", STR_PAD_LEFT) . " " . str_pad("Harga", 8, " ", STR_PAD_LEFT) . " " . str_pad("Total", 9, " ", STR_PAD_LEFT);
+        $lines[] = str_repeat("-", $width);
+
+        $totalQty = 0;
+        $canSeeMoney = $this->canSeeMoney(request());
+
+        foreach ($purchase_order->lines as $line) {
+            $itemName = substr($line->item->name ?? 'Item', 0, 19);
+            $qty = rtrim(rtrim(number_format($line->qty, 2, ',', '.'), '0'), ',');
+            if ($qty === '') $qty = '0';
+            
+            $priceStr = $canSeeMoney ? number_format($line->unit_price, 0, ',', '.') : '***';
+            $subtotalStr = $canSeeMoney ? number_format($line->qty * $line->unit_price, 0, ',', '.') : '***';
+            
+            $strItem = str_pad($itemName, 19);
+            $strQty = str_pad($qty, 5, " ", STR_PAD_LEFT);
+            $strPrice = str_pad(substr($priceStr, -8), 8, " ", STR_PAD_LEFT);
+            $strSub = str_pad(substr($subtotalStr, -9), 9, " ", STR_PAD_LEFT);
+            
+            $lines[] = "$strItem $strQty $strPrice $strSub";
+            $totalQty += $line->qty;
+        }
+        
+        $lines[] = str_repeat("-", $width);
+        
+        $totalQtyStr = rtrim(rtrim(number_format($totalQty, 2, ',', '.'), '0'), ',');
+        if ($totalQtyStr === '') $totalQtyStr = '0';
+        $grandTotalStr = $canSeeMoney ? number_format($purchase_order->grand_total, 0, ',', '.') : '***';
+        
+        $lines[] = str_pad("Total Item", 19) . " " . str_pad($totalQtyStr, 5, " ", STR_PAD_LEFT);
+        $lines[] = str_pad("GRAND TOTAL", 34) . " " . str_pad(substr($grandTotalStr, -9), 9, " ", STR_PAD_LEFT);
+        $lines[] = str_repeat("=", $width);
+        $lines[] = "";
+        
+        // Tanda Tangan (kiri-kanan rapi)
+        $lines[] = str_pad("Disetujui Oleh,", 22) . str_pad("Diterima Oleh,", 23, " ", STR_PAD_LEFT);
+        $lines[] = "";
+        $lines[] = "";
+        $lines[] = str_pad("(_______________)", 22) . str_pad("(_______________)", 23, " ", STR_PAD_LEFT);
+
+        // Pad to exactly 33 lines (14cm at 6 lpi = ~33 lines)
+        $totalLines = count($lines);
+        $maxLines = 33; // 14cm page height
+        $padLines = $maxLines - $totalLines;
+        if ($padLines > 0) {
+            for ($i = 0; $i < $padLines; $i++) {
+                $lines[] = "";
+            }
+        }
+        
+        // Return raw string with CRLF
+        $rawText = implode("\r\n", $lines) . "\r\n";
+        
+        return response()->json([
+            'raw_text' => $rawText
+        ]);
+    }
 
     // ======================================================================
     // API kecil: last price supplier-item

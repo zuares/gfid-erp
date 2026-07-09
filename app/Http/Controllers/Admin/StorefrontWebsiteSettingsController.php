@@ -64,6 +64,7 @@ class StorefrontWebsiteSettingsController extends Controller
         }
 
         if ($section === 'channels') {
+            $data['channels.list'] = (string) $request->input('channels_list', '[]');
             $data['channels.shopee_url'] = (string) $request->input('channels_shopee_url', '');
             $data['channels.tokopedia_url'] = (string) $request->input('channels_tokopedia_url', '');
             $data['channels.tiktok_url'] = (string) $request->input('channels_tiktok_url', '');

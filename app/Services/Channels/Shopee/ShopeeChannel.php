@@ -60,6 +60,22 @@ class ShopeeChannel implements MarketplaceChannel
         return $result;
     }
 
+    protected function post(Store $store, string $path, array $body = []): array
+    {
+        $result = $this->doPost($store, $path, $body);
+
+        $error = $result['error'] ?? null;
+        if ($error === 'error_auth' || str_contains(strtolower((string)($result['message'] ?? '')), 'expired')) {
+            $refreshed = $this->refreshToken($store);
+            if (empty($refreshed['error'])) {
+                $store->refresh();
+                $result = $this->doPost($store, $path, $body);
+            }
+        }
+
+        return $result;
+    }
+
     protected function doGet(Store $store, string $path, array $params = []): array
     {
         $timestamp = time();
@@ -81,19 +97,47 @@ class ShopeeChannel implements MarketplaceChannel
         ];
     }
 
+    protected function doPost(Store $store, string $path, array $body = []): array
+    {
+        $timestamp = time();
+
+        $query = [
+            'partner_id'   => (int) $this->partnerId($store),
+            'timestamp'    => $timestamp,
+            'access_token' => $this->accessToken($store),
+            'shop_id'      => (int) $this->shopId($store),
+            'sign'         => $this->sign($store, $path, $timestamp),
+        ];
+
+        $response = Http::timeout(30)->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
+
+        return $response->json() ?? [
+            'error'   => 'invalid_response',
+            'message' => $response->body(),
+            'status'  => $response->status(),
+        ];
+    }
+
     public function getShopInfo(Store $store): array
     {
         return $this->get($store, '/api/v2/shop/get_shop_info');
     }
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20): array
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array
     {
-        return $this->get($store, '/api/v2/order/get_order_list', [
-            'time_range_field' => 'create_time',
+        $params = [
+            'time_range_field' => 'update_time',
             'time_from' => $timeFrom,
             'time_to' => $timeTo,
             'page_size' => $pageSize,
-        ]);
+        ];
+        if ($cursor) {
+            $params['cursor'] = $cursor;
+        }
+        if ($orderStatus) {
+            $params['order_status'] = $orderStatus;
+        }
+        return $this->get($store, '/api/v2/order/get_order_list', $params);
     }
 
     public function getOrderDetail(Store $store, array $orderSnList): array
@@ -206,5 +250,40 @@ class ShopeeChannel implements MarketplaceChannel
         }
 
         return $data;
+    }
+
+    // ─── Logistics / Fulfillment ──────────────────────────────────────────────
+
+    public function getShippingParameter(Store $store, string $orderSn): array
+    {
+        return $this->get($store, '/api/v2/logistics/get_shipping_parameter', ['order_sn' => $orderSn]);
+    }
+
+    public function shipOrder(Store $store, string $orderSn, array $params = []): array
+    {
+        // Parameter utama ship_order: order_sn, dan salah satu dari pickup/dropoff
+        $body = array_merge(['order_sn' => $orderSn], $params);
+        return $this->post($store, '/api/v2/logistics/ship_order', $body);
+    }
+
+    public function createShippingDocument(Store $store, array $orderSnList): array
+    {
+        $body = [
+            'order_list' => array_map(function($item) {
+                return is_array($item) ? $item : ['order_sn' => $item];
+            }, $orderSnList)
+        ];
+        return $this->post($store, '/api/v2/logistics/create_shipping_document', $body);
+    }
+
+    public function getShippingDocument(Store $store, array $orderSnList): array
+    {
+        $body = [
+            'order_list' => array_map(function($item) {
+                return is_array($item) ? $item : ['order_sn' => $item];
+            }, $orderSnList),
+            'shipping_document_type' => 'NORMAL_AIR_WAYBILL'
+        ];
+        return $this->post($store, '/api/v2/logistics/download_shipping_document', $body);
     }
 }

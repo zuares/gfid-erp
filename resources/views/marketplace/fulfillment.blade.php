@@ -2,124 +2,62 @@
 @section('title', 'Marketplace • Fulfillment')
 
 @include('marketplace._shared')
+@include('sales.shipments._scan_styles')
 
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="Fulfillment" description="Review, konfirmasi, dan picking order sebelum stok dipotong.">
-
-    @if(app()->environment('local', 'development', 'testing', 'staging'))
-    {{-- ══ DEV TOOLS PANEL ══════════════════════════════════════════════════ --}}
-    <div style="background:#faf5ff;border:1.5px solid #ddd6fe;border-radius:14px;padding:.85rem 1.1rem;margin-bottom:1.25rem">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
-            <div style="font-size:.78rem;font-weight:800;color:#7c3aed;letter-spacing:.05em">🛠 DEV TOOLS</div>
-            <div id="devStatsFulfillment" style="font-size:.71rem;color:#9ca3af">loading…</div>
+<div class="sr-scan-page">
+    <div class="sr-topbar">
+        <div class="sr-top-main">
+            <h1 class="sr-title">Marketplace Fulfillment</h1>
+            <div class="sr-sub">Scan order, konfirmasi barang, dan proses pengiriman.</div>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
-            {{-- Load Next Order --}}
-            <button onclick="devLoadNextOrder()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #c4b5fd;background:#ede9fe;color:#6d28d9;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Temukan order READY_TO_SHIP berikutnya dan langsung scan">
-                ⚡ Load Next Order
-            </button>
-            {{-- Seed --}}
-            <button onclick="devSeedFromFulfillment()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #bbf7d0;background:#f0fdf4;color:#16a34a;font-size:.75rem;font-weight:700;cursor:pointer">
-                📥 Seed Orders
-            </button>
-            {{-- Reset fulfillments --}}
-            <button onclick="devResetFulfillmentsHere()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #fde68a;background:#fefce8;color:#a16207;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Hapus semua fulfillments, orders tetap">
-                🔄 Reset Fulfillments
-            </button>
-            {{-- Fresh all --}}
-            <button onclick="devFreshFromFulfillment()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:.75rem;font-weight:700;cursor:pointer">
-                🗑 Fresh All
-            </button>
-            {{-- Bypass blocker --}}
-            <button id="btnBypassBlocker" onclick="devToggleBypass()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #fde68a;background:#fefce8;color:#92400e;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Paksa scan box tampil meskipun ada issues (dev only)">
-                🚧 Bypass Blocker: OFF
-            </button>
-            {{-- Remap items --}}
-            <button onclick="devRemapItemsHere()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Re-resolve mapping_status + cost_status semua order items">
-                🔁 Remap Items
-            </button>
-            <div style="width:1px;height:20px;background:#e2e8f0;margin:0 .1rem"></div>
-            <a href="/marketplace/orders"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .9rem;border-radius:999px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;text-decoration:none">
-                📦 Lihat Orders →
-            </a>
-        </div>
-        <div style="margin-top:.5rem;font-size:.69rem;color:#c4b5fd">
-            ⚡ Load Next = auto-scan order pertama &nbsp;|&nbsp;
-            🔁 Remap = fix mapping_status item lama &nbsp;|&nbsp;
-            Reset = fulfillment dihapus, order tetap
+        <div class="sr-top-actions">
+            @if(app()->environment('local', 'development', 'testing', 'staging'))
+                <button onclick="devLoadNextOrder()" class="sr-btn">⚡ Load Next</button>
+                <button onclick="devRemapItemsHere()" class="sr-btn">🔁 Remap</button>
+                <button id="btnBypassBlocker" onclick="devToggleBypass()" class="sr-btn" style="color: #92400e;">🚧 Bypass OFF</button>
+            @endif
+            <a href="/marketplace/orders" class="sr-btn sr-btn-primary">📦 Lihat Orders</a>
         </div>
     </div>
-    @endif
 
-    {{-- KPI --}}
-    <div class="oc-kpi-grid">
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Selesai Hari Ini</div><div class="oc-kpi-value" id="kpiDoneToday">—</div><div class="oc-kpi-note">order confirmed</div></div>
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Item Diproses</div><div class="oc-kpi-value" id="kpiItemsToday">—</div><div class="oc-kpi-note">qty total hari ini</div></div>
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Menunggu</div><div class="oc-kpi-value" id="kpiWaiting">—</div><div class="oc-kpi-note">draft / pending review</div></div>
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Perlu Mapping</div><div class="oc-kpi-value" id="kpiUnmapped">—</div><div class="oc-kpi-note">SKU belum dipetakan</div></div>
-    </div>
+    <div class="sr-shell">
+        <div class="sr-workflow-stepper">
+            <span class="sr-flow-step active" id="stepScan">1. Scan Barcode</span>
+            <span class="sr-flow-sep">-&gt;</span>
+            <span class="sr-flow-step" id="stepProcess">2. Proses Item</span>
+            <span class="sr-flow-sep">-&gt;</span>
+            <span class="sr-flow-step" id="stepReview">3. Konfirmasi</span>
+        </div>
 
-    {{-- Blocker card (muncul jika ada issues, menggantikan scan box) --}}
-    <div id="blockerCard" style="display:none;margin-bottom:1.25rem">
-        <div style="background:linear-gradient(135deg,rgba(127,29,29,.97) 0%,rgba(153,27,27,.95) 100%);
-                    border-radius:18px;padding:1.75rem 2rem;box-shadow:0 4px 24px rgba(0,0,0,.22)">
-            <div style="display:flex;align-items:flex-start;gap:1rem">
-                <span style="font-size:2rem;line-height:1;flex-shrink:0">🚫</span>
-                <div style="flex:1">
-                    <div style="color:#fef2f2;font-weight:800;font-size:1.05rem;margin-bottom:.35rem;letter-spacing:-.01em">
-                        Selesaikan masalah dulu sebelum memproses order baru
-                    </div>
-                    <div style="color:#fca5a5;font-size:.82rem;margin-bottom:.9rem;line-height:1.5">
-                        Scan order diblokir sampai semua masalah di bawah ini diselesaikan.
-                    </div>
-                    <div id="blockerIssueList" style="margin-bottom:1.1rem"></div>
-                    <a href="{{ route('marketplace.issues') }}"
-                        style="display:inline-block;background:#ef4444;color:#fff;font-weight:800;font-size:.88rem;
-                               padding:.6rem 1.4rem;border-radius:12px;text-decoration:none;
-                               box-shadow:0 2px 8px rgba(0,0,0,.25);transition:background .15s"
-                        onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
-                        → Perbaiki Sekarang
-                    </a>
+        {{-- KPI --}}
+        <div class="sr-summary" style="margin-bottom: .25rem">
+            <div class="sr-stat"><div class="sr-stat-label">Selesai Hari Ini</div><div class="sr-stat-value" id="kpiDoneToday">—</div></div>
+            <div class="sr-stat"><div class="sr-stat-label">Item Diproses</div><div class="sr-stat-value" id="kpiItemsToday">—</div></div>
+            <div class="sr-stat"><div class="sr-stat-label">Menunggu Review</div><div class="sr-stat-value" id="kpiWaiting">—</div></div>
+        </div>
+
+        {{-- Blocker card --}}
+        <div id="blockerCard" style="display:none; margin-bottom: .25rem" class="sr-panel">
+            <div class="sr-panel-body" style="background: rgba(254, 242, 242, 0.8)">
+                <div style="color: #991b1b; font-size: .95rem; font-weight: 800; display:flex; align-items:center; gap:.5rem">
+                    <span style="font-size: 1.25rem">🚫</span> Selesaikan masalah dulu sebelum memproses order baru
                 </div>
+                <div id="blockerIssueList" style="margin-top: .75rem; margin-bottom: .75rem; font-size: .8rem"></div>
+                <a href="{{ route('marketplace.issues') }}" class="sr-btn sr-btn-danger">Perbaiki Sekarang</a>
             </div>
         </div>
-    </div>
 
-    {{-- Scan Box (disembunyikan jika ada issues) --}}
-    <div id="scanBoxPanel" style="background:#fff;border:1px solid var(--gf-border,#e5e7eb);border-radius:22px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;box-shadow:0 1px 6px rgba(15,23,42,.07)">
-
-        {{-- Mode toggle --}}
-        {{-- Default: batch aktif (selaras dengan _scanMode = 'batch' di JS) --}}
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem">
-            <div style="display:flex;gap:.35rem;background:#f1f5f9;border-radius:999px;padding:.25rem">
-                <button id="modeTabOrder" onclick="setScanMode('single')"
-                    style="background:transparent;border:none;border-radius:999px;
-                           padding:.3rem .95rem;color:#64748b;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .18s">
-                    📦 Scan Order
-                </button>
-                <button id="modeTabBatch" onclick="setScanMode('batch')"
-                    style="background:#6366f1;border:none;border-radius:999px;
-                           padding:.3rem .95rem;color:#fff;font-size:.8rem;font-weight:700;cursor:pointer;
-                           transition:all .18s;box-shadow:0 1px 4px rgba(99,102,241,.35)">
-                    📋 Batch Mode
-                </button>
-            </div>
-            <div id="scanModeBadge"
-                style="font-size:.65rem;font-weight:800;letter-spacing:.06em;color:#6366f1;text-transform:uppercase">
-                BATCH MODE
-            </div>
-        </div>
+        {{-- Scan Box Panel --}}
+        <div id="scanBoxPanel" class="sr-panel" style="margin-bottom: .5rem">
+            <div class="sr-panel-body sr-scan-card">
+                <div class="sr-mode-row">
+                    <div style="display:flex; gap: .3rem">
+                        <button id="modeTabOrder" onclick="setScanMode('single')" class="sr-btn" style="min-height: 28px; padding: 2px 10px; font-size: 0.7rem">📦 Scan Order</button>
+                        <button id="modeTabBatch" onclick="setScanMode('batch')" class="sr-btn sr-btn-primary" style="min-height: 28px; padding: 2px 10px; font-size: 0.7rem">📋 Batch Mode</button>
+                    </div>
+                    <div id="scanModeBadge" class="sr-mode">BATCH MODE</div>
+                </div>
 
         {{-- ── SINGLE ORDER MODE ── --}}
         <div id="singleScanBox" style="display:none">
@@ -313,8 +251,8 @@
             </button>
         </div>
     </div>
-
-</x-gf.page>
+</div>
+</div>
 
 {{-- Review Modal (Perlu Konfirmasi) --}}
 <div class="modal fade" id="packedReviewModal" tabindex="-1">
@@ -477,6 +415,10 @@
 
             // Badge indikator
             let badges = '';
+            const carrier = (f.order?.shipping_carrier || '').toLowerCase();
+            if (carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday')) {
+                badges += `<span style="background:#fef08a;color:#854d0e;font-size:.65rem;font-weight:800;padding:.1rem .4rem;border-radius:999px;border:1px solid #fde047;white-space:nowrap;margin-right:4px;">⚡ KILAT</span>`;
+            }
             if (unmapped > 0) {
                 badges += `<span style="background:#fee2e2;color:#b91c1c;font-size:.65rem;font-weight:800;
                                         padding:.1rem .4rem;border-radius:999px;white-space:nowrap">
@@ -820,17 +762,19 @@
         if (!items.length) { list.style.display = 'none'; return; }
         list.style.display = 'block';
         rows.innerHTML = items.map(it => `
-            <div style="display:flex;align-items:center;gap:.6rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:.4rem .7rem">
-                <span style="font-size:.72rem;font-weight:800;color:#4338ca;font-family:monospace;flex-shrink:0">${esc(it.code)}</span>
-                <span style="font-size:.75rem;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</span>
+            <div class="sr-item-row">
+                <div style="flex:1; min-width:0">
+                    <div class="sr-item-code">${esc(it.code)}</div>
+                    <div class="sr-item-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</div>
+                </div>
                 <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
                     <button onclick="singleScanDec(${it.id})"
                         style="background:#e2e8f0;border:none;border-radius:5px;width:22px;height:22px;color:#475569;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1">−</button>
-                    <span style="color:#0f172a;font-weight:800;font-size:.85rem;min-width:20px;text-align:center">${it.qty}</span>
+                    <span class="sr-item-qty" style="min-width:20px;text-align:center">${it.qty}</span>
                     <button onclick="singleScanInc(${it.id})"
                         style="background:#e2e8f0;border:none;border-radius:5px;width:22px;height:22px;color:#475569;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1">+</button>
                     <button onclick="singleScanRemove(${it.id})"
-                        style="background:#fee2e2;border:none;border-radius:5px;width:22px;height:22px;color:#ef4444;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1">✕</button>
+                        style="background:#fee2e2;border:none;border-radius:5px;width:22px;height:22px;color:#ef4444;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1;margin-left:.2rem">✕</button>
                 </div>
             </div>`).join('');
     }
@@ -1693,17 +1637,19 @@
         if (!items.length) { list.style.display = 'none'; return; }
         list.style.display = 'block';
         rows.innerHTML = items.map(it => `
-            <div style="display:flex;align-items:center;gap:.6rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:.4rem .7rem">
-                <span style="font-size:.72rem;font-weight:800;color:#4338ca;font-family:monospace;flex-shrink:0">${esc(it.code)}</span>
-                <span style="font-size:.75rem;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</span>
+            <div class="sr-item-row">
+                <div style="flex:1; min-width:0">
+                    <div class="sr-item-code">${esc(it.code)}</div>
+                    <div class="sr-item-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</div>
+                </div>
                 <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
                     <button onclick="batchDecItem(${it.id})"
                         style="background:#e2e8f0;border:none;border-radius:5px;width:22px;height:22px;color:#475569;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1">−</button>
-                    <span style="color:#0f172a;font-weight:800;font-size:.85rem;min-width:20px;text-align:center">${it.qty}</span>
+                    <span class="sr-item-qty" style="min-width:20px;text-align:center">${it.qty}</span>
                     <button onclick="batchIncItem(${it.id})"
                         style="background:#e2e8f0;border:none;border-radius:5px;width:22px;height:22px;color:#475569;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1">+</button>
                     <button onclick="batchRemoveItem(${it.id})"
-                        style="background:#fee2e2;border:none;border-radius:5px;width:22px;height:22px;color:#ef4444;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1">✕</button>
+                        style="background:#fee2e2;border:none;border-radius:5px;width:22px;height:22px;color:#ef4444;font-weight:800;cursor:pointer;font-size:.8rem;line-height:1;margin-left:.2rem">✕</button>
                 </div>
             </div>`).join('');
 
@@ -1958,6 +1904,13 @@
                                 box-shadow:0 1px 3px rgba(15,23,42,.04)">
                 <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.45rem">
                     <span style="font-size:.78rem;font-weight:800;color:#0f172a;font-family:monospace">${esc(r.orderNo)}</span>
+                    ${(() => {
+                        const carrier = (r.fulfillment?.order?.shipping_carrier || '').toLowerCase();
+                        if (carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday')) {
+                            return `<span style="background:#fef08a;color:#854d0e;font-size:.65rem;font-weight:800;padding:.1rem .4rem;border-radius:999px;border:1px solid #fde047;white-space:nowrap;margin-right:2px;">⚡ KILAT</span>`;
+                        }
+                        return '';
+                    })()}
                     <span style="font-size:.68rem;color:#94a3b8">${esc(r.fulfillment?.order?.store?.name || '')}</span>
                     <span style="margin-left:auto">${badge}</span>
                 </div>

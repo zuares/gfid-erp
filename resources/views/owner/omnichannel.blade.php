@@ -396,6 +396,12 @@
                         <input type="date" class="form-control" id="syncTo">
                     </div>
                 </div>
+                <div class="mb-3">
+                    <div class="form-check form-switch" title="Jalankan sync tanpa menyimpan ke database">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ocSyncDryRun" style="cursor:pointer">
+                        <label class="form-check-label fw-bold" for="ocSyncDryRun" style="font-size:.75rem;color:#64748b;cursor:pointer">Mode Dry Run</label>
+                    </div>
+                </div>
                 <div class="d-flex justify-content-end gap-2">
                     <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
                     <button class="btn btn-dark" style="border-radius:999px" id="syncBtn" onclick="ocDoSync()">Sync</button>
@@ -884,6 +890,7 @@
                     time_from: Math.floor(from.getTime()/1000),
                     time_to:   Math.floor(to.getTime()/1000),
                     page_size: 50,
+                    dry_run: $('ocSyncDryRun').checked ? 1 : 0
                 })
             });
             alert.className = 'alert alert-success';

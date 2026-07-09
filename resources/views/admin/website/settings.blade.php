@@ -803,30 +803,14 @@
                 <span class="ws-panel-title">Channels Penjualan</span>
             </div>
             <div class="ws-panel-body">
-                <div class="ws-grid">
-
-                    <div class="ws-field">
-                        <label class="ws-label">URL Shopee</label>
-                        <input type="text" name="channels.shopee_url" class="ws-input"
-                            value="{{ $s['channels.shopee_url'] ?? '' }}"
-                            placeholder="https://shopee.co.id/tokomu">
-                    </div>
-
-                    <div class="ws-field">
-                        <label class="ws-label">URL Tokopedia</label>
-                        <input type="text" name="channels.tokopedia_url" class="ws-input"
-                            value="{{ $s['channels.tokopedia_url'] ?? '' }}"
-                            placeholder="https://www.tokopedia.com/tokomu">
-                    </div>
-
-                    <div class="ws-field">
-                        <label class="ws-label">URL TikTok Shop</label>
-                        <input type="text" name="channels.tiktok_url" class="ws-input"
-                            value="{{ $s['channels.tiktok_url'] ?? '' }}"
-                            placeholder="https://www.tiktok.com/@tokomu">
-                    </div>
-
-                </div>
+                <p style="font-size:.68rem;color:#94a3b8;margin:0 0 .75rem">
+                    Atur daftar channel penjualan (Website, Shopee, Tokopedia, dll). Drag icon ⠿ untuk mengubah urutan.
+                </p>
+                <input type="hidden" name="channels.list" id="ws-channels-list" value="{{ $s['channels.list'] ?? '[]' }}">
+                <div class="ws-sortable-list" id="ws-channels-ui" style="margin-bottom:1rem"></div>
+                <button type="button" class="ws-add-photo" style="aspect-ratio:auto;height:48px;flex-direction:row;gap:.5rem" onclick="wsAddChannel()">
+                    <span class="plus">+</span> Tambah Channel
+                </button>
             </div>
         </div>
     </div>
@@ -1288,6 +1272,163 @@ document.addEventListener('DOMContentLoaded', function () {
         wsShowTab(savedTab);
     }
 });
+
+// ── Pengaturan Channels (Dinamis) ───────────────────────────────────────────
+function wsRenderChannels() {
+    const list = document.getElementById('ws-channels-ui');
+    const input = document.getElementById('ws-channels-list');
+    if (!list || !input) return;
+
+    let channels = [];
+    try { channels = JSON.parse(input.value || '[]'); } catch(e) {}
+    if (!Array.isArray(channels)) channels = [];
+
+    // Jika sedang edit (ada focus), jangan render ulang keseluruhan agar tidak kehilangan fokus
+    const activeEl = document.activeElement;
+    const isEditing = activeEl && list.contains(activeEl);
+    if (isEditing) return;
+
+    list.innerHTML = '';
+    channels.forEach((ch, idx) => {
+        const item = document.createElement('div');
+        item.className = 'ws-sortable-item';
+        item.draggable = true;
+        item.dataset.index = idx;
+
+        item.innerHTML = `
+            <div style="display:flex; gap:1rem; align-items:flex-start;">
+                <span class="ws-drag-handle" style="cursor:grab; margin-top:2px;" title="Tarik untuk memindahkan urutan">⠿</span>
+                <div style="flex:1;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:.85rem;">
+                        <div class="ws-field">
+                            <label class="ws-label">Nama Channel</label>
+                            <input type="text" class="ws-input" value="${ch.label || ''}" placeholder="Cth: Shopee" oninput="wsUpdateChannel(${idx}, 'label', this.value, false)">
+                        </div>
+                        <div class="ws-field">
+                            <label class="ws-label">URL / Link</label>
+                            <input type="text" class="ws-input" value="${ch.url || ''}" placeholder="https://..." oninput="wsUpdateChannel(${idx}, 'url', this.value, false)">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:.75rem;">
+                        <div style="display:flex; align-items:center; gap:.5rem; cursor:pointer;" onclick="const t = this.querySelector('input'); if(event.target !== t) { t.checked = !t.checked; t.dispatchEvent(new Event('change')); }">
+                            <label class="ws-toggle" style="pointer-events:none;">
+                                <input type="checkbox" onchange="wsUpdateChannel(${idx}, 'dark', this.checked, false)" ${ch.dark ? 'checked' : ''}>
+                                <span class="ws-toggle-track"></span>
+                            </label>
+                            <span style="font-size:.7rem; font-weight:800; color:#475569;">Gaya Tombol Utama (Gelap)</span>
+                        </div>
+                        <button type="button" class="ws-sec-action" style="color:#ef4444; border-color:#fca5a5; background:#fff; font-size:.65rem; height:28px;" onclick="wsRemoveChannel(${idx})">🗑 Hapus</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+
+    // Simple Drag and Drop implementation for channels
+    let dragSrcEl = null;
+    list.querySelectorAll('.ws-sortable-item').forEach(item => {
+        item.addEventListener('dragstart', function(e) {
+            dragSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+        });
+        item.addEventListener('dragenter', function(e) {
+            this.classList.add('drag-over');
+        });
+        item.addEventListener('dragover', function(e) {
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        });
+        item.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+        item.addEventListener('drop', function(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            if (dragSrcEl !== this) {
+                let channelsArr = [];
+                try { channelsArr = JSON.parse(input.value || '[]'); } catch(e) {}
+                const fromIdx = parseInt(dragSrcEl.dataset.index);
+                const toIdx = parseInt(this.dataset.index);
+                const moved = channelsArr.splice(fromIdx, 1)[0];
+                channelsArr.splice(toIdx, 0, moved);
+                input.value = JSON.stringify(channelsArr);
+                
+                // paksa render ulang setelah drop
+                document.activeElement?.blur(); 
+                wsRenderChannels();
+            }
+            return false;
+        });
+        item.addEventListener('dragend', function(e) {
+            list.querySelectorAll('.ws-sortable-item').forEach(i => {
+                i.classList.remove('drag-over');
+                i.classList.remove('dragging');
+            });
+            document.getElementById('ws-save-bar').classList.add('is-dirty');
+            document.getElementById('ws-top-save').classList.add('is-dirty');
+        });
+    });
+}
+
+function wsUpdateChannel(idx, key, value, forceRender = false) {
+    const input = document.getElementById('ws-channels-list');
+    let channels = [];
+    try { channels = JSON.parse(input.value || '[]'); } catch(e) {}
+    if (channels[idx]) {
+        channels[idx][key] = value;
+        input.value = JSON.stringify(channels);
+        
+        // Update text di list header langsung (tanpa merender ulang semuanya)
+        if (key === 'label') {
+            const nameEl = document.getElementById('ch-name-' + idx);
+            if (nameEl) nameEl.textContent = value || 'Channel Baru';
+        }
+        if (key === 'url') {
+            const urlEl = document.getElementById('ch-url-' + idx);
+            if (urlEl) urlEl.textContent = value || 'URL belum diatur';
+        }
+
+        document.getElementById('ws-save-bar').classList.add('is-dirty');
+        document.getElementById('ws-top-save').classList.add('is-dirty');
+
+        if (forceRender) {
+            wsRenderChannels();
+        }
+    }
+}
+
+function wsAddChannel() {
+    const input = document.getElementById('ws-channels-list');
+    let channels = [];
+    try { channels = JSON.parse(input.value || '[]'); } catch(e) {}
+    channels.push({ label: '', url: '', dark: false });
+    input.value = JSON.stringify(channels);
+    
+    // Hilangkan focus agar bisa render ulang
+    document.activeElement?.blur();
+    wsRenderChannels();
+    document.getElementById('ws-save-bar').classList.add('is-dirty');
+    document.getElementById('ws-top-save').classList.add('is-dirty');
+}
+
+function wsRemoveChannel(idx) {
+    if (!confirm('Hapus channel ini?')) return;
+    const input = document.getElementById('ws-channels-list');
+    let channels = [];
+    try { channels = JSON.parse(input.value || '[]'); } catch(e) {}
+    channels.splice(idx, 1);
+    input.value = JSON.stringify(channels);
+    
+    document.activeElement?.blur();
+    wsRenderChannels();
+    document.getElementById('ws-save-bar').classList.add('is-dirty');
+    document.getElementById('ws-top-save').classList.add('is-dirty');
+}
+
+document.addEventListener('DOMContentLoaded', wsRenderChannels);
 
 // ── Atur section tanpa pindah halaman ───────────────────────────────────────
 document.querySelectorAll('[data-section-action]').forEach(function (btn) {

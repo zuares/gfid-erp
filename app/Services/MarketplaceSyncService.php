@@ -50,23 +50,60 @@ class MarketplaceSyncService
      * Mengembalikan array: found, synced, order_sn_list, message.
      * Melempar \RuntimeException jika API error.
      */
-    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50): array
+    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false): array
     {
         $driver = $this->manager->driver($store);
 
-        // 1. Ambil daftar order
-        $listResponse = $driver->getOrders($store, $timeFrom, $timeTo, $pageSize);
+        $orderSnList = [];
+        
+        // Untuk Shopee, kita tarik spesifik per status agar tidak ada order (termasuk kilat) yang terlewat
+        // Catatan: TO_CONFIRM_RECEIVE bukan parameter valid untuk filter di get_order_list (akan memicu error API)
+        $statuses = $store->channel?->code === 'shopee'
+            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED']
+            : ['']; // Channel lain panggil tanpa filter status
 
-        if (! empty($listResponse['error'])) {
-            $this->log($store, 'sync_orders', 'failed', $listResponse['message'] ?? $listResponse['error'], $listResponse);
-            throw new \RuntimeException($listResponse['message'] ?? 'Gagal ambil daftar order dari marketplace.');
+        foreach ($statuses as $status) {
+            $cursor = '';
+            $hasMore = true;
+
+            // 1. Ambil daftar order per status
+            while ($hasMore) {
+                $listResponse = $driver->getOrders($store, $timeFrom, $timeTo, $pageSize, $cursor, $status);
+
+                if (! empty($listResponse['error'])) {
+                    $this->log($store, 'sync_orders', 'failed', $listResponse['message'] ?? $listResponse['error'], $listResponse);
+                    throw new \RuntimeException($listResponse['message'] ?? 'Gagal ambil daftar order dari marketplace.');
+                }
+
+                // Extract items based on channel structure
+                // Shopee uses response.order_list
+                $orders = data_get($listResponse, 'response.order_list');
+                if ($orders === null) {
+                    // TikTok uses data.orders or similar? We'll extract order_id / order_sn
+                    $orders = data_get($listResponse, 'data.orders', []);
+                }
+                
+                $chunkSns = collect($orders)
+                    ->map(fn($o) => $o['order_sn'] ?? $o['order_id'] ?? $o['id'] ?? null)
+                    ->filter()->values()->all();
+                
+                $orderSnList = array_merge($orderSnList, $chunkSns);
+
+                $nextCursor = data_get($listResponse, 'response.next_cursor') ?? data_get($listResponse, 'data.next_cursor');
+                $hasMoreData = data_get($listResponse, 'response.more') ?? data_get($listResponse, 'data.more') ?? false;
+
+                if ($hasMoreData && $nextCursor) {
+                    $cursor = (string) $nextCursor;
+                } else {
+                    $hasMore = false;
+                }
+            }
         }
 
-        $orderSnList = collect(data_get($listResponse, 'response.order_list', []))
-            ->pluck('order_sn')->filter()->unique()->values()->all();
+        $orderSnList = array_unique($orderSnList);
 
         if (empty($orderSnList)) {
-            $this->log($store, 'sync_orders', 'success', 'Tidak ada order ditemukan.', $listResponse);
+            $this->log($store, 'sync_orders', 'success', 'Tidak ada order ditemukan.', ['time_from' => $timeFrom, 'time_to' => $timeTo]);
             return ['found' => 0, 'synced' => 0, 'order_sn_list' => [], 'message' => 'Tidak ada order ditemukan di rentang tanggal ini.'];
         }
 
@@ -82,13 +119,16 @@ class MarketplaceSyncService
         }
 
         // 3. Simpan ke DB
-        $stats  = $this->upsertOrders($store, $details);
+        $stats  = $this->upsertOrders($store, $details, $dryRun);
 
         // 4. Auto-buat fulfillment draft untuk READY_TO_SHIP yang belum punya fulfillment
-        $this->autoCreateFulfillments($store);
+        if (!$dryRun) {
+            $this->autoCreateFulfillments($store);
+        }
 
         $found = count($orderSnList);
-        $this->log($store, 'sync_orders', 'success', "Synced {$stats['new']} baru + {$stats['updated']} update dari {$found} order.", [
+        $logType = $dryRun ? 'sync_orders_dry_run' : 'sync_orders';
+        $this->log($store, $logType, 'success', "Synced {$stats['new']} baru + {$stats['updated']} update dari {$found} order.", [
             'time_from'         => $timeFrom,
             'time_to'           => $timeTo,
             'found'             => $found,
@@ -115,7 +155,7 @@ class MarketplaceSyncService
             'incomplete'        => $stats['incomplete'],
             'total_issues'      => $total_issues,
             'order_sn_list'     => $orderSnList,
-            'message'           => "Berhasil sync {$found} order ({$stats['new']} baru, {$stats['updated']} update).",
+            'message'           => ($dryRun ? "[DRY RUN] " : "") . "Berhasil sync {$found} order ({$stats['new']} baru, {$stats['updated']} update).",
         ];
     }
 
@@ -426,15 +466,15 @@ class MarketplaceSyncService
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private function upsertOrders(Store $store, array $details): array
+    private function upsertOrders(Store $store, array $details, bool $dryRun = false): array
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
             DB::statement('PRAGMA foreign_keys=OFF');
         }
 
-        $outerStats = ['new' => 0, 'updated' => 0, 'sku_empty' => 0, 'mapping_not_found' => 0, 'missing_hpp' => 0, 'ready' => 0, 'incomplete' => 0];
+        $outerStats = ['new' => 0, 'updated' => 0, 'sku_empty' => 0, 'mapping_not_found' => 0, 'missing_hpp' => 0, 'ready' => 0, 'incomplete' => 0, 'skipped' => 0];
 
-        DB::transaction(function () use ($store, $details, &$outerStats) {
+        DB::transaction(function () use ($store, $details, &$outerStats, $dryRun) {
 
             foreach ($details as $detail) {
                 if (empty($detail['order_sn'])) continue;
@@ -457,11 +497,19 @@ class MarketplaceSyncService
                 // ── Kurir & resi (dari package_list) ─────────────────────────
                 $packages  = $detail['package_list'] ?? [];
                 $firstPkg  = $packages[0] ?? [];
-                $trackingNo      = $firstPkg['tracking_no'] ?? null;
+                $trackingNo      = $firstPkg['tracking_no'] ?? $firstPkg['tracking_number'] ?? null; // Added tracking_number for V2 fallback
                 $shippingCarrier = $firstPkg['shipping_carrier']
                     ?? $detail['shipping_carrier']
                     ?? $detail['checkout_shipping_carrier']
                     ?? null;
+                
+                $logisticsStatus = $firstPkg['logistics_status'] ?? '';
+                
+                // Jika status dari Shopee adalah READY_TO_SHIP, tetapi logistiknya sudah diatur (REQUEST_CREATED dsb),
+                // maka secara logika aplikasi kita (GFID) statusnya adalah PROCESSED
+                if ($orderStatus === 'READY_TO_SHIP' && in_array($logisticsStatus, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP'])) {
+                    $orderStatus = 'PROCESSED';
+                }
 
                 // ── Finansial ─────────────────────────────────────────────────
                 $totalAmount       = (float) ($detail['total_amount'] ?? 0);
@@ -486,6 +534,35 @@ class MarketplaceSyncService
                     'TO_CONFIRM_RECEIVE' => 'shipped',
                 ];
                 $statusLegacy = $statusMap[$orderStatus] ?? 'new';
+
+                if ($dryRun) {
+                    $existingOrder = MarketplaceOrder::where('store_id', $store->id)->where('channel_order_id', $detail['order_sn'])->first();
+                    if (!$existingOrder) {
+                        $outerStats['new']++;
+                    } else {
+                        $outerStats['updated']++;
+                    }
+                    
+                    $orderHasIncomplete = false;
+                    foreach (($detail['item_list'] ?? []) as $item) {
+                        $mappingAttrs = $this->issueService->buildMappingAttributes(
+                            modelSku:    $item['model_sku'] ?? null,
+                            itemSku:     $item['item_sku']  ?? null,
+                            externalSku: null,
+                            channelCode: $store->channel?->code,
+                        );
+                        if ($mappingAttrs['mapping_status'] === 'marketplace_sku_empty') $outerStats['sku_empty']++;
+                        if ($mappingAttrs['mapping_status'] === 'mapping_not_found')     $outerStats['mapping_not_found']++;
+                        if ($mappingAttrs['cost_status']    === 'missing_hpp')           $outerStats['missing_hpp']++;
+                        if (($mappingAttrs['data_status']   ?? null) === 'incomplete')   $orderHasIncomplete = true;
+                    }
+                    if ($orderHasIncomplete) {
+                        $outerStats['incomplete']++;
+                    } elseif (in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
+                        $outerStats['ready']++;
+                    }
+                    continue;
+                }
 
                 $order = MarketplaceOrder::updateOrCreate(
                     ['store_id' => $store->id, 'channel_order_id' => $detail['order_sn']],
@@ -534,7 +611,9 @@ class MarketplaceSyncService
                     $outerStats['updated']++;
                 }
 
-                $order->items()->delete();
+                $existingItems = $order->items->keyBy(function ($item) {
+                    return ($item->external_item_id ?: 'null') . '_' . ($item->external_model_id ?: 'null') . '_' . ($item->marketplace_sku ?: 'null');
+                });
 
                 // Channel code untuk SKU Mapping lookup
                 $channelCode = $store->channel?->code;
@@ -542,13 +621,26 @@ class MarketplaceSyncService
                 $orderHasIncomplete = false;
 
                 foreach (($detail['item_list'] ?? []) as $item) {
-                    // Resolusi mapping + HPP — jangan pernah default HPP ke 0
+                    $itemExtId = isset($item['item_id']) ? (string) $item['item_id'] : null;
+                    $modelExtId = isset($item['model_id']) ? (string) $item['model_id'] : null;
+                    $mpSku = $item['model_sku'] ?? $item['item_sku'] ?? null;
+                    
+                    $itemKey = ($itemExtId ?: 'null') . '_' . ($modelExtId ?: 'null') . '_' . ($mpSku ?: 'null');
+                    $existingItem = $existingItems->get($itemKey);
+
+                    // Resolusi mapping + HPP
                     $mappingAttrs = $this->issueService->buildMappingAttributes(
                         modelSku:    $item['model_sku'] ?? null,
                         itemSku:     $item['item_sku']  ?? null,
                         externalSku: null,
                         channelCode: $channelCode,
                     );
+                    
+                    // Proteksi HPP manual override
+                    if ($existingItem && $existingItem->hpp_snapshot > 0) {
+                        $mappingAttrs['hpp_snapshot'] = $existingItem->hpp_snapshot;
+                        $mappingAttrs['cost_status'] = $existingItem->cost_status;
+                    }
 
                     // Track item-level stats
                     if ($mappingAttrs['mapping_status'] === 'marketplace_sku_empty') $outerStats['sku_empty']++;
@@ -556,20 +648,26 @@ class MarketplaceSyncService
                     if ($mappingAttrs['cost_status']    === 'missing_hpp')           $outerStats['missing_hpp']++;
                     if (($mappingAttrs['data_status']   ?? null) === 'incomplete')   $orderHasIncomplete = true;
 
-                    MarketplaceOrderItem::create(array_merge([
-                        'order_id'             => $order->id,
-                        'marketplace_order_id' => $order->id,
-                        'external_item_id'     => isset($item['item_id'])  ? (string) $item['item_id']  : null,
-                        'external_model_id'    => isset($item['model_id']) ? (string) $item['model_id'] : null,
-                        'item_name'            => $item['item_name'] ?? '-',
-                        'item_sku'             => $item['item_sku']  ?? null,
-                        'model_sku'            => $item['model_sku'] ?? null,
-                        'variant_name'         => $item['model_name'] ?? null,
-                        'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
-                        'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
-                        'image_url'            => data_get($item, 'image_info.image_url'),
-                        'raw_json'             => $item,
-                    ], $mappingAttrs));
+                    MarketplaceOrderItem::updateOrCreate(
+                        [
+                            'marketplace_order_id' => $order->id,
+                            'external_item_id'     => $itemExtId,
+                            'external_model_id'    => $modelExtId,
+                        ],
+                        array_merge([
+                            'order_id'             => $order->id,
+                            'item_name'            => $item['item_name'] ?? '-',
+                            'item_sku'             => $item['item_sku']  ?? null,
+                            'model_sku'            => $item['model_sku'] ?? null,
+                            'variant_name'         => $item['model_name'] ?? null,
+                            'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
+                            'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
+                            'image_url'            => data_get($item, 'image_info.image_url'),
+                            'raw_json'             => $item,
+                        ], $mappingAttrs)
+                    );
+                    
+                    $existingItems->forget($itemKey);
                 }
 
                 // Track order-level ready / incomplete
@@ -580,7 +678,9 @@ class MarketplaceSyncService
                 }
             }
 
-            $store->update(['last_synced_at' => now()]);
+            if (!$dryRun) {
+                $store->update(['last_synced_at' => now()]);
+            }
         });
 
         if (DB::connection()->getDriverName() === 'sqlite') {

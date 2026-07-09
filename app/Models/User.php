@@ -82,14 +82,10 @@ class User extends Authenticatable
 
         $module = strtolower(trim($module));
 
-        // Admin selalu boleh akses modul-modul ini (tidak bisa di-override DB)
-        if ($this->role === 'admin' && in_array($module, ['production', 'purchasing', 'marketplace'], true)) {
-            return true;
-        }
-
-        // Admin tidak boleh akses finance/imports apapun setting DB-nya
-        if ($this->role === 'admin' && in_array($module, ['accounting', 'imports'], true)) {
-            return false;
+        // Modul yang dikunci oleh role tidak bisa di-override lewat DB.
+        $locked = self::lockedModulesForRole((string) $this->role);
+        if (isset($locked[$module])) {
+            return (bool) $locked[$module]['on'];
         }
 
         if (!self::moduleAccessTableExists()) {
@@ -115,6 +111,69 @@ class User extends Authenticatable
             'operating' => ['dashboard', 'inventory', 'production'],
             default => ['dashboard'],
         };
+    }
+
+    /**
+     * Modul yang aksesnya "dikunci" oleh role (tidak bisa di-override lewat DB).
+     * Sumber kebenaran tunggal untuk canAccessModule() dan halaman Access Control.
+     *
+     * @return array<string, array{on: bool, reason: string}>
+     */
+    public static function lockedModulesForRole(string $role): array
+    {
+        return match (strtolower($role)) {
+            'admin' => [
+                'production'  => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
+                'purchasing'  => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
+                'marketplace' => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
+                'accounting'  => ['on' => false, 'reason' => 'Admin tidak diizinkan mengakses modul ini.'],
+                'imports'     => ['on' => false, 'reason' => 'Admin tidak diizinkan mengakses modul ini.'],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * Status akses efektif per modul untuk user ini, lengkap dengan info kunci.
+     * Menyatukan aturan owner + override admin + default role + setting DB, sehingga
+     * tampilan checklist di halaman Access Control selalu cocok dengan canAccessModule().
+     *
+     * @return array<string, array{on: bool, locked: bool, reason: ?string}>
+     */
+    public function effectiveModuleAccess(): array
+    {
+        $modules  = array_keys(UserModuleAccess::MODULES);
+        $defaults = self::defaultModulesForRole((string) $this->role);
+        $locked   = self::lockedModulesForRole((string) $this->role);
+
+        $explicit = $this->relationLoaded('moduleAccesses')
+            ? $this->moduleAccesses->keyBy('module')
+            : ($this->exists ? $this->moduleAccesses()->get()->keyBy('module') : collect());
+
+        $out = [];
+        foreach ($modules as $module) {
+            if ($this->isOwner()) {
+                $out[$module] = ['on' => true, 'locked' => true, 'reason' => 'Owner selalu punya akses penuh.'];
+                continue;
+            }
+
+            if (isset($locked[$module])) {
+                $out[$module] = [
+                    'on'     => (bool) $locked[$module]['on'],
+                    'locked' => true,
+                    'reason' => $locked[$module]['reason'],
+                ];
+                continue;
+            }
+
+            $on = isset($explicit[$module])
+                ? (bool) $explicit[$module]->can_access
+                : in_array($module, $defaults, true);
+
+            $out[$module] = ['on' => $on, 'locked' => false, 'reason' => null];
+        }
+
+        return $out;
     }
 
     public static function moduleAccessTableExists(): bool

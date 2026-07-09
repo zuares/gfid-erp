@@ -36,6 +36,9 @@
         $roleRaw = (string) (auth()->user()->role ?? '');
         $role = strtolower(trim($roleRaw));
         $isOwner = $role === 'owner';
+        $isAdmin = $role === 'admin';
+        $canViewAds = $isOwner || $isAdmin;
+        $canViewAllWarehouses = $isOwner || $isAdmin;
 
         $modeText = match ($role) {
             'admin' => 'Admin',
@@ -50,7 +53,7 @@
 
         $warehouseId = (int) ($filters['warehouse_id'] ?? 0);
         $activeWarehouse = null;
-        if ($isOwner && $warehouseId > 0) {
+        if ($canViewAllWarehouses && $warehouseId > 0) {
             $activeWarehouse = collect($warehouses ?? [])->firstWhere('id', $warehouseId);
         }
 
@@ -107,7 +110,7 @@
     @endphp
 
     <div id="stocksItemsPage" class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}"
-        data-hide-rts="{{ $role === 'operating' ? '1' : '0' }}" data-is-owner="{{ $isOwner ? '1' : '0' }}"
+        data-hide-rts="{{ $role === 'operating' ? '1' : '0' }}" data-is-owner="{{ $isOwner ? '1' : '0' }}" data-can-view-ads="{{ $canViewAds ? '1' : '0' }}"
         data-selected-warehouse-id="{{ $warehouseId }}">
 
         @if (session('success'))
@@ -132,7 +135,7 @@
                             <span class="pill pill--ok"><i class="bi bi-hourglass-split"></i>Cover</span>
                         @endif
 
-                        @if ($isOwner && $activeWarehouse)
+                        @if ($canViewAllWarehouses && $activeWarehouse)
                             <span class="pill"><i class="bi bi-house"></i>{{ $activeWarehouse->name }}</span>
                         @endif
 
@@ -236,7 +239,7 @@
         <div class="cardx sticky mb-2" id="controlsCard">
             <div class="cardx-b">
                 <form method="GET" action="{{ route('inventory.stocks.items') }}" id="stockFilterForm">
-                    <div class="controls {{ $isOwner ? 'is-owner' : '' }}">
+                    <div class="controls {{ $canViewAllWarehouses ? 'is-owner' : '' }}">
                         <div>
                             <div class="meta mb-1">Search</div>
                             <div class="search">
@@ -247,8 +250,8 @@
                             </div>
                         </div>
 
-                        {{-- Owner Gudang (name only) --}}
-                        @if ($isOwner)
+                        {{-- Owner / Admin Gudang (name only) --}}
+                        @if ($canViewAllWarehouses)
                             <div>
                                 <div class="meta mb-1">Gudang</div>
                                 <select name="warehouse_id" id="warehouseSelect" class="form-select form-select-sm">
@@ -268,25 +271,27 @@
                         @endif
 
                         <div>
-                            <div class="meta mb-1">Sort</div>
+                            <div class="meta mb-1">Urutkan</div>
                             <select name="sort" id="sortSelect" class="form-select form-select-sm">
-                                <option value="code" @selected($sortVal === 'code')>Alphabet</option>
-                                <option value="total" @selected($sortVal === 'total')>Total</option>
-                                <option value="fg" @selected($sortVal === 'fg')>FG</option>
-                                <option value="wip" @selected($sortVal === 'wip')>WIP</option>
+                                <option value="code" @selected($sortVal === 'code')>Alfabet (Kode)</option>
+                                <option value="total" @selected($sortVal === 'total')>Total Stok</option>
+                                <option value="fg" @selected($sortVal === 'fg')>Siap Jual (FG)</option>
+                                <option value="wip" @selected($sortVal === 'wip')>Dlm Proses (WIP)</option>
                                 @if ($isOwner)
-                                    <option value="value" @selected($sortVal === 'value')>Value</option>
-                                    <option value="ads" @selected($sortVal === 'ads')>ADS</option>
-                                    <option value="cover" @selected($sortVal === 'cover')>Coverage</option>
+                                    <option value="value" @selected($sortVal === 'value')>Nilai Stok</option>
+                                @endif
+                                @if ($canViewAds)
+                                    <option value="ads" @selected($sortVal === 'ads')>Rata² Terjual (ADS)</option>
+                                    <option value="cover" @selected($sortVal === 'cover')>Sisa Hari (Cover)</option>
                                 @endif
                             </select>
                         </div>
 
                         <div>
-                            <div class="meta mb-1">Dir</div>
+                            <div class="meta mb-1">Arah</div>
                             <select name="dir" id="dirSelect" class="form-select form-select-sm">
-                                <option value="desc" @selected($dirVal === 'desc')>Desc</option>
-                                <option value="asc" @selected($dirVal === 'asc')>Asc</option>
+                                <option value="desc" @selected($dirVal === 'desc')>Menurun (Desc)</option>
+                                <option value="asc" @selected($dirVal === 'asc')>Menaik (Asc)</option>
                             </select>
                         </div>
                     </div>
@@ -311,16 +316,18 @@
                             <thead>
                                 <tr>
                                     <th style="width:1%">#</th>
-                                    <th>Code</th>
-                                    <th>Name</th>
-                                    <th class="text-end">Total</th>
-                                    <th class="text-end">FG</th>
-                                    <th class="text-end">WIP</th>
+                                    <th>Kode</th>
+                                    <th>Nama Barang</th>
+                                    <th class="text-end">Total Stok</th>
+                                    <th class="text-end">Siap Jual (FG)</th>
+                                    <th class="text-end">Dlm Proses (WIP)</th>
                                     @if ($isOwner)
                                         <th class="text-end">HPP</th>
-                                        <th class="text-end">Value</th>
-                                        <th class="text-end">ADS</th>
-                                        <th class="text-end">Cover</th>
+                                        <th class="text-end">Nilai Stok</th>
+                                    @endif
+                                    @if ($canViewAds)
+                                        <th class="text-end" title="Average Daily Sales">Rata² Terjual/Hari</th>
+                                        <th class="text-end" title="Coverage Days">Sisa Hari</th>
                                     @endif
                                 </tr>
                             </thead>
@@ -353,7 +360,8 @@
                                                 {{ number_format((float) ($row->hpp_per_unit ?? 0), 0, ',', '.') }}</td>
                                             <td class="text-end mono">
                                                 {{ number_format((float) ($row->stock_value ?? 0), 0, ',', '.') }}</td>
-
+                                        @endif
+                                        @if ($canViewAds)
                                             <td class="text-end">
                                                 <div class="d-flex justify-content-end align-items-center gap-2">
                                                     <span
@@ -369,7 +377,12 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="{{ $isOwner ? 10 : 6 }}" class="text-center py-4 text-muted">No
+                                        @php
+                                            $colSpan = 6;
+                                            if ($isOwner) $colSpan += 2;
+                                            if ($canViewAds) $colSpan += 2;
+                                        @endphp
+                                        <td colspan="{{ $colSpan }}" class="text-center py-4 text-muted">No
                                             data.</td>
                                     </tr>
                                 @endforelse
@@ -388,8 +401,8 @@
                                 'wip_qty' => (float) ($row->wip_qty ?? 0),
                                 'hpp_per_unit' => $isOwner ? (float) ($row->hpp_per_unit ?? 0) : null,
                                 'stock_value' => $isOwner ? (float) ($row->stock_value ?? 0) : null,
-                                'ads' => $isOwner ? (float) ($row->ads ?? 0) : null,
-                                'coverage_days' => $isOwner ? (float) ($row->coverage_days ?? 0) : null,
+                                'ads' => $canViewAds ? (float) ($row->ads ?? 0) : null,
+                                'coverage_days' => $canViewAds ? (float) ($row->coverage_days ?? 0) : null,
                             ];
                         @endphp
 
@@ -407,7 +420,7 @@
                                 <div class="m-right">
                                     <div class="m-metric">
                                         <div>
-                                            <div class="k">Total</div>
+                                            <div class="k">Total Stok</div>
                                             <div class="v mono">
                                                 {{ number_format((float) ($row->total_qty ?? 0), 2, ',', '.') }}</div>
                                         </div>

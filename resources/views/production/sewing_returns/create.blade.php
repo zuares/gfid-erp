@@ -795,11 +795,13 @@
                         </a>
                     </div>
 
-                    <a href="{{ $isRejectReworkMode ? route('production.sewing.reject_returns.index') : route('production.sewing.pickups.create') }}"
-                       class="btn btn-sm btn-outline-success"
-                       style="border-radius:8px;">
-                        {{ $isRejectReworkMode ? 'List Reject' : 'Ambil Jahit' }}
-                    </a>
+                    @if(auth()->user()?->role !== 'admin')
+                        <a href="{{ $isRejectReworkMode ? route('production.sewing.reject_returns.index') : route('production.sewing.pickups.create') }}"
+                           class="btn btn-sm btn-outline-success"
+                           style="border-radius:8px;">
+                            {{ $isRejectReworkMode ? 'List Reject' : 'Ambil Jahit' }}
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>

@@ -43,9 +43,7 @@ class InventoryStockController extends Controller
     {
         $q = Warehouse::orderBy('name');
 
-        if ($role === 'admin') {
-            $q->whereIn('code', ['WH-RTS', 'WH-TRANSIT', 'WIP-SEW']);
-        } elseif ($role === 'operating') {
+        if ($role === 'operating') {
             $q->where('code', '!=', 'WH-RTS');
         }
 
@@ -62,6 +60,7 @@ class InventoryStockController extends Controller
         $user = auth()->user();
         $role = strtolower(trim((string) ($user?->role ?? '')));
         $isOwner = $role === 'owner';
+        $canViewAllWarehouses = $isOwner || $role === 'admin';
 
         // =========================
         // Filters & sorting
@@ -74,19 +73,19 @@ class InventoryStockController extends Controller
 
         $allowedSort = $isOwner
         ? ['code', 'value', 'total', 'fg', 'wip', 'ads', 'cover']
-        : ['code', 'total', 'fg', 'wip'];
+        : ['code', 'total', 'fg', 'wip', 'ads', 'cover']; // Admin can sort by ads/cover
 
         if (!in_array($sort, $allowedSort, true)) {
             $sort = 'code';
         }
 
         // =========================
-        // ✅ Owner: list gudang + selected warehouse_id
+        // ✅ Owner & Admin: list gudang + selected warehouse_id
         // =========================
         $warehouses = collect();
         $warehouseId = null;
 
-        if ($isOwner) {
+        if ($canViewAllWarehouses) {
             $warehouses = Warehouse::query()
                 ->where('active', 1) // ✅ kolomnya active
                 ->orderByRaw("
@@ -102,7 +101,14 @@ class InventoryStockController extends Controller
                 ->orderBy('code')
                 ->get(['id', 'code', 'name', 'type']);
 
-            $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
+            if ($request->has('warehouse_id')) {
+                $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
+            } else {
+                if ($role === 'admin') {
+                    $rts = $warehouses->firstWhere('code', 'WH-RTS');
+                    $warehouseId = $rts ? $rts->id : null;
+                }
+            }
 
             if ($warehouseId && !$warehouses->firstWhere('id', $warehouseId)) {
                 $warehouseId = null;
@@ -121,10 +127,8 @@ class InventoryStockController extends Controller
                 $q->where('w.code', 'WH-PRD')
                     ->orWhere('w.code', 'LIKE', 'WIP-%');
             });
-        } elseif ($role === 'admin') {
-            $base->where('w.code', 'WH-RTS');
-        } elseif ($isOwner && $warehouseId) {
-            // ✅ Owner filter gudang
+        } elseif ($canViewAllWarehouses && $warehouseId) {
+            // ✅ Filter gudang
             $base->where('m.warehouse_id', $warehouseId);
         }
 
@@ -269,7 +273,7 @@ class InventoryStockController extends Controller
         $forceJson = str_contains(strtolower($accept), 'application/json');
 
         if ($request->wantsJson() || $request->expectsJson() || $request->ajax() || $forceJson) {
-            $payloadRows = $rows->map(function ($r) use ($isOwner) {
+            $payloadRows = $rows->map(function ($r) use ($isOwner, $role) {
                 return [
                     'item_id' => (int) $r->item_id,
                     'item_code' => (string) $r->item_code,
@@ -284,8 +288,8 @@ class InventoryStockController extends Controller
 
                     'hpp_per_unit' => $isOwner ? (float) $r->hpp_per_unit : null,
                     'stock_value' => $isOwner ? (float) $r->stock_value : null,
-                    'ads' => $isOwner ? (float) $r->ads : null,
-                    'coverage_days' => $isOwner ? ($r->coverage_days !== null ? (float) $r->coverage_days : null) : null,
+                    'ads' => ($isOwner || $role === 'admin') ? (float) $r->ads : null,
+                    'coverage_days' => ($isOwner || $role === 'admin') ? ($r->coverage_days !== null ? (float) $r->coverage_days : null) : null,
 
                     'locations_url' => route('inventory.stocks.item_locations', $r->item_id),
                 ];

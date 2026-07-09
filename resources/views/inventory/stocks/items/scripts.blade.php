@@ -61,6 +61,7 @@
             if (!pageWrap) return;
 
             const isOwner = (pageWrap.dataset.isOwner === '1');
+            const canViewAds = (pageWrap.dataset.canViewAds === '1');
             const hideRtsWarehouse = (pageWrap.dataset.hideRts === '1');
             const stockCardBaseUrl = pageWrap.dataset.stockcardBaseUrl || '';
 
@@ -113,25 +114,26 @@
             const buildDesktopRow = (row, index, from) => {
                 const no = (from || 0) + index;
 
-                if (!isOwner) {
-                    return `
-          <tr class="item-row" data-item-id="${row.item_id}" data-locations-url="${esc(row.locations_url)}">
-            <td class="text-muted small">${no}</td>
-            <td class="mono">
-              <button type="button" class="code-btn js-row-toggle">
-                <i class="bi bi-caret-right-fill caret"></i><span>${esc(row.item_code)}</span>
-              </button>
-            </td>
-            <td>${esc(row.item_name)}</td>
-            <td class="text-end mono">${fmtQty(num0(row.total_qty))}</td>
-            <td class="text-end mono">${fmtQty(num0(row.fg_qty))}</td>
-            <td class="text-end mono">${fmtQty(num0(row.wip_qty))}</td>
-          </tr>
-        `;
+                let exCols = '';
+                if (isOwner) {
+                    exCols += `
+              <td class="text-end mono">${fmtMoney(num0(row.hpp_per_unit))}</td>
+              <td class="text-end mono">${fmtMoney(num0(row.stock_value))}</td>
+            `;
                 }
-
-                const adsVal = num0(row.ads);
-                const mm = moverMeta(adsVal);
+                if (canViewAds) {
+                    const adsVal = num0(row.ads);
+                    const mm = moverMeta(adsVal);
+                    exCols += `
+              <td class="text-end">
+                <div class="d-flex justify-content-end align-items-center gap-2">
+                  <span class="mono">${fmtQty(adsVal)}</span>
+                  <span class="badge-mover ${mm.cls}"><i class="${mm.icon}"></i>${mm.label}</span>
+                </div>
+              </td>
+              <td class="text-end mono">${fmtMoney(num0(row.coverage_days))}</td>
+            `;
+                }
 
                 return `
         <tr class="item-row" data-item-id="${row.item_id}" data-locations-url="${esc(row.locations_url)}">
@@ -145,15 +147,7 @@
           <td class="text-end mono">${fmtQty(num0(row.total_qty))}</td>
           <td class="text-end mono">${fmtQty(num0(row.fg_qty))}</td>
           <td class="text-end mono">${fmtQty(num0(row.wip_qty))}</td>
-          <td class="text-end mono">${fmtMoney(num0(row.hpp_per_unit))}</td>
-          <td class="text-end mono">${fmtMoney(num0(row.stock_value))}</td>
-          <td class="text-end">
-            <div class="d-flex justify-content-end align-items-center gap-2">
-              <span class="mono">${fmtQty(adsVal)}</span>
-              <span class="badge-mover ${mm.cls}"><i class="${mm.icon}"></i>${mm.label}</span>
-            </div>
-          </td>
-          <td class="text-end mono">${fmtMoney(num0(row.coverage_days))}</td>
+          ${exCols}
         </tr>
       `;
             };
@@ -186,7 +180,7 @@
             <div class="m-right">
               <div class="m-metric">
                 <div>
-                  <div class="k">Total</div>
+                  <div class="k">Total Stok</div>
                   <div class="v mono">${fmtQty(num0(row.total_qty))}</div>
                 </div>
               </div>
@@ -201,7 +195,6 @@
             const buildLocationsHtml = (locations, itemId) => {
                 let list = (locations || []);
 
-                // ✅ hanya gudang terpilih
                 const selectedWarehouseId = Number(pageWrap?.dataset?.selectedWarehouseId || 0);
                 if (selectedWarehouseId > 0) {
                     list = list.filter(loc => Number(loc.id) === selectedWarehouseId);
@@ -286,26 +279,33 @@
 
                 let html = `
         <div class="m-detail-grid">
-          <div class="m-kpi"><div class="k">FG</div><div class="v mono">${fg}</div></div>
-          <div class="m-kpi"><div class="k">WIP</div><div class="v mono">${wip}</div></div>
+          <div class="m-kpi"><div class="k">Siap Jual (FG)</div><div class="v mono">${fg}</div></div>
+          <div class="m-kpi"><div class="k">Dlm Proses (WIP)</div><div class="v mono">${wip}</div></div>
         </div>
       `;
 
                 if (isOwner) {
                     const hpp = fmtMoney(num0(r?.hpp_per_unit));
                     const val = fmtMoney(num0(r?.stock_value));
+                    html += `
+          <div class="m-detail-grid">
+            <div class="m-kpi"><div class="k">HPP</div><div class="v mono">${hpp}</div></div>
+            <div class="m-kpi"><div class="k">Nilai Stok</div><div class="v mono">${val}</div></div>
+          </div>
+        `;
+                }
+
+                if (canViewAds) {
                     const ads = fmtQty(num0(r?.ads));
                     const cover = fmtMoney(num0(r?.coverage_days));
                     const mm = moverMeta(num0(r?.ads));
 
                     html += `
           <div class="m-detail-grid">
-            <div class="m-kpi"><div class="k">HPP</div><div class="v mono">${hpp}</div></div>
-            <div class="m-kpi"><div class="k">Value</div><div class="v mono">${val}</div></div>
-            <div class="m-kpi"><div class="k">ADS</div><div class="v mono">${ads}
+            <div class="m-kpi"><div class="k">Rata² Terjual (ADS)</div><div class="v mono">${ads}
               <span class="badge-mover ${mm.cls}" style="margin-left:.35rem;"><i class="${mm.icon}"></i>${mm.label}</span>
             </div></div>
-            <div class="m-kpi"><div class="k">Cover</div><div class="v mono">${cover}</div></div>
+            <div class="m-kpi"><div class="k">Sisa Hari (Cover)</div><div class="v mono">${cover}</div></div>
           </div>
         `;
                 }
@@ -353,9 +353,12 @@
                 $$('.item-card.is-open').forEach(n => n.classList.remove('is-open'));
 
                 if (desktopTbody) {
-                    desktopTbody.innerHTML = rows.length ?
-                        rows.map((r, idx) => buildDesktopRow(r, idx, from)).join('') :
-                        `<tr><td colspan="${isOwner ? 10 : 6}" class="text-center py-4 text-muted">No data.</td></tr>`;
+                    if (rows.length) {
+                        desktopTbody.innerHTML = rows.map((r, idx) => buildDesktopRow(r, idx, from)).join('');
+                    } else {
+                        const colSpan = 6 + (isOwner ? 2 : 0) + (canViewAds ? 2 : 0);
+                        desktopTbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center py-4 text-muted">No data.</td></tr>`;
+                    }
                 }
 
                 if (mobileList) {
@@ -444,7 +447,7 @@
                 const row = btn.closest('tr.item-row');
                 if (!row) return;
 
-                const colspan = isOwner ? 10 : 6;
+                const colSpan = 6 + (isOwner ? 2 : 0) + (canViewAds ? 2 : 0);
                 const isOpen = row.classList.contains('is-open');
 
                 if (isOpen) {
@@ -465,14 +468,14 @@
                 if (!itemId || !url) return;
 
                 row.classList.add('is-open');
-                openDesktopDetail(row, `<div class="text-muted">Loading…</div>`, colspan);
+                openDesktopDetail(row, `<div class="text-muted">Loading…</div>`, colSpan);
 
                 try {
                     const data = await fetchJson(url);
                     openDesktopDetail(row, buildLocationsHtml(data.locations || [], itemId),
-                        colspan);
+                        colSpan);
                 } catch {
-                    openDesktopDetail(row, `<div class="text-muted">Failed.</div>`, colspan);
+                    openDesktopDetail(row, `<div class="text-muted">Failed.</div>`, colSpan);
                 }
             };
 

@@ -375,8 +375,8 @@
             const quickError = document.getElementById('quick-item-error');
             const quickSave = document.getElementById('quick-item-save');
 
-            const itemsUrl = @json(route('inventory.adjustments.items_for_warehouse'));
-            const quickItemUrl = @json(route('inventory.adjustments.items.quick_store'));
+            const itemsUrl = @json(route('inventory.adjustments.items_for_warehouse', [], false));
+            const quickItemUrl = @json(route('inventory.adjustments.items.quick_store', [], false));
 
             let warehouseItems = [];
             let searchTimer = null;
