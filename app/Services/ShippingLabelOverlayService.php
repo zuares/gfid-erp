@@ -169,8 +169,8 @@ class ShippingLabelOverlayService
                     $footerImgWidth = $scaledWidth;
                     $footerImgHeight = $scaledHeight;
                     // Reserve space for image + social media row below it
-                    $socialRowHeight = !empty($socialAccountsFormatted) ? 3.5 : 0;
-                    $reservedBottom = $footerImgHeight + $socialRowHeight + 1;
+                    $socialRowHeight = !empty($socialAccountsFormatted) ? 2.5 : 0;
+                    $reservedBottom = $footerImgHeight + $socialRowHeight + 0.5;
                 } else {
                     if ($senderName || $senderPhone) {
                         $reservedBottom = 12; // Moderate space for text footer
@@ -203,14 +203,12 @@ class ShippingLabelOverlayService
                     // Full width, flush to edges
                     $xPos = ($width - $footerImgWidth) / 2;
                     
-                    // Calculate social media height needed
-                    $socialHeight = 0;
-                    if (!empty($socialAccountsFormatted)) {
-                        $socialHeight = 3.5; // ~3.5mm for social row to keep it compact
-                    }
+                    // Keep social media fixed at a safe distance from the bottom
+                    $socialMediaY = $height - 3.5; 
                     
-                    // Place image above social row
-                    $imgY = $height - $footerImgHeight - $socialHeight;
+                    // Push footer image down so it sits closer to social media
+                    // We allow it to overlap the social media's top margin slightly since the image has white space
+                    $imgY = $socialMediaY - $footerImgHeight + 2.5; // +2.5mm pushes the image DOWN
                     
                     if ($isFooterPdf && $footerPdfTpl) {
                         $pdf->useTemplate($footerPdfTpl, $xPos, $imgY, $footerImgWidth, $footerImgHeight);
@@ -218,8 +216,8 @@ class ShippingLabelOverlayService
                         $pdf->Image($footerImageFull, $xPos, $imgY, $footerImgWidth, $footerImgHeight);
                     }
                     
-                    // Set Y after image for social media
-                    $pdf->SetY($imgY + $footerImgHeight + 0.5);
+                    // Set Y for social media at its fixed position
+                    $pdf->SetY($socialMediaY);
                 } else {
                     if ($senderName || $senderPhone) {
                         $pdf->SetFont('Arial', 'B', 10);
@@ -241,18 +239,19 @@ class ShippingLabelOverlayService
                     }
                 }
                 
+                $socialMediaY = null;
                 // Always render social media accounts below footer (image or text)
                 if (!empty($socialAccountsFormatted)) {
-                    $pdf->SetFont('Arial', '', 7);
-                    $pdf->SetTextColor(60, 60, 60);
+                    $pdf->SetFont('Arial', 'B', 7); // Make font slightly bolder for clarity
+                    $pdf->SetTextColor(40, 40, 40); // Darker grey for better contrast
                     
                     $totalWidth = 0;
-                    $spacing = 1.5;
-                    $itemSpacing = 4;
+                    $iconSpacing = 1.2; // Space between icon and text
+                    $itemSpacing = 6;   // Space between different accounts
                     
                     foreach ($socialAccountsFormatted as $acc) {
                         if ($acc['icon'] && file_exists($acc['icon'])) {
-                            $totalWidth += 2.5 + $spacing;
+                            $totalWidth += 2.8 + $iconSpacing; // Slightly larger icon (2.8mm)
                         }
                         $totalWidth += $pdf->GetStringWidth($acc['text']);
                     }
@@ -260,12 +259,16 @@ class ShippingLabelOverlayService
                     
                     $startX = $alignStr === 'C' ? ($width - $totalWidth) / 2 : 3;
                     $currentX = max(2, $startX);
+                    
                     $currentY = $pdf->GetY();
+                    // Track it for the border to know where social media starts
+                    $socialMediaY = $currentY;
                     
                     foreach ($socialAccountsFormatted as $acc) {
                         if ($acc['icon'] && file_exists($acc['icon'])) {
-                            $pdf->Image($acc['icon'], $currentX, $currentY + 0.3, 2.5, 2.5);
-                            $currentX += 2.5 + $spacing;
+                            // Perfect vertical alignment for 2.8mm icon and 7pt font
+                            $pdf->Image($acc['icon'], $currentX, $currentY + 0.3, 2.8, 2.8);
+                            $currentX += 2.8 + $iconSpacing;
                         }
                         
                         $pdf->SetXY($currentX, $currentY);
@@ -280,7 +283,16 @@ class ShippingLabelOverlayService
                 if ($this->getSetting('marketplace_footer_border', '0', $config) == '1') {
                     $pdf->SetDrawColor(0, 0, 0);
                     $pdf->SetLineWidth(0.5);
-                    $pdf->Rect(2, 2, $width - 4, $height - 4);
+                    
+                    $borderHeight = $height - 4;
+                    if ($socialMediaY !== null) {
+                        // End the border just slightly above the social media row,
+                        // but ensure it completely covers the footer image.
+                        $borderBottomY = $socialMediaY - 0.2; // 0.2mm above social text
+                        $borderHeight = $borderBottomY - 2;
+                    }
+                    
+                    $pdf->Rect(2, 2, $width - 4, $borderHeight);
                 }
                 
                 // === EXTRA PAGE: GREETING CARD ===
