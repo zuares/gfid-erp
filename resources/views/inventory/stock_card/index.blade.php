@@ -185,6 +185,13 @@
                 @endif
             </div>
         </div>
+        
+        <div class="alert alert-info d-flex align-items-center py-2 px-3 mb-3" style="font-size: .8rem; border-radius: 8px;">
+            <i class="bi bi-info-circle-fill me-2 fs-6"></i>
+            <div>
+                <strong>Info:</strong> Status <span class="badge bg-warning text-dark px-1">Sedang Packing</span> di Fulfillment / Shipment tidak mengurangi stok fisik dan <strong>tidak tercatat</strong> sebagai mutasi di Kartu Stok sampai order benar-benar diposting (Shipment).
+            </div>
+        </div>
 
         {{-- KPI (AJAX replace) --}}
         <div id="sc_kpi">

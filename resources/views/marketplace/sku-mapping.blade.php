@@ -125,6 +125,7 @@
         <table class="gf-clean-table w-100">
             <thead><tr>
                 <th>Marketplace SKU</th><th>Channel</th><th>Item Internal</th>
+                <th class="text-end">Stok Tersedia</th>
                 <th>Catatan</th><th class="text-end">Aksi</th>
             </tr></thead>
             <tbody>
@@ -136,6 +137,12 @@
                         ? `<span class="fw-bold" style="font-size:.82rem">${esc(m.item.code)}</span><br>
                            <span class="text-muted" style="font-size:.72rem">${esc(m.item.name)}</span>`
                         : '<span class="text-danger" style="font-size:.78rem">Item dihapus</span>'}
+                </td>
+                <td class="text-end" style="font-size:.82rem;">
+                    ${m.item 
+                        ? `<span class="fw-bold text-success">${FMT.format(m.item.stock_available || 0)}</span>
+                           <br><span class="text-muted" style="font-size:.7rem;">Fisik: ${FMT.format(m.item.stock_physical || 0)}</span>`
+                        : '—'}
                 </td>
                 <td style="font-size:.78rem;color:#64748b">${esc(m.notes || '—')}</td>
                 <td class="text-end">

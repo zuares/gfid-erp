@@ -283,6 +283,7 @@
 
     $openMarketplaceTools =
         $open('marketplace.toko') ||
+        $open('marketplace.settings') ||
         $open('marketplace.orders') ||
         $open('marketplace.orders.*') ||
         $open('marketplace.fulfillment') ||
@@ -1434,6 +1435,10 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.toko') }}" icon="bi bi-shop"
                                 :active="request()->routeIs('marketplace.toko')">
                                 Toko & Kanal
+                            </x-sidebar.sub-link>
+                            <x-sidebar.sub-link href="{{ route('marketplace.settings') }}" icon="bi bi-gear"
+                                :active="request()->routeIs('marketplace.settings')">
+                                Pengaturan Global
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceOrders)

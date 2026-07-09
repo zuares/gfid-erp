@@ -24,6 +24,7 @@ class OrderFulfillmentLine extends Model
         'notes',
         'picked_at',
         'pick_problem',
+        'allocated_qty',
     ];
 
     protected $casts = [

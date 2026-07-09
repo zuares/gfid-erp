@@ -492,6 +492,7 @@
     $grnOpen = request()->routeIs('purchasing.purchase_receipts.*') || request()->routeIs('purchasing.purchase_returns.*');
     $marketplaceOpen =
         request()->routeIs('marketplace.toko') ||
+        request()->routeIs('marketplace.settings') ||
         request()->routeIs('marketplace.orders') ||
         request()->routeIs('marketplace.orders.*') ||
         request()->routeIs('marketplace.fulfillment') ||
@@ -1342,6 +1343,10 @@
                                 <a href="{{ route('marketplace.toko') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.toko') ? 'active' : '' }}">
                                     <span class="icon">🏪</span><span>Toko & Kanal</span>
+                                </a>
+                                <a href="{{ route('marketplace.settings') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.settings') ? 'active' : '' }}">
+                                    <i class="bi bi-gear"></i> Pengaturan Global
                                 </a>
                             @endif
 

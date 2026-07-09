@@ -670,6 +670,10 @@
             <div class="sr-panel-body">
                 <div class="sr-meta">
                     <div class="sr-meta-item sr-meta-store">
+                        <div class="sr-meta-label">Tipe</div>
+                        <div class="sr-meta-value">{{ ucfirst($shipment->shipment_type ?? 'manual') }}</div>
+                    </div>
+                    <div class="sr-meta-item sr-meta-store">
                         <div class="sr-meta-label">Marketplace</div>
                         <div class="sr-meta-value">{{ $shipment->store->code ?? '-' }} - {{ $shipment->store->name ?? '-' }}</div>
                     </div>
@@ -1108,7 +1112,7 @@
                     <div class="sr-order-head" data-toggle-order="${esc(order.code)}">
                         <div>
                             <div class="sr-order-code">${esc(order.code)}</div>
-                            <div class="sr-order-info">${esc(order.label || 'Manual')}</div>
+                            <div class="sr-order-info">${esc(order.label || ('{{ $shipment->shipment_type ?? 'manual' }}' === 'marketplace' ? 'Marketplace' : 'Manual'))}</div>
                         </div>
                         <div class="sr-order-qty">${qty}</div>
                         <div class="sr-order-chevron">${expanded ? '▲' : '▼'}</div>
@@ -1350,6 +1354,9 @@
         code = normalize(code);
         if (!code) return;
 
+        const shipmentType = '{{ $shipment->shipment_type ?? 'manual' }}';
+        const fallbackLabel = shipmentType === 'marketplace' ? 'Marketplace' : 'Manual';
+
         const existingOrder = findOrder(code);
         if (existingOrder) {
             state.current = existingOrder.code;
@@ -1361,7 +1368,7 @@
         }
 
         const addManualOrder = function () {
-            ensureOrder(code, { label: 'Manual' });
+            ensureOrder(code, { label: fallbackLabel });
             playTone('order');
             toast('ok', `Order ${code}`);
             setMode('item');
@@ -1383,9 +1390,9 @@
             const orderCode = normalize(data?.order?.code || code);
             const label = data?.type === 'order'
                 ? [data.order?.store_code, data.order?.store_name].filter(Boolean).join(' - ')
-                : 'Manual';
+                : fallbackLabel;
 
-            ensureOrder(orderCode, { label: label || 'Manual' });
+            ensureOrder(orderCode, { label: label || fallbackLabel });
             playTone('order');
             toast('ok', `Order ${orderCode}`);
             setMode('item');

@@ -1437,8 +1437,11 @@ function statusBadge(s) {
 
 function fmtDate(s) {
     if (!s) return '';
-    try { return new Date(s + 'T00:00:00').toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'2-digit'}); }
-    catch { return s; }
+    try {
+        const d = new Date(s);
+        if (isNaN(d)) return s;
+        return d.toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'2-digit'});
+    } catch { return s; }
 }
 
 /* ── Focus ── */

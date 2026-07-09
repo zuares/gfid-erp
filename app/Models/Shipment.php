@@ -10,8 +10,12 @@ class Shipment extends Model
 {
     use HasFactory;
 
+    public const TYPE_MARKETPLACE = 'marketplace';
+    public const TYPE_MANUAL = 'manual';
+
     protected $fillable = [
         'code',
+        'shipment_type',
         'store_id',
         'warehouse_id',
         'sales_invoice_id',

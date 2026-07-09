@@ -22,6 +22,19 @@
             </div>
         </div>
 
+        @php
+            $activeAnomaliesCount = \App\Models\InventoryAuditFinding::whereNull('resolved_at')->count();
+        @endphp
+        
+        @if($activeAnomaliesCount > 0)
+            <div class="alert alert-danger" style="margin-bottom: 20px; border-radius: 8px; padding: 15px; background: #fff5f5; border: 1px solid #ffcaca; color: #d32f2f; display: flex; align-items: center; gap: 10px;">
+                <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.2rem;"></i>
+                <div>
+                    <strong>Peringatan Sistem:</strong> Ditemukan <b>{{ $activeAnomaliesCount }}</b> anomali stok/fulfillment. Hubungi administrator untuk mengecek log <code>inventory_audit_findings</code>.
+                </div>
+            </div>
+        @endif
+
         @includeFirst(
             ['dashboard.partials.' . $role, 'dashboard.partials.generic'],
             ['d' => $d]

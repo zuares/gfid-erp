@@ -75,35 +75,34 @@ class StockApiController extends Controller
         $hppPerUnit = (float) ($item->hpp ?? 0);
 
         /**
-         * Stock per warehouse from inventory_mutations (source of truth)
-         * Filter:
-         * - m.item_id = itemId
-         * - group by warehouse
+         * Stock per warehouse from inventory_stocks
          */
-        $rows = DB::table('inventory_mutations as m')
-            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
-            ->where('m.item_id', $itemId)
+        $rows = DB::table('inventory_stocks as s')
+            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
+            ->where('s.item_id', $itemId)
             ->groupBy('w.id', 'w.code', 'w.name')
             ->orderBy('w.code')
             ->selectRaw('
             w.id as warehouse_id,
             w.code as code,
             w.name as name,
-            COALESCE(SUM(m.qty_change), 0) as on_hand
+            COALESCE(SUM(s.qty), 0) as on_hand,
+            COALESCE(SUM(s.allocated_qty), 0) as reserved
         ')
-            ->havingRaw('COALESCE(SUM(m.qty_change), 0) <> 0')
+            ->havingRaw('COALESCE(SUM(s.qty), 0) <> 0 OR COALESCE(SUM(s.allocated_qty), 0) <> 0')
             ->get();
 
         $warehouses = $rows->map(function ($row) use ($isOwner, $hppPerUnit) {
             $onHand = (float) ($row->on_hand ?? 0);
+            $reserved = (float) ($row->reserved ?? 0);
 
             $payload = [
                 'warehouse_id' => (int) $row->warehouse_id,
                 'code' => (string) $row->code,
                 'name' => (string) $row->name,
                 'on_hand' => $onHand,
-                'reserved' => 0.0,
-                'available' => $onHand,
+                'reserved' => $reserved,
+                'available' => $onHand - $reserved,
             ];
 
             // owner-only sensitive data

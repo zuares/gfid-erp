@@ -20,11 +20,28 @@ class SkuMappingController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(
-            SkuMapping::with('item:id,code,name')
-                ->orderBy('marketplace_sku')
-                ->get()
-        );
+        $mappings = SkuMapping::with('item:id,code,name')
+            ->orderBy('marketplace_sku')
+            ->get();
+
+        $itemIds = $mappings->pluck('item_id')->filter()->unique();
+        $stocks = DB::table('inventory_stocks')
+            ->whereIn('item_id', $itemIds)
+            ->selectRaw('item_id, SUM(qty) as total_qty, SUM(allocated_qty) as allocated_qty')
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $mappings->each(function ($mapping) use ($stocks) {
+            if ($mapping->item) {
+                $stock = $stocks->get($mapping->item_id);
+                $mapping->item->stock_physical = (float) ($stock->total_qty ?? 0);
+                $mapping->item->stock_packing = (float) ($stock->allocated_qty ?? 0);
+                $mapping->item->stock_available = $mapping->item->stock_physical - $mapping->item->stock_packing;
+            }
+        });
+
+        return response()->json($mappings);
     }
 
     public function store(Request $request): JsonResponse

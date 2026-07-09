@@ -75,4 +75,9 @@ class OrderFulfillment extends Model
     {
         return $this->lines()->whereColumn('qty_fulfilled', '<', 'qty_ordered')->exists();
     }
+
+    public function shipmentScans()
+    {
+        return $this->hasMany(\App\Models\ShipmentOrderScan::class, 'fulfillment_id');
+    }
 }

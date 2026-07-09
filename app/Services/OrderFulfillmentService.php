@@ -235,26 +235,6 @@ class OrderFulfillmentService
                     continue; // Skip line yang belum ter-mapping
                 }
 
-                // Potong stok — hanya jika warehouse terset
-                if ($fulfillment->warehouse_id) {
-                    InventoryMutation::create([
-                        'date'         => now()->toDateString(),
-                        'warehouse_id' => $fulfillment->warehouse_id,
-                        'item_id'      => $line->item_id,
-                        'lot_id'       => $line->lot_id,
-                        'qty_change'   => $line->qty_fulfilled,
-                        'direction'    => 'out',
-                        'source_type'  => 'order_fulfillment',
-                        'source_id'    => $fulfillment->id,
-                        'notes'        => "Fulfillment order #{$fulfillment->order->channel_order_id}",
-                        'unit_cost'    => 0,
-                        'total_cost'   => 0,
-                    ]);
-
-                    InventoryStock::where('warehouse_id', $fulfillment->warehouse_id)
-                        ->where('item_id', $line->item_id)
-                        ->decrement('qty', $line->qty_fulfilled);
-                }
             }
 
             // Update status fulfillment → picking (stok sudah dipotong, picker mulai ambil barang)
@@ -301,48 +281,6 @@ class OrderFulfillmentService
         $orderNo     = $fulfillment->order?->channel_order_id ?? "#{$fulfillment->id}";
 
         DB::transaction(function () use ($line, $newItemId, $newQty, $warehouseId, $fulfillment, $orderNo) {
-            // 1. Balikkan stok item lama (jika sudah terpetakan & warehouse ada)
-            if ($line->item_id && $warehouseId) {
-                InventoryMutation::create([
-                    'date'        => now()->toDateString(),
-                    'warehouse_id'=> $warehouseId,
-                    'item_id'     => $line->item_id,
-                    'lot_id'      => $line->lot_id,
-                    'qty_change'  => $line->qty_fulfilled,
-                    'direction'   => 'in',
-                    'source_type' => 'order_fulfillment_substitution',
-                    'source_id'   => $fulfillment->id,
-                    'notes'       => "Pembatalan picking — ganti item order {$orderNo}",
-                    'unit_cost'   => 0,
-                    'total_cost'  => 0,
-                ]);
-
-                InventoryStock::where('warehouse_id', $warehouseId)
-                    ->where('item_id', $line->item_id)
-                    ->increment('qty', $line->qty_fulfilled);
-            }
-
-            // 2. Potong stok item pengganti
-            if ($warehouseId) {
-                InventoryMutation::create([
-                    'date'        => now()->toDateString(),
-                    'warehouse_id'=> $warehouseId,
-                    'item_id'     => $newItemId,
-                    'lot_id'      => null,
-                    'qty_change'  => $newQty,
-                    'direction'   => 'out',
-                    'source_type' => 'order_fulfillment_substitution',
-                    'source_id'   => $fulfillment->id,
-                    'notes'       => "Penggantian item picking order {$orderNo}",
-                    'unit_cost'   => 0,
-                    'total_cost'  => 0,
-                ]);
-
-                InventoryStock::where('warehouse_id', $warehouseId)
-                    ->where('item_id', $newItemId)
-                    ->decrement('qty', $newQty);
-            }
-
             // 3. Hitung stok tersisa item baru
             $stockRow = $warehouseId
                 ? InventoryStock::where('warehouse_id', $warehouseId)
@@ -356,6 +294,7 @@ class OrderFulfillmentService
                 'lot_id'          => $stockRow?->lot_id ?? null,
                 'qty_fulfilled'   => $newQty,
                 'stock_available' => (int) ($stockRow?->qty ?? 0),
+                'allocated_qty'   => $newQty,
                 'substituted'     => true,
                 'picked_at'       => now(),   // otomatis dipick setelah substitusi
                 'pick_problem'    => null,
@@ -429,27 +368,6 @@ class OrderFulfillmentService
 
             foreach ($activeLines as $line) {
                 if (! $line->item_id) continue;
-
-                // Potong stok
-                if ($fulfillment->warehouse_id) {
-                    InventoryMutation::create([
-                        'date'        => now()->toDateString(),
-                        'warehouse_id'=> $fulfillment->warehouse_id,
-                        'item_id'     => $line->item_id,
-                        'lot_id'      => $line->lot_id,
-                        'qty_change'  => $line->qty_fulfilled,
-                        'direction'   => 'out',
-                        'source_type' => 'order_fulfillment',
-                        'source_id'   => $fulfillment->id,
-                        'notes'       => "Batch fulfillment order #{$fulfillment->order?->channel_order_id}",
-                        'unit_cost'   => 0,
-                        'total_cost'  => 0,
-                    ]);
-
-                    InventoryStock::where('warehouse_id', $fulfillment->warehouse_id)
-                        ->where('item_id', $line->item_id)
-                        ->decrement('qty', $line->qty_fulfilled);
-                }
 
                 // Mark picked (batch = semua sudah fisik di tangan)
                 $line->update(['picked_at' => now(), 'pick_problem' => null]);
@@ -665,26 +583,7 @@ class OrderFulfillmentService
                 $qty    = (int) ($item['qty'] ?? 0);
                 if (! $itemId || $qty <= 0) continue;
 
-                if ($fulfillment->warehouse_id) {
-                    // TODO: Ambil nilai cost dari HPP item untuk unit_cost dan total_cost (Jangan hardcode 0)
-                    InventoryMutation::create([
-                        'date'         => now()->toDateString(),
-                        'warehouse_id' => $fulfillment->warehouse_id,
-                        'item_id'      => $itemId,
-                        'lot_id'       => $item['lot_id'] ?? null,
-                        'qty_change'   => $qty,
-                        'direction'    => 'out',
-                        'source_type'  => 'order_fulfillment',
-                        'source_id'    => $fulfillment->id,
-                        'notes'        => "Konfirmasi order #{$fulfillment->order?->channel_order_id}",
-                        'unit_cost'    => 0,
-                        'total_cost'   => 0,
-                    ]);
 
-                    InventoryStock::where('warehouse_id', $fulfillment->warehouse_id)
-                        ->where('item_id', $itemId)
-                        ->decrement('qty', $qty);
-                }
             }
 
             $fulfillment->update([
@@ -804,25 +703,6 @@ class OrderFulfillmentService
         DB::transaction(function () use (
             $line, $splits, $warehouseId, $orderNo, $stockAlreadyCut, $fulfillment, &$newLines
         ) {
-            // 1. Jika stok sudah dipotong → reverse item asli
-            if ($stockAlreadyCut && $line->item_id && $warehouseId) {
-                InventoryMutation::create([
-                    'date'        => now()->toDateString(),
-                    'warehouse_id'=> $warehouseId,
-                    'item_id'     => $line->item_id,
-                    'lot_id'      => $line->lot_id,
-                    'qty_change'  => $line->qty_fulfilled,
-                    'direction'   => 'in',
-                    'source_type' => 'order_fulfillment_split',
-                    'source_id'   => $line->id,
-                    'notes'       => "Reverse split — line #{$line->id} order {$orderNo}",
-                    'unit_cost'   => 0, 'total_cost' => 0,
-                ]);
-                InventoryStock::where('warehouse_id', $warehouseId)
-                    ->where('item_id', $line->item_id)
-                    ->increment('qty', $line->qty_fulfilled);
-            }
-
             // 2. Soft-archive parent
             $line->update(['is_split_parent' => true]);
 
@@ -845,25 +725,8 @@ class OrderFulfillmentService
                     'substituted'               => $s['item_id'] !== $line->item_id,
                     'split_parent_id'           => $line->id,
                     'stock_available'           => (int) ($stockRow?->qty ?? 0),
+                    'allocated_qty'             => $stockAlreadyCut ? $s['qty'] : 0,
                 ]);
-
-                if ($stockAlreadyCut && $warehouseId) {
-                    InventoryMutation::create([
-                        'date'        => now()->toDateString(),
-                        'warehouse_id'=> $warehouseId,
-                        'item_id'     => $s['item_id'],
-                        'lot_id'      => $stockRow?->lot_id,
-                        'qty_change'  => $s['qty'],
-                        'direction'   => 'out',
-                        'source_type' => 'order_fulfillment_split',
-                        'source_id'   => $newLine->id,
-                        'notes'       => "Split picking — line #{$newLine->id} order {$orderNo}",
-                        'unit_cost'   => 0, 'total_cost' => 0,
-                    ]);
-                    InventoryStock::where('warehouse_id', $warehouseId)
-                        ->where('item_id', $s['item_id'])
-                        ->decrement('qty', $s['qty']);
-                }
 
                 $newLines[] = $newLine->fresh(['item']);
             }
@@ -897,54 +760,12 @@ class OrderFulfillmentService
         $warehouseId = $fulfillment->warehouse_id;
         $orderNo     = $fulfillment->order?->channel_order_id ?? "#{$fulfillment->id}";
 
-        // Cek apakah ada mutations untuk split children
-        $childIds        = $children->pluck('id')->toArray();
-        $hasMutations    = InventoryMutation::where('source_type', 'order_fulfillment_split')
-            ->whereIn('source_id', $childIds)->exists();
+        // Cek apakah split children ini pernah memotong/reservasi stok
+        $hasAllocations = $children->where('allocated_qty', '>', 0)->isNotEmpty();
 
         DB::transaction(function () use (
-            $parentLine, $children, $childIds, $warehouseId, $orderNo, $hasMutations, $fulfillment
+            $parentLine, $children, $childIds, $warehouseId, $orderNo, $hasAllocations, $fulfillment
         ) {
-            if ($hasMutations && $warehouseId) {
-                // Reverse tiap split child mutation (balik stok child ke gudang)
-                foreach ($children as $child) {
-                    if (! $child->item_id) continue;
-                    InventoryMutation::create([
-                        'date'        => now()->toDateString(),
-                        'warehouse_id'=> $warehouseId,
-                        'item_id'     => $child->item_id,
-                        'lot_id'      => $child->lot_id,
-                        'qty_change'  => $child->qty_fulfilled,
-                        'direction'   => 'in',
-                        'source_type' => 'order_fulfillment_split_restore',
-                        'source_id'   => $child->id,
-                        'notes'       => "Restore split — child #{$child->id} order {$orderNo}",
-                        'unit_cost'   => 0, 'total_cost' => 0,
-                    ]);
-                    InventoryStock::where('warehouse_id', $warehouseId)
-                        ->where('item_id', $child->item_id)
-                        ->increment('qty', $child->qty_fulfilled);
-                }
-
-                // Re-cut stok item original (parent)
-                if ($parentLine->item_id) {
-                    InventoryMutation::create([
-                        'date'        => now()->toDateString(),
-                        'warehouse_id'=> $warehouseId,
-                        'item_id'     => $parentLine->item_id,
-                        'lot_id'      => $parentLine->lot_id,
-                        'qty_change'  => $parentLine->qty_fulfilled,
-                        'direction'   => 'out',
-                        'source_type' => 'order_fulfillment_split_restore',
-                        'source_id'   => $parentLine->id,
-                        'notes'       => "Re-cut restore split — line #{$parentLine->id} order {$orderNo}",
-                        'unit_cost'   => 0, 'total_cost' => 0,
-                    ]);
-                    InventoryStock::where('warehouse_id', $warehouseId)
-                        ->where('item_id', $parentLine->item_id)
-                        ->decrement('qty', $parentLine->qty_fulfilled);
-                }
-            }
 
             // Hapus split children
             OrderFulfillmentLine::whereIn('id', $childIds)->delete();

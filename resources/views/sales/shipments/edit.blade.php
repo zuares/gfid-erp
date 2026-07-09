@@ -1225,13 +1225,28 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Scan Order Dulu
     </a>
 
-    <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
-       id="rekonBtn"
-       data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
-       class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
-       aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
-        {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
-    </a>
+    @if ($shipment->shipment_type === \App\Models\Shipment::TYPE_MANUAL)
+        <form id="postManualForm" action="{{ route('sales.shipments.submit', $shipment) }}" method="POST" class="d-none">
+            @csrf
+        </form>
+        <button type="button" 
+           id="rekonBtn"
+           data-is-manual="1"
+           onclick="if(this.getAttribute('aria-disabled') !== 'true') document.getElementById('postManualForm').submit();"
+           class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
+           aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
+            {{ $totalLines > 0 ? 'Posting Shipment' : 'Scan Barang Dulu' }}
+        </button>
+    @else
+        <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
+           id="rekonBtn"
+           data-is-manual="0"
+           data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
+           class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
+           aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
+            {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
+        </a>
+    @endif
 </div>
 
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
@@ -1305,9 +1320,19 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 <div class="shp-ls-code" id="lastScanCode">—</div>
                 <div class="shp-ls-name" id="lastScanName"></div>
             </div>
-            <div class="shp-ls-qty-wrap">
-                <div class="shp-ls-qty-label">Qty total</div>
-                <div class="shp-ls-qty" id="lastScanQty">—</div>
+            <div class="d-flex align-items-center gap-3 ms-auto">
+                <div class="shp-ls-qty-wrap" style="text-align: right; margin-left: 0;">
+                    <div class="shp-ls-qty-label" style="color: var(--shp-warn);">Sedang Packing</div>
+                    <div class="shp-ls-qty" style="color: var(--shp-warn);" id="lastScanPacking">—</div>
+                </div>
+                <div class="shp-ls-qty-wrap" style="text-align: right; margin-left: 0;">
+                    <div class="shp-ls-qty-label" style="color: #0284c7;">Stok Tersedia</div>
+                    <div class="shp-ls-qty" style="color: #0284c7;" id="lastScanAvailable">—</div>
+                </div>
+                <div class="shp-ls-qty-wrap" style="text-align: right; margin-left: 0;">
+                    <div class="shp-ls-qty-label">Scan / Order</div>
+                    <div class="shp-ls-qty" id="lastScanQty">—</div>
+                </div>
             </div>
         </div>
 
@@ -1608,6 +1633,8 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const lastScanCode      = document.getElementById('lastScanCode');
     const lastScanName      = document.getElementById('lastScanName');
     const lastScanQtyEl     = document.getElementById('lastScanQty');
+    const lastScanPacking   = document.getElementById('lastScanPacking');
+    const lastScanAvailable = document.getElementById('lastScanAvailable');
     const scanErrorBox      = document.getElementById('scanErrorBox');
     const scanErrorMsg      = document.getElementById('scanErrorMsg');
     const sessionCounterEl  = document.getElementById('sessionCounter');
@@ -1756,6 +1783,8 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         lastScanCode.textContent = line.item_code || '—';
         lastScanName.textContent = line.item_name || '';
         lastScanQtyEl.textContent = FMT.format(line.qty_scanned || 0);
+        if (lastScanPacking) lastScanPacking.textContent = FMT.format(line.stock_packing || 0);
+        if (lastScanAvailable) lastScanAvailable.textContent = FMT.format(line.stock_available || 0);
         lastScanBox.style.display = 'flex';
         /* re-trigger animation */
         lastScanBox.style.animation = 'none';
@@ -1850,14 +1879,19 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     function syncRekonButton(totalLines) {
         if (!rekonBtn) return;
         const count = parseInt(totalLines ?? summaryLines?.textContent ?? '0', 10) || 0;
-        const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
+        const isManual = rekonBtn.dataset.isManual === '1';
         if (count > 0) {
-            rekonBtn.href = url;
-            rekonBtn.textContent = 'Lanjut Rekonsiliasi';
+            if (!isManual) {
+                const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
+                rekonBtn.href = url;
+                rekonBtn.textContent = 'Lanjut Rekonsiliasi';
+            } else {
+                rekonBtn.textContent = 'Posting Shipment';
+            }
             rekonBtn.classList.remove('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'false');
         } else {
-            rekonBtn.href = '#';
+            if (!isManual) rekonBtn.href = '#';
             rekonBtn.textContent = 'Scan Barang Dulu';
             rekonBtn.classList.add('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'true');
@@ -2202,11 +2236,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             const code = scanInput.value.trim();
             if (!code) { beepErr(); showScanError('Kode kosong.'); focusScan(); return; }
 
-            /* ── Barcode navigasi: scan NEXT → pindah ke Rekon ── */
+            /* ── Barcode navigasi: scan NEXT → pindah ke Rekon atau Submit ── */
             if (code.toUpperCase() === 'NEXT') {
                 scanInput.value = '';
-                const _rekonUrl = rekonBtn?.dataset?.rekonUrl;
-                if (_rekonUrl) { beepNav(); window.location.href = _rekonUrl; }
+                if (rekonBtn && !rekonBtn.classList.contains('is-disabled')) {
+                    beepNav();
+                    if (rekonBtn.dataset.isManual === '1') {
+                        document.getElementById('postManualForm').submit();
+                    } else if (rekonBtn.dataset.rekonUrl) {
+                        window.location.href = rekonBtn.dataset.rekonUrl;
+                    }
+                }
                 return;
             }
 

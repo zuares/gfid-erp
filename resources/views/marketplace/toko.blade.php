@@ -246,6 +246,13 @@
                 </div>
                 <div class="store-stats">${statsPills}</div>
                 <div class="mb-3">
+                    <label style="font-size:.68rem;font-weight:700;color:#94a3b8;display:block;margin-bottom:.25rem">TIPE RESI</label>
+                    <select class="form-select form-select-sm" style="border-radius:10px;font-size:.75rem;margin-bottom:.5rem"
+                        onchange="setShippingDocumentType(${s.id}, this.value, this)">
+                        <option value="THERMAL_AIR_WAYBILL" ${(s.meta && s.meta.shipping_document_type === 'THERMAL_AIR_WAYBILL') ? 'selected' : ''}>Thermal (100x150)</option>
+                        <option value="NORMAL_AIR_WAYBILL" ${(s.meta && s.meta.shipping_document_type === 'NORMAL_AIR_WAYBILL') ? 'selected' : ''}>A4 (Normal)</option>
+                    </select>
+                    
                     <label style="font-size:.68rem;font-weight:700;color:#94a3b8;display:block;margin-bottom:.25rem">GUDANG DEFAULT</label>
                     <select class="form-select form-select-sm" style="border-radius:10px;font-size:.75rem"
                         onchange="setWarehouse(${s.id}, this.value, this)">
@@ -417,6 +424,25 @@
             });
             sel.style.borderColor = '#16a34a';
             setTimeout(() => { sel.style.borderColor = ''; }, 1500);
+        } catch (e) { alert('Gagal: ' + e.message); }
+        finally { sel.disabled = false; }
+    };
+
+    window.setShippingDocumentType = async function (storeId, type, sel) {
+        sel.disabled = true;
+        try {
+            await api('/api/marketplace/stores/' + storeId, {
+                method: 'PATCH', body: JSON.stringify({ meta_shipping_document_type: type }),
+            });
+            sel.style.borderColor = '#16a34a';
+            setTimeout(() => { sel.style.borderColor = ''; }, 1500);
+            
+            // Perbarui local data agar tampilan tetap sesuai jika render ulang
+            const store = stores.find(s => s.id == storeId);
+            if (store) {
+                if (!store.meta) store.meta = {};
+                store.meta.shipping_document_type = type;
+            }
         } catch (e) { alert('Gagal: ' + e.message); }
         finally { sel.disabled = false; }
     };

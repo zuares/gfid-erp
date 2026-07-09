@@ -212,6 +212,20 @@
         </div>
     @endif
 
+    @if(isset($staleDrafts) && $staleDrafts->count() > 0)
+        <div class="alert alert-warning mb-2" style="border-radius: 8px; font-size: 0.88rem;">
+            <i class="bi bi-clock-history"></i> 
+            <strong>Peringatan Stale Draft:</strong> 
+            Terdapat <b>{{ $staleDrafts->count() }} Shipment</b> (Draft/Submitted) berumur lebih dari 24 jam yang menahan total 
+            <b>{{ number_format($staleDrafts->sum('total_allocated'), 0, ',', '.') }} unit stok</b>. 
+            Mohon segera selesaikan atau hapus draf berikut: 
+            @foreach($staleDrafts->take(5) as $sd)
+                <a href="{{ route('sales.shipments.edit', $sd) }}" class="fw-bold text-dark text-decoration-underline">{{ $sd->code }}</a>{{ !$loop->last ? ',' : '' }}
+            @endforeach
+            @if($staleDrafts->count() > 5) ... @endif
+        </div>
+    @endif
+
     <div class="ship-topbar">
         <div>
             <div class="title">Shipment</div>

@@ -318,7 +318,9 @@
                                     <th style="width:1%">#</th>
                                     <th>Kode</th>
                                     <th>Nama Barang</th>
-                                    <th class="text-end">Total Stok</th>
+                                    <th class="text-end">Stok Fisik</th>
+                                    <th class="text-end">Sedang Packing</th>
+                                    <th class="text-end">Stok Tersedia</th>
                                     <th class="text-end">Siap Jual (FG)</th>
                                     <th class="text-end">Dlm Proses (WIP)</th>
                                     @if ($isOwner)
@@ -350,6 +352,16 @@
 
                                         <td class="text-end mono">
                                             {{ number_format((float) ($row->total_qty ?? 0), 2, ',', '.') }}</td>
+                                        <td class="text-end mono" style="color: var(--bs-warning);">
+                                            @if(($row->allocated_qty ?? 0) > 0)
+                                                {{ number_format((float) ($row->allocated_qty), 2, ',', '.') }}
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end mono fw-bold" style="color: var(--bs-success);">
+                                            {{ number_format((float) (($row->total_qty ?? 0) - ($row->allocated_qty ?? 0)), 2, ',', '.') }}
+                                        </td>
                                         <td class="text-end mono">
                                             {{ number_format((float) ($row->fg_qty ?? 0), 2, ',', '.') }}</td>
                                         <td class="text-end mono">
@@ -397,6 +409,8 @@
                         @php
                             $rowPayload = [
                                 'total_qty' => (float) ($row->total_qty ?? 0),
+                                'allocated_qty' => (float) ($row->allocated_qty ?? 0),
+                                'available_qty' => (float) (($row->total_qty ?? 0) - ($row->allocated_qty ?? 0)),
                                 'fg_qty' => (float) ($row->fg_qty ?? 0),
                                 'wip_qty' => (float) ($row->wip_qty ?? 0),
                                 'hpp_per_unit' => $isOwner ? (float) ($row->hpp_per_unit ?? 0) : null,
@@ -420,9 +434,9 @@
                                 <div class="m-right">
                                     <div class="m-metric">
                                         <div>
-                                            <div class="k">Total Stok</div>
-                                            <div class="v mono">
-                                                {{ number_format((float) ($row->total_qty ?? 0), 2, ',', '.') }}</div>
+                                            <div class="k">Tersedia</div>
+                                            <div class="v mono" style="color: var(--bs-success); font-weight: bold;">
+                                                {{ number_format((float) (($row->total_qty ?? 0) - ($row->allocated_qty ?? 0)), 2, ',', '.') }}</div>
                                         </div>
                                     </div>
                                     <i class="bi bi-caret-right-fill caret"></i>

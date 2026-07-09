@@ -11,7 +11,13 @@ class InventoryStock extends Model
         'item_id',
         'lot_id',
         'qty',
+        'allocated_qty',
     ];
+
+    public function getAvailableQtyAttribute()
+    {
+        return $this->qty - $this->allocated_qty;
+    }
 
     public function warehouse()
     {

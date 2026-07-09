@@ -545,10 +545,10 @@
                 🔁 Remap Items
             </button>
             <div style="width:1px;height:20px;background:#e2e8f0;margin:0 .15rem"></div>
-            {{-- Go to fulfillment --}}
-            <a href="/marketplace/fulfillment"
+            {{-- Go to shipment --}}
+            <a href="/sales/shipments"
                 style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;text-decoration:none">
-                📋 Buka Fulfillment →
+                📋 Buka Shipment →
             </a>
         </div>
         <div style="margin-top:.65rem;font-size:.7rem;color:#9ca3af">
@@ -559,6 +559,18 @@
         </div>
     </div>
     @endif
+
+    {{-- Alert SOP Baru --}}
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:1rem; margin-bottom:1.25rem; display:flex; gap:.75rem; align-items:flex-start">
+        <div style="font-size:1.2rem">📦</div>
+        <div>
+            <div style="font-size:.85rem; font-weight:800; color:#1e40af; margin-bottom:.15rem">SOP BARU PENGIRIMAN</div>
+            <div style="font-size:.78rem; color:#1d4ed8; line-height:1.4">
+                Proses packing dan potong stok kini dilakukan lewat menu <strong><a href="/sales/shipments" style="color:#1d4ed8; text-decoration:underline">Shipment</a></strong>.<br>
+                Gunakan modul Shipment untuk membuat Draft (Batch) pengiriman Marketplace lalu scan resi/order Anda.
+            </div>
+        </div>
+    </div>
 
     {{-- KPI strip --}}
     <div class="oc-kpi-grid" style="margin-bottom:1.25rem">
@@ -572,9 +584,14 @@
             <div class="oc-kpi-value" id="kpiProcessed" style="color:#0284c7">—</div>
             <div class="oc-kpi-note">klik untuk lihat</div>
         </div>
+        <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('ready_to_handover')">
+            <div class="oc-kpi-label">🚚 Siap Kirim</div>
+            <div class="oc-kpi-value" id="kpiReadyToHandover" style="color:#2563eb">—</div>
+            <div class="oc-kpi-note">klik untuk lihat</div>
+        </div>
         <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('shipped')">
-            <div class="oc-kpi-label">🚚 Dikirim</div>
-            <div class="oc-kpi-value" id="kpiShipped" style="color:#2563eb">—</div>
+            <div class="oc-kpi-label">🚀 Sedang Dikirim</div>
+            <div class="oc-kpi-value" id="kpiShipped" style="color:#16a34a">—</div>
             <div class="oc-kpi-note">klik untuk lihat</div>
         </div>
         <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('issues')">
@@ -609,8 +626,11 @@
             <button class="ord-tab" data-tab="processed" onclick="switchTab('processed',this)">
                 Sedang Dikemas <span class="ord-badge" id="badge-processed" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
             </button>
+            <button class="ord-tab" data-tab="ready_to_handover" onclick="switchTab('ready_to_handover',this)">
+                Siap Kirim <span class="ord-badge" id="badge-ready_to_handover" style="background:#e0e7ff;color:#4f46e5;border-color:#c7d2fe">—</span>
+            </button>
             <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped',this)">
-                Dikirim <span class="ord-badge" id="badge-shipped">—</span>
+                Sedang Dikirim <span class="ord-badge" id="badge-shipped">—</span>
             </button>
             <button class="ord-tab" data-tab="completed" onclick="switchTab('completed',this)">
                 Selesai <span class="ord-badge" id="badge-completed">—</span>
@@ -641,8 +661,9 @@
                 <button class="btn-toolbar" id="btnBelumProses" onclick="toggleBelumProses()"
                     style="transition:background .15s">🔴 Belum Proses</button>
                 <button class="btn-toolbar" onclick="printPickingList()">🖨 Cetak Picking List</button>
+                <button class="btn-toolbar" id="btnBulkPrint" onclick="printAllDocuments()" style="display:none;background:#f1f5f9;color:#475569;border-color:#e2e8f0">🖨 Cetak Semua Resi</button>
                 <button class="btn-toolbar primary" id="btnBulkArrangeShipment" onclick="openBulkArrangeShipment()" style="background:#f59e0b;border-color:#f59e0b">🚚 Atur Semua Pengiriman</button>
-                <button class="btn-toolbar primary" id="btnBulkFulfill" onclick="openBulkFulfill()">📦 Proses Semua</button>
+                <button class="btn-toolbar primary" id="btnBulkFulfill" onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>
             </div>
             <div class="process-toolbar-actions" id="toolbarActionsUnresolved" style="display:none">
                 <a href="/marketplace/issues" class="btn-toolbar primary">🔗 Perbaiki di Issues →</a>
@@ -700,6 +721,13 @@
                     
                     <input type="hidden" id="asStoreId">
                     <input type="hidden" id="asOrderSn">
+
+                    <div class="form-check mb-3" style="margin-top: 10px;">
+                        <input class="form-check-input" type="checkbox" id="asPrintDocument" checked>
+                        <label class="form-check-label" for="asPrintDocument" style="font-size:0.8rem; font-weight:600;">
+                            Langsung cetak resi setelah sukses
+                        </label>
+                    </div>
                     
                     <button class="btn btn-primary w-100 fw-bold rounded-pill" id="asSubmitBtn" onclick="submitArrangeShipment()">Konfirmasi Pengiriman</button>
                 </div>
@@ -808,42 +836,6 @@
     </div>
 </div>
 
-{{-- Bulk Fulfillment Progress Modal --}}
-<div class="modal fade" id="bulkFulfillModal" tabindex="-1" data-bs-backdrop="static">
-
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:460px">
-        <div class="modal-content" style="border-radius:20px">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-black" style="font-size:1rem">📦 Proses Semua Order</h5>
-            </div>
-            <div class="modal-body pt-2">
-                <div id="bulkConfirmView">
-                    <p style="font-size:.82rem;color:#475569;margin-bottom:1rem" id="bulkSummaryText"></p>
-                    <div id="bulkUnmappedWarn" class="alert alert-warning d-none" style="font-size:.78rem;border-radius:10px;padding:.5rem .75rem"></div>
-                    <div class="d-flex justify-content-end gap-2 mt-3">
-                        <button class="btn btn-light border fw-bold" style="border-radius:999px;font-size:.78rem" data-bs-dismiss="modal">Batal</button>
-                        <button class="btn btn-dark fw-bold" style="border-radius:999px;font-size:.78rem" id="bulkStartBtn" onclick="runBulkFulfill()">📦 Proses Sekarang</button>
-                    </div>
-                </div>
-                <div id="bulkProgressView" style="display:none">
-                    <div class="mb-2">
-                        <div class="progress" style="height:6px;border-radius:999px;margin-bottom:.5rem">
-                            <div id="bulkProgressBar" class="progress-bar bg-dark" style="width:0%;transition:width .3s"></div>
-                        </div>
-                        <div style="font-size:.75rem;color:#64748b" id="bulkProgressText">Memproses…</div>
-                    </div>
-                    <div id="bulkProgressList" style="max-height:280px;overflow-y:auto"></div>
-                </div>
-                <div id="bulkDoneView" style="display:none">
-                    <div id="bulkDoneSummary"></div>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button class="btn btn-dark fw-bold" style="border-radius:999px;font-size:.78rem" data-bs-dismiss="modal" onclick="render()">✓ Tutup</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 
 @push('scripts')
@@ -885,6 +877,7 @@
         unpaid:     ['UNPAID'],
         ready:      ['READY_TO_SHIP'],
         processed:  ['PROCESSED'],
+        ready_to_handover: ['READY_TO_HANDOVER'],
         shipped:    ['SHIPPED', 'TO_CONFIRM_RECEIVE'],
         completed:  ['COMPLETED'],
         cancelled:  ['CANCELLED', 'IN_CANCEL'],
@@ -1129,6 +1122,7 @@
         $('toolbarActionsUnresolved').style.display = isIssues ? '' : 'none';
         const btnBelumProses = $('btnBelumProses');
         const btnBulkFulfill = $('btnBulkFulfill');
+        const btnBulkPrint = $('btnBulkPrint');
 
         if (isIssues) {
             const rows = filterByTab(applyFilters(orders.filter(inRange)), 'issues');
@@ -1136,18 +1130,21 @@
             $('toolbarInfo').innerHTML = `<strong>${rows.length}</strong> order perlu diperbaiki`;
             if (btnBelumProses) btnBelumProses.style.display = '';
             if (btnBulkFulfill) btnBulkFulfill.style.display = '';
+            if (btnBulkPrint) btnBulkPrint.style.display = 'none';
         } else if (activeTab === 'processed') {
             const rows = getPackingRows();
             toolbar.classList.toggle('visible', rows.length > 0);
             $('toolbarInfo').innerHTML = `<strong>${rows.length}</strong> order sedang dikemas`;
             if (btnBelumProses) btnBelumProses.style.display = 'none';
             if (btnBulkFulfill) btnBulkFulfill.style.display = 'none';
+            if (btnBulkPrint) btnBulkPrint.style.display = '';
         } else {
             const rows = getProcessRows();
             toolbar.classList.toggle('visible', rows.length > 0);
             $('toolbarInfo').innerHTML = `<strong id="toolbarCount">${rows.length}</strong> order perlu diproses hari ini`;
             if (btnBelumProses) btnBelumProses.style.display = '';
             if (btnBulkFulfill) btnBulkFulfill.style.display = '';
+            if (btnBulkPrint) btnBulkPrint.style.display = 'none';
         }
     }
 
@@ -1481,111 +1478,13 @@
         if (failCount > 0) resHtml += `<span style="color:#dc2626;font-weight:bold">❌ ${failCount} gagal.</span>`;
         $('basResultText').innerHTML = resHtml;
     };
-    window.openBulkFulfill = function () {
-        const rows    = getProcessRows();
-        const pending = rows.filter(o => !fulfilledOrderIds.has(o.id));
-        if (!pending.length) return;
-
-        // Cek unmapped items
-        const unmapped = pending.filter(o =>
-            (o.items||[]).some(i => !i.internal_item?.code)
-        );
-
-        $('bulkConfirmView').style.display  = 'block';
-        $('bulkProgressView').style.display = 'none';
-        $('bulkDoneView').style.display     = 'none';
-        $('bulkStartBtn').disabled = false;
-        $('bulkStartBtn').textContent = '📦 Proses Sekarang';
-
-        const newOrders     = pending.filter(o => !printedOrderIds.has(o.id));
-        const printedOrders = pending.filter(o => printedOrderIds.has(o.id));
-
-        let summaryParts = [`<strong>${pending.length}</strong> order akan diproses`];
-        if (printedOrders.length && newOrders.length) {
-            summaryParts.push(`<span style="color:#0369a1">🖨 ${printedOrders.length} sudah dicetak</span> + <span style="color:#dc2626;font-weight:700">🆕 ${newOrders.length} order baru (belum dicetak)</span>`);
-        } else if (newOrders.length && !printedOrders.length) {
-            summaryParts.push(`<span style="color:#dc2626;font-weight:700">⚠ Belum dicetak picking list!</span>`);
-        }
-        $('bulkSummaryText').innerHTML = summaryParts.join(' — ') + '. Item yang sudah mapping akan dikonfirmasi dan stok dipotong.';
-
-        const warnEl = $('bulkUnmappedWarn');
-        if (unmapped.length) {
-            warnEl.className = 'alert alert-warning mb-3';
-            warnEl.innerHTML = `⚠ <strong>${unmapped.length} order</strong> punya item belum mapping — item tersebut akan dilewati, item lainnya tetap diproses.`;
-        } else {
-            warnEl.className = 'alert d-none';
-        }
-
-        new bootstrap.Modal($('bulkFulfillModal')).show();
-    };
-
-    window.runBulkFulfill = async function () {
-        const rows    = getProcessRows().filter(o => !fulfilledOrderIds.has(o.id));
-        const btn     = $('bulkStartBtn');
-        btn.disabled  = true;
-
-        $('bulkConfirmView').style.display  = 'none';
-        $('bulkProgressView').style.display = 'block';
-        $('bulkProgressList').innerHTML     = '';
-
-        let done = 0, skipped = 0, stockWarnings = [];
-
-        for (let i = 0; i < rows.length; i++) {
-            const o    = rows[i];
-            const pct  = Math.round(((i + 1) / rows.length) * 100);
-            $('bulkProgressBar').style.width = pct + '%';
-            $('bulkProgressText').textContent = `Memproses ${i+1} / ${rows.length}…`;
-
-            const li = document.createElement('div');
-            li.className = 'bulk-prog-item';
-            li.innerHTML = `<span class="bulk-prog-icon">⏳</span>
-                <span style="flex:1;font-family:monospace;font-size:.73rem">${esc(o.channel_order_id)}</span>
-                <span style="font-size:.7rem;color:#94a3b8">memproses…</span>`;
-            $('bulkProgressList').appendChild(li);
-            $('bulkProgressList').scrollTop = $('bulkProgressList').scrollHeight;
-
-            try {
-                const draft = await api('/api/fulfillments/create-draft', {
-                    method: 'POST',
-                    body: JSON.stringify({ marketplace_order_id: o.id }),
-                });
-                await api(`/api/fulfillments/${draft.id}/confirm`, { method: 'POST' });
-
-                fulfilledOrderIds.add(o.id);
-                fulfillmentStatusMap.set(o.id, { id: draft.id, status: 'confirmed' });
-                done++;
-
-                // Cek ada shortage?
-                const hasShortage = (draft.lines || []).some(l => l.stock_status === 'low' || l.stock_status === 'empty');
-                if (hasShortage) stockWarnings.push(o.channel_order_id);
-
-                li.innerHTML = `<span class="bulk-prog-icon">✓</span>
-                    <span style="flex:1;font-family:monospace;font-size:.73rem">${esc(o.channel_order_id)}</span>
-                    <span style="font-size:.7rem;color:#16a34a">selesai</span>`;
-            } catch (e) {
-                skipped++;
-                li.innerHTML = `<span class="bulk-prog-icon">✕</span>
-                    <span style="flex:1;font-family:monospace;font-size:.73rem">${esc(o.channel_order_id)}</span>
-                    <span style="font-size:.7rem;color:#dc2626">${e.message.slice(0,40)}</span>`;
-            }
-        }
-
-        // Done view
-        $('bulkProgressView').style.display = 'none';
-        $('bulkDoneView').style.display     = 'block';
-        let summaryHtml = `<div style="font-size:.85rem;margin-bottom:.5rem">
-            <div>✅ <strong>${done}</strong> fulfillment berhasil dikonfirmasi</div>
-            ${skipped ? `<div style="color:#dc2626">✕ <strong>${skipped}</strong> gagal</div>` : ''}
-            ${stockWarnings.length ? `<div style="color:#d97706;margin-top:.3rem">⚠ <strong>${stockWarnings.length}</strong> order stok minus: ${stockWarnings.slice(0,3).join(', ')}${stockWarnings.length>3?'…':''}</div>` : ''}
-        </div>`;
-        $('bulkDoneSummary').innerHTML = summaryHtml;
-    };
 
     // ── KPI ───────────────────────────────────────────────────────────────
     function renderKpi() {
         const rows = applyFilters(orders.filter(inRange));
         $('kpiReady').textContent     = filterByTab(rows, 'ready').length;
         $('kpiProcessed').textContent = filterByTab(rows, 'processed').length;
+        $('kpiReadyToHandover').textContent = filterByTab(rows, 'ready_to_handover').length;
         $('kpiShipped').textContent   = filterByTab(rows, 'shipped').length;
         $('kpiIssues').textContent    = filterByTab(rows, 'issues').length;
     }
@@ -1593,7 +1492,7 @@
     // ── Badges ────────────────────────────────────────────────────────────
     function renderBadges() {
         const rows = applyFilters(orders.filter(inRange));
-        ['all', 'unpaid', 'ready', 'processed', 'shipped', 'completed', 'cancelled', 'issues'].forEach(tab => {
+        ['all', 'unpaid', 'ready', 'processed', 'ready_to_handover', 'shipped', 'completed', 'cancelled', 'issues'].forEach(tab => {
             const el = $('badge-' + tab);
             if (!el) return;
             const count = tab === 'all' ? rows.length : filterByTab(rows, tab).length;
@@ -1757,10 +1656,12 @@
                         : fStatus === 'packed' ? '📦 Packed'
                         : fStatus === 'pending_review' ? '⏳ Review' : '📋 Draft';
                     fulfillBtn = `<button class="btn-fulfillment" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe"
-                        onclick="window.location='/marketplace/fulfillment'">${statusLabel} →</button>`;
+                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
+                        onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
                 } else {
                     fulfillBtn = `<button class="btn-fulfillment"
-                        onclick="window.location='/marketplace/fulfillment?scan=${encodeURIComponent(o.channel_order_id)}'">📦 Proses</button>`;
+                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
+                        onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
                 }
             }
 
@@ -1839,7 +1740,7 @@
     }
 
     function renderProcessCardList(rows, tabName = 'ready') {
-        const isProcessed = tabName === 'processed';
+        const isProcessed = tabName === 'processed' || tabName === 'ready_to_handover';
         const pkRows = rows.map(o => {
             const items       = o.items || [];
             const isFulfilled = fulfilledOrderIds.has(o.id);
@@ -1879,38 +1780,59 @@
                     : '';
             }
 
-            // Accordions for 'processed' tab
+            // Table format for 'processed' and 'ready_to_handover' tabs (menyerupai Rekon)
             let itemsSection = '';
-            let resolveSection = '';
-            let scanSection = '';
             
             if (isProcessed) {
-                const itemCards = items.map(i => renderItemCard(i, true)).join('');
-                itemsSection = makeAccordion('📋 Detail Produk', '', items.length, itemCards);
-
-                const resolveLines = (o.fulfillment_resolve_lines || []).filter(l => l.code);
-                if (resolveLines.length) {
-                    const resolveCards = resolveLines.map(l => `<div class="ord-item-card" style="border-color:#bfdbfe;background:#eff6ff">
-                        <div class="ord-item-qty" style="background:#dbeafe;color:#1d4ed8">${l.qty}×</div>
-                        <div class="ord-item-body">
-                            <div class="ord-item-name" style="color:#1e3a5f">${esc(l.code)}</div>
-                            ${l.name ? `<div class="ord-item-variant">${esc(l.name)}</div>` : ''}
-                        </div>
-                    </div>`).join('');
-                    resolveSection = makeAccordion('✅ Item Diganti/Split (Resolve)', 'color:#1d4ed8', resolveLines.length, resolveCards);
-                }
+                let linesHtml = `<div style="overflow-x:auto; margin-top:.75rem; border:1px solid #e2e8f0; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; min-width:600px;">
+                    <thead style="background:#f8fafc; font-size:.65rem; color:#64748b; text-align:left; border-bottom:1px solid #e2e8f0;"><tr>
+                        <th style="padding:.5rem .8rem">BARANG</th>
+                        <th style="padding:.5rem .8rem; text-align:right">DIPESAN</th>
+                        <th style="padding:.5rem .8rem; text-align:right">TERSEDIA</th>
+                        <th style="padding:.5rem .8rem; text-align:right">KURANG</th>
+                        <th style="padding:.5rem .8rem; text-align:center">STATUS</th>
+                        <th style="padding:.5rem .8rem">BARANG PENGGANTI</th>
+                    </tr></thead><tbody style="font-size:.75rem">`;
 
                 const validScan = (o.fulfillment_scan_log || []).filter(s => s.code && s.qty > 0);
-                if (validScan.length) {
-                    const scanCards = validScan.map(s => `<div class="ord-item-card" style="border-color:#ddd6fe;background:#faf5ff">
-                        <div class="ord-item-qty" style="background:#ede9fe;color:#6d28d9">${s.qty}×</div>
-                        <div class="ord-item-body">
-                            <div class="ord-item-name" style="color:#4c1d95">${esc(s.code)}</div>
-                            ${s.name ? `<div class="ord-item-variant">${esc(s.name)}</div>` : ''}
-                        </div>
-                    </div>`).join('');
-                    scanSection = makeAccordion('📦 Item Terscan', 'color:#7c3aed', validScan.length, scanCards);
-                }
+                const resolveLines = (o.fulfillment_resolve_lines || []).filter(l => l.code);
+                
+                const scans = {};
+                validScan.forEach(s => scans[s.code] = (scans[s.code] || 0) + s.qty);
+                
+                items.forEach(i => {
+                    const code = i.internal_item?.code || i.model_sku || i.item_sku || '?';
+                    const name = i.internal_item?.name || i.item_name || '';
+                    const dipesan = i.qty || 1;
+                    const tersedia = scans[code] || 0;
+                    const kurang = Math.max(0, dipesan - tersedia);
+                    
+                    let statusHtml = '';
+                    if (kurang === 0) statusHtml = '<span style="color:#16a34a;font-weight:800">OK</span>';
+                    else if (tersedia > 0) statusHtml = '<span style="color:#d97706;font-weight:800">Sebagian</span>';
+                    else statusHtml = '<span style="background:#f1f5f9;color:#64748b;padding:2px 6px;border-radius:4px;font-size:.65rem;font-weight:600;white-space:nowrap;">Belum Tertaut</span>';
+                    
+                    // Coba cari resolve (pengganti) - estimasi berdasarkan nama jika kurang
+                    let subHtml = '<span style="color:#cbd5e1">—</span>';
+                    if (kurang > 0 && resolveLines.length > 0) {
+                        // Karena kita tidak memiliki relasi sub langsung di UI, kita tampilkan saja item resolve yang ada
+                        const subs = resolveLines.map(r => `<div style="font-weight:700;color:#1d4ed8">${r.code} <span style="font-weight:400;color:#64748b">×${r.qty}</span></div>`).join('');
+                        subHtml = subs || subHtml;
+                    }
+
+                    linesHtml += `<tr style="border-bottom:1px solid #f1f5f9">
+                        <td style="padding:.5rem .8rem"><div style="font-weight:800;color:#334155;font-size:.8rem">${esc(code)}</div><div style="font-size:.68rem;color:#64748b">${esc(name)}</div></td>
+                        <td style="padding:.5rem .8rem; text-align:right; font-weight:700; font-size:.8rem">${dipesan}</td>
+                        <td style="padding:.5rem .8rem; text-align:right; font-size:.8rem">${tersedia}</td>
+                        <td style="padding:.5rem .8rem; text-align:right; color:${kurang>0?'#dc2626':'#334155'}; font-weight:800; font-size:.8rem">${kurang>0?'-'+kurang:kurang}</td>
+                        <td style="padding:.5rem .8rem; text-align:center">${statusHtml}</td>
+                        <td style="padding:.5rem .8rem">${subHtml}</td>
+                    </tr>`;
+                });
+                
+                linesHtml += `</tbody></table></div>`;
+                itemsSection = linesHtml;
             }
 
             // Tombol aksi
@@ -1930,10 +1852,12 @@
                 actionBtn = `<div class="btn-review" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0;cursor:default">✓ Selesai</div>`;
             } else if (isInPacking) {
                 actionBtn = `<button class="btn-review" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe"
-                    onclick="window.location='/marketplace/fulfillment'">Lanjut →</button>`;
+                    title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
+                    onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
             } else {
                 actionBtn = `<button class="btn-review"
-                    onclick="window.location='/marketplace/fulfillment?scan=${encodeURIComponent(o.channel_order_id)}'">📦 Proses</button>`;
+                    title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
+                    onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
             }
 
             const dataIssue = o.has_data_issues
@@ -1977,7 +1901,7 @@
                         ${actionBtn}
                     </div>
                 </div>
-                ${isProcessed ? `<div style="margin-top:0.8rem">${itemsSection}${resolveSection}${scanSection}</div>` : ''}
+                ${isProcessed ? `<div style="margin-top:0.8rem">${itemsSection}</div>` : ''}
             </div>`;
         }).join('');
 
@@ -2025,7 +1949,10 @@
                 : fStatus === 'picking' ? '🔄 Picking'
                 : fStatus === 'pending_review' ? '⏳ Review' : '';
 
-            return `<div class="pk-row">
+            const isPrinted = printedOrderIds.has(o.id);
+            const printBtn = `<button class="btn-review" style="background:${isPrinted ? '#e0f2fe' : '#f1f5f9'};color:${isPrinted ? '#0369a1' : '#475569'};border-color:${isPrinted ? '#7dd3fc' : '#e2e8f0'}" onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 ${isPrinted ? 'Sudah Cetak' : 'Cetak'}</button>`;
+
+            return `<div class="pk-row ${isPrinted ? 'row-printed' : ''}">
                 <div class="pk-row-left">
                     <div class="pk-order-id">
                         ${esc(o.channel_order_id || '—')}
@@ -2038,7 +1965,10 @@
                         ${packInfo}
                     </div>
                 </div>
-                <button class="btn-review" onclick="openReviewModal(${o.id})">🔍 Review</button>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <button class="btn-review" onclick="openReviewModal(${o.id})">🔍 Review</button>
+                    ${printBtn}
+                </div>
             </div>`;
         }).join('');
 
@@ -2075,9 +2005,9 @@
             return;
         }
 
-        // Tab Sedang Proses: gunakan layout detail seperti Perlu Proses
-        if (activeTab === 'processed') {
-            body.innerHTML = renderProcessCardList(rows, 'processed');
+        // Tab Sedang Proses & Siap Kirim: gunakan layout detail seperti Perlu Proses
+        if (activeTab === 'processed' || activeTab === 'ready_to_handover') {
+            body.innerHTML = renderProcessCardList(rows, activeTab);
             return;
         }
 
@@ -2148,9 +2078,12 @@
                         : fStatus === 'pending_review' ? '⏳ Review'
                         : '📋 Draft';
                     fulfillBtn = `<button class="btn-fulfillment" style="margin-top:.35rem;background:#eff6ff;color:#2563eb;border-color:#bfdbfe"
-                        onclick="window.location='/marketplace/fulfillment'">${statusLabel} →</button>`;
+                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
+                        onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
                 } else {
-                    fulfillBtn = `<button class="btn-fulfillment" style="margin-top:.35rem" onclick="window.location='/marketplace/fulfillment?scan=${encodeURIComponent(o.channel_order_id)}'">📦 Proses</button>`;
+                    fulfillBtn = `<button class="btn-fulfillment" style="margin-top:.35rem"
+                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
+                        onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
                 }
             }
 
@@ -2184,6 +2117,7 @@
             return `<tr class="${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" id="ord-row-${o.id}" ${rowClick}>
                 <td>
                     <div class="ord-id">${esc(o.channel_order_id || '—')}</div>
+                    ${o.shipping_awb_no ? `<div style="margin-top:.2rem;margin-bottom:.2rem"><span style="font-size:0.7rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${esc(o.shipping_carrier || 'Kurir')} - ${esc(o.shipping_awb_no)}</span></div>` : ''}
                     <div class="ord-date">${o.ordered_at ? fmtDate(o.ordered_at) : '—'}</div>
                     ${kilatBadge}
                     ${printedBadge}
@@ -2388,6 +2322,10 @@
             bootstrap.Modal.getInstance($('arrangeShipmentModal')).hide();
             showQsAlert('success', 'Atur Pengiriman berhasil untuk ' + orderSn);
             loadOrders();
+
+            if ($('asPrintDocument') && $('asPrintDocument').checked) {
+                printDocument(storeId, orderSn);
+            }
         } catch (e) {
             btn.disabled = false;
             btn.innerHTML = 'Coba Lagi';
@@ -2401,11 +2339,43 @@
         const alertHtml = `<div id="printAlert" style="position:fixed;top:20px;right:20px;background:#3b82f6;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi dari Marketplace...</div>`;
         document.body.insertAdjacentHTML('beforeend', alertHtml);
         
+        // Buka langsung agar tidak diblokir popup blocker
+        window.open(url, '_blank');
+        
         setTimeout(() => {
             const el = document.getElementById('printAlert');
             if (el) el.remove();
-            window.open(url, '_blank');
-        }, 1500);
+        }, 2000);
+    };
+    window.printAllDocuments = function() {
+        const rows = getPackingRows();
+        if (!rows.length) { alert('Tidak ada order yang sedang dikemas.'); return; }
+        
+        // Kelompokkan orderSn berdasarkan store_id
+        const storeGroups = {};
+        rows.forEach(o => {
+            if (!storeGroups[o.store_id]) storeGroups[o.store_id] = [];
+            storeGroups[o.store_id].push(o.channel_order_id);
+        });
+        
+        const alertHtml = `<div id="printBulkAlert" style="position:fixed;top:20px;right:20px;background:#f59e0b;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi massal dari Marketplace...</div>`;
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+
+        Object.keys(storeGroups).forEach(storeId => {
+            const allSns = storeGroups[storeId];
+            // Shopee limit 50 order per bulk request
+            for (let i = 0; i < allSns.length; i += 50) {
+                const chunk = allSns.slice(i, i + 50);
+                const orderSns = chunk.join(',');
+                const url = `/api/marketplace/stores/${storeId}/documents/bulk?orders=${orderSns}`;
+                window.open(url, '_blank');
+            }
+        });
+
+        setTimeout(() => {
+            const el = document.getElementById('printBulkAlert');
+            if (el) el.remove();
+        }, 2000);
     };
 
     // ── [DEV ONLY] Fresh Orders ───────────────────────────────────────────────

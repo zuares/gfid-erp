@@ -266,24 +266,65 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->post($store, '/api/v2/logistics/ship_order', $body);
     }
 
+    public function getTrackingNumber(Store $store, string $orderSn): array
+    {
+        return $this->get($store, '/api/v2/logistics/get_tracking_number', ['order_sn' => $orderSn]);
+    }
+
     public function createShippingDocument(Store $store, array $orderSnList): array
     {
+        $defaultFormat = \App\Models\SystemSetting::get('marketplace_print_default_format', 'THERMAL_AIR_WAYBILL');
+        $docType = $store->meta['shipping_document_type'] ?? $defaultFormat;
         $body = [
             'order_list' => array_map(function($item) {
                 return is_array($item) ? $item : ['order_sn' => $item];
-            }, $orderSnList)
+            }, $orderSnList),
+            'shipping_document_type' => $docType
         ];
         return $this->post($store, '/api/v2/logistics/create_shipping_document', $body);
     }
 
     public function getShippingDocument(Store $store, array $orderSnList): array
     {
+        $defaultFormat = \App\Models\SystemSetting::get('marketplace_print_default_format', 'THERMAL_AIR_WAYBILL');
+        $docType = $store->meta['shipping_document_type'] ?? $defaultFormat;
         $body = [
             'order_list' => array_map(function($item) {
                 return is_array($item) ? $item : ['order_sn' => $item];
             }, $orderSnList),
-            'shipping_document_type' => 'NORMAL_AIR_WAYBILL'
+            'shipping_document_type' => $docType
         ];
+
+        // Poll get_shipping_document_result up to 5 times
+        for ($i = 0; $i < 5; $i++) {
+            $result = $this->post($store, '/api/v2/logistics/get_shipping_document_result', $body);
+            
+            $allReady = true;
+            if (isset($result['response']['result_list']) && is_array($result['response']['result_list'])) {
+                foreach ($result['response']['result_list'] as $resItem) {
+                    if (isset($resItem['status']) && $resItem['status'] !== 'READY') {
+                        $allReady = false;
+                        break;
+                    }
+                }
+            } else {
+                $allReady = false; // Invalid response format, try again
+            }
+
+            if ($allReady) {
+                break;
+            }
+
+            sleep(1);
+        }
+
+        if (!$allReady) {
+            return [
+                'error' => 'timeout',
+                'message' => 'Dokumen resi sedang diproses oleh Shopee dan belum siap. Silakan coba cetak lagi beberapa saat lagi.'
+            ];
+        }
+
         return $this->post($store, '/api/v2/logistics/download_shipping_document', $body);
     }
 }

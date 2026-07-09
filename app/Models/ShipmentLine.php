@@ -13,6 +13,7 @@ class ShipmentLine extends Model
         'shipment_id',
         'item_id',
         'qty_scanned',
+        'allocated_qty',
         'notes',
     ];
 

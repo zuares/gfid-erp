@@ -69,6 +69,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/toko',        [MarketplaceController::class, 'toko'])->name('marketplace.toko');
     Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
+    Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
     Route::get('/marketplace/picking',     [MarketplaceController::class, 'picking'])->name('marketplace.picking');
     Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
@@ -76,6 +77,11 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
     Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
+    Route::get('/marketplace/settings',    [MarketplaceController::class, 'settings'])->name('marketplace.settings');
+    Route::post('/marketplace/settings',   [MarketplaceController::class, 'updateSettings'])->name('marketplace.settings.update');
+    Route::get('marketplace/settings/sample-greeting', [MarketplaceController::class, 'printSampleGreetingCard'])->name('marketplace.settings.sample_greeting');
+    Route::post('/marketplace/settings/preview-pdf', [MarketplaceController::class, 'previewSettingsPdf'])->name('marketplace.settings.previewPdf');
+    Route::post('/marketplace/settings/delete-template', [MarketplaceController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceController::class, 'analytics'])->name('marketplace.analytics');
     Route::get('/marketplace/issues',      [MarketplaceController::class, 'issueCenter'])->name('marketplace.issues');
 });
@@ -104,8 +110,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     // Logistics Endpoints
     Route::get('/stores/{store}/orders/{orderSn}/shipping-parameter', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getShippingParameter']);
     Route::post('/stores/{store}/orders/{orderSn}/ship', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'arrangeShipment'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+        ->name('marketplace.logistics.ship');
     Route::get('/stores/{store}/orders/{orderSn}/document', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printDocument']);
+    Route::get('/stores/{store}/documents/bulk', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printDocumentBulk']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);

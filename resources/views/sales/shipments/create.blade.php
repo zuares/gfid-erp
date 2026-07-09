@@ -683,12 +683,26 @@ body[data-theme="dark"] .shp-topbar {
 
         <form id="setupForm" autocomplete="off">
             @csrf
+            <input type="hidden" name="shipment_type" id="shipmentTypeInput" value="manual">
             <input type="hidden" name="scan_mode" id="scanModeInput" value="item_first">
             {{-- hidden: diisi JS dari hasil lookup --}}
             <input type="hidden" name="store_id"         id="hiddenStoreId">
             <input type="hidden" name="sales_invoice_id" id="hiddenInvoiceId"
                    value="{{ !empty($invoice) ? $invoice->id : '' }}">
 
+            <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.4rem;font-weight:700;">Tipe Shipment</div>
+            <div class="shp-mode-grid" style="margin-bottom:1rem" role="radiogroup" aria-label="Tipe Shipment">
+                <button type="button" class="shp-mode-card type-btn" data-shipment-type="marketplace" role="radio" aria-checked="false">
+                    <div class="shp-mode-title">Marketplace</div>
+                    <div class="shp-mode-sub">Wajib scan order/resi marketplace. Order yang tidak ditemukan akan ditolak.</div>
+                </button>
+                <button type="button" class="shp-mode-card type-btn active" data-shipment-type="manual" role="radio" aria-checked="true">
+                    <div class="shp-mode-title">Manual / B2B</div>
+                    <div class="shp-mode-sub">Untuk pengiriman manual, B2B, atau invoice internal.</div>
+                </button>
+            </div>
+
+            <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.4rem;font-weight:700;">Mode Scanner</div>
             <div class="shp-mode-grid" role="radiogroup" aria-label="Mode Scan Shipment">
                 <button type="button" class="shp-mode-card active" data-scan-mode="item_first" role="radio" aria-checked="true">
                     <div class="shp-mode-title">Scan Barang Dulu</div>
@@ -1441,6 +1455,53 @@ body[data-theme="dark"] .shp-topbar {
             }
         });
     }
+
+    // Tipe Shipment (Marketplace vs Manual) & UX logic
+    const typeBtns = document.querySelectorAll('.type-btn');
+    const typeInput = document.getElementById('shipmentTypeInput');
+    const modeBtns = document.querySelectorAll('.shp-mode-card:not(.type-btn)');
+    const modeInput = document.getElementById('scanModeInput');
+
+    function selectScanMode(mode) {
+        selectedScanMode = mode;
+        if (modeInput) modeInput.value = mode;
+        modeBtns.forEach(b => {
+            if (b.dataset.scanMode === mode) {
+                b.classList.add('active');
+                b.setAttribute('aria-checked', 'true');
+            } else {
+                b.classList.remove('active');
+                b.setAttribute('aria-checked', 'false');
+            }
+        });
+    }
+
+    typeBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            const type = this.dataset.shipmentType;
+            if (typeInput) typeInput.value = type;
+            
+            typeBtns.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-checked', 'false');
+            });
+            this.classList.add('active');
+            this.setAttribute('aria-checked', 'true');
+
+            // Default UX rule
+            if (type === 'marketplace') {
+                selectScanMode('order_first');
+            } else {
+                selectScanMode('item_first');
+            }
+        });
+    });
+
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            selectScanMode(this.dataset.scanMode);
+        });
+    });
 
     function applyShipMeta(s) {
         const codeEl    = document.getElementById('shipCode');

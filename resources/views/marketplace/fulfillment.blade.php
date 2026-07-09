@@ -22,6 +22,18 @@
     </div>
 
     <div class="sr-shell">
+        {{-- Warning Deprecated --}}
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:1rem; margin-bottom:1.25rem; display:flex; gap:.75rem; align-items:flex-start">
+            <div style="font-size:1.2rem">⚠</div>
+            <div>
+                <div style="font-size:.85rem; font-weight:800; color:#991b1b; margin-bottom:.15rem">HALAMAN DEPRECATED</div>
+                <div style="font-size:.78rem; color:#b91c1c; line-height:1.4">
+                    Flow packing lama sudah digantikan oleh Shipment. Gunakan menu <strong><a href="/sales/shipments" style="color:#b91c1c; text-decoration:underline">/sales/shipments</a></strong> untuk proses gudang.<br>
+                    Halaman ini dialihkan ke mode read-only dan akan segera dinonaktifkan.
+                </div>
+            </div>
+        </div>
+
         <div class="sr-workflow-stepper">
             <span class="sr-flow-step active" id="stepScan">1. Scan Barcode</span>
             <span class="sr-flow-sep">-&gt;</span>
@@ -69,19 +81,17 @@
                 </div>
             </div>
             {{-- Focal point: input dengan border indigo + ring --}}
-            <div style="display:flex;gap:.65rem;align-items:center;background:#f5f3ff;border-radius:14px;padding:.55rem .65rem">
-                <input id="scanInput" type="text"
-                    placeholder="Contoh: 260609MDP1J4DQ"
+            <div style="display:flex;gap:.65rem;align-items:center;background:#f8fafc;border-radius:14px;padding:.55rem .65rem;opacity:.6;cursor:not-allowed">
+                <input id="scanInput" type="text" disabled="disabled"
+                    placeholder="Fungsi dinonaktifkan. Gunakan menu Shipment."
                     autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                     style="flex:1;background:transparent;border:none;
-                           padding:.2rem .3rem;color:#0f172a;font-size:1.05rem;font-weight:700;font-family:monospace;
-                           outline:none;"
+                           padding:.2rem .3rem;color:#94a3b8;font-size:1.05rem;font-weight:700;font-family:monospace;
+                           outline:none;cursor:not-allowed"
                     onkeydown="if(event.key==='Enter')doScan()">
-                <button onclick="doScan()" id="scanBtn"
-                    style="background:#6366f1;border:none;border-radius:10px;padding:.6rem 1.3rem;color:#fff;
-                           font-weight:700;font-size:.9rem;cursor:pointer;transition:background .15s;white-space:nowrap;
-                           box-shadow:0 2px 8px rgba(99,102,241,.3)"
-                    onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
+                <button onclick="doScan()" id="scanBtn" disabled="disabled"
+                    style="background:#94a3b8;border:none;border-radius:10px;padding:.6rem 1.3rem;color:#fff;
+                           font-weight:700;font-size:.9rem;cursor:not-allowed;transition:background .15s;white-space:nowrap;">
                     🔍 Cari
                 </button>
             </div>
@@ -111,18 +121,17 @@
                 <div style="color:#4338ca;font-weight:800;font-size:.88rem;margin-bottom:.2rem">Scan Kode Item (SKU Internal)</div>
                 <div style="color:#94a3b8;font-size:.72rem;margin-bottom:.7rem">Ambil item dari gudang → scan barcode atau ketik kode, tekan Enter</div>
                 {{-- Focal input: background indigo-tint --}}
-                <div style="display:flex;gap:.5rem;align-items:center;background:#f5f3ff;border-radius:12px;padding:.45rem .55rem">
-                    <input id="batchItemInput" type="text"
-                        placeholder="Contoh: KAO-M-RED"
+                <div style="display:flex;gap:.5rem;align-items:center;background:#f8fafc;border-radius:12px;padding:.45rem .55rem;opacity:.6;cursor:not-allowed">
+                    <input id="batchItemInput" type="text" disabled="disabled"
+                        placeholder="Fungsi dinonaktifkan."
                         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                         style="flex:1;background:transparent;border:none;
-                               padding:.18rem .3rem;color:#0f172a;font-size:1rem;font-weight:700;font-family:monospace;
-                               outline:none;"
+                               padding:.18rem .3rem;color:#94a3b8;font-size:1rem;font-weight:700;font-family:monospace;
+                               outline:none;cursor:not-allowed"
                         onkeydown="if(event.key==='Enter')batchAddItem()">
-                    <button onclick="batchAddItem()" id="batchItemBtn"
-                        style="background:#6366f1;border:none;border-radius:8px;padding:.5rem 1rem;color:#fff;
-                               font-weight:700;font-size:.85rem;cursor:pointer;white-space:nowrap;
-                               box-shadow:0 1px 6px rgba(99,102,241,.3)">
+                    <button onclick="batchAddItem()" id="batchItemBtn" disabled="disabled"
+                        style="background:#94a3b8;border:none;border-radius:8px;padding:.5rem 1rem;color:#fff;
+                               font-weight:700;font-size:.85rem;cursor:not-allowed;white-space:nowrap;">
                         + Tambah
                     </button>
                 </div>
@@ -1457,10 +1466,11 @@
             if (res.already_confirmed) {
                 setScanResult(`✓ Order ${orderNo} sudah selesai (${f.confirmed_at ? new Date(f.confirmed_at).toLocaleString('id-ID') : '—'}).`, 'warn');
             } else {
-                setScanResult(`✓ Order ${orderNo} ditemukan — membuka…`, 'success');
+                setScanResult(`✓ Order ${orderNo} ditemukan — mengalihkan…`, 'success');
                 scanInput.value = '';
-                loadFulfillments();
-                setTimeout(() => openFulfillment(f.id), 250);
+                setTimeout(() => {
+                    window.location.href = '/marketplace/fulfillment/' + f.id + '/process';
+                }, 250);
             }
         } catch (e) {
             setScanResult(`✗ ${e.message || 'Order tidak ditemukan.'}`, 'error');

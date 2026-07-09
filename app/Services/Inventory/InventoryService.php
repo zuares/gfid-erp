@@ -217,6 +217,75 @@ class InventoryService
     }
 
     /**
+     * Reserve stock without creating mutations and without deducting physical qty.
+     * Increases allocated_qty.
+     */
+    public function reserveStock(
+        int $warehouseId,
+        int $itemId,
+        float | int | string $qty
+    ): void {
+        $qty = $this->num($qty);
+        if ($qty <= 0) {
+            return;
+        }
+
+        /** @var InventoryStock $stock */
+        $stock = InventoryStock::where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$stock) {
+            $stock = InventoryStock::create([
+                'warehouse_id' => $warehouseId,
+                'item_id' => $itemId,
+                'qty' => 0,
+                'allocated_qty' => 0,
+            ]);
+        }
+
+        $available = $stock->qty - $stock->allocated_qty;
+        if (($available + 0.0000001) < $qty) {
+            throw new \RuntimeException(
+                "Stok tersedia tidak mencukupi untuk di-reserve. Item {$itemId} Gudang {$warehouseId}. "
+                . "Tersedia: {$available}, Mau di-reserve: {$qty}"
+            );
+        }
+
+        $stock->allocated_qty = $this->num($stock->allocated_qty) + $qty;
+        $stock->save();
+    }
+
+    /**
+     * Release reserved stock. Decreases allocated_qty.
+     */
+    public function releaseStock(
+        int $warehouseId,
+        int $itemId,
+        float | int | string $qty
+    ): void {
+        $qty = $this->num($qty);
+        if ($qty <= 0) {
+            return;
+        }
+
+        /** @var InventoryStock|null $stock */
+        $stock = InventoryStock::where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$stock) {
+            return;
+        }
+
+        $newAllocated = $this->num($stock->allocated_qty) - $qty;
+        $stock->allocated_qty = max(0, $newAllocated); // Prevent negative allocation
+        $stock->save();
+    }
+
+    /**
      * Transfer stok antar gudang. (bisa bawa LOT juga)
      */
     public function transfer(
