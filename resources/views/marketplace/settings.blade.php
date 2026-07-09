@@ -5,154 +5,277 @@
 
 @push('head')
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
     :root{
-        --shp-accent:#334155;
-        --shp-accent-2:#1f2937;
-        --shp-border:rgba(148,163,184,.20);
-        --shp-border-strong:rgba(148,163,184,.30);
-        --shp-muted:#64748b;
-        --shp-bg-hover:rgba(148,163,184,.08);
+        --shp-accent: #2563eb;
+        --shp-accent-2: #1d4ed8;
+        --shp-accent-light: #eff6ff;
+        --shp-border: rgba(148,163,184, 0.25);
+        --shp-border-strong: rgba(148,163,184, 0.40);
+        --shp-muted: #64748b;
+        --shp-text: #1e293b;
+        --shp-bg-hover: rgba(241, 245, 249, 0.8);
+        --card-bg: rgba(255, 255, 255, 0.85);
+        --glass-border: rgba(255, 255, 255, 0.5);
     }
-    .page-wrap{ max-width:1100px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    
+    body[data-theme="dark"] {
+        --shp-accent: #3b82f6;
+        --shp-accent-2: #60a5fa;
+        --shp-accent-light: rgba(59, 130, 246, 0.1);
+        --shp-border: rgba(51, 65, 85, 0.8);
+        --shp-border-strong: rgba(71, 85, 105, 0.8);
+        --shp-muted: #94a3b8;
+        --shp-text: #f1f5f9;
+        --shp-bg-hover: rgba(30, 41, 59, 0.8);
+        --card-bg: rgba(15, 23, 42, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.05);
+    }
+
+    .page-wrap { 
+        max-width: 1140px; 
+        margin-inline: auto; 
+        padding: 1rem 1rem 4rem; 
+        background: transparent !important; 
+        font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    }
 
     /* Layout Induk */
-    .ms-main { display:grid; grid-template-columns:minmax(0,1fr); gap:2rem; align-items:start; }
+    .ms-main { display:grid; grid-template-columns:minmax(0,1fr); gap:2.5rem; align-items:start; }
     @media(min-width:992px){ .ms-main { grid-template-columns:260px minmax(0,1fr); } }
 
     /* Sidebar Navigation */
     .ms-side { display:none; }
     @media(min-width:992px){ .ms-side { display:block; position:sticky; top:2rem; } }
+    
     .ms-side-item { 
-        display:flex; align-items:center; gap:.75rem; width:100%; text-align:left; 
-        padding:.75rem 1rem; border:none; background:transparent; border-radius:10px; 
-        cursor:pointer; transition:all .2s ease; margin-bottom:.4rem; 
+        display:flex; align-items:center; gap:1rem; width:100%; text-align:left; 
+        padding: 1rem 1.25rem; border:1px solid transparent; background:transparent; 
+        border-radius:14px; cursor:pointer; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        margin-bottom:0.6rem; position: relative; overflow: hidden;
     }
-    .ms-side-item:hover { background:var(--shp-bg-hover); }
-    .ms-side-item.active { background:var(--shp-accent); box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); }
-    .ms-side-item.active .ms-side-label { color:#fff; }
-    .ms-side-item.active .ms-side-desc { color:rgba(255,255,255,.8); }
-    .ms-side-ic { font-size:1.25rem; flex-shrink:0; width:28px; text-align:center; }
-    .ms-side-label { font-size:.85rem; font-weight:700; color:var(--shp-accent); line-height:1.2; }
-    .ms-side-desc { font-size:.7rem; color:var(--shp-muted); line-height:1.3; margin-top:3px; }
-    body[data-theme="dark"] .ms-side-label { color:#e5e7eb; }
-    body[data-theme="dark"] .ms-side-item.active .ms-side-label { color:#fff; }
+    .ms-side-item:hover { 
+        background: var(--shp-bg-hover);
+        transform: translateX(4px);
+    }
+    .ms-side-item.active { 
+        background: linear-gradient(135deg, var(--shp-accent), var(--shp-accent-2)); 
+        box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4), 0 8px 10px -6px rgba(37, 99, 235, 0.1); 
+        border-color: rgba(255,255,255,0.1);
+    }
+    
+    .ms-side-item.active::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+        transform: translateX(-100%); transition: 0.5s;
+    }
+    .ms-side-item.active:hover::before { transform: translateX(100%); }
+
+    .ms-side-item.active .ms-side-label { color:#ffffff; font-weight: 700; }
+    .ms-side-item.active .ms-side-desc { color:rgba(255,255,255,0.85); }
+    .ms-side-item.active .ms-side-ic i { color:#ffffff !important; }
+    
+    .ms-side-ic { 
+        font-size: 1.35rem; flex-shrink: 0; width: 36px; height: 36px; 
+        display: flex; align-items: center; justify-content: center; 
+        border-radius: 10px; background: var(--shp-accent-light); transition: 0.3s;
+    }
+    .ms-side-item.active .ms-side-ic { background: rgba(255,255,255,0.2); }
+    
+    .ms-side-label { font-size: 0.95rem; font-weight: 600; color: var(--shp-text); line-height: 1.2; transition: 0.3s; }
+    .ms-side-desc { font-size: 0.75rem; color: var(--shp-muted); line-height: 1.4; margin-top: 4px; transition: 0.3s; }
 
     /* Card Panels */
-    .card-main{
-        background: var(--card, #fff);
-        border-radius: 12px;
-        border: 1px solid var(--shp-border);
-        box-shadow: 0 1px 3px rgba(15,23,42,.05);
-        overflow:hidden;
-        margin-bottom: 1.5rem;
-        transition: opacity .2s;
+    .card-main {
+        background: var(--card-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 20px;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255,255,255,0.3);
+        overflow: hidden;
+        margin-bottom: 2rem;
+        transition: transform 0.3s, box-shadow 0.3s;
     }
-    body[data-theme="dark"] .card-main{
-        border-color: rgba(51,65,85,.85);
-        background: #0f172a;
+    body[data-theme="dark"] .card-main { box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); inset 0 1px 0 rgba(255,255,255,0.05); }
+    
+    .card-main:hover {
+        box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08), 0 4px 8px -4px rgba(0, 0, 0, 0.04);
     }
+    
     .card-header-custom {
-        padding: 1.25rem 1.5rem;
-        background: rgba(248,250,252,.5);
+        padding: 1.5rem 2rem;
+        background: transparent;
         border-bottom: 1px solid var(--shp-border);
-        display: flex; align-items: center; gap: .75rem;
+        display: flex; align-items: center; gap: 1rem;
+        position: relative;
     }
-    body[data-theme="dark"] .card-header-custom { background: rgba(15,23,42,.6); }
-    .card-title-custom { font-size: 1rem; font-weight: 700; color: var(--shp-accent); margin:0; }
-    body[data-theme="dark"] .card-title-custom { color: #e5e7eb; }
-    .card-body-custom { padding: 0 1.5rem; }
+    .card-header-custom::after {
+        content: ''; position: absolute; bottom: -1px; left: 2rem; right: 2rem; height: 1px;
+        background: linear-gradient(90deg, var(--shp-accent), transparent);
+        opacity: 0.3;
+    }
+    
+    .card-title-custom { font-size: 1.15rem; font-weight: 700; color: var(--shp-text); margin:0; letter-spacing: -0.01em; }
+    .card-body-custom { padding: 0.5rem 2rem 1.5rem; }
 
     /* Form Elements & Layout */
     .settings-row {
-        padding: 1.5rem 0;
-        border-bottom: 1px solid var(--shp-border);
+        padding: 1.75rem 0;
+        border-bottom: 1px dashed var(--shp-border);
+        transition: background 0.3s;
     }
     .settings-row:last-child { border-bottom: none; }
-    .settings-row-label { font-weight: 700; color: var(--shp-accent); font-size: .9rem; margin-bottom: .25rem; }
-    .settings-row-desc { font-size: .8rem; color: var(--shp-muted); line-height: 1.4; }
-    body[data-theme="dark"] .settings-row-label { color: #d1d5db; }
+    .settings-row:hover { background: rgba(0,0,0,0.01); }
+    body[data-theme="dark"] .settings-row:hover { background: rgba(255,255,255,0.01); }
+    
+    .settings-row-label { font-weight: 700; color: var(--shp-text); font-size: 0.95rem; margin-bottom: 0.35rem; }
+    .settings-row-desc { font-size: 0.85rem; color: var(--shp-muted); line-height: 1.5; }
     
     .form-control, .form-select {
-        border-radius: 8px; 
+        border-radius: 12px; 
         border: 1px solid var(--shp-border-strong);
-        font-size: .85rem;
-        padding: .6rem .85rem;
-        background: var(--card, #fff);
-        color: var(--shp-accent);
-        transition: all .2s;
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+        background: var(--card-bg);
+        color: var(--shp-text);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
     .form-control:focus, .form-select:focus {
         border-color: var(--shp-accent);
-        box-shadow: 0 0 0 3px rgba(51,65,85,.1);
+        background: #fff;
+        box-shadow: 0 0 0 4px var(--shp-accent-light);
+        outline: none;
     }
-    body[data-theme="dark"] .form-control, body[data-theme="dark"] .form-select {
-        background: #1e293b; color: #f3f4f6; border-color: rgba(71,85,105,.8);
-    }
+    body[data-theme="dark"] .form-control:focus, body[data-theme="dark"] .form-select:focus { background: #0f172a; }
 
-    /* Switch */
+    /* Modern iOS-like Switch */
     .form-switch .form-check-input {
-        width: 3rem;
-        height: 1.5rem;
+        width: 3.2rem;
+        height: 1.7rem;
         cursor: pointer;
+        border-radius: 2rem;
+        transition: background-position .15s ease-in-out, background-color .2s ease, border-color .2s ease;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
     .form-switch .form-check-input:checked {
-        background-color: var(--shp-accent);
-        border-color: var(--shp-accent);
+        background-color: #10b981;
+        border-color: #10b981;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 0 0 3px rgba(16, 185, 129, 0.2);
     }
+    .form-check-label { cursor: pointer; font-weight: 500; font-size: 0.9rem; margin-top: 3px; color: var(--shp-text); }
 
     /* Buttons */
-    .btn-pill{ border-radius:8px; padding-inline:1rem; box-shadow:none!important; font-weight:600; font-size:.85rem; }
-    .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
-    .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; transform:translateY(-1px); }
+    .btn-pill { 
+        border-radius: 50px; padding: 0.75rem 1.5rem; box-shadow: none !important; 
+        font-weight: 600; font-size: 0.9rem; letter-spacing: 0.02em; transition: all 0.3s; 
+    }
+    .btn-ship-primary { 
+        background: linear-gradient(135deg, var(--shp-accent), var(--shp-accent-2)) !important; 
+        border: none !important; color: #fff !important; 
+        box-shadow: 0 4px 12px rgba(37,99,235,0.3) !important;
+    }
+    .btn-ship-primary:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 8px 20px rgba(37,99,235,0.4) !important;
+    }
+    .btn-ship-primary:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(37,99,235,0.3) !important; }
     
-    .ms-section { display: none; }
-    .ms-section.active { display: block; animation: ms-fade .3s cubic-bezier(0.16, 1, 0.3, 1); }
-    @keyframes ms-fade { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .ms-section { display: none; opacity: 0; transform: translateY(15px); }
+    .ms-section.active { display: block; animation: ms-fade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes ms-fade { to { opacity:1; transform:translateY(0); } }
 
     /* Mobile Tabs */
-    .ms-tabs { display:flex; overflow-x:auto; gap:.5rem; margin-bottom:1.5rem; padding-bottom:.5rem; }
-    .ms-tabs::-webkit-scrollbar { height: 4px; }
+    .ms-tabs { display:flex; overflow-x:auto; gap:0.75rem; margin-bottom:2rem; padding-bottom:0.5rem; scroll-behavior: smooth; }
+    .ms-tabs::-webkit-scrollbar { height: 0; display: none; }
     @media(min-width:992px){ .ms-tabs { display:none; } }
     .ms-tab-btn {
-        padding: .5rem 1rem; border-radius: 8px; border: 1px solid var(--shp-border);
-        background: transparent; color: var(--shp-muted); font-size: .8rem; font-weight: 700;
-        white-space: nowrap; transition: all .2s;
+        padding: 0.75rem 1.25rem; border-radius: 12px; border: 1px solid var(--shp-border);
+        background: var(--card-bg); color: var(--shp-muted); font-size: 0.85rem; font-weight: 600;
+        white-space: nowrap; transition: all 0.3s;
     }
-    .ms-tab-btn.active { background: var(--shp-accent); color: #fff; border-color: var(--shp-accent); }
+    .ms-tab-btn.active { 
+        background: var(--shp-accent); color: #fff; border-color: var(--shp-accent);
+        box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+    }
     
     .alert-success-custom {
-        background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;
-        padding: 1rem 1.25rem; border-radius: 10px; font-size: .85rem; margin-bottom: 1.5rem; font-weight: 600;
-        display:flex; align-items:center; gap:.5rem;
+        background: linear-gradient(to right, #ecfdf5, #f0fdf4); border: 1px solid #a7f3d0; color: #065f46;
+        padding: 1rem 1.5rem; border-radius: 14px; font-size: 0.95rem; margin-bottom: 2rem; font-weight: 600;
+        display:flex; align-items:center; gap:0.75rem; box-shadow: 0 4px 12px rgba(16,185,129,0.1);
+        animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body[data-theme="dark"] .alert-success-custom { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #34d399; }
+    @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+    
+    /* Interactive Cards */
+    .tpl-label { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer; }
+    
+    .tpl-card { 
+        position:relative; overflow:hidden; border-radius:14px; 
+        border:2px solid transparent; background: var(--card-bg);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 0 0 1px var(--shp-border);
+    }
+    .tpl-card:hover { 
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.08), 0 0 0 1px var(--shp-border-strong); 
     }
     
-    .tpl-label { transition: all .2s; cursor:pointer; }
-    /* For non-card templates (e.g. "Tidak Pakai") */
-    .peer-radio:checked + .tpl-label { border-color: var(--shp-accent) !important; background-color: rgba(51,65,85, 0.05); box-shadow: 0 0 0 2px var(--shp-accent); }
-    
-    .tpl-card { position:relative; overflow:hidden; border-radius:10px; border:2px solid var(--shp-border); transition: all .2s; cursor:pointer; }
-    .tpl-card:hover { border-color: var(--shp-accent); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-    
-    /* Selected state for tpl-card (uses :has to detect checked radio inside) */
     .tpl-card:has(.peer-radio:checked) { 
         border-color: #10b981 !important; 
-        box-shadow: 0 0 0 2px #10b981, 0 4px 12px rgba(16,185,129,.15); 
+        box-shadow: 0 8px 20px rgba(16,185,129,0.2), 0 0 0 1px #10b981; 
+        transform: translateY(-2px);
     }
+    
     .tpl-card:has(.peer-radio:checked)::after {
-        content: '✓ Terpilih';
-        position: absolute; top: 6px; right: 6px;
-        background: #10b981; color: #fff; font-size: .65rem; font-weight: 700;
-        padding: 2px 8px; border-radius: 20px; z-index: 2;
-        letter-spacing: .02em;
+        content: '\f00c'; /* FontAwesome Check */
+        font-family: 'Font Awesome 5 Free'; font-weight: 900;
+        position: absolute; top: 10px; right: 10px;
+        background: #10b981; color: #fff; font-size: 0.8rem;
+        width: 24px; height: 24px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2; box-shadow: 0 2px 6px rgba(16,185,129,0.4);
+        animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+    
+    /* For "Tidak Pakai" option */
+    .form-check:has(.peer-radio:checked) .tpl-label-none {
+        border-color: var(--shp-accent) !important;
+        background: var(--shp-accent-light) !important;
+        box-shadow: 0 0 0 2px var(--shp-accent);
+        color: var(--shp-accent) !important;
     }
     
     .tpl-actions {
         position:absolute; bottom:0; left:0; right:0; background:rgba(255,255,255,0.95);
-        padding:.5rem; display:flex; gap:.25rem; justify-content:center;
-        transform:translateY(100%); transition:transform .2s;
+        backdrop-filter: blur(4px);
+        padding: 0.6rem; display:flex; gap:0.5rem; justify-content:center;
+        transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         border-top:1px solid var(--shp-border);
     }
+    body[data-theme="dark"] .tpl-actions { background: rgba(15,23,42,0.95); }
     .tpl-card:hover .tpl-actions { transform:translateY(0); }
+    
+    /* Upload Zone */
+    .upload-zone {
+        border: 2px dashed var(--shp-border-strong);
+        border-radius: 14px;
+        background: rgba(0,0,0,0.01);
+        transition: all 0.3s;
+    }
+    body[data-theme="dark"] .upload-zone { background: rgba(255,255,255,0.02); }
+    .upload-zone:hover {
+        background: var(--shp-accent-light);
+        border-color: var(--shp-accent);
+        border-style: solid;
+        transform: translateY(-2px);
+    }
+    .upload-zone i { transition: transform 0.3s; }
+    .upload-zone:hover i { transform: translateY(-4px); color: var(--shp-accent) !important; }
 </style>
 @endpush
 
@@ -257,9 +380,9 @@
                             <div class="mb-3">
                                 <div class="form-check p-0">
                                     <input type="radio" name="marketplace_footer_template" id="fTpl_none" value="none" class="d-none peer-radio" {{ ($settings['marketplace_footer_template'] ?? 'none') == 'none' ? 'checked' : '' }}>
-                                    <label class="w-100 border rounded-3 p-3 text-center cursor-pointer tpl-label d-flex align-items-center justify-content-center" for="fTpl_none" style="background:#f8fafc;">
+                                    <label class="w-100 border rounded-4 p-3 text-center cursor-pointer tpl-label tpl-label-none d-flex align-items-center justify-content-center" for="fTpl_none" style="background:var(--card-bg);">
                                         <i class="fas fa-ban text-muted me-2"></i>
-                                        <span class="text-muted fw-bold" style="font-size:.85rem;">Tidak Pakai Footer Template</span>
+                                        <span class="text-muted fw-bold" style="font-size:.9rem;">Tidak Pakai Footer Template</span>
                                     </label>
                                 </div>
                             </div>
@@ -281,11 +404,11 @@
                             
                             <!-- Add New Footer -->
                             <div class="mb-2">
-                                <div class="border rounded-3 p-3 d-flex align-items-center justify-content-center" style="border-style: dashed !important; background: rgba(0,0,0,0.02);">
+                                <div class="upload-zone p-4 d-flex align-items-center justify-content-center">
                                     <input type="file" name="add_footer_template" id="addFooterTemplate" class="d-none" accept="image/png, image/jpeg, application/pdf" onchange="document.getElementById('ms-settings-form').submit();">
-                                    <label for="addFooterTemplate" class="cursor-pointer d-flex align-items-center gap-2 mb-0">
-                                        <i class="fas fa-cloud-upload-alt text-primary"></i>
-                                        <span class="fw-bold" style="font-size:.85rem; color:var(--shp-accent)">Upload Footer Baru</span>
+                                    <label for="addFooterTemplate" class="cursor-pointer d-flex flex-column align-items-center gap-2 mb-0 w-100 h-100">
+                                        <i class="fas fa-cloud-upload-alt text-primary fs-3 opacity-75"></i>
+                                        <span class="fw-bold" style="font-size:.9rem; color:var(--shp-accent)">Upload Footer Baru</span>
                                     </label>
                                 </div>
                             </div>
@@ -389,12 +512,12 @@
                                     
                                     <!-- Tambah Template Baru -->
                                     <div class="col">
-                                        <div class="h-100 border rounded p-2 d-flex flex-column align-items-center justify-content-center border-dashed" style="border-style: dashed !important; background: rgba(0,0,0,0.02); min-height:180px;">
+                                        <div class="upload-zone h-100 p-3 d-flex flex-column align-items-center justify-content-center" style="min-height:180px;">
                                             <input type="file" name="add_greeting_template" id="addGreetingTemplate" class="d-none" accept="image/png, image/jpeg, application/pdf" onchange="document.getElementById('ms-settings-form').submit();">
                                             <label for="addGreetingTemplate" class="cursor-pointer text-center w-100 h-100 d-flex flex-column align-items-center justify-content-center mb-0">
-                                                <i class="fas fa-cloud-upload-alt text-primary mb-2 opacity-75" style="font-size: 2.5rem;"></i>
-                                                <div class="fw-bold" style="font-size:.9rem; color:var(--shp-accent)">Tambah Baru</div>
-                                                <div class="text-muted mt-1" style="font-size:.7rem;">Klik untuk upload</div>
+                                                <i class="fas fa-cloud-upload-alt text-primary mb-3 opacity-75" style="font-size: 2.5rem;"></i>
+                                                <div class="fw-bold" style="font-size:.95rem; color:var(--shp-accent)">Tambah Baru</div>
+                                                <div class="text-muted mt-1" style="font-size:.75rem;">Klik untuk upload</div>
                                             </label>
                                         </div>
                                     </div>

@@ -20,12 +20,21 @@ class StorefrontVisitor extends Model
         'city',
         'first_seen_at',
         'last_seen_at',
+        'is_internal',
+        'internal_reason',
     ];
 
     protected $casts = [
         'first_seen_at' => 'datetime',
         'last_seen_at'  => 'datetime',
+        'is_internal'   => 'boolean',
     ];
+
+    // Scope: only external (non-internal) visitors
+    public function scopeExternal($query)
+    {
+        return $query->where('is_internal', false);
+    }
 
     public function events()
     {

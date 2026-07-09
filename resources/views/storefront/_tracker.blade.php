@@ -58,6 +58,8 @@
     /* ── Click tracking ─────────────────────────────────────────── */
     // Selector → label yang dikirim ke server
     var TRACKED_SELECTORS = [
+        { sel: 'a[href*="#beli"]',                    label: 'start_shopping_cta' },
+        { sel: 'a[href*="shopee.co.id"], a[href*="tokopedia.com"], a[href*="lazada.co.id"], a[href*="tiktok.com"], a[href*="bukalapak.com"], a[href*="blibli.com"]', label: 'marketplace_link' },
         { sel: 'a[href*="/products/"]',              label: 'product_link'   },
         { sel: '[data-track="add-to-cart"]',          label: 'add_to_cart_cta'},
         { sel: 'a[href*="wa.me"], a[href*="api.whatsapp"]', label: 'wa_button' },

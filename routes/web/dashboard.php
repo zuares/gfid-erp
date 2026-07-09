@@ -192,6 +192,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/prospects/export',          [StorefrontCrmController::class, 'exportProspects'])->name('prospects.export');
             Route::get('/visitors',                  [StorefrontVisitorController::class, 'index'])->name('visitors');
             Route::get('/visitors/live',             [StorefrontVisitorController::class, 'live'])->name('visitors.live');
+            Route::post('/visitors/{visitor}/toggle-internal', [StorefrontVisitorController::class, 'toggleInternal'])->name('visitors.toggle_internal');
+            Route::post('/visitors/rescan-internal', [StorefrontVisitorController::class, 'rescanInternal'])->name('visitors.rescan_internal');
+            Route::post('/visitors/save-ip-settings', [StorefrontVisitorController::class, 'saveIpSettings'])->name('visitors.save_ip_settings');
             Route::get('/segments',                  [StorefrontSegmentController::class, 'index'])->name('segments');
             Route::get('/segments/{segment}',        [StorefrontSegmentController::class, 'show'])->name('segments.show');
             Route::get('/customers',                 [StorefrontCustomerController::class, 'index'])->name('customers');

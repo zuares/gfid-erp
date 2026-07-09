@@ -62,6 +62,34 @@ class TrackStorefrontVisitor
         'storefront.order.wa_click',
     ];
 
+    private function isInternalIp(string $ip, string $rawSetting): bool
+    {
+        $entries = array_filter(array_map('trim', explode("\n", str_replace(',', "\n", $rawSetting))));
+        foreach ($entries as $entry) {
+            if (str_ends_with($entry, '.*')) {
+                $prefix = rtrim($entry, '.*');
+                if (str_starts_with($ip, $prefix . '.')) return true;
+                continue;
+            }
+            if (str_contains($entry, '/')) {
+                if ($this->ipMatchesCidr($ip, $entry)) return true;
+                continue;
+            }
+            if ($ip === $entry) return true;
+        }
+        return false;
+    }
+
+    private function ipMatchesCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $bits] = explode('/', $cidr);
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) return false;
+        $ip     = ip2long($ip);
+        $subnet = ip2long($subnet);
+        $mask   = -1 << (32 - (int) $bits);
+        return ($ip & $mask) === ($subnet & $mask);
+    }
+
     public function handle(Request $request, Closure $next): Response
     {
         // Ambil atau buat visitor token
@@ -83,6 +111,35 @@ class TrackStorefrontVisitor
             $visitor->utm_medium    = $request->query('utm_medium');
             $visitor->utm_campaign  = $request->query('utm_campaign');
             // city/province diisi di terminate() setelah response dikirim — tidak menambah latency
+
+            // Auto-mark as internal if IP matches office IP rules
+            $internalIpSetting = \App\Models\SystemSetting::get('crm_internal_ips', '');
+            $isInternalIp = false;
+            if (! empty(trim($internalIpSetting))) {
+                $isInternalIp = $this->isInternalIp($request->ip(), $internalIpSetting);
+            }
+
+            // Auto-mark as internal if they are logged in as staff (admin, owner, operating, dll)
+            $isStaff = false;
+            if (auth()->check() && auth()->user()) {
+                // Semua user yang login ke dashboard admin (apapun rolenya) dianggap internal
+                $isStaff = true;
+            }
+
+            if ($isInternalIp) {
+                $visitor->is_internal     = true;
+                $visitor->internal_reason = 'ip';
+            } elseif ($isStaff) {
+                $visitor->is_internal     = true;
+                $visitor->internal_reason = 'staff';
+            }
+        }
+
+        // Always ensure staff are marked as internal even if they were originally tracked as external
+        // (Misalnya mereka buka website dulu sbg Guest, lalu login ke admin dashboard. Kita update statusnya jadi internal)
+        if (! $visitor->is_internal && auth()->check() && auth()->user()) {
+            $visitor->is_internal     = true;
+            $visitor->internal_reason = 'staff';
         }
 
         $visitor->last_seen_at = $now;

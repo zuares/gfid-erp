@@ -67,6 +67,50 @@ class StorefrontVisitorController extends Controller
         return '—';
     }
 
+    /**
+     * Check whether an IP matches any of the configured internal/office IPs or ranges.
+     * Supports exact IPs (192.168.1.5) or CIDR ranges (192.168.1.0/24) or prefix wildcards (192.168.1.*).
+     */
+    private function isInternalIp(?string $ip): bool
+    {
+        if (! $ip) return false;
+
+        $rawSetting = \App\Models\SystemSetting::get('crm_internal_ips', '');
+        if (empty(trim($rawSetting))) return false;
+
+        $entries = array_filter(array_map('trim', explode('\n', str_replace(',', '\n', $rawSetting))));
+
+        foreach ($entries as $entry) {
+            // Wildcard prefix match: 192.168.1.*
+            if (str_ends_with($entry, '.*')) {
+                $prefix = rtrim($entry, '.*');
+                if (str_starts_with($ip, $prefix . '.')) return true;
+                continue;
+            }
+
+            // CIDR notation: 192.168.1.0/24
+            if (str_contains($entry, '/')) {
+                if ($this->ipMatchesCidr($ip, $entry)) return true;
+                continue;
+            }
+
+            // Exact match
+            if ($ip === $entry) return true;
+        }
+
+        return false;
+    }
+
+    private function ipMatchesCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $bits] = explode('/', $cidr);
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) return false;
+        $ip     = ip2long($ip);
+        $subnet = ip2long($subnet);
+        $mask   = -1 << (32 - (int) $bits);
+        return ($ip & $mask) === ($subnet & $mask);
+    }
+
     private function parseDevice(?string $ua): string
     {
         if (! $ua) return 'desktop';
@@ -84,14 +128,27 @@ class StorefrontVisitorController extends Controller
 
     public function index()
     {
-        $days  = (int) request('days', 30);
-        $since = now()->subDays($days)->startOfDay();
+        $startDate = request('start_date');
+        $endDate   = request('end_date');
 
-        // ── Stat cards ────────────────────────────────────────────────────────
+        if ($startDate && $endDate) {
+            $since = \Carbon\Carbon::parse($startDate)->startOfDay();
+            $until = \Carbon\Carbon::parse($endDate)->endOfDay();
+            $days  = max(1, $since->diffInDays($until));
+        } else {
+            $days  = (int) request('days', 30);
+            $since = now()->subDays($days)->startOfDay();
+            $until = now()->endOfDay();
+        }
 
-        $uniqueVisitors = StorefrontVisitor::where('first_seen_at', '>=', $since)->count();
+        $showInternal = request()->boolean('show_internal', false);
+        $currentInternalIps = \App\Models\SystemSetting::get('crm_internal_ips', '');
 
-        $returningVisitors = StorefrontVisitor::where('first_seen_at', '>=', $since)
+        // ── Stat cards (always external-only) ────────────────────────────────
+
+        $uniqueVisitors = StorefrontVisitor::external()->whereBetween('first_seen_at', [$since, $until])->count();
+
+        $returningVisitors = StorefrontVisitor::external()->whereBetween('first_seen_at', [$since, $until])
             ->whereRaw("CAST((julianday(last_seen_at) - julianday(first_seen_at)) * 24 AS REAL) > 1")
             ->count();
 
@@ -99,12 +156,11 @@ class StorefrontVisitorController extends Controller
             ? round($returningVisitors / $uniqueVisitors * 100, 1)
             : 0;
 
-        // Visitors dalam periode yang punya storefront_customers account
-        $visitorTokensInPeriod = StorefrontVisitor::where('first_seen_at', '>=', $since)
-            ->pluck('visitor_token');
+        $internalCount = StorefrontVisitor::whereBetween('first_seen_at', [$since, $until])
+            ->where('is_internal', true)->count();
 
-        // Cek via customer_phone yang tersimpan di visitor, atau via orders
-        $visitorsWithPhone = StorefrontVisitor::where('first_seen_at', '>=', $since)
+        // Visitors dalam periode yang punya storefront_customers account
+        $visitorsWithPhone = StorefrontVisitor::external()->whereBetween('first_seen_at', [$since, $until])
             ->whereNotNull('customer_phone')
             ->pluck('customer_phone')
             ->map(fn($p) => str_starts_with($p, '0') ? '62' . substr($p, 1) : $p)
@@ -114,7 +170,7 @@ class StorefrontVisitorController extends Controller
 
         // Avg duration
         $durationEvents = StorefrontEvent::where('event_type', 'page_view_duration')
-            ->where('created_at', '>=', $since)
+            ->whereBetween('created_at', [$since, $until])
             ->get();
 
         $avgSeconds = $durationEvents->count() > 0
@@ -126,18 +182,18 @@ class StorefrontVisitorController extends Controller
             : $avgSeconds . 's';
 
         // Bounce rate
-        $totalSessions = StorefrontEvent::where('created_at', '>=', $since)
+        $totalSessions = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereIn('event_type', ['page_view', 'product_view'])
             ->distinct('visitor_token')
             ->count('visitor_token');
 
-        $engagedTokens = StorefrontEvent::where('created_at', '>=', $since)
+        $engagedTokens = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereNotIn('event_type', ['page_view', 'product_view', 'page_view_duration'])
             ->distinct('visitor_token')
             ->pluck('visitor_token')
             ->toArray();
 
-        $bouncedCount = StorefrontEvent::where('created_at', '>=', $since)
+        $bouncedCount = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereIn('event_type', ['page_view', 'product_view'])
             ->whereNotIn('visitor_token', $engagedTokens)
             ->select('visitor_token')
@@ -150,11 +206,11 @@ class StorefrontVisitorController extends Controller
             ? round($bouncedCount / $totalSessions * 100, 1)
             : 0;
 
-        // ── Daily visitors chart ──────────────────────────────────────────────
+        // ── Daily visitors chart (external only) ─────────────────────────────
         $isSqlite = DB::getDriverName() === 'sqlite';
         $dateExpr = $isSqlite ? "date(first_seen_at)" : "DATE(first_seen_at)";
 
-        $dailyVisitors = StorefrontVisitor::where('first_seen_at', '>=', $since)
+        $dailyVisitors = StorefrontVisitor::external()->whereBetween('first_seen_at', [$since, $until])
             ->selectRaw("{$dateExpr} as date, COUNT(*) as count")
             ->groupBy('date')
             ->orderBy('date')
@@ -170,7 +226,7 @@ class StorefrontVisitorController extends Controller
         }
 
         // ── Most visited pages ────────────────────────────────────────────────
-        $pageViews = StorefrontEvent::where('created_at', '>=', $since)
+        $pageViews = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereIn('event_type', ['page_view', 'product_view'])
             ->get()
             ->groupBy(function ($e) {
@@ -194,7 +250,7 @@ class StorefrontVisitorController extends Controller
 
         // ── Most clicked elements ─────────────────────────────────────────────
         $clickEvents = StorefrontEvent::where('event_type', 'click')
-            ->where('created_at', '>=', $since)
+            ->whereBetween('created_at', [$since, $until])
             ->get()
             ->groupBy(fn($e) => $e->payload['label'] ?? 'unknown')
             ->map(fn($g) => [
@@ -226,10 +282,20 @@ class StorefrontVisitorController extends Controller
             ->values();
 
         // ── Recent sessions — batch load to avoid N+1 ────────────────────────
-        $recentVisitors = StorefrontVisitor::where('first_seen_at', '>=', $since)
+        // Show all visitors (internal + external) in list, but sorted with external first
+        $recentQuery = StorefrontVisitor::whereBetween('first_seen_at', [$since, $until])
             ->orderByDesc('last_seen_at')
-            ->take(25)
-            ->get();
+            ->take(25);
+
+        if (! $showInternal) {
+            // When not explicitly showing internal, still show them but sorted to bottom
+            $recentQuery = StorefrontVisitor::whereBetween('first_seen_at', [$since, $until])
+                ->orderBy('is_internal')
+                ->orderByDesc('last_seen_at')
+                ->take(25);
+        }
+
+        $recentVisitors = $recentQuery->get();
 
         $recentTokens = $recentVisitors->pluck('visitor_token')->all();
 
@@ -274,6 +340,8 @@ class StorefrontVisitorController extends Controller
                 'has_cart'   => $events->where('event_type', 'add_to_cart')->isNotEmpty(),
                 'has_order'  => $hasOrder,
                 'has_account' => $hasAccount,
+                'has_start_shopping' => $events->where('event_type', 'click')->filter(fn($e) => ($e->payload['label'] ?? '') === 'start_shopping_cta')->isNotEmpty(),
+                'has_marketplace'    => $events->where('event_type', 'click')->filter(fn($e) => ($e->payload['label'] ?? '') === 'marketplace_link')->isNotEmpty(),
                 'has_login'  => $events->whereIn('event_type', ['page_view'])
                     ->filter(fn($e) => in_array(
                         $e->payload['route'] ?? '',
@@ -282,11 +350,18 @@ class StorefrontVisitorController extends Controller
                 'is_active'  => \Carbon\Carbon::parse($v->last_seen_at)->diffInMinutes(now()) < 5,
                 'device'     => $this->parseDevice($v->user_agent),
                 'brand'      => $this->parseBrand($v->user_agent),
+                'is_internal' => (bool) $v->is_internal,
+                'internal_reason' => $v->internal_reason,
             ];
         });
 
         return view('admin.crm.visitors', compact(
             'days',
+            'startDate',
+            'endDate',
+            'showInternal',
+            'internalCount',
+            'currentInternalIps',
             'uniqueVisitors',
             'returningVisitors',
             'returnRate',
@@ -305,17 +380,91 @@ class StorefrontVisitorController extends Controller
         ));
     }
 
+    // ── Toggle internal flag for a specific visitor ───────────────────────────
+
+    public function toggleInternal(StorefrontVisitor $visitor)
+    {
+        $wasInternal = $visitor->is_internal;
+        $visitor->update([
+            'is_internal'     => ! $wasInternal,
+            'internal_reason' => ! $wasInternal ? 'manual' : null,
+        ]);
+
+        return response()->json([
+            'is_internal'     => $visitor->is_internal,
+            'internal_reason' => $visitor->internal_reason,
+            'message'         => $visitor->is_internal
+                ? 'Visitor ditandai sebagai Internal.'
+                : 'Tanda Internal dihapus.',
+        ]);
+    }
+
+    // ── Bulk re-scan all visitors based on current IP rules ───────────────────
+
+    public function rescanInternal()
+    {
+        $rawSetting = \App\Models\SystemSetting::get('crm_internal_ips', '');
+        $hasRules   = ! empty(trim($rawSetting));
+
+        if (! $hasRules) {
+            return response()->json(['message' => 'Tidak ada IP yang dikonfigurasi.', 'updated' => 0]);
+        }
+
+        $updated = 0;
+        StorefrontVisitor::whereNull('internal_reason')
+            ->orWhere('internal_reason', 'ip')
+            ->chunk(200, function ($visitors) use (&$updated) {
+                foreach ($visitors as $visitor) {
+                    $shouldBeInternal = $this->isInternalIp($visitor->ip_address);
+                    if ((bool) $visitor->is_internal !== $shouldBeInternal) {
+                        $visitor->update([
+                            'is_internal'     => $shouldBeInternal,
+                            'internal_reason' => $shouldBeInternal ? 'ip' : null,
+                        ]);
+                        $updated++;
+                    }
+                }
+            });
+
+        return response()->json([
+            'message' => "Rescan selesai. {$updated} visitor diperbarui.",
+            'updated' => $updated,
+        ]);
+    }
+
+    // ── Save internal IP settings ─────────────────────────────────────────────
+
+    public function saveIpSettings(\Illuminate\Http\Request $request)
+    {
+        $ips = trim($request->input('crm_internal_ips', ''));
+        \App\Models\SystemSetting::updateOrCreate(
+            ['key' => 'crm_internal_ips'],
+            ['value' => $ips, 'description' => 'Daftar IP address WiFi kantor yang dikecualikan dari statistik visitor (1 IP per baris, atau CIDR, atau 192.168.1.*)']
+        );
+        return redirect()->route('admin.crm.visitors', request()->only('days', 'start_date', 'end_date'))
+            ->with('success_ip', 'Pengaturan IP disimpan. Klik "Rescan IP" untuk menerapkan ke semua visitor lama.');
+    }
+
     // ── Live endpoint — JSON untuk AJAX polling ───────────────────────────────
 
     public function live()
     {
-        $days  = (int) request('days', 30);
-        $since = now()->subDays($days)->startOfDay();
+        $startDate = request('start_date');
+        $endDate   = request('end_date');
+
+        if ($startDate && $endDate) {
+            $since = \Carbon\Carbon::parse($startDate)->startOfDay();
+            $until = \Carbon\Carbon::parse($endDate)->endOfDay();
+        } else {
+            $days  = (int) request('days', 30);
+            $since = now()->subDays($days)->startOfDay();
+            $until = now()->endOfDay();
+        }
 
         // ── Stats ─────────────────────────────────────────────────────────────
-        $uniqueVisitors = StorefrontVisitor::where('first_seen_at', '>=', $since)->count();
+        $uniqueVisitors = StorefrontVisitor::whereBetween('first_seen_at', [$since, $until])->count();
 
-        $visitorsWithPhone = StorefrontVisitor::where('first_seen_at', '>=', $since)
+        $visitorsWithPhone = StorefrontVisitor::whereBetween('first_seen_at', [$since, $until])
             ->whereNotNull('customer_phone')
             ->pluck('customer_phone')
             ->map(fn($p) => str_starts_with($p, '0') ? '62' . substr($p, 1) : $p)
@@ -323,18 +472,18 @@ class StorefrontVisitorController extends Controller
 
         $registeredVisitors = StorefrontCustomer::whereIn('phone', $visitorsWithPhone)->count();
 
-        $totalSessions = StorefrontEvent::where('created_at', '>=', $since)
+        $totalSessions = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereIn('event_type', ['page_view', 'product_view'])
             ->distinct('visitor_token')
             ->count('visitor_token');
 
-        $engagedTokens = StorefrontEvent::where('created_at', '>=', $since)
+        $engagedTokens = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereNotIn('event_type', ['page_view', 'product_view', 'page_view_duration'])
             ->distinct('visitor_token')
             ->pluck('visitor_token')
             ->toArray();
 
-        $bouncedCount = StorefrontEvent::where('created_at', '>=', $since)
+        $bouncedCount = StorefrontEvent::whereBetween('created_at', [$since, $until])
             ->whereIn('event_type', ['page_view', 'product_view'])
             ->whereNotIn('visitor_token', $engagedTokens)
             ->select('visitor_token')
@@ -344,7 +493,7 @@ class StorefrontVisitorController extends Controller
 
         $bounceRate = $totalSessions > 0 ? round($bouncedCount / $totalSessions * 100, 1) : 0;
 
-        $returningVisitors = StorefrontVisitor::where('first_seen_at', '>=', $since)
+        $returningVisitors = StorefrontVisitor::whereBetween('first_seen_at', [$since, $until])
             ->whereRaw("CAST((julianday(last_seen_at) - julianday(first_seen_at)) * 24 AS REAL) > 1")
             ->count();
         $returnRate = $uniqueVisitors > 0 ? round($returningVisitors / $uniqueVisitors * 100, 1) : 0;
@@ -383,23 +532,28 @@ class StorefrontVisitorController extends Controller
             $isActive = \Carbon\Carbon::parse($v->last_seen_at)->diffInMinutes(now()) < 5;
 
             return [
-                'token'       => substr($v->visitor_token, 0, 14) . '…',
-                'name'        => $v->customer_name,
-                'phone'       => $v->customer_phone,
-                'city'        => $v->city ? strtolower($v->city) : null,
-                'province'    => $v->province,
-                'page_views'  => $events->whereIn('event_type', ['page_view', 'product_view'])->count(),
-                'total_sec'   => $totalSec,
-                'has_order'   => $hasOrder,
-                'has_account' => $hasAccount,
-                'has_cart'    => $events->where('event_type', 'add_to_cart')->isNotEmpty(),
-                'has_login'   => $events->whereIn('event_type', ['page_view'])
+                'visitor_id'      => $v->id,
+                'is_internal'     => (bool) $v->is_internal,
+                'internal_reason' => $v->internal_reason,
+                'token'           => substr($v->visitor_token, 0, 14) . '…',
+                'name'            => $v->customer_name,
+                'phone'           => $v->customer_phone,
+                'city'            => $v->city ? strtolower($v->city) : null,
+                'province'        => $v->province,
+                'page_views'      => $events->whereIn('event_type', ['page_view', 'product_view'])->count(),
+                'total_sec'       => $totalSec,
+                'has_order'       => $hasOrder,
+                'has_account'     => $hasAccount,
+                'has_cart'        => $events->where('event_type', 'add_to_cart')->isNotEmpty(),
+                'has_start_shopping' => $events->where('event_type', 'click')->filter(fn($e) => ($e->payload['label'] ?? '') === 'start_shopping_cta')->isNotEmpty(),
+                'has_marketplace'    => $events->where('event_type', 'click')->filter(fn($e) => ($e->payload['label'] ?? '') === 'marketplace_link')->isNotEmpty(),
+                'has_login'       => $events->whereIn('event_type', ['page_view'])
                     ->filter(fn($e) => in_array($e->payload['route'] ?? '', ['storefront.login', 'storefront.register', 'storefront.login.verify']))
                     ->isNotEmpty(),
-                'last_seen'   => \Carbon\Carbon::parse($v->last_seen_at)->diffForHumans(),
-                'is_active'   => $isActive,
-                'device'      => $this->parseDevice($v->user_agent),
-                'brand'       => $this->parseBrand($v->user_agent),
+                'last_seen'       => \Carbon\Carbon::parse($v->last_seen_at)->diffForHumans(),
+                'is_active'       => $isActive,
+                'device'          => $this->parseDevice($v->user_agent),
+                'brand'           => $this->parseBrand($v->user_agent),
             ];
         });
 

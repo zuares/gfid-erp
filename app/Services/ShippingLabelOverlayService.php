@@ -41,10 +41,11 @@ class ShippingLabelOverlayService
         }
         
         if ($qpdfPath) {
-            $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_');
-            exec(sprintf("%s --stream-data=uncompress --empty --pages %s 1-z -- %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
+            $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
+            // Disable object streams and uncompress streams to make it compatible with FPDI Free
+            exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
             if ($returnVar === 0 && file_exists($uncompressedFile)) {
-                unlink($tmpFile);
+                @unlink($tmpFile);
                 $tmpFile = $uncompressedFile;
             }
         }
