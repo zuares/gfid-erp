@@ -289,6 +289,7 @@ class InventoryStockController extends Controller
                         'name' => $r->category_name ? (string) $r->category_name : null,
                     ],
                     'total_qty' => (float) $r->total_qty,
+                    'allocated_qty' => (float) $r->allocated_qty,
                     'fg_qty' => (float) $r->fg_qty,
                     'wip_qty' => (float) $r->wip_qty,
 

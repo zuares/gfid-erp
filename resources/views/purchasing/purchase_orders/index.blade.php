@@ -4,7 +4,7 @@
 
 @php
     $user = auth()->user();
-    $canSeeMoney = $user?->isOwner() ?? false;
+    $canSeeMoney = $user?->hasRole(['owner', 'admin']) ?? false;
     $sortCol ??= 'date';
     $sortDir ??= 'desc';
     $sortUrl = fn(string $col) => request()->fullUrlWithQuery([

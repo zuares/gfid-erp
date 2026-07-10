@@ -32,6 +32,7 @@ class InventoryService
         float | int | string | null $unitCost = null, // harga per unit (untuk moving average / nilai mutasi)
         bool $affectLotCost = true, // apakah mutasi ini ikut update LotCost (hanya untuk kain mentah)
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
+        ?int $sourceLineId = null
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -76,6 +77,7 @@ class InventoryService
             'direction' => 'in',
             'source_type' => $sourceType,
             'source_id' => $sourceId,
+            'source_line_id' => $sourceLineId,
             'cutting_job_bundle_id' => $cuttingJobBundleId,
             'notes' => $notes,
             'lot_id' => $lotId ?: null,
@@ -109,6 +111,7 @@ class InventoryService
         bool $affectLotCost = true, // hanya true untuk pemakaian kain mentah
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
         bool $strictNonNegative = false,
+        ?int $sourceLineId = null
     ): ?InventoryMutation {
 
         $qty = $this->num($qty);
@@ -200,6 +203,7 @@ class InventoryService
             'direction' => 'out',
             'source_type' => $sourceType,
             'source_id' => $sourceId,
+            'source_line_id' => $sourceLineId,
             'cutting_job_bundle_id' => $cuttingJobBundleId,
             'notes' => $notes,
             'lot_id' => $lotId,
@@ -233,6 +237,7 @@ class InventoryService
         bool $affectLotCost = true,
         ?int $cuttingJobBundleId = null,
         bool $strictNonNegative = false,
+        ?int $sourceLineId = null
     ): ?InventoryMutation {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -264,7 +269,8 @@ class InventoryService
             $unitCostOverride,
             $affectLotCost,
             $cuttingJobBundleId,
-            $strictNonNegative
+            $strictNonNegative,
+            $sourceLineId
         );
     }
 

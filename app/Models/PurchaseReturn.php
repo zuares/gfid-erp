@@ -11,6 +11,8 @@ class PurchaseReturn extends Model
         'created_by', 'posted_by', 'posted_at', 'voided_by', 'voided_at',
         // Tahap 9 — QC link
         'qc_id', 'return_reason',
+        'resolution_type', 'replacement_status', 'replacement_expected_at',
+        'replacement_received_at', 'replacement_receipt_id'
     ];
 
     public function grn()

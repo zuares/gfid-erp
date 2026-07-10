@@ -1264,6 +1264,7 @@ const RESET_URL  = @json(parse_url(route('sales.shipments.rekon_reset_scans', $s
 const UPDATE_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_update_scan', [$shipment, '__NO__']), PHP_URL_PATH)) !!};
 const LINK_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_link_scan', [$shipment, '__NO__']), PHP_URL_PATH)) !!};
 const SERVER_ORDER_SCANS = @json($savedOrderScans ?? []);
+const SHIPMENT_TYPE = @json($shipment->shipment_type ?? 'marketplace');
 
 // Batch pool dari server — sumber kebenaran qty total per item
 const BATCH_POOL = @json(array_values($batchPool->toArray()));
@@ -1587,7 +1588,7 @@ async function processOrder(no) {
         if (!res.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal memuat pesanan.');
 
         data.no = no;
-        const defaultDecision = data.decision || (data.order?.source === 'manual_scan' ? 'pending' : null);
+        const defaultDecision = data.decision || (SHIPMENT_TYPE === 'manual' ? 'fulfill' : (data.order?.source === 'manual_scan' ? 'pending' : null));
         orders.push({ no, found: data.found, order: data.order, pool_full: data.pool_full, decision: defaultDecision, subs: {} });
 
         if (data.found) {
@@ -1604,8 +1605,13 @@ async function processOrder(no) {
             toast(s === 'ready' ? 'ok' : 'warn', no + (data.order?.source === 'manual_scan' ? ' dicatat' : (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch')));
         } else {
             saveState();
-            sndOrderNoMatch();
-            toast('warn', no + ' dicatat tanpa tautan');
+            if (SHIPMENT_TYPE === 'manual') {
+                sndOrderReady();
+                toast('ok', no + ' dicatat (manual)');
+            } else {
+                sndOrderNoMatch();
+                toast('warn', no + ' dicatat tanpa tautan');
+            }
         }
 
         renderAll();
@@ -1659,6 +1665,31 @@ function renderCard(o, idx) {
     const isLast = idx === orders.length - 1;
 
     if (!found) {
+        if (SHIPMENT_TYPE === 'manual') {
+            const decBadge = decision ? statusBadge(decision) : statusBadge('ready');
+            return `<div class="${cls}" id="ocard-${idx}">
+              <div class="rk-order-hdr" onclick="toggleCard(${idx})">
+                <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
+                <span class="rk-order-store">Pesanan Manual</span>
+                ${decBadge}${dupeBadge}
+                <span class="rk-order-chev" id="chev-${idx}">▼</span>
+              </div>
+              <div id="obody-${idx}" style="display:none">
+                <div class="rk-order-body">
+                  <p style="color:#64748b;font-size:.84rem;margin:0">
+                    Nomor pesanan dicatat. Stok akan dipotong sesuai barang yang disiapkan di batch ini.
+                  </p>
+                  <div class="rk-action-strip">
+                    <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Keputusan:</span>
+                    <button class="rk-act-btn fulfill ${decision==='fulfill'?'on':''}" data-idx="${idx}" data-action="fulfill">Siap Kirim</button>
+                    <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
+                    <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        }
+
         return `<div class="${cls}" id="ocard-${idx}">
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
             <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
@@ -1876,8 +1907,8 @@ window.promptLinkScan = async function(idx) {
 };
 
 function updateConfirmBtn() {
-    const foundOrders = orders.filter(o => o.found);
-    const allDecided  = foundOrders.length > 0 && foundOrders.every(o => o.decision);
+    const validOrders = orders.filter(o => o.found || SHIPMENT_TYPE === 'manual');
+    const allDecided  = validOrders.length > 0 && validOrders.every(o => o.decision);
     topConfirmBtn.disabled = !allDecided;
     topConfirmBtn.classList.toggle('active', allDecided);
     if (allDecided) document.getElementById('ph3').classList.add('active');
@@ -2091,8 +2122,8 @@ function renderSisa() {
     const hasOrders = orders.length > 0;
     const hasAllocation = Object.values(poolUsed).some(q => Number(q) > 0)
         || Object.values(subsUsed).some(q => Number(q) > 0);
-    const foundOrders = orders.filter(o => o.found);
-    const allDecided = foundOrders.length > 0 && foundOrders.every(o => o.decision);
+    const validOrders = orders.filter(o => o.found || SHIPMENT_TYPE === 'manual');
+    const allDecided = validOrders.length > 0 && validOrders.every(o => o.decision);
     const isWarning  = hasAllocation && allDecided && sisa.length > 0;
 
     const rows = sisa.map(s => `

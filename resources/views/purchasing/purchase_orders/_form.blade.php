@@ -3,7 +3,7 @@
     use Illuminate\Support\Carbon;
 
     /** @var \App\Models\PurchaseOrder|null $order */
-    $canSeeMoney = auth()->user()?->isOwner() ?? false;
+    $canSeeMoney = auth()->user()?->hasRole(['owner', 'admin']) ?? false;
 
     // =========================
     // ORDER TYPE
@@ -825,7 +825,7 @@
                         <td class="po-td-item" data-label="Item">
                             <x-item-suggest :items="$items" idName="lines[{{ $i }}][item_id]"
                                 :idValue="$lineItemId" :displayValue="$itemDisplay" :type="$itemSuggestType" :extraParams="$itemSuggestExtra" variant="mini"
-                                displayMode="{{ $orderType === 'packing' ? 'name' : 'code' }}"
+                                displayMode="code-name"
                                 :minChars="1" />
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
@@ -873,7 +873,7 @@
                         <td class="text-center align-middle line-index po-col-no">1</td>
 
                         <td class="po-td-item" data-label="Item">
-                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="{{ $orderType === 'packing' ? 'name' : 'code' }}"
+                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name"
                                 :showName="false" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
                                 placeholder="Masukan kode barang" />
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">

@@ -145,6 +145,12 @@
           </td>
           <td>${esc(row.item_name)}</td>
           <td class="text-end mono">${fmtQty(num0(row.total_qty))}</td>
+          <td class="text-end mono" style="color: var(--bs-warning);">
+            ${num0(row.allocated_qty) > 0 ? fmtQty(num0(row.allocated_qty)) : '<span class="text-muted">-</span>'}
+          </td>
+          <td class="text-end mono fw-bold" style="color: var(--bs-success);">
+            ${fmtQty(num0(row.total_qty) - num0(row.allocated_qty))}
+          </td>
           <td class="text-end mono">${fmtQty(num0(row.fg_qty))}</td>
           <td class="text-end mono">${fmtQty(num0(row.wip_qty))}</td>
           ${exCols}
@@ -156,6 +162,7 @@
                 const no = (from || 0) + index;
                 const rowJson = escAttr(JSON.stringify({
                     total_qty: row.total_qty,
+                    allocated_qty: row.allocated_qty,
                     fg_qty: row.fg_qty,
                     wip_qty: row.wip_qty,
                     hpp_per_unit: row.hpp_per_unit,
@@ -180,8 +187,8 @@
             <div class="m-right">
               <div class="m-metric">
                 <div>
-                  <div class="k">Total Stok</div>
-                  <div class="v mono">${fmtQty(num0(row.total_qty))}</div>
+                  <div class="k">Tersedia</div>
+                  <div class="v mono" style="color: var(--bs-success); font-weight: bold;">${fmtQty(num0(row.total_qty) - num0(row.allocated_qty))}</div>
                 </div>
               </div>
               <i class="bi bi-caret-right-fill caret"></i>

@@ -98,7 +98,7 @@
 
 @php
     use Illuminate\Support\Carbon;
-    $canSeeMoney = auth()->user()?->isOwner() ?? false;
+    $canSeeMoney = auth()->user()?->hasRole(['owner', 'admin']) ?? false;
 @endphp
 
 @forelse ($orders as $order)

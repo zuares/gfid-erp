@@ -98,6 +98,10 @@ class DummyBulkPrintController extends Controller
 
         return response()->json([
             'uuid' => $uuid,
+            'success_count' => $results['success_count'],
+            'failed_count' => $results['failed_count'],
+            'failed_orders' => $results['failed_orders'],
+            'download_url' => url("tmp/bulk_print_{$uuid}.pdf"),
         ]);
     }
 

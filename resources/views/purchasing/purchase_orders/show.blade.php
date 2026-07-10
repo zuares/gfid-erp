@@ -444,7 +444,7 @@
     @php
         $user = auth()->user();
         $isAdmin = strtolower((string)($user->role ?? '')) === 'admin';
-        $canSeeMoney = $user?->isOwner() ?? false;   // hanya owner
+        $canSeeMoney = $user?->hasRole(['owner', 'admin']) ?? false;
         $poHasPrice  = (float) ($order->grand_total ?? 0) > 0;
 
         // Status PO

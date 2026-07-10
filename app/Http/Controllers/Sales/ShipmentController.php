@@ -137,12 +137,15 @@ class ShipmentController extends Controller
             ->withSum('lines as total_allocated', 'allocated_qty')
             ->get();
 
+        $isDummy = request()->boolean('dummy') && app()->environment(['local', 'testing']);
+
         return view('sales.shipments.index', compact(
             'shipments',
             'statusFilter',
             'canSeeNominal',
             'canFreshShipments',
-            'staleDrafts'
+            'staleDrafts',
+            'isDummy'
         ));
     }
 
@@ -377,7 +380,8 @@ class ShipmentController extends Controller
             'mpTotalQty',
             'batchQty',
             'deltaQty',
-            'canSeeNominal'
+            'canSeeNominal',
+            'isDummy'
         ));
     }/**
      * ADMIN: tidak boleh lihat nominal sama sekali.
@@ -1833,7 +1837,13 @@ class ShipmentController extends Controller
                 $orderNo = $row['order_no'];
                 $fulfillmentId = null;
 
-                if ($row['found'] === false || empty($row['order']['invoice_id'])) {
+                $scan = \App\Models\ShipmentOrderScan::where('shipment_id', $shipment->id)
+                    ->where('order_no', $orderNo)
+                    ->first();
+
+                $isManual = ($shipment->shipment_type === 'manual') || ($scan && $scan->source === 'manual_scan');
+
+                if ($isManual) {
                     // Manual order (unlinked)
                     $marketplaceOrder = null;
                     $fulfillment = null;
@@ -1860,6 +1870,7 @@ class ShipmentController extends Controller
                 }
 
                 $existingScan = \App\Models\ShipmentOrderScan::where('fulfillment_id', $fulfillmentId)
+                    ->whereNotNull('fulfillment_id')
                     ->where('shipment_id', '!=', $shipment->id)
                     ->whereHas('shipment', function ($q) {
                         $q->whereIn('status', ['draft', 'submitted', 'posted']);
@@ -1870,20 +1881,25 @@ class ShipmentController extends Controller
                     abort(422, "Pesanan sedang diproses di shipment lain: {$code}.");
                 }
 
-                ShipmentOrderScan::updateOrCreate(
-                    [
-                        'shipment_id' => $shipment->id,
-                        'order_no' => $orderNo,
-                    ],
-                    [
+                if ($scan) {
+                    $scan->update([
                         'fulfillment_id' => $fulfillmentId,
-                        'status' => $row['action'],
-                        'source' => 'manual_scan',
-                        'raw_payload' => $row,
+                        'status'       => $row['action'],
                         'confirmed_at' => now(),
                         'confirmed_by' => auth()->id(),
-                    ]
-                );
+                    ]);
+                } else {
+                    \App\Models\ShipmentOrderScan::create([
+                        'shipment_id'  => $shipment->id,
+                        'order_no'     => $orderNo,
+                        'fulfillment_id' => $fulfillmentId,
+                        'status'       => $row['action'],
+                        'source'       => $isManual ? 'manual_scan' : 'marketplace',
+                        'raw_payload'  => $row,
+                        'confirmed_at' => now(),
+                        'confirmed_by' => auth()->id(),
+                    ]);
+                }
 
                 // Hanya pindahkan ke Siap Kirim jika keputusannya fulfill (Siap Kirim)
                 if ($marketplaceOrder && $row['action'] === 'fulfill' && $marketplaceOrder->order_status !== 'READY_TO_HANDOVER') {

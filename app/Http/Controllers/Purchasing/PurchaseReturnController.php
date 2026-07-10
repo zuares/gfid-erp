@@ -286,6 +286,7 @@ class PurchaseReturnController extends Controller
 
         $data = $request->validate([
             'date' => ['required', 'date'],
+            'resolution_type' => ['required', 'string', 'in:refund,replacement'],
             'notes' => ['nullable', 'string', 'max:500'],
             'lines' => ['array'],
             'lines.*.id' => ['nullable', 'integer'],
@@ -306,6 +307,7 @@ class PurchaseReturnController extends Controller
 
         DB::transaction(function () use ($request, $purchase_return, $data, $remainingMap, $grnLines) {
             $purchase_return->date = $data['date'];
+            $purchase_return->resolution_type = $data['resolution_type'] ?? 'refund';
             $purchase_return->notes = $data['notes'] ?? null;
             $purchase_return->save();
 
@@ -394,6 +396,15 @@ class PurchaseReturnController extends Controller
                 $line->line_total = round($qty * $unit, 2);
                 $line->notes = $row['notes'] ?? null;
                 $line->reason_code = $reason;
+                
+                if ($purchase_return->resolution_type === 'replacement') {
+                    $line->replacement_item_id = (int) $grnLine->item_id; // For MVP, it's the same item
+                    $line->replacement_qty_expected = $qty;
+                } else {
+                    $line->replacement_item_id = null;
+                    $line->replacement_qty_expected = 0;
+                }
+                
                 $line->save();
 
                 if ($isHpp && abs($diffQty) > 0.0001) {
@@ -626,7 +637,11 @@ class PurchaseReturnController extends Controller
 
             // hitung AP outstanding (sementara masih basis GRN posted)
             $order = $purchase_return->order;
-            $apOutstanding = $order ? $this->calcApOutstandingByGrn($order) : 0.0;
+            
+            // Jika replacement, kita TIDAK memotong AP, melainkan lari ke Claim (1305) 100%
+            $apOutstanding = $lockedReturn->resolution_type === 'replacement' 
+                ? 0.0 
+                : ($order ? $this->calcApOutstandingByGrn($order) : 0.0);
 
             // split total INV vs EXP
             $invTotal = 0.0;
@@ -686,6 +701,7 @@ class PurchaseReturnController extends Controller
                     unitCostOverride: $ln->unit_price !== null ? (float) $ln->unit_price : null,
                     affectLotCost: true,
                     strictNonNegative: true,
+                    sourceLineId: (int) $ln->id,
                 );
 
                 $ln->allocated_qty = 0;
@@ -808,12 +824,18 @@ class PurchaseReturnController extends Controller
             // =====================================================
             // 4) Mark posted
             // =====================================================
-            $purchase_return->forceFill([
+            $payload = [
                 'status' => 'posted',
                 'posted_at' => now(),
                 'posted_by' => (int) auth()->id(),
                 'total' => round((float) $purchase_return->lines()->sum('line_total'), 2),
-            ])->save();
+            ];
+
+            if ($lockedReturn->resolution_type === 'replacement') {
+                $payload['replacement_status'] = 'pending';
+            }
+
+            $purchase_return->forceFill($payload)->save();
         });
 
         return back()->with('success', 'Return berhasil diposting.');
@@ -846,6 +868,17 @@ class PurchaseReturnController extends Controller
                 throw ValidationException::withMessages([
                     'return' => 'Return sudah berubah status. Muat ulang halaman.',
                 ]);
+            }
+
+            if ($lockedReturn->resolution_type === 'replacement') {
+                $totalReceived = $lockedReturn->lines()->sum('replacement_qty_received');
+                $hasReceivedReplacement = in_array($lockedReturn->replacement_status, ['partial', 'received']) || $totalReceived > 0;
+
+                if ($hasReceivedReplacement) {
+                    throw ValidationException::withMessages([
+                        'return' => 'Retur tidak dapat dibatalkan karena barang pengganti sudah pernah diterima. Gunakan proses reversal penerimaan barang pengganti.',
+                    ]);
+                }
             }
 
             $warehouseId = (int) $purchase_return->grn->warehouse_id;
@@ -1122,5 +1155,177 @@ class PurchaseReturnController extends Controller
         }
 
         return (float) $value;
+    }
+
+    public function receiveReplacement(Request $request, PurchaseReturn $purchase_return)
+    {
+        if ($purchase_return->resolution_type !== 'replacement') {
+            return back()->with('error', 'Return bukan tipe replacement.');
+        }
+
+        if ($purchase_return->status !== 'posted') {
+            return back()->with('error', 'Return harus berstatus posted.');
+        }
+
+        if (!in_array($purchase_return->replacement_status, ['pending', 'partial'], true)) {
+            return back()->with('error', 'Status replacement tidak valid (harus pending/partial).');
+        }
+
+        $data = $request->validate([
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'received_at' => ['required', 'date'],
+            'document_number' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'lines' => ['required', 'array'],
+            'lines.*.id' => ['required', 'integer'],
+            'lines.*.qty' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($purchase_return, $data) {
+                $lockedReturn = PurchaseReturn::query()
+                    ->whereKey($purchase_return->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (!in_array($lockedReturn->replacement_status, ['pending', 'partial'], true)) {
+                    throw ValidationException::withMessages([
+                        'return' => 'Status replacement sudah berubah.',
+                    ]);
+                }
+
+                $warehouseId = (int) $data['warehouse_id'];
+                $receivedAt = $data['received_at'];
+                $notes = $data['notes'] ?? null;
+                $hasReceipt = false;
+                $totalAmtReceived = 0.0;
+
+                foreach ($data['lines'] as $lineData) {
+                    $qty = (float) $lineData['qty'];
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    $line = $lockedReturn->lines()->where('id', $lineData['id'])->lockForUpdate()->first();
+                    if (!$line) {
+                        continue;
+                    }
+
+                    $outstanding = (float) $line->replacement_qty_expected - (float) $line->replacement_qty_received;
+                    if ($qty > $outstanding + 0.0001) {
+                        throw ValidationException::withMessages([
+                            "lines.{$line->id}.qty" => "Qty diterima ({$qty}) melebihi outstanding ({$outstanding}).",
+                        ]);
+                    }
+
+                    // Stock IN
+                    $this->inventory->stockIn(
+                        warehouseId: $warehouseId,
+                        itemId: (int) $line->replacement_item_id,
+                        qty: $qty,
+                        date: $receivedAt,
+                        sourceType: 'purchase_return_replacement',
+                        sourceId: (int) $lockedReturn->id,
+                        notes: trim("Replacement IN {$lockedReturn->code} | {$notes}"),
+                        lotId: null, // MVP no lot override
+                        unitCost: (float) $line->unit_price,
+                        affectLotCost: true,
+                        cuttingJobBundleId: null,
+                        sourceLineId: (int) $line->id
+                    );
+
+                    $line->replacement_qty_received = (float) $line->replacement_qty_received + $qty;
+                    $line->save();
+
+                    $totalAmtReceived += $qty * (float) $line->unit_price;
+                    $hasReceipt = true;
+                }
+
+                if (!$hasReceipt) {
+                    throw ValidationException::withMessages([
+                        'return' => 'Tidak ada qty valid yang diterima.',
+                    ]);
+                }
+
+                // Journal IN
+                $claimId = (int) Account::where('code', JournalService::CODE_SUPPLIER_CLAIM)->value('id');
+                if ($claimId <= 0) {
+                    throw ValidationException::withMessages([
+                        'return' => 'COA Supplier Claim (1305) belum diatur.',
+                    ]);
+                }
+
+                $inventoryAccountIds = Account::query()
+                    ->whereIn('code', [JournalService::CODE_INV_RAW, JournalService::CODE_INV_PACKAGING])
+                    ->pluck('id', 'code')
+                    ->map(fn($id) => (int) $id);
+
+                // Group by account
+                $invDebitByAcc = [];
+                foreach ($lockedReturn->lines as $ln) {
+                    $qtyReceived = collect($data['lines'])->firstWhere('id', $ln->id)['qty'] ?? 0;
+                    if ($qtyReceived > 0 && $this->isHppLine($lockedReturn, $ln)) {
+                        $invCode = $this->inventoryAccountCodeForReturnLine($ln);
+                        $invAccId = (int) ($inventoryAccountIds[$invCode] ?? $inventoryAccountIds[JournalService::CODE_INV_RAW] ?? 0);
+                        if ($invAccId > 0) {
+                            $invDebitByAcc[$invAccId] = ($invDebitByAcc[$invAccId] ?? 0) + ($qtyReceived * (float) $ln->unit_price);
+                        }
+                    }
+                }
+
+                $journalLines = [];
+                $totalDebit = 0.0;
+                foreach ($invDebitByAcc as $accId => $amt) {
+                    $amt = round((float) $amt, 2);
+                    if ($amt > 0) {
+                        $journalLines[] = ['account_id' => $accId, 'debit' => $amt, 'credit' => 0];
+                        $totalDebit += $amt;
+                    }
+                }
+
+                if ($totalDebit > 0) {
+                    $journalLines[] = ['account_id' => $claimId, 'debit' => 0, 'credit' => $totalDebit];
+                    
+                    // We need a unique sourceId for partial receive journal? 
+                    // MVP: We use unique ID or append time to source_type if partial? 
+                    // Actually, if we receive multiple times, JournalService idempotency by `source_id` will block it unless we use a unique ID per receipt.
+                    // Let's use time() as part of description, and for idempotency we can use a new model PurchaseReturnReceipt, 
+                    // BUT MVP doesn't have it. We can set source_id to null and just log it, 
+                    // OR we can make source_type = 'purchase_return_replacement_in' + rand.
+                    // The safer way for MVP without new table is `source_id = null` and rely on DB transaction.
+                    $this->journal->post(
+                        $receivedAt,
+                        'purchase_return_replacement_in',
+                        null,
+                        "Replacement IN {$lockedReturn->code} - " . now()->timestamp,
+                        $journalLines
+                    );
+                }
+
+                // Check completion
+                $isCompleted = true;
+                foreach ($lockedReturn->lines as $line) {
+                    if (round((float) $line->replacement_qty_received, 4) < round((float) $line->replacement_qty_expected, 4)) {
+                        $isCompleted = false;
+                        break;
+                    }
+                }
+
+                if ($isCompleted) {
+                    $lockedReturn->replacement_status = 'received';
+                    $lockedReturn->replacement_received_at = now();
+                } else {
+                    $lockedReturn->replacement_status = 'partial';
+                }
+
+                $lockedReturn->save();
+            });
+
+            return back()->with('success', 'Barang pengganti berhasil diterima.');
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

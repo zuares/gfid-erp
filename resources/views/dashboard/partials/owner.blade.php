@@ -88,6 +88,6 @@
 
 {{-- ================= DAFTAR ================= --}}
 <div class="dash-panels">
-    @include('dashboard.partials._list_orders', ['title' => 'Pesanan perlu diproses', 'rows' => $d['list_todo'], 'link' => $r('marketplace.orders')])
+    @include('dashboard.partials._list_orders', ['title' => 'Pesanan belum dikirim', 'rows' => $d['list_todo'], 'link' => $r('marketplace.orders')])
     @include('dashboard.partials._list_stock', ['title' => 'Stok kritis (perlu segera)', 'rows' => $d['list_stock'], 'link' => $r('inventory.stocks.items')])
 </div>

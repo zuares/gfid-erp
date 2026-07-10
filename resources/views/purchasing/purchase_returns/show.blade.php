@@ -186,6 +186,8 @@
   $effectExpense = (float) ($effect['expense_total'] ?? 0);
   $effectAp = (float) ($effect['ap_portion'] ?? 0);
   $effectClaim = (float) ($effect['claim_portion'] ?? 0);
+  $totalReceived = (float) (($returnRows ?? collect())->sum('replacement_qty_received'));
+  $hasReceivedReplacement = $ret->resolution_type === 'replacement' && (in_array($ret->replacement_status, ['partial', 'received']) || $totalReceived > 0);
 @endphp
 
 <div class="page-wrap py-4">
@@ -236,7 +238,15 @@
             @if($isVoided)
               <span class="badge-status badge-voided">VOID</span>
             @elseif($isPosted)
-              <span class="badge-status badge-posted">Posted</span>
+              @if($ret->resolution_type === 'replacement' && $ret->replacement_status === 'pending')
+                <span class="badge-status text-bg-warning">Menunggu Barang Pengganti</span>
+              @elseif($ret->resolution_type === 'replacement' && $ret->replacement_status === 'partial')
+                <span class="badge-status text-bg-info">Diterima Sebagian</span>
+              @elseif($ret->resolution_type === 'replacement' && $ret->replacement_status === 'received')
+                <span class="badge-status text-bg-success">Barang Pengganti Diterima</span>
+              @else
+                <span class="badge-status badge-posted">Posted</span>
+              @endif
             @else
               <span class="badge-status badge-draft">Draft</span>
             @endif
@@ -411,6 +421,13 @@
                     required>
                 </div>
                 <div>
+                  <label class="form-label">Tipe Penyelesaian</label>
+                  <select name="resolution_type" class="form-select form-select-sm">
+                    <option value="refund" {{ old('resolution_type', $ret->resolution_type) === 'refund' ? 'selected' : '' }}>Refund (Potong Tagihan)</option>
+                    <option value="replacement" {{ old('resolution_type', $ret->resolution_type) === 'replacement' ? 'selected' : '' }}>Tukar Barang (Replacement)</option>
+                  </select>
+                </div>
+                <div>
                   <label class="form-label">Catatan</label>
                   <input type="text"
                     name="notes"
@@ -428,6 +445,7 @@
               {{-- Hidden inputs agar form tetap valid --}}
               <input type="hidden" name="date" value="{{ $dateValue }}">
               <input type="hidden" name="notes" value="{{ $ret->notes }}">
+              <input type="hidden" name="resolution_type" value="{{ $ret->resolution_type }}">
               @endif
 
               @if($isEditable)
@@ -616,6 +634,11 @@
                 @elseif($isEditable)
                   <span class="status-badge bg-success-subtle text-success border border-success-subtle">Siap diposting</span>
                 @endif
+                @if($hasReceivedReplacement)
+                  <div class="alert alert-warning py-1 px-2 mb-0" style="font-size: 0.75rem;">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Retur ini sudah memiliki penerimaan barang pengganti dan tidak dapat di-void melalui pembatalan biasa.
+                  </div>
+                @endif
               </div>
 
               <div class="d-flex gap-2">
@@ -639,6 +662,13 @@
                 @endif
 
                 @if($isPosted && !$isVoided)
+                  @if($ret->resolution_type === 'replacement' && in_array($ret->replacement_status, ['pending', 'partial']))
+                    <button type="button" class="btn btn-outline-success btn-sm btn-pill" data-bs-toggle="modal" data-bs-target="#receiveReplacementModal">
+                      <i class="bi bi-box-seam me-1"></i> Terima Barang Pengganti
+                    </button>
+                  @endif
+
+                  @if(!$hasReceivedReplacement)
                   <form method="POST" action="{{ route('purchasing.purchase_returns.void', $ret->id) }}" class="js-void-return">
                     @csrf
                     <button class="btn btn-outline-danger btn-sm btn-pill"
@@ -646,6 +676,7 @@
                       <i class="bi bi-x-circle me-1"></i> VOID
                     </button>
                   </form>
+                  @endif
                 @endif
               </div>
             </div>
@@ -656,6 +687,81 @@
     </div>
 
 </div>{{-- /page-wrap --}}
+
+{{-- Modal Terima Barang Pengganti --}}
+@if($isPosted && !$isVoided && $ret->resolution_type === 'replacement' && in_array($ret->replacement_status, ['pending', 'partial']))
+<div class="modal fade" id="receiveReplacementModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form action="{{ route('purchasing.purchase_returns.receive_replacement', $ret->id) }}" method="POST">
+        @csrf
+        <div class="modal-header">
+          <h5 class="modal-title">Terima Barang Pengganti</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Tanggal Terima</label>
+              <input type="text" name="received_at" class="form-control form-control-sm gf-date-input" required value="{{ now()->toDateString() }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Gudang Penerima</label>
+              <select name="warehouse_id" class="form-select form-select-sm" required>
+                <option value="">Pilih Gudang...</option>
+                @foreach(\App\Models\Warehouse::all() as $wh)
+                  <option value="{{ $wh->id }}" {{ $ret->grn?->warehouse_id == $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
+                @endforeach
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Catatan</label>
+              <input type="text" name="notes" class="form-control form-control-sm">
+            </div>
+          </div>
+          
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Menunggu</th>
+                  <th width="150">Qty Terima</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach($ret->lines as $line)
+                  @if(round((float)$line->replacement_qty_expected - (float)$line->replacement_qty_received, 4) > 0)
+                  @php
+                    $outstanding = round((float)$line->replacement_qty_expected - (float)$line->replacement_qty_received, 4);
+                  @endphp
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">{{ $line->item?->name }}</div>
+                      <small class="text-muted">{{ $line->item?->code }}</small>
+                      <input type="hidden" name="lines[{{ $line->id }}][id]" value="{{ $line->id }}">
+                    </td>
+                    <td>{{ $outstanding }}</td>
+                    <td>
+                      <input type="number" step="0.0001" min="0" max="{{ $outstanding }}" name="lines[{{ $line->id }}][qty]" class="form-control form-control-sm" value="{{ $outstanding }}" required>
+                    </td>
+                  </tr>
+                  @endif
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Penerimaan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+@endif
+
 @endsection
 
 @push('scripts')

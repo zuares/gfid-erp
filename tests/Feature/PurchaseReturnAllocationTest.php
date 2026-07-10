@@ -107,6 +107,8 @@ class PurchaseReturnAllocationTest extends TestCase
         
         $line = $ret->lines()->where('item_id', $this->item->id)->first();
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 [
                     'id' => $line->id,
@@ -133,12 +135,16 @@ class PurchaseReturnAllocationTest extends TestCase
         
         $line = $ret->lines()->where('item_id', $this->item->id)->first();
         $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLine->id, 'qty' => '5', 'reason_code' => 'defect']
             ]
         ]);
 
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLine->id, 'qty' => '3', 'reason_code' => 'defect']
             ]
@@ -157,6 +163,8 @@ class PurchaseReturnAllocationTest extends TestCase
         $line = $ret->lines()->where('item_id', $this->item->id)->first();
         // Update line to 0 qty
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLine->id, 'qty' => '0']
             ]
@@ -173,6 +181,8 @@ class PurchaseReturnAllocationTest extends TestCase
         
         $line = $ret->lines()->where('item_id', $this->item->id)->first();
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLine->id, 'qty' => '5', 'reason_code' => 'defect']
             ]
@@ -193,6 +203,8 @@ class PurchaseReturnAllocationTest extends TestCase
         
         $line = $ret->lines()->where('item_id', $this->item->id)->first();
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLine->id, 'qty' => '5', 'reason_code' => 'defect']
             ]
@@ -215,6 +227,8 @@ class PurchaseReturnAllocationTest extends TestCase
         
         $line = $ret->lines()->where('item_id', $this->item->id)->first();
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLine->id, 'qty' => '5', 'reason_code' => 'defect']
             ]
@@ -237,6 +251,8 @@ class PurchaseReturnAllocationTest extends TestCase
         
         $line = $ret->lines()->where('item_id', $this->expenseItem->id)->first();
         $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
             'lines' => [
                 ['id' => $line->id, 'purchase_receipt_line_id' => $this->grnLineExpense->id, 'qty' => '3', 'reason_code' => 'defect']
             ]

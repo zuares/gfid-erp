@@ -509,6 +509,16 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
 
 @section('content')
 <div class="page-wrap">
+    @if(isset($isDummy) && $isDummy)
+    <div style="background-color: #fff3cd; color: #856404; padding: 10px 15px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <strong>🧪 MENGGUNAKAN DUMMY MODE</strong><br>
+            <span style="font-size: 0.9em;">Halaman ini sedang menggunakan data pesanan simulasi. Aksi cetak resi dan lainnya tidak akan berdampak pada production/Shopee.</span>
+        </div>
+        <a href="?" style="background: #856404; color: #fff; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 0.85em; font-weight: bold;">Keluar Dummy</a>
+    </div>
+    @endif
+
     {{-- ── TOPBAR ── --}}
     <div class="ship-topbar">
         <div>
@@ -820,6 +830,8 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
 
 @push('scripts')
 <script>
+const IS_DUMMY_MODE = @json($isDummy ?? false);
+
 (function () {
     // Force header actions ke satu baris (display:block → flex)
     document.addEventListener('DOMContentLoaded', () => {
@@ -1033,7 +1045,8 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
     // ── Load ──────────────────────────────────────────────────────────────
     async function loadOrders() {
         $('ordersBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
-        orders = await api('/api/marketplace/local-orders').catch(() => []);
+        const url = (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) ? '/api/marketplace/local-orders?dummy=1' : '/api/marketplace/local-orders';
+        orders = await api(url).catch(() => []);
         // Pre-populate fulfillment status dari data API
         fulfillmentStatusMap.clear();
         orders.forEach(o => {
@@ -2632,7 +2645,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
                         </div>
                     </div>
                     
-                    <div style="margin-bottom:24px;background:#f0fdf4;padding:10px 12px;border-radius:8px;border:1px solid #bbf7d0;display:none;">
+                    <div style="margin-bottom:24px;background:#f0fdf4;padding:10px 12px;border-radius:8px;border:1px solid #bbf7d0;display:block;">
                         <label style="display:flex;align-items:center;gap:8px;font-size:0.875rem;cursor:pointer;color:#166534;font-weight:600;margin:0;">
                             <input type="checkbox" id="chkPrintGreeting" checked style="width:16px;height:16px;accent-color:#16a34a;cursor:pointer;">
                             Sertakan Kartu Ucapan
@@ -2686,6 +2699,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         const payloadOrders = rows.map((o, idx) => ({
             store_id: o.store_id,
             channel_order_id: o.channel_order_id,
+            order_sn: o.channel_order_id,
             position: idx
         }));
 
@@ -2693,8 +2707,12 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         document.body.insertAdjacentHTML('beforeend', alertHtml);
         
         try {
-                        let printUrl = '/documents/bulk-print';
-            let printPayload = { orders: payloadOrders, mode: mode };
+                        let printUrl = '/api/marketplace/documents/bulk-print';
+            let printPayload = { 
+                orders: payloadOrders, 
+                mode: mode,
+                with_greeting: printGreeting ? 1 : 0
+            };
             
             if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) {
                 printUrl = '/dev/dummy/bulk-print';
@@ -2706,7 +2724,11 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
 
             const res = await fetch(printUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content 
+                },
                 body: JSON.stringify(printPayload)
             });
             
@@ -2728,7 +2750,8 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             
             setTimeout(async () => {
                 try {
-                    const newOrders = await api('/api/marketplace/local-orders');
+                    const url = (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) ? '/api/marketplace/local-orders?dummy=1' : '/api/marketplace/local-orders';
+                    const newOrders = await api(url);
                     orders = newOrders;
                     fulfillmentStatusMap.clear();
                     orders.forEach(o => {

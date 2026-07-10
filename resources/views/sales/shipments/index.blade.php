@@ -185,6 +185,15 @@
 
 @section('content')
 <div class="page-wrap">
+    @if(isset($isDummy) && $isDummy)
+    <div style="background-color: #fff3cd; color: #856404; padding: 10px 15px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <strong>🧪 MENGGUNAKAN DUMMY MODE</strong><br>
+            <span style="font-size: 0.9em;">Halaman ini sedang berada dalam mode dummy pengujian UI.</span>
+        </div>
+        <a href="?" style="background: #856404; color: #fff; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 0.85em; font-weight: bold;">Keluar Dummy</a>
+    </div>
+    @endif
     @php
         use Illuminate\Support\Carbon;
 

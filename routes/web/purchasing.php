@@ -172,6 +172,9 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::post('purchase-returns/{purchase_return}/post', [PurchaseReturnController::class, 'post'])
                 ->name('purchase_returns.post');
 
+            Route::post('purchase-returns/{purchase_return}/receive-replacement', [PurchaseReturnController::class, 'receiveReplacement'])
+                ->name('purchase_returns.receive_replacement');
+
             // Tahap 9 — QC resolve route (owner+admin)
             Route::post(
                 'purchase-receipt-qcs/{qc}/resolve',

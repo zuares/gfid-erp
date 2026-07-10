@@ -67,9 +67,7 @@
         ->values();
 
     if ($variant === 'mini') {
-        if ($displayMode === 'code-name') $displayMode = 'code'; // default mini; allow explicit override
-        $showName = false;
-        $showCategory = false;
+        // default mini; do not override displayMode
     }
 
     $inputDisplayValue = $displayMode === 'code' ? strtoupper($displayValue) : $displayValue;
@@ -134,6 +132,13 @@
 
             .item-suggest-option-code {
                 font-weight: 700;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                white-space: normal;
+                line-height: 1.35;
+                margin-bottom: 2px;
             }
 
             .item-suggest-option-name {

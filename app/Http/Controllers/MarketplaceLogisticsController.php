@@ -8,6 +8,7 @@ use App\Services\Channels\ChannelManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MarketplaceLogisticsController extends Controller
 {
@@ -329,6 +330,7 @@ class MarketplaceLogisticsController extends Controller
     {
         $payloadOrders = $request->input('orders', []);
         $mode = $request->input('mode', 'unprinted_only');
+        $withGreeting = $request->input('with_greeting', 0);
         
         if (empty($payloadOrders)) {
             return response()->json(['error' => 'No orders provided'], 400);
@@ -508,17 +510,21 @@ class MarketplaceLogisticsController extends Controller
             return $a['position'] <=> $b['position'];
         });
 
+        $config = [];
+        $config['marketplace_print_greeting_card'] = $withGreeting == 1 ? '1' : '0';
+        $overlayService = new \App\Services\ShippingLabelOverlayService();
+
         // Merge PDFs
         $finalPdfContent = null;
         if (count($pdfContents) === 1) {
-            $finalPdfContent = $pdfContents[0]['content'];
+            $finalPdfContent = $overlayService->overlayPdfContent($pdfContents[0]['content'], $config);
         } else {
             $pdf = new \setasign\Fpdi\Fpdi();
             $tempFiles = [];
-            $overlayService = new \App\Services\ShippingLabelOverlayService();
+            
             foreach ($pdfContents as $item) {
                 $tmpPath = storage_path('app/temp_pdf_' . uniqid() . '.pdf');
-                $uncompressedContent = $overlayService->uncompressPdfContent($item['content']);
+                $uncompressedContent = $overlayService->overlayPdfContent($item['content'], $config);
                 file_put_contents($tmpPath, $uncompressedContent);
                 $tempFiles[] = $tmpPath;
                 
@@ -549,7 +555,7 @@ class MarketplaceLogisticsController extends Controller
             'success_count' => $successCount,
             'failed_count' => count($failedOrders),
             'failed_orders' => $failedOrders,
-            'download_url' => url('/documents/bulk-print/' . $uuid)
+            'download_url' => url('/api/marketplace/documents/bulk-print/' . $uuid)
         ]);
     }
 

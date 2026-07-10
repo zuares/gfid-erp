@@ -18,6 +18,7 @@ class PurchaseReturnLine extends Model
     protected $fillable = [
         'purchase_return_id', 'purchase_receipt_line_id', 'item_id', 'lot_id',
         'qty', 'allocated_qty', 'unit_price', 'line_total', 'notes', 'reason_code',
+        'replacement_item_id', 'replacement_qty_expected', 'replacement_qty_received'
     ];
 
     public function ret()

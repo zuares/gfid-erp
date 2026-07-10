@@ -14,16 +14,16 @@
         'url' => $r('marketplace.orders'), 'cta' => 'Lihat pesanan',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Perlu diproses', 'icon' => 'bi-hourglass-split', 'color' => $d['orders_todo'] > 0 ? 'amber' : 'green',
-        'value' => number_format($d['orders_todo'], 0, ',', '.'),
-        'sub' => 'Pesanan belum dikirim',
-        'url' => $r('marketplace.fulfillment') ?? $r('marketplace.orders'), 'cta' => 'Proses',
+        'label' => 'Perlu diproses', 'icon' => 'bi-hourglass-split', 'color' => $d['orders_processed'] > 0 ? 'amber' : 'green',
+        'value' => number_format($d['orders_processed'], 0, ',', '.'),
+        'sub' => 'Pesanan belum dipacking',
+        'url' => $r('marketplace.orders'), 'cta' => 'Proses',
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Siap kirim', 'icon' => 'bi-box-seam', 'color' => $d['orders_ready'] > 0 ? 'amber' : '',
         'value' => number_format($d['orders_ready'], 0, ',', '.'),
         'sub' => 'Sudah dipacking, tunggu kurir',
-        'url' => $r('marketplace.picking') ?? $r('marketplace.orders'), 'cta' => 'Siapkan kirim',
+        'url' => $r('marketplace.orders'), 'cta' => 'Siapkan kirim',
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Dikirim (7 hari)', 'icon' => 'bi-truck', 'color' => '',
@@ -80,6 +80,6 @@
 
 {{-- ================= DAFTAR ================= --}}
 <div class="dash-panels">
-    @include('dashboard.partials._list_orders', ['title' => 'Pesanan perlu diproses', 'rows' => $d['list_todo'], 'link' => $r('marketplace.orders'), 'showAmount' => false])
+    @include('dashboard.partials._list_orders', ['title' => 'Pesanan belum dikirim', 'rows' => $d['list_todo'], 'link' => $r('marketplace.orders'), 'showAmount' => false])
     @include('dashboard.partials._list_stock', ['title' => 'Barang jadi menipis', 'rows' => $d['list_stock'], 'link' => $r('inventory.stocks.items')])
 </div>

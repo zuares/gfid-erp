@@ -728,11 +728,19 @@ class PurchaseOrderController extends Controller
         }
 
         // 3) fallback global: item.last_purchase_price (tidak spesifik supplier)
+        // 4) fallback terakhir: item.hpp (berguna untuk finished goods atau master price)
         $fallback = Item::query()
             ->whereKey($itemId)
-            ->value('last_purchase_price');
+            ->select(['last_purchase_price', 'hpp'])
+            ->first();
 
-        $n = (float) ($fallback ?? 0);
+        $n = 0;
+        if ($fallback) {
+            $n = (float) $fallback->last_purchase_price;
+            if ($n <= 0) {
+                $n = (float) $fallback->hpp;
+            }
+        }
         return response()->json(['last_price' => $n > 0 ? $n : null]);
     }
 
@@ -952,7 +960,7 @@ class PurchaseOrderController extends Controller
     protected function canSeeMoney(?Request $request = null): bool
     {
         $user = $request?->user() ?: auth()->user();
-        return $user && method_exists($user, 'isOwner') && $user->isOwner();
+        return $user && method_exists($user, 'hasRole') && $user->hasRole(['owner', 'admin']);
     }
 
     protected function stripMoneyFromNonOwnerPayload(array &$data, ?PurchaseOrder $existingOrder = null): void
