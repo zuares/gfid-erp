@@ -125,6 +125,61 @@ class MarketplaceLogisticsController extends Controller
     }
 
     /**
+     * Sync bookings from marketplace and update local database
+     */
+    public function syncBookings(Store $store, Request $request): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (!method_exists($driver, 'getBookingList')) {
+                return response()->json(['success' => false, 'message' => 'Not supported on this channel'], 400);
+            }
+
+            // Sync bookings for the last 15 days
+            $timeFrom = time() - (86400 * 15);
+            $timeTo = time();
+            $cursor = "";
+            $updated = 0;
+
+            do {
+                $result = $driver->getBookingList($store, $timeFrom, $timeTo, 50, $cursor);
+                if (isset($result['error']) && $result['error']) {
+                    break;
+                }
+
+                $list = $result['response']['order_list'] ?? [];
+                foreach ($list as $booking) {
+                    $orderSn = $booking['order_sn'];
+                    $trackingNo = $booking['tracking_number'] ?? null;
+                    
+                    if ($trackingNo) {
+                        $order = \App\Models\MarketplaceOrder::where('store_id', $store->id)
+                            ->where('channel_order_id', $orderSn)
+                            ->first();
+
+                        if ($order && (empty($order->tracking_no) || $order->needs_shipping_arrangement)) {
+                            $order->tracking_no = $trackingNo;
+                            $order->needs_shipping_arrangement = false;
+                            $order->save();
+                            $updated++;
+                        }
+                    }
+                }
+
+                $more = $result['response']['has_more'] ?? $result['response']['more'] ?? false;
+                $cursor = (string) ($result['response']['next_cursor'] ?? "");
+            } while ($more && $cursor);
+
+            return response()->json([
+                'success' => true, 
+                'message' => "Berhasil sinkronisasi $updated resi/booking."
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
      * Arrange shipment (Atur Pengiriman)
      */
     public function arrangeShipment(Request $request, Store $store, string $orderSn): JsonResponse

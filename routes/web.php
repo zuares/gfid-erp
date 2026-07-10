@@ -116,6 +116,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/orders/{orderSn}/booking-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getBookingDetail']);
     Route::get('/stores/{store}/orders/{orderSn}/raw-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getOrderDetailRaw']);
     Route::get('/stores/{store}/booking-list', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getBookingList']);
+    Route::post('/stores/{store}/sync-bookings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'syncBookings'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/orders/{orderSn}/ship', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'arrangeShipment'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
         ->name('marketplace.logistics.ship');

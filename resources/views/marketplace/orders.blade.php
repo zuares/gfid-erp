@@ -575,6 +575,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
 
             {{-- Sync --}}
             <button class="hdr-btn" style="background:var(--shp-accent);color:#fff;border-color:var(--shp-accent)" onclick="openQuickSync()">🔄 Sync</button>
+            <button class="hdr-btn" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd;display:none" id="btnSyncBookings" onclick="runSyncBookings()">🚚 Sync Resi</button>
             <button class="hdr-btn" onclick="loadOrders()" title="Refresh">🔃</button>
 
             @if(auth()->user()?->role === 'owner')
@@ -985,6 +986,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         sessionStorage.setItem('ord_active_tab', tab);
         document.querySelectorAll('.ord-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        
+        // Show Sync Resi button only in 'ready' tab
+        const btnSyncBookings = document.getElementById('btnSyncBookings');
+        if (btnSyncBookings) {
+            btnSyncBookings.style.display = (tab === 'ready') ? 'inline-block' : 'none';
+        }
+        
         renderTable();
         updateToolbar();
         updatePickingPrintStrip();
@@ -2439,6 +2447,51 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             $('qsProgress').style.display = 'none';
             showQsAlert('danger', 'Gagal: ' + e.message);
             btn.disabled = false; btn.textContent = '↓ Sync Sekarang';
+        }
+    };
+
+    window.runSyncBookings = async function () {
+        const btn = document.getElementById('btnSyncBookings');
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Syncing...';
+
+        try {
+            const stores = await api('/api/marketplace/stores');
+            let storesToSync = stores.filter(s => s.connection_status === 'CONNECTED');
+            
+            if (activeStoreFilter) {
+                storesToSync = storesToSync.filter(s => s.id == activeStoreFilter);
+            }
+
+            if (!storesToSync.length) {
+                Swal.fire('Info', 'Tidak ada toko yang terhubung untuk di-sync resinya.', 'info');
+                btn.disabled = false;
+                btn.innerHTML = '🚚 Sync Resi';
+                return;
+            }
+
+            let msg = '';
+            for (const s of storesToSync) {
+                try {
+                    const res = await api(`/api/marketplace/stores/${s.id}/sync-bookings`, { method: 'POST' });
+                    msg += `Toko ${s.name}: ${res.message}<br>`;
+                } catch (e) {
+                    msg += `Toko ${s.name}: Gagal (${e.message})<br>`;
+                }
+            }
+
+            Swal.fire({
+                title: 'Hasil Sync Resi (15 Hari)',
+                html: msg,
+                icon: 'success'
+            });
+
+            loadOrders();
+        } catch (e) {
+            Swal.fire('Error', 'Gagal memuat toko: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '🚚 Sync Resi';
         }
     };
 
