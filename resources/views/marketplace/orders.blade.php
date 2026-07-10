@@ -1660,11 +1660,14 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (isPacked(o)) return false;
                 
                 if (tab === 'ready') {
-                    return o.order_status === 'READY_TO_SHIP' && !isKilat(o);
+                    // Semua yang belum diatur pengirimannya masuk ke tab Perlu Kirim
+                    return o.needs_shipping_arrangement === true;
                 } else if (tab === 'processed') {
-                    return o.order_status === 'PROCESSED' && !isKilat(o);
+                    // Sudah diatur pengirimannya, tapi belum discan/dipacking (bukan kilat)
+                    return (o.order_status === 'PROCESSED' || (o.order_status === 'READY_TO_SHIP' && o.needs_shipping_arrangement === false)) && !isKilat(o);
                 } else if (tab === 'processed_instant') {
-                    return ['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isKilat(o);
+                    // Sudah diatur pengirimannya, khusus kilat
+                    return (o.order_status === 'PROCESSED' || (o.order_status === 'READY_TO_SHIP' && o.needs_shipping_arrangement === false)) && isKilat(o);
                 }
                 return false;
             });
@@ -2213,10 +2216,18 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const isKilat     = carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
             const kilatBadge  = isKilat ? `<span style="font-size:.65rem;background:#fef08a;color:#854d0e;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fde047;">⚡ KILAT</span>` : '';
 
+            let perluKirimBadge = '';
+            if (o.needs_shipping_arrangement) {
+                perluKirimBadge = `<span style="font-size:.65rem;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fca5a5;">🚚 Perlu Kirim</span>`;
+                if (isKilat) {
+                    perluKirimBadge += `<span style="font-size:.65rem;color:#b91c1c;margin-left:4px;font-weight:600;">Pengiriman Kilat belum diatur</span>`;
+                }
+            }
+
             let logisticsBtn = '';
 
             // Logistics Buttons
-            if (o.order_status === 'READY_TO_SHIP') {
+            if (o.needs_shipping_arrangement || o.order_status === 'READY_TO_SHIP') {
                 logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
             } else if (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
                 logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
@@ -2266,6 +2277,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
                     
                     <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+                        ${perluKirimBadge}
                         ${kilatBadge}
                         ${printedBadge}
                         ${logBadge}

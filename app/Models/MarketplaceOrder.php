@@ -22,6 +22,7 @@ class MarketplaceOrder extends Model
         'currency',
         'ordered_at',
         'synced_at',
+        'shipping_arranged_at',
         'raw_json',
 
         // Legacy — digunakan modul marketplace lama
@@ -58,6 +59,7 @@ class MarketplaceOrder extends Model
         'total_amount'  => 'decimal:2',
         'ordered_at'    => 'datetime',
         'synced_at'     => 'datetime',
+        'shipping_arranged_at' => 'datetime',
         'raw_json'      => 'array',
         'payment_date'  => 'datetime',
         'completed_at'  => 'datetime',
@@ -83,5 +85,10 @@ class MarketplaceOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(MarketplaceOrderItem::class);
+    }
+
+    public function getNeedsShippingArrangementAttribute(): bool
+    {
+        return $this->order_status === 'READY_TO_SHIP' && is_null($this->shipping_arranged_at);
     }
 }

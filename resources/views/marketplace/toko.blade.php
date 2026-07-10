@@ -269,8 +269,8 @@
                     ${s.connection_status === 'CONNECTED' 
                         ? `<button class="btn btn-dark" onclick="openSync(${s.id},'${esc(s.name)}')">↓ Sync Order</button>`
                         : (s.connection_status === 'NOT_CONNECTED' 
-                            ? `<a href="/marketplace/${s.channel ? s.channel.code : 'shopee'}/connect" class="btn btn-primary">Hubungkan ${s.channel ? s.channel.name : 'Toko'}</a>` 
-                            : `<a href="/marketplace/${s.channel ? s.channel.code : 'shopee'}/connect" class="btn btn-danger">Login Ulang ${s.channel ? s.channel.name : 'Toko'}</a>`)
+                            ? `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect" class="btn btn-primary">Hubungkan ${s.channel ? s.channel.name : 'Toko'}</a>` 
+                            : `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect" class="btn btn-danger">Login Ulang ${s.channel ? s.channel.name : 'Toko'}</a>`)
                     }
                     <a href="/marketplace/orders" class="btn btn-light border">📋 Lihat Order</a>
                     ${issues > 0

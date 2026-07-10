@@ -592,6 +592,18 @@
                     @endif
                 @endif
 
+                @if ($user && (in_array($user->role, ['owner','admin']) || $user->isDeveloper()) && $status === 'approved')
+                    @if ($grnCount === 0)
+                        <form action="{{ route('purchasing.purchase_orders.unapprove', $order->id) }}" method="POST"
+                            onsubmit="return confirm('Kembalikan PO ini ke status Draft?');">
+                            @csrf
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                Unapprove
+                            </button>
+                        </form>
+                    @endif
+                @endif
+
                 @if ($status === 'approved' && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
                     @php $hasSupplierInvoiceRoute = \Illuminate\Support\Facades\Route::has('purchasing.supplier_invoices.create'); @endphp
                     @if ($hasSupplierInvoiceRoute)

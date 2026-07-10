@@ -181,6 +181,18 @@ class PurchaseOrderService
         });
     }
 
+    public function unapprove(PurchaseOrder $order): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order) {
+            $order->status = 'draft';
+            $order->approved_by = null;
+            $order->approved_at = null;
+            $order->save();
+
+            return $order->fresh(['supplier', 'lines', 'paymentMethod']);
+        });
+    }
+
     public function cancel(PurchaseOrder $order, int $cancelledBy): PurchaseOrder
     {
         return DB::transaction(function () use ($order, $cancelledBy) {

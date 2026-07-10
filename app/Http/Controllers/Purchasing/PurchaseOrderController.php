@@ -578,6 +578,32 @@ class PurchaseOrderController extends Controller
             ->with('success', 'PO berhasil di-approve.');
     }
 
+    public function unapprove(PurchaseOrder $purchase_order)
+    {
+        abort_unless(
+            in_array(auth()->user()?->role, ['owner', 'admin'], true) || auth()->user()?->isDeveloper(),
+            403, 'Hanya owner atau admin yang bisa unapprove PO.'
+        );
+
+        if ($purchase_order->status !== 'approved') {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'Hanya PO yang berstatus approved yang bisa di-unapprove.');
+        }
+
+        if ($purchase_order->purchaseReceipts()->exists()) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'PO yang sudah memiliki GRN tidak bisa di-unapprove. Hapus GRN terlebih dahulu.');
+        }
+
+        $this->service->unapprove($purchase_order);
+
+        return redirect()
+            ->route('purchasing.purchase_orders.show', $purchase_order->id)
+            ->with('success', 'PO berhasil dikembalikan ke status Draft.');
+    }
+
     public function cancel(PurchaseOrder $purchase_order)
     {
         if (!in_array($purchase_order->status, ['draft', 'approved'], true)) {

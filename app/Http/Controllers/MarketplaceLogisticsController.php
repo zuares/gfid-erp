@@ -137,6 +137,7 @@ class MarketplaceLogisticsController extends Controller
                             ->update([
                                 'order_status' => 'PROCESSED',
                                 'shipping_awb_no' => $awb,
+                                'shipping_arranged_at' => now(),
                                 'raw_json' => $rawJson
                             ]);
                         return response()->json($result);
@@ -146,7 +147,8 @@ class MarketplaceLogisticsController extends Controller
                         ->where('channel_order_id', $orderSn)
                         ->update([
                             'order_status' => 'PROCESSED',
-                            'shipping_awb_no' => $awb
+                            'shipping_awb_no' => $awb,
+                            'shipping_arranged_at' => now()
                         ]);
                     return response()->json($result);
                 }
@@ -157,7 +159,10 @@ class MarketplaceLogisticsController extends Controller
             // Fallback: Mark as PROCESSED locally
             MarketplaceOrder::where('store_id', $store->id)
                 ->where('channel_order_id', $orderSn)
-                ->update(['order_status' => 'PROCESSED']);
+                ->update([
+                    'order_status' => 'PROCESSED',
+                    'shipping_arranged_at' => now()
+                ]);
 
             return response()->json($result);
         } catch (\Exception $e) {

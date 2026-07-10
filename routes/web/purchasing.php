@@ -133,6 +133,9 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
 
             Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
                 ->name('purchase_orders.approve');
+
+            Route::post('purchase-orders/{purchase_order}/unapprove', [PurchaseOrderController::class, 'unapprove'])
+                ->name('purchase_orders.unapprove');
         });
 
         // SUPPLIER INVOICE — owner + accounting (akses dikontrol di controller)

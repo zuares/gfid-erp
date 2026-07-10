@@ -545,6 +545,7 @@ class MarketplaceController extends Controller
 
         if ($status === 'NOT_CONNECTED') {
             $lock->release();
+            $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
             return response()->json([
                 'success' => false,
                 'code'    => 'STORE_NOT_CONNECTED',
@@ -552,13 +553,14 @@ class MarketplaceController extends Controller
                 'action'  => [
                     'type'  => 'redirect',
                     'label' => 'Hubungkan ' . $store->channel->name,
-                    'url'   => url('/marketplace/' . $store->channel->code . '/connect')
+                    'url'   => url('/marketplace/' . $urlSegment . '/connect')
                 ]
             ], 422);
         }
 
         if ($status !== 'CONNECTED') {
             $lock->release();
+            $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
             return response()->json([
                 'success' => false,
                 'code'    => 'SHOPEE_AUTH_REQUIRED',
@@ -566,7 +568,7 @@ class MarketplaceController extends Controller
                 'action'  => [
                     'type'  => 'redirect',
                     'label' => 'Login Ulang ' . $store->channel->name,
-                    'url'   => url('/marketplace/' . $store->channel->code . '/connect')
+                    'url'   => url('/marketplace/' . $urlSegment . '/connect')
                 ]
             ], 401);
         }
@@ -658,6 +660,7 @@ class MarketplaceController extends Controller
             $arr['has_unresolved_lines']   = $o->fulfillment
                 ? $o->fulfillment->lines->whereNull('item_id')->isNotEmpty()
                 : false;
+            $arr['needs_shipping_arrangement'] = $o->needs_shipping_arrangement;
             // Issues: ada item dengan data_status != 'valid' (sama seperti halaman /marketplace/issues)
             $arr['has_data_issues'] = $o->items->contains(
                 fn ($item) => ($item->data_status ?? 'incomplete') !== 'valid'
