@@ -29,6 +29,12 @@ class DashboardController extends Controller
         'RTS'      => 'WH-RTS',
     ];
 
+    public function devRunAudit(): \Illuminate\Http\JsonResponse
+    {
+        \Illuminate\Support\Facades\Artisan::call('inventory:audit-allocated', ['--quiet' => false]);
+        return response()->json(['message' => "Audit selesai dijalankan."]);
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();

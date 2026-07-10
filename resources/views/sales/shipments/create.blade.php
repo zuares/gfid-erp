@@ -692,7 +692,7 @@ body[data-theme="dark"] .shp-topbar {
 
             <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.4rem;font-weight:700;">Tipe Shipment</div>
             <div class="shp-mode-grid" style="margin-bottom:1rem" role="radiogroup" aria-label="Tipe Shipment">
-                <button type="button" class="shp-mode-card type-btn" data-shipment-type="marketplace" role="radio" aria-checked="false">
+                <button type="button" class="shp-mode-card type-btn" data-shipment-type="marketplace" role="radio" aria-checked="false" @if(auth()->user()->role === 'admin') disabled style="opacity: 0.5; cursor: not-allowed;" title="Dinonaktifkan sementara untuk Admin" @endif>
                     <div class="shp-mode-title">Marketplace</div>
                     <div class="shp-mode-sub">Wajib scan order/resi marketplace. Order yang tidak ditemukan akan ditolak.</div>
                 </button>
@@ -708,7 +708,7 @@ body[data-theme="dark"] .shp-topbar {
                     <div class="shp-mode-title">Scan Barang Dulu</div>
                     <div class="shp-mode-sub">Flow sekarang: buat draft lalu scan item.</div>
                 </button>
-                <button type="button" class="shp-mode-card" data-scan-mode="order_first" role="radio" aria-checked="false">
+                <button type="button" class="shp-mode-card" data-scan-mode="order_first" role="radio" aria-checked="false" @if(auth()->user()->role === 'admin') disabled style="opacity: 0.5; cursor: not-allowed;" title="Dinonaktifkan sementara untuk Admin" @endif>
                     <div class="shp-mode-title">Scan Order Dulu</div>
                     <div class="shp-mode-sub">Scanner seperti retur: order aktif lalu item.</div>
                 </button>
@@ -1478,6 +1478,7 @@ body[data-theme="dark"] .shp-topbar {
 
     typeBtns.forEach(btn => {
         btn.addEventListener('click', function () {
+            if (this.disabled) return;
             const type = this.dataset.shipmentType;
             if (typeInput) typeInput.value = type;
             
@@ -1499,6 +1500,7 @@ body[data-theme="dark"] .shp-topbar {
 
     modeBtns.forEach(btn => {
         btn.addEventListener('click', function () {
+            if (this.disabled) return;
             selectScanMode(this.dataset.scanMode);
         });
     });

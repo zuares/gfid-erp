@@ -1182,7 +1182,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 @php
     $totalQty          = $shipment->lines->sum('qty_scanned');
     $totalLines        = $shipment->lines->count();
-    $lastScannedLineId = session('last_scanned_line_id');
+    $lastScannedLineId = $shipment->lines()->latest('updated_at')->value('id');
     $stockInsufficient = collect(session('stock_insufficient', []));
     $hasStockError     = $stockInsufficient->isNotEmpty();
 
@@ -1216,6 +1216,10 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
+    <a href="/marketplace/orders" class="btn btn-shp-outline" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;">
+        📦 Order Marketplace
+    </a>
+
     <button type="button" class="btn btn-shp-submit" onclick="printPickingList()">
         Cetak Picking List
     </button>
@@ -1225,19 +1229,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Scan Order Dulu
     </a>
 
-    @if ($shipment->shipment_type === \App\Models\Shipment::TYPE_MANUAL)
-        <form id="postManualForm" action="{{ route('sales.shipments.submit', $shipment) }}" method="POST" class="d-none">
-            @csrf
-        </form>
-        <button type="button" 
-           id="rekonBtn"
-           data-is-manual="1"
-           onclick="if(this.getAttribute('aria-disabled') !== 'true') document.getElementById('postManualForm').submit();"
-           class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
-           aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
-            {{ $totalLines > 0 ? 'Posting Shipment' : 'Scan Barang Dulu' }}
-        </button>
-    @else
         <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
            id="rekonBtn"
            data-is-manual="0"
@@ -1246,7 +1237,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
            aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
             {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
         </a>
-    @endif
 </div>
 
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
@@ -1879,19 +1869,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     function syncRekonButton(totalLines) {
         if (!rekonBtn) return;
         const count = parseInt(totalLines ?? summaryLines?.textContent ?? '0', 10) || 0;
-        const isManual = rekonBtn.dataset.isManual === '1';
         if (count > 0) {
-            if (!isManual) {
-                const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
-                rekonBtn.href = url;
-                rekonBtn.textContent = 'Lanjut Rekonsiliasi';
-            } else {
-                rekonBtn.textContent = 'Posting Shipment';
-            }
+            const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
+            rekonBtn.href = url;
+            rekonBtn.textContent = 'Lanjut Rekonsiliasi';
             rekonBtn.classList.remove('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'false');
         } else {
-            if (!isManual) rekonBtn.href = '#';
+            rekonBtn.href = '#';
             rekonBtn.textContent = 'Scan Barang Dulu';
             rekonBtn.classList.add('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'true');
@@ -2241,9 +2226,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 scanInput.value = '';
                 if (rekonBtn && !rekonBtn.classList.contains('is-disabled')) {
                     beepNav();
-                    if (rekonBtn.dataset.isManual === '1') {
-                        document.getElementById('postManualForm').submit();
-                    } else if (rekonBtn.dataset.rekonUrl) {
+                    if (rekonBtn.dataset.rekonUrl) {
                         window.location.href = rekonBtn.dataset.rekonUrl;
                     }
                 }

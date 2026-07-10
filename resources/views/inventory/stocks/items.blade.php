@@ -109,7 +109,7 @@
         ];
     @endphp
 
-    <div id="stocksItemsPage" class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index') }}"
+    <div id="stocksItemsPage" class="page-wrap" data-stockcard-base-url="{{ route('inventory.stock_card.index', [], false) }}"
         data-hide-rts="{{ $role === 'operating' ? '1' : '0' }}" data-is-owner="{{ $isOwner ? '1' : '0' }}" data-can-view-ads="{{ $canViewAds ? '1' : '0' }}"
         data-selected-warehouse-id="{{ $warehouseId }}">
 
@@ -338,7 +338,7 @@
                                 @forelse ($stocks as $index => $row)
                                     @php $mm = $moverMeta((float)($row->ads ?? 0)); @endphp
                                     <tr class="item-row" data-item-id="{{ $row->item_id }}"
-                                        data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}">
+                                        data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id, false) }}">
                                         <td class="text-muted small">{{ $stocks->firstItem() + $index }}</td>
 
                                         <td class="mono">
@@ -421,7 +421,7 @@
                         @endphp
 
                         <div class="mcard item-card" data-item-id="{{ $row->item_id }}"
-                            data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id) }}"
+                            data-locations-url="{{ route('inventory.stocks.item_locations', $row->item_id, false) }}"
                             data-row='@json($rowPayload)'>
                             <button type="button" class="mcard-btn js-card-toggle">
                                 <div class="m-left">

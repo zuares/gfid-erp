@@ -5,19 +5,68 @@
 
 @push('head')
 <style>
+    :root{
+        --shp-accent:#334155;
+        --shp-accent-2:#1f2937;
+        --shp-border:rgba(148,163,184,.18);
+        --shp-border-strong:rgba(148,163,184,.30);
+        --shp-muted:#64748b;
+    }
+    
+    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    
+    .card-main{
+        background: var(--card);
+        border-radius: 8px;
+        border: 1px solid var(--shp-border);
+        box-shadow: none;
+        overflow:hidden;
+    }
+    body[data-theme="dark"] .card-main{
+        border-color: rgba(51,65,85,.85);
+        box-shadow: none;
+    }
+
+    .ship-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--shp-border);
+    }
+    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    
+    .controls { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+    @media (min-width: 1024px) {
+        .ship-topbar { flex-wrap: nowrap; overflow-x: auto; }
+        .ship-topbar::-webkit-scrollbar { display: none; }
+        .controls { flex-wrap: nowrap; }
+    }
+    
 /* ── Force header one line ── */
 .gf-master-desc { display: none !important; }
 
 /* ── Header icon buttons ── */
 .hdr-btn {
-    display: inline-flex; align-items: center; gap: .3rem;
-    border: 1.5px solid #e2e8f0; border-radius: 999px;
-    padding: .28rem .65rem; font-size: .75rem; font-weight: 700;
-    background: #fff; color: #0f172a; cursor: pointer;
-    transition: all .15s; white-space: nowrap; position: relative;
+    display: inline-flex; align-items: center; gap: .35rem;
+    border: 1px solid rgba(148,163,184,.35); border-radius: 7px;
+    padding: .32rem .75rem; font-size: .78rem; font-weight: 600;
+    background: transparent; color: #475569; cursor: pointer;
+    transition: all .15s; white-space: nowrap; position: relative; box-shadow: none;
     flex-shrink: 0;
 }
-.hdr-btn:hover { border-color: #94a3b8; background: #f8fafc; }
+.hdr-btn:hover { background: rgba(148,163,184,.08); color: #111827; }
+body[data-theme="dark"] .hdr-btn { color: #9ca3af; border-color: rgba(148,163,184,.25); }
+body[data-theme="dark"] .hdr-btn:hover { background: rgba(148,163,184,.15); color: #fff; }
 .hdr-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
 .hdr-btn .hdr-btn-label { font-size: .68rem; color: #94a3b8; font-weight: 600; }
 .hdr-btn.active .hdr-btn-label { color: rgba(255,255,255,.55); }
@@ -39,58 +88,60 @@
 .hdr-dropdown-item.selected { background: #f1f5f9; font-weight: 800; }
 .hdr-dropdown-divider { height: 1px; background: #f1f5f9; margin: .3rem 0; }
 
-/* ── Search bar ── */
+/* ── Search Bar in Topbar ── */
 .ord-search-bar {
-    display: flex; align-items: center; gap: .5rem;
-    background: #f8fafc; border: 1.5px solid #e2e8f0;
-    border-radius: 12px; padding: .45rem .75rem;
-    margin-bottom: 1rem; transition: border-color .15s;
+    display: flex; align-items: center; gap: .4rem;
+    background: transparent; border: 1px solid rgba(148,163,184,.35);
+    border-radius: 7px; padding: .32rem .75rem;
+    transition: border-color .15s; flex: 1; min-width: 180px; max-width: 320px;
 }
-.ord-search-bar:focus-within { border-color: #94a3b8; background: #fff; }
-.ord-search-bar .search-icon { font-size: .9rem; flex-shrink: 0; opacity: .5; }
+.ord-search-bar:focus-within { border-color: var(--shp-accent); box-shadow: 0 0 0 2px rgba(148,163,184,.15); }
+body[data-theme="dark"] .ord-search-bar { border-color: rgba(148,163,184,.25); }
+body[data-theme="dark"] .ord-search-bar:focus-within { border-color: #94a3b8; box-shadow: 0 0 0 2px rgba(148,163,184,.1); }
+
 .ord-search-bar input {
     border: none; background: transparent; outline: none;
-    font-size: .83rem; font-weight: 600; color: #0f172a; width: 100%;
+    font-size: .78rem; width: 100%; color: #0f172a;
 }
-.ord-search-bar input::placeholder { color: #94a3b8; font-weight: 500; }
+body[data-theme="dark"] .ord-search-bar input { color: #f8fafc; }
+body[data-theme="dark"] .ord-search-bar input::placeholder { color: #64748b; }
 .ord-search-clear {
-    background: none; border: none; cursor: pointer; padding: 0;
-    font-size: .75rem; color: #94a3b8; flex-shrink: 0; display: none;
+    background: none; border: none; font-size: .7rem; color: #94a3b8;
+    cursor: pointer; padding: 0; display: none;
 }
+.ord-search-clear:hover { color: #ef4444; }
 .ord-search-clear.visible { display: block; }
 
 /* ── Tabs ── */
 .ord-tabs {
-    display: flex; gap: .25rem; flex-wrap: nowrap;
+    display: flex; gap: .4rem; flex-wrap: nowrap;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    margin-bottom: 1rem; border-bottom: 1.5px solid #f1f5f9;
-    padding-bottom: .5rem;
+    margin-bottom: 1rem; border-bottom: 1px solid var(--shp-border);
+    padding-bottom: .6rem;
 }
 .ord-tabs::-webkit-scrollbar { display: none; }
 .ord-tab {
     display: flex; align-items: center; gap: .35rem;
-    background: none; border: none; padding: .38rem .7rem;
-    font-size: .78rem; font-weight: 700; color: #94a3b8;
-    border-radius: 8px; cursor: pointer; transition: all .15s;
+    background: transparent; border: 1px solid transparent; padding: .38rem .75rem;
+    font-size: .78rem; font-weight: 600; color: var(--shp-muted);
+    border-radius: 7px; cursor: pointer; transition: all .15s;
     position: relative; white-space: nowrap; flex-shrink: 0;
 }
-.ord-tab:hover { background: #f8fafc; color: #475569; }
-.ord-tab.active { color: #0f172a; background: #f1f5f9; }
-.ord-tab.active::after {
-    content: ''; position: absolute; bottom: -9px; left: 50%;
-    transform: translateX(-50%); width: 70%; height: 2.5px;
-    background: #0f172a; border-radius: 999px;
+.ord-tab:hover { background: rgba(148,163,184,.08); color: var(--shp-accent); }
+.ord-tab.active { 
+    color: #fff; background: var(--shp-accent); border-color: var(--shp-accent); 
 }
 
 /* ── Mobile cards ── */
 .ord-cards { display: flex; flex-direction: column; gap: .5rem; }
 .ord-card {
-    background: #fff; border: 1.5px solid #f1f5f9;
-    border-radius: 14px; overflow: hidden;
+    background: var(--card); border: 1px solid var(--shp-border);
+    border-radius: 8px; overflow: hidden;
     transition: border-color .15s;
 }
-.ord-card:hover { border-color: #e2e8f0; }
+body[data-theme="dark"] .ord-card { border-color: rgba(51,65,85,.85); }
+.ord-card:hover { border-color: var(--shp-border-strong); }
 .ord-card.row-urgent  { border-left: 3px solid #f59e0b; }
 .ord-card.row-packing { border-left: 3px solid #2563eb; }
 .ord-card-header {
@@ -98,30 +149,30 @@
     gap: .5rem; padding: .7rem .9rem .55rem;
 }
 .ord-card-meta { min-width: 0; }
-.ord-card-meta .ord-id { font-size: .78rem; }
+.ord-card-meta .ord-id { font-size: .78rem; font-weight:600; }
 .ord-card-sub {
     display: flex; align-items: center; gap: .4rem; margin-top: .18rem; flex-wrap: wrap;
 }
-.ord-card-sub-text { font-size: .68rem; color: #94a3b8; font-weight: 500; }
+.ord-card-sub-text { font-size: .68rem; color: var(--shp-muted); font-weight: 500; }
 .ord-card-actions { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
-.ord-card-section { border-top: 1px solid #f4f6f9; }
+.ord-card-section { border-top: 1px solid var(--shp-border); }
 /* Accordion trigger */
 .ord-acc-toggle {
     display: flex; align-items: center; justify-content: space-between;
     padding: .42rem .9rem; cursor: pointer; user-select: none;
     gap: .5rem;
 }
-.ord-acc-toggle:hover { background: #f8fafc; }
+.ord-acc-toggle:hover { background: rgba(148,163,184,.05); }
 .ord-acc-label {
-    font-size: .6rem; font-weight: 800; color: #94a3b8; letter-spacing: .06em;
-    text-transform: uppercase; display: flex; align-items: center; gap: .35rem;
+    font-size: .68rem; font-weight: 600; color: var(--shp-muted); letter-spacing: 0;
+    text-transform: none; display: flex; align-items: center; gap: .35rem;
 }
 .ord-acc-count {
-    font-size: .6rem; font-weight: 700; background: #f1f5f9; color: #64748b;
+    font-size: .6rem; font-weight: 600; background: rgba(148,163,184,.15); color: var(--shp-muted);
     border-radius: 999px; padding: .05rem .38rem; line-height: 1.5;
 }
 .ord-acc-chevron {
-    font-size: .6rem; color: #cbd5e1; transition: transform .18s; flex-shrink: 0;
+    font-size: .6rem; color: var(--shp-border-strong); transition: transform .18s; flex-shrink: 0;
 }
 .ord-acc-body {
     display: none; padding: .3rem .9rem .55rem;
@@ -159,10 +210,11 @@
 /* ── Table overrides ── */
 .ord-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .ord-table thead tr th {
-    font-size: .63rem; font-weight: 800; letter-spacing: .05em;
-    color: #94a3b8; text-transform: uppercase; padding: .5rem .75rem;
-    border-bottom: 1.5px solid #f1f5f9; background: #fafafa; white-space: nowrap;
+    font-size: .68rem; font-weight: 600; letter-spacing: 0;
+    color: var(--shp-muted); text-transform: none; padding: .52rem .62rem;
+    border-bottom: 1px solid var(--shp-border); background: var(--card,#fff); white-space: nowrap;
 }
+body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98); color: #9ca3af; }
 .ord-table colgroup .col-order   { width: 13%; }
 .ord-table colgroup .col-items   { width: 44%; }
 .ord-table colgroup .col-items-sm { width: 28%; }
@@ -297,15 +349,17 @@
     }
 }
 .btn-toolbar {
-    display: inline-flex; align-items: center; gap: .3rem;
-    font-size: .73rem; font-weight: 700; padding: .28rem .65rem;
-    border-radius: 999px; border: 1.5px solid #e2e8f0;
-    background: #fff; color: #0f172a; cursor: pointer; transition: all .15s;
-    white-space: nowrap;
+    display: inline-flex; align-items: center; gap: .35rem;
+    background: transparent; border: 1px solid rgba(148,163,184,.35); border-radius: 7px;
+    padding: .35rem .8rem; font-size: .78rem; font-weight: 600;
+    color: #475569; cursor: pointer; transition: all .15s; white-space: nowrap; box-shadow: none;
 }
-.btn-toolbar:hover { border-color: #94a3b8; background: #f8fafc; }
-.btn-toolbar.primary { background: #0f172a; color: #fff; border-color: #0f172a; }
-.btn-toolbar.primary:hover { background: #1e293b; }
+.btn-toolbar:hover { background: rgba(148,163,184,.08); color: #111827; }
+body[data-theme="dark"] .btn-toolbar { color: #9ca3af; border-color: rgba(148,163,184,.25); }
+body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); color: #fff; }
+
+.btn-toolbar.primary { background: var(--shp-accent); color: #fff; border-color: var(--shp-accent); }
+.btn-toolbar.primary:hover { background: var(--shp-accent-2); border-color: var(--shp-accent-2); }
 .btn-toolbar.active { background: #dc2626; color: #fff; border-color: #dc2626; }
 .btn-toolbar.active:hover { background: #b91c1c; }
 /* ── Fulfillment status badge di row ── */
@@ -454,228 +508,152 @@
 @endpush
 
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="Order Lokal"
-    description="Pantau dan proses order masuk dari semua toko.">
-
-    <x-slot:actions>
-        {{-- Hidden date inputs --}}
-        <input type="hidden" id="mpDateFrom" value="{{ $filters['date_from'] }}">
-        <input type="hidden" id="mpDateTo"   value="{{ $filters['date_to'] }}">
-
-        {{-- 🔄 Sync --}}
-        <button class="hdr-btn" style="background:#0f172a;color:#fff;border-color:#0f172a"
-            onclick="openQuickSync()">🔄 Sync</button>
-
-        {{-- 🔃 Refresh --}}
-        <button class="hdr-btn" onclick="loadOrders()" title="Refresh">🔃</button>
-
-        @if(app()->environment('local', 'development', 'testing', 'staging'))
-        <button class="hdr-btn" id="btnDevPanel"
-            style="background:#faf5ff;color:#7c3aed;border-color:#ddd6fe"
-            onclick="toggleDevPanel()">
-            🛠 Dev
-        </button>
-        @endif
-
-        {{-- 🏪 Store filter --}}
-        <div style="position:relative">
-            <button class="hdr-btn" id="btnStore" onclick="toggleDropdown('ddStore', event)">
-                🏪 <span id="btnStoreLabel" class="hdr-btn-label">Semua Toko</span>
-            </button>
-            <div class="hdr-dropdown" id="ddStore">
-                <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">PILIH TOKO</div>
-                <div id="storeDropdownItems"></div>
-            </div>
+<div class="page-wrap">
+    {{-- ── TOPBAR ── --}}
+    <div class="ship-topbar">
+        <div>
+            <h1 class="title">Order Lokal</h1>
+            <div class="sub">Pantau pesanan Marketplace</div>
         </div>
+        <div class="controls" style="flex:1; justify-content:flex-end">
+            {{-- Hidden date inputs --}}
+            <input type="hidden" id="mpDateFrom" value="{{ $filters['date_from'] }}">
+            <input type="hidden" id="mpDateTo"   value="{{ $filters['date_to'] }}">
 
-        {{-- Divider --}}
-        <div style="width:1px;height:20px;background:#e2e8f0;margin:0 .1rem"></div>
+            {{-- Search bar --}}
+            <div class="ord-search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filterSearch" placeholder="Cari order/resi/SKU…" oninput="onSearchInput(this)" autocomplete="off">
+                <button class="ord-search-clear" id="searchClearBtn" onclick="clearSearch()">✕</button>
+            </div>
 
-        {{-- 📅 Date — ujung kanan --}}
-        <div style="position:relative">
-            <button class="hdr-btn" id="btnDate" onclick="toggleDropdown('ddDate', event)">
-                📅 <span id="btnDateLabel" class="hdr-btn-label">30 hari terakhir</span>
-            </button>
-            <div class="hdr-dropdown" id="ddDate" style="right:0;left:auto;min-width:210px">
-                <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">PERIODE CEPAT</div>
-                <div class="hdr-dropdown-item" onclick="setDatePreset(1)">📆 Hari ini</div>
-                <div class="hdr-dropdown-item" onclick="setDatePreset(7)">📆 7 hari terakhir</div>
-                <div class="hdr-dropdown-item selected" onclick="setDatePreset(30)">📆 30 hari terakhir</div>
-                <div class="hdr-dropdown-item" onclick="setDatePreset(90)">📆 90 hari terakhir</div>
-                <div class="hdr-dropdown-divider"></div>
-                <div style="padding:.2rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8">PILIH MANUAL</div>
-                <div style="padding:.3rem .4rem .4rem">
-                    <input type="text" id="mpDateRange" autocomplete="off"
-                        style="width:100%;font-size:.78rem;border:1.5px solid #e2e8f0;border-radius:8px;padding:.28rem .6rem"
-                        placeholder="Pilih rentang…" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}">
+            {{-- Store filter --}}
+            <div style="position:relative">
+                <button class="hdr-btn" id="btnStore" onclick="toggleDropdown('ddStore', event)">
+                    🏪 <span id="btnStoreLabel" class="hdr-btn-label">Semua Toko</span>
+                </button>
+                <div class="hdr-dropdown" id="ddStore">
+                    <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">PILIH TOKO</div>
+                    <div id="storeDropdownItems"></div>
                 </div>
             </div>
-        </div>
-    </x-slot:actions>
 
-    @if(app()->environment('local', 'development', 'testing', 'staging'))
+            {{-- Date filter --}}
+            <div style="position:relative">
+                <button class="hdr-btn" id="btnDate" onclick="toggleDropdown('ddDate', event)">
+                    📅 <span id="btnDateLabel" class="hdr-btn-label">30 hari terakhir</span>
+                </button>
+                <div class="hdr-dropdown" id="ddDate" style="right:0;left:auto;min-width:210px">
+                    <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">PERIODE CEPAT</div>
+                    <div class="hdr-dropdown-item" onclick="setDatePreset(1)">📆 Hari ini</div>
+                    <div class="hdr-dropdown-item" onclick="setDatePreset(7)">📆 7 hari terakhir</div>
+                    <div class="hdr-dropdown-item selected" onclick="setDatePreset(30)">📆 30 hari terakhir</div>
+                    <div class="hdr-dropdown-item" onclick="setDatePreset(90)">📆 90 hari terakhir</div>
+                    <div class="hdr-dropdown-divider"></div>
+                    <div style="padding:.2rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8">PILIH MANUAL</div>
+                    <div style="padding:.3rem .4rem .4rem">
+                        <input type="text" id="mpDateRange" autocomplete="off"
+                            style="width:100%;font-size:.78rem;border:1.5px solid #e2e8f0;border-radius:8px;padding:.28rem .6rem"
+                            placeholder="Pilih rentang…" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}">
+                    </div>
+                </div>
+            </div>
+
+            {{-- Sync --}}
+            <button class="hdr-btn" style="background:var(--shp-accent);color:#fff;border-color:var(--shp-accent)" onclick="openQuickSync()">🔄 Sync</button>
+            <button class="hdr-btn" onclick="loadOrders()" title="Refresh">🔃</button>
+
+            @if(auth()->user()?->role === 'owner')
+            <button class="hdr-btn" id="btnDevPanel" style="background:#faf5ff;color:#7c3aed;border-color:#ddd6fe" onclick="toggleDevPanel()">🛠 Dev</button>
+            @endif
+        </div>
+    </div>
+
+    @if(auth()->user()?->role === 'owner')
     {{-- ══ DEV TOOLS PANEL ══════════════════════════════════════════════════ --}}
-    <div id="devPanel" style="display:none;background:#faf5ff;border:1.5px solid #ddd6fe;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1.25rem">
+    <div id="devPanel" style="display:none;background:#faf5ff;border:1px solid #ddd6fe;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
-            <div style="font-size:.8rem;font-weight:800;color:#7c3aed;letter-spacing:.05em">🛠 DEV TOOLS — LOCAL ONLY</div>
+            <div style="font-size:.8rem;font-weight:800;color:#7c3aed;letter-spacing:.05em">🛠 DEV TOOLS — OWNER ONLY</div>
             <div id="devStats" style="font-size:.73rem;color:#6b7280">—</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
-            {{-- Seed --}}
-            <button id="btnSeedOrders" onclick="devSeedOrders()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bbf7d0;background:#f0fdf4;color:#16a34a;font-size:.75rem;font-weight:700;cursor:pointer">
-                📥 Seed Orders
-            </button>
-            {{-- Reset fulfillments --}}
-            <button id="btnResetFulfillments" onclick="devResetFulfillments()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #fde68a;background:#fefce8;color:#a16207;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Hapus semua fulfillments, orders tetap ada">
-                🔄 Reset Fulfillments
-            </button>
-            {{-- Fresh (nuke all) --}}
-            <button id="btnFreshOrders" onclick="devFreshOrders()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Hapus SEMUA orders + fulfillments">
-                🗑 Fresh All
-            </button>
-            {{-- Remap items --}}
-            <button id="btnRemapItems" onclick="devRemapItems()"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:.75rem;font-weight:700;cursor:pointer"
-                title="Re-resolve semua mapping_status + cost_status item berdasarkan SKU Mapping">
-                🔁 Remap Items
-            </button>
+            <button id="btnSeedOrders" onclick="devSeedOrders()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bbf7d0;background:#f0fdf4;color:#16a34a;font-size:.75rem;font-weight:700;cursor:pointer">📥 Seed Orders</button>
+            <button id="btnResetFulfillments" onclick="devResetFulfillments()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #fde68a;background:#fefce8;color:#a16207;font-size:.75rem;font-weight:700;cursor:pointer" title="Hapus semua fulfillments, orders tetap ada">🔄 Reset Fulfillments</button>
+            <button id="btnFreshOrders" onclick="devFreshOrders()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:.75rem;font-weight:700;cursor:pointer" title="Hapus SEMUA orders + fulfillments">🗑 Fresh All</button>
+            <button id="btnRemapItems" onclick="devRemapItems()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:.75rem;font-weight:700;cursor:pointer" title="Re-resolve semua mapping_status + cost_status item berdasarkan SKU Mapping">🔁 Remap Items</button>
             <div style="width:1px;height:20px;background:#e2e8f0;margin:0 .15rem"></div>
-            {{-- Go to shipment --}}
-            <a href="/sales/shipments"
-                style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;text-decoration:none">
-                📋 Buka Shipment →
-            </a>
-        </div>
-        <div style="margin-top:.65rem;font-size:.7rem;color:#9ca3af">
-            Seed = tambah order baru READY_TO_SHIP &nbsp;|&nbsp;
-            Remap = fix mapping_status item lama &nbsp;|&nbsp;
-            Reset Fulfillments = order balik ke "Perlu Proses" &nbsp;|&nbsp;
-            Fresh All = hapus semua data
+            <a href="/sales/shipments" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;text-decoration:none">📋 Buka Shipment →</a>
         </div>
     </div>
     @endif
 
     {{-- Alert SOP Baru --}}
-    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:1rem; margin-bottom:1.25rem; display:flex; gap:.75rem; align-items:flex-start">
+    @if(false)
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:.75rem 1rem; margin-bottom:1rem; display:flex; gap:.75rem; align-items:flex-start">
         <div style="font-size:1.2rem">📦</div>
         <div>
             <div style="font-size:.85rem; font-weight:800; color:#1e40af; margin-bottom:.15rem">SOP BARU PENGIRIMAN</div>
             <div style="font-size:.78rem; color:#1d4ed8; line-height:1.4">
-                Proses packing dan potong stok kini dilakukan lewat menu <strong><a href="/sales/shipments" style="color:#1d4ed8; text-decoration:underline">Shipment</a></strong>.<br>
-                Gunakan modul Shipment untuk membuat Draft (Batch) pengiriman Marketplace lalu scan resi/order Anda.
+                Proses packing dan potong stok kini dilakukan lewat menu <strong><a href="/sales/shipments" style="color:#1d4ed8; text-decoration:underline">Shipment</a></strong>. Gunakan modul Shipment untuk membuat Draft (Batch) pengiriman.
             </div>
         </div>
     </div>
+    @endif
 
-    {{-- KPI strip --}}
-    <div class="oc-kpi-grid" style="margin-bottom:1.25rem">
-        <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('ready')">
-            <div class="oc-kpi-label">📦 Perlu Dikirim</div>
-            <div class="oc-kpi-value" id="kpiReady" style="color:#d97706">—</div>
-            <div class="oc-kpi-note">klik untuk lihat</div>
+    {{-- TABS (Replacement for redundant KPI cards) --}}
+    <div class="ord-tabs" id="ordTabs" style="margin-bottom:1rem; border-bottom:1px solid var(--shp-border);">
+        <button class="ord-tab active" data-tab="all" onclick="switchTab('all',this)">
+            Semua <span class="ord-badge" id="badge-all">—</span>
+        </button>
+        <button class="ord-tab" data-tab="unpaid" onclick="switchTab('unpaid',this)">
+            Belum Bayar <span class="ord-badge" id="badge-unpaid">—</span>
+        </button>
+        <button class="ord-tab" data-tab="ready" onclick="switchTab('ready',this)">
+            Perlu Dikirim <span class="ord-badge urgent" id="badge-ready">—</span>
+        </button>
+        <button class="ord-tab" data-tab="processed" onclick="switchTab('processed',this)">
+            Sedang Dikemas <span class="ord-badge" id="badge-processed" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
+        </button>
+        <button class="ord-tab" data-tab="ready_to_handover" onclick="switchTab('ready_to_handover',this)">
+            Siap Kirim <span class="ord-badge" id="badge-ready_to_handover" style="background:#e0e7ff;color:#4f46e5;border-color:#c7d2fe">—</span>
+        </button>
+        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped',this)">
+            Sedang Dikirim <span class="ord-badge" id="badge-shipped">—</span>
+        </button>
+        <button class="ord-tab" data-tab="completed" onclick="switchTab('completed',this)">
+            Selesai <span class="ord-badge" id="badge-completed">—</span>
+        </button>
+        <button class="ord-tab" data-tab="cancelled" onclick="switchTab('cancelled',this)">
+            Batal/Retur <span class="ord-badge" id="badge-cancelled">—</span>
+        </button>
+        <button class="ord-tab" data-tab="issues" onclick="switchTab('issues',this)">
+            ⚠️ Bermasalah <span class="ord-badge" id="badge-issues" style="background:#fef2f2;color:#dc2626;border-color:#fecaca">—</span>
+        </button>
+    </div>
+
+    {{-- Toolbar: tab Perlu Diproses (Now more subtle) --}}
+    <div class="process-toolbar" id="processToolbar" style="margin-bottom:1rem; border:1px solid var(--shp-border); background:var(--card); border-radius:8px;">
+        <div class="process-toolbar-info" id="toolbarInfo" style="font-size:.8rem; padding:.5rem 1rem">
+            <strong id="toolbarCount">0</strong> order perlu diproses
         </div>
-        <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('processed')">
-            <div class="oc-kpi-label">📝 Sedang Dikemas</div>
-            <div class="oc-kpi-value" id="kpiProcessed" style="color:#0284c7">—</div>
-            <div class="oc-kpi-note">klik untuk lihat</div>
+        <div class="process-toolbar-actions" id="toolbarActionsProcess">
+            <button class="btn-toolbar" id="btnBelumProses" onclick="toggleBelumProses()">🔴 Filter Belum Proses</button>
+            <button class="btn-toolbar primary" id="btnBulkArrangeShipment" onclick="openBulkArrangeShipment()" style="background:#2563eb;border-color:#2563eb;">🚚 Atur Pengiriman Semua</button>
+            <button class="btn-toolbar primary" id="btnBulkPrint" onclick="printPickingList()" style="background:#0f172a;border-color:#0f172a;">🖨️ Cetak Picking List</button>
+            <button class="btn-toolbar primary" id="btnBulkPrintDocuments" onclick="printAllDocuments()" style="background:#0891b2;border-color:#0891b2;display:none;">🖨️ Cetak Semua Resi</button>
+            <button class="btn-toolbar primary" id="btnBulkFulfill" onclick="window.location='/sales/shipments'">📦 Buka Shipment</button>
         </div>
-        <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('ready_to_handover')">
-            <div class="oc-kpi-label">🚚 Siap Kirim</div>
-            <div class="oc-kpi-value" id="kpiReadyToHandover" style="color:#2563eb">—</div>
-            <div class="oc-kpi-note">klik untuk lihat</div>
-        </div>
-        <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('shipped')">
-            <div class="oc-kpi-label">🚀 Sedang Dikirim</div>
-            <div class="oc-kpi-value" id="kpiShipped" style="color:#16a34a">—</div>
-            <div class="oc-kpi-note">klik untuk lihat</div>
-        </div>
-        <div class="oc-kpi-card" style="cursor:pointer" onclick="switchTabByName('issues')">
-            <div class="oc-kpi-label">⚠️ Bermasalah</div>
-            <div class="oc-kpi-value" id="kpiIssues" style="color:#dc2626">—</div>
-            <div class="oc-kpi-note">klik untuk lihat</div>
+        <div class="process-toolbar-actions" id="toolbarActionsUnresolved" style="display:none">
+            <a href="/marketplace/issues" class="btn-toolbar primary">🔗 Perbaiki di Issues →</a>
         </div>
     </div>
 
-    <x-gf.panel>
-
-        {{-- Search bar — prominent, di atas tabs --}}
-        <div class="ord-search-bar">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="filterSearch"
-                placeholder="Cari nomor order, nama produk, atau SKU…"
-                oninput="onSearchInput(this)" autocomplete="off">
-            <button class="ord-search-clear" id="searchClearBtn" onclick="clearSearch()">✕</button>
-        </div>
-
-        {{-- Tabs --}}
-        <div class="ord-tabs" id="ordTabs">
-            <button class="ord-tab" data-tab="all" onclick="switchTab('all',this)">
-                Semua <span class="ord-badge" id="badge-all">—</span>
-            </button>
-            <button class="ord-tab" data-tab="unpaid" onclick="switchTab('unpaid',this)">
-                Belum Bayar <span class="ord-badge" id="badge-unpaid">—</span>
-            </button>
-            <button class="ord-tab" data-tab="ready" onclick="switchTab('ready',this)">
-                Perlu Dikirim <span class="ord-badge urgent" id="badge-ready">—</span>
-            </button>
-            <button class="ord-tab" data-tab="processed" onclick="switchTab('processed',this)">
-                Sedang Dikemas <span class="ord-badge" id="badge-processed" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
-            </button>
-            <button class="ord-tab" data-tab="ready_to_handover" onclick="switchTab('ready_to_handover',this)">
-                Siap Kirim <span class="ord-badge" id="badge-ready_to_handover" style="background:#e0e7ff;color:#4f46e5;border-color:#c7d2fe">—</span>
-            </button>
-            <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped',this)">
-                Sedang Dikirim <span class="ord-badge" id="badge-shipped">—</span>
-            </button>
-            <button class="ord-tab" data-tab="completed" onclick="switchTab('completed',this)">
-                Selesai <span class="ord-badge" id="badge-completed">—</span>
-            </button>
-            <button class="ord-tab" data-tab="cancelled" onclick="switchTab('cancelled',this)">
-                Batal/Retur <span class="ord-badge" id="badge-cancelled">—</span>
-            </button>
-            <button class="ord-tab" data-tab="issues" onclick="switchTab('issues',this)">
-                ⚠️ Bermasalah <span class="ord-badge" id="badge-issues" style="background:#fef2f2;color:#dc2626;border-color:#fecaca">—</span>
-            </button>
-        </div>
-
-        <div class="picking-print-strip" id="pickingPrintStrip">
-            <div class="picking-print-strip-info" id="pickingPrintInfo">
-                <strong>0</strong> order siap dicetak
-            </div>
-            <button class="btn-toolbar primary" type="button" id="btnPrintPickingTop" onclick="printPickingList()">
-                🖨 Cetak Picking List
-            </button>
-        </div>
-
-        {{-- Toolbar: tab Perlu Diproses --}}
-        <div class="process-toolbar" id="processToolbar">
-            <div class="process-toolbar-info" id="toolbarInfo">
-                <strong id="toolbarCount">0</strong> order perlu diproses hari ini
-            </div>
-            <div class="process-toolbar-actions" id="toolbarActionsProcess">
-                <button class="btn-toolbar" id="btnBelumProses" onclick="toggleBelumProses()"
-                    style="transition:background .15s">🔴 Belum Proses</button>
-                <button class="btn-toolbar" onclick="printPickingList()">🖨 Cetak Picking List</button>
-                <button class="btn-toolbar" id="btnBulkPrint" onclick="printAllDocuments()" style="display:none;background:#f1f5f9;color:#475569;border-color:#e2e8f0">🖨 Cetak Semua Resi</button>
-                <button class="btn-toolbar primary" id="btnBulkArrangeShipment" onclick="openBulkArrangeShipment()" style="background:#f59e0b;border-color:#f59e0b">🚚 Atur Semua Pengiriman</button>
-                <button class="btn-toolbar primary" id="btnBulkFulfill" onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>
-            </div>
-            <div class="process-toolbar-actions" id="toolbarActionsUnresolved" style="display:none">
-                <a href="/marketplace/issues" class="btn-toolbar primary">🔗 Perbaiki di Issues →</a>
-            </div>
-        </div>
-
+    <div class="card-main">
         <div id="ordersBody">
             <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
         </div>
-
-    </x-gf.panel>
-</x-gf.page>
+    </div> <!-- end .card-main -->
+</div> <!-- end .page-wrap -->
 @endsection
 
 {{-- Review Modal (Sedang Proses) --}}
@@ -761,12 +739,7 @@
                         <label class="form-check-label fw-bold" for="qsSyncDryRun" style="font-size:.75rem;color:#64748b;cursor:pointer">Mode Dry Run</label>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <div class="form-check form-switch" title="Otomatis Atur Pengiriman untuk pesanan baru">
-                        <input class="form-check-input" type="checkbox" role="switch" id="qsSyncAutoArrange" style="cursor:pointer" checked>
-                        <label class="form-check-label fw-bold" for="qsSyncAutoArrange" style="font-size:.75rem;color:#059669;cursor:pointer">✅ Auto-Atur Pengiriman (Auto Ship)</label>
-                    </div>
-                </div>
+
                 <div id="qsAlert" class="alert d-none mb-3" style="font-size:.8rem;border-radius:12px"></div>
                 <div id="qsProgress" style="display:none">
                     <div class="d-flex align-items-center gap-2 mb-2" style="font-size:.8rem;color:#475569">
@@ -854,12 +827,13 @@
         }
     });
 
-    const { api, fmtDate, fmtRp, esc, channelPill, statusBadge } = window.mpHelpers;
+    const { api, fmt, fmtDate, fmtRp, esc, channelPill, statusBadge } = window.mpHelpers;
     let orders           = [];
     let activeTab        = sessionStorage.getItem('ord_active_tab') || 'ready';
     let activeStore      = '';
     let fulfilledOrderIds    = new Set();   // order ID yang sudah punya fulfillment confirmed
     let printedOrderIds      = new Set();   // order ID yang sudah dicetak picking list
+    let printedDocOrderSns   = new Set();   // channel_order_id yang sudah dicetak resi
     let currentFulfillment   = null;        // fulfillment aktif di modal
     let fulfillmentStatusMap = new Map();   // order_id → {id, status} — pre-loaded dari API
     let filterBelumProses    = false;       // toggle filter hanya order belum fulfilled
@@ -1088,9 +1062,14 @@
 
     function getPrintablePickingRows() {
         const filtered = applyFilters(orders.filter(inRange));
-        const readyRows = filterByTab(filtered, 'ready');
-        const processedRows = filterByTab(filtered, 'processed');
-        const rows = [...readyRows, ...processedRows];
+        let rows = [];
+        if (activeTab === 'ready') {
+            rows = filterByTab(filtered, 'ready');
+        } else if (activeTab === 'processed') {
+            rows = filterByTab(filtered, 'processed');
+        } else {
+            rows = [...filterByTab(filtered, 'ready'), ...filterByTab(filtered, 'processed')];
+        }
         const unique = new Map();
         rows.forEach(o => unique.set(o.id, o));
         return Array.from(unique.values());
@@ -1122,7 +1101,9 @@
         $('toolbarActionsUnresolved').style.display = isIssues ? '' : 'none';
         const btnBelumProses = $('btnBelumProses');
         const btnBulkFulfill = $('btnBulkFulfill');
+        const btnBulkArrangeShipment = $('btnBulkArrangeShipment');
         const btnBulkPrint = $('btnBulkPrint');
+        const btnBulkPrintDocuments = $('btnBulkPrintDocuments');
 
         if (isIssues) {
             const rows = filterByTab(applyFilters(orders.filter(inRange)), 'issues');
@@ -1130,21 +1111,27 @@
             $('toolbarInfo').innerHTML = `<strong>${rows.length}</strong> order perlu diperbaiki`;
             if (btnBelumProses) btnBelumProses.style.display = '';
             if (btnBulkFulfill) btnBulkFulfill.style.display = '';
+            if (btnBulkArrangeShipment) btnBulkArrangeShipment.style.display = 'none';
             if (btnBulkPrint) btnBulkPrint.style.display = 'none';
+            if (btnBulkPrintDocuments) btnBulkPrintDocuments.style.display = 'none';
         } else if (activeTab === 'processed') {
             const rows = getPackingRows();
             toolbar.classList.toggle('visible', rows.length > 0);
             $('toolbarInfo').innerHTML = `<strong>${rows.length}</strong> order sedang dikemas`;
             if (btnBelumProses) btnBelumProses.style.display = 'none';
-            if (btnBulkFulfill) btnBulkFulfill.style.display = 'none';
+            if (btnBulkFulfill) btnBulkFulfill.style.display = '';
+            if (btnBulkArrangeShipment) btnBulkArrangeShipment.style.display = 'none';
             if (btnBulkPrint) btnBulkPrint.style.display = '';
+            if (btnBulkPrintDocuments) btnBulkPrintDocuments.style.display = '';
         } else {
             const rows = getProcessRows();
             toolbar.classList.toggle('visible', rows.length > 0);
             $('toolbarInfo').innerHTML = `<strong id="toolbarCount">${rows.length}</strong> order perlu diproses hari ini`;
-            if (btnBelumProses) btnBelumProses.style.display = '';
-            if (btnBulkFulfill) btnBulkFulfill.style.display = '';
-            if (btnBulkPrint) btnBulkPrint.style.display = 'none';
+            if (btnBelumProses) btnBelumProses.style.display = 'none';
+            if (btnBulkFulfill) btnBulkFulfill.style.display = 'none';
+            if (btnBulkArrangeShipment) btnBulkArrangeShipment.style.display = '';
+            if (btnBulkPrint) btnBulkPrint.style.display = '';
+            if (btnBulkPrintDocuments) btnBulkPrintDocuments.style.display = 'none';
         }
     }
 
@@ -1166,14 +1153,13 @@
         rows.forEach(o => {
             (o.items || []).forEach(i => {
                 const code    = i.internal_item?.code || '';
-                const variant = i.variant_name || '';
                 const mSku    = i.model_sku || i.item_sku || '';
                 const category = code
                     ? (i.internal_item?.category?.name || i.internal_item?.item_category?.name || i.internal_item?.category_name || 'Tanpa Kategori')
                     : 'Belum Mapping';
                 const categoryOrder = code ? (category === 'Tanpa Kategori' ? 2 : 1) : 3;
-                const key     = category + '||' + (code || mSku) + '||' + variant;
-                if (!itemMap[key]) itemMap[key] = { code, variant, mSku, category, categoryOrder, qty: 0, mapped: !!code };
+                const key     = category + '||' + (code || mSku);
+                if (!itemMap[key]) itemMap[key] = { code, mSku, category, categoryOrder, qty: 0, mapped: !!code };
                 itemMap[key].qty += (i.qty || 1);
             });
         });
@@ -1193,7 +1179,7 @@
             currentCategory = it.category;
 
             const label = it.mapped
-                ? `<strong class="sku-code">${it.code}</strong>${it.variant ? `<span class="variant-text"> — ${it.variant}</span>` : ''}`
+                ? `<strong class="sku-code">${it.code}</strong>`
                 : `<span class="unmapped-text">${it.mSku || '—'} <em>(belum mapping)</em></span>`;
             return `${groupRow}<tr>
                 <td class="chk"><input type="checkbox"></td>
@@ -1373,11 +1359,11 @@
                     </div>
                 </div>
 
-                <div class="section-title">Item yang Harus Diambil</div>
+                <div class="section-title">Daftar Barang Diambil</div>
                 <table>
                     <thead><tr>
                         <th class="chk"></th>
-                        <th style="text-align:left">Kode Item — Varian</th>
+                        <th style="text-align:left">Kode Item</th>
                         <th class="qty">Qty</th>
                         <th class="picked-qty">Diambil</th>
                     </tr></thead>
@@ -1404,7 +1390,8 @@
     let pendingShipOrders = [];
 
     window.openBulkArrangeShipment = function () {
-        pendingShipOrders = (typeof orders !== 'undefined' ? orders : []).filter(o => o.order_status === 'READY_TO_SHIP');
+        // Hanya proses order yang tampil di layar saat ini (terfilter by Toko/Search)
+        pendingShipOrders = getProcessRows();
         
         if (!pendingShipOrders.length) {
             alert('Tidak ada order yang berstatus Belum Diproses (READY_TO_SHIP) di tampilan saat ini.');
@@ -1482,11 +1469,7 @@
     // ── KPI ───────────────────────────────────────────────────────────────
     function renderKpi() {
         const rows = applyFilters(orders.filter(inRange));
-        $('kpiReady').textContent     = filterByTab(rows, 'ready').length;
-        $('kpiProcessed').textContent = filterByTab(rows, 'processed').length;
-        $('kpiReadyToHandover').textContent = filterByTab(rows, 'ready_to_handover').length;
-        $('kpiShipped').textContent   = filterByTab(rows, 'shipped').length;
-        $('kpiIssues').textContent    = filterByTab(rows, 'issues').length;
+        // KPIs removed in favor of clean tabs
     }
 
     // ── Badges ────────────────────────────────────────────────────────────
@@ -1581,16 +1564,17 @@
 
         let bodyHtml = '';
         if (internalCode) {
-            // Tampilkan kode internal sebagai focal, variant + marketplace SKU di bawah
-            bodyHtml = `<div class="ord-item-name">${esc(internalCode)}</div>`
-                + (variantName ? `<div class="ord-item-variant">${esc(variantName)}</div>` : '')
-                + (mSku ? `<div class="ord-item-sku">${esc(mSku)}</div>` : '');
+            const dispName = variantName || i.internal_item?.name || internalCode;
+            bodyHtml = `<div class="ord-item-name">${esc(dispName)}</div>`
+                + (mSku && mSku !== internalCode ? `<div class="ord-item-sku">${esc(mSku)}</div>` : '');
         } else if (mSku) {
-            bodyHtml = `<div class="ord-item-name" style="color:#64748b">${esc(mSku)}</div>`
-                + (variantName ? `<div class="ord-item-variant">${esc(variantName)}</div>` : '')
+            const dispName = variantName || i.item_name || mSku;
+            bodyHtml = `<div class="ord-item-name" style="color:#64748b">${esc(dispName)}</div>`
                 + `<span class="ord-item-nomap">Belum mapping</span>`;
         } else {
-            bodyHtml = `<span class="ord-item-nomap">Belum mapping</span>`;
+            const dispName = variantName || i.item_name || 'Item tidak diketahui';
+            bodyHtml = `<div class="ord-item-name">${esc(dispName)}</div>`
+                + `<span class="ord-item-nomap">Belum mapping</span>`;
         }
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
@@ -1602,10 +1586,28 @@
 
     // ── Table ─────────────────────────────────────────────────────────────
     function filterByTab(rows, tab) {
+        if (tab === 'issues') return rows.filter(TAB_FILTERS.issues);
+
+        const isPacked = o => fulfilledOrderIds.has(o.id);
+
+        if (tab === 'shipped') {
+            return rows.filter(o => ['SHIPPED', 'TO_CONFIRM_RECEIVE'].includes(o.order_status));
+        }
+
+        if (tab === 'ready_to_handover') {
+            return rows.filter(o => 
+                o.order_status === 'READY_TO_HANDOVER' 
+                || (['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isPacked(o))
+            );
+        }
+
+        if (['ready', 'processed'].includes(tab)) {
+            const statuses = TAB_STATUSES[tab];
+            return rows.filter(o => statuses.includes(o.order_status) && !isPacked(o));
+        }
+
         const statuses = TAB_STATUSES[tab];
-        const fn       = TAB_FILTERS[tab];
         if (statuses) return rows.filter(o => statuses.includes(o.order_status));
-        if (fn)       return rows.filter(fn);
         return rows; // tab 'all'
     }
 
@@ -1684,7 +1686,7 @@
                 const resolveLines = (o.fulfillment_resolve_lines || []).filter(l => l.code);
                 if (resolveLines.length) {
                     const resolveCards = resolveLines.map(l => `<div class="ord-item-card" style="border-color:#bfdbfe;background:#eff6ff">
-                        <div class="ord-item-qty" style="background:#dbeafe;color:#1d4ed8">${l.qty}×</div>
+                        <div class="ord-item-qty" style="background:#dbeafe;color:#1d4ed8">${l.qty_ordered}×</div>
                         <div class="ord-item-body">
                             <div class="ord-item-name" style="color:#1e3a5f">${esc(l.code)}</div>
                             ${l.name ? `<div class="ord-item-variant">${esc(l.name)}</div>` : ''}
@@ -1694,9 +1696,9 @@
                 }
             }
 
-            // ── Section: Item Scan (hanya packing, accordion)
+            // ── Section: Item Scan (accordion)
             let scanSection = '';
-            if (isPacking) {
+            if (activeTab === 'processed' || activeTab === 'shipped') {
                 const validScan = (o.fulfillment_scan_log || []).filter(s => s.code && s.qty > 0);
                 if (validScan.length) {
                     const scanCards = validScan.map(s => `<div class="ord-item-card" style="border-color:#ddd6fe;background:#faf5ff">
@@ -1767,12 +1769,13 @@
             if (!isProcessed) {
                 itemChips = items.slice(0, 5).map(i => {
                     const code = i.internal_item?.code || i.model_sku || i.item_sku || '?';
+                    const disp = i.variant_name || i.internal_item?.name || i.item_name || code;
                     const qty  = i.qty || 1;
                     const mapped = !!i.internal_item?.code;
                     return `<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.65rem;font-weight:700;
                         background:${mapped ? '#f1f5f9' : '#fef3c7'};color:${mapped ? '#334155' : '#92400e'};
                         border-radius:6px;padding:.1rem .38rem;font-family:'SF Mono','Menlo',monospace;white-space:nowrap">
-                        ${qty}× ${esc(code)}
+                        ${qty}× ${esc(disp)}
                     </span>`;
                 }).join('');
                 moreChip = items.length > 5
@@ -1803,7 +1806,7 @@
                 
                 items.forEach(i => {
                     const code = i.internal_item?.code || i.model_sku || i.item_sku || '?';
-                    const name = i.internal_item?.name || i.item_name || '';
+                    const name = i.variant_name || i.internal_item?.name || i.item_name || '';
                     const dipesan = i.qty || 1;
                     const tersedia = scans[code] || 0;
                     const kurang = Math.max(0, dipesan - tersedia);
@@ -1813,12 +1816,23 @@
                     else if (tersedia > 0) statusHtml = '<span style="color:#d97706;font-weight:800">Sebagian</span>';
                     else statusHtml = '<span style="background:#f1f5f9;color:#64748b;padding:2px 6px;border-radius:4px;font-size:.65rem;font-weight:600;white-space:nowrap;">Belum Tertaut</span>';
                     
-                    // Coba cari resolve (pengganti) - estimasi berdasarkan nama jika kurang
+                    // Cari item di resolveLines yang merupakan substitusi dari item ini
                     let subHtml = '<span style="color:#cbd5e1">—</span>';
                     if (kurang > 0 && resolveLines.length > 0) {
-                        // Karena kita tidak memiliki relasi sub langsung di UI, kita tampilkan saja item resolve yang ada
-                        const subs = resolveLines.map(r => `<div style="font-weight:700;color:#1d4ed8">${r.code} <span style="font-weight:400;color:#64748b">×${r.qty}</span></div>`).join('');
-                        subHtml = subs || subHtml;
+                        const mSku = i.model_sku || i.item_sku;
+                        let subsList = resolveLines.filter(r => 
+                            (r.substituted || r.split_parent_id || r.code !== code) && 
+                            r.marketplace_sku === mSku
+                        );
+                        
+                        // Fallback untuk order single item
+                        if (subsList.length === 0 && items.length === 1) {
+                            subsList = resolveLines.filter(r => r.substituted || r.split_parent_id || r.code !== code);
+                        }
+                        
+                        if (subsList.length > 0) {
+                            subHtml = subsList.map(r => `<div style="font-weight:700;color:#1d4ed8">${r.code} <span style="font-weight:400;color:#64748b">×${r.qty_ordered}</span></div>`).join('');
+                        }
                     }
 
                     linesHtml += `<tr style="border-bottom:1px solid #f1f5f9">
@@ -1873,7 +1887,30 @@
                 else if (o.logistics_status === 'LOGISTICS_NOT_START') statusText = 'Belum Dimulai';
                 else if (o.logistics_status === 'LOGISTICS_SHIPPED') statusText = 'Sudah Dikirim';
                 
-                logBadge = `<span style="font-size:0.65rem; color:#4f46e5; background:#e0e7ff; border:1px solid #c7d2fe; border-radius:4px; padding:1px 6px; font-weight:700;" title="Status Logistik dari Marketplace">📡 ${statusText}</span>`;
+                if (tabName === 'processed' && o.logistics_status === 'LOGISTICS_REQUEST_CREATED') {
+                    // Sembunyikan badge 'Permintaan Dibuat' jika di tab Sedang Dikemas
+                } else {
+                    logBadge = `<span style="font-size:0.65rem; color:#4f46e5; background:#e0e7ff; border:1px solid #c7d2fe; border-radius:4px; padding:1px 6px; font-weight:700;" title="Status Logistik dari Marketplace">📡 ${statusText}</span>`;
+                }
+            }
+
+            let orderDateHtml = '';
+            if (o.ordered_at || o.created_at) {
+                const dateVal = o.ordered_at || o.created_at;
+                let isLate = false;
+                
+                const d = new Date(dateVal);
+                const todayNoon = new Date();
+                todayNoon.setHours(12, 0, 0, 0);
+                if (d < todayNoon) {
+                    isLate = true;
+                }
+                
+                if (isLate) {
+                    orderDateHtml = `<span class="pk-meta-text" style="color:#dc2626; font-weight:700; background:#fef2f2; padding:1px 5px; border-radius:4px; border:1px solid #fecaca;" title="Pesanan masuk sebelum jam 12 hari ini / kemarin">🗓 ${fmt(dateVal)}</span><span class="pk-meta-text" style="color:#e2e8f0">·</span>`;
+                } else {
+                    orderDateHtml = `<span class="pk-meta-text" style="color:#64748b">🗓 ${fmt(dateVal)}</span><span class="pk-meta-text" style="color:#e2e8f0">·</span>`;
+                }
             }
 
             return `<div class="pk-row ${isPrinted && !isFulfilled ? 'row-printed' : ''}" style="flex-direction:column; align-items:stretch">
@@ -1882,7 +1919,7 @@
                         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
                             <span class="pk-order-id">${esc(o.channel_order_id || '—')}</span>
                             ${kilatBadge}
-                            ${o.shipping_awb_no ? `<span style="font-size:0.7rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${esc(o.shipping_carrier || 'Kurir')} - ${esc(o.shipping_awb_no)}</span>` : ''}
+                            ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                             ${logBadge}
                             ${isPrinted && !isFulfilled ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0369a1; border-radius:4px; padding:1px 6px; font-weight:700; border:1px solid #7dd3fc;">🖨 Sudah Cetak</span>` : ''}
                             ${fBadgeHtml}
@@ -1890,7 +1927,7 @@
                         </div>
                         <div class="pk-row-meta" style="margin-top:.28rem; display:flex; align-items:center; flex-wrap:wrap; gap:.35rem">
                             ${store ? `<span class="pk-meta-text">${esc(store)}</span><span class="pk-meta-text" style="color:#e2e8f0">·</span>` : ''}
-                            ${(o.ordered_at || o.created_at) ? `<span class="pk-meta-text" style="color:#64748b">🗓 ${fmtDate(o.ordered_at || o.created_at)}</span><span class="pk-meta-text" style="color:#e2e8f0">·</span>` : ''}
+                            ${orderDateHtml}
                             <div style="display:flex;flex-wrap:wrap;gap:.25rem;align-items:center">
                                 ${itemChips}${moreChip}
                             </div>
@@ -1956,7 +1993,7 @@
                 <div class="pk-row-left">
                     <div class="pk-order-id">
                         ${esc(o.channel_order_id || '—')}
-                        ${o.shipping_awb_no ? `<span style="font-size:0.75rem; color:#059669; margin-left:8px; font-weight:600; padding:2px 6px; background:#d1fae5; border-radius:4px;">${esc(o.shipping_carrier || 'Kurir')} - ${esc(o.shipping_awb_no)}</span>` : ''}
+                        ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; margin-left:8px; font-weight:600; padding:2px 6px; background:#d1fae5; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                     </div>
                     <div class="pk-row-meta">
                         ${store ? `<span class="pk-meta-text">${esc(store)}</span>` : ''}
@@ -1999,18 +2036,6 @@
             return;
         }
 
-        // Tab Perlu Proses: card-list layout
-        if (activeTab === 'ready') {
-            body.innerHTML = renderProcessCardList(rows);
-            return;
-        }
-
-        // Tab Sedang Proses & Siap Kirim: gunakan layout detail seperti Perlu Proses
-        if (activeTab === 'processed' || activeTab === 'ready_to_handover') {
-            body.innerHTML = renderProcessCardList(rows, activeTab);
-            return;
-        }
-
         if (isMobile()) {
             body.innerHTML = renderMobileCards(rows);
             return;
@@ -2020,17 +2045,71 @@
             const items  = o.items || [];
             const urgent = ACTIVE_ORDER_STATUSES.includes(o.order_status);
 
-            const showPackingCols = activeTab === 'processed';
-            let itemsHtml;
-            if (activeTab === 'processed' && o.fulfillment_lines?.length) {
-                const cards = o.fulfillment_lines.map(l => renderFulfilledLineCard(l)).filter(Boolean);
-                itemsHtml = `<div class="ord-items-cell">${cards.join('')}</div>`;
-            } else {
-                itemsHtml = `<div class="ord-items-cell">`
-                    + items.map(i => renderItemCard(i, urgent)).join('')
-                    + `</div>`;
+            let dateHtml = '—';
+            if (o.ordered_at || o.created_at) {
+                const dateVal = o.ordered_at || o.created_at;
+                const d = new Date(dateVal);
+                const todayNoon = new Date();
+                todayNoon.setHours(12, 0, 0, 0);
+                
+                if (['ready', 'processed', 'ready_to_handover'].includes(activeTab) && d < todayNoon) {
+                    dateHtml = `<span style="color:#ef4444; font-weight:600; font-size:0.65rem; background:#fef2f2; padding:1px 4px; border-radius:4px; border:1px solid #fee2e2;" title="Pesanan masuk sebelum jam 12 hari ini / kemarin">${fmt(dateVal)}</span>`;
+                } else {
+                    dateHtml = `<span style="color:#94a3b8; font-size:0.65rem; font-weight:500;">${fmt(dateVal)}</span>`;
+                }
             }
-            const scanTd = showPackingCols ? `<td>${renderScanLogTd(o.fulfillment_scan_log)}</td>` : '';
+
+            let logBadge = '';
+            if (o.logistics_status) {
+                let statusText = o.logistics_status.replace('LOGISTICS_', '').replace(/_/g, ' ');
+                if (o.logistics_status === 'LOGISTICS_REQUEST_CREATED') statusText = 'Permintaan Dibuat';
+                else if (o.logistics_status === 'LOGISTICS_READY_TO_SHIP') statusText = 'Siap Dikirim';
+                else if (o.logistics_status === 'LOGISTICS_NOT_START') statusText = 'Belum Dimulai';
+                else if (o.logistics_status === 'LOGISTICS_SHIPPED') statusText = 'Sudah Dikirim';
+                
+                if (!(activeTab === 'processed' && o.logistics_status === 'LOGISTICS_REQUEST_CREATED')) {
+                    logBadge = `<span style="font-size:0.65rem; color:#4f46e5; background:#e0e7ff; border:1px solid #c7d2fe; border-radius:4px; padding:1px 6px; font-weight:700;">📡 ${statusText}</span>`;
+                }
+            }
+
+            let itemsHtml = `<div class="ord-items-cell">`
+                + items.map(i => renderItemCard(i, urgent)).join('')
+                + `</div>`;
+                
+            if (activeTab === 'shipped' && o.fulfillment_scan_log?.length) {
+                const validScan = o.fulfillment_scan_log.filter(s => s.code && s.qty > 0);
+                if (validScan.length) {
+                    const scanCards = validScan.map(s => {
+                        return `<div class="ord-item-card" style="border-color:#e9d5ff;background:#f3e8ff;margin-top:4px">
+                            <div class="ord-item-qty" style="background:#ede9fe;color:#6d28d9">${s.qty}×</div>
+                            <div class="ord-item-body">
+                                <div class="ord-item-name" style="color:#4c1d95">${esc(s.code)}</div>
+                                ${s.name ? `<div class="ord-item-variant">${esc(s.name)}</div>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
+                    
+                    itemsHtml += `<div style="margin-top:8px;margin-bottom:4px;font-size:0.65rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em">📦 Item Scan:</div>
+                                  <div class="ord-items-cell">${scanCards}</div>`;
+                }
+            }
+
+            let scanTd = '';
+            if (activeTab === 'processed') {
+                const validScan = (o.fulfillment_scan_log || []).filter(s => s.code && s.qty > 0);
+                if (validScan.length) {
+                    const scanCards = validScan.map(s => `<div class="ord-item-card" style="border-color:#e9d5ff;background:#f3e8ff">
+                        <div class="ord-item-qty" style="background:#ede9fe;color:#6d28d9">${s.qty}×</div>
+                        <div class="ord-item-body">
+                            <div class="ord-item-name" style="color:#4c1d95">${esc(s.code)}</div>
+                            ${s.name ? `<div class="ord-item-variant">${esc(s.name)}</div>` : ''}
+                        </div>
+                    </div>`).join('');
+                    scanTd = `<td><div class="ord-items-cell">${scanCards}</div></td>`;
+                } else {
+                    scanTd = `<td><div style="color:#cbd5e1;font-size:.72rem;font-style:italic">—</div></td>`;
+                }
+            }
 
             // Item Resolve column (Sedang Proses tab)
             let resolveTd = '';
@@ -2038,7 +2117,7 @@
                 const resolveLines = (o.fulfillment_resolve_lines || []).filter(l => l.code);
                 if (resolveLines.length) {
                     const resolveCards = resolveLines.map(l => `<div class="ord-item-card" style="border-color:#bfdbfe;background:#eff6ff">
-                        <div class="ord-item-qty" style="background:#dbeafe;color:#1d4ed8">${l.qty}×</div>
+                        <div class="ord-item-qty" style="background:#dbeafe;color:#1d4ed8">${l.qty_ordered}×</div>
                         <div class="ord-item-body">
                             <div class="ord-item-name" style="color:#1e3a5f">${esc(l.code)}</div>
                             ${l.name ? `<div class="ord-item-variant">${esc(l.name)}</div>` : ''}
@@ -2046,7 +2125,7 @@
                     </div>`).join('');
                     resolveTd = `<td><div class="ord-items-cell">${resolveCards}</div></td>`;
                 } else {
-                    resolveTd = `<td><div style="color:#cbd5e1;font-size:.72rem;font-style:italic">—</div></td>`;
+                    resolveTd = `<td><div style="color:#94a3b8;font-size:.7rem;font-style:italic;padding:4px 0">Tidak ada item pengganti</div></td>`;
                 }
             }
 
@@ -2056,42 +2135,22 @@
             const rowClass    = isFulfilled ? 'row-fulfilled' : (isInPacking ? 'row-packing' : (urgent ? 'row-urgent' : ''));
             const carrier     = (o.shipping_carrier || '').toLowerCase();
             const isKilat     = carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
-            const kilatBadge  = isKilat ? `<div style="margin-top:.3rem"><span style="font-size:.65rem;background:#fef08a;color:#854d0e;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fde047;">⚡ KILAT</span></div>` : '';
+            const kilatBadge  = isKilat ? `<span style="font-size:.65rem;background:#fef08a;color:#854d0e;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fde047;">⚡ KILAT</span>` : '';
 
-            let fulfillBtn = '';
             let logisticsBtn = '';
 
             // Logistics Buttons
             if (o.order_status === 'READY_TO_SHIP') {
-                logisticsBtn = `<button class="btn btn-sm btn-outline-primary mt-1" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
             } else if (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                logisticsBtn = `<button class="btn btn-sm btn-outline-secondary mt-1" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
-            }
-            if (urgent) {
-                if (isFulfilled) {
-                    fulfillBtn = `<div class="btn-fulfillment done" style="margin-top:.35rem">✓ Selesai</div>`;
-                } else if (isInPacking) {
-                    // Order sedang dipacking — tombol lanjutkan
-                    const fStatus = fulfillmentStatusMap.get(o.id)?.status || '';
-                    const statusLabel = fStatus === 'picking' ? '🔄 Picking…'
-                        : fStatus === 'packed'   ? '📦 Packed'
-                        : fStatus === 'pending_review' ? '⏳ Review'
-                        : '📋 Draft';
-                    fulfillBtn = `<button class="btn-fulfillment" style="margin-top:.35rem;background:#eff6ff;color:#2563eb;border-color:#bfdbfe"
-                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
-                        onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
-                } else {
-                    fulfillBtn = `<button class="btn-fulfillment" style="margin-top:.35rem"
-                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
-                        onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
-                }
+                logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
             }
 
-            const printedBadge = isPrinted && !isFulfilled
-                ? `<span style="display:inline-block;margin-top:.3rem;font-size:.65rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:600">🖨 Sudah Cetak</span>`
+            const printedBadge = (isPrinted && !isFulfilled && !['processed', 'shipped'].includes(activeTab))
+                ? `<span style="font-size:.65rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:600">🖨 Sudah Cetak</span>`
                 : '';
 
-            const fBadge = urgent ? `<div style="margin-top:.3rem">${fulfillmentBadge(o)}</div>` : '';
+            const fBadge = urgent ? fulfillmentBadge(o) : '';
 
             // Badge masalah di tab Sudah Proses
             let issueBadge = '';
@@ -2102,11 +2161,22 @@
                     if (iss.hasShort) parts.push('Kurang');
                     if (iss.hasSub)   parts.push('Diganti');
                     if (iss.hasSplit) parts.push('Split');
-                    issueBadge = `<div style="margin-top:.3rem">
-                        <span style="display:inline-block;font-size:.63rem;font-weight:700;
+                    issueBadge = `<span style="font-size:.63rem;font-weight:700;
                             background:#fef3c7;color:#92400e;border:1px solid #fde68a;
-                            border-radius:4px;padding:1px 6px">⚠ ${parts.join(' · ')}</span>
-                    </div>`;
+                            border-radius:4px;padding:1px 6px">⚠ ${parts.join(' · ')}</span>`;
+                }
+            }
+            
+            let pengirimanHtml = '';
+            if (o.shipping_awb_no) {
+                pengirimanHtml += `<div style="margin-bottom:6px"><span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px; display:inline-block; word-break:break-all;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
+            } else if (o.shipping_carrier) {
+                pengirimanHtml += `<div style="margin-bottom:6px"><span style="font-size:0.7rem; color:#64748b; font-weight:700; padding:1px 6px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; display:inline-block;">${esc(o.shipping_carrier)}</span></div>`;
+            }
+            if (logisticsBtn) {
+                pengirimanHtml += `<div>${logisticsBtn}</div>`;
+                if (['processed', 'shipped'].includes(activeTab) && isPrinted) {
+                    pengirimanHtml += `<div style="margin-top:4px; font-size:0.68rem; color:#94a3b8; font-style:italic; text-align:center;">✓ Sudah dicetak</div>`;
                 }
             }
 
@@ -2117,19 +2187,21 @@
             return `<tr class="${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" id="ord-row-${o.id}" ${rowClick}>
                 <td>
                     <div class="ord-id">${esc(o.channel_order_id || '—')}</div>
-                    ${o.shipping_awb_no ? `<div style="margin-top:.2rem;margin-bottom:.2rem"><span style="font-size:0.7rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${esc(o.shipping_carrier || 'Kurir')} - ${esc(o.shipping_awb_no)}</span></div>` : ''}
-                    <div class="ord-date">${o.ordered_at ? fmtDate(o.ordered_at) : '—'}</div>
-                    ${kilatBadge}
-                    ${printedBadge}
-                    ${fBadge}
-                    ${issueBadge}
-                    ${fulfillBtn}
-                    ${logisticsBtn}
+                    <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
+                    
+                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+                        ${kilatBadge}
+                        ${printedBadge}
+                        ${logBadge}
+                        ${fBadge}
+                        ${issueBadge}
+                    </div>
                 </td>
                 <td>${itemsHtml}</td>
                 ${resolveTd}
                 ${scanTd}
                 <td>${statusBadge(o.order_status)}</td>
+                <td>${pengirimanHtml}</td>
                 <td>
                     <div style="font-weight:700;font-size:.78rem">${esc(o.store?.name || '—')}</div>
                     <div style="margin-top:.2rem">${channelPill(o.store?.channel)}</div>
@@ -2139,27 +2211,29 @@
 
         const hasResolveCol = activeTab === 'processed';
         const hasScanCol    = activeTab === 'processed';
-        // col widths: order(12%) | items | resolve? | scan? | status | store
-        const colItems  = hasResolveCol ? '22%' : (hasScanCol ? '28%' : '44%');
-        const colStatus = hasResolveCol ? '9%'  : (hasScanCol ? '10%' : '13%');
-        const colStore  = hasResolveCol ? '14%' : (hasScanCol ? '16%' : '17%');
+        // col widths: order(16%) | items | resolve? | scan? | status | pengiriman | store
+        const colItems  = hasResolveCol ? '16%' : (hasScanCol ? '24%' : '34%');
+        const colStatus = '12%';
+        const colStore  = '12%';
         body.innerHTML = `
         <div class="gf-table-scroll">
         <table class="ord-table">
             <colgroup>
-                <col style="width:12%">
+                <col style="width:16%">
                 <col style="width:${colItems}">
-                ${hasResolveCol ? '<col style="width:20%">' : ''}
-                ${hasScanCol    ? '<col style="width:20%">' : ''}
+                ${hasResolveCol ? '<col style="width:15%">' : ''}
+                ${hasScanCol    ? '<col style="width:15%">' : ''}
                 <col style="width:${colStatus}">
+                <col style="width:14%">
                 <col style="width:${colStore}">
             </colgroup>
             <thead><tr>
                 <th>Nomor Order</th>
                 <th>Item Produk</th>
-                ${hasResolveCol ? '<th>✅ Item Resolve</th>' : ''}
+                ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
                 <th>Status</th>
+                <th>Pengiriman</th>
                 <th>Toko</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
@@ -2224,10 +2298,6 @@
             showQsAlert('success', msg);
             btn.textContent = '✓ Selesai';
             
-            const autoArrange = $('qsSyncAutoArrange').checked;
-            if (autoArrange && !dryRun) {
-                window.autoArrangeAfterSync = true;
-            }
             loadOrders();
         } catch (e) {
             $('qsProgress').style.display = 'none';
@@ -2342,14 +2412,55 @@
         // Buka langsung agar tidak diblokir popup blocker
         window.open(url, '_blank');
         
+        printedDocOrderSns.add(orderSn);
+        
         setTimeout(() => {
             const el = document.getElementById('printAlert');
             if (el) el.remove();
+            renderTable();
         }, 2000);
     };
     window.printAllDocuments = function() {
         const rows = getPackingRows();
         if (!rows.length) { alert('Tidak ada order yang sedang dikemas.'); return; }
+        
+        const unprintedRows = rows.filter(o => !printedDocOrderSns.has(o.channel_order_id));
+        const total = rows.length;
+        const unprinted = unprintedRows.length;
+
+        const modalHtml = `
+            <div id="printOptsModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;">
+                <div style="background:white;padding:24px;border-radius:12px;width:320px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);">
+                    <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;color:#1e293b;">🖨️ Cetak Resi Massal</h3>
+                    <p style="font-size:0.85rem;color:#64748b;margin-bottom:20px;">Terdapat <strong>${total}</strong> total order.<br><strong>${unprinted}</strong> di antaranya belum dicetak resi.</p>
+                    
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <button onclick="executePrintBulk(true)" class="btn-toolbar primary" style="width:100%;justify-content:center;background:#059669;border-color:#059669;color:white;cursor:${unprinted === 0 ? 'not-allowed' : 'pointer'};opacity:${unprinted === 0 ? '0.5' : '1'};" ${unprinted === 0 ? 'disabled' : ''}>
+                            Cetak yang Belum (${unprinted})
+                        </button>
+                        <button onclick="executePrintBulk(false)" class="btn-toolbar" style="width:100%;justify-content:center;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;cursor:pointer;">
+                            Cetak Semua (${total})
+                        </button>
+                        <button onclick="document.getElementById('printOptsModal').remove()" class="btn-toolbar" style="width:100%;justify-content:center;background:transparent;border:none;color:#94a3b8;box-shadow:none;cursor:pointer;">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    };
+
+    window.executePrintBulk = function(onlyUnprinted) {
+        const modal = document.getElementById('printOptsModal');
+        if (modal) modal.remove();
+
+        let rows = getPackingRows();
+        if (onlyUnprinted) {
+            rows = rows.filter(o => !printedDocOrderSns.has(o.channel_order_id));
+        }
+
+        if (!rows.length) { alert('Tidak ada order untuk dicetak.'); return; }
         
         // Kelompokkan orderSn berdasarkan store_id
         const storeGroups = {};
@@ -2372,9 +2483,12 @@
             }
         });
 
+        rows.forEach(o => printedDocOrderSns.add(o.channel_order_id));
+
         setTimeout(() => {
             const el = document.getElementById('printBulkAlert');
             if (el) el.remove();
+            renderTable();
         }, 2000);
     };
 

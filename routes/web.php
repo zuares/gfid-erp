@@ -77,6 +77,10 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
     Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
+    Route::get('/marketplace/cache-monitor', [MarketplaceController::class, 'cacheMonitor'])->name('marketplace.cache-monitor');
+    Route::post('/marketplace/cache-monitor/run', [MarketplaceController::class, 'runCacheCleanup'])->name('marketplace.cache-monitor.run')
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
     Route::get('/marketplace/settings',    [MarketplaceController::class, 'settings'])->name('marketplace.settings');
     Route::post('/marketplace/settings',   [MarketplaceController::class, 'updateSettings'])->name('marketplace.settings.update');
     Route::get('marketplace/settings/sample-greeting', [MarketplaceController::class, 'printSampleGreetingCard'])->name('marketplace.settings.sample_greeting');
@@ -201,17 +205,16 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/fulfillments')->g
     Route::get('/{fulfillment}/audit-logs',                   [FulfillmentController::class, 'auditLogs']);
 });
 
-// Dev-only API (non-production)
-if (! app()->isProduction()) {
-    $noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
-    Route::middleware(['auth', 'access:marketplace'])->group(function () use ($noCsrf) {
-        Route::post('/api/dev/fresh-orders',       [MarketplaceController::class, 'devFreshOrders'])->withoutMiddleware($noCsrf);
-        Route::post('/api/dev/seed-orders',        [MarketplaceController::class, 'devSeedOrders'])->withoutMiddleware($noCsrf);
-        Route::post('/api/dev/reset-fulfillments', [MarketplaceController::class, 'devResetFulfillments'])->withoutMiddleware($noCsrf);
-        Route::get('/api/dev/next-order',          [MarketplaceController::class, 'devNextOrder']);
-        Route::get('/api/dev/stats',               [MarketplaceController::class, 'devStats']);
-    });
-}
+// Dev/Owner Tools (Restricted to Owner, available in all environments)
+$noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
+Route::middleware(['auth', 'role:owner'])->group(function () use ($noCsrf) {
+    Route::post('/api/dev/fresh-orders',       [MarketplaceController::class, 'devFreshOrders'])->withoutMiddleware($noCsrf);
+    Route::post('/api/dev/seed-orders',        [MarketplaceController::class, 'devSeedOrders'])->withoutMiddleware($noCsrf);
+    Route::post('/api/dev/reset-fulfillments', [MarketplaceController::class, 'devResetFulfillments'])->withoutMiddleware($noCsrf);
+    Route::post('/api/dev/run-audit',          [\App\Http\Controllers\DashboardController::class, 'devRunAudit'])->withoutMiddleware($noCsrf);
+    Route::get('/api/dev/next-order',          [MarketplaceController::class, 'devNextOrder']);
+    Route::get('/api/dev/stats',               [MarketplaceController::class, 'devStats']);
+});
 
 // SKU Mapping API
 Route::middleware(['auth', 'access:marketplace'])->prefix('api/sku-mappings')->group(function () {

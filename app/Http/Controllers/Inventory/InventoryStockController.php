@@ -119,7 +119,11 @@ class InventoryStockController extends Controller
         // STEP 1: base stock per item+warehouse
         // =========================
         $base = DB::table('inventory_mutations as m')
-            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id');
+            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
+            ->leftJoin('inventory_stocks as st', function($join) {
+                $join->on('st.item_id', '=', 'm.item_id')
+                     ->on('st.warehouse_id', '=', 'm.warehouse_id');
+            });
 
         // 🔒 Role scope
         if ($role === 'operating') {
@@ -135,7 +139,8 @@ class InventoryStockController extends Controller
         $base->selectRaw('
         m.item_id,
         w.code AS wh_code,
-        SUM(m.qty_change) AS qty
+        SUM(m.qty_change) AS qty,
+        MAX(st.allocated_qty) AS allocated_qty
     ')
             ->groupBy('m.item_id', 'w.code');
 
@@ -169,6 +174,7 @@ class InventoryStockController extends Controller
         item_categories.name AS category_name,
 
         COALESCE(SUM(s.qty),0) AS total_qty,
+        COALESCE(SUM(s.allocated_qty),0) AS allocated_qty,
 
         COALESCE(SUM(
             CASE

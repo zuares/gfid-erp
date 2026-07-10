@@ -21,6 +21,9 @@ use App\Services\MarketplaceSyncService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Artisan;
+use Carbon\Carbon;
 
 class MarketplaceController extends Controller
 {
@@ -103,6 +106,57 @@ class MarketplaceController extends Controller
     public function issueCenter(): \Illuminate\View\View
     {
         return view('marketplace.issues');
+    }
+
+    public function cacheMonitor(): \Illuminate\View\View
+    {
+        $disk = Storage::disk('local');
+        $directory = 'shipping_labels';
+        
+        $totalFiles = 0;
+        $totalSizeBytes = 0;
+        $expiredFiles = 0;
+
+        if ($disk->exists($directory)) {
+            $files = $disk->allFiles($directory);
+            $totalFiles = count($files);
+            
+            $fourDaysAgo = Carbon::now()->subDays(4);
+
+            foreach ($files as $file) {
+                if (!str_ends_with($file, '.pdf.gz')) continue;
+                
+                $totalSizeBytes += $disk->size($file);
+                
+                $filename = basename($file);
+                $filenameWithoutExt = str_replace('.pdf.gz', '', $filename);
+                $parts = explode('_', $filenameWithoutExt, 2);
+                
+                if (count($parts) === 2) {
+                    $storeId = $parts[0];
+                    $orderSn = $parts[1];
+
+                    // Estimasi expired
+                    $order = MarketplaceOrder::where('store_id', $storeId)
+                        ->where('channel_order_id', $orderSn)
+                        ->first();
+                    
+                    if (!$order || ($order->order_status === 'COMPLETED' && $order->updated_at < $fourDaysAgo)) {
+                        $expiredFiles++;
+                    }
+                }
+            }
+        }
+
+        return view('marketplace.cache-monitor', compact('totalFiles', 'totalSizeBytes', 'expiredFiles'));
+    }
+
+    public function runCacheCleanup()
+    {
+        Artisan::call('marketplace:cleanup-labels');
+        $output = Artisan::output();
+        
+        return back()->with('success', nl2br(e($output)));
     }
 
     public function settings(): \Illuminate\View\View
@@ -561,6 +615,8 @@ class MarketplaceController extends Controller
                         'code'          => $l->item?->code ?? null,
                         'name'          => $l->item?->name ?? null,
                         'marketplace_sku' => $l->marketplace_sku ?? null,
+                        'substituted'   => (bool) $l->substituted,
+                        'split_parent_id' => $l->split_parent_id,
                     ])
                     ->values()->all();
                 // Summary info untuk card display

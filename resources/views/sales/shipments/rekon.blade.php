@@ -1052,6 +1052,9 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         <span aria-hidden="true">&larr;</span>
         <span>Kembali ke Scan Barang</span>
     </a>
+    <a href="/marketplace/orders" class="btn-shp-outline" style="text-decoration:none; background:#f8fafc; border-color:#e2e8f0; color:#475569;">
+        📦 Order Marketplace
+    </a>
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
     <span class="shp-topbar-spacer"></span>
@@ -1257,8 +1260,9 @@ const APPLY_URL  = @json(parse_url(route('sales.shipments.rekon_apply', $shipmen
 const EDIT_URL   = @json(parse_url(route('sales.shipments.edit', $shipment), PHP_URL_PATH));
 const CONFIRM_URL = @json(parse_url(route('sales.shipments.confirm_orders', $shipment), PHP_URL_PATH));
 const FMT        = new Intl.NumberFormat('id-ID');
-const STORE_KEY  = 'rk_state_{{ $shipment->id }}';
-const RESTORE_ENABLED = true;
+const RESET_URL  = @json(parse_url(route('sales.shipments.rekon_reset_scans', $shipment), PHP_URL_PATH));
+const UPDATE_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_update_scan', [$shipment, '__NO__']), PHP_URL_PATH)) !!};
+const LINK_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_link_scan', [$shipment, '__NO__']), PHP_URL_PATH)) !!};
 const SERVER_ORDER_SCANS = @json($savedOrderScans ?? []);
 
 // Batch pool dari server — sumber kebenaran qty total per item
@@ -1276,57 +1280,130 @@ let drawerPendingQty = 1;      // qty yang akan di-sub
 function normalizeOrderNo(no) {
     return String(no || '').trim().toUpperCase();
 }
-function batchFingerprint() {
-    // Hash sederhana: sorted item_id:qty pairs
-    return BATCH_POOL.map(p => p.item_id + ':' + p.qty).sort().join('|');
+function rebuildPoolUsed() {
+    poolUsed = {};
+    orders.forEach(o => {
+        if (o.decision === 'skip') return; // Abaikan pesanan yang di-skip
+        if (o.order && o.order.lines) {
+            o.order.lines.forEach(l => {
+                if (l.item_id && l.qty_alloc) {
+                    poolUsed[l.item_id] = (poolUsed[l.item_id] || 0) + l.qty_alloc;
+                }
+            });
+        }
+    });
+}
+
+function recalculateAllocations() {
+    if (!orders.length) return;
+    
+    // 1. Inisialisasi pool murni dari BATCH_POOL
+    const pool = {};
+    BATCH_POOL.forEach(p => pool[p.item_id] = p.qty);
+
+    let anyChanged = false;
+
+    // 2. Evaluasi ulang pesanan berurutan
+    orders.forEach((o, idx) => {
+        if (!o.found || !o.order || !o.order.lines) return;
+
+        let changed = false;
+        let hasShort = false;
+
+        if (o.decision === 'skip') {
+            o.order.lines.forEach(l => {
+                if (l.qty_alloc !== 0) {
+                    l.qty_alloc = 0;
+                    l.qty_short = l.qty_need;
+                    l.status = 'short';
+                    changed = true;
+                }
+            });
+            if (changed) {
+                anyChanged = true;
+                saveOrderScan(idx);
+            }
+            return;
+        }
+
+        o.order.lines.forEach(l => {
+            const need = l.qty_need;
+            const sub = o.subs ? o.subs[l.item_id] : null;
+            
+            if (sub) {
+                if (l.qty_alloc !== 0) {
+                    l.qty_alloc = 0;
+                    l.qty_short = need;
+                    l.status = 'short';
+                    changed = true;
+                }
+                const subQty = Math.min(sub.qty, need);
+                if (pool[sub.sub_id]) {
+                    pool[sub.sub_id] = Math.max(0, pool[sub.sub_id] - subQty);
+                }
+                if (subQty < need) hasShort = true;
+            } else {
+                let alloc = 0;
+                if (pool[l.item_id] > 0) {
+                    alloc = Math.min(need, pool[l.item_id]);
+                    pool[l.item_id] -= alloc;
+                }
+                const short = need - alloc;
+                
+                if (l.qty_alloc !== alloc) {
+                    l.qty_alloc = alloc;
+                    l.qty_short = short;
+                    l.status = short > 0 ? 'short' : 'ok';
+                    changed = true;
+                }
+                if (short > 0) hasShort = true;
+            }
+        });
+
+        const newDecision = hasShort ? 'pending' : 'fulfill';
+        // Otomatis ubah status jika stok mencukupi
+        if (o.decision !== newDecision) {
+            o.decision = newDecision;
+            changed = true;
+        }
+
+        if (changed) {
+            anyChanged = true;
+            saveOrderScan(idx);
+        }
+    });
+
+    if (anyChanged) {
+        toast('info', 'Alokasi stok disesuaikan otomatis.');
+        rebuildPoolUsed();
+    }
 }
 function saveState() {
-    if (!RESTORE_ENABLED) return;
-    try {
-        localStorage.setItem(STORE_KEY, JSON.stringify({
-            batch_fp: batchFingerprint(),
-            poolUsed,
-            orders: orders.map(o => ({
-                no:       normalizeOrderNo(o.no),
-                found:    o.found,
-                order:    o.order,
-                pool_full:o.pool_full,
-                decision: o.decision,
-                subs:     o.subs,
-            })),
-        }));
-    } catch {}
+    // No-op: DB stores the state now.
+}
+function saveOrderScan(idx) {
+    const o = orders[idx];
+    if (!o) return;
+    const url = UPDATE_SCAN_URL.replace('__NO__', encodeURIComponent(o.no));
+    fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': CSRF,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ decision: o.decision, subs: o.subs })
+    }).catch(err => console.error('Failed to sync scan', err));
 }
 function loadState() {
-    if (!RESTORE_ENABLED) {
-        clearState();
-        return 'empty';
-    }
-    try {
-        const raw = localStorage.getItem(STORE_KEY);
-        if (!raw) {
-            orders = Array.isArray(SERVER_ORDER_SCANS) ? SERVER_ORDER_SCANS : [];
-            return orders.length ? 'ok' : 'empty';
-        }
-        const s = JSON.parse(raw);
-        if (!s || !Array.isArray(s.orders) || !s.orders.length) return 'empty';
-        poolUsed = s.poolUsed || {};
-        const seen = new Set();
-        orders = s.orders
-            .map(o => ({ ...o, no: normalizeOrderNo(o.no) }))
-            .filter(o => {
-                if (!o.no || seen.has(o.no)) return false;
-                seen.add(o.no);
-                return true;
-            });
-        // Cek apakah batch sudah berubah sejak terakhir discan
-        // Jika batch_fp tidak ada (data lama) → treat as stale agar re-analisis otomatis
-        const fp = batchFingerprint();
-        return (!s.batch_fp || s.batch_fp !== fp) ? 'stale' : 'ok';
-    } catch { return 'empty'; }
+    orders = Array.isArray(SERVER_ORDER_SCANS) ? SERVER_ORDER_SCANS : [];
+    rebuildPoolUsed();
+    recalculateAllocations(); // Evaluasi ulang jika ada barang baru masuk pool
+    return orders.length ? 'ok' : 'empty';
 }
 function clearState() {
-    try { localStorage.removeItem(STORE_KEY); } catch {}
+    orders = [];
+    poolUsed = {};
 }
 
 /* ── DOM ── */
@@ -1510,7 +1587,7 @@ async function processOrder(no) {
         if (!res.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal memuat pesanan.');
 
         data.no = no;
-        const defaultDecision = data.order?.source === 'manual_scan' ? 'pending' : null;
+        const defaultDecision = data.decision || (data.order?.source === 'manual_scan' ? 'pending' : null);
         orders.push({ no, found: data.found, order: data.order, pool_full: data.pool_full, decision: defaultDecision, subs: {} });
 
         if (data.found) {
@@ -1596,6 +1673,7 @@ function renderCard(o, idx) {
               </p>
               <div class="rk-action-strip">
                 <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Aksi:</span>
+                <button class="rk-act-btn fulfill" style="border-color:#3b82f6;color:#2563eb;" onclick="promptLinkScan(${idx})">Tautkan</button>
                 <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
                 <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
               </div>
@@ -1761,9 +1839,41 @@ window.toggleCard = function (idx) {
 
 function setDecision(idx, action) {
     orders[idx].decision = action;
-    saveState();
+    saveOrderScan(idx);
+    recalculateAllocations();
     renderAll();
 }
+
+window.promptLinkScan = async function(idx) {
+    const o = orders[idx];
+    if (!o) return;
+    const targetNo = prompt(`Masukkan Nomor Resi / Order Marketplace untuk pesanan manual: ${o.no}\n(Contoh: SPXID..., ID234...)`);
+    if (!targetNo || !targetNo.trim()) return;
+
+    try {
+        const url = LINK_SCAN_URL.replace('__NO__', encodeURIComponent(o.no));
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': CSRF,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ target_order_no: targetNo.trim() })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Gagal menautkan pesanan.');
+
+        // Update the order locally
+        orders[idx] = data;
+        recalculateAllocations();
+        rebuildPoolUsed();
+        renderAll();
+        toast('ok', `Berhasil ditautkan ke ${data.order.order_no}`);
+    } catch (err) {
+        toast('err', err.message);
+    }
+};
 
 function updateConfirmBtn() {
     const foundOrders = orders.filter(o => o.found);
@@ -1863,6 +1973,14 @@ window.adjDrawerQty = function (delta) {
     updateStepperUI();
 };
 
+window.cancelSub = function (orderIdx, lineItemId) {
+    if (!orders[orderIdx] || !orders[orderIdx].subs) return;
+    delete orders[orderIdx].subs[lineItemId];
+    saveOrderScan(orderIdx);
+    renderAll();
+    toast('ok', 'Substitusi dibatalkan');
+};
+
 window.confirmPickSub = function () {
     if (!drawerCtx || !drawerPendingSub) return;
     const { orderIdx, lineItemId } = drawerCtx;
@@ -1872,7 +1990,7 @@ window.confirmPickSub = function () {
         sub_name: drawerPendingSub.item_name,
         qty:      drawerPendingQty,
     };
-    saveState();
+    saveOrderScan(orderIdx);
     closeDrawer();
     renderAll();
     toast('ok', 'Substitusi: ' + drawerPendingSub.item_code + ' ×' + drawerPendingQty);
@@ -2023,11 +2141,26 @@ window.toggleSisa = function () {
 /* ── Reset semua ── */
 window.resetRekon = function () {
     if (!confirm('Hapus semua pesanan yang sudah discan dan mulai ulang?')) return;
-    orders = []; poolUsed = {};
-    clearState();
-    renderAll();
-    toast('ok', 'Pesanan direset.');
-    focusInput();
+    
+    // AJAX call to delete all from database
+    fetch(RESET_URL, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': CSRF,
+            'Accept': 'application/json'
+        }
+    }).then(res => res.json()).then(data => {
+        if (data.status === 'ok') {
+            clearState();
+            renderAll();
+            toast('ok', 'Pesanan direset.');
+            focusInput();
+        } else {
+            toast('err', 'Gagal mereset pesanan.');
+        }
+    }).catch(err => {
+        toast('err', 'Terjadi kesalahan jaringan.');
+    });
 };
 
 topConfirmBtn.addEventListener('click', function () {

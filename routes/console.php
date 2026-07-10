@@ -65,3 +65,8 @@ Schedule::command('sales:rebuild-daily-item-sales --days=90')
 
 Schedule::command('inventory:recalc-ads-from-daily --days=30')
     ->dailyAt('00:10');
+
+// Auto-cleanup file resi (.pdf.gz) setiap malam pukul 01:00
+Schedule::command('marketplace:cleanup-labels')
+    ->dailyAt('01:00')
+    ->runInBackground();

@@ -102,6 +102,17 @@ class TrackStorefrontVisitor
         $now = now();
         $visitor = StorefrontVisitor::firstOrNew(['visitor_token' => $token]);
 
+        // Auto-mark as internal via Secret Link Cookie
+        $isInternalCookie = $request->cookie('_gf_staff_bypass');
+        
+        // Cek jika ada secret parameter di URL untuk menanam cookie
+        // URL rahasia: ?staff_mode=gfid
+        if ($request->query('staff_mode') === 'gfid') {
+            $isInternalCookie = '1';
+            // Set cookie selama 10 tahun (permanen)
+            cookie()->queue(cookie()->forever('_gf_staff_bypass', '1'));
+        }
+
         if (! $visitor->exists) {
             $visitor->first_seen_at = $now;
             $visitor->ip_address    = $request->ip();
@@ -129,15 +140,14 @@ class TrackStorefrontVisitor
             if ($isInternalIp) {
                 $visitor->is_internal     = true;
                 $visitor->internal_reason = 'ip';
-            } elseif ($isStaff) {
+            } elseif ($isStaff || $isInternalCookie) {
                 $visitor->is_internal     = true;
                 $visitor->internal_reason = 'staff';
             }
         }
 
         // Always ensure staff are marked as internal even if they were originally tracked as external
-        // (Misalnya mereka buka website dulu sbg Guest, lalu login ke admin dashboard. Kita update statusnya jadi internal)
-        if (! $visitor->is_internal && auth()->check() && auth()->user()) {
+        if (! $visitor->is_internal && (auth()->check() && auth()->user() || $isInternalCookie)) {
             $visitor->is_internal     = true;
             $visitor->internal_reason = 'staff';
         }

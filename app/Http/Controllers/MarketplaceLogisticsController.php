@@ -133,6 +133,30 @@ class MarketplaceLogisticsController extends Controller
                 }
             }
             
+            // Cek Cache Lokal
+            $disk = \Illuminate\Support\Facades\Storage::disk('local');
+            $cachePath = "shipping_labels/{$store->id}/{$orderSn}.pdf.gz";
+            
+            if ($disk->exists($cachePath)) {
+                $content = gzdecode($disk->get($cachePath));
+                return response($content, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="Resi_' . $orderSn . '.pdf"'
+                ]);
+            }
+
+            // Jika belum ada di cache, dan statusnya sudah SHIPPED, berikan keterangan langsung
+            if ($order && $order->order_status === 'SHIPPED') {
+                return response(
+                    "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
+                        <h2 style='color:#e11d48;'>Dokumen Resi Belum Tersimpan</h2>
+                        <p style='color:#475569;'>Resi untuk pesanan ini <strong>belum pernah dicetak dan disimpan (ter-cache)</strong> ke dalam sistem lokal.</p>
+                        <p style='color:#475569;'>Karena pesanan ini sudah berstatus <strong>Sedang Dikirim (Shipped)</strong>, Marketplace sudah tidak mengizinkan sistem untuk menarik ulang dokumen resinya.</p>
+                        <button onclick='window.close()' style='margin-top:20px; padding:10px 25px; background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-weight:700;'>Tutup Halaman</button>
+                    </div>", 400
+                );
+            }
+            
             // Step 1: Create Document
             $createRes = $driver->createShippingDocument($store, [$payload]);
             
@@ -170,6 +194,9 @@ class MarketplaceLogisticsController extends Controller
                 if (str_starts_with($content, '%PDF')) {
                     $overlayService = new \App\Services\ShippingLabelOverlayService();
                     $content = $overlayService->overlayPdfContent($content);
+
+                    // Simpan ke Cache Lokal dengan kompresi GZIP Level 9
+                    $disk->put($cachePath, gzencode($content, 9));
 
                     return response($content, 200, [
                         'Content-Type' => 'application/pdf',

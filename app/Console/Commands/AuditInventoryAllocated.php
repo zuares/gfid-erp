@@ -42,25 +42,34 @@ class AuditInventoryAllocated extends Command
 
         // 1. Phantom Stock & 2. Mismatch Stock
         $this->info("1 & 2. Cek Mismatch Allocated Qty & Phantom Stock...");
-        $mismatches = \Illuminate\Support\Facades\DB::table('inventory_stocks as i')
-            ->leftJoin('shipment_lines as sl', 'sl.item_id', '=', 'i.item_id')
-            ->leftJoin('shipments as s', function($join) {
-                $join->on('s.id', '=', 'sl.shipment_id')
-                     ->whereIn('s.status', ['draft', 'submitted']);
-            })
-            ->select('i.item_id', 'i.allocated_qty as stock_allocated', \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(sl.allocated_qty), 0) as lines_allocated'))
-            ->groupBy('i.item_id', 'i.allocated_qty')
-            ->havingRaw('stock_allocated != lines_allocated')
-            ->get();
+        
+        $stockTotals = \Illuminate\Support\Facades\DB::table('inventory_stocks')
+            ->select('item_id', \Illuminate\Support\Facades\DB::raw('SUM(allocated_qty) as stock_allocated'))
+            ->groupBy('item_id')
+            ->pluck('stock_allocated', 'item_id');
 
-        foreach ($mismatches as $row) {
-            $category = $row->lines_allocated == 0 ? 'phantom_stock' : 'mismatch_stock';
-            $title = $row->lines_allocated == 0 ? "Stok Alokasi Menggantung" : "Selisih Stok Alokasi";
-            $msg = "Item {$row->item_id} memiliki inventory allocated_qty ({$row->stock_allocated}) berbeda dengan total di shipment ({$row->lines_allocated}).";
-            $recordFinding($category, 'high', $title, $msg, $row->item_id, null, null, [
-                'stock_allocated' => $row->stock_allocated,
-                'lines_allocated' => $row->lines_allocated,
-            ]);
+        $lineTotals = \Illuminate\Support\Facades\DB::table('shipment_lines as sl')
+            ->join('shipments as s', 's.id', '=', 'sl.shipment_id')
+            ->whereIn('s.status', ['draft', 'submitted'])
+            ->select('sl.item_id', \Illuminate\Support\Facades\DB::raw('SUM(sl.allocated_qty) as lines_allocated'))
+            ->groupBy('sl.item_id')
+            ->pluck('lines_allocated', 'item_id');
+
+        $allItemIds = collect($stockTotals->keys())->merge($lineTotals->keys())->unique();
+
+        foreach ($allItemIds as $itemId) {
+            $stockAlloc = (int) ($stockTotals[$itemId] ?? 0);
+            $linesAlloc = (int) ($lineTotals[$itemId] ?? 0);
+
+            if ($stockAlloc !== $linesAlloc) {
+                $category = $linesAlloc === 0 ? 'phantom_stock' : 'mismatch_stock';
+                $title = $linesAlloc === 0 ? "Stok Alokasi Menggantung" : "Selisih Stok Alokasi";
+                $msg = "Item {$itemId} memiliki inventory allocated_qty ({$stockAlloc}) berbeda dengan total di shipment ({$linesAlloc}).";
+                $recordFinding($category, 'high', $title, $msg, $itemId, null, null, [
+                    'stock_allocated' => $stockAlloc,
+                    'lines_allocated' => $linesAlloc,
+                ]);
+            }
         }
 
         // 3. Stale Drafts

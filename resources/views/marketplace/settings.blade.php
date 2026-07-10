@@ -304,6 +304,7 @@
         <button type="button" class="ms-tab-btn active" onclick="showSec('cetak', this)"><i class="fas fa-print me-2"></i>Cetak & Logistik</button>
         <button type="button" class="ms-tab-btn" onclick="showSec('sync', this)"><i class="fas fa-sync-alt me-2"></i>Sinkronisasi</button>
         <button type="button" class="ms-tab-btn" onclick="showSec('fulfillment', this)"><i class="fas fa-box me-2"></i>Fulfillment</button>
+        <a href="{{ route('marketplace.cache-monitor') }}" class="ms-tab-btn" style="text-decoration:none; color:inherit; display:flex; align-items:center; justify-content:center;"><i class="fas fa-hdd me-2"></i>Storage Cache</a>
     </div>
 
     <div class="ms-main">
@@ -329,6 +330,13 @@
                     <div class="ms-side-desc">Gudang & pemrosesan</div>
                 </div>
             </button>
+            <a href="{{ route('marketplace.cache-monitor') }}" class="ms-side-item" style="text-decoration:none; color:inherit;">
+                <div class="ms-side-ic"><i class="fas fa-hdd text-info"></i></div>
+                <div>
+                    <div class="ms-side-label">Storage Cache</div>
+                    <div class="ms-side-desc">Pemantauan kapasitas resi</div>
+                </div>
+            </a>
         </div>
         
         <div class="ms-content">
