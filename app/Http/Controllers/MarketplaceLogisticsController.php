@@ -72,6 +72,59 @@ class MarketplaceLogisticsController extends Controller
     }
 
     /**
+     * Get booking details (usually for Instant/Sameday delivery to check driver)
+     */
+    public function getBookingDetail(Store $store, string $orderSn): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getBookingDetail')) {
+                $result = $this->ensureSuccess($driver->getBookingDetail($store, $orderSn));
+                return response()->json($result);
+            }
+            return response()->json(['error' => 'Not supported on this channel'], 400);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
+     * Get raw order detail directly from channel API (for debugging/exploring)
+     */
+    public function getOrderDetailRaw(Store $store, string $orderSn): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getOrderDetail')) {
+                $result = $this->ensureSuccess($driver->getOrderDetail($store, [$orderSn]));
+                return response()->json($result);
+            }
+            return response()->json(['error' => 'Not supported on this channel'], 400);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
+     * Get booking list from channel API (for debugging/exploring)
+     */
+    public function getBookingList(Store $store, Request $request): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getBookingList')) {
+                $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
+                $timeTo = $request->input('time_to', time());
+                $result = $this->ensureSuccess($driver->getBookingList($store, (int)$timeFrom, (int)$timeTo));
+                return response()->json($result);
+            }
+            return response()->json(['error' => 'Not supported on this channel'], 400);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
      * Arrange shipment (Atur Pengiriman)
      */
     public function arrangeShipment(Request $request, Store $store, string $orderSn): JsonResponse

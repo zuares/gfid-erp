@@ -256,7 +256,27 @@ class ShopeeChannel implements MarketplaceChannel
 
     public function getShippingParameter(Store $store, string $orderSn): array
     {
-        return $this->get($store, '/api/v2/logistics/get_shipping_parameter', ['order_sn' => $orderSn]);
+        return $this->doGet($store, '/api/v2/logistics/get_shipping_parameter', [
+            'order_sn' => $orderSn
+        ]);
+    }
+
+    public function getBookingDetail(Store $store, string $orderSn): array
+    {
+        return $this->doGet($store, '/api/v2/order/get_booking_detail', [
+            'order_sn' => $orderSn
+        ]);
+    }
+
+    public function getBookingList(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = ''): array
+    {
+        return $this->doGet($store, '/api/v2/order/get_booking_list', [
+            'time_range_field' => 'create_time',
+            'time_from' => $timeFrom,
+            'time_to' => $timeTo,
+            'page_size' => $pageSize,
+            'cursor' => $cursor
+        ]);
     }
 
     public function shipOrder(Store $store, string $orderSn, array $params = []): array

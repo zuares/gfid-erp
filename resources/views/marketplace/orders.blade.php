@@ -548,6 +548,10 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
                 </div>
             </div>
 
+            <button class="hdr-btn" onclick="checkBookingListFromOrders()">
+                👁 Test API Booking List
+            </button>
+
             {{-- Date filter --}}
             <div style="position:relative">
                 <button class="hdr-btn" id="btnDate" onclick="toggleDropdown('ddDate', event)">
@@ -1934,6 +1938,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 logisticsBtn = `<button class="btn-review" style="background:#f1f5f9;color:#475569;border-color:#e2e8f0"
                     onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
             }
+            if (isKilat && (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED')) {
+                logisticsBtn += `<button class="btn-review mt-1" style="background:#fffbeb;color:#b45309;border-color:#fde68a"
+                    onclick="checkBookingDriver(${o.store_id}, '${o.channel_order_id}')">🔍 Cek Driver / Booking</button>`;
+            }
+            logisticsBtn += `<button class="btn-review mt-1" style="background:#f3f4f6;color:#374151;border-color:#d1d5db"
+                    onclick="checkOrderDetailRaw(${o.store_id}, '${o.channel_order_id}')">👁 Cek Detail API</button>`;
 
             if (isFulfilled) {
                 actionBtn = `<div class="btn-review" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0;cursor:default">✓ Selesai</div>`;
@@ -2355,7 +2365,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
         try {
             const stores = await api('/api/marketplace/stores');
-            const active = stores.filter(s => !s.token_expires_at || new Date(s.token_expires_at) > new Date());
+            const active = stores.filter(s => s.connection_status === 'CONNECTED');
             if (!active.length) {
                 showQsAlert('warning', 'Tidak ada toko aktif yang terhubung.');
                 btn.disabled = false; btn.textContent = '↓ Sync Sekarang'; return;
@@ -3058,6 +3068,70 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (e && e.target !== $('ordReviewBg')) return;
         $('ordReviewBg').classList.remove('open');
         document.body.style.overflow = '';
+    };
+
+    window.checkBookingDriver = async function(storeId, orderSn) {
+        try {
+            Swal.fire({
+                title: 'Loading...',
+                text: 'Mengecek data driver ke Shopee...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            const res = await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/booking-detail`);
+            Swal.fire({
+                title: 'Data Booking/Driver',
+                html: `<pre style="text-align:left; font-size:12px; background:#f8f9fa; padding:10px; border-radius:5px; max-height:400px; overflow:auto;">${JSON.stringify(res, null, 2)}</pre>`,
+                width: '600px',
+                confirmButtonText: 'Tutup'
+            });
+        } catch (e) {
+            Swal.fire('Error', e.message || 'Gagal mengecek data driver.', 'error');
+        }
+    };
+
+    window.checkOrderDetailRaw = async function(storeId, orderSn) {
+        try {
+            Swal.fire({
+                title: 'Loading...',
+                text: 'Mengambil API get_order_detail...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            const res = await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/raw-detail`);
+            Swal.fire({
+                title: 'Raw API: get_order_detail',
+                html: `<pre style="text-align:left; font-size:12px; background:#1e293b; color:#e2e8f0; padding:10px; border-radius:5px; max-height:450px; overflow:auto;">${JSON.stringify(res, null, 2)}</pre>`,
+                width: '650px',
+                confirmButtonText: 'Tutup'
+            });
+        } catch (e) {
+            Swal.fire('Error', e.message || 'Gagal mengambil detail order.', 'error');
+        }
+    };
+
+    window.checkBookingListFromOrders = async function() {
+        if (!activeStoreFilter) {
+            Swal.fire('Info', 'Silakan filter/pilih salah satu Toko terlebih dahulu di sebelah kiri untuk melihat Booking List-nya.', 'info');
+            return;
+        }
+        try {
+            Swal.fire({
+                title: 'Loading...',
+                text: 'Mengecek API get_booking_list (3 hari terakhir)...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            const res = await api(`/api/marketplace/stores/${activeStoreFilter}/booking-list`);
+            Swal.fire({
+                title: 'Raw API: get_booking_list',
+                html: `<pre style="text-align:left; font-size:12px; background:#1e293b; color:#e2e8f0; padding:10px; border-radius:5px; max-height:450px; overflow:auto;">${JSON.stringify(res, null, 2)}</pre>`,
+                width: '650px',
+                confirmButtonText: 'Tutup'
+            });
+        } catch (e) {
+            Swal.fire('Error', e.message || 'Gagal mengambil booking list.', 'error');
+        }
     };
 
     // ── Re-render on resize ───────────────────────────────────────────────

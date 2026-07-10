@@ -19,6 +19,10 @@ class ShopeeStoreAuthController extends Controller
             return response('SHOPEE_PARTNER_ID dan SHOPEE_PARTNER_KEY belum diisi di .env', 422);
         }
 
+        if (request()->has('store_id')) {
+            session(['shopee_connect_store_id' => request('store_id')]);
+        }
+
         $redirectUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/') . '/marketplace/shopee/callback';
 
         $path = '/api/v2/shop/auth_partner';
@@ -84,26 +88,36 @@ class ShopeeStoreAuthController extends Controller
             'base_url' => $baseUrl,
         ];
 
+        $storeId = session()->pull('shopee_connect_store_id');
+        $store = null;
+        if ($storeId) {
+            $store = Store::find($storeId);
+        }
+
         try {
-            Store::updateOrCreate(
-                [
-                    'code' => 'shopee_' . $shopId,
-                ],
-                [
+            if ($store) {
+                $store->update([
                     'channel_id' => $channel->id,
                     'external_shop_id' => (string) $shopId,
-                    'name' => 'Shopee Store ' . $shopId,
-                    'region' => 'ID',
+                    'credentials' => $credentials,
                     'status' => 'active',
                     'is_active' => true,
-                    'credentials' => $credentials,
-                    'token_expires_at' => now()->addSeconds((int) ($token['expire_in'] ?? 0)),
-                    'meta' => [
-                        'auth_source' => 'shopee_oauth',
-                        'raw_token_response' => $token,
-                    ],
-                ]
-            );
+                    'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
+                ]);
+            } else {
+                $store = Store::updateOrCreate(
+                    ['code' => 'shopee_' . $shopId],
+                    [
+                        'name' => 'Shopee ' . $shopId,
+                        'channel_id' => $channel->id,
+                        'external_shop_id' => (string) $shopId,
+                        'credentials' => $credentials,
+                        'status' => 'active',
+                        'is_active' => true,
+                        'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
+                    ]
+                );
+            }
         } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
             // Jika APP_KEY berubah dan tidak bisa mendeskripsi token lama yang ada di database
             return redirect('/marketplace/toko')->with('error', 'Gagal menghubungkan toko Shopee. Data enkripsi lama tidak valid karena perubahan APP_KEY. Silakan hapus data toko lama Anda dan coba hubungkan kembali.');

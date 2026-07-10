@@ -269,14 +269,15 @@
                     ${s.connection_status === 'CONNECTED' 
                         ? `<button class="btn btn-dark" onclick="openSync(${s.id},'${esc(s.name)}')">↓ Sync Order</button>`
                         : (s.connection_status === 'NOT_CONNECTED' 
-                            ? `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect" class="btn btn-primary">Hubungkan ${s.channel ? s.channel.name : 'Toko'}</a>` 
-                            : `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect" class="btn btn-danger">Login Ulang ${s.channel ? s.channel.name : 'Toko'}</a>`)
+                            ? `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect?store_id=${s.id}" class="btn btn-primary">Hubungkan ${s.channel ? s.channel.name : 'Toko'}</a>` 
+                            : `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect?store_id=${s.id}" class="btn btn-danger">Login Ulang ${s.channel ? s.channel.name : 'Toko'}</a>`)
                     }
                     <a href="/marketplace/orders" class="btn btn-light border">📋 Lihat Order</a>
                     ${issues > 0
                         ? `<a href="/marketplace/issues?store_id=${s.id}" class="btn btn-warning" style="font-weight:700">⚠ Perbaiki Data (${issues})</a>`
                         : `<a href="/marketplace/issues?store_id=${s.id}" class="btn btn-light border">🔍 Cek Data</a>`}
                     <a href="/marketplace/fulfillment" class="btn btn-light border">📦 Fulfillment</a>
+                    <button class="btn btn-light border" onclick="checkBookingList(${s.id})">👁 Test API Booking List</button>
                 </div>
             </div>`;
         }).join('')}</div>`;
@@ -463,6 +464,16 @@
         new bootstrap.Modal($('infoModal')).show();
         try {
             const d = await api('/api/marketplace/stores/' + id + '/shop-info');
+            $('infoOutput').textContent = JSON.stringify(d, null, 2);
+        } catch (e) { $('infoOutput').textContent = 'Error: ' + e.message; }
+    };
+
+    window.checkBookingList = async function (id) {
+        $('infoModalTitle').textContent = 'Booking List (Shopee API)';
+        $('infoOutput').textContent = 'Memuat… (Mengecek 3 hari terakhir)';
+        new bootstrap.Modal($('infoModal')).show();
+        try {
+            const d = await api('/api/marketplace/stores/' + id + '/booking-list');
             $('infoOutput').textContent = JSON.stringify(d, null, 2);
         } catch (e) { $('infoOutput').textContent = 'Error: ' + e.message; }
     };
