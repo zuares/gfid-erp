@@ -564,6 +564,9 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             <button class="hdr-btn" onclick="loadOrders()" title="Refresh">🔃</button>
 
             @if(auth()->user()?->role === 'owner')
+                        @if(app()->environment(['local', 'testing']))
+            <button class="hdr-btn" style="background:#fff3cd;color:#856404;border-color:#ffeeba" onclick="window.location.search = '?dummy=1'">🧪 Test Dummy</button>
+            @endif
             <button class="hdr-btn" id="btnDevPanel" style="background:#faf5ff;color:#7c3aed;border-color:#ddd6fe" onclick="toggleDevPanel()">🛠 Dev</button>
             @endif
         </div>
@@ -613,6 +616,9 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         </button>
         <button class="ord-tab" data-tab="processed" onclick="switchTab('processed',this)">
             Sedang Dikemas <span class="ord-badge" id="badge-processed" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
+        </button>
+        <button class="ord-tab" data-tab="processed_instant" onclick="switchTab('processed_instant',this)">
+            ⚡ Instan <span class="ord-badge" id="badge-processed_instant" style="background:#fef08a;color:#854d0e;border-color:#fde047">—</span>
         </button>
         <button class="ord-tab" data-tab="ready_to_handover" onclick="switchTab('ready_to_handover',this)">
             Siap Kirim <span class="ord-badge" id="badge-ready_to_handover" style="background:#e0e7ff;color:#4f46e5;border-color:#c7d2fe">—</span>
@@ -1505,7 +1511,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
     // ── Badges ────────────────────────────────────────────────────────────
     function renderBadges() {
         const rows = applyFilters(orders.filter(inRange));
-        ['all', 'unpaid', 'ready', 'processed', 'ready_to_handover', 'shipped', 'completed', 'cancelled', 'issues'].forEach(tab => {
+        ['all', 'unpaid', 'ready', 'processed', 'processed_instant', 'ready_to_handover', 'shipped', 'completed', 'cancelled', 'issues'].forEach(tab => {
             const el = $('badge-' + tab);
             if (!el) return;
             const count = tab === 'all' ? rows.length : filterByTab(rows, tab).length;
@@ -1631,9 +1637,24 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             );
         }
 
-        if (['ready', 'processed'].includes(tab)) {
-            const statuses = TAB_STATUSES[tab];
-            return rows.filter(o => statuses.includes(o.order_status) && !isPacked(o));
+        if (['ready', 'processed', 'processed_instant'].includes(tab)) {
+            const isKilat = o => {
+                const carrier = (o.shipping_carrier || '').toLowerCase();
+                return carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
+            };
+
+            return rows.filter(o => {
+                if (isPacked(o)) return false;
+                
+                if (tab === 'ready') {
+                    return o.order_status === 'READY_TO_SHIP' && !isKilat(o);
+                } else if (tab === 'processed') {
+                    return o.order_status === 'PROCESSED' && !isKilat(o);
+                } else if (tab === 'processed_instant') {
+                    return ['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isKilat(o);
+                }
+                return false;
+            });
         }
 
         const statuses = TAB_STATUSES[tab];
@@ -1673,7 +1694,10 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             const items  = o.items || [];
             const urgent = ACTIVE_ORDER_STATUSES.includes(o.order_status);
             const isFulfilled = fulfilledOrderIds.has(o.id);
-            const isPrinted   = printedOrderIds.has(o.id);
+            let printCount = o.print_count || 0;
+            if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
+            const isPrinted  = printCount > 0;
+            const cetakTeks  = printCount > 1 ? `Sudah Cetak (ke-${printCount})` : 'Sudah Cetak';
             const isInPacking = fulfillmentStatusMap.has(o.id) && !fulfilledOrderIds.has(o.id);
             const rowClass = isFulfilled ? 'row-fulfilled' : (isInPacking ? 'row-packing' : (urgent ? 'row-urgent' : ''));
 
@@ -1772,11 +1796,14 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
     }
 
     function renderProcessCardList(rows, tabName = 'ready') {
-        const isProcessed = tabName === 'processed' || tabName === 'ready_to_handover';
+        const isProcessed = tabName === 'processed' || tabName === 'processed_instant' || tabName === 'ready_to_handover';
         const pkRows = rows.map(o => {
             const items       = o.items || [];
             const isFulfilled = fulfilledOrderIds.has(o.id);
-            const isPrinted   = printedOrderIds.has(o.id);
+            let printCount = o.print_count || 0;
+            if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
+            const isPrinted  = printCount > 0;
+            const cetakTeks  = printCount > 1 ? `Sudah Cetak (ke-${printCount})` : 'Sudah Cetak';
             const isInPacking = fulfillmentStatusMap.has(o.id) && !isFulfilled;
             const fStatus     = fulfillmentStatusMap.get(o.id)?.status || '';
             const store       = [o.store?.name, o.store?.channel?.name].filter(Boolean).join(' · ');
@@ -1951,7 +1978,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
                             ${kilatBadge}
                             ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                             ${logBadge}
-                            ${isPrinted && !isFulfilled ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0369a1; border-radius:4px; padding:1px 6px; font-weight:700; border:1px solid #7dd3fc;">🖨 Sudah Cetak</span>` : ''}
+                            ${isPrinted && !isFulfilled ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0369a1; border-radius:4px; padding:1px 6px; font-weight:700; border:1px solid #7dd3fc;">🖨 ${cetakTeks}</span>` : ''}
                             ${fBadgeHtml}
                             ${dataIssue}
                         </div>
@@ -2016,8 +2043,11 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
                 : fStatus === 'picking' ? '🔄 Picking'
                 : fStatus === 'pending_review' ? '⏳ Review' : '';
 
-            const isPrinted = printedOrderIds.has(o.id);
-            const printBtn = `<button class="btn-review" style="background:${isPrinted ? '#e0f2fe' : '#f1f5f9'};color:${isPrinted ? '#0369a1' : '#475569'};border-color:${isPrinted ? '#7dd3fc' : '#e2e8f0'}" onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 ${isPrinted ? 'Sudah Cetak' : 'Cetak'}</button>`;
+            let printCount = o.print_count || 0;
+            if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
+            const isPrinted  = printCount > 0;
+            const cetakTeks  = printCount > 1 ? `Sudah Cetak (ke-${printCount})` : 'Sudah Cetak';
+            const printBtn = `<button class="btn-review" style="background:${isPrinted ? '#e0f2fe' : '#f1f5f9'};color:${isPrinted ? '#0369a1' : '#475569'};border-color:${isPrinted ? '#7dd3fc' : '#e2e8f0'}" onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 ${isPrinted ? cetakTeks : 'Cetak'}</button>`;
 
             return `<div class="pk-row ${isPrinted ? 'row-printed' : ''}">
                 <div class="pk-row-left">
@@ -2160,7 +2190,10 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             }
 
             const isFulfilled = fulfilledOrderIds.has(o.id);
-            const isPrinted   = printedOrderIds.has(o.id);
+            let printCount = o.print_count || 0;
+            if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
+            const isPrinted  = printCount > 0;
+            const cetakTeks  = printCount > 1 ? `Sudah Cetak (ke-${printCount})` : 'Sudah Cetak';
             const isInPacking = fulfillmentStatusMap.has(o.id) && !fulfilledOrderIds.has(o.id);
             const rowClass    = isFulfilled ? 'row-fulfilled' : (isInPacking ? 'row-packing' : (urgent ? 'row-urgent' : ''));
             const carrier     = (o.shipping_carrier || '').toLowerCase();
@@ -2177,7 +2210,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             }
 
             const printedBadge = (isPrinted && !isFulfilled && !['processed', 'shipped'].includes(activeTab))
-                ? `<span style="font-size:.65rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:600">🖨 Sudah Cetak</span>`
+                ? `<span style="font-size:.65rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:600">🖨 ${cetakTeks}</span>`
                 : '';
 
             const fBadge = urgent ? fulfillmentBadge(o) : '';
@@ -2319,7 +2352,45 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
                     });
                     totalNew    += d.new || d.synced || 0;
                     totalIssues += (d.sku_empty||0) + (d.mapping_not_found||0) + (d.missing_hpp||0);
-                } catch (e) { /* lanjut */ }
+                } catch (e) {
+                    if (e.data && e.data.action && e.data.action.type === 'redirect') {
+                        // Tutup modal quick sync jika terbuka
+                        const qsModalEl = document.getElementById('quickSyncModal');
+                        if (qsModalEl) {
+                            const qsModal = bootstrap.Modal.getInstance(qsModalEl);
+                            if (qsModal) qsModal.hide();
+                        }
+                        
+                        if (window.Swal) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: e.data.code === 'STORE_NOT_CONNECTED' ? 'Toko Belum Terhubung' : 'Koneksi Bermasalah',
+                                html: e.data.message + '<br><br>Silakan ' + (e.data.code === 'STORE_NOT_CONNECTED' ? 'hubungkan toko' : 'login ulang') + ' agar pesanan dapat disinkronkan.',
+                                showCancelButton: true,
+                                confirmButtonText: e.data.action.label,
+                                cancelButtonText: 'Nanti',
+                                confirmButtonColor: '#1e293b'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    window.location.href = e.data.action.url;
+                                }
+                            });
+                        } else {
+                            if (confirm(e.data.message + "\n\nBuka halaman login sekarang?")) {
+                                window.location.href = e.data.action.url;
+                            }
+                        }
+                        
+                        // Stop the entire sync loop if we need auth
+                        $('qsProgress').style.display = 'none';
+                        $('qsRunBtn').textContent = '↓ Sync Sekarang';
+                        $('qsRunBtn').disabled = false;
+                        return; 
+                    } else {
+                        showQsAlert('danger', `Gagal sync toko ${s.name}: ${e.message}`);
+                        await new Promise(r => setTimeout(r, 2000)); // Beri waktu user membaca pesan
+                    }
+                }
             }
             $('qsProgressBar').style.width = '100%';
             $('qsProgress').style.display = 'none';
@@ -2503,43 +2574,82 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         // Buka langsung agar tidak diblokir popup blocker
         window.open(url, '_blank');
         
-        printedDocOrderSns.add(orderSn);
-        
-        setTimeout(() => {
+        // Jangan langsung update UI. Tunggu 5 detik lalu ambil data asli dari server
+        // untuk memastikan resi benar-benar berhasil diproses.
+        setTimeout(async () => {
             const el = document.getElementById('printAlert');
             if (el) el.remove();
-            renderTable();
-        }, 2000);
+            
+            try {
+                const newOrders = await api('/api/marketplace/local-orders');
+                orders = newOrders;
+                fulfillmentStatusMap.clear();
+                orders.forEach(o => {
+                    if (o.fulfillment_status) {
+                        fulfillmentStatusMap.set(o.id, { id: o.fulfillment_id, status: o.fulfillment_status });
+                        if (o.fulfillment_status === 'confirmed') fulfilledOrderIds.add(o.id);
+                    }
+                });
+                render();
+            } catch(e) {}
+        }, 5000);
     };
     window.printAllDocuments = function() {
         const rows = getPackingRows();
         if (!rows.length) { alert('Tidak ada order yang sedang dikemas.'); return; }
         
-        const unprintedRows = rows.filter(o => !printedDocOrderSns.has(o.channel_order_id));
+        const unprintedRows = rows.filter(o => {
+            let printCount = o.print_count || 0;
+            if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
+            return printCount === 0 && !printedDocOrderSns.has(o.channel_order_id);
+        });
         const total = rows.length;
         const unprinted = unprintedRows.length;
+        const printed = total - unprinted;
 
         const modalHtml = `
-            <div id="printOptsModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;">
-                <div style="background:white;padding:24px;border-radius:12px;width:320px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);">
-                    <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;color:#1e293b;">🖨️ Cetak Resi Massal</h3>
-                    <p style="font-size:0.85rem;color:#64748b;margin-bottom:20px;">Terdapat <strong>${total}</strong> total order.<br><strong>${unprinted}</strong> di antaranya belum dicetak resi.</p>
+            <div id="printOptsModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);">
+                <div style="background:white;padding:28px;border-radius:16px;width:340px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);font-family:sans-serif;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🖨️</div>
+                        <h3 style="margin:0;font-size:1.2rem;color:#0f172a;font-weight:700;">Cetak Resi Massal</h3>
+                    </div>
                     
-                    <div style="margin-bottom:16px;">
-                        <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;cursor:pointer;">
-                            <input type="checkbox" id="chkPrintGreeting" checked style="width:16px;height:16px;">
+                    <p style="font-size:0.875rem;color:#64748b;margin-bottom:16px;line-height:1.5;">Anda akan mencetak dokumen resi lintas toko secara otomatis. Berikut rincian pesanan yang sedang dikemas:</p>
+                    
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:20px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.875rem;">
+                            <span style="color:#64748b;">Total Order (Semua Toko)</span>
+                            <span style="font-weight:700;color:#0f172a;">${total}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.875rem;">
+                            <span style="color:#64748b;">Sudah Pernah Dicetak</span>
+                            <span style="font-weight:700;color:#0284c7;">${printed}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.875rem;padding-top:8px;border-top:1px dashed #cbd5e1;">
+                            <span style="font-weight:700;color:#0f172a;">Belum Dicetak</span>
+                            <span style="font-weight:700;color:#dc2626;background:#fef2f2;padding:2px 8px;border-radius:999px;">${unprinted}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom:24px;background:#f0fdf4;padding:10px 12px;border-radius:8px;border:1px solid #bbf7d0;display:none;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:0.875rem;cursor:pointer;color:#166534;font-weight:600;margin:0;">
+                            <input type="checkbox" id="chkPrintGreeting" checked style="width:16px;height:16px;accent-color:#16a34a;cursor:pointer;">
                             Sertakan Kartu Ucapan
                         </label>
                     </div>
 
                     <div style="display:flex;flex-direction:column;gap:10px;">
-                        <button onclick="executePrintBulk(true)" class="btn-toolbar primary" style="width:100%;justify-content:center;background:#059669;border-color:#059669;color:white;cursor:${unprinted === 0 ? 'not-allowed' : 'pointer'};opacity:${unprinted === 0 ? '0.5' : '1'};" ${unprinted === 0 ? 'disabled' : ''}>
-                            Cetak yang Belum (${unprinted})
+                        <button onclick="executePrintBulk('unprinted_only')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:none;background:${unprinted === 0 ? '#e2e8f0' : '#10b981'};color:${unprinted === 0 ? '#94a3b8' : 'white'};cursor:${unprinted === 0 ? 'not-allowed' : 'pointer'};box-shadow:${unprinted === 0 ? 'none' : '0 2px 4px rgba(16,185,129,0.2)'};" ${unprinted === 0 ? 'disabled' : ''}>
+                            Cetak Resi Belum Pernah Dicetak (${unprinted})
                         </button>
-                        <button onclick="executePrintBulk(false)" class="btn-toolbar" style="width:100%;justify-content:center;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;cursor:pointer;">
-                            Cetak Semua (${total})
+                        <button onclick="executePrintBulk('selected')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;cursor:pointer;">
+                            Cetak Resi Terpilih (${total})
                         </button>
-                        <button onclick="document.getElementById('printOptsModal').remove()" class="btn-toolbar" style="width:100%;justify-content:center;background:transparent;border:none;color:#94a3b8;box-shadow:none;cursor:pointer;">
+                        <button onclick="executePrintBulk('reprint')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;cursor:pointer;">
+                            Cetak Ulang Resi Terpilih (Reprint)
+                        </button>
+                        <button onclick="document.getElementById('printOptsModal').remove()" style="width:100%;padding:10px;border-radius:8px;font-weight:500;font-size:0.9rem;border:none;background:transparent;color:#64748b;cursor:pointer;margin-top:8px;">
                             Batal
                         </button>
                     </div>
@@ -2548,8 +2658,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     };
-
-    window.executePrintBulk = function(onlyUnprinted) {
+    window.executePrintBulk = async function(mode) {
         let printGreeting = true;
         const chk = document.getElementById('chkPrintGreeting');
         if (chk) printGreeting = chk.checked;
@@ -2558,48 +2667,136 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         if (modal) modal.remove();
 
         let rows = getPackingRows();
-        if (onlyUnprinted) {
-            rows = rows.filter(o => !printedDocOrderSns.has(o.channel_order_id));
+        if (mode === 'unprinted_only') {
+            rows = rows.filter(o => {
+                let printCount = o.print_count || 0;
+                if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
+                return printCount === 0 && !printedDocOrderSns.has(o.channel_order_id);
+            });
+        } else if (mode === 'selected') {
+            // Check if any selected already printed
+            const alreadyPrinted = rows.filter(o => (o.print_count || 0) > 0 || printedOrderIds.has(o.id));
+            if (alreadyPrinted.length > 0) {
+                if (!confirm(`Ada ${alreadyPrinted.length} order yang terpilih sudah pernah dicetak resinya. Tetap lanjutkan?`)) return;
+            }
         }
 
         if (!rows.length) { alert('Tidak ada order untuk dicetak.'); return; }
         
-        // Kelompokkan orderSn berdasarkan store_id + shipping_carrier (logistics channel)
-        // Shopee menolak bulk print jika channel/ekspedisi berbeda-beda dalam 1 request
-        const groupedData = {};
-        rows.forEach(o => {
-            const carrier = o.shipping_carrier || 'default';
-            const key = `${o.store_id}_${carrier}`;
-            if (!groupedData[key]) groupedData[key] = { storeId: o.store_id, carrier: carrier, sns: [] };
-            groupedData[key].sns.push(o.channel_order_id);
-        });
-        
-        const alertHtml = `<div id="printBulkAlert" style="position:fixed;top:20px;right:20px;background:#f59e0b;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi massal dari Marketplace...</div>`;
+        const payloadOrders = rows.map((o, idx) => ({
+            store_id: o.store_id,
+            channel_order_id: o.channel_order_id,
+            position: idx
+        }));
+
+        const alertHtml = `<div id="printBulkAlert" style="position:fixed;top:20px;right:20px;background:#f59e0b;color:white;padding:15px 25px;border-radius:8px;z-index:99999;box-shadow:0 4px 6px rgba(0,0,0,0.1);font-family:sans-serif;font-weight:bold;">⏳ Meminta dokumen resi dari Server... Mohon tunggu...</div>`;
         document.body.insertAdjacentHTML('beforeend', alertHtml);
-
-        Object.values(groupedData).forEach(group => {
-            const storeId = group.storeId;
-            const allSns = group.sns;
+        
+        try {
+                        let printUrl = '/documents/bulk-print';
+            let printPayload = { orders: payloadOrders, mode: mode };
             
-            // Shopee limit 50 order per bulk request
-            for (let i = 0; i < allSns.length; i += 50) {
-                const chunk = allSns.slice(i, i + 50);
-                const orderSns = chunk.join(',');
-                const cardParam = printGreeting ? '1' : '0';
-                const url = `/api/marketplace/stores/${storeId}/documents/bulk?orders=${orderSns}&card=${cardParam}`;
-                window.open(url, '_blank');
+            if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) {
+                printUrl = '/dev/dummy/bulk-print';
+                const scenario = document.getElementById('dummyScenarioSelect')?.value;
+                if (scenario) {
+                    printPayload.scenario = scenario;
+                }
             }
-        });
 
-        rows.forEach(o => printedDocOrderSns.add(o.channel_order_id));
-
-        setTimeout(() => {
+            const res = await fetch(printUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(printPayload)
+            });
+            
+            const data = await res.json();
+            
             const el = document.getElementById('printBulkAlert');
             if (el) el.remove();
-            renderTable();
-        }, 2000);
-    };
 
+            if (!res.ok) {
+                if (data.success_count === 0 && data.failed_orders && data.failed_orders.length > 0) {
+                    showFailedPrintModal(data);
+                } else {
+                    alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+                }
+                return;
+            }
+            
+            showFailedPrintModal(data);
+            
+            setTimeout(async () => {
+                try {
+                    const newOrders = await api('/api/marketplace/local-orders');
+                    orders = newOrders;
+                    fulfillmentStatusMap.clear();
+                    orders.forEach(o => {
+                        if (o.fulfillment_status) {
+                            fulfillmentStatusMap.set(o.id, { id: o.fulfillment_id, status: o.fulfillment_status });
+                            if (o.fulfillment_status === 'confirmed') fulfilledOrderIds.add(o.id);
+                        }
+                    });
+                    render();
+                } catch(e) {}
+            }, 3000);
+            
+        } catch (err) {
+            const el = document.getElementById('printBulkAlert');
+            if (el) el.remove();
+            alert('Terjadi kesalahan jaringan atau server timeout.');
+        }
+    };
+    
+    window.showFailedPrintModal = function(data) {
+        let failedListHtml = '';
+        if (data.failed_orders && data.failed_orders.length > 0) {
+            failedListHtml = `
+            <div style="margin-top:16px;max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+                <table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
+                    <thead style="background:#f1f5f9;position:sticky;top:0;">
+                        <tr><th style="text-align:left;padding:8px;">Store</th><th style="text-align:left;padding:8px;">Order SN</th><th style="text-align:left;padding:8px;">Alasan</th></tr>
+                    </thead>
+                    <tbody>
+                        ${data.failed_orders.map(f => `<tr>
+                            <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">${f.store_name}</td>
+                            <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;">${f.channel_order_id}</td>
+                            <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;color:#ef4444;">${f.reason}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        }
+
+        const modalHtml = `
+            <div id="printResultModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);">
+                <div style="background:white;padding:28px;border-radius:16px;width:500px;max-width:90%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);font-family:sans-serif;">
+                    <h3 style="margin:0 0 16px 0;font-size:1.2rem;color:#0f172a;font-weight:700;">Hasil Bulk Print</h3>
+                    <div style="display:flex;gap:16px;margin-bottom:16px;">
+                        <div style="flex:1;background:#f0fdf4;padding:12px;border-radius:8px;border:1px solid #bbf7d0;text-align:center;">
+                            <div style="font-size:0.8rem;color:#166534;font-weight:bold;text-transform:uppercase;">Berhasil</div>
+                            <div style="font-size:2rem;color:#15803d;font-weight:bold;">${data.success_count || 0}</div>
+                        </div>
+                        <div style="flex:1;background:#fef2f2;padding:12px;border-radius:8px;border:1px solid #fecaca;text-align:center;">
+                            <div style="font-size:0.8rem;color:#991b1b;font-weight:bold;text-transform:uppercase;">Gagal</div>
+                            <div style="font-size:2rem;color:#b91c1c;font-weight:bold;">${data.failed_count || 0}</div>
+                        </div>
+                    </div>
+                    ${failedListHtml}
+                    <div style="display:flex;gap:12px;margin-top:24px;">
+                        ${data.success_count > 0 ? `
+                        <button onclick="window.open('${data.download_url}', '_blank'); document.getElementById('printResultModal').remove();" style="flex:1;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:none;background:#2563eb;color:white;cursor:pointer;box-shadow:0 2px 4px rgba(37,99,235,0.2);">
+                            ⬇️ Unduh PDF Berhasil
+                        </button>` : ''}
+                        <button onclick="document.getElementById('printResultModal').remove()" style="flex:1;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #cbd5e1;background:white;color:#334155;cursor:pointer;">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    };
     window.printAllGreetings = function() {
         const rows = getPackingRows();
         // Cukup ambil storeId dari baris pertama saja untuk memenuhi route Laravel
@@ -2733,6 +2930,23 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
     // ─────────────────────────────────────────────────────────────────────────
 
     loadOrders();
+
+    // Auto-refresh polling every 30 seconds (silent fetch)
+    setInterval(async () => {
+        try {
+            const newOrders = await api('/api/marketplace/local-orders');
+            orders = newOrders;
+            fulfillmentStatusMap.clear();
+            orders.forEach(o => {
+                if (o.fulfillment_status) {
+                    fulfillmentStatusMap.set(o.id, { id: o.fulfillment_id, status: o.fulfillment_status });
+                    if (o.fulfillment_status === 'confirmed') fulfilledOrderIds.add(o.id);
+                }
+            });
+            // Hanya update render tanpa merusak UX loading screen yang sudah ada
+            render();
+        } catch(e) {}
+    }, 30000);
 
     // Re-render on resize (mobile ↔ desktop switch)
     // ── Review Modal (Sedang Proses) ────────────────────────────────────────

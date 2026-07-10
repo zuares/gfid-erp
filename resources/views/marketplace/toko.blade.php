@@ -237,7 +237,12 @@
                         <button class="btn btn-dark btn-save-name" onclick="saveRename(${s.id})">Simpan</button>
                         <button class="btn btn-light border btn-save-name" onclick="cancelRename(${s.id})">✕</button>
                     </span>
-                    <span class="ms-auto">${statusBadge(tokenOk ? 'active' : 'inactive')}</span>
+                    <span class="ms-auto">
+                        ${s.connection_status === 'CONNECTED' ? '<span class="badge bg-success">Terhubung</span>' :
+                          (s.connection_status === 'NOT_CONNECTED' ? '<span class="badge bg-secondary">Belum Terhubung</span>' :
+                          (s.connection_status === 'AUTH_REQUIRED' ? '<span class="badge bg-danger">Koneksi Bermasalah</span>' :
+                          '<span class="badge bg-warning text-dark">Perlu Login Ulang</span>'))}
+                    </span>
                 </div>
                 <div class="store-card-meta">
                     Shop ID: <code>${esc(s.external_shop_id || '—')}</code>
@@ -261,7 +266,12 @@
                     </select>
                 </div>
                 <div class="store-actions">
-                    <button class="btn btn-dark" onclick="openSync(${s.id},'${esc(s.name)}')">↓ Sync Order</button>
+                    ${s.connection_status === 'CONNECTED' 
+                        ? `<button class="btn btn-dark" onclick="openSync(${s.id},'${esc(s.name)}')">↓ Sync Order</button>`
+                        : (s.connection_status === 'NOT_CONNECTED' 
+                            ? `<a href="/marketplace/${s.channel ? s.channel.code : 'shopee'}/connect" class="btn btn-primary">Hubungkan ${s.channel ? s.channel.name : 'Toko'}</a>` 
+                            : `<a href="/marketplace/${s.channel ? s.channel.code : 'shopee'}/connect" class="btn btn-danger">Login Ulang ${s.channel ? s.channel.name : 'Toko'}</a>`)
+                    }
                     <a href="/marketplace/orders" class="btn btn-light border">📋 Lihat Order</a>
                     ${issues > 0
                         ? `<a href="/marketplace/issues?store_id=${s.id}" class="btn btn-warning" style="font-weight:700">⚠ Perbaiki Data (${issues})</a>`

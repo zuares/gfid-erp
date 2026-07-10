@@ -83,9 +83,15 @@ class PurchaseOrderController extends Controller
         }
 
         $summaryQuery = clone $q;
+        
+        $grandTotalQuery = clone $summaryQuery;
+        if ($request->status !== 'cancelled') {
+            $grandTotalQuery->where('status', '!=', 'cancelled');
+        }
+
         $summary = (object) [
             'total_orders' => (clone $summaryQuery)->count(),
-            'total_grand_total' => (clone $summaryQuery)->sum('grand_total'),
+            'total_grand_total' => $grandTotalQuery->sum('grand_total'),
             'draft_count' => (clone $summaryQuery)->where('status', 'draft')->count(),
             'approved_count' => (clone $summaryQuery)->where('status', 'approved')->count(),
             'cancelled_count' => (clone $summaryQuery)->where('status', 'cancelled')->count(),

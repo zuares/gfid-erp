@@ -114,7 +114,10 @@
 @endphp
 
 <div class="sd-topbar">
-    <a href="{{ route('sales.shipments.index') }}" class="sd-btn">Kembali</a>
+        <a href="{{ route('sales.shipments.index') }}" class="sd-btn">Kembali</a>
+    @if(app()->environment(['local', 'testing']))
+    <button class="sd-btn" style="background:#fff3cd;color:#856404;border-color:#ffeeba" onclick="window.location.search = '?dummy=1'">🧪 Test Dummy</button>
+    @endif
     <span class="sd-code">{{ $shipment->code }}</span>
     <span class="sd-pill sd-status {{ $statusKey }}">{{ $statusLabel }}</span>
     <span class="sd-spacer"></span>
@@ -198,7 +201,12 @@
                             <div class="sd-order-lead">
                                 <span class="sd-order-num">{{ $loop->iteration }}</span>
                                 <div>
-                                    <div class="sd-order-no">{{ $scan->order_no }}</div>
+                                    <div class="sd-order-no">
+                                        {{ $scan->order_no }}
+                                        @if($scan->fulfillment && $scan->fulfillment->marketplaceOrder && $scan->fulfillment->marketplaceOrder->store)
+                                            <span style="font-size:0.6rem; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:6px; color:#475569; border:1px solid #e2e8f0; vertical-align:middle;">{{ $scan->fulfillment->marketplaceOrder->store->name }}</span>
+                                        @endif
+                                    </div>
                                     <div class="sd-muted">
                                         {{ $scan->source === 'manual_scan' ? 'Belum tertaut' : $scan->source }}
                                         @if($scan->confirmed_at)

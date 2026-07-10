@@ -1,0 +1,8 @@
+app/Http/Controllers/Sales/ShipmentController.php:508:            // tidak peduli APP_URL (bisa berbeda saat pakai ngrok/expose).
+app/Http/Controllers/TikTokShopAuthController.php:24:        $callbackUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/')
+app/Http/Controllers/ShopeeStoreAuthController.php:22:        $redirectUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/') . '/marketplace/shopee/callback';
+app/Http/Kernel.php:18:        \App\Http\Middleware\TrustProxies::class,
+config/app.php:55:    'url' => env('APP_URL', 'http://localhost'),
+config/mail.php:49:            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+config/session.php:172:    'secure' => env('SESSION_SECURE_COOKIE'),
+config/filesystems.php:44:            'url' => env('APP_URL').'/storage',

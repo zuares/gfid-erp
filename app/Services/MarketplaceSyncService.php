@@ -109,13 +109,26 @@ class MarketplaceSyncService
 
         // 2. Ambil detail order per chunk
         $details = [];
+        $failedChunks = 0;
         foreach (array_chunk($orderSnList, 50) as $chunk) {
-            $detailResponse = $driver->getOrderDetail($store, $chunk);
-            if (! empty($detailResponse['error'])) {
-                $this->log($store, 'sync_orders_detail', 'failed', $detailResponse['message'] ?? $detailResponse['error'], $detailResponse);
-                throw new \RuntimeException('Order ditemukan, tapi gagal ambil detail order.');
+            try {
+                $detailResponse = $driver->getOrderDetail($store, $chunk);
+                if (! empty($detailResponse['error'])) {
+                    $this->log($store, 'sync_orders_detail', 'failed', $detailResponse['message'] ?? $detailResponse['error'], $detailResponse);
+                    \Illuminate\Support\Facades\Log::warning("Gagal ambil detail order chunk: " . ($detailResponse['message'] ?? $detailResponse['error']));
+                    $failedChunks++;
+                    continue;
+                }
+                $details = array_merge($details, data_get($detailResponse, 'response.order_list', []));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Exception ambil detail order chunk: " . $e->getMessage());
+                $failedChunks++;
+                continue;
             }
-            $details = array_merge($details, data_get($detailResponse, 'response.order_list', []));
+        }
+        
+        if (empty($details) && $failedChunks > 0) {
+            throw new \RuntimeException('Gagal mengambil detail dari seluruh order API.');
         }
 
         // 3. Simpan ke DB
@@ -507,9 +520,12 @@ class MarketplaceSyncService
                 
                 // Jika status dari Shopee adalah READY_TO_SHIP, tetapi logistiknya sudah diatur (REQUEST_CREATED dsb),
                 // maka secara logika aplikasi kita (GFID) statusnya adalah PROCESSED
-                if ($orderStatus === 'READY_TO_SHIP' && in_array($logisticsStatus, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP'])) {
-                    $orderStatus = 'PROCESSED';
-                }
+                // [UPDATE]: User meminta agar pesanan instan (atau pesanan yang otomatis ter-arrange)
+                // TETAP dibiarkan sebagai READY_TO_SHIP di GFID agar bisa muncul di tab "Perlu Dikirim"
+                // dan mereka bisa secara manual meng-klik "Atur Pengiriman" (Acknowledge) di UI.
+                // if ($orderStatus === 'READY_TO_SHIP' && in_array($logisticsStatus, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP'])) {
+                //     $orderStatus = 'PROCESSED';
+                // }
 
                 // ── Finansial ─────────────────────────────────────────────────
                 $totalAmount       = (float) ($detail['total_amount'] ?? 0);

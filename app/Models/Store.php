@@ -50,4 +50,18 @@ class Store extends Model
     {
         return data_get($this->credentials ?? [], $key, $default);
     }
+
+    public function getConnectionStatusAttribute(): string
+    {
+        $accessToken = $this->credential('access_token');
+        if (empty($accessToken)) {
+            return 'NOT_CONNECTED';
+        }
+
+        if ($this->token_expires_at && $this->token_expires_at->isPast()) {
+            return 'TOKEN_EXPIRED';
+        }
+
+        return 'CONNECTED';
+    }
 }

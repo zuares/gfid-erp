@@ -49,7 +49,9 @@ class MarketplaceController extends Controller
             'date_from' => $request->query('date_from', $weekAgo),
             'date_to'   => $request->query('date_to', $today),
         ];
-        return view('marketplace.orders', compact('filters'));
+        $isDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
+
+        return view('marketplace.orders', compact('filters', 'isDummy'));
     }
 
     public function fulfillment(): \Illuminate\View\View
@@ -478,6 +480,7 @@ class MarketplaceController extends Controller
             'external_shop_id'     => $store->external_shop_id,
             'region'               => $store->region,
             'status'               => $store->status,
+            'connection_status'    => $store->connection_status,
             'token_expires_at'     => $store->token_expires_at?->toISOString(),
             'last_synced_at'       => $store->last_synced_at?->toISOString(),
             'meta'                 => $store->meta,
@@ -507,6 +510,67 @@ class MarketplaceController extends Controller
 
     public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
     {
+        $lock = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
+
+        if (!$lock->get()) {
+            return response()->json(['message' => 'Sync sedang berjalan untuk toko ini. Mohon tunggu.'], 429);
+        }
+
+        $status = $store->connection_status;
+
+        if ($status === 'TOKEN_EXPIRED') {
+            try {
+                if ($store->channel->code === 'shopee') {
+                    /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
+                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                    $shopee->refreshToken($store);
+                    $store->refresh();
+                    $status = $store->connection_status;
+                } else if ($store->channel->code === 'tiktok') {
+                    /** @var \App\Services\Channels\TikTokShop\TikTokShopChannel $tiktok */
+                    $tiktok = app(\App\Services\Channels\TikTokShop\TikTokShopChannel::class);
+                    $tiktok->refreshToken($store);
+                    $store->refresh();
+                    $status = $store->connection_status;
+                }
+            } catch (\Throwable $e) {
+                $status = 'AUTH_REQUIRED';
+                \Illuminate\Support\Facades\Log::warning('Token refresh failed during sync', [
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        if ($status === 'NOT_CONNECTED') {
+            $lock->release();
+            return response()->json([
+                'success' => false,
+                'code'    => 'STORE_NOT_CONNECTED',
+                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Hubungkan ' . $store->channel->name,
+                    'url'   => url('/marketplace/' . $store->channel->code . '/connect')
+                ]
+            ], 422);
+        }
+
+        if ($status !== 'CONNECTED') {
+            $lock->release();
+            return response()->json([
+                'success' => false,
+                'code'    => 'SHOPEE_AUTH_REQUIRED',
+                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Login Ulang ' . $store->channel->name,
+                    'url'   => url('/marketplace/' . $store->channel->code . '/connect')
+                ]
+            ], 401);
+        }
+
         try {
             $result = $this->sync->syncOrders(
                 $store,
@@ -516,14 +580,52 @@ class MarketplaceController extends Controller
                 (bool) $request->dry_run
             );
         } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            $lock->release();
+            
+            $msg = $e->getMessage();
+            if (str_contains(strtolower($msg), 'access_token') || str_contains(strtolower($msg), 'auth')) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'SHOPEE_AUTH_REQUIRED',
+                    'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif.",
+                    'action'  => [
+                        'type'  => 'redirect',
+                        'label' => 'Login Ulang ' . $store->channel->name,
+                        'url'   => url('/marketplace/' . $store->channel->code . '/connect')
+                    ]
+                ], 401);
+            }
+            
+            return response()->json([
+                'success' => false,
+                'code'    => 'VALIDATION_ERROR',
+                'message' => $msg
+            ], 422);
+        } catch (\Throwable $e) {
+            $lock->release();
+            
+            \Illuminate\Support\Facades\Log::error('Marketplace sync internal error', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'code'    => 'CONNECTION_ERROR',
+                'message' => 'Sinkronisasi pesanan belum berhasil. Koneksi ke ' . $store->channel->name . ' sedang bermasalah.'
+            ], 502);
         }
 
+        $lock->release();
         return response()->json($result);
     }
 
     public function localOrders(): JsonResponse
     {
+        if (request()->boolean('dummy') && app()->environment(['local', 'testing'])) {
+            return response()->json(app(\App\Support\DummyMarketplaceOrderProvider::class)->orders());
+        }
+
         // Sertakan scan_log jika kolom sudah ada (setelah migration)
         $hasScanLog = in_array(
             'scan_log',
@@ -551,6 +653,8 @@ class MarketplaceController extends Controller
             $arr = $o->toArray();
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
+            $arr['print_count']            = $o->print_count ?? 0;
+            $arr['printed_at']             = $o->printed_at;
             $arr['has_unresolved_lines']   = $o->fulfillment
                 ? $o->fulfillment->lines->whereNull('item_id')->isNotEmpty()
                 : false;

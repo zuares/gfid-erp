@@ -1,0 +1,69 @@
+app/Services/Accounting/MarketplacePayoutService.php:48:            $journal = Journal::create([
+app/Services/Accounting/MarketplacePayoutService.php:57:            JournalLine::create([
+app/Services/Accounting/MarketplacePayoutService.php:65:            JournalLine::create([
+app/Services/Accounting/MarketplacePayoutService.php:104:            $rev = Journal::create([
+app/Services/Accounting/MarketplacePayoutService.php:113:                JournalLine::create([
+app/Services/OrderFulfillmentService.php:34:            $fulfillment = OrderFulfillment::create([
+app/Services/OrderFulfillmentService.php:59:                OrderFulfillmentLine::create([
+app/Services/OrderFulfillmentService.php:716:                $newLine = OrderFulfillmentLine::create([
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:39:            Channel::firstOrCreate(
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:173:                MarketplaceOrderSettlement::updateOrCreate(
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:374:                MarketplaceAdCampaign::updateOrCreate(
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:490:                $order = MarketplaceOrder::updateOrCreate(
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:559:                    MarketplaceOrderItem::create(array_merge([
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:613:        MarketplaceSyncLog::create([
+app/Services/Purchasing/PurchaseOrderInventoryService.php:102:            $lot = Lot::create([
+app/Services/Purchasing/PurchaseOrderService.php:24:    public function create(array $payload): PurchaseOrder
+app/Services/Purchasing/PurchaseOrderService.php:52:            $order = PurchaseOrder::create($payload);
+app/Services/Purchasing/PurchaseOrderService.php:354:            $order->lines()->create($payload);
+app/Services/Purchasing/PurchaseOrderService.php:393:        SupplierPrice::updateOrCreate(
+app/Services/MarketplaceSyncService.php:39:            Channel::firstOrCreate(
+app/Services/MarketplaceSyncService.php:226:                MarketplaceOrderSettlement::updateOrCreate(
+app/Services/MarketplaceSyncService.php:427:                MarketplaceAdCampaign::updateOrCreate(
+app/Services/MarketplaceSyncService.php:583:                $order = MarketplaceOrder::updateOrCreate(
+app/Services/MarketplaceSyncService.php:667:                    MarketplaceOrderItem::updateOrCreate(
+app/Services/MarketplaceSyncService.php:729:        MarketplaceSyncLog::create([
+app/Services/Marketplace/MarketplaceReconcileService.php:309:                MpReconciliation::updateOrCreate(
+app/Services/Marketplace/MarketplaceReconcileService.php:328:                MpReconciliation::updateOrCreate(
+app/Services/Marketplace/Shopee/ImportShopeeOrdersService.php:161:                $new = Item::create([
+app/Services/Marketplace/Shopee/ImportShopeeOrdersService.php:360:                    SalesInvoiceLine::create([
+app/Services/Marketplace/Import/MpImportService.php:137:                    $mp = MpShipment::create($payload);
+app/Services/Marketplace/Import/MpImportService.php:170:                    MpShipmentItem::create([
+app/Services/OmnichannelSyncService.php:114:                $order = MarketplaceOrder::updateOrCreate(
+app/Services/OmnichannelSyncService.php:135:                    MarketplaceOrderItem::create([
+app/Services/OmnichannelSyncService.php:184:        MarketplaceSyncLog::create([
+app/Services/MarketplaceIssueService.php:32:     * Bangun array attribute mapping untuk dipakai di create() / updateOrCreate().
+app/Services/MarketplaceIssueService.php:147:                    SkuMapping::updateOrCreate(
+app/Services/MarketplaceIssueService.php:254:        SkuMapping::updateOrCreate(
+app/Services/MarketplaceIssueService.php:408:                    SkuMapping::updateOrCreate(
+app/Http/Controllers/Accounting/MarketplacePayoutController.php:63:    public function create()
+app/Http/Controllers/Accounting/MarketplacePayoutController.php:91:        $payout = MarketplacePayout::create($data);
+app/Http/Controllers/Storefront/CartController.php:362:                $order = StorefrontOrder::create([
+app/Http/Controllers/Sales/ShipmentReturnController.php:220:                    $scan = ShipmentReturnOrderScan::create([
+app/Http/Controllers/Sales/ShipmentReturnController.php:561:                    $orderScan = ShipmentReturnOrderScan::create([
+app/Http/Controllers/Sales/ShipmentController.php:811:                ShipmentOrderScan::updateOrCreate(
+app/Http/Controllers/Sales/ShipmentController.php:1648:            \App\Models\ShipmentOrderScan::updateOrCreate(
+app/Http/Controllers/Sales/ShipmentController.php:1761:        \App\Models\ShipmentOrderScan::updateOrCreate(
+app/Http/Controllers/Sales/ShipmentController.php:1873:                ShipmentOrderScan::updateOrCreate(
+app/Http/Controllers/Purchasing/PurchaseRequestController.php:394:                $order = $purchaseOrderService->create([
+app/Http/Controllers/Purchasing/PurchaseOrderController.php:124:    public function create(Request $request)
+app/Http/Controllers/Purchasing/PurchaseOrderController.php:244:        $order = $this->service->create($data);
+app/Http/Controllers/Purchasing/PurchaseOrderController.php:864:            PurchasePayment::create([
+app/Http/Controllers/MarketplaceController.php:1638:            $store = \App\Models\MarketplaceStore::create([
+app/Http/Controllers/MarketplaceController.php:1659:                $order = MarketplaceOrder::create([
+app/Http/Controllers/MarketplaceController.php:1720:                    MarketplaceOrderItem::create([
+app/Http/Controllers/Marketplace/MarketplaceOrderController.php:112:    public function create()
+app/Http/Controllers/Marketplace/MarketplaceOrderController.php:188:            $order = MarketplaceOrder::create([
+app/Http/Controllers/Marketplace/MarketplaceOrderController.php:229:                MarketplaceOrderItem::create([
+app/Http/Controllers/Marketplace/MarketplaceOrderController.php:316:        return Customer::create([
+app/Http/Controllers/Imports/MarketplaceIncomeImportController.php:142:    public function create(Request $request): View
+app/Http/Controllers/Imports/MarketplaceImportController.php:73:    public function create(): View
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:95:            MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:117:            MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:139:                MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:167:                $order = MarketplaceOrder::updateOrCreate(
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:209:                    MarketplaceOrderItem::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:246:        MarketplaceSyncLog::create([
+app/Http/Controllers/Production/ProductionOrderController.php:29:    public function create()
+app/Http/Controllers/Production/ProductionReceiptController.php:23:    public function create(ProductionOrder $order)
+app/Http/Controllers/Production/ProductionIssueController.php:23:    public function create(ProductionOrder $order)

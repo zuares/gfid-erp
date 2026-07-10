@@ -10,25 +10,13 @@ use Illuminate\Support\Facades\Log;
 class ShippingLabelOverlayService
 {
     /**
-     * Shrinks the original PDF and adds a branding footer.
-     * 
-     * @param string $pdfContent The raw PDF content from the marketplace
-     * @param array|null $config Optional custom settings
-     * @return string Modified PDF stream
+     * Uncompresses a PDF string so it can be parsed by FPDI Free.
      */
-    public function overlayPdfContent(string $pdfContent, ?array $config = null): string
+    public function uncompressPdfContent(string $pdfContent): string
     {
-        $isBrandingEnabled = $this->getSetting('marketplace_print_branding', '1', $config);
-        if ($isBrandingEnabled !== '1') {
-            return $pdfContent;
-        }
-
-        // FPDF requires a physical file to import
         $tmpFile = tempnam(sys_get_temp_dir(), 'resi_in_');
         file_put_contents($tmpFile, $pdfContent);
         
-        // Shopee PDFs use compression/cross-reference streams not supported by free FPDI.
-        // Use qpdf or gs (Ghostscript) to uncompress the file.
         $qpdfPath = '';
         $gsPath = '';
         if (function_exists('exec')) {
@@ -56,23 +44,46 @@ class ShippingLabelOverlayService
             }
         }
         
+        $outputContent = $pdfContent;
         if ($qpdfPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
-            // Disable object streams and uncompress streams to make it compatible with FPDI Free
             @exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
             if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
-                @unlink($tmpFile);
-                $tmpFile = $uncompressedFile;
+                $outputContent = file_get_contents($uncompressedFile);
+                @unlink($uncompressedFile);
             }
         } else if ($gsPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
-            // Use Ghostscript to downgrade PDF to version 1.4 which FPDI can read natively
             @exec(sprintf("%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null", escapeshellarg($gsPath), escapeshellarg($uncompressedFile), escapeshellarg($tmpFile)), $output, $returnVar);
             if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
-                @unlink($tmpFile);
-                $tmpFile = $uncompressedFile;
+                $outputContent = file_get_contents($uncompressedFile);
+                @unlink($uncompressedFile);
             }
         }
+        
+        @unlink($tmpFile);
+        return $outputContent;
+    }
+
+    /**
+     * Shrinks the original PDF and adds a branding footer.
+     * 
+     * @param string $pdfContent The raw PDF content from the marketplace
+     * @param array|null $config Optional custom settings
+     * @return string Modified PDF stream
+     */
+    public function overlayPdfContent(string $pdfContent, ?array $config = null): string
+    {
+        $isBrandingEnabled = $this->getSetting('marketplace_print_branding', '1', $config);
+        if ($isBrandingEnabled !== '1') {
+            return $pdfContent;
+        }
+
+        $uncompressed = $this->uncompressPdfContent($pdfContent);
+        
+        // FPDF requires a physical file to import
+        $tmpFile = tempnam(sys_get_temp_dir(), 'resi_in_');
+        file_put_contents($tmpFile, $uncompressed);
         
         $pdf = new Fpdi();
         $pdf->SetAutoPageBreak(false);

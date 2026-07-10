@@ -1,0 +1,50 @@
+app/Models/Store.php:21:        'last_synced_at',
+app/Models/Store.php:29:        'last_synced_at' => 'datetime',
+app/Models/MarketplaceSyncLog.php:8:class MarketplaceSyncLog extends Model
+app/Http/Requests/SyncOrdersRequest.php:7:class SyncOrdersRequest extends FormRequest
+app/Http/Controllers/MarketplaceController.php:5:use App\Http\Requests\SyncOrdersRequest;
+app/Http/Controllers/MarketplaceController.php:13:use App\Models\MarketplaceSyncLog;
+app/Http/Controllers/MarketplaceController.php:20:use App\Services\MarketplaceSyncService;
+app/Http/Controllers/MarketplaceController.php:31:        protected MarketplaceSyncService $sync,
+app/Http/Controllers/MarketplaceController.php:485:            'last_synced_at'       => $store->last_synced_at?->toISOString(),
+app/Http/Controllers/MarketplaceController.php:511:    public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
+app/Http/Controllers/MarketplaceController.php:575:            $result = $this->sync->syncOrders(
+app/Http/Controllers/MarketplaceController.php:1113:        $logs = MarketplaceSyncLog::with('store:id,name')
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:8:use App\Models\MarketplaceSyncLog;
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:59:                'last_synced_at' => optional($store->last_synced_at)->toISOString(),
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:77:    public function syncOrders(Request $request, Store $store, ChannelManager $manager): JsonResponse
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:95:            MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:117:            MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:139:                MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:241:            $store->update(['last_synced_at' => now()]);
+app/Http/Controllers/OmnichannelController.php.backup_fk_sqlite:246:        MarketplaceSyncLog::create([
+app/Http/Controllers/OmnichannelController.php:5:use App\Http\Requests\SyncOrdersRequest;
+app/Http/Controllers/OmnichannelController.php:94:            'last_synced_at'       => $store->last_synced_at?->toISOString(),
+app/Http/Controllers/OmnichannelController.php:119:    public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
+app/Http/Controllers/OmnichannelController.php:122:            $result = $this->sync->syncOrders(
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:11:use App\Models\MarketplaceSyncLog;
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:19:class MarketplaceSyncService
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:53:    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50): array
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:583:            $store->update(['last_synced_at' => now()]);
+app/Services/MarketplaceSyncService.php.bak_sebelum_patch_item:613:        MarketplaceSyncLog::create([
+app/Services/MarketplaceSyncService.php:11:use App\Models\MarketplaceSyncLog;
+app/Services/MarketplaceSyncService.php:19:class MarketplaceSyncService
+app/Services/MarketplaceSyncService.php:53:    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false): array
+app/Services/MarketplaceSyncService.php:698:                $store->update(['last_synced_at' => now()]);
+app/Services/MarketplaceSyncService.php:729:        MarketplaceSyncLog::create([
+app/Services/Marketplace/Ads/ShopeeProductAdsSearchTermImporter.php:7: *              via MarketplaceSyncService::syncAdCampaigns().
+app/Services/OmnichannelSyncService.php:8:use App\Models\MarketplaceSyncLog;
+app/Services/OmnichannelSyncService.php:47:    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50): array
+app/Services/OmnichannelSyncService.php:154:            $store->update(['last_synced_at' => now()]);
+app/Services/OmnichannelSyncService.php:184:        MarketplaceSyncLog::create([
+routes/web.php.bak_cutoff:90:    Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
+routes/console.php:57:Schedule::command('storefront:rank-products')
+routes/console.php:59:    ->withoutOverlapping()
+routes/console.php:63:Schedule::command('sales:rebuild-daily-item-sales --days=90')
+routes/console.php:66:Schedule::command('inventory:recalc-ads-from-daily --days=30')
+routes/console.php:70:Schedule::command('marketplace:cleanup-labels')
+routes/web.php:111:    Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
+bootstrap/app.php:33:    ->withSchedule(function (Schedule $schedule) {
+bootstrap/app.php:48:            ->withoutOverlapping();
+bootstrap/app.php:52:            ->withoutOverlapping();
+bootstrap/app.php:56:            ->withoutOverlapping();

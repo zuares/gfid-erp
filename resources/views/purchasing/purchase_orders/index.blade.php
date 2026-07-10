@@ -457,11 +457,12 @@
                 <input type="hidden" name="to_date"   id="po-to-date"   value="{{ request('to_date') }}">
 
                 <div class="filter-row">
-                    <input type="text" name="supplier_search"
-                        value="{{ request('supplier_search') }}"
-                        placeholder="Cari supplier"
-                        class="form-control form-control-sm filter-search"
-                        autocomplete="off" />
+                    <select name="supplier_id" class="form-select form-select-sm po-filter-auto filter-search">
+                        <option value="">Semua Supplier</option>
+                        @foreach ($suppliers as $sup)
+                            <option value="{{ $sup->id }}" @selected(request('supplier_id') == $sup->id)>{{ $sup->name }}</option>
+                        @endforeach
+                    </select>
 
                     <select name="status" class="form-select form-select-sm po-filter-auto">
                         @foreach ($statusOptions as $value => $label)
@@ -504,7 +505,7 @@
                         class="form-control form-control-sm filter-date" style="cursor:pointer;"
                         data-gf-date="off" readonly />
 
-                    @if (request()->filled('supplier_search') || request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
+                    @if (request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
                         <a href="{{ route('purchasing.purchase_orders.index') }}"
                            class="btn btn-sm btn-outline-secondary filter-reset" style="font-size:.78rem;padding:.25rem .65rem;">
                             Reset
@@ -791,21 +792,7 @@ document.addEventListener('DOMContentLoaded', function () {
         el.addEventListener('change', function () { form.submit(); });
     });
 
-    // Supplier text input: debounce 500ms + auto-focus
-    const supplierInput = form.querySelector('input[name="supplier_search"]');
-    if (supplierInput) {
-        let debounceTimer;
-        supplierInput.addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(function () { form.submit(); }, 500);
-        });
-        // Auto-focus dengan delay agar tidak konflik dengan event lain
-        setTimeout(function () {
-            supplierInput.focus();
-            const len = supplierInput.value.length;
-            supplierInput.setSelectionRange(len, len);
-        }, 100);
-    }
+    // Supplier dropdown auto-submit is already handled by po-filter-auto class
 
     // Single flatpickr range input
     const rangeInput = document.getElementById('po-date-range');

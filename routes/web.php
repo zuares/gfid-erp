@@ -118,7 +118,9 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->name('marketplace.logistics.ship');
     Route::get('/stores/{store}/orders/{orderSn}/document', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printDocument']);
     Route::get('/stores/{store}/orders/{orderSn}/sync-awb', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'syncAwb']);
-    Route::get('/stores/{store}/documents/bulk', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printDocumentBulk']);
+    Route::post('/documents/bulk-print', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'createBulkPrintJob'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/documents/bulk-print/{uuid}', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'downloadBulkPrintJob']);
     Route::get('/stores/{store}/documents/bulk-greetings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printBulkGreetings']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
@@ -233,3 +235,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/sku-mappings')->g
     Route::post('/quick-create-item', [SkuMappingController::class, 'quickCreateItem'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 });
+
+if (app()->environment(['local', 'testing'])) {
+    Route::post('/dev/dummy/bulk-print', [\App\Http\Controllers\Dev\DummyBulkPrintController::class, 'createBulkPrintJob'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+}

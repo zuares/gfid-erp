@@ -259,10 +259,48 @@ class ShipmentController extends Controller
             'store',
             'lines.item.category',
             'orderScans.confirmer',
+            'orderScans.fulfillment.marketplaceOrder.store',
             'creator',
             'submitter',
             'invoice',
         ]);
+
+        $isDummy = request()->boolean('dummy') && app()->environment(['local', 'testing']);
+        if ($isDummy) {
+            $dummyProvider = app(\App\Support\DummyMarketplaceOrderProvider::class);
+            $dummyOrders = $dummyProvider->orders();
+            $dummyScans = $dummyOrders->map(function ($order, $index) use ($shipment) {
+                $scan = new \App\Models\ShipmentOrderScan();
+                $scan->id = 99000 + $index;
+                $scan->order_no = $order['channel_order_id'];
+                $scan->status = 'ok';
+                $scan->source = 'shopee';
+                $scan->confirmed_at = now();
+                
+                $fulfillment = new \App\Models\OrderFulfillment();
+                $fulfillment->id = $order['fulfillment']['id'];
+                
+                $mpOrder = new \App\Models\MarketplaceOrder();
+                $mpOrder->id = $order['id'];
+                $mpOrder->store_id = $order['store_id'];
+                $mpOrder->channel_order_id = $order['channel_order_id'];
+                $mpOrder->order_status = $order['order_status'];
+                $mpOrder->shipping_carrier = $order['shipping_carrier'];
+                $mpOrder->print_count = $order['print_count'];
+                $mpOrder->printed_at = $order['printed_at'] ? \Carbon\Carbon::parse($order['printed_at']) : null;
+                
+                $store = new \App\Models\MarketplaceStore();
+                $store->id = $order['store']['id'];
+                $store->name = $order['store']['name'];
+                
+                $mpOrder->setRelation('store', $store);
+                $fulfillment->setRelation('marketplaceOrder', $mpOrder);
+                $scan->setRelation('fulfillment', $fulfillment);
+                
+                return $scan;
+            });
+            $shipment->setRelation('orderScans', $dummyScans);
+        }
 
         // admin: jangan set unit_hpp / total_hpp sama sekali
         $hppCache = [];

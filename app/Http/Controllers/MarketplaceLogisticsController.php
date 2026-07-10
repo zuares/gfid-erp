@@ -90,7 +90,26 @@ class MarketplaceLogisticsController extends Controller
             }
             
             $driver = $this->manager->driver($store);
-            $result = $this->ensureSuccess($driver->shipOrder($store, $orderSn, $params));
+            $rawResult = $driver->shipOrder($store, $orderSn, $params);
+            
+            // Allow if it's already arranged by marketplace (e.g. Instant/Sameday orders)
+            // or has invalid status due to being already processed
+            if (isset($rawResult['error']) && $rawResult['error']) {
+                $err = $rawResult['error'];
+                $allowedErrors = [
+                    'logistics.already_arranged', 
+                    'logistics.ship_order_already_shipped',
+                    'logistics.pickup_address_unsupported',
+                    'logistics.status_invalid'
+                ];
+                
+                if (in_array($err, $allowedErrors) || str_contains($err, 'already') || str_contains($err, 'unsupported')) {
+                    $rawResult['error'] = ''; 
+                    \Illuminate\Support\Facades\Log::info("shipOrder returned $err for $orderSn, treating as success for local status update.");
+                }
+            }
+            
+            $result = $this->ensureSuccess($rawResult);
             
             // Ambil data terbaru langsung dari Shopee untuk mendapatkan package_number atau tracking_number
             try {
@@ -207,6 +226,10 @@ class MarketplaceLogisticsController extends Controller
             $cachePath = "shipping_labels/{$store->id}/{$orderSn}{$cacheSuffix}.pdf.gz";
             
             if ($disk->exists($cachePath)) {
+                if ($order) {
+                    $order->increment('print_count');
+                    if (!$order->printed_at) $order->update(['printed_at' => now()]);
+                }
                 $content = gzdecode($disk->get($cachePath));
                 return response($content, 200, [
                     'Content-Type' => 'application/pdf',
@@ -271,6 +294,11 @@ class MarketplaceLogisticsController extends Controller
                     // Simpan ke Cache Lokal dengan kompresi GZIP Level 9
                     $disk->put($cachePath, gzencode($content, 9));
 
+                    if ($order) {
+                        $order->increment('print_count');
+                        if (!$order->printed_at) $order->update(['printed_at' => now()]);
+                    }
+
                     return response($content, 200, [
                         'Content-Type' => 'application/pdf',
                         'Content-Disposition' => 'inline; filename="Resi_' . $orderSn . '.pdf"'
@@ -297,95 +325,245 @@ class MarketplaceLogisticsController extends Controller
         }
     }
 
-    public function printDocumentBulk(Request $request, Store $store): \Symfony\Component\HttpFoundation\Response
+    public function createBulkPrintJob(Request $request)
     {
-        try {
-            $orderSns = $request->query('orders');
-            if (empty($orderSns)) {
-                return response()->json(['error' => 'No orders provided'], 400);
+        $payloadOrders = $request->input('orders', []);
+        $mode = $request->input('mode', 'unprinted_only');
+        
+        if (empty($payloadOrders)) {
+            return response()->json(['error' => 'No orders provided'], 400);
+        }
+
+        $results = [];
+        $pdfContents = [];
+        $successfulOrderSns = [];
+        $failedOrders = [];
+        $successCount = 0;
+        
+        // Group payload by store_id
+        $groupedByStore = [];
+        foreach ($payloadOrders as $reqOrder) {
+            $storeId = $reqOrder['store_id'] ?? null;
+            $orderSn = $reqOrder['channel_order_id'] ?? null;
+            $pos = $reqOrder['position'] ?? 0;
+            
+            if (!$storeId || !$orderSn) continue;
+            
+            $groupedByStore[$storeId][] = [
+                'order_sn' => $orderSn,
+                'position' => $pos
+            ];
+        }
+
+        foreach ($groupedByStore as $storeId => $items) {
+            $store = Store::find($storeId);
+            if (!$store) {
+                foreach ($items as $item) {
+                    $failedOrders[] = [
+                        'store_id' => $storeId,
+                        'store_name' => 'Unknown Store',
+                        'channel_order_id' => $item['order_sn'],
+                        'reason' => 'Store not found'
+                    ];
+                }
+                continue;
             }
-            
-            $orderSnList = explode(',', $orderSns);
-            $orderSnList = array_slice($orderSnList, 0, 50); // Maksimal 50
-            
-            $orders = MarketplaceOrder::where('store_id', $store->id)
-                ->whereIn('channel_order_id', $orderSnList)
+
+            $orderSns = array_column($items, 'order_sn');
+            $orders = MarketplaceOrder::where('store_id', $storeId)
+                ->whereIn('channel_order_id', $orderSns)
                 ->get()
                 ->keyBy('channel_order_id');
                 
-            $driver = $this->manager->driver($store);
-            $payloadList = [];
-            
-            foreach ($orderSnList as $orderSn) {
-                $order = $orders->get($orderSn);
-                $payload = ['order_sn' => $orderSn];
-                if ($order) {
-                    if ($order->shipping_awb_no) {
-                        $payload['tracking_number'] = $order->shipping_awb_no;
-                    }
-                    $rawJson = $order->raw_json ?? [];
-                    if (isset($rawJson['package_list']) && is_array($rawJson['package_list'])) {
-                        $packageList = $rawJson['package_list'];
-                        if (count($packageList) > 0 && isset($packageList[0]['package_number'])) {
-                            $payload['package_number'] = $packageList[0]['package_number'];
-                        }
-                    }
-                    
-                    // Fallback get missing tracking number
-                    if (!isset($payload['tracking_number']) && !isset($payload['package_number'])) {
-                        try {
-                            $awb = null;
-                            if (method_exists($driver, 'getTrackingNumber')) {
-                                $trackingResp = $driver->getTrackingNumber($store, $orderSn);
-                                $awb = $trackingResp['response']['tracking_number'] ?? null;
-                            }
-                            if (!$awb && method_exists($driver, 'getOrderDetail')) {
-                                $details = $driver->getOrderDetail($store, [$orderSn]);
-                                $list = $details['response']['order_list'] ?? [];
-                                if (count($list) > 0) {
-                                    $remoteRaw = $list[0];
-                                    if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
-                                        $awb = $remoteRaw['package_list'][0]['tracking_number'];
-                                    }
-                                }
-                            }
-                            if ($awb) {
-                                $payload['tracking_number'] = $awb;
-                                $order->update(['shipping_awb_no' => $awb]);
-                            }
-                        } catch (\Throwable $e) {}
-                    }
+            try {
+                $driver = app(\App\Services\Channels\ChannelManager::class)->driver($store);
+            } catch (\Exception $e) {
+                foreach ($items as $item) {
+                    $failedOrders[] = [
+                        'store_id' => $store->id,
+                        'store_name' => $store->name,
+                        'channel_order_id' => $item['order_sn'],
+                        'reason' => 'Failed to initialize marketplace driver'
+                    ];
                 }
-                $payloadList[] = $payload;
+                continue;
             }
-            
-            $createRes = $driver->createShippingDocument($store, $payloadList);
-            $downloadRes = $driver->getShippingDocument($store, $payloadList);
-            
-            if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
-                $content = $downloadRes['message']; 
-                if (str_starts_with($content, '%PDF')) {
-                    $config = [];
-                    if ($request->has('card')) {
-                        $config['marketplace_print_greeting_card'] = $request->query('card') === '1' ? '1' : '0';
-                    }
-                    $overlayService = new \App\Services\ShippingLabelOverlayService();
-                    $content = $overlayService->overlayPdfContent($content, $config);
 
-                    return response($content, 200, [
-                        'Content-Type' => 'application/pdf',
-                        'Content-Disposition' => 'inline; filename="Resi_Bulk.pdf"'
-                    ]);
+            // Create shipping document in bulk first to trigger generation on Shopee side
+            $payloadListAll = [];
+            foreach ($items as $item) {
+                $orderSn = $item['order_sn'];
+                $order = $orders->get($orderSn);
+                if (!$order) {
+                    $failedOrders[] = [
+                        'store_id' => $store->id,
+                        'store_name' => $store->name,
+                        'channel_order_id' => $orderSn,
+                        'reason' => 'Order not found in database'
+                    ];
+                    continue;
                 }
+                
+                $payload = ['order_sn' => $orderSn];
+                if ($order->shipping_awb_no) {
+                    $payload['tracking_number'] = $order->shipping_awb_no;
+                }
+                $rawJson = $order->raw_json ?? [];
+                if (isset($rawJson['package_list']) && is_array($rawJson['package_list'])) {
+                    $packageList = $rawJson['package_list'];
+                    if (count($packageList) > 0 && isset($packageList[0]['package_number'])) {
+                        $payload['package_number'] = $packageList[0]['package_number'];
+                    }
+                }
+                $payloadListAll[$orderSn] = $payload;
             }
             
-            return response()->json([
-                'create_result' => $createRes,
-                'download_result' => $downloadRes
-            ]);
-        } catch (\Exception $e) {
-            return $this->errorResponse($e);
+            // Chunk by 50 for createShippingDocument
+            $chunks = array_chunk(array_values($payloadListAll), 50);
+            foreach ($chunks as $chunk) {
+                try {
+                    $driver->createShippingDocument($store, $chunk);
+                } catch (\Exception $e) {
+                    // Ignore, we will try to download anyway
+                }
+            }
+
+            // Sleep a bit to allow Shopee to generate documents
+            usleep(500000); // 0.5 sec
+
+            // Download INDIVIDUALLY to guarantee order sorting
+            foreach ($items as $item) {
+                $orderSn = $item['order_sn'];
+                $pos = $item['position'];
+                
+                if (!isset($payloadListAll[$orderSn])) continue;
+                $payload = $payloadListAll[$orderSn];
+                
+                try {
+                    $downloadRes = $driver->getShippingDocument($store, [$payload]);
+                    if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
+                        $content = $downloadRes['message']; 
+                        if (str_starts_with($content, '%PDF')) {
+                            $pdfContents[] = [
+                                'position' => $pos,
+                                'content' => $content,
+                                'order_sn' => $orderSn,
+                                'store_id' => $store->id,
+                            ];
+                            $successCount++;
+                            $successfulOrderSns[$store->id][] = $orderSn;
+                        } else {
+                            $failedOrders[] = [
+                                'store_id' => $store->id,
+                                'store_name' => $store->name,
+                                'channel_order_id' => $orderSn,
+                                'reason' => 'Document not ready or not a PDF'
+                            ];
+                        }
+                    } else {
+                        $failedOrders[] = [
+                            'store_id' => $store->id,
+                            'store_name' => $store->name,
+                            'channel_order_id' => $orderSn,
+                            'reason' => $downloadRes['message'] ?? 'Document not ready'
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    $failedOrders[] = [
+                        'store_id' => $store->id,
+                        'store_name' => $store->name,
+                        'channel_order_id' => $orderSn,
+                        'reason' => 'API Error: ' . $e->getMessage()
+                    ];
+                }
+            }
         }
+        
+        if ($successCount === 0) {
+            return response()->json([
+                'error' => 'Gagal mendapatkan semua dokumen PDF.',
+                'failed_orders' => $failedOrders,
+                'success_count' => 0,
+                'failed_count' => count($failedOrders)
+            ], 400);
+        }
+
+        // Increment print_count
+        foreach ($successfulOrderSns as $storeId => $sns) {
+            MarketplaceOrder::where('store_id', $storeId)
+                ->whereIn('channel_order_id', $sns)
+                ->get()
+                ->each(function($order) use ($mode) {
+                    if ($mode === 'reprint') {
+                        $order->increment('print_count');
+                    } else {
+                        $order->increment('print_count');
+                        if (!$order->printed_at) $order->update(['printed_at' => now()]);
+                    }
+                });
+        }
+
+        // Sort PDFs by position
+        usort($pdfContents, function($a, $b) {
+            return $a['position'] <=> $b['position'];
+        });
+
+        // Merge PDFs
+        $finalPdfContent = null;
+        if (count($pdfContents) === 1) {
+            $finalPdfContent = $pdfContents[0]['content'];
+        } else {
+            $pdf = new \setasign\Fpdi\Fpdi();
+            $tempFiles = [];
+            $overlayService = new \App\Services\ShippingLabelOverlayService();
+            foreach ($pdfContents as $item) {
+                $tmpPath = storage_path('app/temp_pdf_' . uniqid() . '.pdf');
+                $uncompressedContent = $overlayService->uncompressPdfContent($item['content']);
+                file_put_contents($tmpPath, $uncompressedContent);
+                $tempFiles[] = $tmpPath;
+                
+                try {
+                    $pageCount = $pdf->setSourceFile($tmpPath);
+                    for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+                        $templateId = $pdf->importPage($pageNo);
+                        $size = $pdf->getTemplateSize($templateId);
+                        $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                        $pdf->useTemplate($templateId);
+                    }
+                } catch (\Exception $e) {}
+            }
+            
+            foreach ($tempFiles as $f) {
+                if (file_exists($f)) unlink($f);
+            }
+            
+            $finalPdfContent = $pdf->Output('S');
+        }
+
+        $uuid = (string) Str::uuid();
+        $tmpPdfPath = 'public/tmp/bulk_print_' . $uuid . '.pdf';
+        \Illuminate\Support\Facades\Storage::put($tmpPdfPath, $finalPdfContent);
+
+        return response()->json([
+            'uuid' => $uuid,
+            'success_count' => $successCount,
+            'failed_count' => count($failedOrders),
+            'failed_orders' => $failedOrders,
+            'download_url' => url('/documents/bulk-print/' . $uuid)
+        ]);
+    }
+
+    public function downloadBulkPrintJob(string $uuid)
+    {
+        $path = 'public/tmp/bulk_print_' . $uuid . '.pdf';
+        if (!\Illuminate\Support\Facades\Storage::exists($path)) {
+            abort(404, 'Dokumen PDF tidak ditemukan atau sudah kedaluwarsa.');
+        }
+
+        return response()->make(\Illuminate\Support\Facades\Storage::get($path), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="bulk_print_' . $uuid . '.pdf"'
+        ]);
     }
 
     public function printBulkGreetings(Request $request, Store $store): \Symfony\Component\HttpFoundation\Response
