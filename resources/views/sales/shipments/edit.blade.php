@@ -1224,33 +1224,19 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Cetak Picking List
     </button>
 
-    @if ($shipment->shipment_type === 'marketplace')
-        <a href="{{ route('sales.shipments.scan_order', $shipment) }}"
-           class="btn btn-shp-outline">
-            Scan Order Dulu
-        </a>
+    <a href="{{ route('sales.shipments.scan_order', $shipment) }}"
+       class="btn btn-shp-outline">
+        Scan Order Dulu
+    </a>
 
-        <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
-           id="rekonBtn"
-           data-is-manual="0"
-           data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
-           class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
-           aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
-            {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
-        </a>
-    @else
-        <form method="POST" action="{{ route('sales.shipments.submit', $shipment) }}" class="d-inline" onsubmit="return confirm('Selesai dan potong stok?')">
-            @csrf
-            <button type="submit" 
-                    id="rekonBtn"
-                    data-is-manual="1"
-                    class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
-                    {{ $totalLines > 0 ? '' : 'disabled' }}
-                    aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
-                {{ $totalLines > 0 ? 'Selesai & Potong Stok' : 'Scan Barang Dulu' }}
-            </button>
-        </form>
-    @endif
+    <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
+       id="rekonBtn"
+       data-is-manual="0"
+       data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
+       class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
+       aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
+        {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
+    </a>
 </div>
 
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
@@ -1883,24 +1869,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     function syncRekonButton(totalLines) {
         if (!rekonBtn) return;
         const count = parseInt(totalLines ?? summaryLines?.textContent ?? '0', 10) || 0;
-        const isManual = rekonBtn.dataset.isManual === '1';
         if (count > 0) {
-            if (!isManual) {
-                const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
-                rekonBtn.href = url;
-                rekonBtn.textContent = 'Lanjut Rekonsiliasi';
-            } else {
-                rekonBtn.textContent = 'Selesai & Potong Stok';
-                rekonBtn.disabled = false;
-            }
+            const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
+            rekonBtn.href = url;
+            rekonBtn.textContent = 'Lanjut Rekonsiliasi';
             rekonBtn.classList.remove('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'false');
         } else {
-            if (!isManual) {
-                rekonBtn.href = '#';
-            } else {
-                rekonBtn.disabled = true;
-            }
+            rekonBtn.href = '#';
             rekonBtn.textContent = 'Scan Barang Dulu';
             rekonBtn.classList.add('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'true');
@@ -2252,8 +2228,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     beepNav();
                     if (rekonBtn.dataset.rekonUrl) {
                         window.location.href = rekonBtn.dataset.rekonUrl;
-                    } else if (rekonBtn.dataset.isManual === '1') {
-                        rekonBtn.closest('form').submit();
                     }
                 }
                 return;
