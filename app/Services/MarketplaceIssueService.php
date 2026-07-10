@@ -128,6 +128,31 @@ class MarketplaceIssueService
         $itemId = SkuMapping::resolve($sku, $channelCode);
 
         if (! $itemId) {
+            // Coba auto-map berdasarkan item_name & variant_name yang identik dari data masa lalu
+            if (!empty($item->item_name)) {
+                $previouslyMapped = MarketplaceOrderItem::where('item_name', $item->item_name)
+                    ->where(function ($q) use ($item) {
+                        if (empty($item->variant_name)) {
+                            $q->whereNull('variant_name')->orWhere('variant_name', '');
+                        } else {
+                            $q->where('variant_name', $item->variant_name);
+                        }
+                    })
+                    ->whereNotNull('internal_item_id')
+                    ->where('mapping_status', self::MAPPING_MAPPED)
+                    ->first();
+
+                if ($previouslyMapped) {
+                    $itemId = $previouslyMapped->internal_item_id;
+                    SkuMapping::updateOrCreate(
+                        ['marketplace_sku' => $sku, 'channel_code' => $channelCode],
+                        ['item_id' => $itemId, 'notes' => 'Auto-mapped by system (identical product & variant name)']
+                    );
+                }
+            }
+        }
+
+        if (! $itemId) {
             $item->update([
                 'marketplace_sku'  => $sku,
                 'mapping_status'   => self::MAPPING_NOT_FOUND,
