@@ -100,35 +100,45 @@ class PurchaseReturnController extends Controller
                 ->with('success', "Sudah ada draft retur ({$existingDraft->code}) untuk GRN ini. Melanjutkan draft tersebut.");
         }
 
-        $ret = PurchaseReturn::create([
-            'code' => CodeGenerator::generate('PRTN'),
-            'date' => now()->toDateString(),
-            'purchase_receipt_id' => (int) $purchase_receipt->id,
-            'purchase_order_id' => (int) ($purchase_receipt->purchase_order_id ?? $purchase_receipt->order?->id ?? 0) ?: null,
-            'supplier_id' => (int) ($purchase_receipt->supplier_id ?? $purchase_receipt->supplier?->id ?? 0) ?: null,
-            'status' => 'draft',
-            'created_by' => (int) auth()->id(),
-        ]);
-
         $remainingMap = $this->remainingByGrnLine($purchase_receipt);
 
-        foreach ($purchase_receipt->lines as $ln) {
-            $rem = (float) ($remainingMap[$ln->id] ?? 0);
-            if ($rem <= 0.0001) {
-                continue;
-            }
+        try {
+            $ret = DB::transaction(function () use ($purchase_receipt, $remainingMap) {
+                $ret = PurchaseReturn::create([
+                    'code' => CodeGenerator::generate('PRTN'),
+                    'date' => now()->toDateString(),
+                    'purchase_receipt_id' => (int) $purchase_receipt->id,
+                    'purchase_order_id' => (int) ($purchase_receipt->purchase_order_id ?? $purchase_receipt->order?->id ?? 0) ?: null,
+                    'supplier_id' => (int) ($purchase_receipt->supplier_id ?? $purchase_receipt->supplier?->id ?? 0) ?: null,
+                    'status' => 'draft',
+                    'created_by' => (int) auth()->id(),
+                ]);
 
-            // Default qty 0 — operator isi sendiri hanya yang perlu diretur.
-            PurchaseReturnLine::create([
-                'purchase_return_id' => $ret->id,
-                'purchase_receipt_line_id' => (int) $ln->id,
-                'item_id' => (int) $ln->item_id,
-                'lot_id' => $ln->lot_id ? (int) $ln->lot_id : null,
-                'qty' => 0,
-                'unit_price' => (float) $ln->unit_price,
-                'line_total' => 0,
-                'notes' => null,
-            ]);
+                $warehouseId = (int) $purchase_receipt->warehouse_id;
+
+                foreach ($purchase_receipt->lines as $ln) {
+                    $rem = (float) ($remainingMap[$ln->id] ?? 0);
+                    if ($rem <= 0.0001) {
+                        continue;
+                    }
+
+                    $line = PurchaseReturnLine::create([
+                        'purchase_return_id' => $ret->id,
+                        'purchase_receipt_line_id' => (int) $ln->id,
+                        'item_id' => (int) $ln->item_id,
+                        'lot_id' => $ln->lot_id ? (int) $ln->lot_id : null,
+                        'qty' => 0,
+                        'allocated_qty' => 0,
+                        'unit_price' => (float) $ln->unit_price,
+                        'line_total' => 0,
+                        'notes' => null,
+                    ]);
+                }
+
+                return $ret;
+            });
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first());
         }
 
         return redirect()
@@ -299,6 +309,8 @@ class PurchaseReturnController extends Controller
             $purchase_return->notes = $data['notes'] ?? null;
             $purchase_return->save();
 
+            $warehouseId = (int) $purchase_return->grn->warehouse_id;
+
             // 0) Hapus foto yang diminta (hanya foto milik return ini)
             $deleteIds = array_map('intval', $data['delete_photos'] ?? []);
             if (!empty($deleteIds)) {
@@ -334,6 +346,9 @@ class PurchaseReturnController extends Controller
                     ->where('purchase_receipt_line_id', $grnLineId)
                     ->first();
 
+                $oldQty = $line ? (float) $line->qty : 0.0;
+                $isHpp = $this->isHppGrnLine($purchase_return, $grnLine);
+
                 $reason = $row['reason_code'] ?? null;
                 $newFiles = $request->file("lines.$idx.photos", []);
                 $newFiles = is_array($newFiles) ? array_filter($newFiles) : ($newFiles ? [$newFiles] : []);
@@ -344,6 +359,12 @@ class PurchaseReturnController extends Controller
 
                 if (!$keep) {
                     if ($line) {
+                        if ($isHpp && $oldQty > 0.0001) {
+                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, $oldQty, 'purchase_return', $purchase_return->id, $line->id);
+                        }
+                        $line->allocated_qty = 0;
+                        $line->save();
+
                         foreach ($line->photos as $photo) {
                             Storage::disk('public')->delete($photo->path);
                         }
@@ -362,15 +383,33 @@ class PurchaseReturnController extends Controller
                     $line->purchase_return_id = (int) $purchase_return->id;
                 }
 
+                $diffQty = $qty - $oldQty;
+
                 $unit = (float) ($line->unit_price ?? $grnLine->unit_price ?? 0);
                 $line->item_id = (int) $grnLine->item_id;
                 $line->lot_id = $grnLine->lot_id ? (int) $grnLine->lot_id : null;
                 $line->unit_price = $unit;
                 $line->qty = $qty;
+                $line->allocated_qty = $isHpp ? $qty : 0;
                 $line->line_total = round($qty * $unit, 2);
                 $line->notes = $row['notes'] ?? null;
                 $line->reason_code = $reason;
                 $line->save();
+
+                if ($isHpp && abs($diffQty) > 0.0001) {
+                    try {
+                        if ($diffQty > 0) {
+                            $this->inventory->reserveStock($warehouseId, (int) $grnLine->item_id, $diffQty, 'purchase_return', $purchase_return->id, $line->id);
+                        } else {
+                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, abs($diffQty), 'purchase_return', $purchase_return->id, $line->id);
+                        }
+                    } catch (\RuntimeException $e) {
+                        $itemName = $grnLine->item?->name ?? 'Item #' . $grnLine->item_id;
+                        throw ValidationException::withMessages([
+                            "lines.{$grnLineId}.qty" => "Stok tersedia tidak mencukupi untuk dialokasikan ke retur. Item {$itemName}, Diminta: {$diffQty}. " . $e->getMessage(),
+                        ]);
+                    }
+                }
 
                 // Simpan foto baru
                 foreach ($newFiles as $file) {
@@ -389,6 +428,36 @@ class PurchaseReturnController extends Controller
         });
 
         return back()->with('success', 'Draft Return tersimpan.');
+    }
+
+    /**
+     * CANCEL Return: membatalkan draft / submitted return.
+     * Stok yang di-reserve akan di-release.
+     */
+    public function cancel(Request $request, PurchaseReturn $purchase_return)
+    {
+        if (in_array($purchase_return->status, ['posted', 'cancelled'])) {
+            return back()->with('error', "Return tidak bisa dicancel karena statusnya {$purchase_return->status}.");
+        }
+
+        DB::transaction(function () use ($purchase_return) {
+            $warehouseId = (int) $purchase_return->grn->warehouse_id;
+
+            $purchase_return->loadMissing('lines.grnLine.item');
+
+            foreach ($purchase_return->lines as $line) {
+                if ($line->allocated_qty > 0.0001 && $this->isHppGrnLine($purchase_return, $line->grnLine)) {
+                    $this->inventory->releaseStock($warehouseId, (int) $line->item_id, $line->allocated_qty, 'purchase_return', $purchase_return->id, $line->id);
+                }
+                $line->allocated_qty = 0;
+                $line->save();
+            }
+
+            $purchase_return->status = 'cancelled';
+            $purchase_return->save();
+        });
+
+        return back()->with('success', 'Return berhasil dicancel dan alokasi stok telah dilepas.');
     }
 
     /**
@@ -448,6 +517,15 @@ class PurchaseReturnController extends Controller
                 throw ValidationException::withMessages([
                     'lines' => "Qty return melebihi remaining pada salah satu line.",
                 ]);
+            }
+
+            if ($this->isHppLine($purchase_return, $ln)) {
+                $allocated = (float) $ln->allocated_qty;
+                if (abs($qty - $allocated) > 0.0001) {
+                    throw ValidationException::withMessages([
+                        'lines' => "Inkonsistensi alokasi stok. Qty retur: {$qty}, Alokasi saat ini: {$allocated}. Mohon simpan ulang draf.",
+                    ]);
+                }
             }
         }
 
@@ -595,7 +673,7 @@ class PurchaseReturnController extends Controller
                     continue; // expense -> tidak pernah masuk stok
                 }
 
-                $this->inventory->stockOut(
+                $this->inventory->consumeAllocationAndStockOut(
                     warehouseId: $warehouseId,
                     itemId: (int) $ln->item_id,
                     qty: (float) $ln->qty,
@@ -609,6 +687,9 @@ class PurchaseReturnController extends Controller
                     affectLotCost: true,
                     strictNonNegative: true,
                 );
+
+                $ln->allocated_qty = 0;
+                $ln->save();
             }
 
             // =====================================================

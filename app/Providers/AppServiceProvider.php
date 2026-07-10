@@ -12,6 +12,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        \App\Models\PurchaseReturnLine::observe(\App\Observers\PurchaseReturnLineObserver::class);
         Paginator::useBootstrapFive();
         Carbon::setLocale('id');
 

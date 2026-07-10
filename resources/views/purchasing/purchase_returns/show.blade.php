@@ -431,6 +431,9 @@
               @endif
 
               @if($isEditable)
+                <div class="alert alert-info py-2 mb-3 small">
+                  <i class="bi bi-info-circle me-1"></i> Stok baru akan dialokasikan setelah draft disimpan.
+                </div>
                 <div class="return-tools mb-2">
                   <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-zero-all">Reset</button>
                   <button type="button" class="btn btn-sm btn-outline-primary" id="btn-max-all">Maks Semua</button>

@@ -166,6 +166,9 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::post('purchase-returns/{purchase_return}/submit', [PurchaseReturnController::class, 'submit'])
                 ->name('purchase_returns.submit');
 
+            Route::post('purchase-returns/{purchase_return}/cancel', [PurchaseReturnController::class, 'cancel'])
+                ->name('purchase_returns.cancel');
+
             Route::post('purchase-returns/{purchase_return}/post', [PurchaseReturnController::class, 'post'])
                 ->name('purchase_returns.post');
 

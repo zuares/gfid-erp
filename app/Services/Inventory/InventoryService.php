@@ -217,13 +217,68 @@ class InventoryService
     }
 
     /**
+     * Consume allocated stock and perform stockOut atomically.
+     */
+    public function consumeAllocationAndStockOut(
+        int $warehouseId,
+        int $itemId,
+        float | int | string $qty,
+        string | \DateTimeInterface  | null $date = null,
+        ?string $sourceType = null,
+        ?int $sourceId = null,
+        ?string $notes = null,
+        bool $allowNegative = false,
+        ?int $lotId = null,
+        float | int | string | null $unitCostOverride = null,
+        bool $affectLotCost = true,
+        ?int $cuttingJobBundleId = null,
+        bool $strictNonNegative = false,
+    ): ?InventoryMutation {
+        $qty = $this->num($qty);
+        if ($qty <= 0) {
+            return null;
+        }
+
+        /** @var InventoryStock|null $stock */
+        $stock = InventoryStock::where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($stock) {
+            $newAllocated = $this->num($stock->allocated_qty) - $qty;
+            $stock->allocated_qty = max(0, $newAllocated); // Prevent negative allocation
+            $stock->save();
+        }
+
+        return $this->stockOut(
+            $warehouseId,
+            $itemId,
+            $qty,
+            $date,
+            $sourceType,
+            $sourceId,
+            $notes,
+            $allowNegative,
+            $lotId,
+            $unitCostOverride,
+            $affectLotCost,
+            $cuttingJobBundleId,
+            $strictNonNegative
+        );
+    }
+
+    /**
      * Reserve stock without creating mutations and without deducting physical qty.
      * Increases allocated_qty.
      */
     public function reserveStock(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty
+        float | int | string $qty,
+        ?string $sourceType = null,
+        ?int $sourceId = null,
+        ?int $sourceLineId = null
     ): void {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -263,7 +318,10 @@ class InventoryService
     public function releaseStock(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty
+        float | int | string $qty,
+        ?string $sourceType = null,
+        ?int $sourceId = null,
+        ?int $sourceLineId = null
     ): void {
         $qty = $this->num($qty);
         if ($qty <= 0) {
