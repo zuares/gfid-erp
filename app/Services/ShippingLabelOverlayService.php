@@ -28,10 +28,12 @@ class ShippingLabelOverlayService
         file_put_contents($tmpFile, $pdfContent);
         
         // Shopee PDFs use compression/cross-reference streams not supported by free FPDI.
-        // Use qpdf to uncompress the file if qpdf is installed and exec is available.
+        // Use qpdf or gs (Ghostscript) to uncompress the file.
         $qpdfPath = '';
+        $gsPath = '';
         if (function_exists('exec')) {
             $qpdfPath = @exec('which qpdf');
+            $gsPath = @exec('which gs');
         }
 
         if (empty($qpdfPath)) {
@@ -44,10 +46,28 @@ class ShippingLabelOverlayService
             }
         }
         
+        if (empty($gsPath)) {
+            $possiblePaths = ['/usr/local/bin/gs', '/usr/bin/gs'];
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $gsPath = $path;
+                    break;
+                }
+            }
+        }
+        
         if ($qpdfPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
             // Disable object streams and uncompress streams to make it compatible with FPDI Free
             @exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
+            if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
+                @unlink($tmpFile);
+                $tmpFile = $uncompressedFile;
+            }
+        } else if ($gsPath && function_exists('exec')) {
+            $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
+            // Use Ghostscript to downgrade PDF to version 1.4 which FPDI can read natively
+            @exec(sprintf("%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null", escapeshellarg($gsPath), escapeshellarg($uncompressedFile), escapeshellarg($tmpFile)), $output, $returnVar);
             if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
                 @unlink($tmpFile);
                 $tmpFile = $uncompressedFile;
