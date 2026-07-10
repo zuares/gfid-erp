@@ -28,8 +28,12 @@ class ShippingLabelOverlayService
         file_put_contents($tmpFile, $pdfContent);
         
         // Shopee PDFs use compression/cross-reference streams not supported by free FPDI.
-        // Use qpdf to uncompress the file if qpdf is installed.
-        $qpdfPath = exec('which qpdf');
+        // Use qpdf to uncompress the file if qpdf is installed and exec is available.
+        $qpdfPath = '';
+        if (function_exists('exec')) {
+            $qpdfPath = @exec('which qpdf');
+        }
+
         if (empty($qpdfPath)) {
             $possiblePaths = ['/usr/local/bin/qpdf', '/opt/homebrew/bin/qpdf', '/usr/bin/qpdf'];
             foreach ($possiblePaths as $path) {
@@ -40,11 +44,11 @@ class ShippingLabelOverlayService
             }
         }
         
-        if ($qpdfPath) {
+        if ($qpdfPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
             // Disable object streams and uncompress streams to make it compatible with FPDI Free
-            exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
-            if ($returnVar === 0 && file_exists($uncompressedFile)) {
+            @exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
+            if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
                 @unlink($tmpFile);
                 $tmpFile = $uncompressedFile;
             }

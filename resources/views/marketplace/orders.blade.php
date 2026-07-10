@@ -2370,16 +2370,34 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             let html = '';
             
             if (infoNeeded.dropoff) {
-                html += `<div class="form-check">
-                    <input class="form-check-input" type="radio" name="asMethod" id="asDropoff" value="dropoff" checked>
+                html += `<div class="form-check mb-2">
+                    <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asDropoff" value="dropoff" checked>
                     <label class="form-check-label" for="asDropoff"><strong>Drop-off</strong> (Antar ke Cabang)</label>
                 </div>`;
             }
             if (infoNeeded.pickup) {
-                html += `<div class="form-check">
-                    <input class="form-check-input" type="radio" name="asMethod" id="asPickup" value="pickup" ${!infoNeeded.dropoff ? 'checked' : ''}>
+                html += `<div class="form-check mb-2">
+                    <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asPickup" value="pickup" ${!infoNeeded.dropoff ? 'checked' : ''}>
                     <label class="form-check-label" for="asPickup"><strong>Pickup</strong> (Kurir Jemput)</label>
                 </div>`;
+                
+                if (infoNeeded.pickup.address_list && infoNeeded.pickup.address_list.length > 0) {
+                    html += `<div class="pickup-options ps-4 mt-2" id="pickupOptionsWrapper" style="${!infoNeeded.dropoff ? 'display:block;' : 'display:none;'}">
+                        <div class="mb-2">
+                            <label class="form-label" style="font-size:0.8rem">Alamat Pickup</label>
+                            <select class="form-select form-select-sm" id="asPickupAddress">`;
+                    infoNeeded.pickup.address_list.forEach((addr, idx) => {
+                        let timeslots = JSON.stringify(addr.time_slot_list || []);
+                        html += `<option value="${addr.address_id}" data-timeslots='${timeslots.replace(/'/g, "&#39;")}'>${addr.address || addr.address_id}</option>`;
+                    });
+                    html += `       </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" style="font-size:0.8rem">Waktu Pickup</label>
+                            <select class="form-select form-select-sm" id="asPickupTime"></select>
+                        </div>
+                    </div>`;
+                }
             }
             
             if (html === '') {
@@ -2389,6 +2407,42 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             
             $('asOptions').innerHTML = html;
             $('asSubmitBtn').disabled = false;
+            
+            // Bind events for dynamically added options
+            const methodRadios = document.querySelectorAll('.as-method-radio, input[name="asMethod"]');
+            const pickupWrapper = document.getElementById('pickupOptionsWrapper');
+            const addressSelect = document.getElementById('asPickupAddress');
+            const timeSelect = document.getElementById('asPickupTime');
+            
+            methodRadios.forEach(r => {
+                r.addEventListener('change', (e) => {
+                    if (pickupWrapper) {
+                        pickupWrapper.style.display = (e.target.value === 'pickup') ? 'block' : 'none';
+                    }
+                });
+            });
+            
+            if (addressSelect && timeSelect) {
+                const updateTimes = () => {
+                    const selected = addressSelect.options[addressSelect.selectedIndex];
+                    if (!selected) return;
+                    let timeslots = [];
+                    try { timeslots = JSON.parse(selected.getAttribute('data-timeslots') || '[]'); } catch(e){}
+                    timeSelect.innerHTML = '';
+                    if (timeslots.length > 0) {
+                        timeslots.forEach(ts => {
+                            let text = ts.time_text || ts.pickup_time_id || 'Pilih Waktu';
+                            let dateStr = ts.date ? new Date(ts.date * 1000).toLocaleDateString('id-ID') + ' ' : '';
+                            timeSelect.innerHTML += `<option value="${ts.pickup_time_id}">${dateStr}${text}</option>`;
+                        });
+                    } else {
+                        timeSelect.innerHTML = '<option value="">(Tidak ada waktu tersedia)</option>';
+                    }
+                };
+                addressSelect.addEventListener('change', updateTimes);
+                updateTimes();
+            }
+
         } catch (e) {
             $('asLoading').style.display = 'none';
             $('asContent').style.display = 'block';
@@ -2410,7 +2464,14 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         if (method === 'dropoff') {
             params = { dropoff: {} };
         } else if (method === 'pickup') {
-            params = { pickup: {} }; // in real app, might need address_id, pickup_time_id
+            params = { pickup: {} };
+            const addressSelect = document.getElementById('asPickupAddress');
+            const timeSelect = document.getElementById('asPickupTime');
+            if (addressSelect && timeSelect) {
+                // Ensure address_id is sent as an integer or string based on original value (typically integer)
+                if (addressSelect.value) params.pickup.address_id = Number(addressSelect.value) || addressSelect.value;
+                if (timeSelect.value) params.pickup.pickup_time_id = timeSelect.value;
+            }
         }
 
         try {
