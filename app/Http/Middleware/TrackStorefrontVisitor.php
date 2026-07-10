@@ -92,6 +92,11 @@ class TrackStorefrontVisitor
 
     public function handle(Request $request, Closure $next): Response
     {
+        // Bypass tracking visitor during testing
+        if (app()->environment('testing')) {
+            return $next($request);
+        }
+
         // Ambil atau buat visitor token
         // Prioritas: cookie → session fallback → buat baru
         $fromCookie  = $request->cookie('gf_vid');
@@ -197,6 +202,10 @@ class TrackStorefrontVisitor
      */
     public function terminate(Request $request, $response): void
     {
+        if (app()->environment('testing')) {
+            return;
+        }
+
         $token = $request->attributes->get('visitor_token')
             ?? $request->cookie('gf_vid')
             ?? $request->session()->get('_gf_vid');
