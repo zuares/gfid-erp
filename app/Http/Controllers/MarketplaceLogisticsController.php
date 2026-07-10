@@ -15,6 +15,46 @@ class MarketplaceLogisticsController extends Controller
         protected ChannelManager $manager
     ) {}
 
+    public function syncAwb(Store $store, string $orderSn): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            $order = MarketplaceOrder::where('store_id', $store->id)
+                ->where('channel_order_id', $orderSn)
+                ->first();
+
+            if (!$order) {
+                return response()->json(['error' => 'Order not found'], 404);
+            }
+
+            $awb = null;
+            if (method_exists($driver, 'getTrackingNumber')) {
+                $trackingResp = $driver->getTrackingNumber($store, $orderSn);
+                $awb = $trackingResp['response']['tracking_number'] ?? null;
+            }
+            if (!$awb && method_exists($driver, 'getOrderDetail')) {
+                $details = $driver->getOrderDetail($store, [$orderSn]);
+                $list = $details['response']['order_list'] ?? [];
+                if (count($list) > 0) {
+                    $remoteRaw = $list[0];
+                    if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
+                        $awb = $remoteRaw['package_list'][0]['tracking_number'];
+                    }
+                }
+            }
+
+            if ($awb && $order->shipping_awb_no !== $awb) {
+                $order->update(['shipping_awb_no' => $awb]);
+                return response()->json(['success' => true, 'awb' => $awb]);
+            }
+
+            return response()->json(['success' => false, 'message' => 'AWB not found or unchanged', 'awb' => $order->shipping_awb_no]);
+
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Get shipping parameters (Pickup/Dropoff info)
      */
@@ -131,11 +171,40 @@ class MarketplaceLogisticsController extends Controller
                         $payload['package_number'] = $packageList[0]['package_number'];
                     }
                 }
+                
+                // Jika masih kosong, coba ambil langsung dari API sebelum mencetak
+                if (!isset($payload['tracking_number']) && !isset($payload['package_number'])) {
+                    try {
+                        $awb = null;
+                        if (method_exists($driver, 'getTrackingNumber')) {
+                            $trackingResp = $driver->getTrackingNumber($store, $orderSn);
+                            $awb = $trackingResp['response']['tracking_number'] ?? null;
+                        }
+                        if (!$awb && method_exists($driver, 'getOrderDetail')) {
+                            $details = $driver->getOrderDetail($store, [$orderSn]);
+                            $list = $details['response']['order_list'] ?? [];
+                            if (count($list) > 0) {
+                                $remoteRaw = $list[0];
+                                if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
+                                    $awb = $remoteRaw['package_list'][0]['tracking_number'];
+                                }
+                            }
+                        }
+                        if ($awb) {
+                            $payload['tracking_number'] = $awb;
+                            $order->update(['shipping_awb_no' => $awb]);
+                        }
+                    } catch (\Throwable $e) {}
+                }
             }
+            
+            // Parameter untuk greeting card
+            $cardParam = request()->query('card');
+            $cacheSuffix = $cardParam === '0' ? '_nocard' : '';
             
             // Cek Cache Lokal
             $disk = \Illuminate\Support\Facades\Storage::disk('local');
-            $cachePath = "shipping_labels/{$store->id}/{$orderSn}.pdf.gz";
+            $cachePath = "shipping_labels/{$store->id}/{$orderSn}{$cacheSuffix}.pdf.gz";
             
             if ($disk->exists($cachePath)) {
                 $content = gzdecode($disk->get($cachePath));
@@ -192,8 +261,12 @@ class MarketplaceLogisticsController extends Controller
             if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
                 $content = $downloadRes['message']; // Raw body
                 if (str_starts_with($content, '%PDF')) {
+                    $config = [];
+                    if ($cardParam !== null) {
+                        $config['marketplace_print_greeting_card'] = $cardParam === '1' ? '1' : '0';
+                    }
                     $overlayService = new \App\Services\ShippingLabelOverlayService();
-                    $content = $overlayService->overlayPdfContent($content);
+                    $content = $overlayService->overlayPdfContent($content, $config);
 
                     // Simpan ke Cache Lokal dengan kompresi GZIP Level 9
                     $disk->put($cachePath, gzencode($content, 9));
@@ -257,6 +330,31 @@ class MarketplaceLogisticsController extends Controller
                             $payload['package_number'] = $packageList[0]['package_number'];
                         }
                     }
+                    
+                    // Fallback get missing tracking number
+                    if (!isset($payload['tracking_number']) && !isset($payload['package_number'])) {
+                        try {
+                            $awb = null;
+                            if (method_exists($driver, 'getTrackingNumber')) {
+                                $trackingResp = $driver->getTrackingNumber($store, $orderSn);
+                                $awb = $trackingResp['response']['tracking_number'] ?? null;
+                            }
+                            if (!$awb && method_exists($driver, 'getOrderDetail')) {
+                                $details = $driver->getOrderDetail($store, [$orderSn]);
+                                $list = $details['response']['order_list'] ?? [];
+                                if (count($list) > 0) {
+                                    $remoteRaw = $list[0];
+                                    if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
+                                        $awb = $remoteRaw['package_list'][0]['tracking_number'];
+                                    }
+                                }
+                            }
+                            if ($awb) {
+                                $payload['tracking_number'] = $awb;
+                                $order->update(['shipping_awb_no' => $awb]);
+                            }
+                        } catch (\Throwable $e) {}
+                    }
                 }
                 $payloadList[] = $payload;
             }
@@ -267,8 +365,12 @@ class MarketplaceLogisticsController extends Controller
             if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
                 $content = $downloadRes['message']; 
                 if (str_starts_with($content, '%PDF')) {
+                    $config = [];
+                    if ($request->has('card')) {
+                        $config['marketplace_print_greeting_card'] = $request->query('card') === '1' ? '1' : '0';
+                    }
                     $overlayService = new \App\Services\ShippingLabelOverlayService();
-                    $content = $overlayService->overlayPdfContent($content);
+                    $content = $overlayService->overlayPdfContent($content, $config);
 
                     return response($content, 200, [
                         'Content-Type' => 'application/pdf',
@@ -283,6 +385,76 @@ class MarketplaceLogisticsController extends Controller
             ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e);
+        }
+    }
+
+    public function printBulkGreetings(Request $request, Store $store): \Symfony\Component\HttpFoundation\Response
+    {
+        try {
+            $orderSns = $request->query('orders');
+            if (empty($orderSns)) {
+                return response()->json(['error' => 'No orders provided'], 400);
+            }
+            
+            $orderSnList = explode(',', $orderSns);
+            $orderSnList = array_slice($orderSnList, 0, 50); // Maksimal 50
+            
+            // Buat blank PDF
+            $pdf = new \setasign\Fpdi\Fpdi();
+            
+            $width = 100;
+            $height = 150;
+            
+            $greetingImageFull = null;
+            $customGreetingImg = \App\Models\SystemSetting::get('marketplace_greeting_card_image', '');
+            
+            if (!empty($customGreetingImg) && file_exists(storage_path('app/public/' . $customGreetingImg))) {
+                $greetingImageFull = storage_path('app/public/' . $customGreetingImg);
+            } else {
+                $gTpl = \App\Models\SystemSetting::get('marketplace_greeting_card_template', 'template_1.png');
+                if ($gTpl !== 'none') {
+                    if (in_array($gTpl, ['1', '2', '3'])) {
+                        $gTpl = 'template_' . $gTpl . '.png';
+                    }
+                    $tplPath = storage_path('app/public/templates/greetings/' . $gTpl);
+                    if (file_exists($tplPath)) {
+                        $greetingImageFull = $tplPath;
+                    }
+                }
+            }
+
+            // Cetak HANYA 1 Halaman sesuai request user
+            $pdf->AddPage('P', [$width, $height]);
+            
+            if ($greetingImageFull) {
+                $ext = strtolower(pathinfo($greetingImageFull, PATHINFO_EXTENSION));
+                if ($ext === 'pdf') {
+                    try {
+                        $pdf->setSourceFile($greetingImageFull);
+                        $gTplId = $pdf->importPage(1);
+                        $pdf->useTemplate($gTplId, 0, 0, $width, $height);
+                    } catch (\Exception $e) {}
+                } else {
+                    // Add 4mm safe margin
+                    $m = 4;
+                    $pdf->Image($greetingImageFull, $m, $m, $width - ($m * 2), $height - ($m * 2));
+                }
+            } else {
+                $pdf->SetFont('Helvetica', 'B', 14);
+                $pdf->SetXY(0, ($height / 2) - 5);
+                $pdf->Cell($width, 10, 'Thank you for your order!', 0, 1, 'C');
+            }
+            
+            $content = $pdf->Output('S');
+
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="Kartu_Ucapan_Bulk.pdf"'
+            ]);
+            
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed bulk greetings: " . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 

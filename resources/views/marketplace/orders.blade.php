@@ -641,6 +641,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             <button class="btn-toolbar primary" id="btnBulkArrangeShipment" onclick="openBulkArrangeShipment()" style="background:#2563eb;border-color:#2563eb;">🚚 Atur Pengiriman Semua</button>
             <button class="btn-toolbar primary" id="btnBulkPrint" onclick="printPickingList()" style="background:#0f172a;border-color:#0f172a;">🖨️ Cetak Picking List</button>
             <button class="btn-toolbar primary" id="btnBulkPrintDocuments" onclick="printAllDocuments()" style="background:#0891b2;border-color:#0891b2;display:none;">🖨️ Cetak Semua Resi</button>
+            <button class="btn-toolbar primary" id="btnBulkPrintGreetings" onclick="printAllGreetings()" style="background:#8b5cf6;border-color:#8b5cf6;display:none;">💌 Cetak Kartu Ucapan</button>
             <button class="btn-toolbar primary" id="btnBulkFulfill" onclick="window.location='/sales/shipments'">📦 Buka Shipment</button>
         </div>
         <div class="process-toolbar-actions" id="toolbarActionsUnresolved" style="display:none">
@@ -965,7 +966,32 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         renderTable();
         updateToolbar();
         updatePickingPrintStrip();
+        
+        if (tab === 'processed') {
+            autoFetchMissingAwbs();
+        }
     };
+
+    async function autoFetchMissingAwbs() {
+        const rows = orders.filter(o => (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') && !o.shipping_awb_no);
+        if (rows.length === 0) return;
+        
+        let updatedCount = 0;
+        for (const o of rows) {
+            try {
+                const res = await fetch(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/sync-awb`);
+                const data = await res.json();
+                if (data.success && data.awb) {
+                    o.shipping_awb_no = data.awb;
+                    updatedCount++;
+                }
+            } catch(e) {}
+        }
+        
+        if (updatedCount > 0 && activeTab === 'processed') {
+            renderTable();
+        }
+    }
 
     window.switchTabByName = function (tab) {
         const btn = document.querySelector(`.ord-tab[data-tab="${tab}"]`);
@@ -1104,6 +1130,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
         const btnBulkArrangeShipment = $('btnBulkArrangeShipment');
         const btnBulkPrint = $('btnBulkPrint');
         const btnBulkPrintDocuments = $('btnBulkPrintDocuments');
+        const btnBulkPrintGreetings = $('btnBulkPrintGreetings');
 
         if (isIssues) {
             const rows = filterByTab(applyFilters(orders.filter(inRange)), 'issues');
@@ -1114,6 +1141,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             if (btnBulkArrangeShipment) btnBulkArrangeShipment.style.display = 'none';
             if (btnBulkPrint) btnBulkPrint.style.display = 'none';
             if (btnBulkPrintDocuments) btnBulkPrintDocuments.style.display = 'none';
+            if (btnBulkPrintGreetings) btnBulkPrintGreetings.style.display = 'none';
         } else if (activeTab === 'processed') {
             const rows = getPackingRows();
             toolbar.classList.toggle('visible', rows.length > 0);
@@ -1123,6 +1151,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             if (btnBulkArrangeShipment) btnBulkArrangeShipment.style.display = 'none';
             if (btnBulkPrint) btnBulkPrint.style.display = '';
             if (btnBulkPrintDocuments) btnBulkPrintDocuments.style.display = '';
+            if (btnBulkPrintGreetings) btnBulkPrintGreetings.style.display = '';
         } else {
             const rows = getProcessRows();
             toolbar.classList.toggle('visible', rows.length > 0);
@@ -1132,6 +1161,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             if (btnBulkArrangeShipment) btnBulkArrangeShipment.style.display = '';
             if (btnBulkPrint) btnBulkPrint.style.display = '';
             if (btnBulkPrintDocuments) btnBulkPrintDocuments.style.display = 'none';
+            if (btnBulkPrintGreetings) btnBulkPrintGreetings.style.display = 'none';
         }
     }
 
@@ -2434,6 +2464,13 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
                     <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;color:#1e293b;">🖨️ Cetak Resi Massal</h3>
                     <p style="font-size:0.85rem;color:#64748b;margin-bottom:20px;">Terdapat <strong>${total}</strong> total order.<br><strong>${unprinted}</strong> di antaranya belum dicetak resi.</p>
                     
+                    <div style="margin-bottom:16px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;cursor:pointer;">
+                            <input type="checkbox" id="chkPrintGreeting" checked style="width:16px;height:16px;">
+                            Sertakan Kartu Ucapan
+                        </label>
+                    </div>
+
                     <div style="display:flex;flex-direction:column;gap:10px;">
                         <button onclick="executePrintBulk(true)" class="btn-toolbar primary" style="width:100%;justify-content:center;background:#059669;border-color:#059669;color:white;cursor:${unprinted === 0 ? 'not-allowed' : 'pointer'};opacity:${unprinted === 0 ? '0.5' : '1'};" ${unprinted === 0 ? 'disabled' : ''}>
                             Cetak yang Belum (${unprinted})
@@ -2452,6 +2489,10 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
     };
 
     window.executePrintBulk = function(onlyUnprinted) {
+        let printGreeting = true;
+        const chk = document.getElementById('chkPrintGreeting');
+        if (chk) printGreeting = chk.checked;
+        
         const modal = document.getElementById('printOptsModal');
         if (modal) modal.remove();
 
@@ -2462,23 +2503,29 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
 
         if (!rows.length) { alert('Tidak ada order untuk dicetak.'); return; }
         
-        // Kelompokkan orderSn berdasarkan store_id
-        const storeGroups = {};
+        // Kelompokkan orderSn berdasarkan store_id + shipping_carrier (logistics channel)
+        // Shopee menolak bulk print jika channel/ekspedisi berbeda-beda dalam 1 request
+        const groupedData = {};
         rows.forEach(o => {
-            if (!storeGroups[o.store_id]) storeGroups[o.store_id] = [];
-            storeGroups[o.store_id].push(o.channel_order_id);
+            const carrier = o.shipping_carrier || 'default';
+            const key = `${o.store_id}_${carrier}`;
+            if (!groupedData[key]) groupedData[key] = { storeId: o.store_id, carrier: carrier, sns: [] };
+            groupedData[key].sns.push(o.channel_order_id);
         });
         
         const alertHtml = `<div id="printBulkAlert" style="position:fixed;top:20px;right:20px;background:#f59e0b;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi massal dari Marketplace...</div>`;
         document.body.insertAdjacentHTML('beforeend', alertHtml);
 
-        Object.keys(storeGroups).forEach(storeId => {
-            const allSns = storeGroups[storeId];
+        Object.values(groupedData).forEach(group => {
+            const storeId = group.storeId;
+            const allSns = group.sns;
+            
             // Shopee limit 50 order per bulk request
             for (let i = 0; i < allSns.length; i += 50) {
                 const chunk = allSns.slice(i, i + 50);
                 const orderSns = chunk.join(',');
-                const url = `/api/marketplace/stores/${storeId}/documents/bulk?orders=${orderSns}`;
+                const cardParam = printGreeting ? '1' : '0';
+                const url = `/api/marketplace/stores/${storeId}/documents/bulk?orders=${orderSns}&card=${cardParam}`;
                 window.open(url, '_blank');
             }
         });
@@ -2490,6 +2537,24 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
             if (el) el.remove();
             renderTable();
         }, 2000);
+    };
+
+    window.printAllGreetings = function() {
+        const rows = getPackingRows();
+        // Cukup ambil storeId dari baris pertama saja untuk memenuhi route Laravel
+        const storeId = rows.length > 0 ? rows[0].store_id : (activeStore || 1);
+        
+        const alertHtml = `<div id="printBulkAlertGreetings" style="position:fixed;top:20px;right:20px;background:#8b5cf6;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen kartu ucapan...</div>`;
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+
+        // Hanya buka 1 tab berisi 1 halaman sesuai permintaan user
+        const url = `/api/marketplace/stores/${storeId}/documents/bulk-greetings?orders=1`;
+        window.open(url, '_blank');
+
+        setTimeout(() => {
+            const el = document.getElementById('printBulkAlertGreetings');
+            if (el) el.remove();
+        }, 1500);
     };
 
     // ── [DEV ONLY] Fresh Orders ───────────────────────────────────────────────

@@ -117,7 +117,9 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
         ->name('marketplace.logistics.ship');
     Route::get('/stores/{store}/orders/{orderSn}/document', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printDocument']);
+    Route::get('/stores/{store}/orders/{orderSn}/sync-awb', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'syncAwb']);
     Route::get('/stores/{store}/documents/bulk', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printDocumentBulk']);
+    Route::get('/stores/{store}/documents/bulk-greetings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printBulkGreetings']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);
