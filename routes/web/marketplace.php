@@ -10,6 +10,21 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
     ->name('marketplace.')
     ->group(function () {
 
+        Route::get('fix-unpaid-orders', function() {
+            $orders = \App\Models\MarketplaceOrder::where('order_status', 'UNPAID')->get();
+            $sync = app(\App\Services\OmnichannelSyncService::class);
+            $html = "<div style='font-family:sans-serif; padding:20px;'><h3>Memperbaiki " . $orders->count() . " pesanan nyangkut...</h3><br>";
+            foreach($orders as $o) {
+                try {
+                    $sync->syncSpecificOrder($o->store, $o->channel_order_id);
+                    $html .= "✅ Berhasil update status pesanan: {$o->channel_order_id}<br>";
+                } catch (\Exception $e) {
+                    $html .= "❌ Gagal update {$o->channel_order_id}: " . $e->getMessage() . "<br>";
+                }
+            }
+            return $html . "<br><b>Selesai!</b> Semua pesanan nyangkut sudah dibersihkan. Silakan tutup halaman ini.</div>";
+        });
+
         // =========================
         // Marketplace Orders
         // =========================
