@@ -669,9 +669,13 @@
                 </div>
 
                 <div class="store-footer">
-                    <div class="sync-time">
+                    <div class="sync-time" style="margin-bottom:2px;">
                         <i class="bi bi-arrow-repeat"></i>
-                        <span>Sync: ${s.last_synced_at ? fmtShortDate(s.last_synced_at) : 'Belum Pernah'}</span>
+                        <span>Sync API: ${s.last_synced_at ? fmtShortDate(s.last_synced_at) : 'Belum Pernah'}</span>
+                    </div>
+                    <div class="sync-time">
+                        <i class="bi bi-lightning-charge"></i>
+                        <span>Webhook: ${s.meta?.last_webhook_at ? fmtShortDate(s.meta.last_webhook_at) : 'Belum Pernah'}</span>
                     </div>
                 </div>
             </div>`;

@@ -34,8 +34,24 @@ class ProcessShopeeWebhookJob implements ShouldQueue
     {
         Log::info("Processing Shopee Webhook Event: {$this->eventType}");
 
+        $shopId = $this->payload['shop_id'] ?? null;
+        if ($shopId) {
+            $store = \App\Models\Store::where('external_shop_id', (string)$shopId)
+                ->whereHas('channel', function($q) {
+                    $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
+                })->first();
+                
+            if ($store) {
+                $meta = $store->meta ?? [];
+                $meta['last_webhook_at'] = now()->toISOString();
+                $store->update(['meta' => $meta]);
+            }
+        }
+
         if ($this->eventType === 'order_status_update') {
             $this->handleOrderStatusUpdate();
+        } elseif ($this->eventType === 'shop_auth_update') {
+            $this->handleShopAuthUpdate();
         } elseif ($this->eventType === 'tracking_no_update') {
             $this->handleTrackingNoUpdate();
         } elseif ($this->eventType === 'auth_expiry_push') {
@@ -486,6 +502,39 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                 app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $orderSn);
             } catch (\Exception $e) {
                 Log::error("Failed to sync missing order {$orderSn}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Handle shop_authorization_push (Code 1)
+     */
+    protected function handleShopAuthUpdate()
+    {
+        $data = $this->payload['data'] ?? [];
+        $shopId = $this->payload['shop_id'] ?? $data['shop_id'] ?? null;
+        
+        $shopIds = [];
+        if ($shopId) {
+            $shopIds[] = $shopId;
+        }
+        if (!empty($data['shop_id_list'])) {
+            $shopIds = array_merge($shopIds, $data['shop_id_list']);
+        }
+        $shopIds = array_unique($shopIds);
+
+        foreach ($shopIds as $id) {
+            $store = \App\Models\Store::where('external_shop_id', (string)$id)
+                ->whereHas('channel', function($q) {
+                    $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
+                })->first();
+
+            if ($store) {
+                // If it was disconnected, this webhook confirms it has been authorized again
+                $store->update(['connection_status' => 'CONNECTED']);
+                Log::info("Store {$store->name} (ID: {$store->id}) authorized and marked as CONNECTED via shop_authorization_push.");
+            } else {
+                Log::info("Shopee shop_authorization_push received for unknown shop_id: {$id}. Store cannot be created via webhook alone because access_token is missing.");
             }
         }
     }
