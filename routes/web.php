@@ -181,6 +181,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::delete('/stores/{store}',           [MarketplaceController::class, 'deleteStore'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/stores/{store}/disconnect',  [MarketplaceController::class, 'disconnectStore'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 });
 
 // Fulfillment API

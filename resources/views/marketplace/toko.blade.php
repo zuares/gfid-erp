@@ -626,6 +626,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
                             ` : ''}
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-warning me-2"></i>Putuskan Koneksi</button></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item py-2 text-danger fw-bold" onclick="deleteStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-trash3-fill me-2"></i>Hapus Toko</button></li>
                         </ul>
@@ -973,6 +974,18 @@
             cancelRename(storeId);
         } catch (e) {
             alert('Gagal menyimpan nama: ' + e.message);
+        }
+    };
+
+    window.disconnectStore = async function (storeId, name) {
+        if (!confirm('Apakah Anda yakin ingin memutuskan koneksi API untuk toko "' + name + '"?')) return;
+        try {
+            await api('/stores/' + storeId + '/disconnect', {
+                method: 'POST',
+            });
+            loadAll();
+        } catch (e) {
+            alert(e.message || 'Gagal memutuskan koneksi toko');
         }
     };
 

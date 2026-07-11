@@ -1200,6 +1200,24 @@ class MarketplaceController extends Controller
         ]);
     }
 
+    public function disconnectStore(Store $store): JsonResponse
+    {
+        try {
+            $store->update([
+                'credentials' => null,
+                'token_expires_at' => null,
+            ]);
+            
+            return response()->json([
+                'message' => 'Toko berhasil diputuskan koneksinya.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Terjadi kesalahan saat memutuskan koneksi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function deleteStore(Store $store): JsonResponse
     {
         // Cek apakah ada data krusial yang sudah masuk
