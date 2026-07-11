@@ -28,7 +28,8 @@
             <div><div class="fw-bold">GreatFit</div><small class="text-white-50">Good Fit, Good Feel.</small></div>
         </div>
         <div class="gf-nav-label">Marketplace</div>
-        <a href="/marketplace/toko" class="gf-nav-link active"><i class="bi bi-shop-window"></i><span>Toko & Channel</span></a>
+        <a href="/marketplace/toko" class="gf-nav-link {{ request()->is('marketplace/toko') ? 'active' : '' }}"><i class="bi bi-shop-window"></i><span>Toko & Channel</span></a>
+        <a href="{{ route('marketplace.returns') }}" class="gf-nav-link {{ request()->routeIs('marketplace.returns') ? 'active' : '' }}"><i class="bi bi-arrow-return-left"></i><span>Retur Marketplace</span></a>
         <a href="/marketplace/shopee/connect" class="gf-nav-link"><i class="bi bi-box-arrow-in-right"></i><span>Login Shopee</span></a>
     </aside>
     <main class="gf-content">

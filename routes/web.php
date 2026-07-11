@@ -68,6 +68,7 @@ use App\Http\Controllers\TikTokShopAuthController;
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/toko',        [MarketplaceController::class, 'toko'])->name('marketplace.toko');
     Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
+    Route::get('/marketplace/webhook-tests', [MarketplaceController::class, 'webhookTests'])->name('marketplace.webhook-tests');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
@@ -88,6 +89,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::post('/marketplace/settings/delete-template', [MarketplaceController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceController::class, 'analytics'])->name('marketplace.analytics');
     Route::get('/marketplace/issues',      [MarketplaceController::class, 'issueCenter'])->name('marketplace.issues');
+    Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
 });
 
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -115,7 +117,11 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/orders/{orderSn}/shipping-parameter', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getShippingParameter']);
     Route::get('/stores/{store}/orders/{orderSn}/booking-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getBookingDetail']);
     Route::get('/stores/{store}/orders/{orderSn}/raw-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getOrderDetailRaw']);
+    Route::get('/stores/{store}/orders/{orderSn}/tracking', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getTrackingInfo']);
+    Route::get('/stores/{store}/packages/{packageNumber}/raw-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getPackageDetailRaw']);
+    Route::get('/stores/{store}/return-list/raw-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getReturnListRaw']);
     Route::get('/stores/{store}/booking-list', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getBookingList']);
+    Route::get('/stores/{store}/order-list', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getOrderList']);
     Route::post('/stores/{store}/sync-bookings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'syncBookings'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/orders/{orderSn}/ship', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'arrangeShipment'])
@@ -134,6 +140,15 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/stores/{store}/sync-settlements',  [MarketplaceController::class, 'syncSettlements'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/order-profits',                     [MarketplaceController::class, 'orderProfits']);
+    
+    // Returns Module
+    Route::get('/stores/{store}/returns/list', [\App\Http\Controllers\MarketplaceReturnController::class, 'getReturnList']);
+    Route::post('/stores/{store}/returns/sync', [\App\Http\Controllers\MarketplaceReturnController::class, 'syncReturns'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/stores/{store}/returns/{returnSn}/detail', [\App\Http\Controllers\MarketplaceReturnController::class, 'getReturnDetail']);
+    Route::get('/stores/{store}/returns/{returnSn}/tracking', [\App\Http\Controllers\MarketplaceReturnController::class, 'getTracking']);
+    Route::post('/stores/{store}/returns/{returnSn}/confirm', [\App\Http\Controllers\MarketplaceReturnController::class, 'confirmAndRestock'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/ads-analytics',                     [MarketplaceController::class, 'adsAnalytics']);
     Route::post('/stores/{store}/sync-ad-campaigns', [MarketplaceController::class, 'syncAdCampaigns'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
@@ -163,6 +178,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/warehouses',                  [MarketplaceController::class, 'warehouses']);
     Route::patch('/stores/{store}',            [MarketplaceController::class, 'updateStore'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::delete('/stores/{store}',           [MarketplaceController::class, 'deleteStore'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 });
 

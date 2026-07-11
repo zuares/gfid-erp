@@ -54,6 +54,19 @@ class MarketplaceController extends Controller
         return view('marketplace.orders', compact('filters', 'isDummy'));
     }
 
+    public function webhookTests(Request $request): \Illuminate\View\View
+    {
+        $today   = now()->toDateString();
+        $weekAgo = now()->subDays(6)->toDateString();
+        $filters = [
+            'date_from' => $request->query('date_from', $weekAgo),
+            'date_to'   => $request->query('date_to', $today),
+        ];
+        $isDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
+
+        return view('marketplace.webhook-tests', compact('filters', 'isDummy'));
+    }
+
     public function fulfillment(): \Illuminate\View\View
     {
         return view('marketplace.fulfillment');
@@ -510,6 +523,9 @@ class MarketplaceController extends Controller
 
     public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
     {
+        // Beri waktu 3 menit untuk penarikan data berat (misal: opsi 14 hari)
+        set_time_limit(180);
+
         $lock = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
 
         if (!$lock->get()) {
@@ -1182,6 +1198,35 @@ class MarketplaceController extends Controller
             'default_warehouse_id' => $store->default_warehouse_id,
             'fulfillments_updated' => isset($fulfillments) ? $fulfillments->count() : 0,
         ]);
+    }
+
+    public function deleteStore(Store $store): JsonResponse
+    {
+        // Cek apakah ada data krusial yang sudah masuk
+        $hasOrders = \Illuminate\Support\Facades\DB::table('marketplace_orders')->where('store_id', $store->id)->exists();
+        $hasShipments = \Illuminate\Support\Facades\DB::table('shipments')->where('store_id', $store->id)->exists();
+
+        if ($hasOrders || $hasShipments) {
+            return response()->json([
+                'message' => 'Toko ini tidak dapat dihapus karena sudah memiliki riwayat pesanan (orders) atau pengiriman (shipments). Untuk menjaga integritas data akuntansi dan riwayat, sistem menolak penghapusan ini.'
+            ], 422);
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($store) {
+                // Hanya membersihkan data log yang tidak berdampak pada transaksi utama
+                \Illuminate\Support\Facades\DB::table('marketplace_sync_logs')->where('store_id', $store->id)->delete();
+                $store->delete();
+            });
+            
+            return response()->json([
+                'message' => 'Toko berhasil dihapus karena belum memiliki riwayat pesanan.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal menghapus toko: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // ─── Issue Center API ─────────────────────────────────────────────────────

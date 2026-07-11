@@ -25,8 +25,26 @@ Route::prefix('api')
         // ... route api lain (stock, items, dll)
     });
 
+// Webhook endpoints
+Route::prefix('webhooks')->group(function () {
+    Route::post('/shopee', [\App\Http\Controllers\WebhookController::class, 'shopee']);
+    Route::post('/simulate', [\App\Http\Controllers\WebhookController::class, 'simulate']);
+    Route::get('/logs', [\App\Http\Controllers\WebhookController::class, 'logs']);
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('customers', [ApiCustomerController::class, 'index'])
         ->name('api.customers.index');
 
+});
+
+// Mock Shopee API endpoints
+Route::post('/v2/logistics/get_shipping_document_data_info', function (\Illuminate\Http\Request $request) {
+    $filePath = storage_path('app/mock/shopee_shipping_document.json');
+    if (!file_exists($filePath)) {
+        return response()->json(['error' => 'mock_file_not_found', 'message' => 'Mock file not found'], 404);
+    }
+    
+    $jsonContent = file_get_contents($filePath);
+    return response($jsonContent, 200)->header('Content-Type', 'application/json');
 });

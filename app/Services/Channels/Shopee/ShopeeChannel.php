@@ -130,6 +130,7 @@ class ShopeeChannel implements MarketplaceChannel
             'time_from' => $timeFrom,
             'time_to' => $timeTo,
             'page_size' => $pageSize,
+            'response_optional_fields' => 'order_status',
         ];
         if ($cursor) {
             $params['cursor'] = $cursor;
@@ -157,6 +158,49 @@ class ShopeeChannel implements MarketplaceChannel
                 'total_amount',
                 'checkout_shipping_carrier',
             ]),
+        ]);
+    }
+
+    public function getPackageDetail(Store $store, string $packageNumber): array
+    {
+        return $this->get($store, '/api/v2/order/get_package_detail', [
+            'package_number_list' => $packageNumber,
+        ]);
+    }
+
+    public function getReturnList(Store $store, int $pageNo = 0, int $pageSize = 40, ?int $createTimeFrom = null, ?int $createTimeTo = null): array
+    {
+        $params = [
+            'page_no' => $pageNo,
+            'page_size' => $pageSize,
+        ];
+        
+        if ($createTimeFrom !== null && $createTimeTo !== null) {
+            $params['create_time_from'] = $createTimeFrom;
+            $params['create_time_to'] = $createTimeTo;
+        }
+        
+        return $this->get($store, '/api/v2/returns/get_return_list', $params);
+    }
+
+    public function getReturnDetail(Store $store, string $returnSn): array
+    {
+        return $this->get($store, '/api/v2/returns/get_return_detail', [
+            'return_sn' => $returnSn,
+        ]);
+    }
+
+    public function getReverseTrackingInfo(Store $store, string $returnSn): array
+    {
+        return $this->get($store, '/api/v2/returns/get_reverse_tracking_info', [
+            'return_sn' => $returnSn,
+        ]);
+    }
+
+    public function confirmReturn(Store $store, string $returnSn): array
+    {
+        return $this->post($store, '/api/v2/returns/confirm', [
+            'return_sn' => $returnSn,
         ]);
     }
 
@@ -256,27 +300,34 @@ class ShopeeChannel implements MarketplaceChannel
 
     public function getShippingParameter(Store $store, string $orderSn): array
     {
-        return $this->doGet($store, '/api/v2/logistics/get_shipping_parameter', [
+        return $this->get($store, '/api/v2/logistics/get_shipping_parameter', [
             'order_sn' => $orderSn
         ]);
     }
 
     public function getBookingDetail(Store $store, string $orderSn): array
     {
-        return $this->doGet($store, '/api/v2/order/get_booking_detail', [
+        return $this->get($store, '/api/v2/order/get_booking_detail', [
             'order_sn' => $orderSn
         ]);
     }
 
-    public function getBookingList(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = ''): array
+    public function getBookingList(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $bookingStatus = ''): array
     {
-        return $this->doGet($store, '/api/v2/order/get_booking_list', [
+        $params = [
             'time_range_field' => 'create_time',
             'time_from' => $timeFrom,
             'time_to' => $timeTo,
             'page_size' => $pageSize,
-            'cursor' => $cursor
-        ]);
+            'response_optional_fields' => 'booking_status',
+        ];
+        if ($cursor) {
+            $params['cursor'] = $cursor;
+        }
+        if ($bookingStatus) {
+            $params['booking_status'] = $bookingStatus;
+        }
+        return $this->get($store, '/api/v2/order/get_booking_list', $params);
     }
 
     public function shipOrder(Store $store, string $orderSn, array $params = []): array

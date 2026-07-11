@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Marketplace • Order Lokal')
+@section('title', 'Marketplace • Webhook Tests')
 
 @include('marketplace._shared')
 
@@ -504,74 +504,6 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
 }
 .bulk-prog-item:last-child { border-bottom: none; }
 .bulk-prog-icon { flex-shrink: 0; width: 16px; text-align: center; }
-
-/* ── UI Alignment: Shipments KPI & Buttons & Badges ── */
-.kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
-.kpi{
-    display:inline-flex; align-items:baseline; gap:.45rem;
-    border-radius:7px; padding:.2rem .48rem;
-    border:1px solid rgba(148,163,184,.28);
-    background: transparent;
-    font-size:.72rem;
-}
-body[data-theme="dark"] .kpi{
-    background: rgba(15, 23, 42, 0.96);
-    border-color: rgba(51, 65, 85, 0.85);
-}
-.kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
-body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
-.kpi .val{ font-weight:650; color:var(--shp-accent); }
-
-.btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
-.btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
-.btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
-.btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
-.btn-fresh{ border:1px solid #fecaca; color:#b91c1c; background:transparent; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
-.btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
-
-.badge-status{
-    border-radius:7px; padding:.16rem .48rem;
-    font-size:.68rem; letter-spacing:0; text-transform:none;
-    border:1px solid transparent;
-    display:inline-flex; align-items:center; gap:.35rem;
-    white-space:nowrap;
-}
-.badge-status::before{ content:''; width:7px; height:7px; border-radius:999px; display:inline-block; }
-
-.st-draft{ background: rgba(148, 163, 184, 0.10); color:#475569; border-color: rgba(148, 163, 184, 0.30); }
-.st-draft::before{ background: rgba(100, 116, 139, 0.95); }
-.st-submitted{ background: rgba(59, 130, 246, 0.10); color:#1d4ed8; border-color: rgba(59, 130, 246, 0.30); }
-.st-submitted::before{ background: rgba(59, 130, 246, 0.95); }
-.st-posted{ background: rgba(34, 197, 94, 0.10); color:#166534; border-color: rgba(34, 197, 94, 0.30); }
-.st-posted::before{ background: rgba(34, 197, 94, 0.95); }
-.st-cancelled{ background: rgba(239, 68, 68, 0.10); color:#991b1b; border-color: rgba(239, 68, 68, 0.30); }
-.st-cancelled::before{ background: rgba(239, 68, 68, 0.95); }
-
-body[data-theme="dark"] .st-submitted{ background: rgba(59, 130, 246, 0.20); color:#dbeafe; border-color: rgba(59, 130, 246, 0.55); }
-body[data-theme="dark"] .st-posted{ background: rgba(34, 197, 94, 0.20); color:#dcfce7; border-color: rgba(34, 197, 94, 0.55); }
-body[data-theme="dark"] .st-cancelled{ background: rgba(239, 68, 68, 0.18); color:#fecaca; border-color: rgba(239, 68, 68, 0.55); }
-
-/* Overrides to match shipments table style */
-.ord-table thead tr th {
-    font-size: .68rem;
-    text-transform: none;
-    letter-spacing: 0;
-    color: #64748b;
-    background: var(--card,#fff);
-    border-bottom: 1px solid var(--shp-border);
-}
-body[data-theme="dark"] .ord-table thead tr th {
-    background: rgba(15, 23, 42, 0.98);
-    color: #9ca3af;
-    border-bottom-color: rgba(30, 64, 175, 0.6);
-}
-.ord-table tbody tr td {
-    border-top: 1px solid rgba(148, 163, 184, 0.16);
-    border-bottom: 0;
-}
-body[data-theme="dark"] .ord-table tbody tr td {
-    border-top-color: rgba(51, 65, 85, 0.85);
-}
 </style>
 @endpush
 
@@ -590,15 +522,8 @@ body[data-theme="dark"] .ord-table tbody tr td {
     {{-- ── TOPBAR ── --}}
     <div class="ship-topbar">
         <div>
-            <h1 class="title" style="display:flex;align-items:center;gap:.5rem;">
-                Order Lokal
-                <span id="syncIndicator" style="display:none;font-size:.7rem;color:var(--shp-muted);font-weight:normal;">
-                    <span class="prod-tab-spinner" style="width:12px;height:12px;border-width:1.5px;margin-right:.2rem;"></span>
-                    Menyinkronkan...
-                </span>
-            </h1>
-            <div class="sub">Pantau pesanan Marketplace</div>
-            <div class="kpis" id="orderKpis" style="display:none;"></div>
+            <h1 class="title">Webhook Tests</h1>
+            <div class="sub">Simulasi webhook per pesanan (Khusus Dev)</div>
         </div>
         <div class="controls" style="flex:1; justify-content:flex-end">
             {{-- Hidden date inputs --}}
@@ -614,7 +539,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
 
             {{-- Store filter --}}
             <div style="position:relative">
-                <button class="btn-ship-outline" id="btnStore" onclick="toggleDropdown('ddStore', event)">
+                <button class="hdr-btn" id="btnStore" onclick="toggleDropdown('ddStore', event)">
                     🏪 <span id="btnStoreLabel" class="hdr-btn-label">Semua Toko</span>
                 </button>
                 <div class="hdr-dropdown" id="ddStore">
@@ -626,7 +551,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
 
             {{-- Date filter --}}
             <div style="position:relative">
-                <button class="btn-ship-outline" id="btnDate" onclick="toggleDropdown('ddDate', event)">
+                <button class="hdr-btn" id="btnDate" onclick="toggleDropdown('ddDate', event)">
                     📅 <span id="btnDateLabel" class="hdr-btn-label">30 hari terakhir</span>
                 </button>
                 <div class="hdr-dropdown" id="ddDate" style="right:0;left:auto;min-width:210px">
@@ -646,16 +571,15 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
 
             {{-- Sync --}}
-            <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; margin-right: 0.5rem; align-self: center; font-weight: 500;"></span>
-            <button class="btn-ship-primary" onclick="openQuickSync()">🔄 Sync</button>
-            <button class="btn-ship-outline" id="btnSyncBookings" style="display:none; color:#0369a1!important; border-color:#bae6fd!important;" onclick="runSyncBookings()">🚚 Sync Resi</button>
-            <button class="btn-ship-outline" onclick="loadOrders()" title="Refresh">🔃</button>
+            <button class="hdr-btn" style="background:var(--shp-accent);color:#fff;border-color:var(--shp-accent)" onclick="openQuickSync()">🔄 Sync</button>
+            <button class="hdr-btn" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd;display:none" id="btnSyncBookings" onclick="runSyncBookings()">🚚 Sync Resi</button>
+            <button class="hdr-btn" onclick="loadOrders()" title="Refresh">🔃</button>
 
             @if(auth()->user()?->role === 'owner')
                         @if(app()->environment(['local', 'testing']))
-            <button class="btn-ship-outline" style="border-color:#ffeeba!important; color:#856404!important;" onclick="window.location.search = '?dummy=1'">🧪 Test Dummy</button>
+            <button class="hdr-btn" style="background:#fff3cd;color:#856404;border-color:#ffeeba" onclick="window.location.search = '?dummy=1'">🧪 Test Dummy</button>
             @endif
-            <button class="btn-ship-outline" id="btnDevPanel" style="color:#7c3aed!important; border-color:#ddd6fe!important;" onclick="toggleDevPanel()">🛠 Dev</button>
+            <button class="hdr-btn" id="btnDevPanel" style="background:#faf5ff;color:#7c3aed;border-color:#ddd6fe" onclick="toggleDevPanel()">🛠 Dev</button>
             @endif
         </div>
     </div>
@@ -668,12 +592,12 @@ body[data-theme="dark"] .ord-table tbody tr td {
             <div id="devStats" style="font-size:.73rem;color:#6b7280">—</div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
-            <button class="btn-ship-outline" id="btnSeedOrders" onclick="devSeedOrders()" style="color:#16a34a!important; border-color:#bbf7d0!important;">📥 Seed Orders</button>
-            <button class="btn-ship-outline" id="btnResetFulfillments" onclick="devResetFulfillments()" style="color:#a16207!important; border-color:#fde68a!important;" title="Hapus semua fulfillments, orders tetap ada">🔄 Reset Fulfillments</button>
-            <button class="btn-fresh" id="btnFreshOrders" onclick="devFreshOrders()" title="Hapus SEMUA orders + fulfillments">🗑 Fresh All</button>
-            <button class="btn-ship-outline" id="btnRemapItems" onclick="devRemapItems()" style="color:#6d28d9!important; border-color:#c4b5fd!important;" title="Re-resolve semua mapping_status + cost_status item berdasarkan SKU Mapping">🔁 Remap Items</button>
+            <button id="btnSeedOrders" onclick="devSeedOrders()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bbf7d0;background:#f0fdf4;color:#16a34a;font-size:.75rem;font-weight:700;cursor:pointer">📥 Seed Orders</button>
+            <button id="btnResetFulfillments" onclick="devResetFulfillments()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #fde68a;background:#fefce8;color:#a16207;font-size:.75rem;font-weight:700;cursor:pointer" title="Hapus semua fulfillments, orders tetap ada">🔄 Reset Fulfillments</button>
+            <button id="btnFreshOrders" onclick="devFreshOrders()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:.75rem;font-weight:700;cursor:pointer" title="Hapus SEMUA orders + fulfillments">🗑 Fresh All</button>
+            <button id="btnRemapItems" onclick="devRemapItems()" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:.75rem;font-weight:700;cursor:pointer" title="Re-resolve semua mapping_status + cost_status item berdasarkan SKU Mapping">🔁 Remap Items</button>
             <div style="width:1px;height:20px;background:#e2e8f0;margin:0 .15rem"></div>
-            <a href="/sales/shipments" class="btn-ship-outline" style="color:#2563eb!important; border-color:#bfdbfe!important; text-decoration:none;">📋 Buka Shipment →</a>
+            <a href="/sales/shipments" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .85rem;border-radius:999px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#2563eb;font-size:.75rem;font-weight:700;text-decoration:none">📋 Buka Shipment →</a>
         </div>
     </div>
     @endif
@@ -749,36 +673,6 @@ body[data-theme="dark"] .ord-table tbody tr td {
         </div>
     </div> <!-- end .card-main -->
 </div> <!-- end .page-wrap -->
-
-<!-- MODAL PELACAKAN RESI -->
-<div class="modal fade" id="trackingModal" tabindex="-1" aria-labelledby="trackingModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-            <div class="modal-header bg-white border-bottom border-light px-4 py-3">
-                <h5 class="modal-title fw-bold text-dark d-flex align-items-center" id="trackingModalLabel">
-                    <i class="bi bi-geo-alt-fill text-primary me-2"></i> Lacak Pengiriman
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 bg-light" style="min-height: 250px;">
-                <div class="bg-white rounded-3 p-3 shadow-sm mb-4 border border-light d-flex align-items-center justify-content-between">
-                    <div>
-                        <div class="text-muted small mb-1">Pesanan SN</div>
-                        <div class="fw-bold text-primary" id="t_orderSn" style="font-family: monospace; font-size: 1.1rem;">-</div>
-                    </div>
-                    <i class="bi bi-box-seam fs-2 text-muted opacity-50"></i>
-                </div>
-                <div id="trackingModalBody">
-                    <!-- Tracking Timeline Here -->
-                </div>
-            </div>
-            <div class="modal-footer bg-white border-top border-light px-4 py-3">
-                <button type="button" class="btn btn-secondary fw-bold px-4 rounded-pill" data-bs-dismiss="modal">Tutup</button>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- END MODAL -->
 @endsection
 
 {{-- Review Modal (Sedang Proses) --}}
@@ -934,23 +828,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
     </div>
 </div>
 
-{{-- Order Detail Modal --}}
-<div class="modal fade" id="orderDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:15px; border:none; box-shadow:0 10px 40px rgba(0,0,0,0.1)">
-            <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding:1.2rem 1.5rem">
-                <h5 class="modal-title fw-black" style="font-size:1.1rem; color:#0f172a" id="detailModalTitle">Detail Pesanan</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="detailModalBody" style="background:#f8fafc; padding:1.5rem">
-                <!-- Injected via JS -->
-            </div>
-            <div class="modal-footer border-0" style="background:#fff; border-top:1px solid #e2e8f0 !important; border-bottom-left-radius:15px; border-bottom-right-radius:15px">
-                <button type="button" class="btn btn-light fw-bold rounded-pill px-4" data-bs-dismiss="modal">Tutup</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 @push('scripts')
 <script>
@@ -971,31 +849,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     });
 
     const { api, fmt, fmtDate, fmtRp, esc, channelPill, statusBadge } = window.mpHelpers;
-    
-    function orderStatusBadge(s) {
-        if (!s) return `<span class="badge-status st-draft">—</span>`;
-        if (['UNPAID'].includes(s)) return `<span class="badge-status st-draft">${esc(s)}</span>`;
-        if (['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER'].includes(s)) return `<span class="badge-status st-submitted">${esc(s)}</span>`;
-        if (['SHIPPED', 'TO_CONFIRM_RECEIVE', 'COMPLETED'].includes(s)) return `<span class="badge-status st-posted">${esc(s)}</span>`;
-        if (['CANCELLED', 'IN_CANCEL', 'TO_RETURN'].includes(s)) return `<span class="badge-status st-cancelled">${esc(s)}</span>`;
-        return `<span class="badge-status st-draft">${esc(s)}</span>`;
-    }
-
     let orders           = [];
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlTab = urlParams.get('tab');
-    if (urlTab === 'ready_to_ship') {
-        sessionStorage.setItem('ord_active_tab', 'ready');
-    } else if (urlTab) {
-        sessionStorage.setItem('ord_active_tab', urlTab);
-    }
-    
     let activeTab        = sessionStorage.getItem('ord_active_tab') || 'ready';
-    
-    // store_id passed via URL is an ID, but activeStore in JS requires the store name.
-    // We will resolve it later during data load if it's an ID, or just set it if it matches.
-    let activeStore      = urlParams.get('store_id') || '';
+    let activeStore      = '';
     let fulfilledOrderIds    = new Set();   // order ID yang sudah punya fulfillment confirmed
     let printedOrderIds      = new Set();   // order ID yang sudah dicetak picking list
     let printedDocOrderSns   = new Set();   // channel_order_id yang sudah dicetak resi
@@ -1019,7 +875,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         ready_to_handover: ['READY_TO_HANDOVER'],
         shipped:    ['SHIPPED', 'TO_CONFIRM_RECEIVE'],
         completed:  ['COMPLETED'],
-        cancelled:  ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'],
+        cancelled:  ['CANCELLED', 'IN_CANCEL'],
         issues:     null, // via TAB_FILTERS
     };
 
@@ -1127,7 +983,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         sessionStorage.setItem('ord_active_tab', tab);
         document.querySelectorAll('.ord-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        if (window.selectedPrintOrders) window.selectedPrintOrders.clear();
         
         // Show Sync Resi button only in 'ready' tab
         const btnSyncBookings = document.getElementById('btnSyncBookings');
@@ -1196,31 +1051,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         return '';
     }
 
-    function updateLastSyncTime() {
-        const el = document.getElementById('lastSyncTime');
-        if (el) {
-            const now = new Date();
-            el.innerText = 'Terakhir diperbarui: ' + now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
-        }
-    }
-
     // ── Load ──────────────────────────────────────────────────────────────
     async function loadOrders() {
         $('ordersBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         const url = (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) ? '/api/marketplace/local-orders?dummy=1' : '/api/marketplace/local-orders';
         orders = await api(url).catch(() => []);
-
-        if (activeStore && !isNaN(activeStore)) {
-            const storeIdNum = parseInt(activeStore, 10);
-            const matchingOrder = orders.find(o => o.store_id === storeIdNum);
-            if (matchingOrder && matchingOrder.store) {
-                activeStore = matchingOrder.store.name;
-                sessionStorage.setItem('ord_store', activeStore);
-            } else {
-                activeStore = '';
-            }
-        }
-
         // Pre-populate fulfillment status dari data API
         fulfillmentStatusMap.clear();
         orders.forEach(o => {
@@ -1232,7 +1067,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         populateStoreDropdown();
         restoreSavedTab();
         render();
-        updateLastSyncTime();
 
         if (window.autoArrangeAfterSync) {
             window.autoArrangeAfterSync = false;
@@ -1269,7 +1103,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     || (i.model_sku||i.item_sku||'').toLowerCase().includes(search)));
     }
 
-    window.selectedPrintOrders = new Set();
     window.render = function () { renderKpi(); renderBadges(); renderTable(); updateToolbar(); updatePickingPrintStrip(); };
 
     // ── Process Toolbar ───────────────────────────────────────────────────
@@ -1654,42 +1487,31 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         let successCount = 0;
         let failCount = 0;
         
-        let processedCount = 0;
-        const chunkSize = 5; // Eksekusi 5 order sekaligus (Parallel)
-
-        for (let i = 0; i < pendingShipOrders.length; i += chunkSize) {
-            const chunk = pendingShipOrders.slice(i, i + chunkSize);
-            const promises = chunk.map(async (o) => {
-                logMsg(`[${o.channel_order_id}] Memulai...`);
+        for (let i = 0; i < pendingShipOrders.length; i++) {
+            const o = pendingShipOrders[i];
+            const pct = Math.round((i / pendingShipOrders.length) * 100);
+            
+            $('basProgressText').textContent = `Memproses ${i + 1} dari ${pendingShipOrders.length} order...`;
+            $('basProgressBar').style.width = pct + '%';
+            
+            logMsg(`[${o.channel_order_id}] Memulai...`);
+            
+            try {
+                let params = {};
+                if (method === 'dropoff') params = { dropoff: {} };
+                else if (method === 'pickup') params = { pickup: {} };
                 
-                try {
-                    let params = {};
-                    if (method === 'dropoff') params = { dropoff: {} };
-                    else if (method === 'pickup') params = { pickup: {} };
-                    
-                    await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/ship`, {
-                        method: 'POST',
-                        body: JSON.stringify(params)
-                    });
-                    
-                    logMsg(`[${o.channel_order_id}] Berhasil!`, '#16a34a');
-                    successCount++;
-                } catch (e) {
-                    logMsg(`[${o.channel_order_id}] Gagal: ${e.message}`, '#dc2626');
-                    failCount++;
-                } finally {
-                    processedCount++;
-                    const pct = Math.round((processedCount / pendingShipOrders.length) * 100);
-                    $('basProgressText').textContent = `Memproses ${processedCount} dari ${pendingShipOrders.length} order...`;
-                    $('basProgressBar').style.width = pct + '%';
-                }
-            });
-            
-            // Tunggu 5 order ini selesai bersamaan sebelum memuat 5 order berikutnya
-            await Promise.all(promises);
-            
-            // Jeda 500ms antar kelompok untuk mencegah blokir/rate-limit dari Shopee
-            await new Promise(r => setTimeout(r, 500));
+                await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/ship`, {
+                    method: 'POST',
+                    body: JSON.stringify(params)
+                });
+                
+                logMsg(`[${o.channel_order_id}] Berhasil!`, '#16a34a');
+                successCount++;
+            } catch (e) {
+                logMsg(`[${o.channel_order_id}] Gagal: ${e.message}`, '#dc2626');
+                failCount++;
+            }
         }
         
         $('basProgressBar').style.width = '100%';
@@ -1705,25 +1527,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     // ── KPI ───────────────────────────────────────────────────────────────
     function renderKpi() {
         const rows = applyFilters(orders.filter(inRange));
-        let totalQty = 0;
-        let totalRp = 0;
-        
-        rows.forEach(o => {
-            o.items.forEach(i => {
-                totalQty += parseInt(i.qty || 0);
-                totalRp += parseFloat(i.price || 0) * parseInt(i.qty || 0);
-            });
-        });
-
-        const kpisEl = $('orderKpis');
-        if (!kpisEl) return;
-        
-        kpisEl.innerHTML = `
-            <span class="kpi"><span class="lbl">Pesanan</span><span class="val">${rows.length}</span></span>
-            <span class="kpi"><span class="lbl">Qty</span><span class="val">${fmtRp(totalQty).replace('Rp', '').trim()}</span></span>
-            <span class="kpi"><span class="lbl">Rp</span><span class="val">${fmtRp(totalRp)}</span></span>
-        `;
-        kpisEl.style.display = 'flex';
+        // KPIs removed in favor of clean tabs
     }
 
     // ── Badges ────────────────────────────────────────────────────────────
@@ -2007,7 +1811,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                         </div>
                     </div>
                     <div class="ord-card-actions">
-                        ${orderStatusBadge(o.order_status)}
+                        ${statusBadge(o.order_status)}
                         ${urgent ? fulfillmentBadge(o) : ''}
                         ${fulfillBtn}
                         ${isPrinted && !isFulfilled ? `<span style="font-size:.6rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:700">🖨 Cetak</span>` : ''}
@@ -2027,19 +1831,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     function renderProcessCardList(rows, tabName = 'ready') {
         const isProcessed = tabName === 'processed' || tabName === 'processed_instant' || tabName === 'ready_to_handover';
-        
-        let selectAllHtml = '';
-        if (isProcessed && rows.length > 0) {
-            selectAllHtml = `
-            <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                <label style="display:flex; align-items:center; gap: 8px; font-weight:600; cursor:pointer; margin:0; color:#0f172a; font-size:0.9rem;">
-                    <input type="checkbox" id="chkSelectAllOrders" class="form-check-input" style="width:1.25rem;height:1.25rem;cursor:pointer;accent-color:#0284c7;" onclick="document.querySelectorAll('.chk-print-order').forEach(el => el.checked = this.checked)">
-                    Pilih Semua ${rows.length} Pesanan
-                </label>
-                <div style="font-size:0.8rem; color:#64748b;">Gunakan tombol 🖨️ di kanan atas untuk cetak</div>
-            </div>`;
-        }
-
         const pkRows = rows.map(o => {
             const items       = o.items || [];
             const isFulfilled = fulfilledOrderIds.has(o.id);
@@ -2232,7 +2023,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%">
                     <div class="pk-row-left">
                         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-                            ${isProcessed ? `<input type="checkbox" class="form-check-input chk-print-order" data-order-sn="${esc(o.channel_order_id)}" style="width:1.2rem;height:1.2rem;cursor:pointer;accent-color:#0284c7;margin-right:2px;">` : ''}
                             <span class="pk-order-id">${orderIdHtml}</span>
                             ${instantBadge}
                             ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
@@ -2316,7 +2106,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     </div>
                     <div class="pk-row-meta">
                         ${store ? `<span class="pk-meta-text">${esc(store)}</span>` : ''}
-                        ${fStatusLabel ? `<span class="pk-meta-text" style="font-weight:700">${fStatusLabel}</span>` : ''}
+                        ${fStatusLabel ? `<span class="pk-meta-text" style="color:#7c3aed;font-weight:700">${fStatusLabel}</span>` : ''}
                         ${statusBadgeEl}
                         ${packInfo}
                     </div>
@@ -2372,7 +2162,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 todayNoon.setHours(12, 0, 0, 0);
                 
                 if (['ready', 'processed', 'ready_to_handover'].includes(activeTab) && d < todayNoon) {
-                    dateHtml = `<span style="color:#ef4444; font-weight:600; font-size:0.65rem; background:#fef2f2; padding:1px 4px; border-radius:4px; border:1px solid #fecaca;" title="Pesanan masuk sebelum jam 12 hari ini / kemarin">${fmt(dateVal)}</span>`;
+                    dateHtml = `<span style="color:#ef4444; font-weight:600; font-size:0.65rem; background:#fef2f2; padding:1px 4px; border-radius:4px; border:1px solid #fee2e2;" title="Pesanan masuk sebelum jam 12 hari ini / kemarin">${fmt(dateVal)}</span>`;
                 } else {
                     dateHtml = `<span style="color:#94a3b8; font-size:0.65rem; font-weight:500;">${fmt(dateVal)}</span>`;
                 }
@@ -2513,54 +2303,43 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 pengirimanHtml += `<div style="margin-bottom:6px"><span style="font-size:0.7rem; color:#64748b; font-weight:700; padding:1px 6px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; display:inline-block;">${esc(o.shipping_carrier)}</span></div>`;
             }
             if (logisticsBtn) {
-                pengirimanHtml += `<div>${logisticsBtn}</div>`;
-                if (['processed', 'shipped'].includes(activeTab) && isPrinted) {
-                    pengirimanHtml += `<div style="margin-top:4px; font-size:0.68rem; color:#94a3b8; font-style:italic; text-align:center;">✓ Sudah dicetak</div>`;
-                }
-                if (['shipped', 'completed'].includes(activeTab) && o.shipping_awb_no) {
-                    pengirimanHtml += `<div style="margin-top:4px;"><button class="btn btn-sm btn-link" style="font-size:0.65rem; padding:0; text-decoration:none;" onclick="trackOrder(${o.store_id}, '${o.channel_order_id}', event)">🔍 Lacak</button></div>`;
-                }
+                pengirimanHtml += `<div class="mb-2">${logisticsBtn}</div>`;
             }
+
+            // Webhook Buttons
+            let webhookHtml = `<div class="d-flex flex-column gap-1 pt-2" style="border-top:1px dashed #cbd5e1">`;
+            const simulateFn = `simulateOrderWebhook('${o.store?.channel?.code === 'SHOPEE' || o.store?.channel?.code === 'SHP' ? 'shopee' : 'tiktok'}', '${o.store?.external_shop_id}', '${o.channel_order_id}', 'READY_TO_SHIP')`;
+            webhookHtml += `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;" onclick="event.stopPropagation(); ${simulateFn}">Simulate READY_TO_SHIP</button>`;
+            
+            const simulateShippedFn = `simulateOrderWebhook('${o.store?.channel?.code === 'SHOPEE' || o.store?.channel?.code === 'SHP' ? 'shopee' : 'tiktok'}', '${o.store?.external_shop_id}', '${o.channel_order_id}', 'SHIPPED')`;
+            webhookHtml += `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;" onclick="event.stopPropagation(); ${simulateShippedFn}">Simulate SHIPPED</button>`;
+            
+            webhookHtml += `</div>`;
+            
+            pengirimanHtml += webhookHtml;
 
             const rowClick = activeTab === 'issues'
                 ? `onclick="window.location='/marketplace/issues'" style="cursor:pointer"`
                 : '';
 
-            const orderIdContent = `
-                <div class="ord-id">${esc(o.channel_order_id || '—')}</div>
-                <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
-                <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
-                    ${perluKirimBadge}
-                    ${instantBadge}
-                    ${printedBadge}
-                    ${logBadge}
-                    ${fBadge}
-                    ${issueBadge}
-                </div>
-                <div style="margin-top:8px;">
-                    <button class="btn btn-sm" style="font-size:0.65rem; padding:0.15rem 0.5rem; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:4px; font-weight:600" onclick="event.stopPropagation(); window.showOrderDetail(${o.id})">
-                        👁️ Lihat Detail
-                    </button>
-                </div>
-            `;
-            
-            const firstColHtml = activeTab === 'processed' 
-                ? `<div style="display:flex; gap:0.6rem; align-items:flex-start;">
-                    <input type="checkbox" class="form-check-input chk-print-order" data-order-sn="${esc(o.channel_order_id)}" style="width:1.15rem;height:1.15rem;cursor:pointer;accent-color:#0284c7;margin-top:2px;flex-shrink:0;" ${window.selectedPrintOrders.has(o.channel_order_id) ? 'checked' : ''} onclick="if(this.checked) window.selectedPrintOrders.add('${esc(o.channel_order_id)}'); else window.selectedPrintOrders.delete('${esc(o.channel_order_id)}');">
-                    <div style="min-width:0;flex:1;">
-                        ${orderIdContent}
-                    </div>
-                   </div>`
-                : orderIdContent;
-
             return `<tr class="${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" id="ord-row-${o.id}" ${rowClick}>
                 <td>
-                    ${firstColHtml}
+                    <div class="ord-id">${esc(o.channel_order_id || '—')}</div>
+                    <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
+                    
+                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+                        ${perluKirimBadge}
+                        ${instantBadge}
+                        ${printedBadge}
+                        ${logBadge}
+                        ${fBadge}
+                        ${issueBadge}
+                    </div>
                 </td>
                 <td>${itemsHtml}</td>
                 ${resolveTd}
                 ${scanTd}
-                <td>${orderStatusBadge(o.order_status)}</td>
+                <td>${statusBadge(o.order_status)}</td>
                 <td>${pengirimanHtml}</td>
                 <td>
                     <div style="font-weight:700;font-size:.78rem">${esc(o.store?.name || '—')}</div>
@@ -2575,14 +2354,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         const colItems  = hasResolveCol ? '16%' : (hasScanCol ? '24%' : '34%');
         const colStatus = '12%';
         const colStore  = '12%';
-        
-        const firstHeaderHtml = activeTab === 'processed'
-            ? `<div style="display:flex; align-items:center;">
-                <input type="checkbox" id="chkSelectAllOrders" class="form-check-input" style="width:1.1rem;height:1.1rem;cursor:pointer;accent-color:#0284c7;margin-right:8px;" onclick="const isChecked = this.checked; document.querySelectorAll('.chk-print-order').forEach(el => { el.checked = isChecked; const sn = el.getAttribute('data-order-sn'); if(isChecked) window.selectedPrintOrders.add(sn); else window.selectedPrintOrders.delete(sn); })">
-                <span>Nomor Order</span>
-               </div>`
-            : `Nomor Order`;
-
         body.innerHTML = `
         <div class="gf-table-scroll">
         <table class="ord-table">
@@ -2596,12 +2367,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 <col style="width:${colStore}">
             </colgroup>
             <thead><tr>
-                <th>${firstHeaderHtml}</th>
+                <th>Nomor Order</th>
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
                 <th>Status</th>
-                <th>Pengiriman</th>
+                <th>Test Webhook</th>
                 <th>Toko</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
@@ -2764,124 +2535,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     window.loadOrders = loadOrders;
-    const shippingParamCache = new Map();
-    
-    // Background prefetch function to silently cache shipping parameters for all pending ship orders
-    async function prefetchShippingParams() {
-        const readyOrders = orders.filter(o => ['READY_TO_SHIP', 'RETRY_SHIP'].includes(o.order_status));
-        for (const o of readyOrders) {
-            if (!shippingParamCache.has(o.channel_order_id)) {
-                try {
-                    const res = await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/shipping-parameter`);
-                    if (res && !res.error) shippingParamCache.set(o.channel_order_id, res);
-                } catch(e) {}
-                // Jeda 500ms agar tidak spam API server/Shopee
-                await new Promise(r => setTimeout(r, 500));
-            }
-        }
-    }
-    
-    // Trigger prefetch periodically
-    setInterval(prefetchShippingParams, 15000);
-
-    // ── Order Details ────────────────────────────────────────────────────
-    window.showOrderDetail = async function(orderId) {
-        const o = orders.find(x => x.id === orderId);
-        if(!o) return;
-        
-        let modalEl = document.getElementById('orderDetailModal');
-        let modal = bootstrap.Modal.getInstance(modalEl);
-        if (!modal) {
-            modal = new bootstrap.Modal(modalEl);
-        }
-        
-        document.getElementById('detailModalTitle').innerText = 'Mengambil data...';
-        document.getElementById('detailModalBody').innerHTML = '<div style="text-align:center; padding:30px; color:#64748b"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><br>Mengambil data live dari Shopee...</div>';
-        modal.show();
-
-        try {
-            const res = await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/raw-detail`);
-            
-            if (res.error) {
-                document.getElementById('detailModalBody').innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px">❌ Gagal mengambil data: ${esc(res.message || res.error)}</div>`;
-                return;
-            }
-
-            const liveData = res.response?.order_list?.[0] || {};
-            
-            let itemsHtml = (liveData.item_list || []).map(item => `
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px;">
-                    <div>
-                        <div style="font-weight:600; font-size:0.85rem; color:#334155">${esc(item.item_name)}</div>
-                        <div style="font-size:0.75rem; color:#64748b">Var: ${esc(item.model_name || '-')} | SKU: ${esc(item.item_sku || item.model_sku || '-')}</div>
-                    </div>
-                    <div style="text-align:right">
-                        <div style="font-weight:700; font-size:0.85rem; color:#0f172a">${item.model_quantity_purchased}x</div>
-                        <div style="font-size:0.75rem; color:#64748b">${fmtRp(item.model_discounted_price || item.model_original_price)}</div>
-                    </div>
-                </div>
-            `).join('');
-
-            const r = liveData.recipient_address || {};
-            const buyerHtml = `
-                <div style="margin-bottom:15px; padding:12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px;">
-                    <h6 style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px">Informasi Penerima (Live)</h6>
-                    <div style="font-weight:700; font-size:0.9rem; color:#0f172a">${esc(r.name || liveData.buyer_username || '—')}</div>
-                    <div style="font-size:0.8rem; color:#475569; margin-top:2px">📞 ${esc(r.phone || '—')}</div>
-                    <div style="font-size:0.8rem; color:#475569; margin-top:6px; line-height:1.4">
-                        ${esc(r.full_address || '')}
-                    </div>
-                </div>
-            `;
-
-            let pkg = (liveData.package_list && liveData.package_list[0]) || {};
-            const paymentHtml = `
-                <div style="margin-bottom:15px; padding:12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px;">
-                    <h6 style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px">Pembayaran & Pengiriman</h6>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.8rem">
-                        <span style="color:#475569">Metode Bayar</span>
-                        <strong style="color:#0f172a">${esc(liveData.payment_method || '—')}</strong>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.8rem">
-                        <span style="color:#475569">Kurir</span>
-                        <strong style="color:#0f172a">${esc(liveData.shipping_carrier || pkg.shipping_carrier || '—')}</strong>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.8rem">
-                        <span style="color:#475569">No Resi</span>
-                        <div style="text-align: right;">
-                            <strong style="color:#059669; display:block; margin-bottom:4px;">${esc(pkg.package_number || pkg.tracking_number || o.shipping_awb_no || '—')}</strong>
-                            ${(o.order_status === 'SHIPPED' || o.order_status === 'PROCESSED' || o.order_status === 'COMPLETED') ? 
-                            `<button class="btn btn-sm btn-outline-info" style="font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:4px;" onclick="trackOrder(${o.store_id}, '${o.channel_order_id}', event)"><i class="bi bi-truck me-1"></i>Lacak</button>` : ''}
-                        </div>
-                    </div>
-                    <hr style="margin:8px 0; border-color:#e2e8f0">
-                    <div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-top:6px; padding-top:6px;">
-                        <span style="color:#0f172a; font-weight:700">Total Akhir</span>
-                        <strong style="color:#ea580c; font-size:1rem">${fmtRp(liveData.total_amount || 0)}</strong>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('detailModalTitle').innerText = 'Pesanan ' + (liveData.order_sn || o.channel_order_id);
-            document.getElementById('detailModalBody').innerHTML = `
-                <div class="row">
-                    <div class="col-md-7">
-                        <h6 style="font-size:0.85rem; font-weight:700; color:#334155; margin-bottom:10px">Daftar Produk (${liveData.item_list?.length || 0})</h6>
-                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; max-height:350px; overflow-y:auto">
-                            ${itemsHtml || '<div style="color:#94a3b8; font-size:0.8rem; text-align:center">Tidak ada item</div>'}
-                        </div>
-                    </div>
-                    <div class="col-md-5 mt-3 mt-md-0">
-                        ${buyerHtml}
-                        ${paymentHtml}
-                    </div>
-                </div>
-            `;
-        } catch (err) {
-            document.getElementById('detailModalBody').innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px">❌ Gagal menghubungi server: ${err.message}</div>`;
-        }
-    };
-
     // ── Logistics ────────────────────────────────────────────────────────
     window.openArrangeShipment = async function (storeId, orderSn) {
         $('asLoading').style.display = 'block';
@@ -2895,11 +2548,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         modal.show();
 
         try {
-            let res = shippingParamCache.get(orderSn);
-            if (!res) {
-                res = await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/shipping-parameter`);
-                shippingParamCache.set(orderSn, res);
-            }
+            const res = await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/shipping-parameter`);
             
             $('asLoading').style.display = 'none';
             $('asContent').style.display = 'block';
@@ -3024,19 +2673,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             });
             
             bootstrap.Modal.getInstance($('arrangeShipmentModal')).hide();
-            
-            if (window.Swal) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Atur pengiriman sukses untuk ' + orderSn,
-                    timer: 3000,
-                    showConfirmButton: false
-                });
-            } else {
-                showQsAlert('success', 'Atur Pengiriman berhasil untuk ' + orderSn);
-            }
-            
+            showQsAlert('success', 'Atur Pengiriman berhasil untuk ' + orderSn);
             loadOrders();
 
             if ($('asPrintDocument') && $('asPrintDocument').checked) {
@@ -3045,11 +2682,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         } catch (e) {
             btn.disabled = false;
             btn.innerHTML = 'Coba Lagi';
-            if (window.Swal) {
-                Swal.fire('Gagal!', 'Atur Pengiriman Gagal: ' + e.message, 'error');
-            } else {
-                alert('Gagal Atur Pengiriman: ' + e.message);
-            }
+            alert('Gagal Atur Pengiriman: ' + e.message);
         }
     };
 
@@ -3083,15 +2716,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         }, 5000);
     };
     window.printAllDocuments = function() {
-        let rows = getPackingRows();
+        const rows = getPackingRows();
         if (!rows.length) { alert('Tidak ada order yang sedang dikemas.'); return; }
-        
-        const checkedSns = Array.from(window.selectedPrintOrders || new Set());
-        const hasSelection = checkedSns.length > 0;
-        
-        if (hasSelection) {
-            rows = rows.filter(o => checkedSns.includes(o.channel_order_id));
-        }
         
         const unprintedRows = rows.filter(o => {
             let printCount = o.print_count || 0;
@@ -3114,7 +2740,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     
                     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:20px;">
                         <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.875rem;">
-                            <span style="color:#64748b;">${hasSelection ? 'Total Order Terpilih' : 'Total Order (Semua Toko)'}</span>
+                            <span style="color:#64748b;">Total Order (Semua Toko)</span>
                             <span style="font-weight:700;color:#0f172a;">${total}</span>
                         </div>
                         <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.875rem;">
@@ -3139,10 +2765,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                             Cetak Resi Belum Pernah Dicetak (${unprinted})
                         </button>
                         <button onclick="executePrintBulk('selected')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;cursor:pointer;">
-                            ${hasSelection ? `Cetak Resi Terpilih (${total})` : `Cetak Semua Resi (${total})`}
+                            Cetak Resi Terpilih (${total})
                         </button>
                         <button onclick="executePrintBulk('reprint')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;cursor:pointer;">
-                            ${hasSelection ? 'Cetak Ulang Resi Terpilih (Reprint)' : 'Cetak Ulang Semua Resi (Reprint)'}
+                            Cetak Ulang Resi Terpilih (Reprint)
                         </button>
                         <button onclick="document.getElementById('printOptsModal').remove()" style="width:100%;padding:10px;border-radius:8px;font-weight:500;font-size:0.9rem;border:none;background:transparent;color:#64748b;cursor:pointer;margin-top:8px;">
                             Batal
@@ -3162,11 +2788,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (modal) modal.remove();
 
         let rows = getPackingRows();
-        const checkedSns = Array.from(window.selectedPrintOrders || new Set());
-        if (checkedSns.length > 0) {
-            rows = rows.filter(o => checkedSns.includes(o.channel_order_id));
-        }
-
         if (mode === 'unprinted_only') {
             rows = rows.filter(o => {
                 let printCount = o.print_count || 0;
@@ -3177,21 +2798,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             // Check if any selected already printed
             const alreadyPrinted = rows.filter(o => (o.print_count || 0) > 0 || printedOrderIds.has(o.id));
             if (alreadyPrinted.length > 0) {
-                if (window.Swal) {
-                    const result = await Swal.fire({
-                        title: 'Cetak Ulang Resi?',
-                        text: `Terdapat ${alreadyPrinted.length} pesanan yang resinya sudah pernah dicetak sebelumnya. Apakah Anda yakin ingin mencetak ulang resi tersebut?`,
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3b82f6',
-                        cancelButtonColor: '#ef4444',
-                        confirmButtonText: 'Ya, Lanjutkan Cetak',
-                        cancelButtonText: 'Batal'
-                    });
-                    if (!result.isConfirmed) return;
-                } else {
-                    if (!confirm(`Ada ${alreadyPrinted.length} pesanan yang terpilih sudah pernah dicetak resinya. Tetap lanjutkan cetak ulang?`)) return;
-                }
+                if (!confirm(`Ada ${alreadyPrinted.length} order yang terpilih sudah pernah dicetak resinya. Tetap lanjutkan?`)) return;
             }
         }
 
@@ -3295,7 +2902,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         const modalHtml = `
             <div id="printResultModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);">
                 <div style="background:white;padding:28px;border-radius:16px;width:500px;max-width:90%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);font-family:sans-serif;">
-                    <h3 style="margin:0 0 16px 0;font-size:1.2rem;color:#0f172a;font-weight:700;">Print</h3>
+                    <h3 style="margin:0 0 16px 0;font-size:1.2rem;color:#0f172a;font-weight:700;">Hasil Bulk Print</h3>
                     <div style="display:flex;gap:16px;margin-bottom:16px;">
                         <div style="flex:1;background:#f0fdf4;padding:12px;border-radius:8px;border:1px solid #bbf7d0;text-align:center;">
                             <div style="font-size:0.8rem;color:#166534;font-weight:bold;text-transform:uppercase;">Berhasil</div>
@@ -3469,7 +3076,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             });
             // Hanya update render tanpa merusak UX loading screen yang sudah ada
             render();
-            updateLastSyncTime();
         } catch(e) {}
     }, 5000);
 
@@ -3587,6 +3193,35 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             });
         } catch (e) {
             Swal.fire('Error', e.message || 'Gagal mengambil detail order.', 'error');
+        }
+    };
+
+    window.simulateOrderWebhook = async function(provider, platformId, orderSn, status) {
+        if (!confirm('Kirim simulasi Webhook "Order Status Update (' + status + ')" ke order ' + orderSn + '?')) return;
+        
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            const res = await fetch('/api/webhooks/simulate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    provider: provider,
+                    platform_id: platformId,
+                    event_type: 'order_status_update',
+                    order_sn: orderSn,
+                    status: status
+                })
+            });
+            const data = await res.json();
+            alert(data.message || 'Simulasi berhasil dikirim!');
+            // Reload the local orders
+            loadOrders();
+        } catch (e) {
+            alert('Error: ' + e.message);
         }
     };
 

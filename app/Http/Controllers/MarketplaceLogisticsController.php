@@ -106,6 +106,42 @@ class MarketplaceLogisticsController extends Controller
     }
 
     /**
+     * Get raw package detail directly from channel API (for debugging/exploring)
+     */
+    public function getPackageDetailRaw(Store $store, string $packageNumber): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getPackageDetail')) {
+                $result = $this->ensureSuccess($driver->getPackageDetail($store, $packageNumber));
+                return response()->json($result);
+            }
+            return response()->json(['error' => 'Not supported on this channel'], 400);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
+     * Get raw return list directly from channel API (for debugging/exploring)
+     */
+    public function getReturnListRaw(Store $store, Request $request): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getReturnList')) {
+                $pageNo = (int) $request->input('page_no', 0);
+                $pageSize = (int) $request->input('page_size', 20);
+                $result = $this->ensureSuccess($driver->getReturnList($store, $pageNo, $pageSize));
+                return response()->json($result);
+            }
+            return response()->json(['error' => 'Not supported on this channel'], 400);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
      * Get booking list from channel API (for debugging/exploring)
      */
     public function getBookingList(Store $store, Request $request): JsonResponse
@@ -115,7 +151,30 @@ class MarketplaceLogisticsController extends Controller
             if (method_exists($driver, 'getBookingList')) {
                 $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
                 $timeTo = $request->input('time_to', time());
-                $result = $this->ensureSuccess($driver->getBookingList($store, (int)$timeFrom, (int)$timeTo));
+                $status = $request->input('booking_status', '');
+                
+                $result = $this->ensureSuccess($driver->getBookingList($store, (int)$timeFrom, (int)$timeTo, 20, '', $status));
+                return response()->json($result);
+            }
+            return response()->json(['error' => 'Not supported on this channel'], 400);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
+     * Get order list from channel API (for debugging/exploring)
+     */
+    public function getOrderList(Store $store, Request $request): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getOrders')) {
+                $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
+                $timeTo = $request->input('time_to', time());
+                $status = $request->input('order_status', '');
+                
+                $result = $this->ensureSuccess($driver->getOrders($store, (int)$timeFrom, (int)$timeTo, 20, '', $status));
                 return response()->json($result);
             }
             return response()->json(['error' => 'Not supported on this channel'], 400);
@@ -147,19 +206,18 @@ class MarketplaceLogisticsController extends Controller
                     break;
                 }
 
-                $list = $result['response']['order_list'] ?? [];
+                $list = $result['response']['booking_list'] ?? [];
                 foreach ($list as $booking) {
-                    $orderSn = $booking['order_sn'];
-                    $trackingNo = $booking['tracking_number'] ?? null;
+                    $orderSn = $booking['order_sn'] ?: $booking['booking_sn'];
+                    $bookingSn = $booking['booking_sn'];
                     
-                    if ($trackingNo) {
+                    if ($bookingSn) {
                         $order = \App\Models\MarketplaceOrder::where('store_id', $store->id)
                             ->where('channel_order_id', $orderSn)
                             ->first();
 
-                        if ($order && (empty($order->tracking_no) || $order->needs_shipping_arrangement)) {
-                            $order->tracking_no = $trackingNo;
-                            $order->needs_shipping_arrangement = false;
+                        if ($order && empty($order->booking_sn)) {
+                            $order->booking_sn = $bookingSn;
                             $order->save();
                             $updated++;
                         }
@@ -353,14 +411,11 @@ class MarketplaceLogisticsController extends Controller
 
             // Jika belum ada di cache, dan statusnya sudah SHIPPED, berikan keterangan langsung
             if ($order && $order->order_status === 'SHIPPED') {
-                return response(
-                    "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
-                        <h2 style='color:#e11d48;'>Dokumen Resi Belum Tersimpan</h2>
-                        <p style='color:#475569;'>Resi untuk pesanan ini <strong>belum pernah dicetak dan disimpan (ter-cache)</strong> ke dalam sistem lokal.</p>
-                        <p style='color:#475569;'>Karena pesanan ini sudah berstatus <strong>Sedang Dikirim (Shipped)</strong>, Marketplace sudah tidak mengizinkan sistem untuk menarik ulang dokumen resinya.</p>
-                        <button onclick='window.close()' style='margin-top:20px; padding:10px 25px; background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-weight:700;'>Tutup Halaman</button>
-                    </div>", 400
-                );
+                return response()->view('marketplace.documents.fallback_awb', [
+                    'order' => $order,
+                    'store' => $store,
+                    'awb'   => $payload['tracking_number'] ?? $order->shipping_awb_no ?? 'N/A',
+                ], 200);
             }
             
             // Step 1: Create Document
@@ -375,7 +430,11 @@ class MarketplaceLogisticsController extends Controller
                             
                             // Translate common shopee error
                             if (str_contains($errorMsg, 'parcel has been shipped')) {
-                                $errorMsg = "Gagal mencetak resi: Pesanan sudah diserahkan ke kurir (Shipped). Shopee tidak mengizinkan cetak ulang resi untuk pesanan yang sudah dalam pengiriman.";
+                                return response()->view('marketplace.documents.fallback_awb', [
+                                    'order' => $order,
+                                    'store' => $store,
+                                    'awb'   => $payload['tracking_number'] ?? $order->shipping_awb_no ?? 'N/A',
+                                ], 200);
                             }
                             break;
                         }
@@ -618,9 +677,12 @@ class MarketplaceLogisticsController extends Controller
                 });
         }
 
-        // Sort PDFs by position
+        // Sort PDFs by store_id first, then by position to group by store
         usort($pdfContents, function($a, $b) {
-            return $a['position'] <=> $b['position'];
+            if ($a['store_id'] === $b['store_id']) {
+                return $a['position'] <=> $b['position'];
+            }
+            return $a['store_id'] <=> $b['store_id'];
         });
 
         $config = [];
@@ -634,8 +696,23 @@ class MarketplaceLogisticsController extends Controller
         } else {
             $pdf = new \setasign\Fpdi\Fpdi();
             $tempFiles = [];
+            $currentStoreId = null;
             
             foreach ($pdfContents as $item) {
+                // Jika berpindah toko, sisipkan halaman pemisah (Kertas Thermal A6)
+                if ($currentStoreId !== null && $currentStoreId !== $item['store_id']) {
+                    $pdf->AddPage('P', [100, 150]);
+                    $pdf->SetFont('Arial', 'B', 16);
+                    $storeName = \App\Models\Store::find($item['store_id'])->name ?? 'Toko Lainnya';
+                    $pdf->Cell(0, 40, '', 0, 1); // Spacer atas
+                    $pdf->Cell(0, 10, '--- BATAS TOKO ---', 0, 1, 'C');
+                    $pdf->SetFont('Arial', 'B', 14);
+                    $pdf->Cell(0, 10, strtoupper($storeName), 0, 1, 'C');
+                    $pdf->SetFont('Arial', '', 10);
+                    $pdf->Cell(0, 15, 'Pisahkan tumpukan paket setelah kertas ini', 0, 1, 'C');
+                }
+                $currentStoreId = $item['store_id'];
+
                 $tmpPath = storage_path('app/temp_pdf_' . uniqid() . '.pdf');
                 $uncompressedContent = $overlayService->overlayPdfContent($item['content'], $config);
                 file_put_contents($tmpPath, $uncompressedContent);
@@ -752,6 +829,30 @@ class MarketplaceLogisticsController extends Controller
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error("Failed bulk greetings: " . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getTrackingInfo(Store $store, $orderSn, Request $request)
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (!method_exists($driver, 'getTrackingInfo')) {
+                return response()->json(['error' => true, 'message' => 'Driver tidak mendukung pelacakan'], 400);
+            }
+
+            $result = $driver->getTrackingInfo($store, $orderSn);
+            
+            if (isset($result['error']) && !empty($result['error'])) {
+                return response()->json([
+                    'tracking_info' => [],
+                    'message' => 'Belum ada data pelacakan atau pesanan tidak menggunakan resi otomatis.',
+                    'raw_error' => $result['message'] ?? $result['error']
+                ]);
+            }
+
+            return response()->json($result['response'] ?? $result);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
         }
     }
 

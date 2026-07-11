@@ -119,8 +119,23 @@ class ShopeeStoreAuthController extends Controller
                 );
             }
         } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-            // Jika APP_KEY berubah dan tidak bisa mendeskripsi token lama yang ada di database
-            return redirect('/marketplace/toko')->with('error', 'Gagal menghubungkan toko Shopee. Data enkripsi lama tidak valid karena perubahan APP_KEY. Silakan hapus data toko lama Anda dan coba hubungkan kembali.');
+            // Jika APP_KEY berubah, Eloquent tidak bisa mendeskripsi token lama.
+            // Solusi: Kita timpa (force update) data credentials secara langsung menggunakan DB Query Builder (Bypass Eloquent Casts).
+            $updateData = [
+                'channel_id' => $channel->id,
+                'external_shop_id' => (string) $shopId,
+                'credentials' => encrypt($credentials),
+                'status' => 'active',
+                'is_active' => true,
+                'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
+                'updated_at' => now(),
+            ];
+
+            if ($store) {
+                \Illuminate\Support\Facades\DB::table('stores')->where('id', $store->id)->update($updateData);
+            } else {
+                \Illuminate\Support\Facades\DB::table('stores')->where('code', 'shopee_' . $shopId)->update($updateData);
+            }
         } catch (\Throwable $e) {
             return redirect('/marketplace/toko')->with('error', 'Terjadi kesalahan sistem saat menyimpan otentikasi toko: ' . $e->getMessage());
         }

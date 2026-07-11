@@ -71,6 +71,11 @@ Schedule::command('marketplace:sync-orders')
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
+Schedule::command('marketplace:sync-returns')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('marketplace:cleanup-labels')
     ->dailyAt('01:00')
     ->runInBackground();

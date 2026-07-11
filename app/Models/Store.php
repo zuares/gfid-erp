@@ -53,9 +53,13 @@ class Store extends Model
 
     public function getConnectionStatusAttribute(): string
     {
-        $accessToken = $this->credential('access_token');
-        if (empty($accessToken)) {
-            return 'NOT_CONNECTED';
+        try {
+            $accessToken = $this->credential('access_token');
+            if (empty($accessToken)) {
+                return 'NOT_CONNECTED';
+            }
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return 'INVALID_APP_KEY';
         }
 
         if ($this->token_expires_at && $this->token_expires_at->isPast()) {

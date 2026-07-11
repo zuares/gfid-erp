@@ -5,165 +5,510 @@
 
 @push('head')
 <style>
-.store-card {
-    background: #fff;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 18px;
-    padding: 1.25rem 1.4rem 1rem;
-    transition: box-shadow .15s;
-}
-.store-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
-.store-card-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .5rem; }
-.store-card-name { font-weight: 800; font-size: .97rem; color: #0f172a; }
-.rename-btn { background:none;border:none;padding:0 .2rem;cursor:pointer;color:#94a3b8;font-size:.85rem;line-height:1; }
-.rename-btn:hover { color:#0f172a; }
-.rename-inline { display:none;align-items:center;gap:.4rem; }
-.rename-inline input { font-size:.85rem;font-weight:700;border:1.5px solid #cbd5e1;border-radius:8px;padding:.2rem .5rem;width:160px; }
-.rename-inline .btn-save-name { font-size:.7rem;font-weight:700;border-radius:7px;padding:.2rem .6rem; }
-.store-card-meta { font-size: .72rem; color: #64748b; margin-bottom: .75rem; }
-.store-stats { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .85rem; }
-.store-stat {
-    display: inline-flex; align-items: center; gap: .3rem;
-    font-size: .72rem; font-weight: 700; padding: .22rem .7rem;
-    border-radius: 999px; border: 1px solid #e2e8f0; background: #f8fafc; color: #475569;
-}
-.store-stat.warn { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.3); color: #b45309; }
-.store-stat.err  { background: rgba(239,68,68,.08);  border-color: rgba(239,68,68,.25); color: #b91c1c; }
-.store-stat.ok   { background: rgba(22,163,74,.07);  border-color: rgba(22,163,74,.25);  color: #166534; }
-.store-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
-.store-actions .btn { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .3rem .85rem; }
+    :root{
+        --shp-accent:#334155;
+        --shp-accent-2:#1f2937;
+        --shp-border:rgba(148,163,184,.18);
+        --shp-border-strong:rgba(148,163,184,.30);
+        --shp-muted:#64748b;
+    }
+    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
 
+    .card-main{
+        background: var(--card, #fff);
+        border-radius: 8px;
+        border: 1px solid var(--shp-border);
+        box-shadow: none;
+        margin-bottom: 1.5rem;
+    }
+    body[data-theme="dark"] .card-main{
+        background: var(--card, #0f172a);
+        border-color: rgba(51,65,85,.85);
+        box-shadow: none;
+    }
 
-/* Sync result modal */
-.sync-row { display: flex; justify-content: space-between; align-items: center;
-    padding: .45rem 0; border-bottom: 1px solid #f1f5f9; font-size: .85rem; }
-.sync-row:last-child { border-bottom: none; }
-.sync-row .label { color: #475569; }
-.sync-row .val   { font-weight: 800; font-size: .95rem; }
-.sync-row .val.ok  { color: #16a34a; }
-.sync-row .val.err { color: #b91c1c; }
-.sync-row .val.warn{ color: #b45309; }
+    @media (min-width: 768px) {
+        .table-responsive {
+            overflow: visible !important;
+        }
+    }
+    
+    .table-responsive .dropdown-menu {
+        z-index: 1055 !important;
+    }
 
-.store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px,1fr)); gap: 1rem; }
+    .ship-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--shp-border);
+    }
+    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--shp-muted); font-size:.78rem; display:none; }
+    
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+    .kpi{
+        display:inline-flex; align-items:baseline; gap:.45rem;
+        border-radius:7px; padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28);
+        background: transparent;
+        font-size:.72rem;
+    }
+    body[data-theme="dark"] .kpi{
+        background: rgba(15, 23, 42, 0.96);
+        border-color: rgba(51, 65, 85, 0.85);
+    }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
+    body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
+    .kpi .val{ font-weight:650; color:var(--shp-accent); }
+
+    .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; font-size:.78rem; }
+    .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
+    .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
+    .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+
+    .grid-stores {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+        gap: 1.25rem;
+    }
+    .store-card {
+        background: var(--card, #ffffff);
+        border: 1px solid var(--shp-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .store-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+        border-color: rgba(148,163,184,.4);
+    }
+    body[data-theme="dark"] .store-card {
+        background: var(--card, #0f172a);
+        border-color: rgba(51,65,85,.85);
+    }
+    body[data-theme="dark"] .store-card:hover {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        border-color: rgba(148,163,184,.3);
+    }
+
+    .store-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px dashed var(--shp-border-strong);
+    }
+    .store-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .store-brand-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        object-fit: contain;
+        background: #f8fafc;
+        padding: 4px;
+        border: 1px solid rgba(148,163,184,.15);
+    }
+    body[data-theme="dark"] .store-brand-icon { background: rgba(255,255,255,0.05); }
+    .store-title-wrap {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .store-name { font-weight: 800; font-size: 1.05rem; color: #0f172a; margin: 0; line-height: 1.2; display: flex; align-items: center; gap: .3rem;}
+    body[data-theme="dark"] .store-name { color: #f1f5f9; }
+    .store-id { font-size: 0.7rem; color: #64748b; font-family: monospace; letter-spacing: 0.5px; margin-top: 2px;}
+
+    .rename-btn { background:none;border:none;padding:0 .2rem;cursor:pointer;color:#94a3b8;font-size:.85rem;line-height:1; }
+    .rename-btn:hover { color:#0f172a; }
+    body[data-theme="dark"] .rename-btn:hover { color:#f1f5f9; }
+    .rename-inline { display:none;align-items:center;gap:.4rem; margin-top:.35rem; }
+    .rename-inline input { font-size:.8rem;font-weight:600;border:1px solid var(--shp-border-strong);border-radius:6px;padding:.2rem .4rem;width:100%; background:transparent; color:inherit; }
+    .rename-inline .btn-save-name { font-size:.7rem;font-weight:700;border-radius:6px;padding:.2rem .4rem; }
+
+    .badge-status {
+        border-radius: 6px; padding: .25rem .6rem;
+        font-size: .7rem; letter-spacing: 0; text-transform: none;
+        border: 1px solid transparent;
+        display: inline-flex; align-items: center; gap: .35rem;
+        white-space: nowrap; font-weight: 700;
+    }
+    .badge-status::before { content: ''; width: 6px; height: 6px; border-radius: 999px; display: inline-block; }
+
+    .st-connected{ background: rgba(34, 197, 94, 0.12); color:#166534; border-color: rgba(34, 197, 94, 0.30); }
+    .st-connected::before{ background: rgba(34, 197, 94, 0.95); box-shadow: 0 0 6px rgba(34,197,94,0.6);}
+    body[data-theme="dark"] .st-connected { color: #4ade80; }
+    
+    .st-not-connected{ background: rgba(148, 163, 184, 0.12); color:#475569; border-color: rgba(148, 163, 184, 0.30); }
+    .st-not-connected::before{ background: rgba(100, 116, 139, 0.95); }
+    body[data-theme="dark"] .st-not-connected { color: #94a3b8; }
+    
+    .st-auth-required{ background: rgba(239, 68, 68, 0.12); color:#991b1b; border-color: rgba(239, 68, 68, 0.30); }
+    .st-auth-required::before{ background: rgba(239, 68, 68, 0.95); box-shadow: 0 0 6px rgba(239,68,68,0.6);}
+    body[data-theme="dark"] .st-auth-required { color: #f87171; }
+    
+    .st-warning{ background: rgba(245, 158, 11, 0.12); color:#b45309; border-color: rgba(245, 158, 11, 0.30); }
+    .st-warning::before{ background: rgba(245, 158, 11, 0.95); box-shadow: 0 0 6px rgba(245,158,11,0.6);}
+    body[data-theme="dark"] .st-warning { color: #fbbf24; }
+
+    .store-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+    }
+    .stat-box {
+        background: rgba(241, 245, 249, 0.5);
+        border-radius: 8px;
+        padding: 0.75rem 0.5rem;
+        text-align: center;
+        border: 1px solid transparent;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    body[data-theme="dark"] .stat-box { background: rgba(30, 41, 59, 0.5); }
+    
+    .stat-box.warn { background: rgba(254, 243, 199, 0.4); border-color: rgba(253, 230, 138, 0.5); }
+    body[data-theme="dark"] .stat-box.warn { background: rgba(120, 53, 15, 0.3); border-color: rgba(146, 64, 14, 0.4); }
+    
+    .stat-box.err { background: rgba(254, 226, 226, 0.4); border-color: rgba(254, 202, 202, 0.5); }
+    body[data-theme="dark"] .stat-box.err { background: rgba(127, 29, 29, 0.3); border-color: rgba(153, 27, 27, 0.4); }
+
+    .stat-val { font-size: 1.2rem; font-weight: 800; color: #0f172a; line-height: 1; margin-bottom: 0.2rem; }
+    body[data-theme="dark"] .stat-val { color: #f8fafc; }
+    .stat-lbl { font-size: 0.65rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    body[data-theme="dark"] .stat-lbl { color: #94a3b8; }
+    
+    .stat-box.warn .stat-val { color: #b45309; }
+    body[data-theme="dark"] .stat-box.warn .stat-val { color: #fbbf24; }
+    .stat-box.err .stat-val { color: #b91c1c; }
+    body[data-theme="dark"] .stat-box.err .stat-val { color: #f87171; }
+
+    .store-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: auto;
+    }
+    .action-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .btn-action-primary {
+        flex: 1;
+        background: var(--shp-accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem;
+        font-weight: 600;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+    }
+    .btn-action-primary:hover { background: var(--shp-accent-2); color: #fff; transform: translateY(-1px); }
+    
+    .btn-action-secondary {
+        flex: 1;
+        background: transparent;
+        color: #475569;
+        border: 1px solid var(--shp-border-strong);
+        border-radius: 8px;
+        padding: 0.5rem;
+        font-weight: 600;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+    }
+    body[data-theme="dark"] .btn-action-secondary { color: #cbd5e1; }
+    .btn-action-secondary:hover { background: rgba(148,163,184,.08); color: #0f172a; border-color: #94a3b8; }
+    body[data-theme="dark"] .btn-action-secondary:hover { color: #fff; border-color: #cbd5e1; }
+    
+    .btn-action-danger {
+        flex: 1;
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 0.5rem;
+        font-weight: 600;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: all 0.2s;
+        text-decoration: none;
+    }
+    body[data-theme="dark"] .btn-action-danger { color: #f87171; }
+    .btn-action-danger:hover { background: rgba(239, 68, 68, 0.2); color: #b91c1c; }
+
+    .btn-more {
+        width: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--shp-border-strong);
+        border-radius: 8px;
+        color: #64748b;
+        transition: all 0.2s;
+    }
+    .btn-more:hover { background: rgba(148,163,184,.1); color: #0f172a; }
+    body[data-theme="dark"] .btn-more:hover { color: #f8fafc; }
+
+    .store-footer {
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--shp-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+    .sync-time { display: flex; align-items: center; gap: 0.3rem; }
+
+    .empty-state {
+        grid-column: 1 / -1;
+        background: var(--card, #fff);
+        border: 1px dashed var(--shp-border-strong);
+        border-radius: 12px;
+        padding: 4rem 2rem;
+        text-align: center;
+        color: #64748b;
+    }
+    body[data-theme="dark"] .empty-state { background: rgba(15, 23, 42, 0.5); color: #9ca3af; }
+    .empty-state i { font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem; display: block; }
+    body[data-theme="dark"] .empty-state i { color: #475569; }
+
+    /* Summary Bar */
+    .summary-bar {
+        background: var(--card, #fff);
+        border: 1px solid var(--shp-border);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        margin-top: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+    body[data-theme="dark"] .summary-bar { background: var(--card, #0f172a); }
+    .summary-label { font-weight: 700; color: #475569; font-size: 0.9rem; }
+    body[data-theme="dark"] .summary-label { color: #cbd5e1; }
+    .summary-stats { display: flex; gap: 1.5rem; }
+    .summary-stat-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 @endpush
 
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="Toko & Channel" description="Kelola toko marketplace, sync order, dan pantau data bermasalah.">
-    <x-slot:actions>
-        <a href="{{ route('marketplace.shopee.connect') }}" class="btn btn-dark btn-sm"
-            style="border-radius:999px;font-size:.78rem;font-weight:700;min-height:36px">
-            + Login Shopee
-        </a>
-        <a href="{{ route('marketplace.tiktok.connect') }}" class="btn btn-sm"
-            style="border-radius:999px;font-size:.78rem;font-weight:700;min-height:36px;background:#fe2c55;color:#fff;border:none">
-            + Login TikTok Shop
-        </a>
-    </x-slot:actions>
+<div class="page-wrap">
 
-    {{-- KPI --}}
-    <div class="oc-kpi-grid">
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Channel</div><div class="oc-kpi-value" id="kpiChannels">—</div><div class="oc-kpi-note">aktif</div></div>
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Toko</div><div class="oc-kpi-value" id="kpiStores">—</div><div class="oc-kpi-note">terhubung</div></div>
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Token Valid</div><div class="oc-kpi-value" id="kpiTokenExp">—</div><div class="oc-kpi-note">toko aktif</div></div>
-        <div class="oc-kpi-card"><div class="oc-kpi-label">Last Sync</div><div class="oc-kpi-value" id="kpiLastSync" style="font-size:.9rem">—</div><div class="oc-kpi-note">dari toko manapun</div></div>
+    <div class="ship-topbar">
+        <div>
+            <div class="title">Toko & Channel</div>
+            <div class="kpis">
+                <span class="kpi" title="Channel aktif"><span class="lbl">Channel</span><span class="val" id="kpiChannels">—</span></span>
+                <span class="kpi" title="Toko terhubung"><span class="lbl">Toko</span><span class="val" id="kpiStores">—</span></span>
+                <span class="kpi" title="Toko dengan token valid"><span class="lbl">Token Valid</span><span class="val" id="kpiTokenExp">—</span></span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="openWebhookLogs()" style="border-color:#e2e8f0;">
+                <i class="bi bi-file-earmark-code"></i> Log Webhook
+            </button>
+            <a href="{{ route('marketplace.shopee.connect') }}" class="btn btn-sm btn-ship-outline btn-pill">
+                <img src="https://logodownload.org/wp-content/uploads/2021/03/shopee-logo-0.png" style="height:14px; margin-right:4px; vertical-align:middle;"> + Shopee
+            </a>
+            <a href="{{ route('marketplace.tiktok.connect') }}" class="btn btn-sm btn-ship-primary btn-pill" style="background:#000!important; border-color:#000!important; color:#fff!important;">
+                <img src="https://cdn4.iconfinder.com/data/icons/social-media-flat-7/64/Social-media_Tiktok-512.png" style="height:14px; margin-right:4px; vertical-align:middle; filter:brightness(0) invert(1);"> + TikTok
+            </a>
+        </div>
     </div>
 
-    <x-gf.panel title="Daftar Toko" subtitle="Sync order, pantau status, dan kelola data bermasalah per toko.">
-        <x-slot:actions>
-            <button type="button" class="btn btn-light border btn-sm"
-                style="border-radius:999px;font-size:.75rem;font-weight:700"
-                onclick="loadAll()">↻ Refresh</button>
-            <button type="button" class="btn btn-light border btn-sm"
-                style="border-radius:999px;font-size:.75rem;font-weight:700"
-                onclick="bootstrap_()">Buat Channel Default</button>
-        </x-slot:actions>
-        <div id="storeBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
-    </x-gf.panel>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold m-0" style="color:var(--shp-accent)"><i class="bi bi-shop me-2" style="color:#3b82f6;"></i> Daftar Toko Anda</h5>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-ship-outline btn-pill btn-sm shadow-sm" onclick="bootstrap_()"><i class="bi bi-magic me-1"></i> Setup Default</button>
+            <button type="button" class="btn btn-ship-primary btn-pill btn-sm shadow-sm" onclick="loadAll()"><i class="bi bi-arrow-clockwise me-1"></i> Segarkan</button>
+        </div>
+    </div>
 
-    {{-- Sync Log --}}
-    <x-gf.panel title="Riwayat Sync" subtitle="10 sync terakhir dari semua toko.">
-        <x-slot:actions>
-            <button class="btn btn-light border btn-sm" style="border-radius:999px;font-size:.75rem;font-weight:700"
-                onclick="loadSyncLogs()">↻ Refresh</button>
-        </x-slot:actions>
-        <div id="syncLogBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
-    </x-gf.panel>
-</x-gf.page>
+    <div id="storeBody" class="grid-stores">
+        <div class="empty-state"><div class="spinner-border text-primary"></div><div class="mt-3">Memuat data toko...</div></div>
+    </div>
 
-{{-- ── Sync Date Modal ────────────────────────────────────────────────────── --}}
+    <div id="storeSummary" class="summary-bar" style="display:none;">
+        <div class="summary-label"><i class="bi bi-pie-chart-fill me-2 text-primary"></i> Ringkasan Total</div>
+        <div class="summary-stats" id="summaryStats"></div>
+    </div>
+
+</div>
+
+{{-- Modal & Skrip pendukung lainnya disembunyikan untuk kerapihan, tapi tetap berjalan --}}
 <div class="modal fade" id="syncModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:400px">
-        <div class="modal-content" style="border-radius:20px">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:350px">
+        <div class="modal-content" style="border-radius:12px">
             <div class="modal-header border-0 pb-0">
                 <div>
-                    <h5 class="modal-title fw-black" id="syncModalTitle">Sync Order</h5>
-                    <div class="text-muted" style="font-size:.8rem" id="syncModalSub">Pilih rentang tanggal</div>
+                    <h6 class="modal-title fw-black" id="syncModalTitle">Sync Order</h6>
                 </div>
                 <button class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div id="syncAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
-                <div class="d-flex gap-3 mb-3">
+                <div id="syncAlert" class="alert d-none mb-3" style="border-radius:8px;font-size:.8rem;padding:.5rem"></div>
+                <div class="d-flex gap-2 mb-3">
                     <div class="flex-fill">
-                        <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">DARI</label>
-                        <input type="date" class="form-control" id="syncFrom" style="border-radius:12px">
+                        <label class="form-label fw-bold" style="font-size:.7rem;color:#64748b;margin-bottom:.2rem">DARI TANGGAL</label>
+                        <input type="date" class="form-control form-control-sm" id="syncFrom" style="border-radius:6px">
                     </div>
                     <div class="flex-fill">
-                        <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">SAMPAI</label>
-                        <input type="date" class="form-control" id="syncTo" style="border-radius:12px">
+                        <label class="form-label fw-bold" style="font-size:.7rem;color:#64748b;margin-bottom:.2rem">SAMPAI TANGGAL</label>
+                        <input type="date" class="form-control form-control-sm" id="syncTo" style="border-radius:6px">
                     </div>
                 </div>
                 <div class="mb-3">
-                    <div class="form-check form-switch" title="Jalankan sync tanpa menyimpan ke database">
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="tokoSyncDryRun" style="cursor:pointer">
-                        <label class="form-check-label fw-bold" for="tokoSyncDryRun" style="font-size:.75rem;color:#64748b;cursor:pointer">Mode Dry Run</label>
+                        <label class="form-check-label fw-bold" for="tokoSyncDryRun" style="font-size:.75rem;color:#64748b;cursor:pointer">Mode Uji Coba (Tanpa Simpan)</label>
                     </div>
                 </div>
                 <div class="d-flex justify-content-end gap-2">
-                    <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
-                    <button class="btn btn-dark" style="border-radius:999px" id="syncBtn" onclick="doSync()">↓ Sync</button>
+                    <button class="btn btn-ship-outline btn-pill btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-ship-primary btn-pill btn-sm" id="syncBtn" onclick="doSync()">Sync Sekarang</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{{-- ── Sync Result Summary Modal ──────────────────────────────────────────── --}}
 <div class="modal fade" id="syncResultModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
-        <div class="modal-content" style="border-radius:20px">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px">
+        <div class="modal-content" style="border-radius:12px">
             <div class="modal-header border-0 pb-0">
                 <div>
-                    <h5 class="modal-title fw-black">✅ Sync Selesai</h5>
-                    <div class="text-muted" style="font-size:.8rem" id="syncResultSub">—</div>
+                    <h6 class="modal-title fw-black">✅ Hasil Sinkronisasi</h6>
+                    <div class="text-muted" style="font-size:.75rem" id="syncResultSub">—</div>
                 </div>
                 <button class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="syncResultBody">
-                {{-- diisi oleh JS --}}
+            <div class="modal-body" id="syncResultBody"></div>
+            <div class="modal-footer border-0 pt-0" id="syncResultFooter"></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="infoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:12px">
+            <div class="modal-header border-0 pb-2">
+                <h6 class="modal-title fw-black" id="infoModalTitle">Detail Teknis Toko</h6>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-footer border-0 pt-0" id="syncResultFooter">
-                {{-- diisi oleh JS --}}
+            <div class="modal-body pt-0">
+                <div class="input-group input-group-sm mb-3" id="orderStatusGroup" style="display:none;">
+                    <span class="input-group-text bg-light text-muted fw-bold">Status Pesanan:</span>
+                    <select class="form-select" id="orderStatusSelect">
+                        <option value="">Semua Status</option>
+                        <option value="UNPAID">UNPAID (Belum Dibayar)</option>
+                        <option value="READY_TO_SHIP">READY_TO_SHIP (Perlu Dikirim)</option>
+                        <option value="PROCESSED">PROCESSED (Sudah Diproses)</option>
+                        <option value="SHIPPED">SHIPPED (Dikirim)</option>
+                        <option value="COMPLETED">COMPLETED (Selesai)</option>
+                        <option value="CANCELLED">CANCELLED (Dibatalkan)</option>
+                    </select>
+                    <button class="btn btn-ship-primary px-3" type="button" id="btnFetchOrderList">Tarik Data</button>
+                </div>
+                <pre class="bg-light rounded p-3 small mb-0" id="infoOutput" style="max-height:65vh;overflow:auto"></pre>
             </div>
         </div>
     </div>
 </div>
 
-{{-- ── Shop Info Modal ────────────────────────────────────────────────────── --}}
-<div class="modal fade" id="infoModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:20px">
-            <div class="modal-header border-0">
-                <h5 class="modal-title fw-black" id="infoModalTitle">Info Toko</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Webhook Logs Modal -->
+<div class="modal fade" id="webhookModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Live Webhook Logs (Shopee)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <pre class="bg-light rounded p-3 small mb-0" id="infoOutput" style="max-height:70vh;overflow:auto"></pre>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush" id="webhookLogList">
+                    <div class="p-4 text-center text-muted">Memuat logs...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openWebhookLogs()">Refresh</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- API Test Modal -->
+<div class="modal fade" id="apiTestModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="apiTestModalTitle">Tes API Shopee</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <div class="input-group mb-3">
+                    <span class="input-group-text bg-white" id="apiTestInputLabel">Order SN</span>
+                    <input type="text" id="apiTestInput" class="form-control form-control-sm" placeholder="Contoh: 2404098R48U37H">
+                    <button class="btn btn-primary btn-sm px-3" id="btnTestApi" style="font-weight:600">Fetch JSON</button>
+                </div>
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                        <span class="fw-bold" style="font-size:0.8rem; color:#475569">Response:</span>
+                        <button class="btn btn-sm text-muted py-0" onclick="navigator.clipboard.writeText(document.getElementById('apiTestOutput').textContent); alert('Tersalin!')" title="Copy JSON"><i class="bi bi-clipboard"></i></button>
+                    </div>
+                    <div class="card-body p-0">
+                        <pre id="apiTestOutput" class="m-0 p-3" style="max-height: 50vh; font-size: 0.75rem; color:#0f172a; background:#f8fafc; border-bottom-left-radius:8px; border-bottom-right-radius:8px; overflow-y:auto;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -174,12 +519,25 @@
     let syncStoreId = null, syncStoreName = '';
     const $ = id => document.getElementById(id);
 
-    // ── Format helpers ────────────────────────────────────────────────────
-    const fmtRp = n => n > 0 ? n.toLocaleString('id') : '—';
+    // ── Icons for Platform ────────────────────────────────────────────────
+    const platformIcon = (channelCode) => {
+        if (!channelCode) return '';
+        const c = channelCode.toUpperCase();
+        if (c === 'SHP' || c === 'SHOPEE') return `<img src="https://logodownload.org/wp-content/uploads/2021/03/shopee-logo-0.png" class="platform-icon" title="Shopee">`;
+        if (c === 'TKT' || c === 'TIKTOK') return `<img src="https://cdn4.iconfinder.com/data/icons/social-media-flat-7/64/Social-media_Tiktok-512.png" class="platform-icon" title="TikTok Shop">`;
+        return `<span class="badge bg-secondary" style="font-size:.65rem">${esc(c)}</span>`;
+    };
 
-    // ── Load everything ───────────────────────────────────────────────────
+    const fmtShortDate = dStr => {
+        if (!dStr) return '—';
+        const d = new Date(dStr);
+        if (isNaN(d)) return '—';
+        const t = d.toTimeString().substring(0,5);
+        return `${d.getDate()} ${d.toLocaleString('id',{month:'short'})} ${t}`;
+    };
+
     async function loadAll() {
-        $('storeBody').innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>`;
+        $('storeBody').innerHTML = `<tr><td colspan="8" class="empty"><div class="spinner-border spinner-border-sm text-secondary me-2"></div> Memuat toko...</td></tr>`;
         const [cRes, sRes, wRes, statRes] = await Promise.allSettled([
             api('/api/marketplace/channels'),
             api('/api/marketplace/stores'),
@@ -199,148 +557,143 @@
         $('kpiStores').textContent   = stores.length;
         const valid = stores.filter(s => s.token_expires_at && new Date(s.token_expires_at) > new Date()).length;
         $('kpiTokenExp').textContent = valid;
-        const last = stores.filter(s => s.last_synced_at).sort((a,b) => new Date(b.last_synced_at)-new Date(a.last_synced_at))[0];
-        $('kpiLastSync').textContent = last?.last_synced_at ? fmtDate(last.last_synced_at) : '—';
     }
 
     function renderStoreCards() {
         const body = $('storeBody');
+        const summary = $('storeSummary');
         if (!stores.length) {
-            body.innerHTML = `<div class="oc-empty">Belum ada toko.<br><a href="{{ route('marketplace.shopee.connect') }}" class="btn btn-dark btn-sm mt-2" style="border-radius:999px">+ Login Shopee</a></div>`;
+            body.innerHTML = `<div class="empty-state"><i class="bi bi-inboxes"></i><div>Belum ada toko yang terhubung.</div></div>`;
+            summary.style.display = 'none';
             return;
         }
 
-        body.innerHTML = `<div class="store-grid">${stores.map(s => {
+        let totalOrders = 0;
+        let totalUnfulfil = 0;
+        let totalIssues = 0;
+
+        body.innerHTML = stores.map((s, idx) => {
             const stats = storeStats[String(s.id)] || {};
             const issues    = stats.issues    || 0;
             const orders    = stats.orders_today || 0;
             const unfulfil  = stats.unfulfilled  || 0;
-            const tokenOk   = s.token_expires_at && new Date(s.token_expires_at) > new Date();
+            
+            totalOrders += orders;
+            totalUnfulfil += unfulfil;
+            totalIssues += issues;
+            
+            let statusClass = 'st-not-connected';
+            let statusLabel = 'Terputus';
+            if (s.connection_status === 'CONNECTED') { statusClass = 'st-connected'; statusLabel = 'Tersambung'; }
+            else if (s.connection_status === 'AUTH_REQUIRED') { statusClass = 'st-auth-required'; statusLabel = 'Akses Ditolak'; }
+            else if (s.connection_status !== 'NOT_CONNECTED') { statusClass = 'st-warning'; statusLabel = 'Perlu Login'; }
 
-            const statsPills = [
-                `<span class="store-stat">${orders} order hari ini</span>`,
-                unfulfil  > 0 ? `<span class="store-stat warn">⏳ ${unfulfil} belum fulfillment</span>` : '',
-                issues    > 0 ? `<span class="store-stat err">⚠ ${issues} data bermasalah</span>`
-                              : `<span class="store-stat ok">✓ Data valid</span>`,
-            ].filter(Boolean).join('');
+            const channelCode = s.channel ? (s.channel.code || '').toUpperCase() : '';
+            const connectUrl = `/marketplace/${channelCode === 'TKT' || channelCode === 'TIKTOK' ? 'tiktok' : 'shopee'}/connect?store_id=${s.id}`;
+            const isConn = s.connection_status === 'CONNECTED';
 
-            const wh = warehouses.find(w => w.id == s.default_warehouse_id);
-            const whLabel = wh ? `${esc(wh.code)} — ${esc(wh.name)}` : '— Pilih Gudang —';
+            return `
+            <div class="store-card">
+                <div class="store-header">
+                    <div class="store-brand">
+                        <div class="store-brand-icon">${platformIcon(channelCode)}</div>
+                        <div class="store-title-wrap">
+                            <h3 class="store-name" id="store-name-${s.id}">
+                                ${esc(s.name || 'Toko Tanpa Nama')}
+                                <button class="rename-btn" title="Ubah Nama" onclick="startRename(${s.id})"><i class="bi bi-pencil-square"></i></button>
+                            </h3>
+                            <div class="rename-inline" id="rename-inline-${s.id}">
+                                <input type="text" id="rename-input-${s.id}" value="${esc(s.name || '')}">
+                                <button class="btn btn-ship-primary btn-save-name" onclick="saveRename(${s.id})">Simpan</button>
+                                <button class="btn btn-ship-outline btn-save-name" onclick="cancelRename(${s.id})">Batal</button>
+                            </div>
+                            <div class="store-id">ID: ${esc(s.external_shop_id || '—')}</div>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn-more px-2 py-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Menu Lanjutan">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:.8rem; border-radius:8px">
+                            <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/orders?store_id=${s.id}"><i class="bi bi-card-list me-2"></i>Semua Pesanan</a></li>
+                            <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/fulfillment"><i class="bi bi-box-seam me-2"></i>Menu Packing</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="checkStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-info-square me-2"></i>Shop Info API</button></li>
+                            ${(channelCode === 'SHP' || channelCode === 'SHOPEE') ? `
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'order_status_update')"><i class="bi bi-broadcast text-primary me-2"></i>Simulasi: Tes Order Baru</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'auth_expiry_push')"><i class="bi bi-broadcast text-warning me-2"></i>Simulasi: Token Expired (Push 12)</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
+                            ` : ''}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item py-2 text-danger fw-bold" onclick="deleteStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-trash3-fill me-2"></i>Hapus Toko</button></li>
+                        </ul>
+                    </div>
+                </div>
 
-            return `<div class="store-card">
-                <div class="store-card-head">
-                    ${channelPill(s.channel)}
-                    <span class="store-card-name" id="store-name-${s.id}">${esc(s.name || '—')}</span>
-                    <button class="rename-btn" title="Ganti nama toko" onclick="startRename(${s.id})">✎</button>
-                    <span class="rename-inline" id="rename-inline-${s.id}">
-                        <input type="text" id="rename-input-${s.id}" value="${esc(s.name || '')}">
-                        <button class="btn btn-dark btn-save-name" onclick="saveRename(${s.id})">Simpan</button>
-                        <button class="btn btn-light border btn-save-name" onclick="cancelRename(${s.id})">✕</button>
-                    </span>
-                    <span class="ms-auto">
-                        ${s.connection_status === 'CONNECTED' ? '<span class="badge bg-success">Terhubung</span>' :
-                          (s.connection_status === 'NOT_CONNECTED' ? '<span class="badge bg-secondary">Belum Terhubung</span>' :
-                          (s.connection_status === 'AUTH_REQUIRED' ? '<span class="badge bg-danger">Koneksi Bermasalah</span>' :
-                          '<span class="badge bg-warning text-dark">Perlu Login Ulang</span>'))}
-                    </span>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge-status ${statusClass}">${statusLabel}</span>
+                    ${!isConn ? `<a href="${connectUrl}" class="btn btn-sm btn-outline-danger" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Sambungkan Ulang</a>` : ''}
                 </div>
-                <div class="store-card-meta">
-                    Shop ID: <code>${esc(s.external_shop_id || '—')}</code>
-                    · Last sync: ${s.last_synced_at ? fmtDate(s.last_synced_at) : 'Belum pernah'}
-                    · ${esc(s.region || 'ID')}
+
+                <div class="store-stats">
+                    <a href="/marketplace/orders?store_id=${s.id}&tab=unpaid" class="stat-box" style="text-decoration:none; color:inherit; cursor:pointer;">
+                        <div class="stat-val">${orders}</div>
+                        <div class="stat-lbl">Pesanan</div>
+                    </a>
+                    <a href="/marketplace/orders?store_id=${s.id}&tab=ready_to_ship" class="stat-box ${unfulfil > 0 ? 'warn' : ''}" style="text-decoration:none; color:inherit; cursor:pointer;">
+                        <div class="stat-val">${unfulfil}</div>
+                        <div class="stat-lbl">Perlu Kirim</div>
+                    </a>
+                    <a href="/marketplace/issues?store_id=${s.id}" class="stat-box ${issues > 0 ? 'err' : ''}" style="text-decoration:none; color:inherit; cursor:pointer;">
+                        <div class="stat-val">${issues}</div>
+                        <div class="stat-lbl">Isu Data</div>
+                    </a>
                 </div>
-                <div class="store-stats">${statsPills}</div>
-                <div class="mb-3">
-                    <label style="font-size:.68rem;font-weight:700;color:#94a3b8;display:block;margin-bottom:.25rem">TIPE RESI</label>
-                    <select class="form-select form-select-sm" style="border-radius:10px;font-size:.75rem;margin-bottom:.5rem"
-                        onchange="setShippingDocumentType(${s.id}, this.value, this)">
-                        <option value="THERMAL_AIR_WAYBILL" ${(s.meta && s.meta.shipping_document_type === 'THERMAL_AIR_WAYBILL') ? 'selected' : ''}>Thermal (100x150)</option>
-                        <option value="NORMAL_AIR_WAYBILL" ${(s.meta && s.meta.shipping_document_type === 'NORMAL_AIR_WAYBILL') ? 'selected' : ''}>A4 (Normal)</option>
-                    </select>
-                    
-                    <label style="font-size:.68rem;font-weight:700;color:#94a3b8;display:block;margin-bottom:.25rem">GUDANG DEFAULT</label>
-                    <select class="form-select form-select-sm" style="border-radius:10px;font-size:.75rem"
-                        onchange="setWarehouse(${s.id}, this.value, this)">
-                        <option value="">— Pilih Gudang —</option>
-                        ${warehouses.map(w => `<option value="${w.id}" ${s.default_warehouse_id == w.id ? 'selected' : ''}>${esc(w.code)} — ${esc(w.name)}</option>`).join('')}
-                    </select>
-                </div>
+
                 <div class="store-actions">
-                    ${s.connection_status === 'CONNECTED' 
-                        ? `<button class="btn btn-dark" onclick="openSync(${s.id},'${esc(s.name)}')">↓ Sync Order</button>`
-                        : (s.connection_status === 'NOT_CONNECTED' 
-                            ? `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect?store_id=${s.id}" class="btn btn-primary">Hubungkan ${s.channel ? s.channel.name : 'Toko'}</a>` 
-                            : `<a href="/marketplace/${s.channel ? (s.channel.code === 'TKT' ? 'tiktok' : 'shopee') : 'shopee'}/connect?store_id=${s.id}" class="btn btn-danger">Login Ulang ${s.channel ? s.channel.name : 'Toko'}</a>`)
-                    }
-                    <a href="/marketplace/orders" class="btn btn-light border">📋 Lihat Order</a>
-                    ${issues > 0
-                        ? `<a href="/marketplace/issues?store_id=${s.id}" class="btn btn-warning" style="font-weight:700">⚠ Perbaiki Data (${issues})</a>`
-                        : `<a href="/marketplace/issues?store_id=${s.id}" class="btn btn-light border">🔍 Cek Data</a>`}
-                    <a href="/marketplace/fulfillment" class="btn btn-light border">📦 Fulfillment</a>
-                    <button class="btn btn-light border" onclick="checkBookingList(${s.id})">👁 Test API Booking List</button>
+                    ${issues > 0 ? `
+                    <div class="action-row">
+                        <a href="/marketplace/issues?store_id=${s.id}" class="btn-action-danger"><i class="bi bi-exclamation-triangle-fill"></i> Perbaiki Isu Data</a>
+                    </div>
+                    ` : ''}
+                    <div class="action-row">
+                        ${isConn 
+                            ? `<button class="btn-action-primary" onclick="openSync(${s.id},'${esc(s.name)}')"><i class="bi bi-cloud-download"></i> Tarik Manual</button>`
+                            : `<button class="btn-action-secondary" disabled><i class="bi bi-cloud-download"></i> Terputus</button>`
+                        }
+                        <a href="/marketplace/orders?store_id=${s.id}" class="btn-action-secondary"><i class="bi bi-receipt"></i> Kelola</a>
+                    </div>
+                </div>
+
+                <div class="store-footer">
+                    <div class="sync-time">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span>Sync: ${s.last_synced_at ? fmtShortDate(s.last_synced_at) : 'Belum Pernah'}</span>
+                    </div>
                 </div>
             </div>`;
-        }).join('')}</div>`;
+        }).join('');
+
+        // Render Summary
+        $('summaryStats').innerHTML = `
+            <div class="summary-stat-item" title="Total Pesanan Masuk"><i class="bi bi-bag-check" style="font-size:1rem; color:#3b82f6"></i> <span>${totalOrders} Pesanan Hari Ini</span></div>
+            ${totalUnfulfil > 0 ? `<div class="summary-stat-item text-warning" title="Total Belum Dikemas"><i class="bi bi-box-seam"></i> <span>${totalUnfulfil} Perlu Dikirim</span></div>` : ''}
+            ${totalIssues > 0 ? `<div class="summary-stat-item text-danger" title="Total Masalah Data"><i class="bi bi-exclamation-circle-fill"></i> <span>${totalIssues} Isu Data</span></div>` : ''}
+        `;
+        summary.style.display = 'flex';
     }
 
-    // ── Sync Log ──────────────────────────────────────────────────────────
-    async function loadSyncLogs() {
-        $('syncLogBody').innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>`;
-        try {
-            const logs = await api('/api/marketplace/sync-logs');
-            if (!logs.length) {
-                $('syncLogBody').innerHTML = `<div class="oc-empty">Belum ada riwayat sync.</div>`;
-                return;
-            }
-            $('syncLogBody').innerHTML = `
-            <div class="gf-table-scroll">
-            <table class="gf-clean-table w-100">
-                <thead><tr>
-                    <th>Toko</th><th>Waktu</th><th>Status</th>
-                    <th class="text-end">Baru</th><th class="text-end">Update</th>
-                    <th class="text-end">SKU Kosong</th><th class="text-end">Belum Mapping</th>
-                    <th class="text-end">HPP Kosong</th><th class="text-end">Siap Fulfillment</th>
-                    <th class="text-end">Belum Lengkap</th><th>Keterangan</th>
-                </tr></thead>
-                <tbody>
-                ${logs.filter(l => l.action === 'sync_orders').slice(0, 20).map(l => {
-                    const p = l.payload || {};
-                    const isOk = l.status === 'success';
-                    return `<tr>
-                        <td style="font-size:.78rem">${esc(l.store_name || '—')}</td>
-                        <td style="font-size:.78rem;white-space:nowrap">${fmtDate(l.created_at)}</td>
-                        <td>${isOk
-                            ? `<span class="badge bg-success-subtle text-success" style="border-radius:999px">✓ Sukses</span>`
-                            : `<span class="badge bg-danger-subtle text-danger" style="border-radius:999px">✗ Gagal</span>`}</td>
-                        <td class="text-end" style="font-size:.8rem">${p.new ?? '—'}</td>
-                        <td class="text-end" style="font-size:.8rem">${p.updated ?? '—'}</td>
-                        <td class="text-end" style="font-size:.8rem;color:${(p.sku_empty||0)>0?'#b91c1c':'inherit'}">${p.sku_empty ?? '—'}</td>
-                        <td class="text-end" style="font-size:.8rem;color:${(p.mapping_not_found||0)>0?'#b45309':'inherit'}">${p.mapping_not_found ?? '—'}</td>
-                        <td class="text-end" style="font-size:.8rem;color:${(p.missing_hpp||0)>0?'#1d4ed8':'inherit'}">${p.missing_hpp ?? '—'}</td>
-                        <td class="text-end" style="font-size:.8rem;color:${(p.ready||0)>0?'#166534':'inherit'}">${p.ready ?? '—'}</td>
-                        <td class="text-end" style="font-size:.8rem;color:${(p.incomplete||0)>0?'#b45309':'inherit'}">${p.incomplete ?? '—'}</td>
-                        <td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.message||'')}">
-                            ${esc(l.message || '—')}
-                        </td>
-                    </tr>`;
-                }).join('')}
-                </tbody>
-            </table></div>`;
-        } catch (e) {
-            $('syncLogBody').innerHTML = `<div class="oc-empty text-danger">Gagal memuat log: ${e.message}</div>`;
-        }
-    }
-
-    // ── Sync flow ─────────────────────────────────────────────────────────
     window.openSync = function (id, name) {
         syncStoreId = id;
         syncStoreName = name;
-        $('syncModalTitle').textContent = 'Sync Order — ' + name;
+        $('syncModalTitle').textContent = 'Tarik Pesanan: ' + name;
         $('syncAlert').className = 'alert d-none';
         const today = new Date().toISOString().slice(0,10);
         const week  = new Date(Date.now() - 6*864e5).toISOString().slice(0,10);
         $('syncFrom').value = week; $('syncTo').value = today;
-        $('syncBtn').disabled = false; $('syncBtn').textContent = '↓ Sync';
+        $('syncBtn').disabled = false; $('syncBtn').textContent = 'Mulai Proses';
         new bootstrap.Modal($('syncModal')).show();
     };
 
@@ -349,8 +702,8 @@
         const from = new Date($('syncFrom').value + 'T00:00:00');
         const to   = new Date($('syncTo').value   + 'T23:59:59');
         const btn  = $('syncBtn'), alertEl = $('syncAlert');
-        btn.disabled = true; btn.textContent = '⏳ Syncing…';
-        alertEl.className = 'alert alert-warning'; alertEl.textContent = 'Sedang mengambil order dari marketplace…';
+        btn.disabled = true; btn.textContent = 'Memproses...';
+        alertEl.className = 'alert alert-warning'; alertEl.textContent = 'Menghubungi Marketplace...';
 
         try {
             const d = await api('/api/marketplace/stores/' + syncStoreId + '/sync-orders', {
@@ -363,103 +716,52 @@
                 })
             });
 
-            // Tutup sync modal, buka result modal
             bootstrap.Modal.getInstance($('syncModal')).hide();
             showSyncResult(d, syncStoreName);
             loadAll();
-            loadSyncLogs();
         } catch (e) {
-            alertEl.className = 'alert alert-danger'; alertEl.textContent = e.message;
-            btn.disabled = false; btn.textContent = '↓ Coba Lagi';
+            alertEl.className = 'alert alert-danger'; alertEl.textContent = 'Error: ' + e.message;
+            btn.disabled = false; btn.textContent = 'Coba Lagi';
         }
     };
 
     function showSyncResult(d, storeName) {
-        $('syncResultSub').textContent = storeName + ' — ' + (d.message || '');
-
+        $('syncResultSub').textContent = storeName + ' — ' + (d.message || 'Selesai');
         const rows = [
-            { label: '📦 Order ditemukan',       val: d.found            ?? 0,  style: '' },
-            { label: '✅ Order baru',             val: d.new              ?? 0,  style: 'ok' },
-            { label: '🔄 Order diperbarui',       val: d.updated          ?? 0,  style: '' },
-            { label: '⊘ SKU marketplace kosong', val: d.sku_empty        ?? 0,  style: (d.sku_empty||0)>0 ? 'err' : '' },
-            { label: '❓ SKU belum dimapping',    val: d.mapping_not_found ?? 0, style: (d.mapping_not_found||0)>0 ? 'warn' : '' },
-            { label: '⚠ HPP belum diisi',        val: d.missing_hpp      ?? 0,  style: (d.missing_hpp||0)>0 ? 'warn' : '' },
-            { label: '✓ Siap fulfillment',        val: d.ready            ?? 0,  style: (d.ready||0)>0 ? 'ok' : '' },
-            { label: '⚠ Data belum lengkap',      val: d.incomplete       ?? 0,  style: (d.incomplete||0)>0 ? 'warn' : '' },
+            { label: 'Pesanan Ditemukan',       val: d.found            ?? 0,  style: '' },
+            { label: 'Pesanan Baru Disimpan',   val: d.new              ?? 0,  style: 'ok' },
+            { label: 'Pesanan Diperbarui',      val: d.updated          ?? 0,  style: '' },
+            { label: 'Isu: SKU Belum Terpetakan',val: d.mapping_not_found ?? 0, style: (d.mapping_not_found||0)>0 ? 'warn' : '' },
+            { label: 'Isu: Kekurangan Data',    val: (d.sku_empty||0)+(d.missing_hpp||0)+(d.incomplete||0),  style: ((d.sku_empty||0)+(d.missing_hpp||0)+(d.incomplete||0))>0 ? 'warn' : '' },
         ];
-
         $('syncResultBody').innerHTML = rows.map(r =>
-            `<div class="sync-row">
-                <span class="label">${r.label}</span>
-                <span class="val ${r.style}">${r.val}</span>
+            `<div style="display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px solid #e2e8f0; font-size:.85rem">
+                <span style="color:#64748b">${r.label}</span>
+                <span class="${r.style === 'ok' ? 'text-success fw-bold' : (r.style === 'warn' ? 'text-warning fw-bold' : 'fw-bold')}">${r.val}</span>
             </div>`
         ).join('');
-
+        
         const hasIssues = (d.sku_empty||0) + (d.mapping_not_found||0) + (d.missing_hpp||0) > 0;
         const storeQs = syncStoreId ? `?store_id=${syncStoreId}` : '';
 
         $('syncResultFooter').innerHTML = `
-            <div class="d-flex flex-wrap gap-2 w-100">
-                ${hasIssues
-                    ? `<a href="/marketplace/issues${storeQs}" class="btn btn-warning fw-bold" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">
-                        ⚠ Perbaiki Data Bermasalah (${d.total_issues||0})
-                       </a>`
-                    : ''}
-                ${(d.ready||0) > 0
-                    ? `<a href="/marketplace/fulfillment" class="btn btn-success fw-bold" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">
-                        📦 Lanjut ke Fulfillment
-                       </a>`
-                    : ''}
-                <a href="/marketplace/orders" class="btn btn-light border fw-bold" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">
-                    📋 Lihat Semua Order
-                </a>
-                <button class="btn btn-light border fw-bold ms-auto" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">
-                    Kembali ke Toko
-                </button>
+            <div class="d-flex flex-wrap gap-2 w-100 mt-2">
+                ${hasIssues ? `<a href="/marketplace/issues${storeQs}" class="btn btn-ship-primary btn-pill btn-sm" style="background:#f59e0b!important;border-color:#f59e0b!important;color:#fff!important" data-bs-dismiss="modal">Cek Masalah Data</a>` : ''}
+                <button class="btn btn-ship-outline btn-pill btn-sm ms-auto" data-bs-dismiss="modal">Tutup</button>
             </div>`;
-
         new bootstrap.Modal($('syncResultModal')).show();
     }
 
-    // ── Store actions ─────────────────────────────────────────────────────
     window.bootstrap_ = async function () {
         await api('/api/marketplace/bootstrap', { method: 'POST' }).catch(e => alert(e.message));
         loadAll();
     };
 
-    window.setWarehouse = async function (storeId, warehouseId, sel) {
-        sel.disabled = true;
-        try {
-            await api('/api/marketplace/stores/' + storeId, {
-                method: 'PATCH', body: JSON.stringify({ default_warehouse_id: warehouseId || null }),
-            });
-            sel.style.borderColor = '#16a34a';
-            setTimeout(() => { sel.style.borderColor = ''; }, 1500);
-        } catch (e) { alert('Gagal: ' + e.message); }
-        finally { sel.disabled = false; }
-    };
 
-    window.setShippingDocumentType = async function (storeId, type, sel) {
-        sel.disabled = true;
-        try {
-            await api('/api/marketplace/stores/' + storeId, {
-                method: 'PATCH', body: JSON.stringify({ meta_shipping_document_type: type }),
-            });
-            sel.style.borderColor = '#16a34a';
-            setTimeout(() => { sel.style.borderColor = ''; }, 1500);
-            
-            // Perbarui local data agar tampilan tetap sesuai jika render ulang
-            const store = stores.find(s => s.id == storeId);
-            if (store) {
-                if (!store.meta) store.meta = {};
-                store.meta.shipping_document_type = type;
-            }
-        } catch (e) { alert('Gagal: ' + e.message); }
-        finally { sel.disabled = false; }
-    };
 
     window.checkStore = async function (id, name) {
-        $('infoModalTitle').textContent = 'Info Toko — ' + name;
+        $('orderStatusGroup').style.display = 'none';
+        $('infoModalTitle').textContent = 'Info API — ' + name;
         $('infoOutput').textContent = 'Memuat…';
         new bootstrap.Modal($('infoModal')).show();
         try {
@@ -468,14 +770,182 @@
         } catch (e) { $('infoOutput').textContent = 'Error: ' + e.message; }
     };
 
-    window.checkBookingList = async function (id) {
-        $('infoModalTitle').textContent = 'Booking List (Shopee API)';
-        $('infoOutput').textContent = 'Memuat… (Mengecek 3 hari terakhir)';
-        new bootstrap.Modal($('infoModal')).show();
+    window.testApiType = null;
+    window.testApiStoreId = null;
+
+    // Webhook log function
+    window.openWebhookLogs = async function() {
+        new bootstrap.Modal($('webhookModal')).show();
+        $('webhookLogList').innerHTML = '<div class="p-4 text-center text-muted">Memuat logs...</div>';
         try {
-            const d = await api('/api/marketplace/stores/' + id + '/booking-list');
+            const logs = await api('/api/webhooks/logs?provider=shopee');
+            if (logs.length === 0) {
+                $('webhookLogList').innerHTML = '<div class="p-4 text-center text-muted">Belum ada webhook yang masuk.</div>';
+                return;
+            }
+            
+            $('webhookLogList').innerHTML = logs.map(log => `
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between mb-1">
+                        <strong class="mb-1">${log.event_type}</strong>
+                        <small class="text-muted">${new Date(log.created_at).toLocaleString('id-ID')}</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="badge ${log.signature_verified ? 'bg-success' : 'bg-warning text-dark'}">
+                            ${log.signature_verified ? 'Signature Valid' : 'Signature Unverified / Invalid'}
+                        </span>
+                    </div>
+                    <pre style="background:#f8fafc; padding:10px; border-radius:6px; font-size:11px; max-height:200px; overflow:auto;">${JSON.stringify(log.payload, null, 2)}</pre>
+                </div>
+            `).join('');
+        } catch (e) {
+            $('webhookLogList').innerHTML = '<div class="p-4 text-center text-danger">Error: ' + e.message + '</div>';
+        }
+    };
+
+    window.simulateWebhook = async function(id, name, driver, platformId, eventType = 'order_status_update') {
+        if (driver !== 'shopee') {
+            alert('Saat ini simulasi webhook baru mendukung Shopee.');
+            return;
+        }
+        
+        let confirmMsg = 'Kirim simulasi Webhook "Order Status Update (READY_TO_SHIP)" ke toko ' + name + '?';
+        if (eventType === 'auth_expiry_push') {
+            confirmMsg = 'Kirim simulasi Webhook "Open API Authorization Expiry Push" (Code 12) ke toko ' + name + '?\n\nIni akan merubah status token toko menjadi kedaluwarsa.';
+        }
+
+        if (!confirm(confirmMsg)) return;
+        
+        try {
+            await api('/api/webhooks/simulate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    provider: driver,
+                    platform_id: platformId,
+                    event_type: eventType
+                })
+            });
+            alert('Simulasi berhasil dikirim! Silakan klik tombol "Log Webhook" untuk melihat hasilnya.');
+            // Reload the stores after a slight delay to allow the background job to finish
+            setTimeout(() => loadStores(), 1500);
+            // window.openWebhookLogs();
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    };
+
+    window.checkBookingList = function (id, name) {
+        window.testApiStoreId = id;
+        window.testApiType = 'booking';
+        $('infoModalTitle').textContent = 'API Get Booking List — ' + name;
+        $('orderStatusGroup').querySelector('.input-group-text').textContent = 'Status Booking:';
+        $('orderStatusGroup').style.display = 'flex';
+        $('orderStatusSelect').value = ''; // default semua
+        new bootstrap.Modal($('infoModal')).show();
+        
+        $('btnFetchOrderList').click();
+    };
+
+    window.checkOrderList = function (id, name) {
+        window.testApiStoreId = id;
+        window.testApiType = 'order';
+        $('infoModalTitle').textContent = 'API Get Order List — ' + name;
+        $('orderStatusGroup').querySelector('.input-group-text').textContent = 'Status Pesanan:';
+        $('orderStatusGroup').style.display = 'flex';
+        $('orderStatusSelect').value = ''; // default semua
+        new bootstrap.Modal($('infoModal')).show();
+        
+        // Auto-fetch default "Semua Status"
+        $('btnFetchOrderList').click();
+    };
+
+    $('btnFetchOrderList').onclick = async function() {
+        const id = window.testApiStoreId;
+        const type = window.testApiType;
+        const status = $('orderStatusSelect').value;
+        
+        let url = '';
+        if (type === 'order') {
+            url = '/api/marketplace/stores/' + id + '/order-list' + (status ? '?order_status=' + status : '');
+            $('infoOutput').textContent = 'Memuat Order List (' + (status || 'Semua Status') + ')...';
+        } else {
+            url = '/api/marketplace/stores/' + id + '/booking-list' + (status ? '?booking_status=' + status : '');
+            $('infoOutput').textContent = 'Memuat Booking List (' + (status || 'Semua Status') + ')...';
+        }
+        
+        $('btnFetchOrderList').disabled = true;
+        
+        try {
+            const d = await api(url);
             $('infoOutput').textContent = JSON.stringify(d, null, 2);
-        } catch (e) { $('infoOutput').textContent = 'Error: ' + e.message; }
+        } catch (e) { 
+            $('infoOutput').textContent = 'Error: ' + e.message; 
+        } finally {
+            $('btnFetchOrderList').disabled = false;
+        }
+    };
+
+    window.testOrderDetail = function(storeId, storeName) {
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'order';
+        $('apiTestModalTitle').textContent = 'Tes API: get_order_detail — ' + storeName;
+        $('apiTestInputLabel').textContent = 'Order SN';
+        $('apiTestInput').value = '';
+        $('apiTestOutput').textContent = 'Masukkan Order SN lalu klik Fetch JSON.';
+        
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
+    window.testPackageDetail = function(storeId, storeName) {
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'package';
+        $('apiTestModalTitle').textContent = 'Tes API: get_package_detail — ' + storeName;
+        $('apiTestInputLabel').textContent = 'Package Number';
+        $('apiTestInput').value = '';
+        $('apiTestOutput').textContent = 'Masukkan Package Number lalu klik Fetch JSON.';
+        
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
+    window.testReturnList = function(storeId, storeName) {
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'return_list';
+        $('apiTestModalTitle').textContent = 'Tes API: get_return_list — ' + storeName;
+        $('apiTestInputLabel').textContent = 'Page No';
+        $('apiTestInput').value = '0';
+        $('apiTestOutput').textContent = 'Masukkan Page No (misal 0) lalu klik Fetch JSON.';
+        
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
+    $('btnTestApi').onclick = async function() {
+        const storeId = window.testApiStoreId;
+        const inputVal = $('apiTestInput').value.trim();
+        const type = window.testApiEndpointType;
+        
+        if (!inputVal && type !== 'return_list') return alert('Silakan masukkan parameter.');
+        if (type === 'return_list' && inputVal === '') $('apiTestInput').value = '0';
+        
+        let url = '';
+        if (type === 'order') {
+            url = '/api/marketplace/stores/' + storeId + '/orders/' + inputVal + '/raw-detail';
+        } else if (type === 'package') {
+            url = '/api/marketplace/stores/' + storeId + '/packages/' + inputVal + '/raw-detail';
+        } else if (type === 'return_list') {
+            url = '/api/marketplace/stores/' + storeId + '/return-list/raw-detail?page_no=' + (inputVal || 0);
+        }
+
+        $('apiTestOutput').textContent = 'Memanggil ' + url + ' ...\\nTunggu sebentar...';
+        $('btnTestApi').disabled = true;
+        
+        try {
+            const res = await api(url);
+            $('apiTestOutput').textContent = JSON.stringify(res, null, 2);
+        } catch (e) {
+            $('apiTestOutput').textContent = 'Error: ' + e.message;
+        } finally {
+            $('btnTestApi').disabled = false;
+        }
     };
 
     window.startRename = function (storeId) {
@@ -506,10 +976,20 @@
         }
     };
 
+    window.deleteStore = async function (storeId, name) {
+        if (!confirm('Apakah Anda yakin ingin menghapus toko "' + name + '"?')) return;
+        try {
+            await api('/api/marketplace/stores/' + storeId, {
+                method: 'DELETE',
+            });
+            loadAll();
+        } catch (e) {
+            alert(e.message || 'Gagal menghapus toko');
+        }
+    };
+
     window.loadAll = loadAll;
-    window.loadSyncLogs = loadSyncLogs;
     loadAll();
-    loadSyncLogs();
 })();
 </script>
 @endpush

@@ -163,6 +163,28 @@ class OmnichannelSyncService
         return $count;
     }
 
+    public function syncSpecificOrder(Store $store, string $orderSn): void
+    {
+        $driver = $this->manager->driver($store);
+        $detailResponse = $driver->getOrderDetail($store, [$orderSn]);
+
+        if (! empty($detailResponse['error'])) {
+            $this->log($store, 'sync_specific_order', 'failed', "Gagal ambil detail {$orderSn}: " . ($detailResponse['message'] ?? $detailResponse['error']), $detailResponse);
+            return;
+        }
+
+        $details = data_get($detailResponse, 'response.order_list', []);
+        if (empty($details)) {
+            $this->log($store, 'sync_specific_order', 'failed', "Order {$orderSn} tidak ditemukan di response Shopee", $detailResponse);
+            return;
+        }
+
+        $this->upsertOrders($store, $details);
+        $this->autoCreateFulfillments($store);
+
+        $this->log($store, 'sync_specific_order', 'success', "Berhasil menarik pesanan baru {$orderSn}", $details);
+    }
+
     private function autoCreateFulfillments(Store $store): void
     {
         $orders = MarketplaceOrder::where('store_id', $store->id)

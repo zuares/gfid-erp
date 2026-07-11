@@ -627,6 +627,10 @@ class MarketplaceSyncService
                     $outerStats['updated']++;
                 }
 
+                if (in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
+                    \App\Jobs\DownloadMarketplaceShippingDocumentJob::dispatch($store->id, $detail['order_sn']);
+                }
+
                 $existingItems = $order->items->keyBy(function ($item) {
                     return ($item->external_item_id ?: 'null') . '_' . ($item->external_model_id ?: 'null') . '_' . ($item->marketplace_sku ?: 'null');
                 });

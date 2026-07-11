@@ -283,6 +283,7 @@
 
     $openMarketplaceTools =
         $open('marketplace.toko') ||
+        $open('marketplace.returns') ||
         $open('marketplace.settings') ||
         $open('marketplace.orders') ||
         $open('marketplace.orders.*') ||
@@ -1436,6 +1437,12 @@
                                 :active="request()->routeIs('marketplace.toko')">
                                 Toko & Kanal
                             </x-sidebar.sub-link>
+
+                            <x-sidebar.sub-link href="{{ route('marketplace.returns') }}" icon="bi bi-arrow-return-left"
+                                :active="request()->routeIs('marketplace.returns')">
+                                Retur
+                            </x-sidebar.sub-link>
+
                             <x-sidebar.sub-link href="{{ route('marketplace.settings') }}" icon="bi bi-gear"
                                 :active="request()->routeIs('marketplace.settings')">
                                 Pengaturan Global
