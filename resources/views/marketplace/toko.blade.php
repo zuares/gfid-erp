@@ -608,6 +608,7 @@
                                 <button class="btn btn-ship-outline btn-save-name" onclick="cancelRename(${s.id})">Batal</button>
                             </div>
                             <div class="store-id">ID: ${esc(s.external_shop_id || '—')}</div>
+                            ${s.token_expires_at ? `<div style="font-size: 0.65rem; color: #64748b; margin-top: 4px;"><i class="bi bi-key text-warning"></i> Exp: ${new Date(s.token_expires_at).toLocaleString('id-ID', {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</div>` : ''}
                         </div>
                     </div>
                     <div class="dropdown">
@@ -615,6 +616,8 @@
                             <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:.8rem; border-radius:8px">
+                            <li><button class="dropdown-item py-2 fw-semibold text-primary" onclick="forceSyncStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-repeat me-2"></i>Tarik Data (Semua & Sekarang)</button></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/orders?store_id=${s.id}"><i class="bi bi-card-list me-2"></i>Semua Pesanan</a></li>
                             <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/fulfillment"><i class="bi bi-box-seam me-2"></i>Menu Packing</a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -625,6 +628,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-warning me-2"></i>Putuskan Koneksi</button></li>
                             <li><hr class="dropdown-divider"></li>
@@ -641,7 +645,7 @@
                 <div class="store-stats">
                     <a href="/marketplace/orders?store_id=${s.id}&tab=unpaid" class="stat-box" style="text-decoration:none; color:inherit; cursor:pointer;">
                         <div class="stat-val">${orders}</div>
-                        <div class="stat-lbl">Pesanan</div>
+                        <div class="stat-lbl">Hari Ini</div>
                     </a>
                     <a href="/marketplace/orders?store_id=${s.id}&tab=ready_to_ship" class="stat-box ${unfulfil > 0 ? 'warn' : ''}" style="text-decoration:none; color:inherit; cursor:pointer;">
                         <div class="stat-val">${unfulfil}</div>
@@ -661,7 +665,7 @@
                     ` : ''}
                     <div class="action-row">
                         ${isConn 
-                            ? `<button class="btn-action-primary" onclick="openSync(${s.id},'${esc(s.name)}')"><i class="bi bi-cloud-download"></i> Tarik Manual</button>`
+                            ? `<button class="btn-action-primary" onclick="openSync(${s.id},'${esc(s.name)}')"><i class="bi bi-calendar-range"></i> Pilih Tanggal Sync</button>`
                             : `<button class="btn-action-secondary" disabled><i class="bi bi-cloud-download"></i> Terputus</button>`
                         }
                         <a href="/marketplace/orders?store_id=${s.id}" class="btn-action-secondary"><i class="bi bi-receipt"></i> Kelola</a>
@@ -1002,6 +1006,48 @@
             loadAll();
         } catch (e) {
             alert(e.message || 'Gagal menghapus toko');
+        }
+    };
+
+    window.forceSyncStore = async function (storeId, storeName) {
+        if (!confirm(`Tarik seluruh pesanan (15 hari) dan retur untuk toko ${storeName} sekarang? Proses akan berjalan di latar belakang.`)) return;
+
+        try {
+            const res = await api(`/stores/${storeId}/force-sync-background`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            alert(res.message || 'Sinkronisasi berhasil dijadwalkan.');
+        } catch (e) {
+            alert('Gagal menjadwalkan sinkronisasi: ' + e.message);
+        }
+    };
+
+    window.triggerHistoricalBackfill = async function (storeId, storeName) {
+        const year = prompt(`Tarik Histori (Mesin Waktu) untuk toko ${storeName}.\nMasukkan tahun target mundur (contoh: 2022):`, "2022");
+        if (!year) return;
+        
+        if (!confirm(`Peringatan: Menarik seluruh histori order dan retur dari tahun ${year} akan berjalan lama di latar belakang.\nAnda tetap bisa menutup halaman ini. Lanjutkan?`)) return;
+
+        try {
+            const res = await fetch(`/api/marketplace/stores/${storeId}/sync-historical`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ year: year })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                alert("Berhasil! Proses tarik histori sedang berjalan di latar belakang server.");
+            } else {
+                alert("Gagal: " + (data.message || 'Unknown error'));
+            }
+        } catch (e) {
+            alert("Gagal memanggil API: " + e.message);
         }
     };
 

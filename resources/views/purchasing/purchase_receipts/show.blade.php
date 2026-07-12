@@ -213,7 +213,14 @@
       {{-- Kiri --}}
       <div style="min-width:0;">
         <h2 class="mb-0 lh-1" style="font-size:1.35rem;">Goods Receipt</h2>
-        <div class="text-muted mono mt-1" style="font-size:.8rem;">Kode: {{ $receipt->code }}</div>
+        <div class="text-muted mono mt-1 d-flex align-items-center gap-2" style="font-size:.8rem;">
+          Kode: {{ $receipt->code }}
+          @if($receipt->is_replacement)
+            <span class="badge bg-info text-dark rounded-pill" style="font-size:0.7rem; font-family:var(--bs-font-sans-serif);">
+              <i class="bi bi-arrow-repeat me-1"></i> Replacement
+            </span>
+          @endif
+        </div>
       </div>
 
       {{-- Kanan: semua aksi sejajar --}}
@@ -232,6 +239,18 @@
              class="btn btn-outline-primary btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
           </a>
+
+          @if($receipt->is_replacement)
+            <form action="{{ route('purchasing.purchase_receipts.destroy', $receipt->id) }}" method="POST"
+                  onsubmit="return confirm('Hapus/Batalkan Draft Pengganti ini?');" class="d-inline">
+              @csrf
+              @method('DELETE')
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash me-1"></i>Batal Draft
+              </button>
+            </form>
+          @endif
+
           @if ($isAdmin && !$grnHasPrice)
             <button type="button" class="btn btn-success btn-sm disabled"
                     title="Harga belum diisi di PO. Hubungi owner."
@@ -240,7 +259,7 @@
             </button>
           @else
             <form action="{{ route('purchasing.purchase_receipts.post', $receipt->id) }}" method="POST"
-                  onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');">
+                  onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');" class="d-inline">
               @csrf
               <button type="submit" class="btn btn-success btn-sm">
                 <i class="bi bi-check-lg me-1"></i>Post GRN
@@ -402,6 +421,15 @@
                 <dd class="col-sm-8">
                   <a href="{{ route('purchasing.purchase_orders.show', $receipt->purchase_order_id) }}" class="text-decoration-none">
                     {{ $receipt->purchaseOrder->code }}
+                  </a>
+                </dd>
+              @endif
+
+              @if ($receipt->is_replacement && $receipt->purchase_return_id && $receipt->returnOrigin)
+                <dt class="col-sm-4">Pengganti Retur</dt>
+                <dd class="col-sm-8">
+                  <a href="{{ route('purchasing.purchase_returns.show', $receipt->purchase_return_id) }}" class="text-decoration-none">
+                    {{ $receipt->returnOrigin->code }}
                   </a>
                 </dd>
               @endif

@@ -74,9 +74,10 @@ class SyncOrdersCommand extends Command
             if ($status === 'TOKEN_EXPIRED') {
                 if (! $isDryRun) {
                     try {
-                        if ($store->channel->code === 'shopee') {
-                            $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
-                            $shopee->refreshToken($store);
+                        $manager = app(\App\Services\Channels\ChannelManager::class);
+                        $driver = $manager->driver($store);
+                        if (method_exists($driver, 'refreshToken')) {
+                            $driver->refreshToken($store);
                             $store->refresh();
                             $status = $store->connection_status;
                         }

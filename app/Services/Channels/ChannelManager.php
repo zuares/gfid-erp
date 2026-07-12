@@ -12,12 +12,12 @@ class ChannelManager
 {
     public function driver(Store $store): MarketplaceChannel
     {
-        $code = $store->channel?->code;
+        $code = strtolower($store->channel?->code ?? '');
 
         return match ($code) {
-            'shopee' => app(ShopeeChannel::class),
-            'tiktok' => app(TikTokShopChannel::class),
-            default  => throw new RuntimeException("Channel {$code} belum punya adapter."),
+            'shopee', 'shp' => app(ShopeeChannel::class),
+            'tiktok', 'ttk', 'tt' => app(TikTokShopChannel::class),
+            default  => throw new RuntimeException("Channel {$store->channel?->code} belum punya adapter."),
         };
     }
 }

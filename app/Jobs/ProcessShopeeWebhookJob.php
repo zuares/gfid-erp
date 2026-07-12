@@ -441,19 +441,93 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             // If we want to be safe, we could force-update the status to 'TO_RETURN' if not already.
             if ($localOrder->order_status !== 'TO_RETURN' && $localOrder->order_status !== 'CANCELLED') {
                  $localOrder->update(['order_status' => 'TO_RETURN', 'meta' => $meta]);
-                 Log::info("Updated local order {$orderSn} status to TO_RETURN due to return_updates_push.");
+                 \Illuminate\Support\Facades\Log::info("Updated local order {$orderSn} status to TO_RETURN due to return_updates_push.");
             } else {
                  $localOrder->update(['meta' => $meta]);
             }
             
-            Log::info("Processed return_updates_push for order {$orderSn}, return_sn {$returnSn}");
+            \Illuminate\Support\Facades\Log::info("Processed return_updates_push for order {$orderSn}, return_sn {$returnSn}");
             event(new \App\Events\OrderUpdated($store->id, $orderSn, $localOrder->order_status));
         } else {
-            Log::info("Order {$orderSn} not found locally during return_updates_push. Syncing via API.");
+            \Illuminate\Support\Facades\Log::info("Order {$orderSn} not found locally during return_updates_push. Syncing via API.");
             try {
                 app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $orderSn);
             } catch (\Exception $e) {
-                Log::error("Failed to sync missing order {$orderSn}: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error("Failed to sync missing order {$orderSn}: " . $e->getMessage());
+            }
+        }
+
+        // ==========================================
+        // HYBRID ARCHITECTURE: SYNC RETURN DETAIL TO DB
+        // ==========================================
+        if ($returnSn) {
+            try {
+                $manager = app(\App\Services\Channels\ChannelManager::class);
+                $driver = $manager->driver($store);
+                if (method_exists($driver, 'getReturnDetail')) {
+                    $res = $driver->getReturnDetail($store, $returnSn);
+                    $data = $res['response'] ?? null;
+                    
+                    if ($data) {
+                        $returnObj = \App\Models\MarketplaceReturn::updateOrCreate(
+                            [
+                                'store_id' => $store->id,
+                                'return_sn' => $returnSn,
+                            ],
+                            [
+                                'order_sn' => $data['order_sn'] ?? $orderSn,
+                                'status' => $data['status'] ?? null,
+                                'reason' => $data['reason'] ?? null,
+                                'reason_text_code' => $data['text_reason'] ?? $data['reason_text_code'] ?? null,
+                                'return_solution' => $data['return_solution'] ?? null,
+                                'amount_before_discount' => $data['amount_before_discount'] ?? 0,
+                                'needs_logistics' => $data['needs_logistics'] ?? false,
+                                'tracking_number' => $data['tracking_number'] ?? null,
+                                'create_time' => $data['create_time'] ?? null,
+                                'update_time' => $data['update_time'] ?? null,
+                            ]
+                        );
+
+                        if (isset($data['item']) && is_array($data['item'])) {
+                            $existingItemIds = [];
+                            foreach ($data['item'] as $itm) {
+                                $sku = $itm['item_sku'] ?? $itm['variation_sku'] ?? null;
+                                $internalItemId = null;
+                                if ($sku) {
+                                    $internalItem = \App\Models\Item::where('code', $sku)->first();
+                                    if ($internalItem) {
+                                        $internalItemId = $internalItem->id;
+                                    }
+                                }
+
+                                $retItem = \App\Models\MarketplaceReturnItem::updateOrCreate(
+                                    [
+                                        'marketplace_return_id' => $returnObj->id,
+                                        'item_sku' => $itm['item_sku'] ?? null,
+                                        'variation_sku' => $itm['variation_sku'] ?? null,
+                                        'item_name' => $itm['item_name'] ?? $itm['name'] ?? null,
+                                    ],
+                                    [
+                                        'item_id' => $internalItemId,
+                                        'variation_name' => $itm['variation_name'] ?? null,
+                                        'return_item_quantity' => $itm['amount'] ?? $itm['return_item_quantity'] ?? 1,
+                                        'images' => isset($itm['images']) && is_array($itm['images']) ? $itm['images'] : null,
+                                    ]
+                                );
+                                $existingItemIds[] = $retItem->id;
+                            }
+                            
+                            if (!empty($existingItemIds)) {
+                                \App\Models\MarketplaceReturnItem::where('marketplace_return_id', $returnObj->id)
+                                    ->whereNotIn('id', $existingItemIds)
+                                    ->delete();
+                            }
+                        }
+                        \Illuminate\Support\Facades\Log::info("Successfully synced return_sn {$returnSn} to database via Webhook.");
+                    }
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to sync return detail for return_sn {$returnSn}: " . $e->getMessage());
             }
         }
     }

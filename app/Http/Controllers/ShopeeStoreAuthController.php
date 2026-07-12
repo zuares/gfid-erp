@@ -158,6 +158,12 @@ class ShopeeStoreAuthController extends Controller
             // silent — name stays as fallback
         }
 
+        // Jalankan sinkronisasi awal secara otomatis di background
+        if (isset($storeModel) && $storeModel) {
+            \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $storeModel->id]);
+            \App\Jobs\SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
+        }
+
         return redirect('/marketplace/toko?connected=1');
     }
 }

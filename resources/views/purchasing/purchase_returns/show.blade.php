@@ -392,6 +392,54 @@
       @endif
     </div>
 
+    {{-- REPLACEMENT RECEIPTS --}}
+    @if($ret->resolution_type === 'replacement' && $ret->replacementReceipts->isNotEmpty())
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card-section border-info">
+          <div class="card-section-header bg-info-subtle text-info border-info d-flex justify-content-between align-items-center">
+            <span>Riwayat Penerimaan Barang Pengganti</span>
+            <span class="badge bg-info text-dark rounded-pill">{{ $ret->replacementReceipts->count() }} Dokumen</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th class="bg-light">No. Penerimaan</th>
+                  <th class="bg-light">Tanggal</th>
+                  <th class="bg-light">Gudang</th>
+                  <th class="bg-light">Status</th>
+                  <th class="bg-light text-end">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach($ret->replacementReceipts as $rr)
+                <tr>
+                  <td class="fw-semibold mono">{{ $rr->code }}</td>
+                  <td class="mono">{{ \Illuminate\Support\Carbon::parse($rr->date)->format('d/m/Y') }}</td>
+                  <td>{{ $rr->warehouse?->name ?? '-' }}</td>
+                  <td>
+                    @if($rr->status === 'posted')
+                      <span class="badge-status badge-posted">Posted</span>
+                    @elseif($rr->status === 'draft')
+                      <span class="badge-status badge-draft">Draft</span>
+                    @else
+                      <span class="badge-status bg-secondary-subtle text-secondary">{{ strtoupper($rr->status) }}</span>
+                    @endif
+                  </td>
+                  <td class="text-end">
+                    <a href="{{ route('purchasing.purchase_receipts.show', $rr->id) }}" class="btn btn-sm btn-outline-primary py-0" style="font-size:0.75rem;">Lihat GRN</a>
+                  </td>
+                </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    @endif
+
     <div class="row g-3 mb-3">
       {{-- DETAIL LINES --}}
       <div class="col-12">

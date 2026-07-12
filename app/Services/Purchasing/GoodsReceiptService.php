@@ -236,6 +236,11 @@ class GoodsReceiptService
             // ==========================
             $inventoryCode = (string) (config('accounting.inventory_account_code') ?: '1201');
             $apCode = (string) (config('accounting.ap_account_code') ?: '2101');
+            
+            if ($grn->is_replacement) {
+                $apCode = JournalService::CODE_SUPPLIER_CLAIM;
+            }
+
             $advanceCode = '1151';
 
             $inventoryAccountId = (int) (Account::where('code', $inventoryCode)->value('id') ?? 0);
@@ -475,6 +480,13 @@ class GoodsReceiptService
                 }
             }
 
+            if ($grn->is_replacement && $grn->purchase_return_id) {
+                $returnOrigin = \App\Models\PurchaseReturn::find($grn->purchase_return_id);
+                if ($returnOrigin) {
+                    $this->syncReplacementProgress($returnOrigin);
+                }
+            }
+
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
@@ -536,6 +548,14 @@ class GoodsReceiptService
             // Sync received_status di PO terkait
             if ($grn->purchase_order_id) {
                 $this->syncReceivedStatus((int) $grn->purchase_order_id);
+            }
+
+            // Jika Replacement Receipt di-unpost, kita perlu merekonsiliasi ulang replacement_status pada Return origin
+            if ($grn->is_replacement && $grn->purchase_return_id) {
+                $returnOrigin = \App\Models\PurchaseReturn::find($grn->purchase_return_id);
+                if ($returnOrigin) {
+                    $this->syncReplacementProgress($returnOrigin);
+                }
             }
 
             // ==========================
@@ -774,7 +794,12 @@ class GoodsReceiptService
                 continue;
             }
 
-            $isHpp = $this->isLineEligibleForStock($line->purchase_order_line_id, (int) $line->item_id, $elig);
+            // Kalau GRN ini replacement, anggap selalu masuk stok (HPP) sesuai barang pengganti
+            if ($grn->is_replacement) {
+                $isHpp = true;
+            } else {
+                $isHpp = $this->isLineEligibleForStock($line->purchase_order_line_id, (int) $line->item_id, $elig);
+            }
 
             if ($isHpp) {
                 $hppTotal = round($hppTotal + $amt, 2);
@@ -800,12 +825,88 @@ class GoodsReceiptService
         }
 
         return [
-            'hpp_total'          => round($hppTotal, 2),
-            'hpp_by_item_role'   => $hppByItemRole,
+            'hpp_total' => $hppTotal,
+            'hpp_by_item_role' => $hppByItemRole,
+            'expense_total' => $expenseTotal,
             'expense_by_account' => $expenseByAcc,
-            'expense_total'      => round($expenseTotal, 2),
         ];
     }
+
+    /**
+     * Sinkronisasi ulang (Rekonsiliasi) status replacement berdasarkan aggregate GRN pengganti yang posted.
+     */
+    public function syncReplacementProgress(\App\Models\PurchaseReturn $purchaseReturn): void
+    {
+        // 1. Lock the return and its lines
+        $lockedReturn = \App\Models\PurchaseReturn::query()
+            ->whereKey($purchaseReturn->id)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$lockedReturn) return;
+        
+        $lockedReturnLines = $lockedReturn->lines()->lockForUpdate()->get();
+
+        // 2. Fetch all POSTED replacement receipts for this return
+        // Note: we don't count 'draft' or 'void'
+        $postedReceipts = \App\Models\PurchaseReceipt::query()
+            ->with('lines')
+            ->where('purchase_return_id', $lockedReturn->id)
+            ->where('is_replacement', true)
+            ->where('status', 'posted')
+            ->get();
+
+        // 3. Aggregate qty per return line ID
+        $receivedByReturnLine = [];
+        foreach ($postedReceipts as $rec) {
+            foreach ($rec->lines as $line) {
+                if ($line->purchase_return_line_id && $line->qty_received > 0) {
+                    $receivedByReturnLine[$line->purchase_return_line_id] = 
+                        ($receivedByReturnLine[$line->purchase_return_line_id] ?? 0.0) + (float) $line->qty_received;
+                }
+            }
+        }
+
+        // 4. Update return lines
+        $isCompleted = true;
+        $totalReceived = 0.0;
+
+        foreach ($lockedReturnLines as $rLine) {
+            $newReceived = $receivedByReturnLine[$rLine->id] ?? 0.0;
+            
+            // Check over-replacement
+            if (round($newReceived, 4) > round((float) $rLine->replacement_qty_expected, 4) + 0.0001) {
+                throw ValidationException::withMessages([
+                    'replacement' => "Fatal Error: Rekonsiliasi menemukan qty replacement ({$newReceived}) melebihi expected ({$rLine->replacement_qty_expected}) pada line return {$rLine->id}.",
+                ]);
+            }
+
+            $rLine->replacement_qty_received = $newReceived;
+            $rLine->save();
+
+            $totalReceived += $newReceived;
+
+            if (round($newReceived, 4) < round((float) $rLine->replacement_qty_expected, 4)) {
+                $isCompleted = false;
+            }
+        }
+
+        // 5. Update header status deterministically
+        if ($isCompleted && $lockedReturnLines->count() > 0) {
+            $lockedReturn->replacement_status = 'received';
+            $lockedReturn->replacement_received_at = now();
+        } else {
+            if ($totalReceived <= 0.0001) {
+                $lockedReturn->replacement_status = 'pending';
+            } else {
+                $lockedReturn->replacement_status = 'partial';
+            }
+            $lockedReturn->replacement_received_at = null;
+        }
+
+        $lockedReturn->save();
+    }
+
 
     protected function buildEligibilityMapsForGrnLines(PurchaseReceipt $grn): array
     {

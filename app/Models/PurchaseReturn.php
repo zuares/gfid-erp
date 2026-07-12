@@ -23,6 +23,8 @@ class PurchaseReturn extends Model
     {return $this->belongsTo(Supplier::class);}
     public function lines()
     {return $this->hasMany(PurchaseReturnLine::class);}
+    public function replacementReceipts()
+    {return $this->hasMany(PurchaseReceipt::class, 'purchase_return_id');}
 
     /** Tahap 9 — QC yang memicu return ini */
     public function qc()

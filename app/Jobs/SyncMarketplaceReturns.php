@@ -21,12 +21,14 @@ class SyncMarketplaceReturns implements ShouldQueue
     public $store;
     public $createTimeFrom;
     public $createTimeTo;
+    public $fullSync;
 
-    public function __construct(Store $store, ?int $createTimeFrom = null, ?int $createTimeTo = null)
+    public function __construct(Store $store, ?int $createTimeFrom = null, ?int $createTimeTo = null, bool $fullSync = false)
     {
         $this->store = $store;
         $this->createTimeFrom = $createTimeFrom;
         $this->createTimeTo = $createTimeTo;
+        $this->fullSync = $fullSync;
     }
 
     public function handle(ChannelManager $manager): void
@@ -37,9 +39,15 @@ class SyncMarketplaceReturns implements ShouldQueue
                 return;
             }
 
-            // Sync 15 hari terakhir jika tidak ditentukan
-            $tsTo = $this->createTimeTo ?? time();
-            $tsFrom = $this->createTimeFrom ?? ($tsTo - (14 * 86400));
+            // Jika fullSync aktif, kita tarik data secara menyeluruh (null)
+            if ($this->fullSync) {
+                $tsFrom = null;
+                $tsTo = null;
+            } else {
+                // Sync 15 hari terakhir jika tidak ditentukan
+                $tsTo = $this->createTimeTo ?? time();
+                $tsFrom = $this->createTimeFrom ?? ($tsTo - (14 * 86400));
+            }
 
             $pageNo = 0;
             $pageSize = 40;
@@ -68,10 +76,14 @@ class SyncMarketplaceReturns implements ShouldQueue
             // --- Sync Active Old Returns ---
             // Cari retur di DB lokal yang statusnya masih belum selesai, tapi umurnya lebih dari 15 hari
             // Kita fetch ulang manual per return_sn untuk update status terakhirnya
-            $activeOldReturns = MarketplaceReturn::where('store_id', $this->store->id)
-                ->whereNotIn('status', ['COMPLETED', 'CLOSED', 'CANCELLED', 'REFUND_PAID'])
-                ->where('create_time', '<', $tsFrom)
-                ->get();
+            $query = MarketplaceReturn::where('store_id', $this->store->id)
+                ->whereNotIn('status', ['COMPLETED', 'CLOSED', 'CANCELLED', 'REFUND_PAID']);
+                
+            if ($tsFrom !== null) {
+                $query->where('create_time', '<', $tsFrom);
+            }
+            
+            $activeOldReturns = $query->get();
 
             if (method_exists($driver, 'getReturnDetail')) {
                 foreach ($activeOldReturns as $oldReturn) {

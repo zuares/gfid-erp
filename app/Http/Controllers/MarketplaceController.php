@@ -521,6 +521,41 @@ class MarketplaceController extends Controller
         );
     }
 
+    public function syncHistorical(Request $request, Store $store): JsonResponse
+    {
+        $year = $request->input('year', 2022);
+
+        // Lempar pekerjaan berat ini ke antrean (Queue) di latar belakang
+        \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-orders', [
+            'year' => $year,
+            '--store' => $store->id
+        ]);
+        
+        \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-returns', [
+            'year' => $year,
+            '--store' => $store->id
+        ]);
+
+        return response()->json([
+            'status' => 'success', 
+            'message' => "Proses 'Mesin Waktu' menuju tahun {$year} untuk toko {$store->name} sedang berjalan di latar belakang!"
+        ]);
+    }
+
+    public function forceSyncBackground(Request $request, Store $store): JsonResponse
+    {
+        // Jalankan sinkronisasi secara asinkron di queue
+        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $store->id]);
+        \App\Jobs\SyncMarketplaceReturns::dispatch($store, null, null, true);
+        
+        $store->update(['last_synced_at' => now()]);
+
+        return response()->json([
+            'message' => 'Perintah tarik data pesanan dan retur terbaru telah dikirim ke latar belakang.',
+            'status' => 'queued'
+        ]);
+    }
+
     public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
     {
         // Beri waktu 3 menit untuk penarikan data berat (misal: opsi 14 hari)

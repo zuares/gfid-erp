@@ -9,6 +9,23 @@ class Kernel extends ConsoleKernel
     protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule): void
     {
         $schedule->command('inventory:audit-allocated')->dailyAt('01:00');
+        
+        // Cron Job Penjaga Masa Kini: Tarik data retur 15 hari terakhir setiap jam
+        $schedule->call(function () {
+            $stores = \App\Models\Store::whereHas('channel', function($q) {
+                $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
+            })->get();
+            
+            foreach ($stores as $store) {
+                // Biarkan parameter tanggal kosong agar otomatis menggunakan 15 hari terakhir
+                dispatch(new \App\Jobs\SyncMarketplaceReturns($store));
+            }
+        })->hourly()->name('sync-marketplace-returns')->withoutOverlapping();
+
+        // Cron Job Penjaga Masa Kini (Orders): Tarik data order 3 hari terakhir (default command) setiap jam
+        $schedule->command('marketplace:sync-orders')
+                 ->hourly()
+                 ->withoutOverlapping();
     }
 
     protected function commands(): void

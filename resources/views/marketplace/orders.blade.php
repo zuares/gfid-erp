@@ -1991,10 +1991,21 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 }
             }
 
+            let slaBadge = '';
+            if (o.ship_by_date && ACTIVE_ORDER_STATUSES.includes(o.order_status) && !['shipped','completed'].includes(activeTab)) {
+                const hoursLeft = (new Date(o.ship_by_date) - new Date()) / 3600000;
+                if (hoursLeft < 12 && hoursLeft > 0) {
+                    slaBadge = `<span style="font-size:0.65rem; background:#fef3c7; color:#d97706; padding:1px 6px; border-radius:4px; font-weight:700; border:1px solid #fde68a; margin-left:4px;" title="SLA Pengiriman < 12 Jam">⚠️ SLA ${Math.floor(hoursLeft)}j</span>`;
+                } else if (hoursLeft <= 0) {
+                    slaBadge = `<span style="font-size:0.65rem; background:#fee2e2; color:#dc2626; padding:1px 6px; border-radius:4px; font-weight:700; border:1px solid #fecaca; margin-left:4px;" title="Terlambat (SLA Terlewati)">🚨 TELAT</span>`;
+                }
+            }
+
             let orderIdHtml = esc(o.channel_order_id || '—');
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
+            orderIdHtml += slaBadge;
 
             return `<div class="ord-card ${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}">
                 <div class="ord-card-header">
@@ -2223,10 +2234,21 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 }
             }
 
+            let slaBadge = '';
+            if (o.ship_by_date && ACTIVE_ORDER_STATUSES.includes(o.order_status) && !['shipped','completed'].includes(activeTab)) {
+                const hoursLeft = (new Date(o.ship_by_date) - new Date()) / 3600000;
+                if (hoursLeft < 12 && hoursLeft > 0) {
+                    slaBadge = `<span style="font-size:0.65rem; background:#fef3c7; color:#d97706; padding:1px 6px; border-radius:4px; font-weight:700; border:1px solid #fde68a; margin-left:4px;" title="SLA Pengiriman < 12 Jam">⚠️ SLA ${Math.floor(hoursLeft)}j</span>`;
+                } else if (hoursLeft <= 0) {
+                    slaBadge = `<span style="font-size:0.65rem; background:#fee2e2; color:#dc2626; padding:1px 6px; border-radius:4px; font-weight:700; border:1px solid #fecaca; margin-left:4px;" title="Terlambat (SLA Terlewati)">🚨 TELAT</span>`;
+                }
+            }
+
             let orderIdHtml = esc(o.channel_order_id || '—');
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
+            orderIdHtml += slaBadge;
 
             return `<div class="pk-row ${isPrinted && !isFulfilled ? 'row-printed' : ''}" style="flex-direction:column; align-items:stretch">
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%">
@@ -2484,10 +2506,21 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 ? `<span style="font-size:.65rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:600">🖨 ${cetakTeks}</span>`
                 : '';
 
+            let slaBadge = '';
+            if (o.ship_by_date && ACTIVE_ORDER_STATUSES.includes(o.order_status) && !['shipped','completed'].includes(activeTab)) {
+                const hoursLeft = (new Date(o.ship_by_date) - new Date()) / 3600000;
+                if (hoursLeft < 12 && hoursLeft > 0) {
+                    slaBadge = `<span style="font-size:0.65rem; background:#fef3c7; color:#d97706; padding:1px 6px; border-radius:4px; font-weight:700; border:1px solid #fde68a; margin-left:4px;" title="SLA Pengiriman < 12 Jam">⚠️ SLA ${Math.floor(hoursLeft)}j</span>`;
+                } else if (hoursLeft <= 0) {
+                    slaBadge = `<span style="font-size:0.65rem; background:#fee2e2; color:#dc2626; padding:1px 6px; border-radius:4px; font-weight:700; border:1px solid #fecaca; margin-left:4px;" title="Terlambat (SLA Terlewati)">🚨 TELAT</span>`;
+                }
+            }
+
             let orderIdHtml = esc(o.channel_order_id || '—');
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
+            orderIdHtml += slaBadge;
 
             const fBadge = urgent ? fulfillmentBadge(o) : '';
 
@@ -3455,7 +3488,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     loadOrders();
 
-    // Auto-refresh polling every 30 seconds (silent fetch)
+    // Auto-refresh polling every 5 minutes (silent fetch)
     setInterval(async () => {
         try {
             const newOrders = await api('/api/marketplace/local-orders');
@@ -3471,7 +3504,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             render();
             updateLastSyncTime();
         } catch(e) {}
-    }, 5000);
+    }, 300000);
 
     // Re-render on resize (mobile ↔ desktop switch)
     // ── Review Modal (Sedang Proses) ────────────────────────────────────────

@@ -82,9 +82,10 @@ class SupplierInvoiceController extends Controller
             ])->find((int) $poId);
 
             if ($order) {
-                // Total GRN posted
+                // Total GRN posted (kecuali replacement, karena tagihan supplier tidak mencakup GRN pengganti)
                 $grnPostedTotal = (float) $order->purchaseReceipts
                     ->where('status', 'posted')
+                    ->where('is_replacement', false)
                     ->sum('grand_total');
 
                 // Total return posted dari GRN milik PO ini
@@ -188,9 +189,13 @@ class SupplierInvoiceController extends Controller
         if ($order) {
             $grnPostedTotal = (float) $order->purchaseReceipts
                 ->where('status', 'posted')
+                ->where('is_replacement', false)
                 ->sum('grand_total');
 
-            $grnCount = $order->purchaseReceipts->where('status', 'posted')->count();
+            $grnCount = $order->purchaseReceipts
+                ->where('status', 'posted')
+                ->where('is_replacement', false)
+                ->count();
 
             $returnTotal = (float) DB::table('purchase_returns as pr')
                 ->join('purchase_receipts as rec', 'rec.id', '=', 'pr.purchase_receipt_id')

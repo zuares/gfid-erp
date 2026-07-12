@@ -37,16 +37,16 @@
         padding:.45rem .75rem;
         margin-inline:-.75rem;
         margin-bottom:.65rem;
-        background: rgba(255,255,255,.8);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid var(--shp-border);
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--shp-border);
     }
-    body[data-theme="dark"] .ship-topbar{
-        background: rgba(15,23,42,.8);
-    }
-    .ship-title { font-size:1.15rem; font-weight:700; color:var(--shp-accent-2); margin:0; letter-spacing:-.3px; }
-    body[data-theme="dark"] .ship-title { color:#f1f5f9; }
+    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--shp-muted); font-size:.78rem; }
+    body[data-theme="dark"] .sub{ color:#9ca3af; }
     
+    .controls{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+
     .ret-table { width: 100%; border-collapse: separate; border-spacing: 0; }
     .ret-table thead th {
         font-size: .75rem; font-weight: 600; color: var(--shp-muted); text-transform: uppercase;
@@ -58,28 +58,104 @@
     }
     .ret-table tbody tr:hover td { background: #f1f5f9; }
     body[data-theme="dark"] .ret-table tbody tr:hover td { background: #1e293b; }
+
+    /* Modern Tab Toggle */
+    .btn-check:checked + .btn {
+        background-color: #ffffff !important;
+        color: var(--shp-accent-2) !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    body[data-theme="dark"] .btn-check:checked + .btn {
+        background-color: #334155 !important;
+        color: #ffffff !important;
+    }
 </style>
 @endpush
 
 @section('content')
 <div class="page-wrap">
-    <div class="ship-topbar">
-        <h1 class="ship-title">Retur Marketplace</h1>
-        <div class="d-flex gap-2 align-items-center">
-            <div class="input-group input-group-sm bg-light rounded-2 border-0" style="min-width: 220px; overflow: hidden;">
-                <span class="input-group-text bg-transparent border-0 text-muted ps-3 pe-2"><i class="bi bi-calendar3"></i></span>
-                <input type="text" id="dateRange" class="form-control border-0 bg-transparent shadow-none px-1 fw-medium" placeholder="Pilih Tanggal..." readonly style="font-size: 0.85rem; cursor: pointer;">
+    
+    <div class="ship-topbar flex-column align-items-stretch gap-3">
+        <!-- Baris Pertama: Title & Date Picker -->
+        <div class="d-flex justify-content-between align-items-start w-100">
+            <div>
+                <div class="title">Retur Marketplace</div>
+                <div class="sub">Kelola retur pembeli dan pesanan gagal kirim (RTS).</div>
             </div>
             
-            <select id="storeSelect" class="form-select form-select-sm border-0 bg-light" style="min-width: 180px; font-weight:500;">
-                <option value="">Semua Toko...</option>
+            <!-- Date Picker (Kanan Atas Sejajar dengan Title) -->
+            <div class="input-group input-group-sm border bg-light rounded overflow-hidden shadow-sm" style="width: 220px; flex-shrink: 0;">
+                <span class="input-group-text bg-transparent border-0 text-muted ps-2 pe-1"><i class="bi bi-calendar3"></i></span>
+                <input type="text" id="dateRange" class="form-control border-0 bg-transparent shadow-none px-2 fw-medium" placeholder="Semua Waktu" readonly style="font-size: 0.85rem; cursor: pointer;">
+            </div>
+        </div>
+
+        <!-- Baris Kedua: Controls (Filter & Action) -->
+        <div class="controls justify-content-end w-100 mt-1">
+            <!-- Tab Toggle -->
+            <div class="btn-group bg-light rounded p-1 border shadow-sm" role="group">
+                <input type="radio" class="btn-check" name="returnType" id="typeReturn" value="return" checked onchange="currentPage=0; fetchReturns(true, false)">
+                <label class="btn btn-sm fw-semibold border-0 text-muted px-3 mb-0" for="typeReturn" style="border-radius:4px;">Retur</label>
+
+                <input type="radio" class="btn-check" name="returnType" id="typeRts" value="rts" onchange="currentPage=0; fetchReturns(true, false)">
+                <label class="btn btn-sm fw-semibold border-0 text-muted px-3 mb-0" for="typeRts" style="border-radius:4px;">RTS (Gagal)</label>
+            </div>
+
+            <!-- Store Select -->
+            <select id="storeSelect" class="form-select form-select-sm border bg-light rounded fw-medium px-3 shadow-sm" style="width: 150px; outline:none; box-shadow:none;">
+                <option value="">Pilih Toko...</option>
                 @foreach($stores as $store)
                     <option value="{{ $store->id }}">{{ $store->name }}</option>
                 @endforeach
             </select>
-            <button class="btn btn-sm btn-dark" id="btnRefresh" onclick="fetchReturns()" disabled>
+
+            <!-- Refresh & Last Sync -->
+            <span id="lastSyncTime" class="d-none d-md-inline" style="font-size: 0.75rem; color: #6c757d; margin-right: 0.5rem; align-self: center; font-weight: 500;"></span>
+            <button class="btn btn-sm btn-dark rounded shadow-sm" id="btnRefresh" onclick="fetchReturns()" disabled>
                 <i class="bi bi-arrow-clockwise"></i>
             </button>
+            
+            <button class="btn btn-sm btn-outline-primary fw-medium rounded px-3 shadow-sm" id="btnSyncHistorical" onclick="triggerHistoricalBackfill()" disabled>
+                <i class="bi bi-cloud-download me-1"></i> Tarik Histori
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Section -->
+    <div class="row g-3 mb-3">
+        <div class="col-md-3 col-6">
+            <div class="card-main p-3 text-center h-100" style="background: var(--card);">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Total Data</div>
+                <div class="fs-4 fw-bolder text-dark" id="kpiTotal">0</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card-main p-3 text-center h-100" style="background: var(--card);">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Perlu Diproses</div>
+                <div class="fs-4 fw-bolder text-warning" id="kpiPending">0</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card-main p-3 text-center h-100" style="background: var(--card);">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Selesai</div>
+                <div class="fs-4 fw-bolder text-success" id="kpiCompleted">0</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card-main p-3 text-center h-100" style="background: var(--card);">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Total Nilai (Rp)</div>
+                <div class="fs-5 fw-bolder text-primary mt-1" id="kpiValue">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Separate Search Section -->
+    <div class="card-main mb-3" style="background: var(--card);">
+        <div class="p-2">
+            <div class="input-group input-group-lg border-0 bg-light rounded overflow-hidden">
+                <span class="input-group-text bg-transparent border-0 text-muted ps-4 pe-2"><i class="bi bi-search fs-5"></i></span>
+                <input type="text" id="searchInput" class="form-control border-0 bg-transparent shadow-none px-2 fw-bold" placeholder="Scan Barcode / Ketik Nomor Pesanan / Resi (AWB)..." autofocus autocomplete="off" style="font-size: 1.05rem; color: var(--shp-accent-2);">
+            </div>
         </div>
     </div>
 
@@ -90,7 +166,6 @@
                     <tr>
                         <th class="ps-4">Tanggal</th>
                         <th>Return & Order SN</th>
-                        <th>Barang</th>
                         <th>Tipe</th>
                         <th>Alasan Retur</th>
                         <th>Status</th>
@@ -100,7 +175,7 @@
                 </thead>
                 <tbody id="returnsBody">
                     <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">Silakan pilih toko terlebih dahulu.</td>
+                        <td colspan="7" class="text-center py-5 text-muted">Silakan pilih toko terlebih dahulu.</td>
                     </tr>
                 </tbody>
             </table>
@@ -134,6 +209,24 @@
     </div>
 </div>
 
+<!-- Modal Detail -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold">Detail Retur & Refund</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+                <!-- Content injected via JS -->
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Tracking -->
 <div class="modal fade" id="trackingModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
@@ -151,7 +244,7 @@
         </div>
     </div>
 </div>
-</div> <!-- End container-fluid -->
+
 
 @endsection
 
@@ -199,24 +292,23 @@
             dateFormat: "Y-m-d",
             defaultDate: [past15, today],
             maxDate: "today",
-            onChange: function(selectedDates) {
+            onChange: function(selectedDates, dateStr, instance) {
                 if (selectedDates.length === 2) {
-                    const diffTime = Math.abs(selectedDates[1] - selectedDates[0]);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    if (diffDays > 15) {
-                        alert("Rentang waktu maksimal untuk API Shopee adalah 15 hari.");
-                        fp.clear();
-                        return;
-                    }
                     currentPage = 0;
-                    fetchReturns(true);
+                    fetchReturns(true, false);
                 }
+            },
+            onClose: function(selectedDates, dateStr, instance) {
+                instance.set("maxDate", "today");
             }
         });
     }
 
+    const btnSyncHistorical = document.getElementById('btnSyncHistorical');
+
     storeSelect.addEventListener('change', function() {
         selectedStoreId = this.value;
+        btnSyncHistorical.disabled = !selectedStoreId;
         currentPage = 0;
         fetchReturns(true, false);
     });
@@ -226,14 +318,48 @@
         fetchReturns(true, true);
     });
 
-    async function fetchReturns(reset = false, shouldSync = false) {
+    let searchTimeout = null;
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('keyup', function(e) {
+        clearTimeout(searchTimeout);
+        // Jika menekan enter, langsung fetch tanpa delay
+        if (e.key === 'Enter') {
+            currentPage = 0;
+            fetchReturns(true, false);
+        } else {
+            // Debounce 500ms
+            searchTimeout = setTimeout(() => {
+                currentPage = 0;
+                fetchReturns(true, false);
+            }, 500);
+        }
+    });
+
+    function triggerHistoricalBackfill() {
+        if (!selectedStoreId) return alert('Pilih toko terlebih dahulu!');
+        
+        let year = prompt('Tarik histori mundur sampai tahun berapa? (Contoh: 2022)', '2022');
+        if (!year) return;
+        
+        if (confirm(`Peringatan: Sistem akan menyedot histori Pesanan & Retur dari tahun ${year} hingga hari ini untuk toko yang dipilih.\n\nProses ini berjalan di latar belakang (Background Job) dan akan memakan waktu sesuai banyaknya pesanan Anda.\n\nLanjutkan?`)) {
+            api(`/api/marketplace/stores/${selectedStoreId}/sync-historical`, {
+                method: 'POST',
+                body: JSON.stringify({ year: year })
+            }).then(res => {
+                alert(res.message || 'Tugas diletakkan di latar belakang!');
+            }).catch(err => {
+                alert('Gagal memicu mesin waktu: ' + err.message);
+            });
+        }
+    }
+
+    async function fetchReturns(reset = false, forceSync = false) {
         if (isLoading) return;
         isLoading = true;
         btnRefresh.disabled = true;        
 
         if (reset) {
-            const syncText = shouldSync ? 'Menyinkronkan data terbaru dengan Marketplace...' : 'Memuat data dari database...';
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">${syncText}</div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data...</div></td></tr>`;
             allReturnsData = [];
         }
 
@@ -243,7 +369,6 @@
                 tsFrom = Math.floor(fp.selectedDates[0].getTime() / 1000);
                 tsTo = Math.floor(fp.selectedDates[1].getTime() / 1000) + 86399;
             } else {
-                // Fallback default jika flatpickr belum me-render atau kosong
                 const t = new Date();
                 const p = new Date();
                 p.setDate(t.getDate() - 14);
@@ -251,40 +376,37 @@
                 tsTo = Math.floor(t.getTime() / 1000) + 86399;
             }
             
-            if (tsTo - tsFrom > 16 * 86400) {
-                alert("Rentang waktu maksimal untuk API Shopee adalah 15 hari.");
-                isLoading = false; btnRefresh.disabled = false;
-                return;
-            }
-
-            let storesToFetch = [];
-            if (selectedStoreId) {
-                storesToFetch.push(selectedStoreId);
+            // Note: Tidak ada lagi error batasan 15 hari dari flatpickr 
+            // Karena UI sekarang bebas menarik range manapun dari Database lokal!
+            if (selectedStoreId === 'all') {
+                storesToFetch = @json($stores->pluck('id'));
             } else {
-                Array.from(storeSelect.options).forEach(opt => {
-                    if (opt.value) storesToFetch.push(opt.value);
-                });
+                storesToFetch = selectedStoreId ? [parseInt(selectedStoreId)] : @json($stores->pluck('id'));
             }
 
-            // Lakukan sinkronisasi jika diminta (misal tombol refresh ditekan)
-            if (shouldSync) {
+            // Update teks loading jika manual refresh
+            if (reset && forceSync) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Menarik data langsung dari server Shopee...</div></td></tr>`;
+            }
+
+            // Sinkronisasi paksa jika tombol Refresh ditekan
+            if (forceSync) {
                 const syncPromises = storesToFetch.map(sId => 
                     api(`/api/marketplace/stores/${sId}/returns/sync?create_time_from=${tsFrom}&create_time_to=${tsTo}`, { method: 'POST' })
                     .catch(e => console.warn('Gagal sync toko', sId, e))
                 );
                 await Promise.all(syncPromises);
-                
-                // Update teks loading
-                if (reset) {
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Menampilkan data retur...</div></td></tr>`;
-                }
+                shouldSync = false; // Hindari sinkronisasi berulang yang tidak perlu
             }
 
             let newReturns = [];
             let hasMore = false;
+            
+            const returnType = document.querySelector('input[name="returnType"]:checked')?.value || 'return';
+            const searchQuery = document.getElementById('searchInput').value.trim();
 
             const promises = storesToFetch.map(sId => 
-                api(`/api/marketplace/stores/${sId}/returns/list?page_no=${currentPage}&page_size=40&create_time_from=${tsFrom}&create_time_to=${tsTo}`)
+                api(`/api/marketplace/stores/${sId}/returns/list?page_no=${currentPage}&page_size=40&create_time_from=${tsFrom}&create_time_to=${tsTo}&type=${returnType}&search=${encodeURIComponent(searchQuery)}`)
                 .then(res => {
                     if (res && res.return) {
                         res.return.forEach(r => r.store_id = sId);
@@ -309,19 +431,48 @@
 
         } catch (e) {
             if (reset) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Gagal mengambil data retur: ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Gagal mengambil data retur: ${e.message}</td></tr>`;
             } else {
                 alert('Gagal mengambil data lebih lanjut: ' + e.message);
             }
         } finally {
             isLoading = false;
             btnRefresh.disabled = false;
+            updateLastSyncTime();
+        }
+    }
+
+    function updateLastSyncTime() {
+        const el = document.getElementById('lastSyncTime');
+        if (el) {
+            const now = new Date();
+            el.innerText = 'Terakhir diperbarui: ' + now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
         }
     }
 
     function renderTable(hasMore) {
+        // Update KPIs
+        let totalPending = 0;
+        let totalCompleted = 0;
+        let totalValue = 0;
+        
+        allReturnsData.forEach(r => {
+            if (r.status === 'WAITING_SELLER_RECEIVE' || r.status === 'SELLER_DISPUTE' || r.status === 'PROCESSING') {
+                totalPending++;
+            }
+            if (r.status === 'COMPLETED' || r.status === 'REFUND_PAID') {
+                totalCompleted++;
+            }
+            totalValue += Number(r.amount_before_discount || 0);
+        });
+
+        document.getElementById('kpiTotal').innerText = allReturnsData.length;
+        document.getElementById('kpiPending').innerText = totalPending;
+        document.getElementById('kpiCompleted').innerText = totalCompleted;
+        document.getElementById('kpiValue').innerText = 'Rp ' + totalValue.toLocaleString('id-ID');
+
         if (allReturnsData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Saat ini tidak ada data retur. Semua aman! 🎉</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted">Saat ini tidak ada data retur. Semua aman! 🎉</td></tr>';
             return;
         }
 
@@ -363,13 +514,10 @@
                 cleanStatus = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-hourglass-split me-1"></i>Proses Shopee</span>`;
             }
 
-            let btnHtml = '';
+            let btnHtml = `<button class="btn btn-sm btn-outline-primary fw-bold shadow-sm d-block w-100 mb-1" onclick="openDetailModal('${r.return_sn}', '${r.store_id}')"><i class="bi bi-info-circle me-1"></i>Detail</button>`;
             if (r.status === 'WAITING_SELLER_RECEIVE') {
-                btnHtml = `<button class="btn btn-sm btn-success fw-bold shadow-sm d-block w-100 mb-1" onclick="openConfirmModal('${r.return_sn}', '${r.store_id}')"><i class="bi bi-check2-all me-1"></i>Terima & Restock</button>`;
-            } else {
-                btnHtml = `<button class="btn btn-sm btn-light text-muted border d-block w-100 mb-1" disabled>Menunggu...</button>`;
+                btnHtml += `<button class="btn btn-sm btn-success fw-bold shadow-sm d-block w-100 mb-1" onclick="openConfirmModal('${r.return_sn}', '${r.store_id}')"><i class="bi bi-check2-all me-1"></i>Terima & Restock</button>`;
             }
-            
             if (r.needs_logistics && r.tracking_number) {
                 btnHtml += `<button class="btn btn-sm btn-outline-info d-block w-100" onclick="trackReturn('${r.return_sn}', '${r.store_id}')"><i class="bi bi-truck me-1"></i>Lacak: ${r.tracking_number}</button>`;
             }
@@ -385,7 +533,6 @@
                     <div class="fw-semibold text-primary mb-1">${r.return_sn}</div>
                     <div class="small text-muted"><i class="bi bi-box-seam me-1"></i>${r.order_sn}</div>
                 </td>
-                <td>${itemsHtml}</td>
                 <td>${typeBadge}</td>
                 <td>${r.reason_text_code || r.reason || '—'}</td>
                 <td class="text-center align-middle">${cleanStatus}</td>
@@ -398,7 +545,7 @@
         if (hasMore) {
             const trMore = document.createElement('tr');
             trMore.innerHTML = `
-                <td colspan="8" class="text-center py-3 bg-light">
+                <td colspan="7" class="text-center py-3 bg-light">
                     <button class="btn btn-sm btn-outline-primary fw-bold" onclick="loadMore()">Muat Lebih Banyak</button>
                 </td>
             `;
@@ -509,5 +656,51 @@
         }
     };
 
+    window.openDetailModal = async function(returnSn, storeId) {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('detailModal'));
+        const body = document.getElementById('detailModalBody');
+        
+        body.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Memuat detail retur...</div>
+            </div>
+        `;
+        modal.show();
+
+        try {
+            const data = await api(`/api/marketplace/stores/${storeId}/returns/${returnSn}/detail`);
+            
+            let html = `<div class="mb-3">
+                <div class="fw-bold mb-1">Status Retur (Shopee)</div>
+                <div class="badge bg-secondary mb-2">${data.status || 'UNKNOWN'}</div>
+                <div><strong>Alasan:</strong> ${data.reason_text_code || data.reason || '-'}</div>
+            </div>`;
+
+            if (data.item && data.item.length > 0) {
+                html += `<div class="fw-bold mb-2 mt-4 border-bottom pb-1">Daftar Barang yang Diretur</div>`;
+                data.item.forEach(itm => {
+                    const sku = itm.item_sku || itm.variation_sku || '';
+                    html += `
+                        <div class="d-flex align-items-center gap-3 mb-3 border p-2 rounded bg-light">
+                            <img src="${itm.images && itm.images.length ? itm.images[0] : ''}" style="width:60px; height:60px; object-fit:cover; border-radius:6px;" onerror="this.style.display='none'">
+                            <div>
+                                <div class="fw-semibold" style="line-height:1.2;">${itm.item_name || 'Item'}</div>
+                                <div class="small text-muted mt-1">Variasi: ${itm.variation_name || '-'}</div>
+                                <div class="mt-1">
+                                    <span class="badge bg-white text-dark border border-secondary shadow-sm">SKU: ${sku}</span>
+                                    <span class="badge bg-info text-white shadow-sm ms-1">Qty: ${itm.return_item_quantity || 1}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            body.innerHTML = html;
+        } catch(e) {
+            body.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Gagal memuat detail: ${e.message}</div>`;
+        }
+    };
 </script>
 @endpush

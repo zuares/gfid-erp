@@ -9,6 +9,7 @@ class PurchaseReceiptLine extends Model
     protected $fillable = [
         'purchase_receipt_id',
         'purchase_order_line_id', // ← penting
+        'purchase_return_line_id',
         'item_id',
         'lot_id',
         'qty_received',
@@ -40,5 +41,10 @@ class PurchaseReceiptLine extends Model
     public function purchaseOrderLine()
     {
         return $this->belongsTo(PurchaseOrderLine::class, 'purchase_order_line_id');
+    }
+
+    public function returnLineOrigin()
+    {
+        return $this->belongsTo(PurchaseReturnLine::class, 'purchase_return_line_id');
     }
 }

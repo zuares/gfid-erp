@@ -263,6 +263,7 @@ class PurchaseReceiptController extends Controller
             'order',
             'qc.checkedBy',
             'qc.purchaseReturn',
+            'returnOrigin',
         ]);
 
         return view('purchasing.purchase_receipts.show', [
@@ -303,6 +304,12 @@ class PurchaseReceiptController extends Controller
             return redirect()
                 ->route('purchasing.purchase_receipts.show', $purchase_receipt->id)
                 ->with('error', 'Hanya GRN draft yang bisa diedit.');
+        }
+
+        if ($purchase_receipt->is_replacement) {
+            return redirect()
+                ->route('purchasing.purchase_receipts.show', $purchase_receipt->id)
+                ->with('error', 'Replacement GRN tidak dapat diedit secara manual. Jika salah, batalkan/hapus GRN ini dan ulangi proses terima pengganti dari dokumen Retur.');
         }
 
         $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'order']);
@@ -657,5 +664,29 @@ class PurchaseReceiptController extends Controller
     {
         $user = $request?->user() ?: auth()->user();
         return $user && method_exists($user, 'isOwner') && $user->isOwner();
+    }
+
+    /**
+     * Batal/Hapus Draft Replacement GRN.
+     */
+    public function destroy(Request $request, PurchaseReceipt $purchase_receipt)
+    {
+        $this->ensureCanAccess($request);
+
+        if ($purchase_receipt->status !== 'draft') {
+            return back()->with('error', 'Hanya dokumen berstatus Draft yang dapat dihapus.');
+        }
+
+        if (!$purchase_receipt->is_replacement) {
+            return back()->with('error', 'Fitur hapus ini hanya untuk Draft GRN Pengganti.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($purchase_receipt) {
+            $purchase_receipt->lines()->delete();
+            $purchase_receipt->delete();
+        });
+
+        return redirect()->route('purchasing.purchase_returns.show', $purchase_receipt->purchase_return_id)
+            ->with('success', 'Draft Penerimaan Barang Pengganti telah dibatalkan.');
     }
 }

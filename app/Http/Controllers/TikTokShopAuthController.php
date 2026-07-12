@@ -118,12 +118,12 @@ class TikTokShopAuthController extends Controller
                 'refresh_token_expire_in'  => $data['refresh_token_expire_in'] ?? null,
             ];
 
-            Store::updateOrCreate(
-                ['code' => 'tiktok_' . $shopId],
+            $storeModel = Store::updateOrCreate(
+                ['code' => 'tiktok_' . $shopCipher],
                 [
+                    'name'             => $shopName,
                     'channel_id'       => $channel->id,
                     'external_shop_id' => $shopId,
-                    'name'             => $shopName,
                     'region'           => $region,
                     'status'           => 'active',
                     'is_active'        => true,
@@ -138,6 +138,12 @@ class TikTokShopAuthController extends Controller
                     ],
                 ]
             );
+
+            // Jalankan sinkronisasi awal secara otomatis di background
+            if (isset($storeModel) && $storeModel) {
+                \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $storeModel->id]);
+                \App\Jobs\SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
+            }
         }
 
         return redirect('/marketplace/toko?connected=1');

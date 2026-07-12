@@ -23,6 +23,8 @@ class PurchaseReceipt extends Model
         'surat_jalan_no',
         'created_by',
         'approved_by',
+        'is_replacement',
+        'purchase_return_id',
     ];
 
     protected $casts = [
@@ -33,6 +35,7 @@ class PurchaseReceipt extends Model
         'tax_amount' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'grand_total' => 'decimal:2',
+        'is_replacement' => 'boolean',
     ];
 
     // RELATIONS
@@ -73,6 +76,11 @@ class PurchaseReceipt extends Model
     public function returns()
     {
         return $this->hasMany(\App\Models\PurchaseReturn::class, 'purchase_receipt_id');
+    }
+
+    public function returnOrigin()
+    {
+        return $this->belongsTo(\App\Models\PurchaseReturn::class, 'purchase_return_id');
     }
 
     /** Tahap 6: QC ringan (satu QC per GRN) */

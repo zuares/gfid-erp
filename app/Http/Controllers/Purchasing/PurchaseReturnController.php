@@ -25,6 +25,7 @@ class PurchaseReturnController extends Controller
     public function __construct(
         protected JournalService $journal,
         protected \App\Services\Inventory\InventoryService $inventory,
+        protected \App\Services\Purchasing\ReplacementReceiptService $replacementReceiptService,
     ) {}
 
     public function index(Request $request)
@@ -148,7 +149,7 @@ class PurchaseReturnController extends Controller
 
     public function show(PurchaseReturn $purchase_return)
     {
-        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'lines.item', 'lines.grnLine', 'lines.photos', 'supplier', 'order']);
+        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'lines.item', 'lines.grnLine', 'lines.photos', 'supplier', 'order', 'replacementReceipts']);
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
         $returnLineByGrnLine = $purchase_return->lines->keyBy('purchase_receipt_line_id');
 
@@ -1182,146 +1183,24 @@ class PurchaseReturnController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($purchase_return, $data) {
+            $receipt = DB::transaction(function () use ($purchase_return, $data) {
                 $lockedReturn = PurchaseReturn::query()
                     ->whereKey($purchase_return->id)
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if (!in_array($lockedReturn->replacement_status, ['pending', 'partial'], true)) {
-                    throw ValidationException::withMessages([
-                        'return' => 'Status replacement sudah berubah.',
-                    ]);
-                }
-
-                $warehouseId = (int) $data['warehouse_id'];
-                $receivedAt = $data['received_at'];
-                $notes = $data['notes'] ?? null;
-                $hasReceipt = false;
-                $totalAmtReceived = 0.0;
-
-                foreach ($data['lines'] as $lineData) {
-                    $qty = (float) $lineData['qty'];
-                    if ($qty <= 0) {
-                        continue;
-                    }
-
-                    $line = $lockedReturn->lines()->where('id', $lineData['id'])->lockForUpdate()->first();
-                    if (!$line) {
-                        continue;
-                    }
-
-                    $outstanding = (float) $line->replacement_qty_expected - (float) $line->replacement_qty_received;
-                    if ($qty > $outstanding + 0.0001) {
-                        throw ValidationException::withMessages([
-                            "lines.{$line->id}.qty" => "Qty diterima ({$qty}) melebihi outstanding ({$outstanding}).",
-                        ]);
-                    }
-
-                    // Stock IN
-                    $this->inventory->stockIn(
-                        warehouseId: $warehouseId,
-                        itemId: (int) $line->replacement_item_id,
-                        qty: $qty,
-                        date: $receivedAt,
-                        sourceType: 'purchase_return_replacement',
-                        sourceId: (int) $lockedReturn->id,
-                        notes: trim("Replacement IN {$lockedReturn->code} | {$notes}"),
-                        lotId: null, // MVP no lot override
-                        unitCost: (float) $line->unit_price,
-                        affectLotCost: true,
-                        cuttingJobBundleId: null,
-                        sourceLineId: (int) $line->id
-                    );
-
-                    $line->replacement_qty_received = (float) $line->replacement_qty_received + $qty;
-                    $line->save();
-
-                    $totalAmtReceived += $qty * (float) $line->unit_price;
-                    $hasReceipt = true;
-                }
-
-                if (!$hasReceipt) {
-                    throw ValidationException::withMessages([
-                        'return' => 'Tidak ada qty valid yang diterima.',
-                    ]);
-                }
-
-                // Journal IN
-                $claimId = (int) Account::where('code', JournalService::CODE_SUPPLIER_CLAIM)->value('id');
-                if ($claimId <= 0) {
-                    throw ValidationException::withMessages([
-                        'return' => 'COA Supplier Claim (1305) belum diatur.',
-                    ]);
-                }
-
-                $inventoryAccountIds = Account::query()
-                    ->whereIn('code', [JournalService::CODE_INV_RAW, JournalService::CODE_INV_PACKAGING])
-                    ->pluck('id', 'code')
-                    ->map(fn($id) => (int) $id);
-
-                // Group by account
-                $invDebitByAcc = [];
-                foreach ($lockedReturn->lines as $ln) {
-                    $qtyReceived = collect($data['lines'])->firstWhere('id', $ln->id)['qty'] ?? 0;
-                    if ($qtyReceived > 0 && $this->isHppLine($lockedReturn, $ln)) {
-                        $invCode = $this->inventoryAccountCodeForReturnLine($ln);
-                        $invAccId = (int) ($inventoryAccountIds[$invCode] ?? $inventoryAccountIds[JournalService::CODE_INV_RAW] ?? 0);
-                        if ($invAccId > 0) {
-                            $invDebitByAcc[$invAccId] = ($invDebitByAcc[$invAccId] ?? 0) + ($qtyReceived * (float) $ln->unit_price);
-                        }
-                    }
-                }
-
-                $journalLines = [];
-                $totalDebit = 0.0;
-                foreach ($invDebitByAcc as $accId => $amt) {
-                    $amt = round((float) $amt, 2);
-                    if ($amt > 0) {
-                        $journalLines[] = ['account_id' => $accId, 'debit' => $amt, 'credit' => 0];
-                        $totalDebit += $amt;
-                    }
-                }
-
-                if ($totalDebit > 0) {
-                    $journalLines[] = ['account_id' => $claimId, 'debit' => 0, 'credit' => $totalDebit];
-                    
-                    // We need a unique sourceId for partial receive journal? 
-                    // MVP: We use unique ID or append time to source_type if partial? 
-                    // Actually, if we receive multiple times, JournalService idempotency by `source_id` will block it unless we use a unique ID per receipt.
-                    // Let's use time() as part of description, and for idempotency we can use a new model PurchaseReturnReceipt, 
-                    // BUT MVP doesn't have it. We can set source_id to null and just log it, 
-                    // OR we can make source_type = 'purchase_return_replacement_in' + rand.
-                    // The safer way for MVP without new table is `source_id = null` and rely on DB transaction.
-                    $this->journal->post(
-                        $receivedAt,
-                        'purchase_return_replacement_in',
-                        null,
-                        "Replacement IN {$lockedReturn->code} - " . now()->timestamp,
-                        $journalLines
-                    );
-                }
-
-                // Check completion
-                $isCompleted = true;
-                foreach ($lockedReturn->lines as $line) {
-                    if (round((float) $line->replacement_qty_received, 4) < round((float) $line->replacement_qty_expected, 4)) {
-                        $isCompleted = false;
-                        break;
-                    }
-                }
-
-                if ($isCompleted) {
-                    $lockedReturn->replacement_status = 'received';
-                    $lockedReturn->replacement_received_at = now();
-                } else {
-                    $lockedReturn->replacement_status = 'partial';
-                }
-
-                $lockedReturn->save();
+                return $this->replacementReceiptService->createFromReturn(
+                    $lockedReturn, 
+                    $data['lines'], 
+                    $data['received_at'], 
+                    (int) $data['warehouse_id'], 
+                    $data['notes'] ?? null, 
+                    $data['document_number'] ?? null
+                );
             });
 
-            return back()->with('success', 'Barang pengganti berhasil diterima.');
+            return redirect()->route('purchasing.purchase_receipts.show', $receipt->id)
+                ->with('success', 'Barang pengganti berhasil diterima dan Draft Penerimaan (GRN) telah dibuat. Silakan periksa dan Posting.');
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         } catch (\Exception $e) {
