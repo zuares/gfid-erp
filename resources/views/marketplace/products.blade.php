@@ -24,7 +24,10 @@
 @section('content')
 <div class="d-flex align-items-center justify-content-between mb-2">
     <h5 class="fw-black mb-0">🏷 Produk Marketplace</h5>
-    <button class="btn btn-sm btn-primary" id="btnSync" onclick="syncProducts()">⟳ Sync dari Shopee</button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary" id="btnAutoMap" onclick="autoMap()">⚡ Auto-map SKU Sama</button>
+        <button class="btn btn-sm btn-primary" id="btnSync" onclick="syncProducts()">⟳ Sync dari Shopee</button>
+    </div>
 </div>
 
 <div class="prd-toolbar">
@@ -42,9 +45,9 @@
 <table class="prd-table">
     <thead><tr>
         <th style="width:30px"></th><th style="width:54px"></th><th>Produk</th><th>Toko</th>
-        <th>Status</th><th>Harga</th><th>Stok</th><th>Terjual</th><th style="width:210px">Aksi</th>
+        <th>Status</th><th>Harga</th><th>Stok</th><th>Terjual</th><th>Mapping</th><th style="width:210px">Aksi</th>
     </tr></thead>
-    <tbody id="prdBody"><tr><td colspan="9" class="text-center text-muted py-4">Memuat…</td></tr></tbody>
+    <tbody id="prdBody"><tr><td colspan="10" class="text-center text-muted py-4">Memuat…</td></tr></tbody>
 </table>
 </div>
 @endsection
@@ -87,10 +90,27 @@
         finally { $('btnSync').disabled = false; $('btnSync').textContent = '⟳ Sync dari Shopee'; }
     };
 
+    function mappingBadge(m) {
+        if (!m.model_sku) return '<span class="st-badge" style="background:#fef3c7;color:#92400e">SKU kosong</span>';
+        if (m.mapping) {
+            return `<span class="st-badge" style="background:#dcfce7;color:#166534" title="${esc(m.mapping.item_name || '')}">✓ ${esc(m.mapping.item_code || m.mapping.item_id)}</span>
+                <button class="btn btn-outline-secondary btn-mini" onclick="openMapModal('${esc(m.model_sku)}')" title="Ganti mapping">✎</button>`;
+        }
+        return `<button class="btn btn-outline-danger btn-mini" onclick="openMapModal('${esc(m.model_sku)}')">❌ Map</button>`;
+    }
+
+    function mappingSummary(models) {
+        const withSku = models.filter(m => m.model_sku);
+        if (!withSku.length) return '<span class="st-badge" style="background:#fef3c7;color:#92400e">SKU kosong</span>';
+        const mapped = withSku.filter(m => m.mapping).length;
+        const ok = mapped === withSku.length;
+        return `<span class="st-badge" style="background:${ok ? '#dcfce7' : '#fee2e2'};color:${ok ? '#166534' : '#991b1b'}">${mapped}/${withSku.length} ✓</span>`;
+    }
+
     function render() {
         $('prdCount').textContent = products.length + ' produk';
         if (!products.length) {
-            $('prdBody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Belum ada produk. Klik "Sync dari Shopee".</td></tr>';
+            $('prdBody').innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Belum ada produk. Klik "Sync dari Shopee".</td></tr>';
             return;
         }
         $('prdBody').innerHTML = products.map(p => {
@@ -111,6 +131,7 @@
                 <td>${price}</td>
                 <td class="fw-bold">${p.stock_total ?? 0}</td>
                 <td>${p.sales ?? '—'}</td>
+                <td>${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
                 <td>
                     ${!multiModel && models.length ? inlineEditors(p.id, models[0]) : ''}
                     ${st === 'NORMAL'
@@ -127,6 +148,7 @@
                     <td>${rp(m.price)}</td>
                     <td>${m.stock}</td>
                     <td></td>
+                    <td>${mappingBadge(m)}</td>
                     <td>${inlineEditors(p.id, m)}</td>
                 </tr>`).join('') : '';
 
@@ -181,6 +203,70 @@
     function toast(title) {
         if (window.Swal) Swal.fire({ toast:true, position:'top-end', icon:'success', title, showConfirmButton:false, timer:2200 });
     }
+
+    // ── Mapping SKU → item internal ──────────────────────────────────────────
+    window.autoMap = async function () {
+        $('btnAutoMap').disabled = true;
+        try {
+            const res = await api(`${API}/auto-map`, { method: 'POST', body: '{}' });
+            toast(res.message);
+            loadProducts();
+        } catch (e) { alert('Gagal: ' + e.message); }
+        finally { $('btnAutoMap').disabled = false; }
+    };
+
+    window.openMapModal = async function (sku) {
+        const { value: itemId } = await Swal.fire({
+            title: `Mapping SKU: ${sku}`,
+            html: `
+                <input id="mapSearch" class="swal2-input" placeholder="Cari kode / nama item internal…" style="font-size:.85rem">
+                <div id="mapResults" style="max-height:240px;overflow-y:auto;text-align:left;font-size:.8rem"></div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Simpan',
+            cancelButtonText: 'Batal',
+            didOpen: () => {
+                const inp = document.getElementById('mapSearch');
+                const box = document.getElementById('mapResults');
+                let t = null;
+                window._mapSelected = null;
+
+                async function search(q) {
+                    const items = await fetch(`/api/sku-mappings/search-items?q=${encodeURIComponent(q)}`, { headers: { 'Accept': 'application/json' } }).then(r => r.json());
+                    box.innerHTML = items.length ? items.map(i => `
+                        <div class="map-opt" data-id="${i.id}" style="padding:6px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer;border-radius:6px">
+                            <b>${i.code}</b> — ${i.name}
+                        </div>`).join('') : '<div class="text-muted p-2">Tidak ditemukan.</div>';
+                    box.querySelectorAll('.map-opt').forEach(el => el.onclick = () => {
+                        box.querySelectorAll('.map-opt').forEach(x => x.style.background = '');
+                        el.style.background = '#eef2ff';
+                        window._mapSelected = parseInt(el.dataset.id);
+                    });
+                }
+                inp.oninput = () => { clearTimeout(t); t = setTimeout(() => search(inp.value), 300); };
+                search(sku); // pra-isi hasil dengan SKU-nya sendiri
+                inp.focus();
+            },
+            preConfirm: () => {
+                if (!window._mapSelected) { Swal.showValidationMessage('Pilih item internal dulu'); return false; }
+                return window._mapSelected;
+            }
+        });
+
+        if (!itemId) return;
+        try {
+            await api('/api/sku-mappings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    marketplace_sku: sku,
+                    channel_code: null, // global — dipakai semua channel & sync order
+                    item_id: itemId,
+                    notes: 'mapping dari tab Produk'
+                })
+            });
+            toast(`SKU ${sku} berhasil di-mapping ✔`);
+            loadProducts();
+        } catch (e) { alert('Gagal simpan mapping: ' + e.message); }
+    };
 
     // Realtime: webhook item_update → refresh daftar
     if (window.Echo) {

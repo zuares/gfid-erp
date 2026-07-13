@@ -33,7 +33,67 @@ class MarketplaceProductController extends Controller
             })
             ->orderByDesc('synced_at');
 
-        return response()->json($q->limit(500)->get());
+        $products = $q->limit(500)->get();
+
+        // ── Status mapping per model (dipakai juga oleh sync order) ─────────
+        $skus = $products->flatMap(fn ($p) => $p->models->pluck('model_sku'))
+            ->filter()->unique()->values();
+
+        $mappings = \App\Models\SkuMapping::whereIn('marketplace_sku', $skus)
+            ->where(fn ($w) => $w->whereNull('channel_code')->orWhere('channel_code', 'shopee'))
+            ->with('item:id,code,name')
+            ->get()
+            // channel-spesifik menang atas global
+            ->sortBy(fn ($m) => $m->channel_code === null ? 1 : 0)
+            ->keyBy('marketplace_sku');
+
+        foreach ($products as $p) {
+            foreach ($p->models as $m) {
+                $map = $m->model_sku ? ($mappings[$m->model_sku] ?? null) : null;
+                $m->setAttribute('mapping', $map ? [
+                    'id'        => $map->id,
+                    'item_id'   => $map->item_id,
+                    'item_code' => $map->item?->code,
+                    'item_name' => $map->item?->name,
+                ] : null);
+            }
+        }
+
+        return response()->json($products);
+    }
+
+    /**
+     * Auto-map: model_sku yang persis sama dengan kode item internal
+     * dibuatkan mapping global otomatis.
+     */
+    public function autoMap()
+    {
+        $unmappedSkus = \App\Models\MarketplaceProductModel::whereNotNull('model_sku')
+            ->where('model_sku', '!=', '')
+            ->pluck('model_sku')->unique()
+            ->reject(fn ($sku) => \App\Models\SkuMapping::where('marketplace_sku', $sku)->exists())
+            ->values();
+
+        $created = 0;
+        foreach ($unmappedSkus as $sku) {
+            $item = \App\Models\Item::where('code', $sku)->where('active', 1)->first();
+            if ($item) {
+                \App\Models\SkuMapping::create([
+                    'marketplace_sku' => $sku,
+                    'channel_code'    => null, // global — berlaku semua channel
+                    'item_id'         => $item->id,
+                    'notes'           => 'auto-map dari tab Produk (kode sama persis)',
+                ]);
+                $created++;
+            }
+        }
+
+        return response()->json([
+            'created' => $created,
+            'message' => $created > 0
+                ? "Berhasil auto-map {$created} SKU (kode persis sama)."
+                : 'Tidak ada SKU yang cocok persis dengan kode item internal.',
+        ]);
     }
 
     /**

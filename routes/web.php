@@ -145,6 +145,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/products',                        [\App\Http\Controllers\MarketplaceProductController::class, 'index']);
     Route::post('/products/sync',                  [\App\Http\Controllers\MarketplaceProductController::class, 'sync'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/auto-map',              [\App\Http\Controllers\MarketplaceProductController::class, 'autoMap'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/stock',       [\App\Http\Controllers\MarketplaceProductController::class, 'updateStock'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/price',       [\App\Http\Controllers\MarketplaceProductController::class, 'updatePrice'])
