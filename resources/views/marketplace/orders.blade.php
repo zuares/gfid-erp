@@ -2570,9 +2570,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             } else if (activeTab === 'ready') {
                 logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
             } else {
-                if (o.needs_shipping_arrangement || o.order_status === 'READY_TO_SHIP') {
+                if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
-                } else if (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
+                } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
                 }
             }
@@ -2875,7 +2875,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     
     // Background prefetch function to silently cache shipping parameters for all pending ship orders
     async function prefetchShippingParams() {
-        const readyOrders = orders.filter(o => ['READY_TO_SHIP', 'RETRY_SHIP'].includes(o.order_status));
+        const readyOrders = orders.filter(o => ['READY_TO_SHIP', 'RETRY_SHIP'].includes(o.order_status) && !o.shipping_awb_no);
         for (const o of readyOrders) {
             if (!shippingParamCache.has(o.channel_order_id)) {
                 try {
