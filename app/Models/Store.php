@@ -16,6 +16,7 @@ class Store extends Model
         'external_shop_id',
         'region',
         'status',
+        'is_active',
         'credentials',
         'token_expires_at',
         'last_synced_at',
@@ -23,6 +24,7 @@ class Store extends Model
     ];
 
     protected $casts = [
+        'is_active' => 'boolean',
         'credentials' => 'encrypted:array',
         'meta' => 'array',
         'token_expires_at' => 'datetime',

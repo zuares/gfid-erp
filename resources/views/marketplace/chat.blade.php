@@ -412,8 +412,9 @@
             return code.includes('shp') || code === 'shopee';
         });
 
-        // Hanya tampilkan toko yang bermasalah (butuh aksi). Kalau semua sehat → banner disembunyikan.
-        const bad = shopee.filter(s => s.connection_status !== 'CONNECTED');
+        // Hanya toko yang bermasalah & masih AKTIF. Toko nonaktif (sengaja tidak
+        // dipakai) tidak diingatkan.
+        const bad = shopee.filter(s => s.connection_status !== 'CONNECTED' && s.is_active !== false);
         const box = $('storeAlert');
         if (!bad.length) { box.innerHTML = ''; return; }
 

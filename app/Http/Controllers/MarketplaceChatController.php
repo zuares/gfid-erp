@@ -27,7 +27,10 @@ class MarketplaceChatController extends Controller
     {
         if ($request->boolean('sync')) {
             $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-                ->where('status', 'active')->get();
+                ->where('status', 'active')
+                ->where('is_active', true) // lewati toko yang sengaja dinonaktifkan
+                ->get()
+                ->filter(fn ($s) => filled($s->credential('access_token'))); // & yang tak punya token
 
             foreach ($stores as $store) {
                 try {

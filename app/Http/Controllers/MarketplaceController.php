@@ -493,6 +493,7 @@ class MarketplaceController extends Controller
             'external_shop_id'     => $store->external_shop_id,
             'region'               => $store->region,
             'status'               => $store->status,
+            'is_active'            => (bool) $store->is_active,
             'connection_status'    => $store->connection_status,
             'token_expires_at'     => $store->token_expires_at?->toISOString(),
             'last_synced_at'       => $store->last_synced_at?->toISOString(),
@@ -1486,6 +1487,21 @@ class MarketplaceController extends Controller
                 'message' => 'Terjadi kesalahan saat memutuskan koneksi: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Aktif/Nonaktifkan toko. Toko nonaktif tidak dimunculkan di peringatan
+     * koneksi (dianggap sengaja tidak dipakai) dan dilewati sync chat.
+     */
+    public function toggleActive(Store $store): JsonResponse
+    {
+        $store->update(['is_active' => ! $store->is_active]);
+
+        return response()->json([
+            'success'   => true,
+            'is_active' => (bool) $store->is_active,
+            'message'   => $store->is_active ? 'Toko diaktifkan.' : 'Toko dinonaktifkan (disembunyikan dari peringatan).',
+        ]);
     }
 
     public function deleteStore(Store $store): JsonResponse

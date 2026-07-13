@@ -162,6 +162,9 @@
     body[data-theme="dark"] .st-connected { color: #4ade80; }
     
     .st-not-connected{ background: rgba(148, 163, 184, 0.12); color:#475569; border-color: rgba(148, 163, 184, 0.30); }
+    .st-inactive{ background: rgba(100, 116, 139, 0.10); color:#64748b; border-color: rgba(100, 116, 139, 0.25); }
+    .st-inactive::before{ background: rgba(100, 116, 139, 0.6); }
+    .store-card.is-inactive{ opacity:.72; }
     .st-not-connected::before{ background: rgba(100, 116, 139, 0.95); }
     body[data-theme="dark"] .st-not-connected { color: #94a3b8; }
     
@@ -588,12 +591,16 @@
             else if (s.connection_status === 'AUTH_REQUIRED') { statusClass = 'st-auth-required'; statusLabel = 'Akses Ditolak'; }
             else if (s.connection_status !== 'NOT_CONNECTED') { statusClass = 'st-warning'; statusLabel = 'Perlu Login'; }
 
+            // Toko nonaktif (sengaja tidak dipakai) → tidak diberi peringatan koneksi.
+            const inactive = s.is_active === false;
+            if (inactive) { statusClass = 'st-inactive'; statusLabel = 'Nonaktif'; }
+
             const channelCode = s.channel ? (s.channel.code || '').toUpperCase() : '';
             const connectUrl = `/marketplace/${channelCode === 'TKT' || channelCode === 'TIKTOK' ? 'tiktok' : 'shopee'}/connect?store_id=${s.id}`;
             const isConn = s.connection_status === 'CONNECTED';
 
             return `
-            <div class="store-card">
+            <div class="store-card ${inactive ? 'is-inactive' : ''}">
                 <div class="store-header">
                     <div class="store-brand">
                         <div class="store-brand-icon">${platformIcon(channelCode)}</div>
@@ -632,6 +639,7 @@
                             ` : ''}
                             <li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-secondary me-2"></i>Putuskan Koneksi</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="toggleActive(${s.id})"><i class="bi bi-power ${inactive ? 'text-success' : 'text-secondary'} me-2"></i>${inactive ? 'Aktifkan Toko' : 'Nonaktifkan Toko (sembunyikan peringatan)'}</button></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item py-2 text-danger fw-bold" onclick="deleteStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-trash3-fill me-2"></i>Hapus Toko</button></li>
                         </ul>
@@ -640,7 +648,9 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <span class="badge-status ${statusClass}">${statusLabel}</span>
-                    <a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>
+                    ${inactive
+                        ? `<button class="btn btn-sm btn-outline-success" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan</button>`
+                        : `<a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>`}
                 </div>
 
                 <div class="store-stats">
@@ -995,6 +1005,15 @@
             loadAll();
         } catch (e) {
             alert(e.message || 'Gagal memutuskan koneksi toko');
+        }
+    };
+
+    window.toggleActive = async function (storeId) {
+        try {
+            const res = await api('/api/marketplace/stores/' + storeId + '/toggle-active', { method: 'POST' });
+            loadAll();
+        } catch (e) {
+            alert(e.message || 'Gagal mengubah status aktif toko');
         }
     };
 
