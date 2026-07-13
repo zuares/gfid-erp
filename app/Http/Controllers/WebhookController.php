@@ -97,9 +97,18 @@ class WebhookController extends Controller
                 'ip_address' => $request->ip()
             ]);
 
-            // Dispatch background job to process the webhook
-            if ($verified || true) { // Optional: enforce $verified in production
+            // Dispatch background job to process the webhook.
+            // Di production, signature WAJIB valid (anti spoofing).
+            // Di lokal/staging tetap longgar supaya gampang testing via ngrok/simulate.
+            $shouldProcess = $verified || !app()->environment('production');
+
+            if ($shouldProcess && $eventType !== 'verify') {
                 \App\Jobs\ProcessShopeeWebhookJob::dispatch($payload, $eventType);
+            } elseif (!$shouldProcess) {
+                Log::warning('Shopee Webhook ditolak: signature tidak valid.', [
+                    'event_type' => $eventType,
+                    'ip' => $request->ip(),
+                ]);
             }
 
         } catch (\Exception $e) {

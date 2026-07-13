@@ -3575,8 +3575,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     loadOrders();
 
-    // Auto-refresh polling every 5 minutes (silent fetch)
-    setInterval(async () => {
+    // ── Silent refresh (dipakai polling & realtime push) ────────────────────
+    let silentRefreshBusy = false;
+    async function silentRefresh() {
+        if (silentRefreshBusy) return;
+        silentRefreshBusy = true;
         try {
             const newOrders = await api('/api/marketplace/local-orders');
             orders = newOrders;
@@ -3590,8 +3593,44 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             // Hanya update render tanpa merusak UX loading screen yang sudah ada
             render();
             updateLastSyncTime();
-        } catch(e) {}
-    }, 300000);
+        } catch(e) {} finally {
+            silentRefreshBusy = false;
+        }
+    }
+
+    // ── Realtime push via Reverb (webhook Shopee → OrderUpdated broadcast) ──
+    let echoConnected = false;
+    let rtDebounce = null;
+    if (window.Echo) {
+        try {
+            window.Echo.channel('marketplace')
+                .listen('OrderUpdated', () => {
+                    // Debounce: webhook sering datang beruntun (status+resi+dokumen)
+                    clearTimeout(rtDebounce);
+                    rtDebounce = setTimeout(silentRefresh, 800);
+                });
+
+            const conn = window.Echo.connector?.pusher?.connection;
+            if (conn) {
+                conn.bind('connected',    () => { echoConnected = true;  });
+                conn.bind('disconnected', () => { echoConnected = false; });
+                conn.bind('unavailable',  () => { echoConnected = false; });
+                echoConnected = conn.state === 'connected';
+            }
+        } catch (e) { console.warn('Realtime listener gagal:', e); }
+    }
+
+    // ── Fallback polling ─────────────────────────────────────────────────────
+    // WebSocket konek  → safety-net tiap 5 menit.
+    // WebSocket putus  → polling dipercepat tiap 30 detik supaya tidak ada yang nyangkut.
+    let lastPollAt = Date.now();
+    setInterval(() => {
+        const interval = echoConnected ? 300000 : 30000;
+        if (Date.now() - lastPollAt >= interval) {
+            lastPollAt = Date.now();
+            silentRefresh();
+        }
+    }, 5000);
 
     // Re-render on resize (mobile ↔ desktop switch)
     // ── Review Modal (Sedang Proses) ────────────────────────────────────────

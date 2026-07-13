@@ -363,6 +363,32 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+  {{-- ✅ Realtime: Laravel Echo + Reverb (WebSocket) --}}
+  @if (config('broadcasting.default') === 'reverb' && config('broadcasting.connections.reverb.key'))
+    <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/laravel-echo@2.3.7/dist/echo.iife.js"></script>
+    <script>
+      (function () {
+        try {
+          var host = @json(config('broadcasting.connections.reverb.options.host')) || window.location.hostname;
+          var port = Number(@json(config('broadcasting.connections.reverb.options.port', 443)));
+          var scheme = @json(config('broadcasting.connections.reverb.options.scheme', 'https'));
+          window.Echo = new Echo({
+            broadcaster: 'reverb',
+            key: @json(config('broadcasting.connections.reverb.key')),
+            wsHost: host,
+            wsPort: port,
+            wssPort: port,
+            forceTLS: scheme === 'https',
+            enabledTransports: ['ws', 'wss'],
+          });
+        } catch (e) {
+          console.warn('Echo init failed:', e);
+        }
+      })();
+    </script>
+  @endif
+
   @if (session('success') || session('error'))
     <script>
       document.addEventListener('DOMContentLoaded', function() {
