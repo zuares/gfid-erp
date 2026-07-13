@@ -740,8 +740,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
     {{-- Toolbar: Actions & Sub-Tabs --}}
     <div class="process-toolbar" id="processToolbar" style="margin-bottom:1rem; border:1px solid var(--shp-border); background:var(--card); border-radius:8px; padding:6px;">
         <div style="display:flex; align-items:center;">
-            <div class="process-toolbar-info" id="toolbarInfo" style="font-size:.8rem; padding:.2rem .5rem;">
-                <strong id="toolbarCount">0</strong> order
+            <div class="process-toolbar-info" id="toolbarInfo" style="display:none; font-size:.8rem; padding:.2rem .5rem;">
             </div>
             
             <div id="subTabProcessedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
@@ -1401,8 +1400,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         } else {
             const rows = getProcessRows();
             toolbar.classList.toggle('visible', rows.length > 0);
-            $('toolbarInfo').style.display = 'block';
-            $('toolbarInfo').innerHTML = `<strong id="toolbarCount">${rows.length}</strong> order perlu diproses`;
+            $('toolbarInfo').style.display = 'none';
         }
     }
 
