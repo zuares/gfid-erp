@@ -97,6 +97,16 @@ class MarketplaceChatController extends Controller
     }
 
     /**
+     * Total pesan belum dibaca (untuk badge sidebar).
+     */
+    public function unreadCount()
+    {
+        return response()->json([
+            'unread' => (int) MarketplaceConversation::sum('unread_count'),
+        ]);
+    }
+
+    /**
      * Deep-link dari halaman orders: cari/buat percakapan untuk sebuah order.
      * Body: store_id, order_sn, text (optional — kalau diisi langsung kirim).
      */

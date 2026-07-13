@@ -860,7 +860,8 @@
                     @if ($router->has('marketplace.chat'))
                         <x-sidebar.simple-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
                             :active="request()->routeIs('marketplace.chat')">
-                            Chat
+                            Chat <span id="sidebarChatBadge"
+                                style="display:none;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:1px 6px;margin-left:6px;vertical-align:middle"></span>
                         </x-sidebar.simple-link>
                     @endif
 

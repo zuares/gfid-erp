@@ -141,6 +141,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
 
     // Chat Marketplace
+    Route::get('/chat/unread-count',                         [\App\Http\Controllers\MarketplaceChatController::class, 'unreadCount']);
     Route::get('/chat/conversations',                        [\App\Http\Controllers\MarketplaceChatController::class, 'conversations']);
     Route::get('/chat/conversations/{conversation}/messages', [\App\Http\Controllers\MarketplaceChatController::class, 'messages']);
     Route::post('/chat/conversations/{conversation}/send',    [\App\Http\Controllers\MarketplaceChatController::class, 'send'])

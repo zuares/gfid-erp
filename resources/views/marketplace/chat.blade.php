@@ -83,6 +83,7 @@
     const API = '/api/marketplace/chat';
     let conversations = [];
     let activeConv = null;
+    let pendingCompose = null; // {storeId, orderSn, buyerUsername} → chat baru (cold-start)
     let echoConnected = false;
     let pollTimer = null;
 
@@ -140,6 +141,7 @@
 
     // ── Thread ───────────────────────────────────────────────────────────────
     window.openConversation = async function (id, syncFirst = true) {
+        pendingCompose = null;
         activeConv = conversations.find(c => c.id === id) || activeConv;
         renderConversations();
 
@@ -192,12 +194,34 @@
     // ── Kirim pesan ──────────────────────────────────────────────────────────
     window.sendMessage = async function () {
         const text = $('msgText').value.trim();
-        if (!text || !activeConv) return;
+        if (!text || (!activeConv && !pendingCompose)) return;
         $('btnSend').disabled = true;
         try {
-            await api(`${API}/conversations/${activeConv.id}/send`, { method: 'POST', body: JSON.stringify({ text }) });
-            $('msgText').value = '';
-            await openConversation(activeConv.id, false);
+            if (activeConv) {
+                await api(`${API}/conversations/${activeConv.id}/send`, { method: 'POST', body: JSON.stringify({ text }) });
+                $('msgText').value = '';
+                await openConversation(activeConv.id, false);
+            } else {
+                // Cold-start: kirim pesan pertama via send_message (to_id = buyer),
+                // percakapan baru otomatis terbentuk
+                const res = await api(`${API}/start-from-order`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        store_id: pendingCompose.storeId,
+                        order_sn: pendingCompose.orderSn,
+                        text
+                    })
+                });
+                $('msgText').value = '';
+                pendingCompose = null;
+                await loadConversations(false);
+                if (res.conversation) {
+                    openConversation(res.conversation.id, true);
+                } else {
+                    // Terkirim tapi conversation_id belum terbaca → sync penuh
+                    await loadConversations(true);
+                }
+            }
         } catch (e) {
             alert('Gagal kirim: ' + e.message);
         } finally {
@@ -208,6 +232,24 @@
     window.onMsgKey = function (ev) {
         if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); sendMessage(); }
     };
+
+    // Panel percakapan BARU (belum ada di Shopee) — pesan pertama membentuk percakapan
+    function openComposePane(storeId, orderSn, buyerUsername) {
+        activeConv = null;
+        pendingCompose = { storeId, orderSn, buyerUsername };
+        renderConversations();
+
+        $('chatEmpty').style.display = 'none';
+        $('chatHead').style.display = '';
+        $('chatMsgs').style.display = '';
+        $('chatInput').style.display = '';
+        $('chatName').textContent = buyerUsername || 'Pembeli';
+        $('chatStore').textContent = `Order ${orderSn} • percakapan baru`;
+        $('chatAvatar').innerHTML = esc((buyerUsername || '?')[0].toUpperCase());
+        $('chatMsgs').innerHTML =
+            '<div class="text-center text-muted" style="font-size:.75rem;padding:20px">' +
+            'Belum ada percakapan dengan pembeli ini.<br>Kirim pesan pertama untuk memulai chat. 👇</div>';
+    }
 
     // ── Realtime via Reverb ──────────────────────────────────────────────────
     function setRtState(on) {
@@ -260,10 +302,14 @@
             });
             await loadConversations(false);
             if (res.conversation) {
-                openConversation(res.conversation.id);
+                await openConversation(res.conversation.id);
+            } else if (res.buyer_user_id) {
+                // Belum ada percakapan → buka panel tulis pesan pertama (cold-start)
+                openComposePane(parseInt(storeId), orderSn, res.buyer_username);
             } else {
-                alert(`Belum ada percakapan dengan ${res.buyer_username || 'pembeli ini'}. ` +
-                      `Percakapan baru akan terbentuk saat pembeli mengirim chat, atau hubungi via Seller Centre.`);
+                alert(`Data buyer untuk order ${orderSn} belum lengkap. ` +
+                      `Sync ulang order ini dulu, atau hubungi via Seller Centre.`);
+                return;
             }
             $('msgText').value = `Halo kak ${res.buyer_username || ''}, mengenai pesanan ${orderSn} `.trimEnd() + ' ';
             $('msgText').focus();

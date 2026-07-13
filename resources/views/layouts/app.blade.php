@@ -389,6 +389,37 @@
     </script>
   @endif
 
+  {{-- ✅ Badge unread chat di sidebar (realtime + refresh berkala) --}}
+  <script>
+    (function () {
+      var badge = document.getElementById('sidebarChatBadge');
+      if (!badge) return;
+
+      function refreshChatBadge() {
+        fetch('/api/marketplace/chat/unread-count', { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (!d) return;
+            var n = d.unread || 0;
+            badge.textContent = n > 99 ? '99+' : n;
+            badge.style.display = n > 0 ? 'inline-block' : 'none';
+          })
+          .catch(function () {});
+      }
+
+      document.addEventListener('DOMContentLoaded', refreshChatBadge);
+      setInterval(refreshChatBadge, 60000);
+
+      // Realtime: pesan baru masuk → update badge seketika
+      if (window.Echo) {
+        try {
+          window.Echo.channel('marketplace')
+            .listen('ChatMessageReceived', refreshChatBadge);
+        } catch (e) {}
+      }
+    })();
+  </script>
+
   @if (session('success') || session('error'))
     <script>
       document.addEventListener('DOMContentLoaded', function() {
