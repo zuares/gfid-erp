@@ -750,6 +750,20 @@
                                     </a>
                                 @endif
 
+                                @if ($router->has('marketplace.products'))
+                                    <a href="{{ route('marketplace.products') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.products') ? 'active' : '' }}">
+                                        <span class="icon">🏷</span><span>Produk</span>
+                                    </a>
+                                @endif
+
+                                @if ($router->has('marketplace.chat'))
+                                    <a href="{{ route('marketplace.chat') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.chat') ? 'active' : '' }}">
+                                        <span class="icon">💬</span><span>Chat</span>
+                                    </a>
+                                @endif
+
                                 @if ($hasMarketplaceSalesReport)
                                     <a href="{{ route('marketplace.reports.sales') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">

@@ -1469,6 +1469,19 @@
                                 Order Lokal
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($router->has('marketplace.products'))
+                            <x-sidebar.sub-link href="{{ route('marketplace.products') }}" icon="bi bi-tags"
+                                :active="request()->routeIs('marketplace.products')">
+                                Produk
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($router->has('marketplace.chat'))
+                            <x-sidebar.sub-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
+                                :active="request()->routeIs('marketplace.chat')">
+                                Chat <span id="sidebarChatBadge"
+                                    style="display:none;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;border-radius:99px;padding:1px 6px;margin-left:6px;vertical-align:middle"></span>
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasMarketplacePemenuhan)
                             <x-sidebar.sub-link href="{{ route('marketplace.fulfillment') }}" icon="bi bi-truck"
                                 :active="request()->routeIs('marketplace.fulfillment') || request()->routeIs('marketplace.fulfillment.*')">
