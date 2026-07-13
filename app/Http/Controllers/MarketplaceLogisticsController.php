@@ -381,6 +381,9 @@ class MarketplaceLogisticsController extends Controller
                                 }
                             }
                         }
+                        if ($awb && str_starts_with(strtoupper($awb), 'OFG')) {
+                            $awb = null;
+                        }
                         if ($awb) {
                             $payload['tracking_number'] = $awb;
                             $order->update(['shipping_awb_no' => $awb]);
@@ -455,6 +458,9 @@ class MarketplaceLogisticsController extends Controller
                                     }
                                     
                                     if ($awb || $pkgNo) {
+                                        if ($awb && str_starts_with(strtoupper($awb), 'OFG')) {
+                                            $awb = null;
+                                        }
                                         if ($awb) {
                                             $payload['tracking_number'] = $awb;
                                             if ($order) {

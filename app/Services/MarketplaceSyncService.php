@@ -511,7 +511,14 @@ class MarketplaceSyncService
                 // ── Kurir & resi (dari package_list) ─────────────────────────
                 $packages  = $detail['package_list'] ?? [];
                 $firstPkg  = $packages[0] ?? [];
-                $trackingNo      = $firstPkg['tracking_no'] ?? $firstPkg['tracking_number'] ?? $firstPkg['package_number'] ?? null; // Added package_number for V2 fallback
+                $trackingNo      = $firstPkg['tracking_no'] ?? $firstPkg['tracking_number'] ?? null;
+                if (!$trackingNo && !empty($firstPkg['package_number']) && !str_starts_with(strtoupper($firstPkg['package_number']), 'OFG')) {
+                    $trackingNo = $firstPkg['package_number'];
+                }
+                
+                if ($trackingNo && str_starts_with(strtoupper($trackingNo), 'OFG')) {
+                    $trackingNo = null;
+                }
                 $shippingCarrier = $firstPkg['shipping_carrier']
                     ?? $detail['shipping_carrier']
                     ?? $detail['checkout_shipping_carrier']
