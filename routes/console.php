@@ -99,6 +99,13 @@ Schedule::command('marketplace:run-boosts')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Proses antrean job (order webhook, download resi, sync historis) lewat cron —
+// tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
+Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3 --sleep=1')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('marketplace:cleanup-labels')
     ->dailyAt('01:00')
     ->runInBackground();

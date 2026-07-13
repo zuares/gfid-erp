@@ -106,7 +106,14 @@ class WebhookController extends Controller
             $shouldProcess = $verified || !app()->environment('production');
 
             if ($shouldProcess && $eventType === 'webchat_push') {
-                \App\Jobs\ProcessShopeeChatWebhookJob::dispatch($payload);
+                // Proses LANGSUNG (sync) supaya pesan chat tersimpan & di-broadcast
+                // seketika — realtime tidak bergantung pada queue worker yang jalan.
+                try {
+                    \App\Jobs\ProcessShopeeChatWebhookJob::dispatchSync($payload);
+                } catch (\Throwable $e) {
+                    Log::warning('Chat webhook sync gagal, fallback ke antrean: ' . $e->getMessage());
+                    \App\Jobs\ProcessShopeeChatWebhookJob::dispatch($payload);
+                }
             } elseif ($shouldProcess && $eventType !== 'verify') {
                 \App\Jobs\ProcessShopeeWebhookJob::dispatch($payload, $eventType);
             } elseif (!$shouldProcess) {
