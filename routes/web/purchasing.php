@@ -156,6 +156,10 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
         Route::middleware('role:owner,admin')->group(function () {
 
             // RETURN — index, show, edit draft (owner+admin)
+            // AJAX Search untuk GRN saat mau bikin return
+            Route::get('purchase-returns/search-grn', [PurchaseReturnController::class, 'searchGrnForReturn'])
+                ->name('purchase_returns.search_grn');
+                
             Route::get('purchase-returns', [PurchaseReturnController::class, 'index'])
                 ->name('purchase_returns.index');
 

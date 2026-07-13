@@ -82,6 +82,13 @@ class PurchaseOrderController extends Controller
             $q->whereDate('date', '<=', $request->to_date);
         }
 
+        if ($request->filled('q')) {
+            $term = (string) $request->q;
+            $q->where(function ($sub) use ($term) {
+                $sub->where('code', 'like', '%' . $term . '%');
+            });
+        }
+
         $summaryQuery = clone $q;
         
         $grandTotalQuery = clone $summaryQuery;
@@ -444,6 +451,14 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diedit.');
         }
 
+        // ✅ RECEIVING LOCK: admin gudang (tanpa hak harga) tidak boleh mengedit PO
+        // yang sudah dirujuk GRN. Owner masih boleh (proteksi granular di Service).
+        if ($purchase_order->isLocked() && !($request->user()?->canSeePurchasePrices())) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'PO terkunci karena sudah ada GRN. Tidak dapat diedit.');
+        }
+
         $purchase_order->load(['lines.item', 'paymentMethod']);
 
         $suppliers = Supplier::orderBy('name')->get();
@@ -516,6 +531,14 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diubah.');
         }
 
+        // ✅ RECEIVING LOCK: user tanpa hak harga tidak boleh update PO terkunci.
+        // Owner boleh — Service memproteksi line yang sudah dirujuk GRN.
+        if ($purchase_order->isLocked() && !($request->user()?->canSeePurchasePrices())) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'PO terkunci karena sudah ada GRN. Perubahan ditolak.');
+        }
+
         $data = $this->validateData($request, $purchase_order);
         $data['status'] = 'draft';
 
@@ -544,6 +567,12 @@ class PurchaseOrderController extends Controller
     {
         if ($purchase_order->status !== 'draft') {
             return back()->with('error', 'PO non-draft tidak boleh dihapus.');
+        }
+
+        // ✅ RECEIVING LOCK: PO yang sudah dirujuk GRN tidak boleh dihapus
+        // (menjaga integritas referensi purchase_order_line_id pada GRN).
+        if ($purchase_order->isLocked()) {
+            return back()->with('error', 'PO terkunci karena sudah ada GRN. Tidak dapat dihapus.');
         }
 
         $purchase_order->lines()->delete();
@@ -626,6 +655,9 @@ class PurchaseOrderController extends Controller
     }
     public function printDotMatrix(PurchaseOrder $purchase_order)
     {
+        // Dokumen PO memuat harga → hanya untuk role berhak harga.
+        abort_unless($this->canSeeMoney(request()), 403, 'Anda tidak memiliki akses harga untuk mencetak PO.');
+
         return view('purchasing.purchase_orders.print_dot_matrix', [
             'order' => $purchase_order
         ]);
@@ -633,6 +665,8 @@ class PurchaseOrderController extends Controller
 
     public function printRaw(PurchaseOrder $purchase_order)
     {
+        abort_unless($this->canSeeMoney(request()), 403, 'Anda tidak memiliki akses harga untuk mencetak PO.');
+
         $purchase_order->load(['supplier', 'lines.item', 'paymentMethod']);
 
         $width = 45; // lebar approx untuk 12cm
@@ -986,7 +1020,7 @@ class PurchaseOrderController extends Controller
     protected function canSeeMoney(?Request $request = null): bool
     {
         $user = $request?->user() ?: auth()->user();
-        return $user && method_exists($user, 'hasRole') && $user->hasRole(['owner', 'admin']);
+        return $user && method_exists($user, 'canSeePurchasePrices') && $user->canSeePurchasePrices();
     }
 
     protected function stripMoneyFromNonOwnerPayload(array &$data, ?PurchaseOrder $existingOrder = null): void

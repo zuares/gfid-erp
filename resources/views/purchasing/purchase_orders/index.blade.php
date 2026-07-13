@@ -4,7 +4,7 @@
 
 @php
     $user = auth()->user();
-    $canSeeMoney = $user?->hasRole(['owner', 'admin']) ?? false;
+    $canSeeMoney = $user?->canSeePurchasePrices() ?? false;
     $sortCol ??= 'date';
     $sortDir ??= 'desc';
     $sortUrl = fn(string $col) => request()->fullUrlWithQuery([
@@ -19,346 +19,161 @@
 
 @push('head')
     <style>
-        .page-wrap {
-            max-width: 1080px;
-            margin-inline: auto;
-            padding-bottom: 3rem;
-        }
 
-        .card-filter {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            padding: .8rem .9rem;
-            margin-bottom: .85rem;
-        }
+    :root {
+        --shp-accent: #334155;
+        --shp-accent-2: #1f2937;
+        --shp-border: rgba(148,163,184,.18);
+        --shp-muted: #64748b;
+    }
+    .page-wrap { max-width: 1040px; margin-inline: auto; padding: .75rem .75rem 4rem; background: transparent !important; }
 
-        .card-table {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            overflow: hidden;
-        }
+    .card-main {
+        background: var(--card, #fff);
+        border-radius: 8px;
+        border: 1px solid var(--shp-border);
+        box-shadow: none;
+        overflow: hidden;
+    }
 
-        .table thead th {
-            background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
-            border-bottom-color: var(--line);
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: var(--muted);
-            white-space: nowrap;
-            padding: .52rem .65rem;
-        }
+    .ship-topbar {
+        display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap;
+        padding: .45rem .75rem; margin-inline: -.75rem; margin-bottom: .65rem;
+        background: var(--card, #fff); border-bottom: 1px solid var(--shp-border);
+    }
+    .title { font-weight: 750; font-size: 1rem; margin: 0; color: #0f172a; }
+    .sub { color: var(--shp-muted); font-size: .78rem; }
 
-        .th-sort {
-            cursor: pointer;
-            user-select: none;
-            text-decoration: none;
-            color: var(--muted);
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
-        .th-sort:hover { color: var(--body); }
-        .th-sort.active { color: var(--body); font-weight: 700; }
+    .kpis { display: flex; flex-wrap: wrap; gap: .32rem; margin-top: .35rem; }
+    .kpi { display: inline-flex; align-items: baseline; gap: .45rem; border-radius: 7px; padding: .2rem .48rem; border: 1px solid rgba(148,163,184,.28); font-size: .72rem; }
+    .kpi .lbl { color: #94a3b8; font-size: .66rem; }
+    .kpi .val { font-weight: 650; color: var(--shp-accent); }
 
-        .table tbody td {
-            vertical-align: middle;
-            font-size: .83rem;
-            padding: .58rem .65rem;
-            border-bottom-color: var(--line);
-        }
+    .controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    .filter-label { font-size: .8rem; color: #6b7280; }
+    
 
-        .table tbody tr:last-child td { border-bottom: none; }
 
-        .po-row:hover { background: rgba(59,130,246,.04); }
+    .filter-select {
+        border-radius: 6px;
+        font-size: .8rem;
+        background-color: #fff;
+        border: 1px solid rgba(148,163,184,.3);
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px rgba(0,0,0,.02) !important;
+        color: #334155;
+        height: 36px !important;
+        padding: 0.35rem 0.75rem;
+        line-height: 1.5;
+    }
+    .filter-select:hover, .filter-select:focus {
+        background-color: #fff;
+        border-color: rgba(148,163,184,.4);
+    }
 
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
-        }
+    .btn-pill { border-radius: 7px; padding-inline: .78rem; box-shadow: none !important; font-weight: 600; text-decoration: none; }
+    .btn-ship-primary { background: var(--shp-accent) !important; border-color: var(--shp-accent) !important; color: #fff !important; }
+    .btn-ship-primary:hover { background: var(--shp-accent-2) !important; border-color: var(--shp-accent-2) !important; color: #fff !important; }
+    .btn-ship-outline { color: #475569 !important; border: 1px solid rgba(148,163,184,.35) !important; }
+    .btn-ship-outline:hover { background: rgba(148,163,184,.08) !important; color: #111827 !important; }
 
-        /* PO Status badge */
-        .badge-status {
-            border-radius: 999px;
-            font-size: .7rem;
-            padding: .1rem .6rem;
-            border: 1px solid transparent;
-            white-space: nowrap;
-        }
+    @media (min-width: 769px) {
+        .filter-select { width: auto; min-width: 130px; }
+        #po-date-range { width: 190px !important; }
+        .search-input { width: 160px; }
+    }
 
-        .badge-draft {
-            background: rgba(148, 163, 184, .12);
-            color: #64748b;
-            border-color: rgba(148, 163, 184, .5);
-        }
+    .table-responsive {
+        overflow: visible;
+    }
+    .table-responsive::-webkit-scrollbar { width: 6px; height: 6px; }
+    .table-responsive::-webkit-scrollbar-track { background: transparent; }
+    .table-responsive::-webkit-scrollbar-thumb { background: rgba(148,163,184,.3); border-radius: 4px; }
+    .table-responsive::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.5); }
 
-        .badge-approved {
-            background: rgba(22, 163, 74, .12);
-            color: #15803d;
-            border-color: rgba(22, 163, 74, .6);
-        }
+    .table-list { margin-bottom: 0; }
 
-        .badge-cancelled {
-            background: rgba(220, 38, 38, .08);
-            color: #b91c1c;
-            border-color: rgba(220, 38, 38, .6);
-        }
+    .table-list thead th { position: sticky; top: 0; z-index: 10; border-bottom-width: 1px; font-size: .68rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; background: var(--card, #fff); padding: .75rem 1rem; white-space: nowrap; }
+    .table-list thead th::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        border-bottom: 1px solid rgba(148,163,184,.25);
+    }
 
-        /* Payment status badge */
-        .badge-pay {
-            border-radius: 999px;
-            font-size: .7rem;
-            padding: .1rem .55rem;
-            border: 1px solid rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .10);
-            color: #64748b;
-            white-space: nowrap;
-        }
+    .table-list tbody td { vertical-align: middle; border-top-color: rgba(148,163,184,.12); padding: .65rem 1rem; font-size: .83rem; }
 
-        .badge-pay-paid {
-            border-color: rgba(22, 163, 74, .55);
-            background: rgba(22, 163, 74, .12);
-            color: #15803d;
-        }
+    .badge-status { border-radius: 7px; padding: .16rem .48rem; font-size: .68rem; border: 1px solid transparent; display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+    .badge-status::before { content: ''; width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
+    
+    .st-draft { background: rgba(148,163,184,.10); color: #475569; border-color: rgba(148,163,184,.30); }
+    .st-draft::before { background: rgba(100,116,139,.95); }
+    .st-approved { background: rgba(59,130,246,.10); color: #1d4ed8; border-color: rgba(59,130,246,.30); }
+    .st-approved::before { background: rgba(59,130,246,.95); }
+    .st-cancelled { background: rgba(239,68,68,.10); color: #991b1b; border-color: rgba(239,68,68,.30); }
+    .st-cancelled::before { background: rgba(239,68,68,.95); }
 
-        .badge-pay-partial {
-            border-color: rgba(234, 179, 8, .55);
-            background: rgba(234, 179, 8, .12);
-            color: #a16207;
-        }
+    .code-link { font-weight: 600; text-decoration: none; color: inherit; }
+    .code-link:hover { text-decoration: underline; }
+    .muted { font-size: .82rem; color: #6b7280; }
+    .supplier-name { font-weight: 600; }
 
-        .badge-pay-unpaid {
-            border-color: rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .10);
-            color: #64748b;
-        }
+    .badge-pay { border-radius: 7px; font-size: .7rem; padding: .1rem .55rem; border: 1px solid rgba(148,163,184,.45); background: rgba(148,163,184,.10); color: #64748b; white-space: nowrap; }
+    .badge-pay-paid { border-color: rgba(22,163,74,.55); background: rgba(22,163,74,.12); color: #15803d; }
+    .badge-pay-partial { border-color: rgba(234,179,8,.55); background: rgba(234,179,8,.12); color: #a16207; }
 
-        .badge-grn {
-            border-radius: 999px;
-            font-size: .65rem;
-            padding: .05rem .45rem;
-            margin-left: .25rem;
-            background: rgba(59, 130, 246, .08);
-            color: #1d4ed8;
-            border: 1px solid rgba(59, 130, 246, .5);
-            white-space: nowrap;
-        }
+    .badge-rcv { border-radius: 7px; font-size: .65rem; padding: .05rem .45rem; border: 1px solid transparent; white-space: nowrap; display: inline-block; }
+    .badge-rcv-none { background: rgba(148,163,184,.08); color: #94a3b8; border-color: rgba(148,163,184,.4); }
+    .badge-rcv-partial { background: #fef08a; color: #854d0e; border-color: #fde047; }
+    .badge-rcv-full { background: #16a34a; color: #fff; border-color: #15803d; box-shadow: 0 1px 2px rgba(22,163,74,.3); }
 
-        /* PR-E: badge "Dari PR" di PO index */
-        .badge-pr-ref {
-            border-radius: 999px;
-            font-size: .62rem;
-            padding: .04rem .42rem;
-            margin-left: .2rem;
-            background: rgba(99,102,241,.08);
-            color: #4f46e5;
-            border: 1px solid rgba(99,102,241,.4);
-            white-space: nowrap;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .badge-pr-ref:hover { background: rgba(99,102,241,.16); color: #4f46e5; }
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono"; }
 
-        /* received_status badge */
-        .badge-rcv {
-            border-radius: 999px;
-            font-size: .65rem;
-            padding: .05rem .45rem;
-            border: 1px solid transparent;
-            white-space: nowrap;
-            display: inline-block;
-        }
-        .badge-rcv-none {
-            background: rgba(148,163,184,.08);
-            color: #94a3b8;
-            border-color: rgba(148,163,184,.4);
-        }
-        .badge-rcv-partial {
-            background: rgba(234,179,8,.10);
-            color: #a16207;
-            border-color: rgba(234,179,8,.5);
-        }
-        .badge-rcv-full {
-            background: rgba(22,163,74,.10);
-            color: #15803d;
-            border-color: rgba(22,163,74,.5);
-        }
+    .empty { padding: 2.2rem 1.25rem; text-align: center; color: #64748b; }
+    .divider { height: 1px; background: rgba(148,163,184,.20); }
 
-        .row-draft {
-            background: rgba(248, 250, 252, 0.9);
-        }
+    .th-sort {
+        cursor: pointer;
+        user-select: none;
+        text-decoration: none;
+        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+    }
+    .th-sort:hover { color: #0f172a; }
+    .th-sort.active { color: #0f172a; font-weight: 700; }
 
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: .6rem;
-            margin-bottom: .85rem;
-        }
+    @media (max-width: 768px) {
+        .page-wrap { padding: .5rem .5rem 4rem; }
+        .ship-topbar { margin-inline: -.5rem; padding: .5rem .65rem; }
+        .title { font-size: 1.05rem; }
+        .sub { display: none; }
+        
+        .filter-bar { padding: .65rem; }
+        form#po-filter-form { display: flex; flex-wrap: wrap; gap: .75rem; width: 100%; }
+        .filter-select { flex: 1 1 calc(50% - .375rem); min-width: 120px; }
+        #po-date-range { flex: 1 1 100%; width: 100% !important; }
+        .position-relative { flex: 1 1 100%; width: 100%; }
+        .btn { flex: 1 1 100%; }
+        .controls { width: 100%; align-items: stretch; }
 
-        .kpi-cell {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: .72rem .82rem;
-            min-width: 0;
-        }
+        .kpis { display: none; }
+        .table-responsive { overflow: visible; max-height: none; }
+        .table-list thead { display: none; }
+        .table-list, .table-list tbody, .table-list tr, .table-list td { display: block; width: 100%; }
+        .table-list tbody tr { padding: .66rem; border-top: 1px solid rgba(148,163,184,.16); }
+        .table-list tbody td { vertical-align: middle; border-top-color: rgba(148,163,184,.12); padding: .65rem 1rem; font-size: .83rem; border: 0; padding: 0;}
+        .mobile-hide { display: none !important; }
+        .ship-row-main { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+        .ship-row-meta { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .35rem; color: #64748b; font-size: .78rem; }
+        .ship-row-action { margin-top: .55rem; }
+        .ship-row-action .btn { width: 100%; min-height: 38px; }
+    }
 
-        .kpi-label {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: var(--muted);
-            font-weight: 800;
-            margin-bottom: .18rem;
-        }
-
-        .kpi-value {
-            font-size: .95rem;
-            font-weight: 850;
-            line-height: 1.2;
-        }
-
-        .kpi-sub {
-            font-size: .72rem;
-            color: var(--muted);
-            margin-top: .08rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .filter-row {
-            display: grid;
-            grid-template-columns: minmax(170px, 1.2fr) 140px 140px 180px auto;
-            gap: .5rem;
-            align-items: center;
-        }
-
-        .po-code {
-            font-weight: 850;
-            font-size: .85rem;
-            white-space: nowrap;
-        }
-
-        .po-sub {
-            font-size: .72rem;
-            color: var(--muted);
-            white-space: nowrap;
-        }
-
-        .supplier-code {
-            font-weight: 850;
-            font-size: .86rem;
-            white-space: nowrap;
-        }
-
-        .table-total {
-            font-size: .86rem;
-            font-weight: 850;
-            white-space: nowrap;
-        }
-
-        .status-stack {
-            display: flex;
-            gap: .3rem;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .status-main {
-            font-weight: 850;
-            font-size: .78rem;
-            line-height: 1.15;
-        }
-
-        .status-main.is-approved {
-            color: #15803d;
-        }
-
-        .status-main.is-draft {
-            color: #64748b;
-        }
-
-        .status-main.is-cancelled {
-            color: #b91c1c;
-        }
-
-        .status-meta {
-            margin-top: .16rem;
-            color: var(--muted);
-            font-size: .72rem;
-            line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* ===== MOBILE ===== */
-        @media (max-width: 767.98px) {
-            .page-wrap {
-                padding-inline: .75rem;
-            }
-
-            .card-filter {
-                padding: .75rem .8rem;
-            }
-
-            .kpi-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: .5rem;
-            }
-
-            .filter-row {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .filter-row .filter-search,
-            .filter-row .filter-date,
-            .filter-row .filter-reset {
-                grid-column: 1 / -1;
-            }
-
-            .card-po-mobile {
-                background: var(--card);
-                border-radius: 12px;
-                border: 1px solid var(--line);
-                padding: .75rem .85rem;
-                margin-bottom: .6rem;
-            }
-
-            .card-po-mobile h6 {
-                font-size: .92rem;
-                margin-bottom: .25rem;
-            }
-
-            .card-po-mobile .meta {
-                font-size: .75rem;
-                color: var(--muted);
-            }
-
-            .card-po-mobile .meta span+span::before {
-                content: "•";
-                margin-inline: .35rem;
-                opacity: .65;
-            }
-
-            .card-po-mobile .amount {
-                font-size: .95rem;
-            }
-
-            .card-po-mobile .actions a {
-                font-size: .75rem;
-                padding-inline: .45rem;
-                padding-block: .2rem;
-            }
-
-            .kpi-value {
-                font-size: .88rem;
-            }
-        }
-    </style>
+</style>
 @endpush
 
 @section('content')
@@ -388,393 +203,274 @@
         };
     @endphp
 
-    <div class="page-wrap py-3">
+    <div class="page-wrap">
+    @if (session('success'))
+        <div class="flash-clean alert alert-success py-2 small mb-2" style="border-radius:8px; border:1px solid rgba(148,163,184,.25);">{{ session('success') }}</div>
+    @endif
+    @if (session('error'))
+        <div class="flash-clean alert alert-danger py-2 small mb-2" style="border-radius:8px; border:1px solid rgba(148,163,184,.25);">{{ session('error') }}</div>
+    @endif
 
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-center gap-3 mb-3 flex-wrap">
-            <div>
-                <h2 class="mb-0 lh-1" style="font-size:1.35rem;">Purchase Orders</h2>
-                <div class="text-muted small mt-1">Daftar PO</div>
-            </div>
-            <div>
-                @if ($user && in_array($user->role, ['owner', 'admin']))
-                    <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-primary btn-sm">
-                        + PO
-                    </a>
-                @endif
-            </div>
-        </div>
+    <div class="ship-topbar">
+        <div>
+            <div class="title">Purchase Orders</div>
+            <div class="sub">Daftar pemesanan barang.</div>
 
-        {{-- FLASH --}}
-        @if (session('success'))
-            <div class="alert alert-success py-2 small">{{ session('success') }}</div>
-        @endif
-        @if (session('error'))
-            <div class="alert alert-danger py-2 small">{{ session('error') }}</div>
-        @endif
-
-        {{-- KPI --}}
-        @if (isset($summary))
-            <div class="kpi-grid">
-                <div class="kpi-cell">
-                    <div class="kpi-label">Total PO</div>
-                    <div class="kpi-value mono">{{ $summary->total_orders }}</div>
-                    @if ($summary->last_date)
-                        <div class="kpi-sub">Terakhir {{ id_date($summary->last_date) }}</div>
+            @if (isset($summary))
+                <div class="kpis">
+                    <span class="kpi"><span class="lbl">Total PO</span><span class="val mono">{{ $summary->total_orders }}</span></span>
+                    <span class="kpi"><span class="lbl">Draft</span><span class="val mono">{{ $summary->draft_count }}</span></span>
+                    <span class="kpi"><span class="lbl">Approved</span><span class="val mono">{{ $summary->approved_count }}</span></span>
+                    @if ($canSeeMoney)
+                        <span class="kpi"><span class="lbl">Nilai</span><span class="val mono">Rp {{ number_format($summary->total_grand_total, 0, ',', '.') }}</span></span>
                     @endif
                 </div>
-                <div class="kpi-cell">
-                    <div class="kpi-label">Draft</div>
-                    <div class="kpi-value mono">{{ $summary->draft_count }}</div>
-                    <div class="kpi-sub">Belum approve</div>
-                </div>
-                <div class="kpi-cell">
-                    <div class="kpi-label">Approved</div>
-                    <div class="kpi-value mono">{{ $summary->approved_count }}</div>
-                    <div class="kpi-sub">Siap operasional</div>
-                </div>
-                @if ($canSeeMoney)
-                    <div class="kpi-cell">
-                        <div class="kpi-label">Nilai PO</div>
-                        <div class="kpi-value mono" style="font-size:.86rem;">{{ rupiah($summary->total_grand_total) }}</div>
-                        @if (($summary->cancelled_count ?? 0) > 0)
-                            <div class="kpi-sub">Cancel {{ $summary->cancelled_count }}</div>
-                        @endif
-                    </div>
-                @else
-                    <div class="kpi-cell">
-                        <div class="kpi-label">Cancelled</div>
-                        <div class="kpi-value mono">{{ $summary->cancelled_count ?? 0 }}</div>
-                    </div>
-                @endif
-            </div>
-        @endif
+            @endif
+        </div>
 
-        {{-- FILTER --}}
-        <div class="card-filter mb-3">
-            <form id="po-filter-form" method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
+        <div class="controls">
+            
+
+            @if ($user && in_array($user->role, ['owner', 'admin']))
+                <a href="{{ route('purchasing.purchase_orders.create') }}" class="btn btn-sm btn-ship-primary btn-pill">
+                    PO Baru
+                </a>
+            @endif
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <form id="po-filter-form" method="GET" class="d-flex align-items-center flex-wrap" style="width:100%; gap: 1rem;">
                 <input type="hidden" name="from_date" id="po-from-date" value="{{ request('from_date') }}">
                 <input type="hidden" name="to_date"   id="po-to-date"   value="{{ request('to_date') }}">
 
-                <div class="filter-row">
-                    <select name="supplier_id" class="form-select form-select-sm po-filter-auto filter-search">
-                        <option value="">Semua Supplier</option>
-                        @foreach ($suppliers as $sup)
-                            <option value="{{ $sup->id }}" @selected(request('supplier_id') == $sup->id)>{{ $sup->name }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="status" class="form-select form-select-sm po-filter-auto">
-                        @foreach ($statusOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-
-                    @if ($canSeeMoney)
-                        <select name="pay_status" class="form-select form-select-sm po-filter-auto">
-                            @foreach ($payStatusOptions as $value => $label)
-                                <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    @endif
-
-                    {{-- Single flatpickr range input --}}
-                    @php
-                        $idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-                        $rangeDisplay = '';
-                        if (request('from_date') && request('to_date')) {
-                            try {
-                                $f = \Carbon\Carbon::parse(request('from_date'));
-                                $t = \Carbon\Carbon::parse(request('to_date'));
-                                $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1]
-                                    . ' – ' . $t->day . ' ' . $idMonths[$t->month-1] . ' ' . $t->year;
-                            } catch (\Exception $e) {
-                                $rangeDisplay = request('from_date') . ' – ' . request('to_date');
-                            }
-                        } elseif (request('from_date')) {
-                            try {
-                                $f = \Carbon\Carbon::parse(request('from_date'));
-                                $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1] . ' ' . $f->year;
-                            } catch (\Exception $e) {
-                                $rangeDisplay = request('from_date');
-                            }
-                        }
-                    @endphp
-                    <input type="text" id="po-date-range" value="{{ $rangeDisplay }}"
-                        placeholder="Tanggal" autocomplete="off"
-                        class="form-control form-control-sm filter-date" style="cursor:pointer;"
-                        data-gf-date="off" readonly />
-
-                    @if (request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
-                        <a href="{{ route('purchasing.purchase_orders.index') }}"
-                           class="btn btn-sm btn-outline-secondary filter-reset" style="font-size:.78rem;padding:.25rem .65rem;">
-                            Reset
-                        </a>
-                    @endif
+                <!-- Search Input -->
+                <div class="position-relative">
+                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm filter-select search-input" placeholder="Cari PO..." autocomplete="off" onchange="this.form.submit()">
+                    <i class="bi bi-search position-absolute text-muted" style="right: 8px; top: 50%; transform: translateY(-50%); font-size: .75rem;"></i>
                 </div>
-            </form>
-        </div>
 
-        {{-- DESKTOP TABLE --}}
-        <div class="card-table d-none d-md-block">
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width:18%;">
-                                <a href="{{ $sortUrl('date') }}" class="th-sort {{ $sortCol === 'date' ? 'active' : '' }}">
-                                    PO {{ $sortIcon('date') }}
-                                </a>
-                            </th>
-                            <th>
-                                <a href="{{ $sortUrl('supplier_id') }}" class="th-sort {{ $sortCol === 'supplier_id' ? 'active' : '' }}">
-                                    Supplier {{ $sortIcon('supplier_id') }}
-                                </a>
-                            </th>
-                            @if ($canSeeMoney)
-                                <th style="width:14%;" class="text-end">
-                                    <a href="{{ $sortUrl('grand_total') }}" class="th-sort {{ $sortCol === 'grand_total' ? 'active' : '' }}">
-                                        Total {{ $sortIcon('grand_total') }}
-                                    </a>
-                                </th>
-                            @endif
-                            <th style="width:25%;">
-                                <a href="{{ $sortUrl('status') }}" class="th-sort {{ $sortCol === 'status' ? 'active' : '' }}">
-                                    Status {{ $sortIcon('status') }}
-                                </a>
-                            </th>
-                            <th style="width:4%;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($orders as $order)
-                            @php
-                                $poBadgeClass = match ($order->status) {
-                                    'approved' => 'badge-status badge-approved',
-                                    'cancelled' => 'badge-status badge-cancelled',
-                                    default => 'badge-status badge-draft',
-                                };
-                                $rowClass = $order->status === 'draft' ? 'row-draft' : '';
-                                $grnCount = $order->purchaseReceipts?->count() ?? 0;
-                                $ps = (string) ($order->payment_status ?? 'unpaid');
-                                $payBadgeClass = $payBadge($ps);
-                                $rcv = $order->received_status ?? 'not_received';
-                                $rcvClass = match($rcv) {
-                                    'fully_received' => 'badge-rcv badge-rcv-full',
-                                    'partial'        => 'badge-rcv badge-rcv-partial',
-                                    default          => 'badge-rcv badge-rcv-none',
-                                };
-                                $statusMainClass = match ($order->status) {
-                                    'approved' => 'status-main is-approved',
-                                    'cancelled' => 'status-main is-cancelled',
-                                    default => 'status-main is-draft',
-                                };
-                                $statusLabel = match ((string) $order->status) {
-                                    'approved' => 'Approved',
-                                    'cancelled' => 'Cancelled',
-                                    'closed' => 'Closed',
-                                    default => 'Draft',
-                                };
-                                $rcvLabel = match($rcv) {
-                                    'fully_received' => 'Terima lengkap',
-                                    'partial' => 'Terima sebagian',
-                                    default => 'Belum terima',
-                                };
-                                $payLabel = match($ps) {
-                                    'paid' => 'Lunas',
-                                    'partial' => 'Bayar sebagian',
-                                    default => 'Belum bayar',
-                                };
-                            @endphp
+                <select name="supplier_id" class="form-select form-select-sm filter-select po-filter-auto">
+                    <option value="">Semua Supplier</option>
+                    @foreach ($suppliers as $sup)
+                        <option value="{{ $sup->id }}" @selected(request('supplier_id') == $sup->id)>{{ $sup->name }}</option>
+                    @endforeach
+                </select>
 
-                            <tr class="{{ $rowClass }} po-row" style="cursor:pointer;"
-                                data-href="{{ route('purchasing.purchase_orders.show', $order->id) }}">
-                                {{-- PO: kode + tanggal --}}
-                                <td>
-                                    <span class="fw-semibold mono" style="font-size:.82rem;white-space:nowrap;">
-                                        {{ $order->code }}
-                                    </span>
-                                    <div class="text-muted mono" style="font-size:.72rem;white-space:nowrap;">{{ id_date($order->date) }}</div>
-                                </td>
+                <select name="status" class="form-select form-select-sm filter-select po-filter-auto">
+                    @foreach ($statusOptions as $value => $label)
+                        <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
 
-                                {{-- Supplier + Jenis --}}
-                                <td style="max-width:220px;">
-                                    <div class="supplier-code mono" title="{{ optional($order->supplier)->name ?? '' }}">
-                                        {{ optional($order->supplier)->code ?? '—' }}
-                                    </div>
-                                    <div class="po-sub">{{ po_order_type_label($order->order_type) }}</div>
-                                </td>
+                @if ($canSeeMoney)
+                    <select name="pay_status" class="form-select form-select-sm filter-select po-filter-auto">
+                        @foreach ($payStatusOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                @endif
 
-                                @if ($canSeeMoney)
-                                    <td class="text-end mono table-total">{{ rupiah($order->grand_total) }}</td>
-                                @endif
-
-                                {{-- Status: main badge + info baris kedua --}}
-                                <td>
-                                    <div class="{{ $statusMainClass }}">{{ $statusLabel }}</div>
-                                    @php
-                                        $subParts = [];
-                                        $subParts[] = $rcvLabel;
-                                        if ($canSeeMoney) $subParts[] = $payLabel;
-                                        if ($grnCount > 0) $subParts[] = 'GRN ' . $grnCount;
-                                        if (!empty($order->purchase_request_id)) $subParts[] = 'PR';
-                                        if (!empty($order->due_date) && $canSeeMoney) $subParts[] = 'JT ' . id_date($order->due_date);
-                                    @endphp
-                                    <div class="status-meta">{{ implode(' · ', $subParts) }}</div>
-                                </td>
-
-                                <td class="text-end">
-                                    @if ($order->status === 'draft')
-                                        <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
-                                            class="text-muted" title="Edit"
-                                            style="font-size:.85rem;line-height:1;">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
-                                    @else
-                                        <i class="bi bi-chevron-right text-muted" style="font-size:.8rem;opacity:.4;"></i>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="{{ $canSeeMoney ? 6 : 4 }}" class="text-center text-muted py-4">Belum ada Purchase Order.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="px-3 py-2">
-                {{ $orders->links() }}
-            </div>
-        </div>
-
-        {{-- MOBILE LIST --}}
-        <div class="d-md-none">
-            @forelse ($orders as $order)
                 @php
-                    $poBadgeClass = match ($order->status) {
-                        'approved' => 'badge-status badge-approved',
-                        'cancelled' => 'badge-status badge-cancelled',
-                        default => 'badge-status badge-draft',
-                    };
-
-                    $grnCount = $order->purchaseReceipts?->count() ?? 0;
-
-                    $ps = (string) ($order->payment_status ?? 'unpaid');
-                    $payBadgeClass = $payBadge($ps);
-
-                    $paid = (float) ($order->paid_amount ?? 0);
-                    $grand = (float) ($order->grand_total ?? 0);
-                    $bal = max(0, $grand - $paid);
-                    $rcv = $order->received_status ?? 'not_received';
-                    $rcvClass = match($rcv) {
-                        'fully_received' => 'badge-rcv badge-rcv-full',
-                        'partial'        => 'badge-rcv badge-rcv-partial',
-                        default          => 'badge-rcv badge-rcv-none',
-                    };
-                    $statusMainClass = match ($order->status) {
-                        'approved' => 'status-main is-approved',
-                        'cancelled' => 'status-main is-cancelled',
-                        default => 'status-main is-draft',
-                    };
-                    $statusLabel = match ((string) $order->status) {
-                        'approved' => 'Approved',
-                        'cancelled' => 'Cancelled',
-                        'closed' => 'Closed',
-                        default => 'Draft',
-                    };
-                    $rcvLabel = match($rcv) {
-                        'fully_received' => 'Terima lengkap',
-                        'partial' => 'Terima sebagian',
-                        default => 'Belum terima',
-                    };
-                    $payLabel = match($ps) {
-                        'paid' => 'Lunas',
-                        'partial' => 'Bayar sebagian',
-                        default => 'Belum bayar',
-                    };
+                    $idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+                    $rangeDisplay = '';
+                    if (request('from_date') && request('to_date')) {
+                        try {
+                            $f = \Carbon\Carbon::parse(request('from_date'));
+                            $t = \Carbon\Carbon::parse(request('to_date'));
+                            $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1]
+                                . ' – ' . $t->day . ' ' . $idMonths[$t->month-1] . ' ' . $t->year;
+                        } catch (\Exception $e) {
+                            $rangeDisplay = request('from_date') . ' – ' . request('to_date');
+                        }
+                    } elseif (request('from_date')) {
+                        try {
+                            $f = \Carbon\Carbon::parse(request('from_date'));
+                            $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1] . ' ' . $f->year;
+                        } catch (\Exception $e) {
+                            $rangeDisplay = request('from_date');
+                        }
+                    }
                 @endphp
+                <input type="text" id="po-date-range" value="{{ $rangeDisplay }}"
+                    placeholder="Tanggal" autocomplete="off"
+                    class="form-control form-control-sm filter-select" style="cursor:pointer; width:180px;"
+                    data-gf-date="off" readonly />
 
-                <div class="card-po-mobile">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
-                        <div>
-                            <h6 class="mb-0 mono">
-                                <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                                    class="text-decoration-none">
-                                    {{ $order->code }}
-                                </a>
-                            </h6>
-                            <div class="meta mt-1">
-                                <span class="mono">{{ id_date($order->date) }}</span>
-                                @if ($order->supplier)
-                                    <span class="mono">{{ $order->supplier->code }}</span>
-                                @endif
-                                <span>{{ po_order_type_label($order->order_type) }}</span>
-                            </div>
-                        </div>
-
-                        <div class="text-end">
-                            <div class="{{ $statusMainClass }}">{{ $statusLabel }}</div>
-                        </div>
-                    </div>
-
-                    @php
-                        $mobileStatusParts = [$rcvLabel];
-                        if ($grnCount > 0) $mobileStatusParts[] = 'GRN ' . $grnCount;
-                        if (!empty($order->purchase_request_id)) $mobileStatusParts[] = 'PR';
-                    @endphp
-                    <div class="status-meta mt-2">{{ implode(' · ', $mobileStatusParts) }}</div>
-
-                    @if ($canSeeMoney)
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <div class="text-muted meta">Bayar</div>
-                            <div class="text-end">
-                                <span class="{{ $payBadgeClass }}">{{ match($ps) { 'paid' => 'Lunas', 'partial' => 'Sebagian', default => 'Belum' } }}</span>
-                                @if (!empty($order->due_date))
-                                    <div class="text-muted meta mono mt-1">JT: {{ id_date($order->due_date) }}</div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <div>
-                                <div class="text-muted meta mb-1">Total</div>
-                                <div class="amount mono">{{ rupiah($order->grand_total) }}</div>
-                            </div>
-                            <div class="text-end">
-                                <div class="text-muted meta mb-1">Sisa</div>
-                                <div class="amount mono fw-semibold">{{ rupiah($bal) }}</div>
-                            </div>
-                        </div>
-                    @endif
-
-                    <div class="d-flex justify-content-end gap-1 mt-2 actions">
-                        <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                            class="btn btn-outline-secondary btn-sm px-2" title="Detail">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                        @if ($order->status === 'draft')
-                            <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
-                                class="btn btn-outline-primary btn-sm px-2" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                        @endif
-                    </div>
-                </div>
-            @empty
-                <div class="text-center text-muted py-3 small">Belum ada Purchase Order.</div>
-            @endforelse
-
-            <div class="mt-2">
-                {{ $orders->links() }}
-            </div>
-        </div>
+                @if (request()->filled('q') || request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
+                    <a href="{{ route('purchasing.purchase_orders.index') }}"
+                       class="btn btn-sm btn-ship-outline btn-pill">
+                        Reset
+                    </a>
+                @endif
+            </form>
     </div>
+
+    <div class="card card-main">
+        <div class="card-body p-0">
+            @if ($orders->count() === 0)
+                <div class="empty">Belum ada Purchase Order.</div>
+            @else
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-list mb-0">
+                    <thead>
+                    <tr>
+                        <th style="width: 46px;" class="mobile-hide">#</th>
+                        <th style="width: 130px;">
+                            <a href="{{ $sortUrl('date') }}" class="th-sort {{ $sortCol === 'date' ? 'active' : '' }}">
+                                Tanggal {{ $sortIcon('date') }}
+                            </a>
+                        </th>
+                        <th style="width: 160px;">PO</th>
+                        <th>
+                            <a href="{{ $sortUrl('supplier_id') }}" class="th-sort {{ $sortCol === 'supplier_id' ? 'active' : '' }}">
+                                Supplier {{ $sortIcon('supplier_id') }}
+                            </a>
+                        </th>
+                        @if ($canSeeMoney)
+                            <th class="text-end" style="width: 140px;">
+                                <a href="{{ $sortUrl('grand_total') }}" class="th-sort {{ $sortCol === 'grand_total' ? 'active' : '' }}">
+                                    Total Rp {{ $sortIcon('grand_total') }}
+                                </a>
+                            </th>
+                        @endif
+                        <th style="width: 140px;">Status</th>
+                        <th style="width: 90px;" class="mobile-hide"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($orders as $order)
+                        @php
+                            $grnCount = $order->purchaseReceipts?->count() ?? 0;
+                            $ps = (string) ($order->payment_status ?? 'unpaid');
+                            $payBadgeClass = $payBadge($ps);
+                            $rcv = $order->received_status ?? 'not_received';
+                            $rcvClass = match($rcv) {
+                                'fully_received' => 'badge-rcv badge-rcv-full',
+                                'partial'        => 'badge-rcv badge-rcv-partial',
+                                default          => 'badge-rcv badge-rcv-none',
+                            };
+                            
+                            $uiStatus = $order->status;
+                            $statusClass = match ($uiStatus) {
+                                'approved' => 'st-approved',
+                                'cancelled' => 'st-cancelled',
+                                default => 'st-draft',
+                            };
+                            $statusLabel = match ((string) $uiStatus) {
+                                'approved' => 'Approved',
+                                'cancelled' => 'Cancelled',
+                                default => 'Draft',
+                            };
+                            $rcvLabel = match($rcv) {
+                                'fully_received' => 'Masuk Gudang',
+                                'partial' => 'Masuk Sebagian',
+                                default => 'Belum Masuk',
+                            };
+                            $payLabel = match($ps) {
+                                'paid' => 'Lunas',
+                                'partial' => 'Bayar sebagian',
+                                default => 'Belum bayar',
+                            };
+
+                            $actionRoute = $uiStatus === 'draft'
+                                ? route('purchasing.purchase_orders.edit', $order->id)
+                                : route('purchasing.purchase_orders.show', $order->id);
+                            $actionLabel = $uiStatus === 'draft' ? 'Lanjutkan' : 'Detail';
+                        @endphp
+
+                        <tr>
+                            <td class="text-muted small mobile-hide">
+                                {{ ($orders->currentPage() - 1) * $orders->perPage() + $loop->iteration }}
+                            </td>
+
+                            <td class="small mobile-hide mono">{{ id_date($order->date) }}</td>
+
+                            <td>
+                                <div class="ship-row-main">
+                                    <div>
+                                        <a class="code-link mono" style="font-size:.84rem;" href="{{ $actionRoute }}">
+                                            {{ $order->code }}
+                                        </a>
+
+                                        <div class="muted mt-1" style="font-size: .78rem;">
+                                            @php
+                                                $subParts = [];
+                                                if ($canSeeMoney) $subParts[] = $payLabel;
+                                                if ($grnCount > 0) $subParts[] = 'GRN ' . $grnCount;
+                                                if (!empty($order->purchase_request_id)) $subParts[] = 'PR';
+                                                if (!empty($order->due_date) && $canSeeMoney) $subParts[] = 'JT: ' . id_date($order->due_date);
+                                            @endphp
+                                            {{ implode(' · ', $subParts) }}
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end d-md-none gap-1">
+                                        <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
+                                        @if ($rcv === 'fully_received')
+                                            <span class="badge-rcv badge-rcv-full fw-semibold" style="font-size: .62rem; padding: .15rem .45rem;"><i class="bi bi-check2-all me-1"></i>Masuk Gudang</span>
+                                        @elseif ($rcv === 'partial')
+                                            <span class="badge-rcv badge-rcv-partial fw-semibold" style="font-size: .62rem; padding: .15rem .45rem;"><i class="bi bi-box-seam me-1"></i>Masuk Sebagian</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="supplier-name">{{ optional($order->supplier)->name ?? '—' }}</div>
+                                <div class="muted">{{ optional($order->supplier)->code ?? '' }} · {{ po_order_type_label($order->order_type) }}</div>
+                                <div class="ship-row-meta d-md-none">
+                                    <span class="mono">{{ id_date($order->date) }}</span>
+                                </div>
+                            </td>
+
+                            @if($canSeeMoney)
+                                <td class="text-end mobile-hide">
+                                    <span class="fw-semibold mono">Rp {{ number_format($order->grand_total, 0, ',', '.') }}</span>
+                                </td>
+                            @endif
+
+                            <td class="mobile-hide">
+                                <div><span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span></div>
+                                @if ($rcv === 'fully_received')
+                                    <div class="mt-1"><span class="badge-rcv badge-rcv-full fw-semibold" style="font-size: .62rem; padding: .15rem .45rem;"><i class="bi bi-check2-all me-1"></i>Masuk Gudang</span></div>
+                                @elseif ($rcv === 'partial')
+                                    <div class="mt-1"><span class="badge-rcv badge-rcv-partial fw-semibold" style="font-size: .62rem; padding: .15rem .45rem;"><i class="bi bi-box-seam me-1"></i>Masuk Sebagian</span></div>
+                                @endif
+                            </td>
+
+                            <td class="text-end ship-row-action mobile-hide">
+                                <a href="{{ $actionRoute }}" class="btn btn-sm btn-ship-outline btn-pill">
+                                    {{ $actionLabel }}
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="divider"></div>
+        <div class="p-3">
+            {{ $orders->links() }}
+        </div>
+        @endif
+    </div>
+</div>
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    // Auto-focus ke input cari saat halaman dibuka (kursor di akhir teks)
+    const searchInput = document.querySelector('input[name="q"].search-input')
+        || document.querySelector('input[name="q"]');
+    if (searchInput) {
+        setTimeout(function () {
+            searchInput.focus();
+            const len = searchInput.value.length;
+            try { searchInput.setSelectionRange(len, len); } catch (e) {}
+        }, 100);
+    }
+
     // Row click via data-href (safer than inline onclick)
     document.querySelectorAll('tr.po-row').forEach(function (row) {
         row.addEventListener('click', function (e) {

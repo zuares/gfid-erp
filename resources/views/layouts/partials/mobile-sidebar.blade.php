@@ -760,7 +760,7 @@
                                 @if ($router->has('marketplace.chat'))
                                     <a href="{{ route('marketplace.chat') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.chat') ? 'active' : '' }}">
-                                        <span class="icon">💬</span><span>Chat</span>
+                                        <span class="icon">💬</span><span>Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none; font-size:.65rem; padding:.2rem .4rem;"></span></span>
                                     </a>
                                 @endif
 

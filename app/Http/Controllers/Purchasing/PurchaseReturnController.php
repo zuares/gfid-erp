@@ -78,12 +78,60 @@ class PurchaseReturnController extends Controller
         return view('purchasing.purchase_returns.index', compact('returns', 'summary', 'search', 'status'));
     }
 
-    public function createFromGrn(PurchaseReceipt $purchase_receipt)
+    public function searchGrnForReturn(Request $request)
+    {
+        $term = trim((string) $request->query('q', ''));
+        $supplierId = (int) $request->query('supplier_id', 0);
+
+        // Cari GRN yang statusnya posted (dokumen penerimaan yang bisa diretur).
+        $query = \App\Models\PurchaseReceipt::with('supplier')
+            ->where('status', 'posted');
+
+        // Flow supplier-first: batasi ke supplier terpilih.
+        if ($supplierId > 0) {
+            $query->where('supplier_id', $supplierId);
+        }
+
+        if ($term !== '') {
+            $query->where(function ($q) use ($term) {
+                $q->where('code', 'LIKE', "%{$term}%")
+                  ->orWhere('surat_jalan_no', 'LIKE', "%{$term}%")
+                  ->orWhereHas('supplier', function ($sq) use ($term) {
+                      $sq->where('name', 'LIKE', "%{$term}%")
+                         ->orWhere('code', 'LIKE', "%{$term}%");
+                  });
+            });
+        }
+
+        $results = $query->orderByDesc('date')->orderByDesc('id')->limit(30)->get()->map(function ($grn) {
+            $supplier = $grn->supplier->name ?? 'Supplier -';
+            $sj = $grn->surat_jalan_no ? " · SJ {$grn->surat_jalan_no}" : '';
+            $date = $grn->date ? \Illuminate\Support\Carbon::parse($grn->date)->format('d/m/Y') : '';
+            return [
+                'id'   => $grn->id,
+                'text' => trim("{$grn->code} — {$supplier}{$sj}" . ($date ? " · {$date}" : '')),
+            ];
+        });
+
+        return response()->json(['results' => $results]);
+    }
+
+    public function createFromGrn(Request $request, PurchaseReceipt $purchase_receipt)
     {
         $purchase_receipt->loadMissing(['lines.item', 'order', 'supplier', 'warehouse']);
 
         if ($purchase_receipt->status !== 'posted') {
             return back()->with('error', 'Return hanya boleh dari GRN yang sudah POSTED.');
+        }
+
+        // Tanggal retur (opsional dari modal); fallback ke hari ini.
+        $returnDate = now()->toDateString();
+        if ($request->filled('date')) {
+            try {
+                $returnDate = \Illuminate\Support\Carbon::parse($request->input('date'))->toDateString();
+            } catch (\Throwable $e) {
+                $returnDate = now()->toDateString();
+            }
         }
 
         // Dedup: kalau sudah ada draft aktif (belum posted, belum void) untuk GRN ini,
@@ -104,10 +152,10 @@ class PurchaseReturnController extends Controller
         $remainingMap = $this->remainingByGrnLine($purchase_receipt);
 
         try {
-            $ret = DB::transaction(function () use ($purchase_receipt, $remainingMap) {
+            $ret = DB::transaction(function () use ($purchase_receipt, $remainingMap, $returnDate) {
                 $ret = PurchaseReturn::create([
                     'code' => CodeGenerator::generate('PRTN'),
-                    'date' => now()->toDateString(),
+                    'date' => $returnDate,
                     'purchase_receipt_id' => (int) $purchase_receipt->id,
                     'purchase_order_id' => (int) ($purchase_receipt->purchase_order_id ?? $purchase_receipt->order?->id ?? 0) ?: null,
                     'supplier_id' => (int) ($purchase_receipt->supplier_id ?? $purchase_receipt->supplier?->id ?? 0) ?: null,

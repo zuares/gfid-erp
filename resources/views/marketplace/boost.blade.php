@@ -35,10 +35,11 @@
     /* ── Tabs ── */
     .ord-tabs {
         display: flex; gap: .5rem; flex-wrap: wrap;
-        background: #ffffff; padding: .7rem; border-radius: 12px; margin-bottom: 1.25rem;
+        background: rgba(255, 255, 255, 0.9); padding: .7rem; border-radius: 12px; margin-bottom: 1.25rem;
         border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+        position: sticky; top: 68px; z-index: 290; backdrop-filter: blur(12px);
     }
-    body[data-theme="dark"] .ord-tabs { background: rgba(15, 23, 42, 0.4); border-color: rgba(255,255,255,0.1); }
+    body[data-theme="dark"] .ord-tabs { background: rgba(15, 23, 42, 0.7); border-color: rgba(255,255,255,0.1); }
     .ord-tab {
         display: flex; align-items: center; gap: .45rem;
         background: #f8fafc; border: 1px solid #f1f5f9; padding: .45rem .85rem;
@@ -89,15 +90,30 @@
     .muted{ font-size:.74rem; color:#6b7280; }
 
     /* ── Slots ── */
-    .bo-slots{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; padding: 1rem; }
-    .bo-slot{ width:48px; height:48px; border-radius:12px; border:2px dashed rgba(148,163,184,.4); display:flex; align-items:center; justify-content:center; font-size:1.1rem; color:#cbd5e1; }
-    .bo-slot.filled{ border-style:solid; border-color:#ea580c; background:rgba(234,88,12,.08); color:#ea580c; }
+    .bo-slots{ display:flex; gap:1.25rem; flex-wrap:wrap; align-items:center; padding: 1.5rem 1rem; }
+    .bo-slot{ width:64px; height:64px; border-radius:16px; border:2px dashed rgba(148,163,184,.5); display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:#cbd5e1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: #f8fafc; }
+    .bo-slot.empty { cursor: pointer; transition: all 0.2s; }
+    .bo-slot.empty:hover { background: #f1f5f9; border-color: rgba(148,163,184,.8); transform: translateY(-2px); }
     
-    .bo-chip{ display:flex; align-items:center; gap:.6rem; border:1px solid rgba(15,23,42,.1); border-radius:12px; padding:.5rem .7rem; background:#f8fafc; width:100%; max-width:320px; }
+    .chip-time { border: 1px solid #cbd5e1; background: #fff; padding: .4rem .85rem; border-radius: 8px; font-size: .85rem; font-weight: 700; color: #475569; cursor: pointer; transition: all .2s; user-select: none; }
+    .chip-time:hover { background: #f8fafc; border-color: #94a3b8; }
+    .chip-time.active { background: var(--prd-accent); border-color: var(--prd-accent); color: #fff; box-shadow: 0 4px 8px rgba(234,88,12,.25); transform: translateY(-1px); }
+    body[data-theme="dark"] .chip-time { background: #1e293b; border-color: rgba(51,65,85,.6); color: #cbd5e1; }
+    body[data-theme="dark"] .chip-time.active { color: #fff; }
+
+    .bo-chip{ display:flex; align-items:center; gap:.8rem; border:1px solid rgba(15,23,42,.06); border-radius:16px; padding:.75rem; background:#fff; width:100%; max-width:320px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: transform 0.2s; }
+    .bo-chip:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color:rgba(15,23,42,.12); }
     body[data-theme="dark"] .bo-chip{ background:#1e293b; border-color:rgba(51,65,85,.6); }
-    .bo-chip img{ width:38px; height:38px; border-radius:8px; object-fit:cover; background:#e2e8f0; }
-    .bo-chip .nm{ font-size:.8rem; font-weight:700; line-height:1.2; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .bo-chip .rm{ font-size:.7rem; color:#ea580c; font-weight:700; margin-top:.15rem; }
+    .bo-chip img{ width:48px; height:48px; border-radius:10px; object-fit:cover; background:#e2e8f0; }
+    .bo-chip .nm{ font-size:.85rem; font-weight:700; line-height:1.3; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-chip .rm{ font-size:.75rem; color:#ea580c; font-weight:800; margin-top:.3rem; background: rgba(234,88,12,0.1); padding: 2px 8px; border-radius: 6px; display: inline-block; }
+
+    .pick-prd-item { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; }
+    .pick-prd-item:hover { background: #f8fafc; }
+    body[data-theme="dark"] .pick-prd-item { border-color: rgba(255,255,255,0.05); }
+    body[data-theme="dark"] .pick-prd-item:hover { background: rgba(255,255,255,0.02); }
+    .pick-prd-item img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+    .pick-prd-item .nm { font-size: .8rem; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--prd-text); }
 
     .btn-action { font-size: .72rem; padding: .25rem .6rem; border-radius: 6px; font-weight: 600; }
     .btn-outline-orange { color: #ea580c; border: 1px solid rgba(234,88,12,.4); background: rgba(234,88,12,.05); }
@@ -111,8 +127,55 @@
     .time-pill { background: rgba(37,99,235,.1); color: #1d4ed8; padding: .25rem .5rem; border-radius: 999px; font-size: .7rem; font-weight: 700; display: inline-flex; align-items:center; margin-right: .3rem; margin-bottom: .3rem; }
     .time-pill.off { opacity: .5; background: rgba(148,163,184,.2); color: #64748b; }
 
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
+    .tab-pane { display: none; opacity: 0; }
+    .tab-pane.active { display: block; animation: fadeInTab 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+    @keyframes fadeInTab { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Skeleton Loaders ── */
+    .skel-tr td { position: relative; overflow: hidden; }
+    .skel-tr td::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent); animation: skeleton-sweep 1.2s infinite; }
+    body[data-theme="dark"] .skel-tr td::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); }
+    .skel-block { height: 14px; background: #e2e8f0; border-radius: 6px; margin-bottom: 6px; }
+    body[data-theme="dark"] .skel-block { background: #334155; }
+    .skel-av { width: 48px; height: 48px; background: #e2e8f0; border-radius: 10px; flex-shrink: 0; }
+    body[data-theme="dark"] .skel-av { background: #334155; }
+    @keyframes skeleton-sweep { 100% { left: 200%; } }
+
+    /* ── Mobile Responsiveness ── */
+    @media (max-width: 768px) {
+        .prd-topbar { flex-direction: column; align-items: stretch; padding: .75rem; }
+        .controls { width: 100%; flex-direction: column; align-items: stretch; margin-top: .5rem; gap: .75rem; }
+        .controls .filter-select { max-width: 100%; text-align: center; padding: .6rem; font-size: .85rem; border: 2px solid var(--prd-accent); background: rgba(234,88,12,.05); color: var(--prd-accent); box-shadow: 0 4px 6px -1px rgba(234,88,12,.1); }
+        .controls .btn-prd-outline { width: 100%; text-align: center; padding: .6rem; }
+        
+        /* Jadikan tombol tab full width (Grid 2 kolom agar proporsional dan tidak terlalu memakan tinggi layar) */
+        .ord-tabs { 
+            top: 160px; /* Adjust sticky point for mobile */ 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 8px; 
+            padding: 8px; 
+        }
+        .ord-tab { 
+            width: 100%; 
+            justify-content: center; 
+            font-size: .75rem; 
+            padding: .6rem .25rem; 
+        }
+
+        .filter-search { max-width: 100%; }
+        .bo-slots { justify-content: center; }
+        .bo-chip { max-width: 100%; }
+        
+        /* Mobile Table to Card List */
+        .table-list thead { display: none; }
+        .table-list tr { display: flex; flex-direction: column; padding: 1rem; border-bottom: 1px solid var(--prd-border); gap: .5rem; position: relative; }
+        .table-list td { padding: 0 !important; border: none !important; width: 100% !important; text-align: left !important; }
+        .table-list td:last-child > div { flex-direction: row; width: 100%; gap: .4rem !important; }
+        .table-list td:last-child > div > .btn-action { flex: 1; justify-content: center; padding: .6rem .25rem; font-size: .7rem; }
+        .btn-action span { display: inline-block; } /* Tampilkan teks tombol */
+        .badge.bg-warning { position: absolute; top: 1rem; right: 1rem; font-size: .65rem; }
+    }
 </style>
 @endpush
 
@@ -183,25 +246,25 @@
 
     {{-- Tab: Jadwal & Rotasi --}}
     <div id="tab-sched" class="tab-pane">
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <div class="card-main" style="height:100%;">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card-main" style="height:100%; margin-bottom:0;">
                     <div class="card-header-styled">
                         <div><i class="bi bi-clock"></i> Jadwal Jam-Tetap</div>
                     </div>
-                    <div style="padding:1rem;">
-                        <div style="font-size:.75rem; color:#64748b; margin-bottom:1rem;">Produk dinaikkan otomatis tiap hari pada jam yang ditentukan.</div>
+                    <div style="padding:1.25rem;">
+                        <div style="font-size:.78rem; color:#64748b; margin-bottom:1rem; line-height: 1.4;">Produk dinaikkan otomatis setiap hari pada jam yang telah ditentukan secara persis.</div>
                         <div id="scheduleList"></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 mb-3">
-                <div class="card-main" style="height:100%;">
+            <div class="col-md-6">
+                <div class="card-main" style="height:100%; margin-bottom:0;">
                     <div class="card-header-styled">
-                        <div><i class="bi bi-arrow-repeat"></i> Antrian Rotasi (Pool)</div>
+                        <div><i class="bi bi-arrow-repeat"></i> Antrean Rotasi (Pool)</div>
                     </div>
-                    <div style="padding:1rem;">
-                        <div style="font-size:.75rem; color:#64748b; margin-bottom:1rem;">Digilir mengisi slot kosong tiap 4 jam. Yang terlama belum naik mendapat giliran duluan.</div>
+                    <div style="padding:1.25rem;">
+                        <div style="font-size:.78rem; color:#64748b; margin-bottom:1rem; line-height: 1.4;">Digilir untuk mengisi slot yang kosong setiap 4 jam. Produk yang paling lama belum dinaikkan akan mendapat prioritas giliran duluan.</div>
                         <div id="poolList"></div>
                     </div>
                 </div>
@@ -236,19 +299,54 @@
   <div class="modal-dialog modal-sm modal-dialog-centered">
     <div class="modal-content" style="border-radius:14px; border:none; box-shadow:0 10px 30px rgba(0,0,0,.15);">
       <div class="modal-header border-0 pb-1">
-        <h6 class="modal-title fw-bold">Atur Jadwal</h6>
+        <h6 class="modal-title fw-bold">📅 Jadwal Harian Otomatis</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body pt-1">
         <input type="hidden" id="schedPid">
-        <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:.75rem;">Pilih jam untuk menaikkan produk ini tiap harinya:</label>
-            <div id="schedTimesModal" style="display:flex; flex-direction:column; gap:.5rem;">
-                <input type="time" class="form-control" value="08:00">
-            </div>
-            <button class="btn btn-sm text-primary p-0 mt-2" onclick="addTimeFieldModal()" style="font-size:.75rem; font-weight:600;"><i class="bi bi-plus-circle"></i> Tambah Jam</button>
+        <div style="font-size:.75rem; color:#64748b; margin-bottom:1rem; line-height:1.4;">
+            Pilih jam berapa saja produk ini akan dinaikkan setiap harinya. (Saran: Jeda antar jam minimal 4 jam)
         </div>
+        
+        <div class="mb-3">
+            <label class="form-label text-dark" style="font-size:.78rem; font-weight:700;">Pilihan Cepat (Disarankan)</label>
+            <div id="schedChips" style="display:flex; flex-wrap:wrap; gap:.5rem;">
+                <div class="chip-time" onclick="toggleTimeChip(this, '08:00')">08:00</div>
+                <div class="chip-time" onclick="toggleTimeChip(this, '12:00')">12:00</div>
+                <div class="chip-time" onclick="toggleTimeChip(this, '16:00')">16:00</div>
+                <div class="chip-time" onclick="toggleTimeChip(this, '20:00')">20:00</div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-dark" style="font-size:.78rem; font-weight:700;">+ Waktu Spesifik (Opsional)</label>
+            <input type="time" id="customSchedTime" class="form-control form-control-sm" onchange="checkSchedWarning()">
+        </div>
+
+        <div id="warnSched" class="alert alert-warning" style="display:none; font-size:.7rem; padding:.5rem .75rem; margin-bottom:1rem; border-radius:8px;">
+            ⚠️ <b>Jeda Terlalu Dekat:</b> Ada jadwal dengan selisih kurang dari 4 jam. Fitur Boost berdurasi 4 jam, sehingga jadwal berdekatan mungkin ditolak oleh sistem.
+        </div>
+
         <button class="btn btn-prd-primary w-100 btn-pill" onclick="saveScheduleModal()">Simpan Jadwal</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal Pilih Produk untuk Boost -->
+<div class="modal fade" id="modalPickBoost" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius:14px; border:none; box-shadow:0 10px 30px rgba(0,0,0,.15);">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-bold">Pilih Produk untuk Dinaikkan</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div style="padding: .5rem 1rem;">
+            <input type="text" id="pickSearch" class="form-control form-control-sm" placeholder="Cari nama produk..." onkeyup="renderPickList()">
+        </div>
+        <div id="pickBoostList" style="max-height: 400px; overflow-y: auto; padding-bottom: .5rem;">
+            <!-- Render list here -->
+        </div>
       </div>
     </div>
   </div>
@@ -323,6 +421,16 @@
             switchTab(activeTab);
             return;
         }
+        
+        // Tampilkan Skeleton Loaders
+        $('slotCount').textContent = '';
+        $('slotBar').innerHTML = Array(5).fill('<div class="bo-slot" style="border:none;"><div class="skel-av skel-tr" style="width:100%;height:100%;border-radius:14px;background:#e2e8f0;border:none;"></div></div>').join('');
+        $('boostedList').innerHTML = Array(2).fill('<div class="bo-chip skel-tr" style="border:none;box-shadow:none;"><div class="skel-av"></div><div style="flex:1"><div class="skel-block" style="width:80%"></div><div class="skel-block" style="width:40%"></div></div></div>').join('');
+        $('allProductsBody').innerHTML = Array(5).fill(0).map(()=>`<tr class="skel-tr"><td><div style="display:flex;gap:.75rem;align-items:center"><div class="skel-av"></div><div style="flex:1"><div class="skel-block" style="width:70%"></div><div class="skel-block" style="width:40%;margin-bottom:0"></div></div></div></td><td><div class="skel-block" style="width:50%;margin-bottom:0"></div></td><td><div class="skel-block" style="width:80px;margin-left:auto;margin-bottom:0"></div></td></tr>`).join('');
+        $('scheduleList').innerHTML = '<div class="skel-block" style="width:100%;height:40px;border-radius:8px;"></div>';
+        $('poolList').innerHTML = '<div class="skel-block" style="width:100%;height:40px;border-radius:8px;"></div>';
+        $('logList').innerHTML = Array(3).fill(0).map(()=>`<tr class="skel-tr"><td><div class="skel-block" style="width:60%"></div></td><td><div class="skel-block" style="width:40%"></div></td><td><div class="skel-block" style="width:80%"></div></td><td><div class="skel-block" style="width:50%"></div></td></tr>`).join('');
+
         await loadStatus(); // load status first so renderAllProducts has statusData
         await loadProducts();
         switchTab(activeTab); // refresh current tab
@@ -362,7 +470,13 @@
         $('slotCount').textContent = `(${used}/${max})`;
         
         let bar = '';
-        for (let i = 0; i < max; i++) bar += `<div class="bo-slot ${i < used ? 'filled' : ''}">${i < used ? '🚀' : ''}</div>`;
+        for (let i = 0; i < max; i++) {
+            if (i < used) {
+                bar += `<div class="bo-slot filled">🚀</div>`;
+            } else {
+                bar += `<div class="bo-slot empty" onclick="openPickBoostModal()" title="Klik untuk memilih produk">+</div>`;
+            }
+        }
         $('slotBar').innerHTML = bar;
 
         $('boostedList').innerHTML = (statusData.items || []).length
@@ -375,6 +489,47 @@
                     </div>
                 </div>`).join('')
             : '<span class="text-muted" style="font-size:.8rem;">Belum ada produk yang dinaikkan.</span>';
+    }
+
+    let pickBoostModalInstance = null;
+
+    function openPickBoostModal() {
+        if (!products || !products.length) {
+            toast('Silakan tunggu data produk dimuat atau pastikan toko memiliki produk.', 'warning');
+            return;
+        }
+        $('pickSearch').value = '';
+        renderPickList();
+        if (!pickBoostModalInstance) pickBoostModalInstance = new bootstrap.Modal($('modalPickBoost'));
+        pickBoostModalInstance.show();
+    }
+
+    function renderPickList() {
+        const q = $('pickSearch').value.toLowerCase();
+        const boostedMap = {};
+        (statusData.items || []).forEach(it => boostedMap[it.id] = it);
+        
+        // Filter produk yang statusnya NORMAL dan belum diboost
+        let list = products.filter(p => p.item_status === 'NORMAL' && !boostedMap[p.id]);
+        if (q) list = list.filter(p => (p.item_name || '').toLowerCase().includes(q));
+
+        if (!list.length) {
+            $('pickBoostList').innerHTML = `<div class="text-center py-4 text-muted" style="font-size:.8rem;">Tidak ada produk tersedia.</div>`;
+            return;
+        }
+
+        $('pickBoostList').innerHTML = list.map(p => `
+            <div class="pick-prd-item" onclick="pickBoostAction(${p.id})">
+                ${p.image_url ? `<img src="${esc(p.image_url)}">` : `<div style="width:40px;height:40px;background:#e2e8f0;border-radius:8px;"></div>`}
+                <div class="nm" title="${esc(p.item_name)}">${esc(p.item_name)}</div>
+                <button class="btn btn-sm btn-prd-outline" style="padding:.25rem .6rem;font-size:.7rem;border-radius:6px;">Pilih</button>
+            </div>
+        `).join('');
+    }
+
+    async function pickBoostAction(pid) {
+        if (pickBoostModalInstance) pickBoostModalInstance.hide();
+        await quickBoost(pid);
     }
 
     // ── All Products Tab ──
@@ -411,13 +566,13 @@
                     </div>
                 </td>
                 <td>
-                    ${isBoosted ? `<span class="badge bg-warning text-dark"><i class="bi bi-rocket-takeoff"></i> Sedang Naik (${rmLabel})</span>` : `<span class="text-muted" style="font-size:.75rem;">-</span>`}
+                    ${isBoosted ? `<span class="badge bg-warning text-dark"><i class="bi bi-rocket-takeoff"></i> <span class="rm-text">Sedang Naik (${rmLabel})</span></span>` : `<span class="text-muted d-none d-md-block" style="font-size:.75rem;">-</span>`}
                 </td>
                 <td style="text-align:right; white-space:nowrap;">
                     <div style="display:flex; gap:.3rem; justify-content:flex-end;">
-                        <button class="btn btn-action btn-outline-orange" onclick="quickBoost(${p.id})" title="Naikkan Sekarang"><i class="bi bi-rocket"></i> Naikkan</button>
-                        <button class="btn btn-action btn-outline-secondary" onclick="openSchedModal(${p.id})" title="Atur Jadwal (Tiap Hari)"><i class="bi bi-calendar-check"></i> Jadwal</button>
-                        <button class="btn btn-action btn-outline-secondary" onclick="addPool(${p.id})" title="Masukkan ke Antrian Rotasi (Gilir)"><i class="bi bi-arrow-repeat"></i> Rotasi</button>
+                        <button class="btn btn-action btn-outline-orange" onclick="quickBoost(${p.id})" title="Naikkan Sekarang"><i class="bi bi-rocket"></i> <span>Naikkan</span></button>
+                        <button class="btn btn-action btn-outline-secondary" onclick="openSchedModal(${p.id})" title="Atur Jadwal (Tiap Hari)"><i class="bi bi-calendar-check"></i> <span>Jadwal</span></button>
+                        <button class="btn btn-action btn-outline-secondary" onclick="addPool(${p.id})" title="Masukkan ke Antrian Rotasi (Gilir)"><i class="bi bi-arrow-repeat"></i> <span>Rotasi</span></button>
                     </div>
                 </td>
             </tr>`;
@@ -436,18 +591,52 @@
     // Modal Schedule
     function openSchedModal(pid) {
         $('schedPid').value = pid;
-        $('schedTimesModal').innerHTML = '<input type="time" class="form-control" value="08:00">';
+        document.querySelectorAll('#schedChips .chip-time').forEach(el => el.classList.remove('active'));
+        $('customSchedTime').value = '';
+        $('warnSched').style.display = 'none';
         new bootstrap.Modal($('modalSched')).show();
     }
-    function addTimeFieldModal() {
-        const div = document.createElement('div');
-        div.innerHTML = '<input type="time" class="form-control" value="12:00">';
-        $('schedTimesModal').appendChild(div.firstElementChild);
+    
+    function toggleTimeChip(el, timeStr) {
+        el.classList.toggle('active');
+        checkSchedWarning();
     }
+
+    function checkSchedWarning() {
+        const chips = [...document.querySelectorAll('#schedChips .chip-time.active')].map(el => el.innerText.trim());
+        const custom = $('customSchedTime').value;
+        const allTimes = [...chips];
+        if (custom) allTimes.push(custom);
+        
+        let tooClose = false;
+        if (allTimes.length > 1) {
+            const minutes = allTimes.map(t => {
+                const [h,m] = t.split(':').map(Number);
+                return h * 60 + m;
+            }).sort((a,b)=>a-b);
+            
+            for (let i = 1; i < minutes.length; i++) {
+                if (minutes[i] - minutes[i-1] < 240) { tooClose = true; break; }
+            }
+            if (!tooClose && (minutes[0] + 1440 - minutes[minutes.length-1] < 240)) {
+                tooClose = true;
+            }
+        }
+        $('warnSched').style.display = tooClose ? 'block' : 'none';
+    }
+
     async function saveScheduleModal() {
         const pid = parseInt($('schedPid').value);
-        const times = [...document.querySelectorAll('#schedTimesModal input[type="time"]')].map(i => i.value).filter(Boolean);
-        if (!times.length) return alert('Isi minimal satu jam.');
+        const chips = [...document.querySelectorAll('#schedChips .chip-time.active')].map(el => el.innerText.trim());
+        const custom = $('customSchedTime').value;
+        const times = [...chips];
+        if (custom && !times.includes(custom)) times.push(custom);
+        
+        if (!times.length) {
+            toast('Pilih minimal satu jam.', 'warning');
+            return;
+        }
+        
         try {
             const res = await api(`${API}/boost/schedules`, { method:'POST', body: JSON.stringify({ store_id: storeId(), marketplace_product_id: pid, times }) });
             toast(res.message);

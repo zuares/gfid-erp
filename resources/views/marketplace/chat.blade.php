@@ -25,7 +25,7 @@
 
     /* Layout & Containers */
     .chat-wrap { 
-        display:flex; gap:0; height:calc(100vh - 140px); min-height:540px; 
+        display:flex; gap:0; height:calc(100vh - 180px); min-height:400px; 
         border: 1px solid var(--chat-border); border-radius: 16px; 
         overflow:hidden; background: var(--chat-surface);
         box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01);
@@ -57,20 +57,28 @@
     .chat-pane-head { padding:14px 20px; background: var(--chat-glass); backdrop-filter: blur(12px); border-bottom:1px solid var(--chat-border); display:flex; align-items:center; gap:12px; z-index: 10; }
     
     /* Chat Messages */
-    .chat-msgs { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:12px; z-index: 5; }
-    .msg { max-width:75%; padding:10px 14px; font-size:.875rem; line-height:1.5; word-break:break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .msg.buyer  { background: var(--chat-bubble-buyer); border: 1px solid #e2e8f0; align-self:flex-start; border-radius: 16px 16px 16px 4px; color: var(--chat-text-dark); }
-    .msg.seller { background: var(--chat-bubble-seller); align-self:flex-end; border-radius: 16px 16px 4px 16px; color: #fff; }
-    .msg .msg-time { font-size:.65rem; margin-top:4px; text-align:right; opacity: 0.7; }
-    .msg.seller .msg-time { color: rgba(255,255,255,0.8); }
-    .msg.buyer .msg-time { color: var(--chat-text-muted); }
+    .chat-msgs { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:4px; z-index: 5; scroll-behavior: smooth; position: relative; }
+    .msg { max-width:75%; padding:8px 12px; font-size:.875rem; line-height:1.4; word-break:break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border-radius:12px; margin-bottom:2px; }
+    .msg.buyer  { background: var(--chat-bubble-buyer); border: 1px solid #e2e8f0; align-self:flex-start; color: var(--chat-text-dark); }
+    .msg.seller { background: var(--chat-bubble-seller); align-self:flex-end; border: none; color: #fff; }
+    
+    .msg.msg-first { margin-top: 8px; }
+    .msg.msg-last { margin-bottom: 8px; }
+    .msg.buyer.msg-last { border-bottom-left-radius: 2px; }
+    .msg.seller.msg-last { border-bottom-right-radius: 2px; }
+    
+    .msg .msg-time { font-size:.62rem; margin-top:2px; display:flex; align-items:center; gap:4px; opacity: 0.7; }
+    .msg.seller .msg-time { color: rgba(255,255,255,0.85); justify-content:flex-end; }
+    .msg.buyer .msg-time { color: var(--chat-text-muted); justify-content:flex-end; }
+    .msg-tick { font-size:.6rem; letter-spacing: -2px; margin-right: 2px; }
+    
     .msg img { max-width:240px; border-radius:8px; display:block; margin-top: 4px; }
     
     /* Input Area */
-    .chat-input { padding:16px 20px; background: var(--chat-glass); backdrop-filter: blur(12px); border-top:1px solid var(--chat-border); display:flex; gap:12px; align-items:flex-end; z-index: 10; }
-    .chat-input textarea { flex:1; resize:none; border:2px solid #94a3b8; border-radius:12px; padding:10px 14px; font-size:.875rem; height:46px; transition: all 0.2s; background: #fff; color: #0f172a; font-weight: 500; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
-    .chat-input textarea:focus { outline: none; border-color: var(--chat-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.15), inset 0 2px 4px rgba(0,0,0,0.02); height: 80px; }
-    .chat-input textarea::placeholder { color: #94a3b8; font-weight: 400; }
+    .chat-input { padding:14px 20px; background: var(--chat-glass); backdrop-filter: blur(12px); border-top:1px solid var(--chat-border); display:flex; gap:12px; align-items:flex-end; z-index: 10; }
+    .chat-input textarea { flex:1; resize:none; border:2px solid #94a3b8; border-radius:16px; padding:10px 14px; font-size:.875rem; min-height:44px; max-height:120px; transition: border-color 0.2s, box-shadow 0.2s; background: #fff; color: #0f172a; font-weight: 500; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); line-height: 1.4; overflow-y: auto; }
+    .chat-input textarea:focus { outline: none; border-color: var(--chat-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.15), inset 0 2px 4px rgba(0,0,0,0.02); }
+    .chat-input textarea::placeholder { color: #94a3b8; font-weight: 400; line-height: 1.5; }
     .chat-input button { border-radius: 10px; font-weight: 600; padding: 0 20px; height: 46px; background: var(--chat-primary); border: none; transition: all 0.2s; color: #fff; }
     .chat-input button:hover { background: var(--chat-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
     .chat-input button:active { transform: translateY(0); }
@@ -84,10 +92,44 @@
     .rt-on  { background:#10b981; box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(16, 185, 129, 0.6); } 
     .rt-off { background:#f59e0b; }
     
+    /* Scroll Down Button */
+    .btn-scroll-down { position: absolute; bottom: 85px; right: 20px; width: 38px; height: 38px; background: #fff; border-radius: 50%; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--chat-primary); font-size: 1.2rem; z-index: 15; opacity: 0; pointer-events: none; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(15px); }
+    .btn-scroll-down.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .btn-scroll-down:hover { background: #f8fafc; }
+    
+    /* Skeleton Loader */
+    .skel-item { padding: 12px 16px; display: flex; gap: 12px; border-bottom: 1px solid #f1f5f9; }
+    .skel-av { width: 42px; height: 42px; border-radius: 50%; background: #e2e8f0; flex-shrink:0; position: relative; overflow: hidden; }
+    .skel-body { flex: 1; display: flex; flex-direction: column; gap: 8px; justify-content: center; position: relative; overflow: hidden; }
+    .skel-line { height: 10px; background: #e2e8f0; border-radius: 4px; }
+    .skel-av::after, .skel-line::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: skeleton-sweep 1.2s infinite; }
+    @keyframes skeleton-sweep { 100% { left: 200%; } }
+    
+    .btn-back-list { display:none; align-items:center; justify-content:center; width:36px; height:36px; border:none; background:transparent; font-size:1.2rem; cursor:pointer; color:var(--chat-text-muted); border-radius:50%; margin-right:4px; transition:background 0.2s; }
+    .btn-back-list:hover { background: #f1f5f9; }
+
     @media (max-width: 768px) {
-        .chat-wrap { flex-direction:column; height:calc(100vh - 100px); border-radius: 0; border-left: none; border-right: none; }
-        .chat-list { width:100%; max-height:40vh; }
-        .chat-pane { min-height:50vh; }
+        /* Mencegah body scroll di mobile agar chat terasa seperti aplikasi native */
+        body { overflow: hidden !important; }
+        
+        .chat-wrap { 
+            position: fixed;
+            top: 115px; /* Jarak dari header & judul */
+            bottom: calc(100px + env(safe-area-inset-bottom)) !important; /* Aman dari nav-bottom dan tombol tengahnya */
+            left: 0; right: 0;
+            height: auto !important; 
+            border-radius: 0; border: none; border-top: 1px solid var(--chat-border);
+            z-index: 30;
+            margin: 0 !important;
+            flex-direction: column;
+        }
+        .chat-list { width:100%; height:100%; max-height:none; border-right: none; }
+        .chat-pane { display:none; width:100%; height:100%; min-height:0; }
+        
+        .chat-wrap.show-chat .chat-list { display:none; }
+        .chat-wrap.show-chat .chat-pane { display:flex; }
+        
+        .btn-back-list { display:flex; }
     }
 </style>
 @endpush
@@ -115,18 +157,20 @@
     <div class="chat-pane" id="chatPane">
         <div class="chat-empty" id="chatEmpty">
             <div class="chat-empty-icon">💬</div>
-            <div>Pilih percakapan di sebelah kiri untuk mulai mengobrol</div>
+            <div>Pilih percakapan untuk mulai mengobrol</div>
         </div>
         <div class="chat-pane-head" id="chatHead" style="display:none">
+            <button class="btn-back-list" onclick="closeConversation()" title="Kembali">←</button>
             <div class="conv-avatar" id="chatAvatar">?</div>
-            <div>
-                <div class="conv-name" id="chatName">—</div>
-                <div class="conv-store" id="chatStore">—</div>
+            <div style="min-width:0;">
+                <div class="conv-name" id="chatName" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+                <div class="conv-store" id="chatStore" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
             </div>
         </div>
-        <div class="chat-msgs" id="chatMsgs" style="display:none"></div>
+        <div class="chat-msgs" id="chatMsgs" style="display:none" onscroll="handleChatScroll()"></div>
+        <button id="btnScrollDown" class="btn-scroll-down" onclick="scrollToBottom()">⬇</button>
         <div class="chat-input" id="chatInput" style="display:none">
-            <textarea id="msgText" placeholder="Tulis pesan… (Enter untuk kirim)" onkeydown="onMsgKey(event)"></textarea>
+            <textarea id="msgText" placeholder="Tulis pesan… (Enter untuk kirim)" onkeydown="onMsgKey(event)" oninput="autoGrow(this)"></textarea>
             <button class="btn btn-primary btn-sm px-3" onclick="sendMessage()" id="btnSend">Kirim</button>
         </div>
     </div>
@@ -163,6 +207,17 @@
 
     // ── Conversations ────────────────────────────────────────────────────────
     window.loadConversations = async function (sync = false) {
+        if (!conversations.length && !sync) {
+            // Skeleton Loader jika belum ada data
+            $('convList').innerHTML = Array(4).fill(0).map(() => `
+                <div class="skel-item">
+                    <div class="skel-av"></div>
+                    <div class="skel-body">
+                        <div class="skel-line" style="width: 40%"></div>
+                        <div class="skel-line" style="width: 70%"></div>
+                    </div>
+                </div>`).join('');
+        }
         try {
             conversations = await api(`${API}/conversations${sync ? '?sync=1' : ''}`);
             renderConversations();
@@ -215,6 +270,9 @@
         
         renderConversations();
 
+        // Tampilkan panel chat (khusus mobile akan memicu efek toggle)
+        document.querySelector('.chat-wrap').classList.add('show-chat');
+
         $('chatEmpty').style.display = 'none';
         $('chatHead').style.display = '';
         $('chatMsgs').style.display = '';
@@ -227,13 +285,55 @@
         try {
             const data = await api(`${API}/conversations/${id}/messages${syncFirst ? '?sync=1' : ''}`);
             renderMessages(data.messages);
+            
+            // Otomatis focus ke input setelah pesan dimuat
+            setTimeout(() => {
+                const input = $('msgText');
+                input.focus();
+                if (input.value.length > 0) input.select();
+            }, 100);
+            
             // Tandai terbaca (non-blocking)
             api(`${API}/conversations/${id}/read`, { method: 'POST' }).then(() => {
                 const c = conversations.find(x => x.id === id);
-                if (c) { c.unread_count = 0; renderConversations(); }
+                if (c) { 
+                    c.unread_count = 0; 
+                    renderConversations(); 
+                    if (window.refreshChatBadge) window.refreshChatBadge(false);
+                }
             }).catch(() => {});
         } catch (e) {
             $('chatMsgs').innerHTML = `<div class="text-center text-danger" style="font-size:.75rem">${esc(e.message)}</div>`;
+        }
+    };
+
+    window.closeConversation = function () {
+        document.querySelector('.chat-wrap').classList.remove('show-chat');
+        activeConv = null;
+        pendingCompose = null;
+        window.activeConversationId = null;
+        renderConversations();
+    };
+    
+    window.autoGrow = function (el) {
+        el.style.height = '44px';
+        const newHeight = Math.min(el.scrollHeight, 120);
+        el.style.height = newHeight + 'px';
+    };
+
+    window.scrollToBottom = function () {
+        $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight;
+    };
+
+    window.handleChatScroll = function () {
+        const msgs = $('chatMsgs');
+        const btn = $('btnScrollDown');
+        if (!msgs || !btn) return;
+        // Tampilkan tombol scroll bawah jika jarak ke bawah lebih dari 150px
+        if (msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight > 150) {
+            btn.classList.add('visible');
+        } else {
+            btn.classList.remove('visible');
         }
     };
 
@@ -242,10 +342,11 @@
             $('chatMsgs').innerHTML = '<div class="text-center text-muted" style="font-size:.75rem">Belum ada pesan.</div>';
             return;
         }
-        $('chatMsgs').innerHTML = messages.map(m => {
+        
+        let lastDate = '';
+        $('chatMsgs').innerHTML = messages.map((m, i) => {
             let body = esc(m.text || '');
             if (m.message_type === 'image') {
-                // Spec: content.url = URL penuh; thumb_url hanya hash (bukan URL)
                 const url = (m.content?.url || '').startsWith('http') ? m.content.url : null;
                 body = url ? `<img src="${esc(url)}" loading="lazy">` : '🖼 [gambar]';
             } else if (m.message_type === 'video') {
@@ -259,14 +360,40 @@
             } else if (m.message_type === 'bundle_message' || m.message_type === 'faq_liveagent') {
                 body = '🤖 <i style="opacity:0.8">[FAQ]</i> ' + (m.text ? esc(m.text) : '');
             } else if (!m.text && m.message_type !== 'text') {
-                // Format cantik jika ada tipe pesan lain yang nyasar
                 const niceType = (m.message_type || '').replace(/_/g, ' ');
                 body = `[${esc(niceType)}]`;
             }
-            const t = m.sent_at ? new Date(m.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
-            return `<div class="msg ${m.from_role === 'seller' ? 'seller' : 'buyer'}">${body}<div class="msg-time">${t}</div></div>`;
+            
+            let dateSeparator = '';
+            let t = '';
+            if (m.sent_at) {
+                const d = new Date(m.sent_at);
+                const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+                t = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                
+                if (dateStr !== lastDate) {
+                    dateSeparator = `<div class="date-separator"><span>${dateStr}</span></div>`;
+                    lastDate = dateStr;
+                }
+            }
+            
+            // Logika Grouping (First / Last)
+            const prev = messages[i - 1];
+            const next = messages[i + 1];
+            const sameAsPrev = prev && prev.from_role === m.from_role;
+            const sameAsNext = next && next.from_role === m.from_role;
+            
+            let extraClass = '';
+            if (!sameAsPrev) extraClass += ' msg-first';
+            if (!sameAsNext) extraClass += ' msg-last';
+            
+            const isSeller = m.from_role === 'seller';
+            const roleClass = isSeller ? 'seller' : 'buyer';
+            const tick = isSeller ? `<span class="msg-tick">✓✓</span>` : '';
+            
+            return `${dateSeparator}<div class="msg ${roleClass}${extraClass}">${body}<div class="msg-time">${t}${tick}</div></div>`;
         }).join('');
-        $('chatMsgs').scrollTop = $('chatMsgs').scrollHeight;
+        setTimeout(() => scrollToBottom(), 50);
     }
 
     // ── Kirim pesan ──────────────────────────────────────────────────────────
@@ -301,7 +428,18 @@
                 }
             }
         } catch (e) {
-            alert('Gagal kirim: ' + e.message);
+            let errorMsg = e.message;
+            // Translasi error spesifik dari Shopee
+            if (errorMsg.includes('You can only message the buyer if they start a conversation with you within 7 days')) {
+                errorMsg = 'Sistem Shopee menolak pesan ini. Aturan Shopee: Anda hanya diizinkan membalas jika pembeli chat duluan (maks 7 hari), atau ada pesanan (maks 30 hari).';
+            }
+            
+            if (window.Swal) {
+                window.Swal.fire({ icon: 'warning', title: 'Gagal Terkirim', text: errorMsg, confirmButtonColor: '#3b82f6' });
+            } else {
+                alert('Gagal kirim: ' + errorMsg);
+            }
+            
             // Kalau gagal karena token/koneksi, tampilkan banner re-authorize.
             if (/token|terhubung|authoriz/i.test(e.message)) loadStoreStatus();
         } finally {
@@ -329,6 +467,12 @@
         $('chatMsgs').innerHTML =
             '<div class="text-center text-muted" style="font-size:.75rem;padding:20px">' +
             'Belum ada percakapan dengan pembeli ini.<br>Kirim pesan pertama untuk memulai chat. 👇</div>';
+            
+        setTimeout(() => {
+            const input = $('msgText');
+            input.focus();
+            if (input.value.length > 0) input.select();
+        }, 100);
     }
 
     // ── Realtime via Reverb ──────────────────────────────────────────────────
@@ -397,7 +541,11 @@
                 return;
             }
             $('msgText').value = `Halo kak ${res.buyer_username || ''}, mengenai pesanan ${orderSn} `.trimEnd() + ' ';
-            $('msgText').focus();
+            setTimeout(() => {
+                const input = $('msgText');
+                input.focus();
+                input.select();
+            }, 100);
         } catch (e) { console.warn('Deep-link chat gagal:', e); }
     }
 

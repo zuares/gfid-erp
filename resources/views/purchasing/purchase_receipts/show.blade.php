@@ -5,29 +5,53 @@
 
 @push('head')
 <style>
-  .page-wrap { max-width:1080px; margin-inline:auto; padding-bottom:3rem; }
+  :root{
+    --shp-accent:#334155;
+    --shp-accent-2:#1f2937;
+    --shp-border:rgba(148,163,184,.18);
+    --shp-muted:#64748b;
+  }
+  .page-wrap { max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; }
 
   .mono {
     font-variant-numeric: tabular-nums;
     font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono";
   }
 
+  /* Sticky topbar (selaras shipment) */
+  .ship-topbar{
+    position:sticky; top:0; z-index:300;
+    display:flex; justify-content:space-between; align-items:center;
+    gap:.6rem; flex-wrap:wrap;
+    padding:.55rem .75rem; margin-inline:-.75rem; margin-bottom:.85rem;
+    background:var(--card,#fff); border-bottom:1px solid var(--shp-border);
+  }
+  body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+  .title{ font-weight:750; font-size:1.05rem; margin:0; line-height:1.1; }
+  .topbar-code{ color:var(--shp-muted); font-size:.78rem; margin-top:.2rem; }
+
+  .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+  .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
+  .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
+  .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+  .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+
   /* Cards */
   .card-info {
     background: var(--card);
-    border-radius: 14px;
-    border: 1px solid var(--line);
+    border-radius: 8px;
+    border: 1px solid var(--shp-border);
     padding: 1.1rem 1.2rem;
   }
   .card-section {
     background: var(--card);
-    border-radius: 14px;
-    border: 1px solid var(--line);
+    border-radius: 8px;
+    border: 1px solid var(--shp-border);
     overflow: hidden;
   }
   .card-section-header {
     padding: .6rem 1rem;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--shp-border);
     font-size: .72rem;
     text-transform: uppercase;
     letter-spacing: .07em;
@@ -35,17 +59,23 @@
     font-weight: 600;
   }
 
-  /* Status badges */
+  /* Dot status badges (selaras shipment) */
   .badge-status {
-    border-radius: 999px;
-    font-size: .7rem;
-    padding: .1rem .6rem;
+    border-radius: 7px;
+    font-size: .68rem;
+    padding: .16rem .48rem;
     border: 1px solid transparent;
     white-space: nowrap;
+    display:inline-flex; align-items:center; gap:.35rem;
   }
-  .badge-draft   { background:rgba(148,163,184,.12);color:#64748b;border-color:rgba(148,163,184,.5); }
-  .badge-posted  { background:rgba(22,163,74,.12);color:#15803d;border-color:rgba(22,163,74,.6); }
-  .badge-closed  { background:rgba(15,23,42,.10);color:#334155;border-color:rgba(15,23,42,.25); }
+  .badge-status::before{ content:''; width:7px; height:7px; border-radius:999px; display:inline-block; }
+  .badge-draft   { background:rgba(148,163,184,.10);color:#475569;border-color:rgba(148,163,184,.30); }
+  .badge-draft::before{ background:rgba(100,116,139,.95); }
+  .badge-posted  { background:rgba(34,197,94,.10);color:#166534;border-color:rgba(34,197,94,.30); }
+  .badge-posted::before{ background:rgba(34,197,94,.95); }
+  .badge-closed  { background:rgba(15,23,42,.08);color:#334155;border-color:rgba(15,23,42,.22); }
+  .badge-closed::before{ background:rgba(51,65,85,.95); }
+  body[data-theme="dark"] .badge-posted { color:#dcfce7;border-color:rgba(34,197,94,.55); }
   [data-theme="dark"] .badge-closed { color:#cbd5e1;border-color:rgba(203,213,225,.3); }
 
   /* Info label/value */
@@ -208,35 +238,40 @@
 
 <div class="page-wrap py-4">
 
-    {{-- HEADER --}}
-    <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
+    {{-- HEADER (sticky topbar selaras shipment) --}}
+    <div class="ship-topbar">
       {{-- Kiri --}}
       <div style="min-width:0;">
-        <h2 class="mb-0 lh-1" style="font-size:1.35rem;">Goods Receipt</h2>
-        <div class="text-muted mono mt-1 d-flex align-items-center gap-2" style="font-size:.8rem;">
-          Kode: {{ $receipt->code }}
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="title">Goods Receipt</span>
+          @if ($isPosted)
+            <span class="badge-status badge-posted">Posted</span>
+          @elseif ($isDraft)
+            <span class="badge-status badge-draft">Draft</span>
+          @else
+            <span class="badge-status badge-closed">{{ ucfirst($receipt->status) }}</span>
+          @endif
           @if($receipt->is_replacement)
-            <span class="badge bg-info text-dark rounded-pill" style="font-size:0.7rem; font-family:var(--bs-font-sans-serif);">
-              <i class="bi bi-arrow-repeat me-1"></i> Replacement
-            </span>
+            <span class="badge-status badge-closed"><i class="bi bi-arrow-repeat"></i> Replacement</span>
           @endif
         </div>
+        <div class="topbar-code mono">{{ $receipt->code }}</div>
       </div>
 
       {{-- Kanan: semua aksi sejajar --}}
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-outline-secondary btn-sm">
+        <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-ship-outline btn-pill btn-sm">
           <i class="bi bi-arrow-left me-1"></i>Kembali
         </a>
 
         <a href="{{ route('purchasing.purchase_receipts.barcode', $receipt->id) }}"
-           class="btn btn-outline-dark btn-sm" target="_blank">
+           class="btn btn-ship-outline btn-pill btn-sm" target="_blank">
           <i class="bi bi-upc-scan me-1"></i>Cetak Barcode
         </a>
 
         @if ($isDraft && $canManage)
           <a href="{{ route('purchasing.purchase_receipts.edit', $receipt->id) }}"
-             class="btn btn-outline-primary btn-sm">
+             class="btn btn-ship-outline btn-pill btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
           </a>
 
@@ -252,7 +287,7 @@
           @endif
 
           @if ($isAdmin && !$grnHasPrice)
-            <button type="button" class="btn btn-success btn-sm disabled"
+            <button type="button" class="btn btn-success btn-pill btn-sm disabled"
                     title="Harga belum diisi di PO. Hubungi owner."
                     style="opacity:.5;cursor:not-allowed;">
               <i class="bi bi-check-lg me-1"></i>Post GRN
@@ -261,7 +296,7 @@
             <form action="{{ route('purchasing.purchase_receipts.post', $receipt->id) }}" method="POST"
                   onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');" class="d-inline">
               @csrf
-              <button type="submit" class="btn btn-success btn-sm">
+              <button type="submit" class="btn btn-success btn-pill btn-sm">
                 <i class="bi bi-check-lg me-1"></i>Post GRN
               </button>
             </form>
@@ -271,7 +306,7 @@
         @if ($isPosted && $canManage)
           @if ($primaryDraftReturn && $returnShowRouteName)
             <a href="{{ route($returnShowRouteName, $primaryDraftReturn->id) }}"
-               class="btn btn-return btn-sm"
+               class="btn btn-return btn-pill btn-sm"
                onclick="return confirm('Sudah ada RETURN draft untuk GRN ini. Buka draft return?');">
               <i class="bi bi-arrow-return-left me-1"></i>Lanjut Return
             </a>
@@ -284,7 +319,7 @@
             <form action="{{ route($returnCreateRouteName, $receipt->id) }}" method="POST"
                   onsubmit="return confirm('Buat draft RETURN dari GRN ini?');">
               @csrf
-              <button type="submit" class="btn btn-return btn-sm">
+              <button type="submit" class="btn btn-return btn-pill btn-sm">
                 <i class="bi bi-arrow-return-left me-1"></i>Return
               </button>
             </form>
@@ -295,7 +330,7 @@
           <form action="{{ route('purchasing.purchase_receipts.unpost', $receipt->id) }}" method="POST"
                 onsubmit="return confirm('UNPOST GRN ini? Stok akan dibalik dan jurnal di-void.');">
             @csrf
-            <button type="submit" class="btn btn-outline-danger btn-sm">
+            <button type="submit" class="btn btn-outline-danger btn-pill btn-sm">
               <i class="bi bi-x me-1"></i>Unpost
             </button>
           </form>

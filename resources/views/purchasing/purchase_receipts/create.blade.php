@@ -4,13 +4,50 @@
 
 @push('head')
 <style>
-    .page-wrap { max-width: 1080px; margin-inline: auto; }
+    .shp-wrap { max-width: 1040px; margin-inline: auto; padding: .75rem .75rem 4rem; }
+    .shp-topbar {
+        position: sticky; top: 0; z-index: 300;
+        display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
+        padding: .65rem 1rem; background: var(--card, #fff);
+        border-bottom: 1px solid rgba(148,163,184,.18);
+    }
+    .shp-topbar-code { font-weight: 900; font-size: .95rem; white-space: nowrap; color: #0f172a; }
+    .shp-topbar-spacer { flex: 1; min-width: .5rem; }
+    .shp-badge {
+        border-radius: 7px; padding: .18rem .48rem; font-size: .68rem;
+        background: transparent; color: #64748b;
+        border: 1px solid rgba(148,163,184,.28); white-space: nowrap;
+    }
+    .shp-meta-bar {
+        display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+        padding-bottom: .85rem; margin-bottom: 1rem; margin-top: .5rem;
+        border-bottom: 1px solid rgba(148,163,184,.18);
+    }
+    .shp-meta-code { font-weight: 900; font-size: 1.05rem; color: #0f172a; letter-spacing: -.01em; }
+    .shp-meta-store {
+        display: inline-flex; align-items: center; padding: .18rem .6rem;
+        border-radius: 999px; border: 1px solid rgba(148,163,184,.6);
+        font-size: .75rem; font-weight: 700; color: #475569;
+    }
 
     .card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 14px;
+        background: var(--card, #fff);
+        border: 1px solid rgba(148,163,184,.18);
+        border-radius: 8px;
         overflow: hidden;
+        box-shadow: 0 1px 6px rgba(15,23,42,.07);
+    }
+
+    .form-control,
+    .form-control-sm {
+        border-radius: 8px;
+        border-color: rgba(148,163,184,.35);
+        box-shadow: none !important;
+    }
+    .form-control:focus,
+    .form-control-sm:focus {
+        border-color: rgba(71,85,105,.75);
+        box-shadow: none !important;
     }
 
     .mono {
@@ -34,7 +71,39 @@
     .tag-draft-grn { background:rgba(239,68,68,.08);   color:#b91c1c; border-color:rgba(239,68,68,.35); }
     .tag-po        { background:rgba(148,163,184,.1);  color:#475569; border-color:rgba(148,163,184,.4); }
 
-    .btn-pill { border-radius: 999px; padding-inline: 1rem; }
+    /* ── Button (Selaras Shipment) ── */
+    .btn-shp-primary {
+        background: #334155 !important;
+        border: 1px solid #334155 !important;
+        color: #fff !important;
+        border-radius: 7px !important;
+        letter-spacing: 0;
+        text-transform: none;
+        box-shadow: none !important;
+        padding: .35rem .75rem !important;
+        font-size: .85rem !important;
+        font-weight: 600 !important;
+    }
+    .btn-shp-primary:hover {
+        background: #1f2937 !important;
+        border-color: #1f2937 !important;
+    }
+    .btn-shp-outline {
+        border-radius: 7px !important;
+        letter-spacing: 0;
+        text-transform: none;
+        box-shadow: none !important;
+        padding: .35rem .75rem !important;
+        font-size: .85rem !important;
+        color: #475569 !important;
+        background: transparent !important;
+        border: 1px solid rgba(148,163,184,.35) !important;
+        font-weight: 600 !important;
+    }
+    .btn-shp-outline:hover {
+        background: rgba(148,163,184,.08) !important;
+        color: #111827 !important;
+    }
 
     /* ── Filter bar ── */
     .filter-bar {
@@ -65,20 +134,28 @@
 
     /* ── Table ── */
     thead th {
-        background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+        background: var(--card, #f9fafb);
         position: sticky; top: 0; z-index: 1;
-        font-size: .72rem;
+        font-size: .7rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .05em;
-        color: var(--muted);
-        padding-block: .55rem;
+        color: #6b7280;
+        border-bottom: 1px solid rgba(148,163,184,.18);
+        padding-block: .4rem;
         white-space: nowrap;
     }
-    .table-sm td { padding-block: .5rem; }
+    .table-sm td { padding-block: .35rem; vertical-align: middle; border-bottom: 1px solid rgba(148,163,184,.14); }
+    .table-sm tr:last-child td { border-bottom: none; }
 
-    .item-code { font-weight: 700; font-size: .85rem; }
-    .item-name { font-size: .78rem; color: var(--muted); margin-top: .05rem; }
+    .item-code { font-weight: 700; font-size: .9rem; color: #334155; }
+    .item-name { font-size: .82rem; color: #64748b; margin-top: .15rem; line-height: 1.35; }
+
+    /* Selected row highlight (selaras shipment: state jelas) */
+    #grnLinesBody tr:has(.line-check:checked) {
+        background: rgba(51,65,85,.045);
+        box-shadow: inset 3px 0 0 #334155;
+    }
 
     .progress-mini {
         height: 3px;
@@ -115,34 +192,91 @@
         margin-bottom: .25rem;
     }
 
-    @media (max-width:767.98px) {
-        .page-wrap { padding-inline: .5rem; }
+    @media (max-width: 767.98px) {
+        .shp-wrap { padding-inline: .5rem; padding-bottom: 6.5rem; }
+        .shp-topbar { padding: .55rem .75rem; }
+        .shp-topbar-code { font-size: 1rem; }
+        .shp-meta-code { font-size: 1rem; }
+
+        /* Header form: 1 kolom, field lebih besar & mudah ditekan */
+        .field-lbl { font-size: .74rem; }
+        .form-control-sm, .form-select-sm { min-height: 42px; font-size: .95rem; }
+        .filter-bar .form-control, .filter-bar .form-select { min-height: 42px; }
+
+        /* Tabel → kartu item (selaras shipment) */
         thead { display: none; }
-        tbody tr {
+        #grnLinesBody tr {
             display: block;
             border: 1px solid var(--line);
-            border-radius: 10px;
-            margin-bottom: .5rem;
-            padding: .5rem .75rem;
+            border-radius: 12px;
+            margin-bottom: .6rem;
+            padding: .7rem .85rem;
+            box-shadow: 0 1px 4px rgba(15,23,42,.05);
         }
-        tbody td {
+        #grnLinesBody td {
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 0;
-            padding-block: .18rem;
+            padding-block: .3rem;
         }
-        tbody td[data-label]::before {
+        #grnLinesBody td[data-label]::before {
             content: attr(data-label);
-            font-size: .72rem;
+            font-size: .8rem;
+            font-weight: 600;
             color: var(--muted);
             flex-shrink: 0;
             margin-right: .75rem;
         }
-        td.td-item { display: block !important; }
+
+        /* Baris item full-width + garis pemisah */
+        td.td-item {
+            display: block !important;
+            padding-bottom: .5rem !important;
+            margin-bottom: .35rem;
+            border-bottom: 1px dashed rgba(148,163,184,.28) !important;
+        }
         td.td-item::before { display: none !important; }
-        .qty-input { width: 75px; }
-        .col-harga { display: none !important; }
+        .item-code { font-size: 1rem; }
+        .item-name { font-size: .88rem; }
+
+        /* Sembunyikan kolom bernilai rendah di HP (data tetap ada utk JS) */
+        .col-harga,
+        #grnLinesBody td[data-label="#"],
+        #grnLinesBody td[data-label="Unit"],
+        #grnLinesBody td[data-label="Qty PO"] { display: none !important; }
+
+        /* Sisa = penekanan konteks batas terima */
+        #grnLinesBody td[data-label="Sisa"] { font-size: .9rem; }
+        #grnLinesBody td[data-label="Sisa"]::before { font-weight: 700; color: #334155; }
+
+        /* Input qty lebih besar & mudah diketik */
+        #grnLinesBody td[data-label="Diterima"]::before,
+        #grnLinesBody td[data-label="Reject"]::before { font-weight: 700; color: #334155; }
+        .qty-input { width: 132px; height: 44px; font-size: 1.05rem; }
+
+        /* Checkbox pilih lebih besar + label di kiri */
+        td[data-label="Pilih"] { justify-content: flex-start; gap: .55rem; }
+        .line-check { width: 1.3rem; height: 1.3rem; }
+
+        /* Izinkan footer sticky menempel ke viewport (card default overflow:hidden) */
+        .grn-detail-card { overflow: visible; }
+
+        /* Aksi bawah sticky (selaras shipment: tombol full-width mudah dijangkau) */
+        .grn-actions {
+            position: sticky; bottom: 0; z-index: 60;
+            flex-direction: column; align-items: stretch; gap: .55rem;
+            background: var(--card, #fff);
+            border-top: 1px solid var(--line);
+            box-shadow: 0 -3px 12px rgba(15,23,42,.10);
+            margin-inline: -.85rem; margin-bottom: -.85rem;
+            padding: .7rem .85rem;
+            border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+        }
+        .grn-actions #footer-total { text-align: center; }
+        .grn-actions .grn-actions-btns { display: flex; gap: .5rem; }
+        .grn-actions .grn-actions-btns .btn-shp-primary { flex: 1; min-height: 46px; font-size: .98rem !important; }
+        .grn-actions .grn-actions-btns .btn-shp-outline { min-height: 46px; }
     }
 </style>
 @endpush
@@ -150,7 +284,7 @@
 @section('content')
 @php
     $u = auth()->user();
-    $canSeeMoney = $u?->isOwner() ?? false;
+    $canSeeMoney = $u?->canSeePurchasePrices() ?? false;
     $hasOrder    = isset($order) && $order?->id;
 
     $defaultDate = old('date', now()->toDateString());
@@ -194,35 +328,36 @@
     $colCount           = $canSeeMoney ? 9 : 8;
 @endphp
 
-<div class="page-wrap py-3 px-2 px-md-0">
+<div class="shp-topbar">
+    <span class="shp-topbar-code">Goods Receipt Baru</span>
+    <span class="shp-badge">Buat Draft</span>
+    <span class="shp-topbar-spacer"></span>
+    <div class="d-flex gap-2">
+        @if ($hasOrder)
+            <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
+               class="btn btn-shp-outline" style="text-decoration:none">Kembali ke PO</a>
+        @else
+            <a href="{{ route('purchasing.purchase_receipts.index') }}"
+               class="btn btn-shp-outline" style="text-decoration:none">Daftar GRN</a>
+        @endif
+    </div>
+</div>
 
-    {{-- ── HEADER ── --}}
-    <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
-        <div>
-            <h2 class="mb-0">Goods Receipt Baru</h2>
-            <div class="text-muted small mt-1">
-                @if ($hasOrder)
-                    Penerimaan untuk <span class="mono fw-semibold">{{ $order->code }}</span>
-                    · {{ $order->supplier?->name ?? '-' }}
-                    &nbsp;<span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
-                @else
-                    Pilih item dari PO yang sudah approved &nbsp;
-                    <span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
-                    @unless ($hasOrder)
-                        &nbsp;<span class="tag" style="font-size:.68rem;">1 GRN = 1 PO</span>
-                    @endunless
-                @endif
-            </div>
-        </div>
-        <div class="d-flex gap-2">
-            @if ($hasOrder)
-                <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                   class="btn btn-sm btn-outline-secondary btn-pill">&larr; Kembali ke PO</a>
-            @else
-                <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                   class="btn btn-sm btn-outline-secondary btn-pill">&larr; Daftar GRN</a>
-            @endif
-        </div>
+<div class="shp-wrap">
+
+    {{-- ── SUBTITLE / META ── --}}
+    <div class="shp-meta-bar">
+        @if ($hasOrder)
+            <span class="shp-meta-code">Penerimaan untuk {{ $order->code }}</span>
+            <span class="shp-meta-store">{{ $order->supplier?->name ?? '-' }}</span>
+            <span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
+        @else
+            <span class="shp-meta-code">Pilih item dari PO (draft atau approved)</span>
+            <span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
+            @unless ($hasOrder)
+                <span class="shp-badge">1 GRN = 1 PO</span>
+            @endunless
+        @endif
     </div>
 
     {{-- ── ERRORS ── --}}
@@ -334,7 +469,7 @@
         </div>
 
         {{-- ── TABEL DETAIL ── --}}
-        <div class="card mb-4">
+        <div class="card mb-4 grn-detail-card">
             <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap py-2">
                 <span class="fw-semibold small">Detail Barang</span>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -343,7 +478,7 @@
                     @endif
                     {{-- Tombol Terima Semua --}}
                     <button type="button" id="btnReceiveAll"
-                            class="btn btn-sm btn-outline-primary btn-pill d-none">
+                            class="btn btn-shp-outline d-none">
                         ⚡ Terima Semua
                     </button>
                     <input type="checkbox" id="checkAll" class="form-check-input" title="Pilih semua">
@@ -500,9 +635,9 @@
                                 <div style="font-size:1.5rem;margin-bottom:.5rem;">✅</div>
                                 Semua item sudah diterima penuh.
                             @elseif (!$hasOrder && !$selectedSupplierId)
-                                Tidak ada item dari PO berstatus approved.
+                                Tidak ada item dari PO (draft/approved).
                             @elseif (!$hasOrder && $selectedSupplierId)
-                                Tidak ada item PO approved untuk supplier ini.
+                                Tidak ada item PO (draft/approved) untuk supplier ini.
                             @else
                                 Tidak ada detail item.
                             @endif
@@ -518,20 +653,20 @@
                 Tidak ada item yang cocok.
             </div>
 
-            <div class="card-footer d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div class="card-footer grn-actions d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="text-muted small" id="footer-total">
                     Total qty bersih: <span class="mono fw-bold" id="footerTotalAlt">0,00</span>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 grn-actions-btns">
                     @if ($hasOrder)
                         <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}"
-                           class="btn btn-sm btn-outline-secondary btn-pill">Batal</a>
+                           class="btn btn-shp-outline">Batal</a>
                     @else
                         <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                           class="btn btn-sm btn-outline-secondary btn-pill">Batal</a>
+                           class="btn btn-shp-outline">Batal</a>
                     @endif
-                    <button type="button" id="btnSubmitGrn" class="btn btn-sm btn-primary btn-pill">
-                        Simpan GRN
+                    <button type="button" id="btnSubmitGrn" class="btn btn-shp-primary">
+                        Buat Draft GRN
                     </button>
                 </div>
             </div>
@@ -553,12 +688,12 @@
                 <div id="confirmSummary"></div>
             </div>
             <div class="modal-footer border-top justify-content-between">
-                <span class="text-muted small">Klik <strong>Ya, Simpan</strong> jika sudah sesuai.</span>
+                <span class="text-muted small">Klik <strong>Ya, Buat Draft</strong> jika sudah sesuai.</span>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary btn-pill"
+                    <button type="button" class="btn btn-shp-outline"
                             data-bs-dismiss="modal">Koreksi</button>
-                    <button type="button" id="btnConfirm" class="btn btn-sm btn-primary btn-pill">
-                        Ya, Simpan
+                    <button type="button" id="btnConfirm" class="btn btn-shp-primary">
+                        Ya, Buat Draft
                     </button>
                 </div>
             </div>

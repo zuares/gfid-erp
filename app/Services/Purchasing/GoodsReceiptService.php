@@ -7,12 +7,14 @@ use App\Models\Account;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\Lot;
+use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
+use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -23,6 +25,7 @@ class GoodsReceiptService
     public function __construct(
         protected InventoryService $inventory,
         protected JournalService $journal,
+        protected PurchaseOrderService $purchaseOrders,
     ) {}
 
     /**
@@ -33,6 +36,29 @@ class GoodsReceiptService
         return DB::transaction(function () use ($payload) {
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
+
+            $supplierId = (int) ($payload['supplier_id'] ?? 0);
+            $actorId = (int) ($payload['created_by'] ?? (auth()->id() ?? 0)) ?: null;
+
+            // =====================================================
+            // VALIDASI RELASI PO (defense-in-depth level Service)
+            // - PO boleh: draft / approved / closed ; TIDAK cancelled/terhapus.
+            // - Supplier GRN wajib = supplier PO.
+            // - Kunci baris PO agar tidak balapan dengan edit PO.
+            // =====================================================
+            $po = null;
+            $poId = !empty($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : null;
+            if ($poId) {
+                $po = PurchaseOrder::query()->whereKey($poId)->lockForUpdate()->first();
+                $this->assertPoReceivable($po, $supplierId, $poId);
+            }
+
+            // Validasi per-baris + PAKSA harga dari PO (abaikan harga dari request).
+            $linesData = $this->validateAndEnrichLinesFromPo(
+                is_array($linesData) ? $linesData : [],
+                $po,
+                $poId
+            );
 
             if (empty($payload['code'] ?? null)) {
                 $suppCode = DB::table('suppliers')
@@ -68,8 +94,155 @@ class GoodsReceiptService
             // subtotal header = total semua line (jujur)
             $this->recalcTotals($grn, $subtotalAll);
 
+            // =====================================================
+            // KUNCI PO saat GRN pertama berhasil disimpan (create),
+            // supaya line yang dirujuk GRN tidak bisa dihapus/diubah.
+            // =====================================================
+            if ($po) {
+                $this->purchaseOrders->lockForReceiving(
+                    $po,
+                    (int) $grn->id,
+                    $actorId,
+                    "Dikunci oleh GRN {$grn->code}."
+                );
+            }
+
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
+    }
+
+    /**
+     * Validasi PO boleh menjadi acuan GRN.
+     * Boleh: draft / approved / closed. Tolak: tidak ada / cancelled / supplier beda.
+     */
+    protected function assertPoReceivable(?PurchaseOrder $po, int $supplierId, int $poId): void
+    {
+        if (!$po) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => "Purchase Order #{$poId} tidak ditemukan atau sudah dihapus.",
+            ]);
+        }
+
+        if ($po->status === 'cancelled') {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'PO berstatus cancelled tidak bisa dijadikan acuan GRN.',
+            ]);
+        }
+
+        if (!$po->isReceivableForGrn()) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO berstatus draft, approved, atau closed.',
+            ]);
+        }
+
+        if ($supplierId > 0 && (int) $po->supplier_id !== $supplierId) {
+            throw ValidationException::withMessages([
+                'supplier_id' => 'Supplier GRN harus sama dengan supplier pada PO.',
+            ]);
+        }
+    }
+
+    /**
+     * Validasi setiap baris terhadap PO + PAKSA unit_price dari PO (server-side).
+     *
+     * Aturan:
+     * - Baris ber-purchase_order_line_id WAJIB punya header PO, dan line tsb WAJIB
+     *   milik PO header (bukan PO lain / bukan line terhapus).
+     * - item_id baris harus == item_id PO line.
+     * - qty_received + qty_reject tidak boleh melebihi outstanding PO line.
+     * - unit_price DISETEL server-side dari PO line (harga dari request diabaikan).
+     */
+    protected function validateAndEnrichLinesFromPo(array $linesData, ?PurchaseOrder $po, ?int $poId): array
+    {
+        // Kumpulkan po_line_id yang direferensikan
+        $poLineIds = collect($linesData)
+            ->pluck('purchase_order_line_id')
+            ->filter(fn ($v) => $v !== null && $v !== '')
+            ->map(fn ($v) => (int) $v)
+            ->unique()->values()->all();
+
+        $poLines = collect();
+        $alreadyByLine = [];
+        if (!empty($poLineIds)) {
+            $poLines = PurchaseOrderLine::query()
+                ->whereIn('id', $poLineIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            // qty terpakai per PO line dari GRN lain (draft + posted) — cegah over-receipt.
+            $alreadyByLine = DB::table('purchase_receipt_lines as prl')
+                ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+                ->whereIn('prl.purchase_order_line_id', $poLineIds)
+                ->whereIn('pr.status', ['draft', 'posted'])
+                ->groupBy('prl.purchase_order_line_id')
+                ->selectRaw('prl.purchase_order_line_id as line_id, SUM(prl.qty_received + prl.qty_reject) as used')
+                ->pluck('used', 'line_id')
+                ->map(fn ($v) => (float) $v)
+                ->toArray();
+        }
+
+        $out = [];
+        foreach ($linesData as $i => $row) {
+            $poLineId = ($row['purchase_order_line_id'] ?? null);
+            $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
+
+            if ($poLineId) {
+                if (!$po) {
+                    throw ValidationException::withMessages([
+                        "lines.$i" => 'Baris merujuk PO line tetapi GRN tidak punya PO header.',
+                    ]);
+                }
+
+                /** @var PurchaseOrderLine|null $poLine */
+                $poLine = $poLines->get($poLineId);
+                if (!$poLine) {
+                    throw ValidationException::withMessages([
+                        "lines.$i" => "PO line #{$poLineId} tidak ditemukan (mungkin sudah dihapus).",
+                    ]);
+                }
+
+                if ((int) $poLine->purchase_order_id !== (int) $poId) {
+                    throw ValidationException::withMessages([
+                        "lines.$i" => "PO line #{$poLineId} bukan milik PO ini (berasal dari PO lain).",
+                    ]);
+                }
+
+                $itemId = (int) ($row['item_id'] ?? 0);
+                if ($itemId > 0 && $itemId !== (int) $poLine->item_id) {
+                    throw ValidationException::withMessages([
+                        "lines.$i" => 'Item baris GRN tidak sama dengan item pada PO line.',
+                    ]);
+                }
+                // Paksa item mengikuti PO line (jangan percaya request).
+                $row['item_id'] = (int) $poLine->item_id;
+
+                // Outstanding check
+                $ordered = (float) $poLine->qty;
+                $already = (float) ($alreadyByLine[$poLineId] ?? 0);
+                $remaining = max(0.0, round($ordered - $already, 4));
+                $req = $this->num($row['qty_received'] ?? 0) + $this->num($row['qty_reject'] ?? 0);
+                if ($ordered > 0 && $req > $remaining + 0.0001) {
+                    throw ValidationException::withMessages([
+                        "lines.$i" => "Qty penerimaan melebihi sisa PO. Dipesan: {$ordered}, sudah: {$already}, sisa: {$remaining}.",
+                    ]);
+                }
+
+                // ✅ HARGA SERVER-SIDE: selalu ambil dari PO line, abaikan request.
+                $row['unit_price'] = (float) $poLine->unit_price;
+            } else {
+                // Baris tanpa PO line: hanya boleh bila GRN memang tidak berbasis PO,
+                // atau baris ad-hoc pada GRN ber-PO (diizinkan, harga apa adanya dari controller).
+                if ($poId) {
+                    // GRN punya PO header tetapi baris tak menyebut PO line → tetap izinkan
+                    // sebagai baris ad-hoc, namun tidak ada enrichment PO.
+                }
+            }
+
+            $out[] = $row;
+        }
+
+        return $out;
     }
 
     public function update(PurchaseReceipt $grn, array $payload): PurchaseReceipt
@@ -226,8 +399,18 @@ class GoodsReceiptService
             $grn->status = 'posted';
             $grn->save();
 
-            // Sync received_status di PO terkait
+            // Sync received_status di PO terkait + pastikan PO terkunci (fallback
+            // untuk GRN yang mungkin dibuat sebelum mekanisme lock aktif).
             if ($grn->purchase_order_id) {
+                $po = PurchaseOrder::query()->whereKey((int) $grn->purchase_order_id)->lockForUpdate()->first();
+                if ($po && !$po->isLocked()) {
+                    $this->purchaseOrders->lockForReceiving(
+                        $po,
+                        (int) $grn->id,
+                        (int) ($grn->created_by ?? (auth()->id() ?? 0)) ?: null,
+                        "Dikunci saat posting GRN {$grn->code}."
+                    );
+                }
                 $this->syncReceivedStatus((int) $grn->purchase_order_id);
             }
 
@@ -1096,25 +1279,24 @@ class GoodsReceiptService
             return;
         }
 
-        // Kumpulkan po_line_id yang unit_price-nya masih 0
-        $zeroLines = $lines->filter(fn($l) => (float) ($l->unit_price ?? 0) <= 0
-            && !empty($l->purchase_order_line_id));
+        // ✅ HARGA SERVER-SIDE: untuk SEMUA baris yang punya po_line_id, harga
+        // SELALU diambil dari PO line (bukan hanya saat 0), sehingga nilai dari
+        // request admin tidak pernah dipercaya.
+        $poLinked = $lines->filter(fn($l) => !empty($l->purchase_order_line_id));
 
-        if ($zeroLines->isEmpty()) {
+        if ($poLinked->isEmpty()) {
             return;
         }
 
         // Ambil harga PO sekaligus
-        $poLineIds = $zeroLines->pluck('purchase_order_line_id')->unique()->filter();
+        $poLineIds = $poLinked->pluck('purchase_order_line_id')->unique()->filter();
         $poPrices  = PurchaseOrderLine::whereIn('id', $poLineIds)
             ->pluck('unit_price', 'id');
 
-        $subtotal = (float) ($grn->subtotal ?? 0);
-
-        foreach ($zeroLines as $line) {
+        foreach ($poLinked as $line) {
             $poPrice = (float) ($poPrices[$line->purchase_order_line_id] ?? 0);
             if ($poPrice <= 0) {
-                continue; // tidak ada fallback, biarkan 0
+                continue; // PO belum ada harga → biarkan (guard grand_total>0 akan menahan post)
             }
 
             $lineTotal = round($poPrice * (float) ($line->qty_received ?? 0), 2);
@@ -1124,8 +1306,6 @@ class GoodsReceiptService
                 'line_total' => $lineTotal,
                 'updated_at' => now(),
             ]);
-
-            $subtotal += $lineTotal;
         }
 
         // Recalculate header

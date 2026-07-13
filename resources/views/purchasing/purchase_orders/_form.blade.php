@@ -3,7 +3,7 @@
     use Illuminate\Support\Carbon;
 
     /** @var \App\Models\PurchaseOrder|null $order */
-    $canSeeMoney = auth()->user()?->hasRole(['owner', 'admin']) ?? false;
+    $canSeeMoney = auth()->user()?->canSeePurchasePrices() ?? false;
 
     // =========================
     // ORDER TYPE

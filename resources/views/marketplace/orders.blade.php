@@ -121,6 +121,7 @@ body[data-theme="dark"] .ord-search-bar input::placeholder { color: #64748b; }
     margin-bottom: 1.25rem;
     border: 1px solid #e2e8f0;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+    position: sticky; top: 60px; z-index: 30;
 }
 body[data-theme="dark"] .ord-tabs {
     background: rgba(15, 23, 42, 0.4);
@@ -223,8 +224,44 @@ body[data-theme="dark"] .ord-card { border-color: rgba(51,65,85,.85); }
     .oc-kpi-value { font-size: 1.5rem !important; }
     .oc-kpi-label { font-size: .65rem !important; }
     .oc-kpi-note  { font-size: .6rem !important; }
-    .process-toolbar { flex-direction: column; align-items: flex-start; }
-    .process-toolbar-actions { width: 100%; overflow-x: auto; }
+    .process-toolbar { flex-direction: column; align-items: stretch !important; padding: 10px !important; gap: 10px; top: 125px !important; }
+    .toolbar-top-row { flex-direction: column; align-items: stretch !important; width: 100% !important; gap: 8px; }
+    .process-toolbar-info { padding: 0 !important; width: 100%; text-align: left; }
+    .process-toolbar-actions { width: 100%; flex-wrap: wrap !important; gap: 8px !important; padding-bottom: 2px; }
+    .process-toolbar-actions::-webkit-scrollbar { display: none; }
+    .process-toolbar-actions .btn-toolbar { flex: 1 1 40% !important; padding: 0.5rem 0.5rem !important; font-size: 0.75rem !important; justify-content: center; border-radius: 8px !important; box-shadow: 0 2px 4px -1px rgba(0,0,0,0.1) !important; text-align: center; }
+    
+    .ord-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        top: 60px !important;
+    }
+    .ord-tabs::-webkit-scrollbar { display: none; }
+    
+    #subTabProcessedContainer, #subTabReadyContainer {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        max-width: 100%;
+        margin-left: 0 !important;
+        padding: 4px !important;
+        border-radius: 8px;
+    }
+    #subTabProcessedContainer::-webkit-scrollbar, #subTabReadyContainer::-webkit-scrollbar { display: none; }
+    .ord-subtab { flex: 1 1 0% !important; justify-content: center; text-align: center; padding: 0.4rem 0.1rem !important; font-size: 0.7rem !important; border-radius: 6px !important; }
+    
+    .mobile-hide { display: none !important; }
+}
+
+@media (max-width: 767.98px) {
+    /* Fix sticky not working due to overflow-x: hidden in layout */
+    html, body, .app-shell, .app-main, .app-main .page-wrap {
+        overflow-x: clip !important;
+    }
 }
 .ord-badge {
     font-size: .63rem; font-weight: 800; padding: .1rem .35rem;
@@ -348,6 +385,8 @@ body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98)
     display: none; align-items: center; justify-content: space-between;
     padding: .6rem .75rem; background: #f8fafc; border-radius: 10px;
     border: 1.5px solid #f1f5f9; margin-bottom: 1rem; gap: .5rem;
+    position: sticky; top: 135px; z-index: 25;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 .process-toolbar.visible { display: flex; }
 .process-toolbar-info { font-size: .75rem; color: #64748b; font-weight: 600; }
@@ -647,7 +686,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
 
             {{-- Store filter --}}
-            <div style="position:relative">
+            <div style="position:relative" class="mobile-hide">
                 <button class="btn-ship-outline" id="btnStore" onclick="toggleDropdown('ddStore', event)" style="border:none; background:#f1f5f9; color:#475569; font-weight:600; padding: 0.35rem 0.6rem; border-radius: 6px; box-shadow:none;">
                     <span style="opacity:0.7;">🏪</span> <span id="btnStoreLabel" class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">Semua Toko</span>
                 </button>
@@ -658,7 +697,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
 
             {{-- Date filter --}}
-            <div style="position:relative">
+            <div style="position:relative" class="mobile-hide">
                 <button class="btn-ship-outline" id="btnDate" onclick="toggleDropdown('ddDate', event)" style="border:none; background:#f1f5f9; color:#475569; font-weight:600; padding: 0.35rem 0.6rem; border-radius: 6px; box-shadow:none;">
                     <span style="opacity:0.7;">📅</span> <span id="btnDateLabel" class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">30 hari terakhir</span>
                 </button>
@@ -679,8 +718,8 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
 
             {{-- Sync --}}
-            <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; margin-right: 0.4rem; font-weight: 500;"></span>
-            <button class="btn-ship-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onclick="openQuickSync()">🔄 Sync Pesanan</button>
+            <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; margin-right: 0.4rem; font-weight: 500;" class="mobile-hide"></span>
+            <button class="btn-ship-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onclick="openQuickSync()">🔄 <span class="mobile-hide">Sync Pesanan</span></button>
             <button class="btn-ship-outline" onclick="loadOrders()" title="Segarkan Data" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border-color:#e2e8f0; border-radius: 6px; color:#475569; background:#fff; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">🔃</button>
         </div>
     </div>
@@ -739,7 +778,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
     </div>
     {{-- Toolbar: Actions & Sub-Tabs --}}
     <div class="process-toolbar" id="processToolbar" style="margin-bottom:1rem; border:1px solid var(--shp-border); background:var(--card); border-radius:8px; padding:6px;">
-        <div style="display:flex; align-items:center;">
+        <div class="toolbar-top-row" style="display:flex; align-items:center; width:100%;">
             <div class="process-toolbar-info" id="toolbarInfo" style="display:none; font-size:.8rem; padding:.2rem .5rem;">
             </div>
             
@@ -755,18 +794,18 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
         </div>
 
-        <div class="process-toolbar-actions" id="toolbarActionsReady" style="display:none;">
-            <button class="btn-toolbar" id="btnBulkArrangeShipment" onclick="openBulkArrangeShipment()" style="border:none; background:#eff6ff; color:#2563eb;">🚚 Atur Kirim</button>
-            <button class="btn-toolbar" id="btnBulkPrintReady" onclick="printPickingList()" style="border:none; background:#f1f5f9; color:#334155;">🖨️ Picking List</button>
+        <div class="process-toolbar-actions" id="toolbarActionsReady" style="display:none; gap:6px;">
+            <button class="btn-toolbar" id="btnBulkArrangeShipment" onclick="openBulkArrangeShipment()" style="border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; font-weight:700;">🚚 Atur Kirim</button>
+            <button class="btn-toolbar" id="btnBulkPrintReady" onclick="printPickingList()" style="border:1px solid #cbd5e1; background:#f8fafc; color:#475569; font-weight:600;">🖨️ Picking List</button>
         </div>
-        <div class="process-toolbar-actions" id="toolbarActionsProcessed" style="display:none;">
-            <button class="btn-toolbar" id="btnBulkPrintProcessed" onclick="printPickingList()" style="border:none; background:#f1f5f9; color:#334155;">🖨️ Picking List</button>
-            <button class="btn-toolbar" id="btnBulkPrintDocuments" onclick="printAllDocuments()" style="border:none; background:#ecfeff; color:#0891b2;">🖨️ Cetak Resi</button>
-            <button class="btn-toolbar" id="btnBulkPrintGreetings" onclick="printAllGreetings()" style="border:none; background:#f5f3ff; color:#7c3aed;">💌 Kartu</button>
-            <button class="btn-toolbar" id="btnBulkFulfill" onclick="window.location='/sales/shipments'" style="border:none; background:#f0fdf4; color:#16a34a;">📦 Shipment</button>
+        <div class="process-toolbar-actions" id="toolbarActionsProcessed" style="display:none; gap:6px;">
+            <button class="btn-toolbar" id="btnBulkPrintProcessed" onclick="printPickingList()" style="border:1px solid #cbd5e1; background:#f8fafc; color:#475569; font-weight:600;">🖨️ Picking List</button>
+            <button class="btn-toolbar" id="btnBulkPrintDocuments" onclick="printAllDocuments()" style="border:1px solid #a5f3fc; background:#ecfeff; color:#0e7490; font-weight:600;">🖨️ Cetak Resi</button>
+            <button class="btn-toolbar" id="btnBulkPrintGreetings" onclick="printAllGreetings()" style="border:1px solid #ddd6fe; background:#f5f3ff; color:#6d28d9; font-weight:600;">💌 Kartu</button>
+            <button class="btn-toolbar" id="btnBulkFulfill" onclick="window.location='/sales/shipments'" style="border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; font-weight:700;">📦 Shipment</button>
         </div>
-        <div class="process-toolbar-actions" id="toolbarActionsUnresolved" style="display:none">
-            <a href="/marketplace/issues" class="btn-toolbar primary">🔗 Perbaiki →</a>
+        <div class="process-toolbar-actions" id="toolbarActionsUnresolved" style="display:none; gap:6px;">
+            <a href="/marketplace/issues" class="btn-toolbar primary" style="font-weight:700;">🔗 Perbaiki →</a>
         </div>
     </div>
 
@@ -1961,6 +2000,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     function renderMobileCards(rows) {
         const isPacking = activeTab === 'processed';
 
+        // Urutkan berdasarkan pesanan terbaru
+        rows.sort((a, b) => new Date(b.ordered_at || 0) - new Date(a.ordered_at || 0));
+
         const cards = rows.map(o => {
             const items  = o.items || [];
             const urgent = ACTIVE_ORDER_STATUSES.includes(o.order_status);
@@ -1973,22 +2015,29 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const rowClass = isFulfilled ? 'row-fulfilled' : (isInPacking ? 'row-packing' : (urgent ? 'row-urgent' : ''));
 
             // Tombol aksi
-            let fulfillBtn = '';
-            if (urgent) {
-                if (isFulfilled) {
-                    fulfillBtn = `<div class="btn-fulfillment done">✓ Selesai</div>`;
-                } else if (isInPacking) {
-                    const fStatus = fulfillmentStatusMap.get(o.id)?.status || '';
-                    const statusLabel = fStatus === 'picking' ? '🔄 Picking'
-                        : fStatus === 'packed' ? '📦 Packed'
-                        : fStatus === 'pending_review' ? '⏳ Review' : '📋 Draft';
-                    fulfillBtn = `<button class="btn-fulfillment" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe"
-                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
-                        onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
+            let actionBtn = '';
+            
+            if (activeTab === 'ready') {
+                if (o.order_status === 'UNPAID') {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
-                    fulfillBtn = `<button class="btn-fulfillment"
-                        title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
-                        onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                }
+            } else if (activeTab === 'processed') {
+                if (isFulfilled) {
+                    actionBtn = `<div class="btn-fulfillment done" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; font-weight:700">✓ Selesai</div>`;
+                } else if (isInPacking) {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; font-weight:700" onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
+                } else {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; font-weight:700; border:1px solid #cbd5e1" onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
+                }
+            } else {
+                if (o.order_status === 'UNPAID') {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
                 }
             }
 
@@ -1996,7 +2045,18 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const storeName   = o.store?.name || '';
             const channelName = o.store?.channel?.name || '';
             const storeText   = [storeName, channelName].filter(Boolean).join(' · ');
-            const dateText    = o.ordered_at ? fmtDate(o.ordered_at) : '';
+            
+            let dateTimeText = '';
+            if (o.ordered_at) {
+                const d = new Date(o.ordered_at);
+                if (!isNaN(d.valueOf())) {
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mm = d.toLocaleString('id-ID', { month: 'short' });
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const min = String(d.getMinutes()).padStart(2, '0');
+                    dateTimeText = `${dd} ${mm} · ${hh}:${min}`;
+                }
+            }
             const carrier     = (o.shipping_carrier || '').toLowerCase();
             const isInstant   = carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
             let instantBadge  = isInstant ? `<span style="font-size:.65rem;background:#fef08a;color:#854d0e;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fde047;margin-right:4px;">⚡ INSTAN</span>` : '';
@@ -2005,9 +2065,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 instantBadge += `<span style="font-size:.65rem;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fca5a5;margin-right:4px;" title="Shopee Advance Fulfillment">🚀 KILAT</span>`;
             }
 
-            // ── Section: Item Produk (accordion)
+            // ── Section: Item Produk (Tampil default tanpa accordion di mobile)
             const itemCards = items.map(i => renderItemCard(i, urgent)).join('');
-            const itemsSection = makeAccordion('Item Produk', '', items.length, itemCards);
+            const itemsSection = `<div class="ord-card-section" style="padding:0.6rem 0.9rem; border-top:1px dashed #e2e8f0; background:#f8fafc">
+                <div style="font-size:0.65rem; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:0.5rem; letter-spacing:0.05em">Item Produk (${items.length})</div>
+                <div class="ord-items-cell" style="padding:0">${itemCards}</div>
+            </div>`;
 
             // ── Section: Item Resolve (hanya packing, accordion)
             let resolveSection = '';
@@ -2057,26 +2120,26 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
             orderIdHtml += slaBadge;
 
-            return `<div class="ord-card ${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}">
+            return `<div class="ord-card ${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" style="overflow:hidden">
                 <div class="ord-card-header">
                     <div class="ord-card-meta">
                         <div class="ord-id">${orderIdHtml}</div>
                         <div class="ord-card-sub">
                             ${instantBadge}
-                            ${dateText ? `<span class="ord-card-sub-text">${dateText}</span>` : ''}
-                            ${storeText ? `<span class="ord-card-sub-text" style="color:#cbd5e1">·</span><span class="ord-card-sub-text">${esc(storeText)}</span>` : ''}
+                            ${storeText ? `<span class="ord-card-sub-text">${esc(storeText)}</span>` : ''}
                         </div>
                     </div>
-                    <div class="ord-card-actions">
-                        ${orderStatusBadge(o.order_status)}
-                        ${urgent ? fulfillmentBadge(o) : ''}
-                        ${fulfillBtn}
-                        ${isPrinted && !isFulfilled ? `<span style="font-size:.6rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:700">🖨 Cetak</span>` : ''}
+                    <div class="ord-card-actions" style="text-align:right">
+                        ${isPrinted && !isFulfilled ? `<div style="margin-bottom:4px;"><span style="font-size:.6rem;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:700">🖨 Cetak</span></div>` : ''}
+                        ${dateTimeText ? `<div style="font-size:0.65rem; color:#64748b; font-weight:600;">${dateTimeText}</div>` : ''}
                     </div>
                 </div>
                 ${itemsSection}
                 ${resolveSection}
                 ${scanSection}
+                <div style="padding:0.75rem 0.9rem; border-top:1px solid #e2e8f0; background:#fff">
+                    ${actionBtn}
+                </div>
             </div>`;
         }).join('');
 

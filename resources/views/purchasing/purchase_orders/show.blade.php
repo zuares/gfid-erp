@@ -5,446 +5,87 @@
 
 @push('head')
     <style>
-        .page-wrap {
-            max-width: 1080px;
-            margin-inline: auto;
-        }
-
-        .card {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            overflow: hidden;
-        }
-
-        th.sticky {
-            position: sticky;
-            top: 0;
-            background: var(--card);
-            z-index: 1;
-        }
-
-        .mono {
-            font-variant-numeric: tabular-nums;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
-        }
-
-        .tag {
-            border-radius: 999px;
-            padding: .15rem .65rem;
-            font-size: .7rem;
-            border: 1px solid var(--line);
-            background: rgba(148, 163, 184, .12);
-            white-space: nowrap;
-        }
-
-        .tag-status-draft {
-            background: rgba(148, 163, 184, .12);
-            color: #64748b;
-            border-color: rgba(148, 163, 184, .6);
-        }
-
-        .tag-status-approved {
-            background: rgba(22, 163, 74, .12);
-            color: #15803d;
-            border-color: rgba(22, 163, 74, .6);
-        }
-
-        .tag-status-cancelled {
-            background: rgba(220, 38, 38, .08);
-            color: #b91c1c;
-            border-color: rgba(220, 38, 38, .6);
-        }
-
-        .tag-grn {
-            border-radius: 999px;
-            padding: .15rem .6rem;
-            font-size: .7rem;
-            border: 1px solid rgba(59, 130, 246, .5);
-            background: rgba(59, 130, 246, .08);
-            color: #1d4ed8;
-            white-space: nowrap;
-        }
-
-        .badge-pill {
-            border-radius: 999px;
-            font-size: .7rem;
-            padding: .1rem .5rem;
-            border: 1px solid transparent;
-            white-space: nowrap;
-        }
-
-        .badge-posted {
-            background: rgba(22, 163, 74, .12);
-            color: #15803d;
-            border-color: rgba(22, 163, 74, .5);
-        }
-
-        .badge-draft {
-            background: rgba(148, 163, 184, .12);
-            color: #64748b;
-            border-color: rgba(148, 163, 184, .5);
-        }
-
-        /* payment badges */
-        .pay-badge {
-            border-radius: 999px;
-            padding: .14rem .6rem;
-            font-size: .72rem;
-            border: 1px solid rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .12);
-            color: #64748b;
-            white-space: nowrap;
-        }
-
-        .pay-paid {
-            border-color: rgba(22, 163, 74, .55);
-            background: rgba(22, 163, 74, .12);
-            color: #15803d;
-        }
-
-        .pay-partial {
-            border-color: rgba(234, 179, 8, .55);
-            background: rgba(234, 179, 8, .12);
-            color: #a16207;
-        }
-
-        .pay-unpaid {
-            border-color: rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .12);
-            color: #64748b;
-        }
-
-        /* method badges */
-        .pm-badge {
-            border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .7rem;
-            border: 1px solid rgba(148, 163, 184, .5);
-            background: rgba(148, 163, 184, .10);
-            color: #64748b;
-            white-space: nowrap;
-        }
-
-        .pm-cash {
-            border-color: rgba(22, 163, 74, .5);
-            background: rgba(22, 163, 74, .10);
-            color: #15803d;
-        }
-
-        .pm-credit {
-            border-color: rgba(59, 130, 246, .55);
-            background: rgba(59, 130, 246, .08);
-            color: #1d4ed8;
-        }
-
-        .pm-transfer {
-            border-color: rgba(234, 179, 8, .55);
-            background: rgba(234, 179, 8, .10);
-            color: #a16207;
-        }
-
-        /* type chips */
-        .type-chip {
-            border-radius: 999px;
-            padding: .12rem .55rem;
-            font-size: .72rem;
-            border: 1px solid rgba(148, 163, 184, .45);
-            background: rgba(148, 163, 184, .10);
-            color: #64748b;
-            white-space: nowrap;
-            text-transform: uppercase;
-        }
-
-        .type-dp {
-            border-color: rgba(59, 130, 246, .55);
-            background: rgba(59, 130, 246, .08);
-            color: #1d4ed8;
-        }
-
-        .type-payment {
-            border-color: rgba(22, 163, 74, .55);
-            background: rgba(22, 163, 74, .10);
-            color: #15803d;
-        }
-
-        .type-dp-apply {
-            border-color: rgba(234, 179, 8, .55);
-            background: rgba(234, 179, 8, .10);
-            color: #a16207;
-        }
-
-        .btn-pill {
-            border-radius: 999px;
-            padding-inline: .95rem;
-        }
-
-        .gf-card {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            overflow: hidden;
-        }
-
-        .gf-card-h {
-            padding: .65rem .9rem;
-            border-bottom: 1px solid var(--line);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: .75rem;
-            flex-wrap: wrap;
-        }
-
-        .gf-card-title {
-            font-size: .74rem;
-            text-transform: uppercase;
-            letter-spacing: .07em;
-            color: var(--muted);
-            font-weight: 800;
-        }
-
-        .summary-col {
-            padding: .85rem 1rem;
-            border-right: 1px solid var(--line);
-        }
-
-        .summary-col:last-child {
-            border-right: 0;
-        }
-
-        .summary-label {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: var(--muted);
-            font-weight: 800;
-            margin-bottom: .22rem;
-        }
-
-        .summary-value {
-            font-size: .98rem;
-            font-weight: 800;
-        }
-
-        .summary-money {
-            font-size: clamp(.82rem, 1.6vw, .98rem);
-            line-height: 1.2;
-            word-break: break-word;
-        }
-
-        .po-total-cell {
-            font-size: .95rem;
-            font-weight: 800;
-            white-space: nowrap;
-        }
-
-        .po-progress {
-            display: flex;
-            justify-content: flex-end;
-            gap: .3rem;
-            flex-wrap: wrap;
-        }
-
-        .po-progress-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, .28);
-            background: rgba(148, 163, 184, .07);
-            color: var(--muted);
-            padding: .12rem .48rem;
-            font-size: .68rem;
-            font-weight: 800;
-            white-space: nowrap;
-        }
-
-        .po-progress-pill strong {
-            color: var(--text);
-        }
-
-        .po-progress-pill.is-ok {
-            color: #15803d;
-            border-color: rgba(22, 163, 74, .24);
-            background: rgba(22, 163, 74, .07);
-        }
-
-        .po-progress-pill.is-return {
-            color: #b45309;
-            border-color: rgba(245, 158, 11, .28);
-            background: rgba(245, 158, 11, .08);
-        }
-
-        .po-progress-pill.is-left {
-            color: #2563eb;
-            border-color: rgba(37, 99, 235, .24);
-            background: rgba(37, 99, 235, .07);
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: .6rem;
-        }
-
-        .info-cell {
-            min-height: 64px;
-            padding: .7rem .85rem;
-            border: 1px solid rgba(148, 163, 184, .18);
-            border-radius: 12px;
-            background: rgba(148, 163, 184, .045);
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .info-label {
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            color: var(--muted);
-            font-weight: 800;
-            margin-bottom: .18rem;
-        }
-
-        .info-value {
-            font-size: .88rem;
-            font-weight: 700;
-            line-height: 1.25;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .info-sub {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .po-table thead th {
-            background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
-            border-bottom-color: var(--line);
-            font-size: .68rem;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-            padding: .52rem .65rem;
-            white-space: nowrap;
-        }
-
-        .po-table tbody td {
-            border-bottom-color: var(--line);
-            vertical-align: middle;
-            padding: .58rem .65rem;
-            font-size: .83rem;
-        }
-
-        .modal-content.gf-modal {
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            overflow: hidden;
-        }
-
-        .gf-modal .modal-header,
-        .gf-modal .modal-footer {
-            padding: .7rem .95rem;
-            border-color: var(--line);
-        }
-
-        .gf-modal .modal-body {
-            padding: .95rem;
-        }
-
-        .modal-kpi {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: .15rem .55rem;
-            font-size: .72rem;
-            color: var(--muted);
-            background: rgba(148, 163, 184, .08);
-        }
-
-        .modal-kpi strong {
-            color: var(--text);
-        }
-
-        @media (max-width: 768px) {
-            .page-wrap {
-                padding-inline: .75rem;
-            }
-
-            .po-item-name {
-                font-size: .9rem;
-                font-weight: 600;
-            }
-
-            .po-item-code {
-                font-size: .78rem;
-            }
-
-            .card .card-body {
-                padding: .75rem .85rem;
-            }
-
-            .card-header {
-                padding: .6rem .85rem;
-            }
-
-            .po-mobile-card {
-                border-top: 1px solid var(--line);
-                padding-top: .5rem;
-                margin-top: .5rem;
-            }
-
-            .po-mobile-card:first-of-type {
-                border-top: none;
-                padding-top: 0;
-                margin-top: 0;
-            }
-
-            .po-actions .btn-action {
-                width: 100%;
-            }
-
-            .summary-col {
-                border-right: 0;
-                border-bottom: 1px solid var(--line);
-            }
-
-            .summary-col:nth-last-child(-n+2) {
-                border-bottom: 0;
-            }
-
-            .info-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: .5rem;
-            }
-
-            .summary-money {
-                font-size: .82rem;
-            }
-
-            .po-total-cell {
-                font-size: .88rem;
-            }
-
-            .po-progress {
-                justify-content: flex-start;
-            }
-        }
-    </style>
+.po-wrap{max-width:1080px;margin-inline:auto;padding:.7rem .75rem 3rem}
+.po-topbar{position:sticky;top:0;z-index:250;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.55rem .75rem;background:var(--card,#fff);border-bottom:1px solid rgba(148,163,184,.18)}
+.po-code{font-weight:900;font-size:1.05rem;color:#111827;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.po-supplier{font-size:.8rem;color:#64748b;margin-left:.25rem}
+.po-spacer{flex:1}
+.po-btn,.po-pill{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;border-radius:7px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#475569;text-decoration:none;font-size:.76rem;padding:.28rem .6rem;min-height:34px}
+.po-btn{font-weight:800; cursor:pointer;}
+.po-btn:hover{background:rgba(148,163,184,.09);color:#111827;text-decoration:none}
+.po-primary{background:#334155!important;border-color:#334155!important;color:#fff!important}
+.po-success{background:#15803d!important;border-color:#15803d!important;color:#fff!important}
+.po-success:hover{background:#166534!important;border-color:#166534!important}
+.po-info{background:#0ea5e9!important;border-color:#0ea5e9!important;color:#fff!important}
+.po-info:hover{background:#0284c7!important}
+.po-status{font-weight:850;color:#334155;background:rgba(148,163,184,.08)}
+.po-status.approved{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.2)}
+.po-status.closed{color:#0f172a;background:rgba(15,23,42,.08);border-color:rgba(15,23,42,.2)}
+.po-status.cancelled{color:#991b1b;background:rgba(153,27,27,.08);border-color:rgba(153,27,27,.2)}
+.po-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
+.po-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
+.po-kpi{padding:.65rem .75rem}
+.po-label{font-size:.72rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
+.po-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.18rem;font-weight:900;color:#111827;margin-top:.12rem}
+.po-head{display:flex;align-items:center;gap:.55rem;justify-content:space-between;padding:.7rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}
+.po-title{font-weight:900;color:#334155}
+.po-muted{color:#64748b;font-size:.8rem}
+.po-body{padding:.75rem .85rem}
+.po-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
+.po-table-wrap{overflow:auto;border:1px solid rgba(148,163,184,.16);border-radius:8px}
+.po-table{width:100%;border-collapse:collapse}
+.po-table th,.po-table td{padding:.55rem .65rem;border-bottom:1px solid rgba(148,163,184,.12);vertical-align:middle}
+.po-table th{text-align:left;font-size:.72rem;color:#64748b;font-weight:900;text-transform:uppercase;letter-spacing:.02em;background:rgba(148,163,184,.04)}
+.po-table td{font-size:.86rem;color:#334155}
+.po-code-cell{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}
+.po-name{color:#64748b;font-size:.8rem;margin-top:.08rem}
+.po-r{text-align:right}
+.po-total td{font-weight:900;color:#111827;background:rgba(148,163,184,.04)}
+.po-tabs{display:flex;gap:.25rem;margin-bottom:.65rem;border-bottom:1px solid rgba(148,163,184,.18);flex-wrap:wrap}
+.po-tab{appearance:none;display:inline-flex;align-items:center;gap:.4rem;border:none;background:transparent;color:#64748b;font-weight:800;font-size:.82rem;padding:.55rem .8rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.po-tab:hover{color:#334155}
+.po-tab.active{color:#111827;border-bottom-color:#334155}
+.po-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;border-radius:999px;background:rgba(148,163,184,.16);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.7rem;font-weight:900}
+.po-tab.active .po-tab-count{background:#334155;color:#fff}
+.po-tabpane{display:none}
+.po-tabpane.active{display:block}
+.po-tabpane .po-card{margin-bottom:0}
+
+@media(max-width:860px){
+  .po-wrap{padding:.5rem .5rem 3.5rem}
+  .po-topbar{padding:.5rem}
+  .po-code{flex:1;min-width:150px;font-size:1.02rem}
+  .po-supplier{display:none;}
+  .po-topbar .po-pill:not(.po-status),.po-hide-mobile{display:none}
+  .po-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}
+  .po-kpi{padding:.58rem .62rem}
+  .po-value{font-size:1.08rem}
+  .po-head{padding:.65rem .7rem}
+  .po-body{padding:.65rem .7rem}
+  .po-table-wrap{border:none;border-radius:0;overflow:visible}
+  .po-table,.po-table tbody,.po-table tr,.po-table td{display:block;width:100%}
+  .po-table thead{display:none}
+  .po-table tr{border:1px solid rgba(148,163,184,.16);border-radius:8px;margin-bottom:.45rem;padding:.55rem .6rem;background:var(--card,#fff)}
+  .po-table td{border:0;padding:0}
+  .po-table td.po-r{text-align:left;margin-top:.35rem}
+  .po-table td.progress-cell { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed rgba(148,163,184,.3); }
+  .po-total{display:none!important}
+}
+.mono {
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono";
+}
+/* Utility */
+.badge-posted { background:rgba(22,163,74,.12);color:#15803d;border-color:rgba(22,163,74,.6); border: 1px solid; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.72rem; }
+.badge-draft { background:rgba(148,163,184,.12);color:#64748b;border-color:rgba(148,163,184,.5); border: 1px solid; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.72rem; }
+</style>
 @endpush
 
 @section('content')
     @php
         $user = auth()->user();
         $isAdmin = strtolower((string)($user->role ?? '')) === 'admin';
-        $canSeeMoney = $user?->hasRole(['owner', 'admin']) ?? false;
+        $canSeeMoney = $user?->canSeePurchasePrices() ?? false;
         $poHasPrice  = (float) ($order->grand_total ?? 0) > 0;
 
         // Status PO
@@ -514,677 +155,404 @@
         ]);
     @endphp
 
-    <div class="page-wrap py-4">
+    
+<div class="po-topbar">
+    <a href="{{ route('purchasing.purchase_orders.index') }}" class="po-btn" title="Kembali"><i class="bi bi-arrow-left"></i> Kembali</a>
+    
+    @php
+       $statusBadgeClass = match($status) {
+           'approved' => 'approved',
+           'closed' => 'closed',
+           'cancelled' => 'cancelled',
+           default => 'draft'
+       };
+       $statusLabel = match($status) {
+           'approved' => 'APPROVED',
+           'closed' => 'CLOSED',
+           'cancelled' => 'CANCELLED',
+           default => 'DRAFT'
+       };
+    @endphp
+    
+    <span class="po-code">{{ $order->code }}</span>
+    <span class="po-supplier d-none d-md-inline">{{ optional($order->supplier)->name ?? 'Purchase Order' }}</span>
+    
+    <span class="po-pill po-status {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
+    
+    @if ($order->isLocked())
+        <span class="po-pill po-status" style="background:rgba(245,158,11,.1);color:#92400e;border:1px solid rgba(245,158,11,.3);" title="{{ $order->lock_reason }} ({{ optional($order->locked_at)->format('d/m/Y H:i') }})"><i class="bi bi-lock-fill"></i> Locked</span>
+    @endif
+    
+    <span class="po-spacer"></span>
 
-        {{-- HEADER --}}
-        <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
-            <div style="min-width:0;">
-                <h2 class="mb-0 lh-1 mono" style="font-size:1.35rem;">{{ $order->code }}</h2>
-                <div class="text-muted mt-1" style="font-size:.82rem;">{{ optional($order->supplier)->name ?? 'Purchase Order' }}</div>
-            </div>
+    {{-- PRIMARY ACTIONS --}}
+    @if ($status === 'draft')
+        @if ($user && ($user->isOwner() || $user->isDeveloper()))
+            @if ($poHasPrice)
+                <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve PO ini? Setelah di-approve, PO tidak bisa diedit lagi.');">
+                    @csrf
+                    <button type="submit" class="po-btn po-primary" title="Approve PO">Approve</button>
+                </form>
+            @else
+                <button type="button" class="po-btn po-primary" style="opacity:.5;cursor:not-allowed;" title="{{ $canSeeMoney ? 'Harga belum diisi, edit PO terlebih dahulu.' : 'Dokumen belum lengkap, hubungi owner.' }}">Approve</button>
+            @endif
+        @endif
+    @endif
+    
+    @if ($canSeeMoney && $canPay && $hasAp)
+         <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="Bayar PO"><i class="bi bi-cash-coin d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Bayar PO</span></button>
+    @endif
+    
+    {{-- Terima (buat GRN) --}}
+    @if ($user && ($user->isOwner() || $isAdmin) && $order->isReceivableForGrn() && $status !== 'cancelled' && ($canCreateGrn ?? true))
+         <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}" class="po-btn po-info" title="Terima Barang"><i class="bi bi-box-seam d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Terima</span></a>
+    @endif
 
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <a href="{{ route('purchasing.purchase_orders.index') }}"
-                   class="btn btn-outline-secondary btn-sm">
-                    Kembali
-                </a>
-
-                <a href="{{ route('purchasing.purchase_orders.print_dot_matrix', $order->id) }}" class="btn btn-outline-dark btn-sm">
-                    <i class="bi bi-printer"></i> Cetak (Dot Matrix)
-                </a>
-
-                @if ($status === 'draft')
-                    <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}"
-                       class="btn btn-outline-primary btn-sm">
-                        Edit
+    {{-- Opsi Lainnya --}}
+    <div class="dropdown d-inline-block">
+        <button class="po-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Opsi Lainnya"><i class="bi bi-three-dots-vertical"></i></button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="font-size: .85rem; border-radius: 12px; padding: .5rem 0;">
+            @if ($canSeeMoney)
+                <li>
+                    <a class="dropdown-item py-2" href="{{ route('purchasing.purchase_orders.print_dot_matrix', $order->id) }}">
+                        <i class="bi bi-printer me-2 text-muted"></i> Cetak (Dot Matrix)
                     </a>
-                @endif
-
-                @if ($user && ($user->isOwner() || $isAdmin) && $status === 'approved')
-                    @if ($canCreateGrn ?? true)
-                        <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}"
-                            class="btn btn-outline-primary btn-sm">
-                            Terima
+                </li>
+            @endif
+            @if ($status === 'draft' && (!$order->isLocked() || ($user && $user->canSeePurchasePrices())))
+                <li>
+                    <a class="dropdown-item py-2" href="{{ route('purchasing.purchase_orders.edit', $order->id) }}">
+                        <i class="bi bi-pencil me-2 text-muted"></i> Edit PO
+                    </a>
+                </li>
+            @endif
+            @if ($canSeeMoney && $canPay && $hasAp)
+                <li>
+                    <button type="button" class="dropdown-item py-2" data-bs-toggle="modal" data-bs-target="#modalApplyDp" @if (!$canApplyDp) disabled @endif>
+                        <i class="bi bi-arrow-left-right me-2 text-muted"></i> Offset DP
+                    </button>
+                </li>
+            @endif
+            @if ($status === 'approved' && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
+                @if (\Illuminate\Support\Facades\Route::has('purchasing.supplier_invoices.create'))
+                    <li>
+                        <a class="dropdown-item py-2" href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $order->id]) }}">
+                            <i class="bi bi-receipt me-2 text-muted"></i> Buat Invoice Supplier
                         </a>
-                    @endif
+                    </li>
                 @endif
-
-                @if ($canSeeMoney && $canPay)
-                    @if ($hasAp)
-                        <button type="button" class="btn btn-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#modalAddPayment">
-                            Bayar
-                        </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#modalApplyDp"
-                            @if (!$canApplyDp) disabled @endif
-                            title="{{ $canApplyDp ? '' : 'Offset DP tidak tersedia / hutang sudah lunas / PO cancelled' }}">
-                            Offset DP
-                        </button>
-                    @else
-                        <span class="badge rounded-pill text-bg-light border" style="font-size:.72rem;font-weight:500;letter-spacing:.01em;">
-                            GRN belum posted
-                        </span>
-                    @endif
-                    @if ($hasPayments)
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                            data-bs-toggle="collapse" data-bs-target="#paymentHistoryCollapse">
-                            Riwayat
-                        </button>
-                    @endif
-                @endif
-
-                @if ($user && (in_array($user->role, ['owner','admin']) || $user->isDeveloper()) && $status === 'draft')
-                    @if ($poHasPrice)
-                        <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST"
-                            onsubmit="return confirm('Approve PO ini? Setelah di-approve, PO tidak bisa diedit lagi.');">
-                            @csrf
-                            <button type="submit" class="btn btn-success btn-sm">
-                                Approve
-                            </button>
-                        </form>
-                    @else
-                        <button type="button" class="btn btn-success btn-sm disabled"
-                            style="opacity:.5;cursor:not-allowed;"
-                            title="{{ $canSeeMoney ? 'Harga belum diisi, edit PO terlebih dahulu.' : 'Dokumen belum lengkap, hubungi owner.' }}">
-                            Approve
-                        </button>
-                    @endif
-                @endif
-
-                @if ($user && (in_array($user->role, ['owner','admin']) || $user->isDeveloper()) && $status === 'approved')
-                    @if ($grnCount === 0)
-                        <form action="{{ route('purchasing.purchase_orders.unapprove', $order->id) }}" method="POST"
-                            onsubmit="return confirm('Kembalikan PO ini ke status Draft?');">
-                            @csrf
-                            <button type="submit" class="btn btn-warning btn-sm">
-                                Unapprove
-                            </button>
-                        </form>
-                    @endif
-                @endif
-
-                @if ($status === 'approved' && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
-                    @php $hasSupplierInvoiceRoute = \Illuminate\Support\Facades\Route::has('purchasing.supplier_invoices.create'); @endphp
-                    @if ($hasSupplierInvoiceRoute)
-                        <a href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $order->id]) }}"
-                           class="btn btn-sm btn-outline-success">
-                            Faktur
-                        </a>
-                    @endif
-                @endif
-
-                @if ($user && $user->isOwner() && !($order->isClosed()) && ($canClose ?? false))
-                    @php $hasCloseRoute = \Illuminate\Support\Facades\Route::has('purchasing.purchase_orders.close'); @endphp
-                    @if ($hasCloseRoute)
-                        <form action="{{ route('purchasing.purchase_orders.close', $order->id) }}" method="POST"
-                            onsubmit="return confirm('Close PO ini? Pastikan semua sudah lunas dan diterima.');">
-                            @csrf
-                            <button type="submit" class="btn btn-sm btn-dark">
-                                Close
-                            </button>
-                        </form>
-                    @endif
-                @endif
-
-                @if ($user && $user->isOwner() && in_array($status, ['draft', 'approved'], true) && $grnCount === 0)
+            @endif
+            @if ($status === 'draft' && $user && in_array($user->role, ['owner','admin']))
+                <li><hr class="dropdown-divider"></li>
+                <li>
                     <form action="{{ route('purchasing.purchase_orders.cancel', $order->id) }}" method="POST"
-                        onsubmit="return confirm('Batalkan PO ini? Tindakan ini tidak bisa dibatalkan.');">
+                          onsubmit="return confirm('Cancel PO ini?');">
                         @csrf
-                        <button type="submit" class="btn btn-outline-danger btn-sm">
-                            Cancel
+                        <button type="submit" class="dropdown-item py-2 text-danger">
+                            <i class="bi bi-x-circle me-2"></i> Cancel PO
                         </button>
                     </form>
-                @endif
-            </div>
-        </div>
-
-        {{-- FLASH --}}
-        @if (session('success'))
-            <div class="alert alert-success py-2 small">{{ session('success') }}</div>
-        @endif
-        @if (session('error'))
-            <div class="alert alert-danger py-2 small">{{ session('error') }}</div>
-        @endif
-
-        {{-- ============================================================
-        RINGKASAN PO — Status + Nominal (Tahap 4)
-        ============================================================ --}}
-        @php
-            $isClosed    = $order->isClosed();
-            $rcvStatus   = $order->received_status ?? 'not_received';
-            $closeBlks   = $closeBlockers ?? [];
-            $canClosePO  = ($canClose ?? false) && !$isClosed;
-            $invTotal    = (float) ($invoiceTotalAmount ?? 0);
-            $invPaid     = (float) ($invoiceTotalPaid ?? 0);
-            $invOutstand = (float) ($invoiceOutstanding ?? 0);
-            $poInvoiceList = $poInvoices ?? collect();
-        @endphp
-        {{-- SUMMARY CARD --}}
-        <div class="gf-card mb-3">
-            <div class="row g-0">
-                <div class="col-6 col-md-3 summary-col">
-                    <div class="summary-label">Status</div>
-                    <div class="summary-value">
-                        <span class="{{ $statusClass }} mono">{{ $isClosed ? 'CLOSED' : strtoupper($status) }}</span>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3 summary-col">
-                    <div class="summary-label">Terima</div>
-                    <div class="summary-value">{{ received_status_label($rcvStatus) }}</div>
-                </div>
-                <div class="col-6 col-md-3 summary-col">
-                    <div class="summary-label">Item / Qty</div>
-                    <div class="summary-value mono">{{ $order->lines->count() }} item · {{ decimal_id($totalQty, 2) }}</div>
-                </div>
-                @if ($canSeeMoney)
-                    <div class="col-6 col-md-3 summary-col">
-                        <div class="summary-label">Total / Sisa</div>
-                        <div class="summary-value mono summary-money">{{ rupiah($order->grand_total) }}</div>
-                        <div class="{{ $apOutstanding > 0 ? 'text-danger' : 'text-success' }} mono" style="font-size:.76rem;font-weight:800;">
-                            {{ $apOutstanding > 0 ? 'Sisa ' . rupiah($apOutstanding) : 'Lunas' }}
-                        </div>
-                    </div>
-                @else
-                    <div class="col-6 col-md-3 summary-col">
-                        <div class="summary-label">Bayar</div>
-                        <div class="summary-value"><span class="{{ $payBadgeClass }}">{{ match($payStatus) { 'paid' => 'Lunas', 'partial' => 'Sebagian', default => 'Belum' } }}</span></div>
-                    </div>
-                @endif
-            </div>
-
-            @if (($canSeeMoney && $invTotal > 0) || $isClosed || count($closeBlks) > 0 || $canClosePO)
-                <div class="px-3 py-2 border-top d-flex align-items-center gap-2 flex-wrap" style="font-size:.78rem;">
-                    @if ($canSeeMoney && $invTotal > 0)
-                        <span class="modal-kpi">Invoice <strong class="mono">{{ rupiah($invTotal) }}</strong></span>
-                        <span class="modal-kpi">Dibayar <strong class="mono">{{ rupiah($invPaid) }}</strong></span>
-                        <span class="modal-kpi">Outstanding <strong class="mono">{{ rupiah($invOutstand) }}</strong></span>
-                    @endif
-                    @if (!$isClosed && count($closeBlks) > 0)
-                        @foreach ($closeBlks as $blk)
-                            <span class="modal-kpi" style="color:#b91c1c;">{{ $blk }}</span>
-                        @endforeach
-                    @elseif ($isClosed)
-                        <span class="modal-kpi">Closed {{ $order->closed_at ? id_date($order->closed_at) : '' }}</span>
-                    @elseif ($canClosePO)
-                        <span class="modal-kpi">Siap close</span>
-                    @endif
-                </div>
+                </li>
             @endif
+        </ul>
+    </div>
+</div>
+
+<div class="po-wrap">
+    <div class="po-grid mt-2">
+        <div class="po-card po-kpi">
+            <div class="po-label">Item Batch</div>
+            <div class="po-value">{{ $order->lines->count() }} <span class="po-muted" style="font-size:.8rem;font-weight:500;">Tipe</span> <span class="po-muted mx-1 fw-normal" style="opacity:.4;">•</span> {{ decimal_id($totalQty, 2) }} <span class="po-muted" style="font-size:.8rem;font-weight:500;">Pcs</span></div>
         </div>
-
-        {{-- WARNING: harga belum diisi --}}
-        @if ($status === 'draft' && !$poHasPrice && ($canSeeMoney || $isAdmin))
-            <div class="alert mb-3 py-2 px-3 d-flex align-items-center gap-2"
-                 style="background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.4);border-radius:10px;font-size:.85rem;">
-                @if ($canSeeMoney)
-                    <span><strong>Harga belum diisi.</strong> Isi harga sebelum approval.</span>
-                @else
-                    <span><strong>PO belum bisa di-approve.</strong> Hubungi owner.</span>
-                @endif
-            </div>
-        @endif
-
-        {{-- INFO CARD --}}
-        <div class="gf-card mb-3">
-            <div class="card-body">
-                <div class="info-grid">
-                    <div class="info-cell">
-                        <div class="info-label">Tanggal</div>
-                        <div class="info-value mono">{{ id_date($order->date) }}</div>
-                    </div>
-                    <div class="info-cell">
-                        <div class="info-label">Supplier</div>
-                        <div class="info-value mono" title="{{ optional($order->supplier)->name ?? '' }}">
-                            {{ optional($order->supplier)->code ?? '—' }}
-                        </div>
-                    </div>
-                    <div class="info-cell">
-                        <div class="info-label">Jenis</div>
-                        <div class="info-value">{{ po_order_type_label($order->order_type, true) }}</div>
-                    </div>
-                    @if ($canSeeMoney)
-                        @php
-                            $pmModeLabel = ['cash' => 'Tunai', 'transfer' => 'Transfer', 'credit' => 'Tempo'];
-                            $pmMode = strtolower((string) ($pm->mode ?? ''));
-                        @endphp
-                        <div class="info-cell">
-                            <div class="info-label">Bayar</div>
-                            <div class="info-value">{{ $pm ? ($pmModeLabel[$pmMode] ?? $pm->name) : '—' }}</div>
-                            @if (!empty($order->due_date))
-                                <div class="text-muted mono info-sub" style="font-size:.72rem;">Jatuh tempo {{ id_date($order->due_date) }}</div>
-                            @endif
-                        </div>
-                    @endif
-                </div>
-                @if ($order->notes || !empty($purchaseRequest))
-                    <div class="border-top mt-3 pt-2 d-flex gap-2 flex-wrap" style="font-size:.8rem;">
-                        @if ($order->notes)
-                            <span class="modal-kpi">Catatan <strong>{{ $order->notes }}</strong></span>
-                        @endif
-                        @if (!empty($purchaseRequest))
-                            @if (\Illuminate\Support\Facades\Route::has('purchasing.purchase_requests.show'))
-                                <a href="{{ route('purchasing.purchase_requests.show', $purchaseRequest->id) }}" class="modal-kpi text-decoration-none">
-                                    PR <strong class="mono">{{ $purchaseRequest->code }}</strong>
-                                </a>
-                            @else
-                                <span class="modal-kpi">PR <strong class="mono">{{ $purchaseRequest->code }}</strong></span>
-                            @endif
-                        @endif
-                    </div>
-                @endif
-            </div>
+        @if ($canSeeMoney)
+        <div class="po-card po-kpi">
+            <div class="po-label">Total PO</div>
+            <div class="po-value">{{ rupiah($order->grand_total) }}</div>
         </div>
-
-        {{-- RIWAYAT PEMBAYARAN (COLLAPSE) --}}
-        @if ($canSeeMoney && $hasPayments)
-            <div class="collapse mb-4" id="paymentHistoryCollapse">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="fw-semibold">Riwayat Pembayaran</div>
-                        <div class="text-muted small mono">
-                            Sisa {{ rupiah($apOutstanding) }} • DP Avail {{ rupiah($dpAvailable) }}
-                        </div>
-                    </div>
-
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0 mono align-middle">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 18%;">Tanggal</th>
-                                        <th style="width: 14%;">Tipe</th>
-                                        <th>Metode</th>
-                                        <th style="width: 18%;" class="text-end">Nominal</th>
-                                        <th style="width: 18%;">Ref</th>
-                                        <th style="width: 14%;" class="text-end">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($order->payments as $p)
-                                        @php
-                                            $pMode = strtolower((string) ($p->paymentMethod?->mode ?? ''));
-                                            $pPmClass = match ($pMode) {
-                                                'cash' => 'pm-badge pm-cash',
-                                                'credit' => 'pm-badge pm-credit',
-                                                'transfer' => 'pm-badge pm-transfer',
-                                                default => 'pm-badge',
-                                            };
-
-                                            $type = (string) ($p->type ?? '');
-                                            $typeClass = match ($type) {
-                                                'dp' => 'type-chip type-dp',
-                                                'dp_apply' => 'type-chip type-dp-apply',
-                                                default => 'type-chip type-payment',
-                                            };
-
-                                            $typeLabel = match ($type) {
-                                                'dp' => 'DP',
-                                                'dp_apply' => 'OFFSET',
-                                                default => 'PAYMENT',
-                                            };
-                                        @endphp
-
-                                        <tr @class(['text-muted' => $p->voided_at])>
-                                            <td>{{ $p->date ? id_date($p->date) : '-' }}</td>
-
-                                            <td>
-                                                <span class="{{ $typeClass }}">{{ $typeLabel }}</span>
-                                            </td>
-
-                                            <td>
-                                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                    <span>{{ $p->paymentMethod?->name ?? '-' }}</span>
-                                                    @if ($p->paymentMethod)
-                                                        <span class="{{ $pPmClass }} mono">
-                                                            {{ strtoupper($p->paymentMethod?->mode ?? '-') }}
-                                                        </span>
-                                                    @endif
-                                                    @if ($p->voided_at)
-                                                        <span class="tag tag-status-cancelled mono">VOID</span>
-                                                    @endif
-                                                </div>
-
-                                                @if ($p->cashAccount)
-                                                    <div class="text-muted small mono">
-                                                        {{ $p->cashAccount->code }} — {{ $p->cashAccount->name }}
-                                                    </div>
-                                                @else
-                                                    @if (strtolower((string) ($p->paymentMethod?->mode ?? '')) === 'credit')
-                                                        <div class="text-muted small">Tanpa kas/bank (tempo/credit)</div>
-                                                    @endif
-                                                @endif
-
-                                                @if (!empty($p->notes))
-                                                    <div class="text-muted small">{{ $p->notes }}</div>
-                                                @endif
-                                            </td>
-
-                                            <td class="text-end fw-semibold">{{ rupiah($p->amount) }}</td>
-                                            <td>{{ $p->ref_no ?? '—' }}</td>
-
-                                            <td class="text-end">
-                                                @if (!$p->voided_at && $canPay)
-                                                    <button type="button" class="btn btn-sm btn-outline-danger"
-                                                        data-bs-toggle="modal" data-bs-target="#modalVoidPayment"
-                                                        data-payment-id="{{ $p->id }}"
-                                                        data-payment-type="{{ $typeLabel }}"
-                                                        data-payment-amount="{{ rupiah($p->amount) }}"
-                                                        data-payment-date="{{ $p->date ? id_date($p->date) : '-' }}">
-                                                        VOID
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted small">—</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="po-card po-kpi">
+            <div class="po-label">Total GRN</div>
+            <div class="po-value">{{ rupiah($grnPostedTotal) }}</div>
+        </div>
+        <div class="po-card po-kpi">
+            <div class="po-label">Sisa Tagihan</div>
+            <div class="po-value" style="color:#b91c1c;">{{ rupiah($apOutstanding) }}</div>
+        </div>
+        @else
+        <div class="po-card po-kpi">
+            <div class="po-label">Status</div>
+            <div class="po-value" style="font-size:1rem">{{ $statusLabel }}</div>
+        </div>
         @endif
+    </div>
 
-        {{-- GOODS RECEIPTS (GRN) — owner & admin --}}
+    <div class="po-tabs" role="tablist">
+        <button type="button" class="po-tab active" data-tab="item">Rincian Barang <span class="po-tab-count">{{ $order->lines->count() }}</span></button>
         @if ($user && ($user->isOwner() || $isAdmin))
-        <div class="gf-card mb-4">
-            <div class="gf-card-h">
-                <div>
-                    <div class="gf-card-title">Penerimaan</div>
-                    <div class="mono fw-semibold" style="font-size:.9rem;">{{ $grnCount }} dokumen</div>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    @if ($status === 'approved' && !($canCreateGrn ?? true))
-                        <span class="modal-kpi">Semua diterima</span>
-                    @endif
+        <button type="button" class="po-tab" data-tab="grn">Penerimaan (GRN) <span class="po-tab-count">{{ $grnCount }}</span></button>
+        @endif
+        @if ($canSeeMoney && $order->payments->count() > 0)
+        <button type="button" class="po-tab" data-tab="payments">Riwayat Bayar <span class="po-tab-count">{{ $order->payments->count() }}</span></button>
+        @endif
+    </div>
 
-                    <a href="{{ route('purchasing.purchase_receipts.index', ['po' => $order->id]) }}"
-                        class="btn btn-sm btn-outline-secondary">
-                        Semua
-                    </a>
+    {{-- TAB ITEM BARANG --}}
+    <div class="po-tabpane active" id="po-tab-item" role="tabpanel">
+        <div class="po-card">
+            <div class="po-head">
+                <div>
+                    <div class="po-title">Barang Dipesan</div>
+                    <div class="po-muted">Ringkasan barang yang dipesan pada dokumen PO ini.</div>
                 </div>
             </div>
-
-            <div class="table-responsive d-none d-md-block">
-                @if ($grnCount === 0)
-                    <div class="p-3 text-muted small">Belum ada penerimaan.</div>
+            <div class="po-body">
+                @if($order->lines->isEmpty())
+                    <div class="po-empty">Belum ada item.</div>
                 @else
-                    <table class="table table-sm mb-0 mono align-middle po-table">
+                    <div class="po-table-wrap">
+                        <table class="po-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="po-r">Qty</th>
+                                    @if($canSeeMoney)
+                                        <th class="po-r po-hide-mobile">@ Harga</th>
+                                        <th class="po-r po-hide-mobile">Subtotal</th>
+                                    @endif
+                                    <th class="po-r">Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($order->lines as $line)
+                                    @php
+                                        $hasDiscount = (float) $line->discount > 0.0001;
+                                        $rcv = (float) $line->qty_received;
+                                        $ret = (float) $line->qty_returned;
+                                        $qtyOut = $line->qty - $rcv;
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            <div class="po-code-cell">{{ $line->item->code ?? '-' }}</div>
+                                            <div class="po-name">{{ $line->item->name ?? '-' }}</div>
+                                            
+                                            {{-- MOBILE EXTRA INFO --}}
+                                            <div class="d-md-none mt-1">
+                                                @if($canSeeMoney)
+                                                    <div style="font-size:.8rem;color:#475569;">{{ angka($line->unit_price) }} x {{ decimal_id($line->qty, 2) }} = <b>{{ angka($line->subtotal) }}</b></div>
+                                                @else
+                                                    <div style="font-size:.8rem;color:#475569;">Qty: <b>{{ decimal_id($line->qty, 2) }}</b> pcs</div>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="po-r po-hide-mobile">
+                                            <div class="po-code-cell">{{ decimal_id($line->qty, 2) }}</div>
+                                            <div class="po-name">Pcs</div>
+                                        </td>
+                                        @if($canSeeMoney)
+                                            <td class="po-r po-hide-mobile">
+                                                {{ angka($line->unit_price) }}
+                                                @if($hasDiscount)
+                                                    <br><span class="text-danger" style="font-size:.7rem">Disc: -{{ angka($line->discount) }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="po-r po-hide-mobile">{{ angka($line->subtotal) }}</td>
+                                        @endif
+                                        <td class="progress-cell" style="min-width: 140px; vertical-align: top;">
+                                            @if ($rcv > 0)
+                                                <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
+                                                    <span style="color:#64748b;">Terima</span>
+                                                    <strong style="color:#15803d; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($rcv, 2) }}</strong>
+                                                </div>
+                                            @endif
+                                            @if ($ret > 0)
+                                                <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
+                                                    <span style="color:#64748b;">Retur</span>
+                                                    <strong style="color:#b91c1c; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($ret, 2) }}</strong>
+                                                </div>
+                                            @endif
+                                            @if ($qtyOut > 0)
+                                                <div class="d-flex justify-content-between" style="font-size:.78rem;">
+                                                    <span style="color:#64748b;">Sisa</span>
+                                                    <strong style="color:#d97706; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($qtyOut, 2) }}</strong>
+                                                </div>
+                                            @endif
+                                            @if ($rcv == 0 && $ret == 0 && $qtyOut == 0)
+                                                <div class="text-end text-muted">-</div>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>{{-- /po-tab-item --}}
+
+    {{-- TAB GRN --}}
+    @if ($user && ($user->isOwner() || $isAdmin))
+    <div class="po-tabpane" id="po-tab-grn" role="tabpanel">
+        <div class="po-card">
+            <div class="po-head">
+                <div>
+                    <div class="po-title">Penerimaan Barang (GRN)</div>
+                    <div class="po-muted">Daftar surat jalan yang telah diterbitkan untuk PO ini.</div>
+                </div>
+            </div>
+            <div class="po-body">
+                @if ($grnCount === 0)
+                    <div class="po-empty">Belum ada penerimaan.</div>
+                @else
+                    <div class="po-table-wrap">
+                        <table class="po-table">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Dokumen</th>
+                                    <th>Gudang</th>
+                                    @if ($canSeeMoney)
+                                    <th class="po-r">Total</th>
+                                    @endif
+                                    <th style="text-align:center;">Status</th>
+                                    <th class="po-r">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($grnList as $grn)
+                                    @php
+                                        $isPosted = ($grn->status ?? 'draft') === 'posted';
+                                        $badgeStatusClass = $isPosted ? 'badge-posted' : 'badge-draft';
+                                        $statusLabelGRN = $isPosted ? 'POSTED' : 'DRAFT';
+                                        $wh = $grn->warehouse ?? null;
+                                    @endphp
+                                    <tr>
+                                        <td class="po-code-cell" style="font-weight:normal;color:#64748b;">{{ $grn->date ? id_date($grn->date) : '-' }}</td>
+                                        <td>
+                                            <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}" class="po-code-cell text-decoration-none" style="color:#0284c7;">{{ $grn->code ?? $grn->id }}</a>
+                                            <div class="d-md-none mt-1">
+                                                @if ($wh) <span style="font-size:.7rem; color:#64748b;">{{ $wh->name }}</span> @endif
+                                            </div>
+                                        </td>
+                                        <td class="po-hide-mobile">
+                                            @if ($wh)
+                                                <div style="font-weight:700;">{{ $wh->code }}</div>
+                                                <div class="po-muted" style="font-size:.7rem;">{{ $wh->name }}</div>
+                                            @else
+                                                <span class="po-muted">-</span>
+                                            @endif
+                                        </td>
+                                        @if ($canSeeMoney)
+                                        <td class="po-r" style="font-weight:700;">{{ isset($grn->grand_total) ? rupiah($grn->grand_total) : '—' }}</td>
+                                        @endif
+                                        <td style="text-align:center;">
+                                            <span class="{{ $badgeStatusClass }}">{{ $statusLabelGRN }}</span>
+                                        </td>
+                                        <td class="po-r">
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}" class="po-btn" style="min-height:28px;padding:.1rem .5rem;">Detail</a>
+                                                @if (!$isPosted)
+                                                    <form action="{{ route('purchasing.purchase_receipts.post', $grn->id) }}" method="POST" onsubmit="return confirm('Post GRN ini? Setelah di-post, stok akan ter-update.');">
+                                                        @csrf
+                                                        <button type="submit" class="po-btn po-success" style="min-height:28px;padding:.1rem .5rem;">Post</button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- TAB PEMBAYARAN --}}
+    @if ($canSeeMoney && $order->payments->count() > 0)
+    <div class="po-tabpane" id="po-tab-payments" role="tabpanel">
+        <div class="po-card">
+            <div class="po-head">
+                <div>
+                    <div class="po-title">Riwayat Pembayaran</div>
+                    <div class="po-muted">Daftar mutasi uang keluar untuk PO ini.</div>
+                </div>
+            </div>
+            <div class="po-body">
+                <div class="po-table-wrap">
+                    <table class="po-table">
                         <thead>
                             <tr>
-                                <th style="width: 18%;">Tanggal</th>
-                                <th>Dokumen</th>
-                                <th style="width: 18%;">Gudang</th>
-                                @if ($canSeeMoney)
-                                <th style="width: 16%;" class="text-end">Total</th>
-                                @endif
-                                <th style="width: 12%;" class="text-center">Status</th>
-                                <th style="width: 10%;" class="text-end"></th>
+                                <th>Tanggal</th>
+                                <th>Tipe</th>
+                                <th>Metode</th>
+                                <th class="po-r">Nominal</th>
+                                <th class="po-hide-mobile">Ref</th>
+                                <th class="po-r">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($grnList as $grn)
+                            @foreach ($order->payments as $p)
                                 @php
-                                    $isPosted = ($grn->status ?? 'draft') === 'posted';
-                                    $badgeStatusClass = $isPosted
-                                        ? 'badge-pill badge-posted'
-                                        : 'badge-pill badge-draft';
-                                    $statusLabel = $isPosted ? 'POSTED' : 'DRAFT';
-                                    $wh = $grn->warehouse ?? null;
+                                    $type = (string) ($p->type ?? '');
+                                    $typeLabel = match ($type) {
+                                        'dp' => 'DP',
+                                        'dp_apply' => 'Gunakan DP',
+                                        'return_apply' => 'Retur',
+                                        default => 'Pelunasan',
+                                    };
                                 @endphp
                                 <tr>
-                                    <td>{{ $grn->date ? id_date($grn->date) : '-' }}</td>
+                                    <td class="po-code-cell" style="font-weight:normal;color:#64748b;">{{ $p->date ? id_date($p->date) : '-' }}</td>
+                                    <td><span class="po-pill" style="font-size:.7rem;padding:0 .4rem;">{{ $typeLabel }}</span></td>
                                     <td>
-                                        <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}"
-                                            class="text-decoration-none">
-                                            {{ $grn->code ?? $grn->id }}
-                                        </a>
+                                        <div style="font-weight:700;">{{ $p->paymentMethod?->code ?? '-' }}</div>
+                                        <div class="po-muted" style="font-size:.7rem;">{{ $p->paymentMethod?->name ?? '-' }}</div>
                                     </td>
-                                    <td>
-                                        @if ($wh)
-                                            <div class="fw-semibold">{{ $wh->code }}</div>
-                                            <div class="text-muted small">{{ $wh->name }}</div>
+                                    <td class="po-r" style="font-weight:700;">
+                                        @if(in_array($type, ['dp_apply','return_apply']))
+                                            <span style="color:#d97706;">{{ rupiah($p->amount) }}</span>
                                         @else
-                                            <span class="text-muted small">-</span>
+                                            <span style="color:#15803d;">{{ rupiah($p->amount) }}</span>
                                         @endif
                                     </td>
-                                    @if ($canSeeMoney)
-                                    <td class="text-end">{{ isset($grn->grand_total) ? rupiah($grn->grand_total) : '—' }}</td>
-                                    @endif
-                                    <td class="text-center">
-                                        <span class="{{ $badgeStatusClass }}">{{ $statusLabel }}</span>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="d-flex justify-content-end gap-1">
-                                            <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}"
-                                                class="btn btn-xs btn-outline-secondary btn-sm">Detail</a>
-                                            @if (!$isPosted)
-                                                <form action="{{ route('purchasing.purchase_receipts.post', $grn->id) }}"
-                                                    method="POST"
-                                                    onsubmit="return confirm('Post GRN ini? Setelah di-post, stok akan ter-update.');">
-                                                    @csrf
-                                                    <button type="submit"
-                                                        class="btn btn-xs btn-success btn-sm">Post</button>
-                                                </form>
-                                            @endif
-                                        </div>
+                                    <td class="po-hide-mobile"><span class="po-code-cell" style="font-weight:normal;">{{ $p->reference_number ?? '-' }}</span></td>
+                                    <td class="po-r">
+                                        <form action="{{ route('purchasing.purchase_orders.payments.destroy', [$order->id, $p->id]) }}" method="POST" onsubmit="return confirm('Hapus/Void pembayaran ini?');">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="po-btn" style="color:#b91c1c;min-height:28px;padding:.1rem .5rem;"><i class="bi bi-trash"></i> Void</button>
+                                        </form>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                @endif
-            </div>
-
-            {{-- Mobile cards --}}
-            <div class="d-md-none">
-                @if ($grnCount === 0)
-                    <div class="p-3 text-muted small">Belum ada penerimaan.</div>
-                @else
-                    <div class="p-3 pt-2">
-                        @foreach ($grnList as $grn)
-                            @php
-                                $isPosted = ($grn->status ?? 'draft') === 'posted';
-                                $badgeStatusClass = $isPosted ? 'badge-pill badge-posted' : 'badge-pill badge-draft';
-                                $statusLabel = $isPosted ? 'POSTED' : 'DRAFT';
-                                $wh = $grn->warehouse ?? null;
-                            @endphp
-
-                            <div class="po-mobile-card">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div class="fw-semibold mono">
-                                            <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}"
-                                                class="text-decoration-none">
-                                                {{ $grn->code ?? $grn->id }}
-                                            </a>
-                                        </div>
-                                        <div class="text-muted small mono">{{ $grn->date ? id_date($grn->date) : '-' }}
-                                        </div>
-                                        @if ($wh)
-                                            <div class="small mt-1">
-                                                <span class="fw-semibold mono">{{ $wh->code }}</span>
-                                                <span class="text-muted">• {{ $wh->name }}</span>
-                                            </div>
-                                        @endif
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="{{ $badgeStatusClass }}">{{ $statusLabel }}</span>
-                                    </div>
-                                </div>
-
-                                @if ($canSeeMoney)
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <div class="small text-muted">Total</div>
-                                    <div class="mono fw-semibold">
-                                        {{ isset($grn->grand_total) ? rupiah($grn->grand_total) : '—' }}</div>
-                                </div>
-                                @endif
-
-                                <div class="d-flex justify-content-end gap-1 mt-2">
-                                    <a href="{{ route('purchasing.purchase_receipts.show', $grn->id) }}"
-                                        class="btn btn-outline-secondary btn-sm">Detail</a>
-
-                                    @if (!$isPosted)
-                                        <form action="{{ route('purchasing.purchase_receipts.post', $grn->id) }}"
-                                            method="POST"
-                                            onsubmit="return confirm('Post GRN ini? Setelah di-post, stok akan ter-update.');">
-                                            @csrf
-                                            <button type="submit" class="btn btn-success btn-sm">Post</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-        </div>
-        @endif {{-- end isOwner GRN --}}
-
-        {{-- DETAIL BARANG --}}
-        <div class="gf-card mb-4">
-            <div class="gf-card-h">
-                <div>
-                    <div class="gf-card-title">Barang</div>
-                    <div class="mono fw-semibold" style="font-size:.9rem;">{{ $order->lines->count() }} item · {{ decimal_id($totalQty, 2) }}</div>
-                </div>
-            </div>
-
-            <div class="table-responsive d-none d-md-block">
-                <table class="table table-sm mb-0 mono po-table">
-                    <thead>
-                        <tr>
-                            <th class="sticky text-center" style="width: 54px;">No</th>
-                            <th class="sticky">Item</th>
-                            <th class="text-end sticky" style="width: 12%">Qty</th>
-                            <th class="text-end sticky" style="width: 24%">Progress</th>
-                            @if ($canSeeMoney)
-                                <th class="text-end sticky" style="width: 18%">Harga</th>
-                                @if ($hasDiscount)
-                                    <th class="text-end sticky" style="width: 15%">Diskon</th>
-                                @endif
-                                <th class="text-end sticky" style="width: 18%">Total</th>
-                            @endif
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($order->lines as $line)
-                            @php
-                                $lineReceived = (float) (($receivedByLine ?? collect())->get($line->id, 0));
-                                $lineReturned = (float) (($returnedByLine ?? collect())->get($line->id, 0));
-                                $lineLeft = max(0, round((float) $line->qty - $lineReceived, 4));
-                            @endphp
-                            <tr>
-                                <td class="text-center align-middle text-muted">{{ $loop->iteration }}</td>
-                                <td>
-                                    <div class="po-item-name">{{ optional($line->item)->name ?? '—' }}</div>
-                                    @if ($line->item)
-                                        <div class="text-muted small po-item-code">{{ $line->item->code }}</div>
-                                    @endif
-                                </td>
-                                <td class="text-end">{{ decimal_id($line->qty, 2) }}</td>
-                                <td class="text-end">
-                                    <div class="po-progress">
-                                        <span class="po-progress-pill is-ok">Terima <strong class="mono">{{ decimal_id($lineReceived, 2) }}</strong></span>
-                                        @if ($lineReturned > 0.0001)
-                                            <span class="po-progress-pill is-return">Retur <strong class="mono">{{ decimal_id($lineReturned, 2) }}</strong></span>
-                                        @endif
-                                        <span class="po-progress-pill is-left">Sisa <strong class="mono">{{ decimal_id($lineLeft, 2) }}</strong></span>
-                                    </div>
-                                </td>
-                                @if ($canSeeMoney)
-                                    <td class="text-end">{{ angka($line->unit_price) }}</td>
-                                    @if ($hasDiscount)
-                                        <td class="text-end">{{ angka($line->discount) }}</td>
-                                    @endif
-                                    <td class="text-end fw-semibold">{{ angka($line->line_total) }}</td>
-                                @endif
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="{{ $canSeeMoney ? ($hasDiscount ? 7 : 6) : 4 }}" class="text-center text-muted py-3">Tidak ada item</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                    @if ($canSeeMoney)
-                        <tfoot>
-                            <tr class="table-light">
-                                <th colspan="{{ $hasDiscount ? 6 : 5 }}" class="text-end">Total</th>
-                                <th class="text-end mono po-total-cell">{{ rupiah($order->grand_total) }}</th>
-                            </tr>
-                        </tfoot>
-                    @endif
-                </table>
-            </div>
-
-            <div class="d-md-none">
-                <div class="p-3 pt-2">
-                    @forelse ($order->lines as $line)
-                        @php
-                            $item = $line->item;
-                            $lineReceived = (float) (($receivedByLine ?? collect())->get($line->id, 0));
-                            $lineReturned = (float) (($returnedByLine ?? collect())->get($line->id, 0));
-                            $lineLeft = max(0, round((float) $line->qty - $lineReceived, 4));
-                        @endphp
-                        <div class="po-mobile-card">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <div class="po-item-name">{{ $item->name ?? '—' }}</div>
-                                    @if ($item)
-                                        <div class="text-muted small mono">{{ $item->code }}</div>
-                                    @endif
-                                </div>
-                                <div class="text-end mono small text-muted">No. {{ $loop->iteration }}</div>
-                            </div>
-
-                            <div class="mt-2 small">
-                                <div class="d-flex justify-content-between"><span>Qty</span><span
-                                        class="mono">{{ decimal_id($line->qty, 2) }}</span></div>
-                                <div class="po-progress mt-2">
-                                    <span class="po-progress-pill is-ok">Terima <strong class="mono">{{ decimal_id($lineReceived, 2) }}</strong></span>
-                                    @if ($lineReturned > 0.0001)
-                                        <span class="po-progress-pill is-return">Retur <strong class="mono">{{ decimal_id($lineReturned, 2) }}</strong></span>
-                                    @endif
-                                    <span class="po-progress-pill is-left">Sisa <strong class="mono">{{ decimal_id($lineLeft, 2) }}</strong></span>
-                                </div>
-                                @if ($canSeeMoney)
-                                    <div class="d-flex justify-content-between"><span>Harga</span><span
-                                            class="mono">{{ angka($line->unit_price) }}</span></div>
-                                    @if ($hasDiscount)
-                                        <div class="d-flex justify-content-between"><span>Diskon</span><span
-                                                class="mono">{{ angka($line->discount) }}</span></div>
-                                    @endif
-                                @endif
-                            </div>
-
-                            @if ($canSeeMoney)
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <div class="small text-muted">Total</div>
-                                    <div class="mono fw-semibold">{{ angka($line->line_total) }}</div>
-                                </div>
-                            @endif
-                        </div>
-                    @empty
-                        <div class="text-center text-muted py-3 small">Tidak ada item</div>
-                    @endforelse
-
-                    @if ($canSeeMoney)
-                        <div class="mt-3 border-top pt-2 small">
-                            <div class="d-flex justify-content-between mt-1 fw-bold">
-                                <span>Total PO</span>
-                                <span class="mono">{{ rupiah($order->grand_total) }}</span>
-                            </div>
-                        </div>
-                    @endif
                 </div>
             </div>
         </div>
-
     </div>
+    @endif
+    
+</div>
+
+<script>
+(function(){
+    var tabs = document.querySelectorAll('.po-tab');
+    var panes = document.querySelectorAll('.po-tabpane');
+    function activate(name){
+        tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+        panes.forEach(function(p){ p.classList.toggle('active', p.id === 'po-tab-' + name); });
+        try { history.replaceState(null, '', '#' + name); } catch(e){}
+    }
+    tabs.forEach(function(t){
+        t.addEventListener('click', function(){ activate(t.dataset.tab); });
+    });
+    var hash = (location.hash || '').replace('#','');
+    if (['item','grn','payments'].indexOf(hash) !== -1) activate(hash);
+})();
+</script>
+
 
     @if ($canSeeMoney)
     {{-- =========================================================

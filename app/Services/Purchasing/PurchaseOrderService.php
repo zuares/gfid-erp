@@ -64,13 +64,28 @@ class PurchaseOrderService
     public function update(PurchaseOrder $order, array $payload): PurchaseOrder
     {
         return DB::transaction(function () use ($order, $payload) {
+            // ✅ Kunci baris PO saat proses (hindari race dengan GRN create).
+            $order = PurchaseOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines']);
 
             $payload = $this->onlyHeaderFields($payload);
 
-            // code tidak boleh berubah lewat update
+            // code tidak boleh berubah lewat update (referensi audit)
             unset($payload['code']);
+
+            // ✅ RECEIVING LOCK: PO yang sudah dirujuk GRN tidak boleh ganti supplier
+            // dan nomor PO, serta line yang sudah diterima diproteksi (lihat syncLinesLocked()).
+            if ($order->isLocked()) {
+                if (array_key_exists('supplier_id', $payload)
+                    && (int) $payload['supplier_id'] !== (int) $order->supplier_id) {
+                    throw ValidationException::withMessages([
+                        'supplier_id' => 'PO terkunci (sudah ada GRN). Supplier tidak dapat diubah.',
+                    ]);
+                }
+                unset($payload['supplier_id']); // paksa tetap
+            }
 
             if (array_key_exists('date', $payload)) {
                 $order->date = $payload['date'];
@@ -113,7 +128,9 @@ class PurchaseOrderService
 
             $order->save();
 
-            $subtotal = $this->syncLines($order, is_array($linesData) ? $linesData : []);
+            $subtotal = $order->isLocked()
+                ? $this->syncLinesLocked($order, is_array($linesData) ? $linesData : [])
+                : $this->syncLines($order, is_array($linesData) ? $linesData : []);
             $this->recalculateTotals($order, $subtotal);
 
             return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
@@ -216,6 +233,267 @@ class PurchaseOrderService
 
             return $order->fresh(['supplier', 'lines', 'cancelledBy', 'paymentMethod']);
         });
+    }
+
+    // ======================================================================
+    // RECEIVING LOCK
+    // ======================================================================
+
+    /**
+     * Kunci PO karena sudah ada GRN yang merujuk ke line-nya.
+     * Idempoten: first_grn_id hanya diisi sekali (GRN penyebab lock).
+     * Dipanggil dari GoodsReceiptService::create() di dalam transaksi + lockForUpdate.
+     */
+    public function lockForReceiving(PurchaseOrder $order, int $grnId, ?int $userId = null, ?string $reason = null): void
+    {
+        if ($order->isLocked()) {
+            return; // sudah terkunci — jangan overwrite jejak lock pertama
+        }
+
+        $order->forceFill([
+            'receiving_started_at' => $order->receiving_started_at ?? now(),
+            'locked_at'   => now(),
+            'locked_by'   => $userId,
+            'lock_reason' => $reason ?: 'GRN pertama dibuat dari PO ini.',
+            'first_grn_id' => $grnId,
+        ])->save();
+    }
+
+    /**
+     * Evaluasi apakah lock boleh dilepas setelah seluruh GRN dibatalkan/dihapus.
+     *
+     * KEPUTUSAN: konservatif. Lock HANYA dilepas bila TIDAK ada jejak yang
+     * relevan sama sekali:
+     * - tidak ada GRN tersisa (posted maupun draft),
+     * - tidak pernah/ tidak ada payment (termasuk voided sebagai jejak),
+     * - tidak ada purchase return.
+     * Jika salah satu pernah ada (stok/jurnal/payment/return/audit), lock TIDAK dibuka.
+     * Default flow tetap terkunci karena GRN normal tidak bisa dihapus.
+     */
+    public function maybeUnlock(PurchaseOrder $order): bool
+    {
+        if (!$order->isLocked()) {
+            return false;
+        }
+
+        $hasAnyGrn = DB::table('purchase_receipts')
+            ->where('purchase_order_id', $order->id)->exists();
+
+        $hasAnyPayment = DB::table('purchase_payments')
+            ->where('purchase_order_id', $order->id)->exists();
+
+        $hasAnyReturn = DB::table('purchase_returns')
+            ->where('purchase_order_id', $order->id)->exists();
+
+        if ($hasAnyGrn || $hasAnyPayment || $hasAnyReturn) {
+            return false; // ada jejak relevan → tetap terkunci
+        }
+
+        $order->forceFill([
+            'locked_at'   => null,
+            'locked_by'   => null,
+            'lock_reason' => null,
+            'first_grn_id' => null,
+            'receiving_started_at' => null,
+        ])->save();
+
+        return true;
+    }
+
+    /**
+     * Total qty yang sudah "terpakai" per purchase_order_line_id, dari SEMUA GRN
+     * (draft + posted) yang merujuk line tsb. Dipakai sebagai batas bawah qty PO.
+     */
+    protected function receivedQtyByLineId(PurchaseOrder $order): array
+    {
+        return DB::table('purchase_receipt_lines')
+            ->join('purchase_receipts', 'purchase_receipts.id', '=', 'purchase_receipt_lines.purchase_receipt_id')
+            ->where('purchase_receipts.purchase_order_id', $order->id)
+            ->whereIn('purchase_receipts.status', ['draft', 'posted'])
+            ->whereNotNull('purchase_receipt_lines.purchase_order_line_id')
+            ->groupBy('purchase_receipt_lines.purchase_order_line_id')
+            ->selectRaw('purchase_receipt_lines.purchase_order_line_id as line_id, SUM(purchase_receipt_lines.qty_received + purchase_receipt_lines.qty_reject) as used')
+            ->pluck('used', 'line_id')
+            ->map(fn ($v) => (float) $v)
+            ->toArray();
+    }
+
+    /**
+     * Sinkronisasi line untuk PO TERKUNCI — TIDAK melakukan lines()->delete() buta.
+     *
+     * Aturan (defense-in-depth level Service):
+     * - Line yang sudah dirujuk GRN (received/reject > 0 atau punya receiptLines):
+     *   • tidak boleh hilang (dihapus) dari payload,
+     *   • item tidak boleh diganti (dicocokkan per item_id),
+     *   • qty tidak boleh turun di bawah qty yang sudah diterima,
+     *   • harga/diskon/notes boleh diperbarui (owner memperbaiki harga sebelum GRN diposting).
+     * - Line lama tanpa referensi GRN boleh diubah/dihapus.
+     * - Line baru boleh ditambahkan.
+     *
+     * Pencocokan dilakukan per item_id karena form PO tidak mengirim id line,
+     * dan item pada line yang sudah dirujuk memang dilarang berubah.
+     */
+    protected function syncLinesLocked(PurchaseOrder $order, array $linesData): float
+    {
+        $orderType = $this->normalizeOrderType($order->getAttribute('order_type') ?: 'material');
+
+        $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
+        $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
+        $hasItemDefaultAlloc = Schema::hasColumn('items', 'default_allocation');
+        $hasItemDefaultExpAcc = Schema::hasColumn('items', 'default_expense_account_id');
+
+        $existingLines = $order->lines()->get();
+        $receivedByLineId = $this->receivedQtyByLineId($order);
+
+        // item_id → daftar line id yang REFERENCED (dipakai GRN)
+        $referencedByItem = [];
+        foreach ($existingLines as $ln) {
+            $used = (float) ($receivedByLineId[$ln->id] ?? 0);
+            if ($used > 0.0001) {
+                $referencedByItem[(int) $ln->item_id][] = $ln;
+            }
+        }
+
+        // Preload item master untuk validasi tipe + default alokasi
+        $incomingItemIds = collect($linesData)
+            ->pluck('item_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all();
+        $itemsById = Item::query()
+            ->whereIn('id', array_merge($incomingItemIds, array_keys($referencedByItem)))
+            ->get()->keyBy('id');
+
+        // Agregasi qty incoming per item (form bisa mengirim item sama di >1 baris)
+        $incomingByItem = [];
+        foreach ($linesData as $i => $row) {
+            $itemId = (int) ($row['item_id'] ?? 0);
+            $qty = $this->toNumber($row['qty'] ?? 0);
+            if ($itemId <= 0 || $qty <= 0.0001) {
+                continue;
+            }
+            $incomingByItem[$itemId] = ($incomingByItem[$itemId] ?? 0) + $qty;
+        }
+
+        // 1) GUARD: semua item yang sudah dirujuk GRN wajib tetap ada dgn qty >= received.
+        foreach ($referencedByItem as $itemId => $lines) {
+            $requiredMin = 0.0;
+            foreach ($lines as $ln) {
+                $requiredMin += (float) ($receivedByLineId[$ln->id] ?? 0);
+            }
+
+            if (!array_key_exists($itemId, $incomingByItem)) {
+                $name = $itemsById[$itemId]->name ?? ('#' . $itemId);
+                throw ValidationException::withMessages([
+                    'lines' => "Item \"{$name}\" sudah dirujuk GRN dan tidak boleh dihapus dari PO terkunci.",
+                ]);
+            }
+
+            if ($incomingByItem[$itemId] + 0.0001 < $requiredMin) {
+                $name = $itemsById[$itemId]->name ?? ('#' . $itemId);
+                throw ValidationException::withMessages([
+                    'lines' => "Qty item \"{$name}\" tidak boleh diturunkan di bawah qty yang sudah diterima ({$requiredMin}).",
+                ]);
+            }
+        }
+
+        // 2) Hapus HANYA line lama yang TIDAK dirujuk GRN.
+        foreach ($existingLines as $ln) {
+            $used = (float) ($receivedByLineId[$ln->id] ?? 0);
+            if ($used <= 0.0001) {
+                $ln->delete();
+            }
+        }
+
+        // 3) Rebuild: untuk item referenced → pertahankan line pertama (update harga/qty),
+        //    sisanya (item non-referenced) dibuat baru seperti biasa.
+        $subtotal = 0.0;
+        $consumedReferenced = []; // item_id sudah dipakai untuk update in-place
+
+        foreach ($linesData as $i => $row) {
+            $itemId = (int) ($row['item_id'] ?? 0);
+            $qty = $this->toNumber($row['qty'] ?? 0);
+            $unitPrice = $this->toNumber($row['unit_price'] ?? 0);
+            $discount = $this->toNumber($row['discount'] ?? 0);
+            $notes = $row['notes'] ?? null;
+
+            if ($itemId <= 0 || $qty <= 0.0001) {
+                continue;
+            }
+
+            $item = $itemsById->get($itemId);
+            if (!$item) {
+                continue;
+            }
+            if ((string) $item->type !== (string) $orderType) {
+                throw ValidationException::withMessages([
+                    "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
+                ]);
+            }
+
+            $lineTotal = round(max(0, ($qty * $unitPrice) - $discount), 2);
+
+            // Alokasi/expense account: pertahankan yang lama untuk referenced, hitung untuk baru.
+            $referenced = $referencedByItem[$itemId] ?? [];
+            $isReferencedItem = !empty($referenced) && !in_array($itemId, $consumedReferenced, true);
+
+            if ($isReferencedItem) {
+                /** @var PurchaseOrderLine $keep */
+                $keep = $referenced[0];
+                $keep->qty = round($qty, 4);
+                $keep->unit_price = round($unitPrice, 4);
+                $keep->discount = round($discount, 2);
+                $keep->line_total = $lineTotal;
+                $keep->notes = $notes;
+                // item_id, allocation, expense_account_id SENGAJA tidak diubah.
+                $keep->save();
+                $consumedReferenced[] = $itemId;
+
+                // Line referenced ekstra (item sama di >1 line) dibiarkan apa adanya.
+            } else {
+                $allocation = 'hpp';
+                if ($hasLineAllocation) {
+                    $fromLine = $row['allocation'] ?? null;
+                    $allocRaw = ($fromLine !== null && $fromLine !== '')
+                        ? (string) $fromLine
+                        : (string) ($hasItemDefaultAlloc ? ($item->default_allocation ?? 'hpp') : 'hpp');
+                    $allocation = in_array($allocRaw, ['hpp', 'expense'], true) ? $allocRaw : 'hpp';
+                }
+
+                $expenseAccountId = null;
+                if ($hasLineExpenseAcc && $allocation === 'expense') {
+                    $fromLine = $row['expense_account_id'] ?? null;
+                    if ($fromLine !== null && $fromLine !== '' && (int) $fromLine > 0) {
+                        $expenseAccountId = (int) $fromLine;
+                    } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                        $expenseAccountId = (int) $item->default_expense_account_id;
+                    }
+                }
+
+                $payload = [
+                    'item_id' => $itemId,
+                    'lot_id' => !empty($row['lot_id']) ? (int) $row['lot_id'] : null,
+                    'qty' => round($qty, 4),
+                    'unit_price' => round($unitPrice, 4),
+                    'discount' => round($discount, 2),
+                    'line_total' => $lineTotal,
+                    'notes' => $notes,
+                ];
+                if ($hasLineAllocation) {
+                    $payload['allocation'] = $allocation;
+                }
+                if ($hasLineExpenseAcc) {
+                    $payload['expense_account_id'] = ($allocation === 'expense') ? $expenseAccountId : null;
+                }
+                $order->lines()->create($payload);
+            }
+
+            $subtotal = round($subtotal + $lineTotal, 2);
+            $this->touchLastPrices($order, $itemId, (float) $unitPrice);
+        }
+
+        // Tambahkan kembali line_total referenced yang tidak muncul di incoming
+        // (seharusnya tidak terjadi karena guard di atas, tetapi jaga konsistensi subtotal).
+        $subtotal = round((float) $order->lines()->sum('line_total'), 2);
+
+        return $subtotal;
     }
 
     // ======================================================================

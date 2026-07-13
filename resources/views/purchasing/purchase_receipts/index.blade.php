@@ -1,107 +1,118 @@
 {{-- resources/views/purchasing/purchase_receipts/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Goods Receipts')
+@section('title', 'Goods Receipts • Terima Barang')
 
 @push('head')
 <style>
-    .page-wrap {
-        max-width: 1080px;
-        margin-inline: auto;
-        padding-bottom: 3rem;
+    :root{
+        --shp-accent:#334155;
+        --shp-accent-2:#1f2937;
+        --shp-border:rgba(148,163,184,.18);
+        --shp-border-strong:rgba(148,163,184,.30);
+        --shp-muted:#64748b;
     }
+    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    .mono{ font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono"; }
 
-    .card-filter {
-        background: var(--card);
-        border-radius: 14px;
-        border: 1px solid var(--line);
-        padding: .85rem .95rem;
-        margin-bottom: .85rem;
+    .card-main{ background:var(--card); border-radius:8px; border:1px solid var(--shp-border); overflow:hidden; }
+    body[data-theme="dark"] .card-main{ border-color:rgba(51,65,85,.85); }
+
+    .ship-topbar{
+        position:sticky; top:0; z-index:300;
+        display:flex; justify-content:space-between; align-items:flex-start;
+        gap:.6rem; flex-wrap:wrap;
+        padding:.55rem .75rem; margin-inline:-.75rem; margin-bottom:.65rem;
+        background:var(--card,#fff); border-bottom:1px solid var(--shp-border);
     }
+    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight:750; font-size:1rem; margin:0; }
+    .sub{ color:var(--shp-muted); font-size:.78rem; }
+    body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .card-table {
-        background: var(--card);
-        border-radius: 14px;
-        border: 1px solid var(--line);
-        overflow: hidden;
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.4rem; }
+    .kpi{
+        display:inline-flex; align-items:baseline; gap:.45rem;
+        border-radius:7px; padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28); background:transparent; font-size:.72rem;
     }
+    body[data-theme="dark"] .kpi{ background:rgba(15,23,42,.96); border-color:rgba(51,65,85,.85); }
+    .kpi .lbl{ font-size:.66rem; color:#94a3b8; }
+    .kpi .val{ font-weight:650; color:var(--shp-accent); }
+    body[data-theme="dark"] .kpi .val{ color:#cbd5e1; }
 
-    .mono {
-        font-variant-numeric: tabular-nums;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+    .btn-pill{ border-radius:7px; padding-inline:.85rem; box-shadow:none!important; font-weight:600; }
+    .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
+    .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
+    .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+
+    /* Filter bar */
+    .filter-bar{
+        background:var(--card); border:1px solid var(--shp-border);
+        border-radius:8px; padding:.6rem .7rem; margin-bottom:.65rem;
     }
+    .filter-bar .form-control, .filter-bar .form-select{ border-radius:7px; font-size:.82rem; }
+    .filter-summary{ font-size:.74rem; color:var(--shp-muted); }
+    .filter-summary strong{ color:var(--shp-accent); }
+    body[data-theme="dark"] .filter-summary strong{ color:#cbd5e1; }
 
-    .table thead th {
-        border-bottom-width: 1px;
-        font-size: .72rem;
-        text-transform: uppercase;
-        letter-spacing: .07em;
-        color: var(--muted);
-        white-space: nowrap;
-        padding: .5rem .75rem;
+    /* Table (selaras shipment) */
+    .table-list{ margin-bottom:0; }
+    .table-list thead th{
+        border-bottom-width:1px; font-size:.68rem; text-transform:none; letter-spacing:0;
+        color:#64748b; background:var(--card,#fff); padding:.52rem .62rem; white-space:nowrap;
     }
+    body[data-theme="dark"] .table-list thead th{ background:rgba(15,23,42,.98); color:#9ca3af; }
+    .table-list tbody td{ vertical-align:middle; border-top-color:rgba(148,163,184,.16); padding:.52rem .62rem; }
+    body[data-theme="dark"] .table-list tbody td{ border-top-color:rgba(51,65,85,.85); }
 
-    .table tbody td {
-        vertical-align: middle;
-        font-size: .83rem;
-        padding: .45rem .75rem;
+    .grn-row{ cursor:pointer; }
+    .grn-row:hover{ background:rgba(51,65,85,.035); }
+    .code-link{ font-weight:700; text-decoration:none; color:inherit; font-size:.9rem; }
+    .code-link:hover{ text-decoration:underline; }
+    .muted{ font-size:.78rem; color:#6b7280; }
+    body[data-theme="dark"] .muted{ color:#9ca3af; }
+    .store-name{ font-weight:600; font-size:.86rem; }
+    .ret-flag{ color:#b45309; font-weight:600; }
+
+    /* Dot status badges */
+    .badge-status{
+        border-radius:7px; padding:.16rem .48rem; font-size:.68rem; white-space:nowrap;
+        border:1px solid transparent; display:inline-flex; align-items:center; gap:.35rem;
     }
+    .badge-status::before{ content:''; width:7px; height:7px; border-radius:999px; display:inline-block; }
+    .st-draft{ background:rgba(148,163,184,.10); color:#475569; border-color:rgba(148,163,184,.30); }
+    .st-draft::before{ background:rgba(100,116,139,.95); }
+    .st-posted{ background:rgba(34,197,94,.10); color:#166534; border-color:rgba(34,197,94,.30); }
+    .st-posted::before{ background:rgba(34,197,94,.95); }
+    .st-closed{ background:rgba(15,23,42,.08); color:#334155; border-color:rgba(15,23,42,.22); }
+    .st-closed::before{ background:rgba(51,65,85,.95); }
+    body[data-theme="dark"] .st-posted{ background:rgba(34,197,94,.20); color:#dcfce7; border-color:rgba(34,197,94,.55); }
+    body[data-theme="dark"] .st-closed{ color:#cbd5e1; border-color:rgba(203,213,225,.3); }
 
-    .table tbody tr:last-child td { border-bottom: none; }
+    .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
+    body[data-theme="dark"] .empty{ color:#9ca3af; }
 
-    .grn-row { cursor: pointer; }
-    .grn-row:hover { background: rgba(59,130,246,.04); }
-
-    /* Status badges */
-    .badge-grn {
-        border-radius: 999px;
-        font-size: .7rem;
-        padding: .1rem .6rem;
-        border: 1px solid transparent;
-        white-space: nowrap;
-    }
-    .badge-grn-draft {
-        background: rgba(148,163,184,.12);
-        color: #64748b;
-        border-color: rgba(148,163,184,.5);
-    }
-    .badge-grn-posted {
-        background: rgba(22,163,74,.12);
-        color: #15803d;
-        border-color: rgba(22,163,74,.6);
-    }
-    .badge-grn-closed {
-        background: rgba(15,23,42,.10);
-        color: #334155;
-        border-color: rgba(15,23,42,.25);
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .badge-grn-closed { color: #cbd5e1; border-color: rgba(203,213,225,.3); }
-    }
-    [data-theme="dark"] .badge-grn-closed { color: #cbd5e1; border-color: rgba(203,213,225,.3); }
-
-    /* Mobile card */
-    @media (max-width: 767.98px) {
-        .page-wrap { padding-inline: .75rem; }
-        .card-filter { padding: .75rem .8rem; }
-
-        .card-grn-mobile {
-            background: var(--card);
-            border-radius: 12px;
-            border: 1px solid var(--line);
-            padding: .75rem .85rem;
-            margin-bottom: .6rem;
-        }
-        .card-grn-mobile .meta {
-            font-size: .75rem;
-            color: var(--muted);
-        }
-        .card-grn-mobile .meta span+span::before {
-            content: "•";
-            margin-inline: .35rem;
-            opacity: .65;
-        }
+    @media (max-width:768px){
+        .page-wrap{ padding:.5rem .5rem 4rem; }
+        .ship-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
+        .title{ font-size:1.05rem; }
+        .sub{ display:none; }
+        .kpis{ gap:.3rem; }
+        .table-responsive{ overflow:visible; }
+        .table-list thead{ display:none; }
+        .table-list, .table-list tbody, .table-list tr, .table-list td{ display:block; width:100%; }
+        .table-list tbody tr{ padding:.7rem .8rem; border-top:1px solid rgba(148,163,184,.16); }
+        .table-list tbody td{ border:0; padding:0; }
+        .table-list tbody td.mobile-hide{ display:none; }
+        .ship-row-main{ display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; }
+        .ship-row-meta{ display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; margin-top:.4rem; color:#64748b; font-size:.78rem; }
+        .ship-row-meta span+span::before{ content:'•'; margin-right:.45rem; opacity:.6; }
+        .ship-row-action{ margin-top:.6rem; }
+        .ship-row-action .btn{ width:100%; min-height:40px; display:flex; align-items:center; justify-content:center; }
+        .code-link{ font-size:.95rem; }
+        .store-name{ font-size:.9rem; margin-top:.5rem; }
     }
 </style>
 @endpush
@@ -109,19 +120,30 @@
 @section('content')
 @php
     $user = auth()->user();
-    $startIndex = method_exists($receipts, 'firstItem') ? $receipts->firstItem() : 1;
+    $startIndex = method_exists($receipts, 'firstItem') ? ($receipts->firstItem() ?? 1) : 1;
 @endphp
 
-<div class="page-wrap py-3">
+<div class="page-wrap">
 
-    {{-- HEADER --}}
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    {{-- TOPBAR --}}
+    <div class="ship-topbar">
         <div>
-            <h2 class="mb-0">Goods Receipts</h2>
-            <div class="text-muted small">Penerimaan barang dari supplier ke gudang.</div>
+            <div class="title">Goods Receipt</div>
+            <div class="sub">Penerimaan barang dari supplier ke gudang.</div>
+            @if (isset($summary))
+                <div class="kpis">
+                    <span class="kpi"><span class="lbl">Total</span><span class="val mono">{{ $summary->total_receipts ?? 0 }}</span></span>
+                    <span class="kpi"><span class="lbl">Draft</span><span class="val mono">{{ $summary->draft_count ?? 0 }}</span></span>
+                    <span class="kpi"><span class="lbl">Posted</span><span class="val mono">{{ $summary->posted_count ?? 0 }}</span></span>
+                    @if (($summary->closed_count ?? 0) > 0)
+                        <span class="kpi"><span class="lbl">Closed</span><span class="val mono">{{ $summary->closed_count }}</span></span>
+                    @endif
+                </div>
+            @endif
         </div>
-        <a href="{{ route('purchasing.purchase_receipts.create') }}" class="btn btn-primary btn-sm">
-            + GRN Baru
+
+        <a href="{{ route('purchasing.purchase_receipts.create') }}" class="btn btn-sm btn-ship-primary btn-pill">
+            <i class="bi bi-plus-lg me-1"></i> GRN Baru
         </a>
     </div>
 
@@ -134,29 +156,24 @@
     @endif
 
     {{-- FILTER --}}
-    <div class="card-filter">
+    <div class="filter-bar">
         <form id="grn-filter-form" method="GET" action="{{ route('purchasing.purchase_receipts.index') }}">
             <input type="hidden" name="from_date" id="grn-from-date" value="{{ request('from_date') }}">
             <input type="hidden" name="to_date"   id="grn-to-date"   value="{{ request('to_date') }}">
 
             <div class="d-flex flex-wrap gap-2 align-items-center">
-                <input type="text" name="supplier_search"
-                    id="grn-supplier-search"
-                    value="{{ request('supplier_search') }}"
-                    placeholder="Cari supplier…"
-                    class="form-control form-control-sm"
-                    style="max-width:180px;" autocomplete="off" />
+                <input type="text" name="supplier_search" id="grn-supplier-search"
+                    value="{{ request('supplier_search') }}" placeholder="Cari supplier…"
+                    class="form-control form-control-sm" style="max-width:200px;" autocomplete="off" />
 
-                <select name="warehouse_id" class="form-select form-select-sm grn-filter-auto" style="max-width:150px;">
+                <select name="warehouse_id" class="form-select form-select-sm grn-filter-auto" style="max-width:160px;">
                     <option value="">Semua Gudang</option>
                     @foreach ($warehouses as $wh)
-                        <option value="{{ $wh->id }}" @selected(request('warehouse_id') == $wh->id)>
-                            {{ $wh->name }}
-                        </option>
+                        <option value="{{ $wh->id }}" @selected(request('warehouse_id') == $wh->id)>{{ $wh->name }}</option>
                     @endforeach
                 </select>
 
-                <select name="status" class="form-select form-select-sm grn-filter-auto" style="max-width:120px;">
+                <select name="status" class="form-select form-select-sm grn-filter-auto" style="max-width:130px;">
                     <option value="">Semua Status</option>
                     <option value="draft"  @selected(request('status') === 'draft')>Draft</option>
                     <option value="posted" @selected(request('status') === 'posted')>Posted</option>
@@ -170,168 +187,60 @@
                         try {
                             $f = \Carbon\Carbon::parse(request('from_date'));
                             $t = \Carbon\Carbon::parse(request('to_date'));
-                            $grnRangeDisplay = $f->day . ' ' . $idMonthsGrn[$f->month-1]
-                                . ' – ' . $t->day . ' ' . $idMonthsGrn[$t->month-1] . ' ' . $t->year;
-                        } catch (\Exception $e) {
-                            $grnRangeDisplay = request('from_date') . ' – ' . request('to_date');
-                        }
+                            $grnRangeDisplay = $f->day.' '.$idMonthsGrn[$f->month-1].' – '.$t->day.' '.$idMonthsGrn[$t->month-1].' '.$t->year;
+                        } catch (\Exception $e) { $grnRangeDisplay = request('from_date').' – '.request('to_date'); }
                     } elseif (request('from_date')) {
                         try {
                             $f = \Carbon\Carbon::parse(request('from_date'));
-                            $grnRangeDisplay = $f->day . ' ' . $idMonthsGrn[$f->month-1] . ' ' . $f->year;
-                        } catch (\Exception $e) {
-                            $grnRangeDisplay = request('from_date');
-                        }
+                            $grnRangeDisplay = $f->day.' '.$idMonthsGrn[$f->month-1].' '.$f->year;
+                        } catch (\Exception $e) { $grnRangeDisplay = request('from_date'); }
                     }
                 @endphp
-                <input type="text" id="grn-date-range" value="{{ $grnRangeDisplay }}"
-                    placeholder="Pilih tanggal…" autocomplete="off" data-gf-date="off"
-                    class="form-control form-control-sm" style="max-width:190px;cursor:pointer;" readonly />
+                <input type="text" id="grn-date-range" value="{{ $grnRangeDisplay }}" placeholder="Pilih tanggal…"
+                    autocomplete="off" data-gf-date="off" class="form-control form-control-sm"
+                    style="max-width:200px;cursor:pointer;" readonly />
 
                 @if (request()->filled('supplier_search') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date'))
-                    <a href="{{ route('purchasing.purchase_receipts.index') }}"
-                       class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;padding:.25rem .65rem;">
+                    <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
                         <i class="bi bi-x me-1"></i>Reset
                     </a>
                 @endif
             </div>
         </form>
 
-        {{-- SUMMARY --}}
-        @if (isset($summary))
-            <div class="d-flex flex-wrap gap-1 mt-2" style="font-size:.78rem;color:var(--muted);">
-                <span><strong class="text-body mono">{{ $summary->total_receipts ?? 0 }}</strong> GRN</span>
-                <span>·</span>
-                <span>Draft <strong class="text-body mono">{{ $summary->draft_count ?? 0 }}</strong></span>
-                <span>·</span>
-                <span>Posted <strong class="text-body mono">{{ $summary->posted_count ?? 0 }}</strong></span>
-                @if (($summary->closed_count ?? 0) > 0)
-                    <span>·</span>
-                    <span>Closed <strong class="text-body mono">{{ $summary->closed_count }}</strong></span>
-                @endif
-                @if (!empty($summary->last_date))
-                    <span>·</span>
-                    <span>Terakhir <strong class="text-body mono">{{ id_date($summary->last_date) }}</strong></span>
-                @endif
+        @if (isset($summary) && !empty($summary->last_date))
+            <div class="filter-summary mt-2">
+                Terakhir diterima: <strong class="mono">{{ id_date($summary->last_date) }}</strong>
             </div>
         @endif
     </div>
 
-    {{-- DESKTOP TABLE --}}
-    <div class="card-table d-none d-md-block">
-        <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th style="width:22%;">GRN</th>
-                        <th>Supplier</th>
-                        <th style="width:16%;">Gudang</th>
-                        <th style="width:14%;">Status</th>
-                        <th style="width:4%;"></th>
-                    </tr>
-                </thead>
-                <tbody id="grn-table-body">
-                    @forelse ($receipts as $receipt)
-                        @php
-                            $hasReturn   = ($receipt->return_count ?? 0) > 0;
-                            $statusClass = match ((string) $receipt->status) {
-                                'posted' => 'badge-grn badge-grn-posted',
-                                'closed' => 'badge-grn badge-grn-closed',
-                                default  => 'badge-grn badge-grn-draft',
-                            };
-                        @endphp
-                        <tr class="grn-row" data-href="{{ route('purchasing.purchase_receipts.show', $receipt->id) }}">
-                            <td>
-                                <span class="fw-semibold mono" style="font-size:.82rem;white-space:nowrap;">
-                                    {{ $receipt->code ?? ('GRN#' . $receipt->id) }}
-                                </span>
-                                <div class="text-muted mono" style="font-size:.72rem;white-space:nowrap;">
-                                    {{ $receipt->date ? id_date($receipt->date) : '—' }}
-                                </div>
-                            </td>
-                            <td style="max-width:220px;">
-                                <div style="font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                    {{ optional($receipt->supplier)->name ?? '—' }}
-                                </div>
-                                <div class="text-muted mono" style="font-size:.71rem;">
-                                    {{ optional($receipt->supplier)->code ?? '' }}
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-size:.83rem;">{{ optional($receipt->warehouse)->name ?? '—' }}</div>
-                                <div class="text-muted mono" style="font-size:.71rem;">{{ optional($receipt->warehouse)->code ?? '' }}</div>
-                            </td>
-                            <td>
-                                <span class="{{ $statusClass }}">{{ ucfirst($receipt->status) }}</span>
-                                @if ($hasReturn)
-                                    <div class="text-muted" style="font-size:.72rem;margin-top:.15rem;">Retur {{ $receipt->return_count }}x</div>
-                                @endif
-                            </td>
-                            <td class="text-end">
-                                <i class="bi bi-chevron-right text-muted" style="font-size:.8rem;opacity:.4;"></i>
-                            </td>
-                        </tr>
-                    @empty
+    {{-- TABLE (satu tabel responsif; mobile → kartu) --}}
+    <div class="card card-main">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-list">
+                    <thead>
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">Belum ada Goods Receipt.</td>
+                            <th style="width:46px;">#</th>
+                            <th style="width:120px;">Tanggal</th>
+                            <th style="width:210px;">GRN</th>
+                            <th>Supplier / Gudang</th>
+                            <th style="width:120px;">Status</th>
+                            <th style="width:100px;"></th>
                         </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <div id="grn-loading" class="text-center py-2 text-muted d-none" style="font-size:.8rem;">
-            Memuat data…
-        </div>
-        <div id="grn-load-more-trigger"></div>
-
-        @if (method_exists($receipts, 'links'))
-            <div class="px-3 py-2">{{ $receipts->links() }}</div>
-        @endif
-    </div>
-
-    {{-- MOBILE LIST --}}
-    <div class="d-md-none">
-        @forelse ($receipts as $receipt)
-            @php
-                $hasReturn   = ($receipt->return_count ?? 0) > 0;
-                $statusClass = match ((string) $receipt->status) {
-                    'posted' => 'badge-grn badge-grn-posted',
-                    'closed' => 'badge-grn badge-grn-closed',
-                    default  => 'badge-grn badge-grn-draft',
-                };
-            @endphp
-            <div class="card-grn-mobile" onclick="window.location='{{ route('purchasing.purchase_receipts.show', $receipt->id) }}'">
-                <div class="d-flex justify-content-between align-items-start mb-1">
-                    <div>
-                        <div class="fw-semibold mono" style="font-size:.88rem;">
-                            {{ $receipt->code ?? ('GRN#' . $receipt->id) }}
-                        </div>
-                        <div class="meta mt-1">
-                            <span class="mono">{{ $receipt->date ? id_date($receipt->date) : '—' }}</span>
-                            @if (optional($receipt->supplier)->name)
-                                <span>{{ $receipt->supplier->name }}</span>
-                            @endif
-                            @if (optional($receipt->warehouse)->name)
-                                <span>{{ $receipt->warehouse->name }}</span>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="text-end">
-                        <span class="{{ $statusClass }}">{{ ucfirst($receipt->status) }}</span>
-                        @if ($hasReturn)
-                            <div class="text-muted mt-1" style="font-size:.72rem;">Retur {{ $receipt->return_count }}x</div>
-                        @endif
-                    </div>
-                </div>
+                    </thead>
+                    <tbody id="grn-table-body">
+                        @include('purchasing.purchase_receipts._rows', ['receipts' => $receipts, 'startIndex' => $startIndex])
+                    </tbody>
+                </table>
             </div>
-        @empty
-            <div class="text-center text-muted py-3 small">Belum ada Goods Receipt.</div>
-        @endforelse
 
-        <div class="mt-2">
+            <div id="grn-loading" class="text-center py-2 text-muted d-none" style="font-size:.8rem;">Memuat data…</div>
+            <div id="grn-load-more-trigger"></div>
+
             @if (method_exists($receipts, 'links'))
-                {{ $receipts->links() }}
+                <div class="px-3 py-2">{{ $receipts->links() }}</div>
             @endif
         </div>
     </div>
@@ -345,12 +254,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('grn-filter-form');
     if (!form) return;
 
-    // Selects: auto-submit on change
     form.querySelectorAll('select.grn-filter-auto').forEach(function (el) {
         el.addEventListener('change', function () { form.submit(); });
     });
 
-    // Supplier text: debounce 500ms + auto-focus
     const supplierInput = document.getElementById('grn-supplier-search');
     if (supplierInput) {
         let timer;
@@ -365,15 +272,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 100);
     }
 
-    // Flatpickr date range
     const rangeInput = document.getElementById('grn-date-range');
     const fromHidden = document.getElementById('grn-from-date');
     const toHidden   = document.getElementById('grn-to-date');
     if (rangeInput && window.flatpickr) {
         const ID_MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-        function fmtDate(d, withYear) {
-            return d.getDate() + ' ' + ID_MONTHS[d.getMonth()] + (withYear ? ' ' + d.getFullYear() : '');
-        }
+        function fmtDate(d, withYear) { return d.getDate() + ' ' + ID_MONTHS[d.getMonth()] + (withYear ? ' ' + d.getFullYear() : ''); }
         function fmtRange(dates) {
             if (dates.length === 2) {
                 const sameYear = dates[0].getFullYear() === dates[1].getFullYear();
@@ -382,19 +286,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (dates.length === 1) return fmtDate(dates[0], true) + ' …';
             return '';
         }
-
         flatpickr(rangeInput, {
-            mode: 'range',
-            dateFormat: 'Y-m-d',
-            locale: { firstDayOfWeek: 1 },
-            allowInput: false,
+            mode: 'range', dateFormat: 'Y-m-d', locale: { firstDayOfWeek: 1 }, allowInput: false,
             defaultDate: [fromHidden.value, toHidden.value].filter(Boolean),
             onChange: function (selectedDates, dateStr, fp) {
                 fp.input.value = fmtRange(selectedDates);
-                if (selectedDates.length === 1) {
-                    fromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
-                    toHidden.value   = '';
-                } else if (selectedDates.length === 2) {
+                if (selectedDates.length === 1) { fromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d'); toHidden.value = ''; }
+                else if (selectedDates.length === 2) {
                     fromHidden.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
                     toHidden.value   = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
                     form.submit();
@@ -407,13 +305,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Row click via data-href
-    document.querySelectorAll('tr.grn-row').forEach(function (row) {
-        row.addEventListener('click', function (e) {
-            if (e.target.closest('a, button, form')) return;
-            const href = row.dataset.href;
-            if (href) window.location = href;
-        });
+    // Row click (delegated so appended rows work too)
+    document.addEventListener('click', function (e) {
+        const row = e.target.closest('tr.grn-row');
+        if (!row) return;
+        if (e.target.closest('a, button, form')) return;
+        const href = row.dataset.href;
+        if (href) window.location = href;
     });
 
     // Infinite scroll
@@ -428,19 +326,13 @@ document.addEventListener('DOMContentLoaded', function () {
         isLoading = true;
         if (loadingEl) loadingEl.classList.remove('d-none');
         try {
-            const res = await fetch(nextPageUrl, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
-            });
+            const res = await fetch(nextPageUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
             const data = await res.json();
             if (data.html && tableBody) tableBody.insertAdjacentHTML('beforeend', data.html);
             nextPageUrl = data.next_page_url;
             if (!nextPageUrl && observer) observer.unobserve(triggerEl);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            if (loadingEl) loadingEl.classList.add('d-none');
-            isLoading = false;
-        }
+        } catch (e) { console.error(e); }
+        finally { if (loadingEl) loadingEl.classList.add('d-none'); isLoading = false; }
     }
 
     const observer = new IntersectionObserver(entries => {

@@ -31,6 +31,12 @@ class PurchaseOrder extends Model
         'order_type',
         'received_status',
         'purchase_request_id',  // PR-D — additive, nullable
+        // Receiving lock (GRN dari PO draft) — additive, nullable
+        'receiving_started_at',
+        'locked_at',
+        'locked_by',
+        'lock_reason',
+        'first_grn_id',
     ];
 
     protected $casts = [
@@ -44,6 +50,8 @@ class PurchaseOrder extends Model
         'approved_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'closed_at' => 'datetime',  // Tahap 4
+        'receiving_started_at' => 'datetime',
+        'locked_at' => 'datetime',
     ];
 
     /*
@@ -123,6 +131,49 @@ class PurchaseOrder extends Model
     public function isClosed(): bool
     {
         return !is_null($this->closed_at);
+    }
+
+    /**
+     * Receiving lock: PO dikunci karena sudah ada GRN yang merujuk ke line-nya.
+     * locked_at adalah flag otoritatif (bukan status tampilan).
+     */
+    public function isLocked(): bool
+    {
+        return !is_null($this->locked_at);
+    }
+
+    /** Status yang boleh menjadi acuan GRN (draft/approved/closed, TIDAK cancelled). */
+    public function isReceivableForGrn(): bool
+    {
+        return in_array($this->status, ['draft', 'approved'], true) || $this->isClosed();
+    }
+
+    /** Label turunan untuk UI: Draft / Receiving / Partially Received / Fully Received / Locked. */
+    public function receivingStageLabel(): string
+    {
+        if ($this->status === 'cancelled') {
+            return 'Cancelled';
+        }
+        if ($this->isFullyReceived()) {
+            return 'Fully Received';
+        }
+        if ($this->isPartiallyReceived()) {
+            return 'Partially Received';
+        }
+        if ($this->isLocked()) {
+            return 'Receiving';
+        }
+        return ucfirst($this->status ?? 'draft');
+    }
+
+    public function lockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    public function firstGrn(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\PurchaseReceipt::class, 'first_grn_id');
     }
 
     public function isFullyReceived(): bool

@@ -119,7 +119,10 @@ class PurchaseReceiptController extends Controller
                 $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
             }], 'qty_received')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
-                $q->where('status', 'approved');
+                // Flow baru: GRN boleh dari PO draft ATAU approved (closed juga valid).
+                // Cancelled dikecualikan.
+                $q->whereIn('status', ['draft', 'approved'])
+                  ->where('status', '!=', 'cancelled');
 
                 if (!empty($selectedSupplierId)) {
                     $q->where('supplier_id', (int) $selectedSupplierId);
@@ -172,10 +175,11 @@ class PurchaseReceiptController extends Controller
      */
     public function createFromOrder(PurchaseOrder $purchase_order)
     {
-        if ($purchase_order->status !== 'approved') {
+        // Flow baru: GRN boleh dari PO draft / approved / closed. Cancelled ditolak.
+        if (!$purchase_order->isReceivableForGrn() || $purchase_order->status === 'cancelled') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'GRN hanya bisa dibuat dari PO yang sudah di-approve.');
+                ->with('error', 'GRN hanya bisa dibuat dari PO berstatus draft, approved, atau closed (bukan cancelled).');
         }
 
         $purchase_order->load([
@@ -533,15 +537,18 @@ class PurchaseReceiptController extends Controller
             $poLineId = $poLineIds[$i] ?? null;
             $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
 
-            $unitPrice = $this->num($unitPrices[$i] ?? 0);
-            if (!$this->canSeeMoney($request)) {
-                if ($poLineId && array_key_exists($poLineId, $poPriceMap)) {
-                    $unitPrice = (float) $poPriceMap[$poLineId];
-                } elseif (!empty($existingPriceByItem[$itemId])) {
-                    $unitPrice = (float) array_shift($existingPriceByItem[$itemId]);
-                } else {
-                    $unitPrice = 0.0;
-                }
+            // ✅ HARGA SERVER-SIDE (defense-in-depth level Controller):
+            // - Jika baris terkait PO line → harga SELALU dari PO (abaikan request, semua role).
+            // - Jika tidak ada PO line → hanya user berhak harga yang boleh input; selain itu 0.
+            //   (Service tetap menjadi otoritas final atas harga.)
+            if ($poLineId && array_key_exists($poLineId, $poPriceMap)) {
+                $unitPrice = (float) $poPriceMap[$poLineId];
+            } elseif ($this->canSeeMoney($request)) {
+                $unitPrice = $this->num($unitPrices[$i] ?? 0);
+            } elseif (!empty($existingPriceByItem[$itemId])) {
+                $unitPrice = (float) array_shift($existingPriceByItem[$itemId]);
+            } else {
+                $unitPrice = 0.0;
             }
 
             if ($poLineId) {
@@ -593,7 +600,7 @@ class PurchaseReceiptController extends Controller
 
         /** @var PurchaseOrder|null $po */
         $po = PurchaseOrder::query()
-            ->select(['id', 'supplier_id', 'status'])
+            ->select(['id', 'supplier_id', 'status', 'closed_at'])
             ->find($poId);
 
         if (!$po) {
@@ -602,9 +609,11 @@ class PurchaseReceiptController extends Controller
             ]);
         }
 
-        if (!in_array((string) $po->status, ['approved', 'closed'], true)) {
+        // Flow baru: draft juga diizinkan (admin gudang tidak perlu approve).
+        // Cancelled tetap ditolak.
+        if ($po->status === 'cancelled' || !$po->isReceivableForGrn()) {
             throw ValidationException::withMessages([
-                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO yang statusnya approved/closed.',
+                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO berstatus draft/approved/closed (bukan cancelled).',
             ]);
         }
 
@@ -663,7 +672,7 @@ class PurchaseReceiptController extends Controller
     protected function canSeeMoney(?Request $request = null): bool
     {
         $user = $request?->user() ?: auth()->user();
-        return $user && method_exists($user, 'isOwner') && $user->isOwner();
+        return $user && method_exists($user, 'canSeePurchasePrices') && $user->canSeePurchasePrices();
     }
 
     /**

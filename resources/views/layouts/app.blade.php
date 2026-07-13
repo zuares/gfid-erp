@@ -404,9 +404,8 @@
   {{-- ✅ Badge unread chat di sidebar (realtime + refresh berkala) --}}
   <script>
     (function () {
-      var badge = document.getElementById('sidebarChatBadge');
-      if (!badge) return;
-
+      var badges = document.querySelectorAll('.sidebarChatBadge');
+      
       var previousUnread = -1;
 
       function playNotificationSound() {
@@ -429,11 +428,17 @@
             }
             previousUnread = n;
 
-            badge.textContent = n > 99 ? '99+' : n;
-            badge.style.display = n > 0 ? 'inline-block' : 'none';
+            var txt = n > 99 ? '99+' : n;
+            var disp = n > 0 ? 'inline-block' : 'none';
+            badges.forEach(function(b) {
+                b.textContent = txt;
+                b.style.display = disp;
+            });
           })
           .catch(function () {});
       }
+      
+      window.refreshChatBadge = refreshChatBadge;
 
       document.addEventListener('DOMContentLoaded', function() { refreshChatBadge(false); });
       // Auto-refresh setiap 20 detik (selalu bisa play sound jika memang ada yang unread baru)
