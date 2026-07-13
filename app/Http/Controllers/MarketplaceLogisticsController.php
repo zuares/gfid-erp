@@ -429,6 +429,52 @@ class MarketplaceLogisticsController extends Controller
                             $errorMsg = $resItem['fail_message'];
                             
                             // Translate common shopee error
+                            if (str_contains(strtolower($errorMsg), 'tracking number is invalid')) {
+                                try {
+                                    $awb = null;
+                                    $pkgNo = null;
+                                    
+                                    // Panggil getShippingParameter sesuai request user
+                                    if (method_exists($driver, 'getShippingParameter')) {
+                                        $driver->getShippingParameter($store, $orderSn);
+                                    }
+                                    
+                                    if (method_exists($driver, 'getTrackingNumber')) {
+                                        $trackResp = $driver->getTrackingNumber($store, $orderSn);
+                                        $awb = $trackResp['response']['tracking_number'] ?? null;
+                                    }
+                                    
+                                    if (!$awb && method_exists($driver, 'getOrderDetail')) {
+                                        $details = $driver->getOrderDetail($store, [$orderSn]);
+                                        $list = $details['response']['order_list'] ?? [];
+                                        if (count($list) > 0 && !empty($list[0]['package_list'][0])) {
+                                            $pkg = $list[0]['package_list'][0];
+                                            $awb = $pkg['tracking_number'] ?? $awb;
+                                            $pkgNo = $pkg['package_number'] ?? null;
+                                        }
+                                    }
+                                    
+                                    if ($awb || $pkgNo) {
+                                        if ($awb) {
+                                            $payload['tracking_number'] = $awb;
+                                            if ($order) {
+                                                $order->update(['shipping_awb_no' => $awb]);
+                                            }
+                                        }
+                                        if ($pkgNo) {
+                                            $payload['package_number'] = $pkgNo;
+                                        }
+                                        
+                                        // Retry create document with updated payload
+                                        $createRes = $driver->createShippingDocument($store, [$payload]);
+                                        if (empty($createRes['error']) && (!isset($createRes['response']['result_list'][0]['fail_message']))) {
+                                            $errorMsg = null;
+                                            break;
+                                        }
+                                    }
+                                } catch (\Throwable $e) {}
+                            }
+
                             if (str_contains($errorMsg, 'parcel has been shipped')) {
                                 return response()->view('marketplace.documents.fallback_awb', [
                                     'order' => $order,
