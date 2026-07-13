@@ -250,8 +250,16 @@
                 body = '🎬 [video]';
             } else if (m.message_type === 'item') {
                 body = '🛍 [produk]';
+            } else if (m.message_type === 'order') {
+                body = '📦 [pesanan]';
+            } else if (m.message_type === 'sticker') {
+                body = '✨ [stiker]';
+            } else if (m.message_type === 'bundle_message' || m.message_type === 'faq_liveagent') {
+                body = '🤖 [Pesan FAQ / Otomatis]';
             } else if (!m.text && m.message_type !== 'text') {
-                body = `[${esc(m.message_type)}]`;
+                // Format cantik jika ada tipe pesan lain yang nyasar
+                const niceType = (m.message_type || '').replace(/_/g, ' ');
+                body = `[${esc(niceType)}]`;
             }
             const t = m.sent_at ? new Date(m.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
             return `<div class="msg ${m.from_role === 'seller' ? 'seller' : 'buyer'}">${body}<div class="msg-time">${t}</div></div>`;
