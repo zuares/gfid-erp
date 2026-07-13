@@ -94,7 +94,12 @@
     description="Performa campaign Shopee Ads — spend, ROAS, ACOS, break-even & rekomendasi scale / stop.">
 
     {{-- ── KPI ─────────────────────────────────────────────────────────────── --}}
-    <div class="oc-kpi-grid" style="grid-template-columns:repeat(6,minmax(0,1fr))">
+    <div class="oc-kpi-grid" style="grid-template-columns:repeat(7,minmax(0,1fr))">
+        <div class="oc-kpi-card" style="border:1px solid rgba(34,197,94,.35)">
+            <div class="oc-kpi-label">💰 Saldo Iklan</div>
+            <div class="oc-kpi-value" id="kpiBalance" style="font-size:.88rem">—</div>
+            <div class="kpi-mini" id="kpiBalanceSub">pilih toko untuk cek</div>
+        </div>
         <div class="oc-kpi-card">
             <div class="oc-kpi-label">Total Spend</div>
             <div class="oc-kpi-value" id="kpiSpend" style="font-size:.88rem">—</div>
@@ -162,6 +167,28 @@
         </div>
 
         <div id="adsSyncAlert" class="alert d-none mt-3" style="border-radius:12px;font-size:.85rem"></div>
+    </x-gf.panel>
+
+    {{-- ── Performa Harian Toko (live dari API) ─────────────────────────────── --}}
+    <x-gf.panel title="Performa Harian Toko" subtitle="Gabungan semua campaign CPC — live dari Shopee Ads API. Pilih toko lalu klik Muat.">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnShopPerf" onclick="loadShopPerf()">📊 Muat Performa Harian</button>
+            <span class="text-muted" style="font-size:.72rem" id="shopPerfInfo"></span>
+        </div>
+        <div style="overflow-x:auto">
+            <table class="table table-sm" style="font-size:.75rem" id="shopPerfTable">
+                <thead>
+                    <tr style="color:#64748b;font-size:.68rem;text-transform:uppercase">
+                        <th>Tanggal</th><th class="text-end">Impresi</th><th class="text-end">Klik</th>
+                        <th class="text-end">CTR</th><th class="text-end">Spend</th>
+                        <th class="text-end">Order</th><th class="text-end">GMV</th><th class="text-end">ROAS</th>
+                    </tr>
+                </thead>
+                <tbody id="shopPerfBody">
+                    <tr><td colspan="8" class="text-center text-muted py-3">Belum dimuat.</td></tr>
+                </tbody>
+            </table>
+        </div>
     </x-gf.panel>
 
     {{-- ── Tabel Campaign ───────────────────────────────────────────────────── --}}
@@ -251,10 +278,82 @@
             opt.textContent = s.name + ' (' + (s.channel?.name || '?') + ')';
             sel.appendChild(opt);
         });
-        sel.addEventListener('change', loadAds);
+        sel.addEventListener('change', () => { loadAds(); loadBalance(); });
         setDateRange(30);
         loadAds();
     }
+
+    // ── Saldo Iklan (v2.ads.get_total_balance) ────────────────────────────────
+    async function loadBalance() {
+        const sid = $('adsStoreId').value;
+        if (!sid) {
+            $('kpiBalance').textContent = '—';
+            $('kpiBalanceSub').textContent = 'pilih toko untuk cek';
+            return;
+        }
+        $('kpiBalance').textContent = '⏳';
+        try {
+            const d = await api(`/api/marketplace/stores/${sid}/ads-balance`);
+            $('kpiBalance').textContent = d.balance != null ? fmtRp(d.balance) : '—';
+            $('kpiBalanceSub').textContent = 'sisa kredit iklan';
+            // Peringatan saldo menipis
+            if (d.balance != null && d.balance < 100000) {
+                $('kpiBalance').style.color = '#dc2626';
+                $('kpiBalanceSub').textContent = '⚠ saldo menipis — top up!';
+            } else {
+                $('kpiBalance').style.color = '';
+            }
+        } catch (e) {
+            $('kpiBalance').textContent = '—';
+            $('kpiBalanceSub').textContent = e.message.length > 40 ? 'gagal cek saldo' : e.message;
+        }
+    }
+
+    // ── Performa Harian Toko (v2.ads.get_all_cpc_ads_daily_performance) ──────
+    window.loadShopPerf = async function () {
+        const sid = $('adsStoreId').value;
+        if (!sid) { alert('Pilih toko dulu.'); return; }
+        const btn = $('btnShopPerf');
+        btn.disabled = true; btn.textContent = '⏳ Memuat…';
+        $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Memuat dari Shopee…</td></tr>';
+        try {
+            const d = await api(`/api/marketplace/stores/${sid}/ads-shop-performance?date_from=${$('dateFrom').value}&date_to=${$('dateTo').value}`);
+            const days = d.days || [];
+            if (!days.length) {
+                $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Tidak ada data di rentang ini.</td></tr>';
+            } else {
+                const tot = { imp:0, clk:0, spend:0, ord:0, gmv:0 };
+                $('shopPerfBody').innerHTML = days.map(r => {
+                    tot.imp += +r.impressions || 0; tot.clk += +r.clicks || 0;
+                    tot.spend += +r.spend || 0; tot.ord += +r.orders || 0; tot.gmv += +r.gmv || 0;
+                    return `<tr>
+                        <td>${r.date || '—'}</td>
+                        <td class="text-end">${(+r.impressions || 0).toLocaleString('id-ID')}</td>
+                        <td class="text-end">${(+r.clicks || 0).toLocaleString('id-ID')}</td>
+                        <td class="text-end">${r.ctr != null ? (+r.ctr).toFixed(2) + '%' : '—'}</td>
+                        <td class="text-end">${fmtRp(r.spend || 0)}</td>
+                        <td class="text-end">${r.orders ?? 0}</td>
+                        <td class="text-end">${fmtRp(r.gmv || 0)}</td>
+                        <td class="text-end fw-bold" style="color:${r.roas >= 4 ? '#166534' : (r.roas != null && r.roas < 2 ? '#dc2626' : 'inherit')}">${r.roas != null ? (+r.roas).toFixed(2) : '—'}</td>
+                    </tr>`;
+                }).join('') + `<tr class="fw-bold" style="border-top:2px solid #cbd5e1;background:#f8fafc">
+                        <td>TOTAL</td>
+                        <td class="text-end">${tot.imp.toLocaleString('id-ID')}</td>
+                        <td class="text-end">${tot.clk.toLocaleString('id-ID')}</td>
+                        <td class="text-end">${tot.imp ? (tot.clk / tot.imp * 100).toFixed(2) + '%' : '—'}</td>
+                        <td class="text-end">${fmtRp(tot.spend)}</td>
+                        <td class="text-end">${tot.ord}</td>
+                        <td class="text-end">${fmtRp(tot.gmv)}</td>
+                        <td class="text-end">${tot.spend ? (tot.gmv / tot.spend).toFixed(2) : '—'}</td>
+                    </tr>`;
+                $('shopPerfInfo').textContent = `${days.length} hari · ${$('dateFrom').value} s/d ${$('dateTo').value}`;
+            }
+        } catch (e) {
+            $('shopPerfBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">${e.message}</td></tr>`;
+        } finally {
+            btn.disabled = false; btn.textContent = '📊 Muat Performa Harian';
+        }
+    };
 
     // ── Sync dari API ─────────────────────────────────────────────────────────
     window.runSync = async function () {

@@ -1009,6 +1009,63 @@ class MarketplaceController extends Controller
         return response()->json($result);
     }
 
+    /**
+     * Saldo iklan (ads credit) sebuah toko — v2.ads.get_total_balance
+     */
+    public function adsBalance(Store $store): JsonResponse
+    {
+        $res = $this->manager->driver($store)->getAdsTotalBalance($store);
+
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['message'] ?? $res['error']], 422);
+        }
+
+        $data = $res['response'] ?? [];
+
+        return response()->json([
+            'balance'  => $data['total_balance'] ?? $data['balance'] ?? null,
+            'currency' => $data['currency'] ?? 'IDR',
+            'raw'      => $data,
+        ]);
+    }
+
+    /**
+     * Performa iklan harian level toko — v2.ads.get_all_cpc_ads_daily_performance
+     */
+    public function adsShopPerformance(Request $request, Store $store): JsonResponse
+    {
+        $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
+        $dateTo   = $request->input('date_to',   now()->toDateString());
+
+        $res = $this->manager->driver($store)->getAdsShopDailyPerformance(
+            $store,
+            \Carbon\Carbon::parse($dateFrom)->format('d-m-Y'),
+            \Carbon\Carbon::parse($dateTo)->format('d-m-Y'),
+        );
+
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['message'] ?? $res['error']], 422);
+        }
+
+        // Bentuk respons bervariasi antar region: response.day_list / array langsung
+        $days = data_get($res, 'response.day_list')
+            ?? data_get($res, 'response.daily_performance')
+            ?? (is_array($res['response'] ?? null) && array_is_list($res['response']) ? $res['response'] : []);
+
+        $rows = collect($days)->map(fn ($d) => [
+            'date'        => $d['date'] ?? null,
+            'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
+            'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
+            'ctr'         => $d['ctr'] ?? null,
+            'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
+            'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
+            'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
+            'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
+        ])->values();
+
+        return response()->json(['days' => $rows]);
+    }
+
     /** Debug: lihat raw response Shopee Ads API (hapus setelah selesai debug) */
     public function debugAdApi(Request $request, Store $store): JsonResponse
     {

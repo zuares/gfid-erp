@@ -263,6 +263,28 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
+    /**
+     * Saldo iklan (ads credit) toko.
+     * Endpoint: GET /api/v2/ads/get_total_balance
+     */
+    public function getAdsTotalBalance(Store $store): array
+    {
+        return $this->get($store, '/api/v2/ads/get_total_balance', []);
+    }
+
+    /**
+     * Performa iklan harian level TOKO (semua campaign CPC digabung).
+     * Endpoint: GET /api/v2/ads/get_all_cpc_ads_daily_performance
+     * Date format: DD-MM-YYYY
+     */
+    public function getAdsShopDailyPerformance(Store $store, string $startDate, string $endDate): array
+    {
+        return $this->get($store, '/api/v2/ads/get_all_cpc_ads_daily_performance', [
+            'start_date' => $startDate,
+            'end_date'   => $endDate,
+        ]);
+    }
+
     public function refreshToken(Store $store): array
     {
         $path = '/api/v2/auth/access_token/get';

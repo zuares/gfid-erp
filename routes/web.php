@@ -179,6 +179,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/stores/{store}/returns/{returnSn}/confirm', [\App\Http\Controllers\MarketplaceReturnController::class, 'confirmAndRestock'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/ads-analytics',                     [MarketplaceController::class, 'adsAnalytics']);
+    Route::get('/stores/{store}/ads-balance',           [MarketplaceController::class, 'adsBalance']);
+    Route::get('/stores/{store}/ads-shop-performance',  [MarketplaceController::class, 'adsShopPerformance']);
     Route::post('/stores/{store}/sync-ad-campaigns', [MarketplaceController::class, 'syncAdCampaigns'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores/{store}/debug-ad-api', [MarketplaceController::class, 'debugAdApi']); // TODO: hapus setelah debug
