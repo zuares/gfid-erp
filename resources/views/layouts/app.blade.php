@@ -404,7 +404,7 @@
           } catch(err) {}
       }
 
-      function refreshChatBadge() {
+      function refreshChatBadge(playSound = true) {
         fetch('/api/marketplace/chat/unread-count', { headers: { 'Accept': 'application/json' } })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
@@ -412,7 +412,7 @@
             var n = d.unread || 0;
             
             // Putar suara jika jumlah pesan baru bertambah, dan bukan saat load pertama kali
-            if (previousUnread !== -1 && n > previousUnread) {
+            if (playSound && previousUnread !== -1 && n > previousUnread) {
                 playNotificationSound();
             }
             previousUnread = n;
@@ -423,9 +423,9 @@
           .catch(function () {});
       }
 
-      document.addEventListener('DOMContentLoaded', refreshChatBadge);
-      // Auto-refresh setiap 20 detik
-      setInterval(refreshChatBadge, 20000);
+      document.addEventListener('DOMContentLoaded', function() { refreshChatBadge(false); });
+      // Auto-refresh setiap 20 detik (selalu bisa play sound jika memang ada yang unread baru)
+      setInterval(function() { refreshChatBadge(true); }, 20000);
 
       // Instantiate Echo dynamically based on server .env without needing npm run build
       if (window.EchoClass) {
@@ -454,7 +454,12 @@
         try {
           window.Echo.channel('marketplace')
             .listen('ChatMessageReceived', function(e) {
-                refreshChatBadge();
+                // Jika user sedang melihat chat yang sama, tidak perlu bunyi Ting! global
+                if (window.activeConversationId && window.activeConversationId == e.conversation_id) {
+                    refreshChatBadge(false);
+                } else {
+                    refreshChatBadge(true);
+                }
             });
         } catch (e) {}
       }

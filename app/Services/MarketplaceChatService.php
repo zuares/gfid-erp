@@ -280,7 +280,7 @@ class MarketplaceChatService
         $lastText = data_get($c, 'latest_message_content.text')
             ?? (is_string(data_get($c, 'latest_message_content')) ? data_get($c, 'latest_message_content') : null);
 
-        return MarketplaceConversation::updateOrCreate(
+        $conv = MarketplaceConversation::updateOrCreate(
             ['store_id' => $store->id, 'conversation_id' => $extConvId],
             array_filter([
                 'buyer_user_id'     => data_get($c, 'to_id') !== null ? (string) data_get($c, 'to_id') : null,
@@ -293,6 +293,22 @@ class MarketplaceChatService
                 'meta'              => $c,
             ], fn ($v) => $v !== null)
         );
+
+        // Jika data baru, atau jika unread_count baru saja bertambah (misal tarikan Cron Job)
+        if (
+            ($conv->wasRecentlyCreated && $conv->unread_count > 0) ||
+            ($conv->wasChanged('unread_count') && $conv->unread_count > $conv->getOriginal('unread_count'))
+        ) {
+            event(new ChatMessageReceived(
+                $store->id,
+                $conv->id,
+                $extConvId,
+                'buyer', // Karena unread_count naik, pasti pesan dari pembeli
+                mb_substr((string) $conv->last_message_text, 0, 80)
+            ));
+        }
+
+        return $conv;
     }
 
     /**

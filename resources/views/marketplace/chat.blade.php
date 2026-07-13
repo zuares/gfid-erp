@@ -171,6 +171,11 @@
 
     window.renderConversations = function () {
         const q = ($('convSearch').value || '').toLowerCase();
+        
+        // Simpan posisi scroll sebelum render ulang
+        const list = $('convList');
+        const oldScroll = list.scrollTop;
+
         const rows = conversations.filter(c => !q || (c.buyer_username || '').toLowerCase().includes(q));
 
         if (!rows.length) {
@@ -191,13 +196,21 @@
                     ${c.unread_count > 0 ? `<br><span class="conv-unread">${c.unread_count}</span>` : ''}
                     ${(c.unread_count === 0 && c.is_answered === 0) ? `<br><span style="color:#ef4444;font-size:0.6rem;font-weight:700">Belum dibalas</span>` : ''}
                 </div>
+                </div>
             </div>`).join('');
+            
+        // Kembalikan posisi scroll
+        list.scrollTop = oldScroll;
     };
 
     // ── Thread ───────────────────────────────────────────────────────────────
     window.openConversation = async function (id, syncFirst = true) {
         pendingCompose = null;
         activeConv = conversations.find(c => c.id === id) || activeConv;
+        
+        // Simpan ke window agar lonceng notifikasi global tau kita sedang melihat chat ini
+        window.activeConversationId = activeConv ? activeConv.id : null;
+        
         renderConversations();
 
         $('chatEmpty').style.display = 'none';
