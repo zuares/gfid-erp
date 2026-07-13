@@ -630,7 +630,8 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
-                            <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-warning me-2"></i>Putuskan Koneksi</button></li>
+                            <li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-secondary me-2"></i>Putuskan Koneksi</button></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item py-2 text-danger fw-bold" onclick="deleteStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-trash3-fill me-2"></i>Hapus Toko</button></li>
                         </ul>
@@ -639,7 +640,7 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <span class="badge-status ${statusClass}">${statusLabel}</span>
-                    ${!isConn ? `<a href="${connectUrl}" class="btn btn-sm btn-outline-danger" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Sambungkan Ulang</a>` : ''}
+                    <a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>
                 </div>
 
                 <div class="store-stats">
