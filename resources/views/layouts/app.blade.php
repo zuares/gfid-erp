@@ -427,7 +427,29 @@
       // Auto-refresh setiap 20 detik
       setInterval(refreshChatBadge, 20000);
 
-      // Realtime: pesan baru masuk → update badge seketika (opsional jika Reverb menyala)
+      // Instantiate Echo dynamically based on server .env without needing npm run build
+      if (window.EchoClass) {
+          @if(config('broadcasting.default') === 'pusher')
+              window.Echo = new window.EchoClass({
+                  broadcaster: 'pusher',
+                  key: '{{ config('broadcasting.connections.pusher.key') }}',
+                  cluster: '{{ config('broadcasting.connections.pusher.options.cluster') }}',
+                  forceTLS: true
+              });
+          @elseif(config('broadcasting.default') === 'reverb')
+              window.Echo = new window.EchoClass({
+                  broadcaster: 'reverb',
+                  key: '{{ config('broadcasting.connections.reverb.key') }}',
+                  wsHost: '{{ config('broadcasting.connections.reverb.options.host') }}',
+                  wsPort: {{ config('broadcasting.connections.reverb.options.port') ?? 80 }},
+                  wssPort: {{ config('broadcasting.connections.reverb.options.port') ?? 443 }},
+                  forceTLS: {{ config('broadcasting.connections.reverb.options.scheme') === 'https' ? 'true' : 'false' }},
+                  enabledTransports: ['ws', 'wss'],
+              });
+          @endif
+      }
+
+      // Realtime: pesan baru masuk → update badge seketika
       if (window.Echo) {
         try {
           window.Echo.channel('marketplace')

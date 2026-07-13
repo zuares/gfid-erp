@@ -68,9 +68,10 @@
     
     /* Input Area */
     .chat-input { padding:16px 20px; background: var(--chat-glass); backdrop-filter: blur(12px); border-top:1px solid var(--chat-border); display:flex; gap:12px; align-items:flex-end; z-index: 10; }
-    .chat-input textarea { flex:1; resize:none; border:1px solid #cbd5e1; border-radius:12px; padding:10px 14px; font-size:.875rem; height:46px; transition: all 0.2s; background: #fff; }
-    .chat-input textarea:focus { outline: none; border-color: var(--chat-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); height: 80px; }
-    .chat-input button { border-radius: 10px; font-weight: 600; padding: 0 20px; height: 46px; background: var(--chat-primary); border: none; transition: all 0.2s; }
+    .chat-input textarea { flex:1; resize:none; border:2px solid #94a3b8; border-radius:12px; padding:10px 14px; font-size:.875rem; height:46px; transition: all 0.2s; background: #fff; color: #0f172a; font-weight: 500; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+    .chat-input textarea:focus { outline: none; border-color: var(--chat-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.15), inset 0 2px 4px rgba(0,0,0,0.02); height: 80px; }
+    .chat-input textarea::placeholder { color: #94a3b8; font-weight: 400; }
+    .chat-input button { border-radius: 10px; font-weight: 600; padding: 0 20px; height: 46px; background: var(--chat-primary); border: none; transition: all 0.2s; color: #fff; }
     .chat-input button:hover { background: var(--chat-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
     .chat-input button:active { transform: translateY(0); }
     
