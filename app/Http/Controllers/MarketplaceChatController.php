@@ -77,10 +77,21 @@ class MarketplaceChatController extends Controller
     {
         $data = $request->validate(['text' => 'required|string|max:2000']);
 
-        $res = $this->chat->sendText($conversation->store, $conversation, $data['text']);
+        $store = $conversation->store;
+        if (! $store || blank($store->credential('access_token'))) {
+            return response()->json([
+                'message' => 'Toko percakapan ini belum terhubung ke Shopee. Buka menu Toko lalu Authorize/Re-authorize dulu.',
+            ], 422);
+        }
+
+        $res = $this->chat->sendText($store, $conversation, $data['text']);
 
         if (! empty($res['error'])) {
-            return response()->json(['message' => $res['message'] ?? 'Gagal mengirim pesan.'], 422);
+            $msg = $res['message'] ?? 'Gagal mengirim pesan.';
+            if (stripos($msg, 'access_token') !== false || ($res['error'] ?? '') === 'error_auth') {
+                $msg = 'Token Shopee bermasalah. Coba Re-authorize toko ini di menu Toko, lalu kirim ulang.';
+            }
+            return response()->json(['message' => $msg], 422);
         }
 
         return response()->json(['success' => true]);

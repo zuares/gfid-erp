@@ -4,7 +4,9 @@ namespace App\Services\Channels\Shopee;
 
 use App\Models\Store;
 use App\Services\Channels\Contracts\MarketplaceChannel;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ShopeeChannel implements MarketplaceChannel
 {
@@ -46,6 +48,7 @@ class ShopeeChannel implements MarketplaceChannel
 
     protected function get(Store $store, string $path, array $params = []): array
     {
+        $this->ensureFreshToken($store); // proaktif: refresh sebelum kedaluwarsa
         $result = $this->doGet($store, $path, $params);
 
         $error = $result['error'] ?? '';
@@ -65,6 +68,7 @@ class ShopeeChannel implements MarketplaceChannel
 
     protected function post(Store $store, string $path, array $body = []): array
     {
+        $this->ensureFreshToken($store); // proaktif: refresh sebelum kedaluwarsa
         $result = $this->doPost($store, $path, $body);
 
         $error = $result['error'] ?? '';
@@ -290,37 +294,82 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
+    /**
+     * Refresh proaktif: kalau token tinggal ≤2 menit lagi (atau tidak diketahui
+     * kapan kedaluwarsa), segarkan dulu sebelum memanggil API. Mencegah error
+     * "Invalid access_token" yang muncul saat token pas kedaluwarsa.
+     */
+    protected function ensureFreshToken(Store $store): void
+    {
+        if ($store->token_expires_at && $store->token_expires_at->isAfter(now()->addMinutes(2))) {
+            return; // masih segar
+        }
+        if (blank($store->credential('refresh_token'))) {
+            return; // tak ada refresh_token — biarkan API menjawab dengan error jelas
+        }
+        $this->refreshToken($store);
+    }
+
+    /**
+     * Tukar refresh_token → access_token baru.
+     *
+     * PENTING: refresh_token Shopee sekali-pakai dan BEROTASI. Kalau beberapa
+     * request menabrak bersamaan saat token kedaluwarsa (mis. halaman chat yang
+     * polling + sync + kirim sekaligus), refresh paralel akan saling membatalkan
+     * dan menghasilkan "Invalid access_token". Karena itu refresh dikunci: hanya
+     * SATU proses yang benar-benar menukar token; sisanya menunggu lalu memakai
+     * token baru yang sudah tersimpan.
+     */
     public function refreshToken(Store $store): array
     {
-        $path = '/api/v2/auth/access_token/get';
-        $timestamp = time();
+        $lock    = Cache::lock("shopee:refresh:{$store->id}", 35); // > HTTP timeout (30s)
+        $gotLock = false;
+        try { $gotLock = $lock->block(15); } catch (\Throwable $e) { $gotLock = false; }
 
-        $url = $this->baseUrl($store) . $path . '?' . http_build_query([
-            'partner_id' => (int) $this->partnerId($store),
-            'timestamp' => $timestamp,
-            'sign' => $this->sign($store, $path, $timestamp, false),
-        ]);
+        try {
+            // Proses lain mungkin sudah menyegarkan token selagi kita menunggu.
+            $store->refresh();
+            if ($store->token_expires_at
+                && $store->token_expires_at->isAfter(now()->addMinutes(2))
+                && filled($store->credential('access_token'))) {
+                return ['access_token' => $store->credential('access_token'), 'reused' => true];
+            }
 
-        $response = Http::timeout(30)->post($url, [
-            'refresh_token' => $store->credential('refresh_token'),
-            'partner_id' => (int) $this->partnerId($store),
-            'shop_id' => (int) $this->shopId($store),
-        ]);
+            $path      = '/api/v2/auth/access_token/get';
+            $timestamp = time();
 
-        $data = $response->json() ?? [];
-
-        if (empty($data['error']) && !empty($data['access_token'])) {
-            $credentials = $store->credentials ?? [];
-            $credentials['access_token'] = $data['access_token'];
-            $credentials['refresh_token'] = $data['refresh_token'] ?? $credentials['refresh_token'] ?? null;
-
-            $store->update([
-                'credentials' => $credentials,
-                'token_expires_at' => now()->addSeconds((int) ($data['expire_in'] ?? 0)),
+            $url = $this->baseUrl($store) . $path . '?' . http_build_query([
+                'partner_id' => (int) $this->partnerId($store),
+                'timestamp'  => $timestamp,
+                'sign'       => $this->sign($store, $path, $timestamp, false),
             ]);
-        }
 
-        return $data;
+            $response = Http::timeout(30)->post($url, [
+                'refresh_token' => $store->credential('refresh_token'),
+                'partner_id'    => (int) $this->partnerId($store),
+                'shop_id'       => (int) $this->shopId($store),
+            ]);
+
+            $data = $response->json() ?? [];
+
+            if (empty($data['error']) && !empty($data['access_token'])) {
+                $credentials = $store->credentials ?? [];
+                $credentials['access_token']  = $data['access_token'];
+                $credentials['refresh_token'] = $data['refresh_token'] ?? $credentials['refresh_token'] ?? null;
+
+                $store->update([
+                    'credentials'      => $credentials,
+                    'token_expires_at' => now()->addSeconds((int) ($data['expire_in'] ?? 0)),
+                ]);
+            } else {
+                Log::warning("[shopee] refresh token store #{$store->id} gagal: "
+                    . ($data['message'] ?? $data['error'] ?? 'unknown'));
+            }
+
+            return $data;
+        } finally {
+            if ($gotLock) { optional($lock)->release(); }
+        }
     }
 
     // ─── Logistics / Fulfillment ──────────────────────────────────────────────

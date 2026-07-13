@@ -97,9 +97,11 @@
     <h5 class="fw-black mb-0">💬 Chat Marketplace</h5>
     <div class="d-flex align-items-center gap-2" style="font-size:.7rem;color:#64748b">
         <span class="rt-dot rt-off" id="rtDot"></span><span id="rtLabel">menghubungkan…</span>
-        <button class="btn btn-sm btn-outline-secondary" style="font-size:.7rem" onclick="loadConversations(true)">⟳ Sync</button>
+        <button class="btn btn-sm btn-outline-secondary" style="font-size:.7rem" onclick="loadConversations(true);loadStoreStatus()">⟳ Sync</button>
     </div>
 </div>
+
+<div id="storeAlert"></div>
 
 <div class="chat-wrap">
     <div class="chat-list">
@@ -300,6 +302,8 @@
             }
         } catch (e) {
             alert('Gagal kirim: ' + e.message);
+            // Kalau gagal karena token/koneksi, tampilkan banner re-authorize.
+            if (/token|terhubung|authoriz/i.test(e.message)) loadStoreStatus();
         } finally {
             $('btnSend').disabled = false;
         }
@@ -397,7 +401,48 @@
         } catch (e) { console.warn('Deep-link chat gagal:', e); }
     }
 
+    // ── Status token toko (biar gampang lihat mana yang perlu re-authorize) ──
+    window.loadStoreStatus = async function () {
+        let stores;
+        try { stores = await api('/api/marketplace/stores'); }
+        catch { return; }
+
+        const shopee = (stores || []).filter(s => {
+            const code = (s.channel?.code || '').toLowerCase();
+            return code.includes('shp') || code === 'shopee';
+        });
+
+        // Hanya tampilkan toko yang bermasalah (butuh aksi). Kalau semua sehat → banner disembunyikan.
+        const bad = shopee.filter(s => s.connection_status !== 'CONNECTED');
+        const box = $('storeAlert');
+        if (!bad.length) { box.innerHTML = ''; return; }
+
+        const labelOf = st => ({
+            TOKEN_EXPIRED:  'token kedaluwarsa',
+            NOT_CONNECTED:  'belum terhubung',
+            AUTH_REQUIRED:  'akses ditolak',
+            INVALID_APP_KEY:'kunci app tidak valid',
+        }[st] || 'perlu login');
+
+        box.innerHTML = `
+            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;
+                        background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);
+                        border-radius:10px;padding:.5rem .75rem;margin-bottom:.6rem;font-size:.78rem;">
+                <span style="font-weight:700;color:#b45309;">⚠ Perlu re-authorize:</span>
+                ${bad.map(s => `
+                    <span style="display:inline-flex;align-items:center;gap:.4rem;background:#fff;
+                                 border:1px solid rgba(148,163,184,.3);border-radius:999px;padding:.15rem .3rem .15rem .6rem;">
+                        <b>${esc(s.name)}</b>
+                        <span style="color:#94a3b8;font-size:.7rem;">${labelOf(s.connection_status)}</span>
+                        <a href="/marketplace/shopee/connect?store_id=${s.id}"
+                           style="text-decoration:none;background:#ea580c;color:#fff;border-radius:999px;
+                                  padding:.1rem .55rem;font-weight:700;font-size:.7rem;">Re-authorize</a>
+                    </span>`).join('')}
+            </div>`;
+    }
+
     // Init
+    loadStoreStatus();
     loadConversations(true).then(handleDeepLink);
 })();
 </script>
