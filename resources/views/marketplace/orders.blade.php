@@ -750,9 +750,9 @@ body[data-theme="dark"] .ord-table tbody tr td {
                 <button class="ord-subtab" data-sub="ready" onclick="switchSubTabProcessed('ready', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-ready">—</span></button>
             </div>
             <div id="subTabReadyContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
-                <button class="ord-subtab active" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
+                <button class="ord-subtab" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
+                <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Diproses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
-                <button class="ord-subtab" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Diproses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
             </div>
         </div>
 
@@ -1021,7 +1021,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     
     let activeTab        = sessionStorage.getItem('ord_active_tab') || 'ready';
     let subTabProcessed  = 'packing';
-    let subTabReady      = 'all';
+    let subTabReady      = 'process';
     // store_id passed via URL is an ID, but activeStore in JS requires the store name.
     // We will resolve it later during data load if it's an ID, or just set it if it matches.
     let activeStore      = urlParams.get('store_id') || '';
