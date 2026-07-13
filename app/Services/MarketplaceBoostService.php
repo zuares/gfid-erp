@@ -141,7 +141,10 @@ class MarketplaceBoostService
     public function run(): array
     {
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->where('status', 'active')->get();
+            ->where('status', 'active')->get()
+            // Lewati toko yang belum terhubung (tanpa access_token) — kalau tidak,
+            // tiap run akan gagal "invalid token" dan mengotori log.
+            ->filter(fn ($s) => filled($s->credential('access_token')));
 
         $summary = [];
         foreach ($stores as $store) {

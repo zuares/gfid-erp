@@ -292,13 +292,28 @@
 
     async function init() {
         stores = await api(`${API}/stores`).catch(() => []);
-        const shopee = stores.filter(s => (s.channel?.code || '').toLowerCase().includes('shp') || (s.channel?.code || '').toLowerCase() === 'shopee');
-        const list = shopee.length ? shopee : stores;
-        
-        $('fStore').innerHTML = '<option value="">— Pilih Toko —</option>' + list.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+        // Hanya toko Shopee yang BENAR-BENAR terhubung (punya token). Toko yang
+        // belum di-authorize dibuang supaya tidak memicu "invalid token".
+        const shopee = stores.filter(s => {
+            const code = (s.channel?.code || '').toLowerCase();
+            const isShopee = code.includes('shp') || code === 'shopee';
+            return isShopee && s.connection_status !== 'NOT_CONNECTED' && s.connection_status !== 'INVALID_APP_KEY';
+        });
+
+        if (!shopee.length) {
+            $('fStore').innerHTML = '<option value="">— tidak ada toko Shopee terhubung —</option>';
+            statusData = { error: 'Belum ada toko Shopee yang terhubung. Authorize/Re-authorize toko dulu di menu Toko.' };
+            switchTab(activeTab);
+            return;
+        }
+
+        $('fStore').innerHTML = shopee.map(s => {
+            const warn = s.connection_status === 'TOKEN_EXPIRED' ? ' ⚠ token kedaluwarsa' : '';
+            return `<option value="${s.id}">${esc(s.name)}${warn}</option>`;
+        }).join('');
         $('fStore').addEventListener('change', reloadAll);
-        
-        reloadAll();
+
+        reloadAll(); // auto-pilih toko pertama yang terhubung
     }
 
     async function reloadAll() {

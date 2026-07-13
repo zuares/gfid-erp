@@ -8,6 +8,7 @@ use App\Models\MarketplaceBoostSchedule;
 use App\Models\MarketplaceProduct;
 use App\Models\Store;
 use App\Services\MarketplaceBoostService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -24,7 +25,7 @@ class MarketplaceBoostController extends Controller
     public function status(Request $request)
     {
         $store = $this->resolveStore($request);
-        if (! $store) return response()->json(['error' => 'Toko Shopee tidak ditemukan.', 'items' => []], 422);
+        if ($resp = $this->assertConnected($store)) return $resp;
 
         return response()->json(['store_id' => $store->id] + $this->boost->currentlyBoosted($store));
     }
@@ -39,7 +40,7 @@ class MarketplaceBoostController extends Controller
         ]);
 
         $store = $this->resolveStore($request);
-        if (! $store) return response()->json(['message' => 'Toko Shopee tidak ditemukan.'], 422);
+        if ($resp = $this->assertConnected($store, 'message')) return $resp;
 
         $products = MarketplaceProduct::where('store_id', $store->id)
             ->whereIn('id', $data['product_ids'])->get();
@@ -206,16 +207,40 @@ class MarketplaceBoostController extends Controller
 
     // ─── Helper ─────────────────────────────────────────────────────────────────
 
-    /** Toko dari request, atau toko Shopee aktif pertama sebagai default. */
+    /**
+     * Toko dari request, atau — kalau tidak dispesifikkan — toko Shopee aktif
+     * pertama yang BENAR-BENAR terhubung (punya access_token). Ini mencegah
+     * default ke toko yang belum di-authorize sehingga selalu "invalid token".
+     */
     protected function resolveStore(Request $request): ?Store
     {
-        $q = Store::whereHas('channel', fn ($c) => $c->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->where('status', 'active');
+        $shopee = Store::whereHas('channel', fn ($c) => $c->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('status', 'active')->orderBy('id')->get();
 
         if ($request->filled('store_id')) {
-            return (clone $q)->where('id', $request->integer('store_id'))->first()
+            return $shopee->firstWhere('id', $request->integer('store_id'))
                 ?? Store::find($request->integer('store_id'));
         }
-        return $q->orderBy('id')->first();
+
+        return $shopee->first(fn ($s) => filled($s->credential('access_token'))) ?? $shopee->first();
+    }
+
+    /**
+     * Pastikan toko ada & sudah terhubung ke Shopee. Kalau belum, balas pesan
+     * jelas (bukan "invalid token" yang membingungkan).
+     */
+    protected function assertConnected(?Store $store, string $key = 'error'): ?JsonResponse
+    {
+        if (! $store) {
+            return response()->json([$key => 'Toko Shopee tidak ditemukan.', 'items' => []], 422);
+        }
+        if (blank($store->credential('access_token'))) {
+            return response()->json([
+                $key            => "Toko \"{$store->name}\" belum terhubung ke Shopee. Buka menu Toko lalu klik Authorize/Re-authorize dulu.",
+                'items'         => [],
+                'not_connected' => true,
+            ], 422);
+        }
+        return null;
     }
 }

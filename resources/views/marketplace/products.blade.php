@@ -103,6 +103,56 @@
     .prd-caret{ cursor:pointer; user-select:none; color:#64748b; font-size:.8rem; }
     .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
 
+    /* ── Tabs (Produk / Boost) ── */
+    .pt-tabs{ display:flex; gap:.35rem; margin-bottom:.85rem; }
+    .pt-tab{
+        font-size:.82rem; font-weight:650; padding:.4rem .9rem; border-radius:8px;
+        border:1px solid var(--prd-border); background:transparent; color:var(--prd-muted); cursor:pointer;
+    }
+    .pt-tab:hover{ background:rgba(148,163,184,.08); }
+    .pt-tab.active{ background:var(--prd-accent); border-color:var(--prd-accent); color:#fff; }
+    .pt-pane{ display:none; }
+    .pt-pane.active{ display:block; animation:ptfade .2s ease; }
+    @keyframes ptfade{ from{ opacity:0; transform:translateY(3px);} to{ opacity:1; transform:none;} }
+
+    /* ── Boost pane (minimalis) ── */
+    .bo-bar{ display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
+    .bo-slotcount{ font-size:.78rem; font-weight:700; color:#ea580c; }
+    .bo-sec{ border:1px solid var(--prd-border); border-radius:10px; padding:.85rem 1rem; margin-bottom:.9rem; background:var(--card,#fff); }
+    body[data-theme="dark"] .bo-sec{ background:rgba(15,23,42,.5); }
+    .bo-sec-head{ font-size:.85rem; font-weight:750; margin-bottom:.6rem; }
+    .bo-hint{ font-weight:500; font-size:.7rem; color:#94a3b8; margin-left:.3rem; }
+    .bo-slotbar{ display:flex; gap:.4rem; margin-bottom:.6rem; }
+    .bo-slot{ width:40px; height:40px; border-radius:10px; border:2px dashed rgba(148,163,184,.4); display:flex; align-items:center; justify-content:center; font-size:1rem; color:#cbd5e1; }
+    .bo-slot.filled{ border-style:solid; border-color:#ea580c; background:rgba(234,88,12,.08); }
+    .bo-chips{ display:flex; gap:.5rem; flex-wrap:wrap; }
+    .bo-chip{ display:flex; align-items:center; gap:.5rem; border:1px solid var(--prd-border); border-radius:10px; padding:.35rem .55rem; background:rgba(248,250,252,.6); max-width:260px; }
+    body[data-theme="dark"] .bo-chip{ background:rgba(30,41,59,.6); }
+    .bo-chip img{ width:32px; height:32px; border-radius:7px; object-fit:cover; background:#e2e8f0; }
+    .bo-chip .nm{ font-size:.74rem; font-weight:650; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-chip .rm{ font-size:.66rem; color:#ea580c; font-weight:700; }
+    .bo-list{ display:flex; flex-direction:column; }
+    .bo-row{ display:flex; align-items:center; gap:.55rem; padding:.45rem 0; border-top:1px solid rgba(148,163,184,.14); font-size:.78rem; }
+    .bo-row:first-child{ border-top:0; }
+    .bo-row img{ width:32px; height:32px; border-radius:7px; object-fit:cover; background:#e2e8f0; flex:none; }
+    .bo-row .grow{ flex:1; min-width:0; }
+    .bo-row .nm{ font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-row .meta{ font-size:.68rem; color:#94a3b8; }
+    .bo-empty{ font-size:.76rem; color:#94a3b8; padding:.5rem 0; }
+    .bo-timepill{ display:inline-flex; align-items:center; gap:.3rem; font-size:.7rem; font-weight:700; padding:.14rem .5rem; border-radius:999px; background:rgba(37,99,235,.1); color:#1d4ed8; margin:0 .25rem .25rem 0; }
+    .bo-timepill.off{ background:rgba(148,163,184,.18); color:#64748b; }
+    .bo-timepill a{ text-decoration:none; }
+    .bo-add{ display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; margin-top:.7rem; padding-top:.7rem; border-top:1px dashed rgba(148,163,184,.3); }
+    .bo-add select.prod-picker{ min-width:220px; max-width:280px; }
+    .bo-times{ display:flex; gap:.3rem; flex-wrap:wrap; }
+    .bo-t{ font-size:.76rem; padding:.25rem .4rem; border-radius:7px; border:1px solid var(--prd-border); background:var(--card,#fff); }
+    body[data-theme="dark"] .bo-t{ background:#0f172a; color:#fff; }
+    .bo-tag{ font-size:.62rem; font-weight:800; padding:.1rem .4rem; border-radius:5px; text-transform:uppercase; }
+    .tag-schedule{ background:rgba(37,99,235,.12); color:#1d4ed8; }
+    .tag-pool{ background:rgba(22,163,74,.12); color:#15803d; }
+    .tag-manual{ background:rgba(100,116,139,.14); color:#475569; }
+    .bo-off{ opacity:.5; }
+
     @media (max-width:768px){
         .page-wrap{ padding:.5rem .5rem 4rem; }
         .prd-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
@@ -127,12 +177,19 @@
             <div class="kpis" id="kpiRow"></div>
         </div>
         <div class="controls">
-            <a class="btn btn-pill btn-prd-outline" href="{{ route('marketplace.boost') }}" title="Atur jadwal & rotasi Naikkan Produk">🚀 Boost</a>
             <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()">⚡ Auto-map</button>
             <button class="btn btn-pill btn-prd-primary" id="btnSync" onclick="syncProducts()">⟳ Sync Shopee</button>
         </div>
     </div>
 
+    {{-- Tabs --}}
+    <div class="pt-tabs">
+        <button class="pt-tab active" data-tab="produk" onclick="switchTab('produk')">🏷 Daftar Produk</button>
+        <button class="pt-tab" data-tab="boost" onclick="switchTab('boost')">🚀 Naikkan Produk</button>
+    </div>
+
+    {{-- ══ TAB: Daftar Produk ══ --}}
+    <div id="tabProduk" class="pt-pane active">
     {{-- Filter bar --}}
     <div class="filter-bar">
         <input type="text" class="form-control form-control-sm filter-search" placeholder="🔍 Cari nama / SKU / item id…" id="fSearch">
@@ -178,6 +235,51 @@
             <tbody id="prdBody"><tr><td colspan="10" class="empty">Memuat…</td></tr></tbody>
         </table>
     </div>
+    </div>{{-- /tabProduk --}}
+
+    {{-- ══ TAB: Naikkan Produk (Boost) ══ --}}
+    <div id="tabBoost" class="pt-pane">
+        <div class="bo-bar">
+            <select class="form-select form-select-sm filter-select" id="boStore"></select>
+            <span class="bo-slotcount" id="boSlots">—</span>
+            <button class="btn btn-sm btn-prd-outline ms-auto" onclick="boReload()">⟳ Refresh</button>
+        </div>
+
+        {{-- Sedang di-boost --}}
+        <div class="bo-sec">
+            <div class="bo-sec-head">Sedang di-boost <span class="bo-hint">maks 5 · tiap boost 4 jam</span></div>
+            <div class="bo-slotbar" id="boSlotBar"></div>
+            <div class="bo-chips" id="boBoosted"></div>
+        </div>
+
+        {{-- Jadwal jam-tetap --}}
+        <div class="bo-sec">
+            <div class="bo-sec-head">⏰ Jadwal jam-tetap <span class="bo-hint">naik otomatis tiap hari di jam ini</span></div>
+            <div id="boSchedList" class="bo-list"></div>
+            <div class="bo-add">
+                <select class="prod-picker form-select form-select-sm" id="boSchedPick"></select>
+                <span class="bo-times" id="boSchedTimes"><input type="time" class="bo-t" value="08:00"></span>
+                <button class="btn btn-sm btn-prd-outline" onclick="boAddTime()">+ jam</button>
+                <button class="btn btn-sm btn-prd-primary" onclick="boSaveSched()">Simpan</button>
+            </div>
+        </div>
+
+        {{-- Rotasi otomatis --}}
+        <div class="bo-sec">
+            <div class="bo-sec-head">🔁 Rotasi otomatis <span class="bo-hint">isi slot kosong bergiliran tiap 4 jam</span></div>
+            <div id="boPoolList" class="bo-list"></div>
+            <div class="bo-add">
+                <select class="prod-picker form-select form-select-sm" id="boPoolPick"></select>
+                <button class="btn btn-sm btn-prd-primary" onclick="boAddPool()">+ Tambah ke antrian</button>
+            </div>
+        </div>
+
+        {{-- Riwayat --}}
+        <div class="bo-sec">
+            <div class="bo-sec-head">🧾 Riwayat <span class="bo-hint">50 boost terakhir</span></div>
+            <div id="boLogs" class="bo-list bo-logs"></div>
+        </div>
+    </div>{{-- /tabBoost --}}
 </div>
 @endsection
 
@@ -462,6 +564,7 @@
                 body: JSON.stringify({ store_id: p.store_id, product_ids: [pid] }),
             });
             toast(res.message || 'Produk dinaikkan', res.success ? 'success' : 'warning');
+            if (boLoaded && $('tabBoost').classList.contains('active')) boReload();
         } catch (e) {
             toast('Gagal boost: ' + e.message, 'error');
         } finally {
@@ -574,6 +677,151 @@
     let searchDeb = null;
     $('fSearch').addEventListener('input', () => { clearTimeout(searchDeb); searchDeb = setTimeout(render, 250); });
     ['fStore','fStatus','fMapping','fStock','fSort'].forEach(id => $(id).addEventListener('change', render));
+
+    // ══════════════════════════════════════════════════════════════════════
+    // TAB: Naikkan Produk (Boost) — memakai ulang `products`, `api`, `esc`
+    // ══════════════════════════════════════════════════════════════════════
+    const BAPI = '/api/marketplace/boost';
+    let boLoaded = false;
+
+    window.switchTab = function (tab) {
+        document.querySelectorAll('.pt-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        $('tabProduk').classList.toggle('active', tab === 'produk');
+        $('tabBoost').classList.toggle('active', tab === 'boost');
+        if (tab === 'boost') {
+            boBuildStores();
+            boLoaded = true;
+            boReload();
+        }
+    };
+
+    const boStoreId = () => $('boStore').value;
+    const fmtT = d => d ? new Date(d).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+    function remLabel(mins) {
+        if (mins == null || mins <= 0) return 'aktif';
+        const h = Math.floor(mins / 60), m = mins % 60;
+        return (h ? h + 'j ' : '') + m + 'm lagi';
+    }
+
+    function boBuildStores() {
+        const sel = $('boStore'), cur = sel.value;
+        const stores = [...new Map(products.filter(p => p.store).map(p => [p.store.id, p.store.name])).entries()];
+        sel.innerHTML = stores.map(([id, name]) => `<option value="${id}">${esc(name)}</option>`).join('') || '<option value="">— tidak ada toko —</option>';
+        if (cur) sel.value = cur;
+        if (!sel.dataset.bound) { sel.addEventListener('change', boReload); sel.dataset.bound = '1'; }
+    }
+
+    function boFillPickers() {
+        const sid = String(boStoreId());
+        const opts = '<option value="">— pilih produk —</option>' +
+            products.filter(p => String(p.store?.id) === sid && p.item_status === 'NORMAL')
+                .map(p => `<option value="${p.id}">${esc((p.item_name || 'item ' + p.item_id).slice(0, 60))}${p.item_sku ? ' · ' + esc(p.item_sku) : ''}</option>`).join('');
+        document.querySelectorAll('#tabBoost .prod-picker').forEach(el => el.innerHTML = opts);
+    }
+
+    window.boReload = function () {
+        boFillPickers();
+        boStatus(); boScheds(); boPool(); boLogs();
+    };
+
+    async function boStatus() {
+        $('boSlots').textContent = '…';
+        $('boSlotBar').innerHTML = ''; $('boBoosted').innerHTML = '';
+        let d;
+        try { d = await api(`${BAPI}/status?store_id=${boStoreId()}`); }
+        catch (e) { $('boSlots').textContent = ''; $('boBoosted').innerHTML = `<span class="bo-empty text-danger">${esc(e.message)}</span>`; return; }
+        if (d.error) { $('boSlots').textContent = ''; $('boBoosted').innerHTML = `<span class="bo-empty text-danger">${esc(d.error)}</span>`; return; }
+
+        const used = d.used || (d.items || []).length, max = d.max || 5;
+        $('boSlots').textContent = `${used}/${max} slot terpakai`;
+        let bar = '';
+        for (let i = 0; i < max; i++) bar += `<div class="bo-slot ${i < used ? 'filled' : ''}">${i < used ? '🚀' : ''}</div>`;
+        $('boSlotBar').innerHTML = bar;
+        $('boBoosted').innerHTML = (d.items || []).length
+            ? d.items.map(it => `<div class="bo-chip">${it.image_url ? `<img src="${esc(it.image_url)}">` : ''}<div><div class="nm" title="${esc(it.name)}">${esc(it.name)}</div><div class="rm">${remLabel(it.remaining_minutes)}</div></div></div>`).join('')
+            : '<span class="bo-empty">Belum ada produk yang di-boost.</span>';
+    }
+
+    async function boScheds() {
+        const c = $('boSchedList'); c.innerHTML = '<div class="bo-empty">Memuat…</div>';
+        let d;
+        try { d = await api(`${BAPI}/schedules?store_id=${boStoreId()}`); }
+        catch (e) { c.innerHTML = `<div class="bo-empty text-danger">${esc(e.message)}</div>`; return; }
+        const byProd = {};
+        (d.schedules || []).forEach(s => { (byProd[s.product_id] ||= { name:s.product, sku:s.sku, img:s.image_url, rows:[] }).rows.push(s); });
+        const keys = Object.keys(byProd);
+        c.innerHTML = keys.length ? keys.map(k => {
+            const g = byProd[k];
+            const pills = g.rows.sort((a,b)=>a.time.localeCompare(b.time)).map(r =>
+                `<span class="bo-timepill ${r.is_active ? '' : 'off'}">${r.time}
+                    <a href="javascript:boToggleSched(${r.id})" title="aktif/nonaktif">${r.is_active ? '⏸' : '▶'}</a>
+                    <a href="javascript:boDelSched(${r.id})" title="hapus" style="color:#dc2626">✕</a></span>`).join('');
+            return `<div class="bo-row">${g.img ? `<img src="${esc(g.img)}">` : ''}<div class="grow"><div class="nm">${esc(g.name || '—')}</div><div class="meta">${esc(g.sku || '')}</div></div><div style="text-align:right">${pills}</div></div>`;
+        }).join('') : '<div class="bo-empty">Belum ada jadwal.</div>';
+    }
+
+    window.boAddTime = function () {
+        const el = document.createElement('input');
+        el.type = 'time'; el.className = 'bo-t'; el.value = '20:00';
+        $('boSchedTimes').appendChild(el);
+    };
+
+    window.boSaveSched = async function () {
+        const pid = parseInt($('boSchedPick').value);
+        if (!pid) return alert('Pilih produk dulu.');
+        const times = [...document.querySelectorAll('#boSchedTimes .bo-t')].map(i => i.value).filter(Boolean);
+        if (!times.length) return alert('Isi minimal satu jam.');
+        try {
+            const res = await api(`${BAPI}/schedules`, { method:'POST', body: JSON.stringify({ store_id: boStoreId(), marketplace_product_id: pid, times }) });
+            toast(res.message);
+            $('boSchedPick').value = '';
+            $('boSchedTimes').innerHTML = '<input type="time" class="bo-t" value="08:00">';
+            boScheds();
+        } catch (e) { toast('Gagal: ' + e.message, 'error'); }
+    };
+
+    window.boToggleSched = async function (id) { await api(`${BAPI}/schedules/${id}/toggle`, { method:'POST' }); boScheds(); };
+    window.boDelSched = async function (id) { if (!confirm('Hapus slot jadwal ini?')) return; await api(`${BAPI}/schedules/${id}`, { method:'DELETE' }); boScheds(); };
+
+    async function boPool() {
+        const c = $('boPoolList'); c.innerHTML = '<div class="bo-empty">Memuat…</div>';
+        let d;
+        try { d = await api(`${BAPI}/pool?store_id=${boStoreId()}`); }
+        catch (e) { c.innerHTML = `<div class="bo-empty text-danger">${esc(e.message)}</div>`; return; }
+        c.innerHTML = (d.pool || []).length ? d.pool.map(p => `
+            <div class="bo-row ${p.is_active ? '' : 'bo-off'}">${p.image_url ? `<img src="${esc(p.image_url)}">` : ''}
+                <div class="grow"><div class="nm">${esc(p.product || '—')}</div>
+                    <div class="meta">terakhir naik: ${p.last_boosted_at ? fmtT(p.last_boosted_at) : 'belum pernah'}</div></div>
+                <button class="btn btn-prd-outline btn-mini" onclick="boTogglePool(${p.id})">${p.is_active ? '⏸' : '▶'}</button>
+                <button class="btn btn-outline-danger btn-mini" onclick="boDelPool(${p.id})">✕</button></div>`).join('')
+            : '<div class="bo-empty">Antrian kosong.</div>';
+    }
+
+    window.boAddPool = async function () {
+        const pid = parseInt($('boPoolPick').value);
+        if (!pid) return alert('Pilih produk dulu.');
+        try {
+            const res = await api(`${BAPI}/pool`, { method:'POST', body: JSON.stringify({ store_id: boStoreId(), product_ids: [pid] }) });
+            toast(res.message); $('boPoolPick').value = ''; boPool();
+        } catch (e) { toast('Gagal: ' + e.message, 'error'); }
+    };
+
+    window.boTogglePool = async function (id) { await api(`${BAPI}/pool/${id}/toggle`, { method:'POST' }); boPool(); };
+    window.boDelPool = async function (id) { if (!confirm('Keluarkan dari antrian?')) return; await api(`${BAPI}/pool/${id}`, { method:'DELETE' }); boPool(); };
+
+    async function boLogs() {
+        const c = $('boLogs'); c.innerHTML = '<div class="bo-empty">Memuat…</div>';
+        let d;
+        try { d = await api(`${BAPI}/logs?store_id=${boStoreId()}`); }
+        catch (e) { c.innerHTML = `<div class="bo-empty text-danger">${esc(e.message)}</div>`; return; }
+        const rows = (d.logs || []).slice(0, 50);
+        c.innerHTML = rows.length ? rows.map(l => `
+            <div class="bo-row"><span class="bo-tag tag-${l.source}">${l.source}</span>
+                <div class="grow"><div class="nm">${esc(l.product)}</div>
+                    <div class="meta">${l.success ? '' : '⚠ ' + esc(l.message || 'gagal') + ' · '}${fmtT(l.boosted_at)}</div></div>
+                <span>${l.success ? '✅' : '❌'}</span></div>`).join('')
+            : '<div class="bo-empty">Belum ada riwayat.</div>';
+    }
 
     // ── Realtime ────────────────────────────────────────────────────────────
     if (window.Echo) {
