@@ -25,9 +25,15 @@ class ProcessShopeeChatWebhookJob implements ShouldQueue
         $shopId = $this->payload['shop_id'] ?? null;
         if (! $shopId) return;
 
-        $store = Store::where('external_shop_id', (string) $shopId)
+        $candidates = Store::where('external_shop_id', (string) $shopId)
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->first();
+            ->orderByDesc('is_active')
+            ->get();
+
+        // Kalau ada beberapa record untuk shop yang sama (mis. "Insight" mati &
+        // "Insight Corps" aktif), pilih yang aktif & terhubung supaya bisa dibalas.
+        $store = $candidates->first(fn ($s) => $s->is_active && filled($s->credential('access_token')))
+            ?? $candidates->first();
 
         if (! $store) {
             Log::warning("Chat webhook: shop_id {$shopId} tidak dikenal.");

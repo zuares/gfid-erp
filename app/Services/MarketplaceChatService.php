@@ -80,6 +80,25 @@ class MarketplaceChatService
      */
     public function sendText(Store $store, ?MarketplaceConversation $conversation, string $text, $toId = null): array
     {
+        // Kalau toko percakapan tidak siap kirim (tanpa access_token / nonaktif) —
+        // mis. record duplikat "Insight" yang mati — alihkan ke toko lain milik
+        // SHOP yang sama yang benar-benar terhubung (mis. "Insight Corps").
+        if (blank($store->credential('access_token')) || ! $store->is_active) {
+            $alt = $this->connectedSiblingStore($store);
+            if ($alt) {
+                if ($conversation && $conversation->store_id !== $alt->id) {
+                    $conversation->update(['store_id' => $alt->id]);
+                }
+                Log::info("Chat: kirim dialihkan dari toko #{$store->id} ({$store->name}) ke #{$alt->id} ({$alt->name}) — shop sama, toko asal tidak terhubung.");
+                $store = $alt;
+            } else {
+                return [
+                    'error'   => 'store_not_connected',
+                    'message' => "Toko \"{$store->name}\" belum terhubung ke Shopee dan tidak ada toko pengganti untuk shop ini. Re-authorize toko dulu.",
+                ];
+            }
+        }
+
         $driver = $this->manager->driver($store);
         $toId   = $toId ?: $conversation?->buyer_user_id;
 
@@ -141,6 +160,38 @@ class MarketplaceChatService
         }
 
         return ['success' => true, 'conversation' => $conversation?->fresh()];
+    }
+
+    /**
+     * Kembalikan toko yang benar-benar bisa dipakai kirim untuk shop ini:
+     * toko itu sendiri kalau sudah terhubung & aktif, atau toko pengganti
+     * (shop sama) yang terhubung. Kalau tidak ada, kembalikan toko asal.
+     */
+    public function usableStore(Store $store): Store
+    {
+        if (filled($store->credential('access_token')) && $store->is_active) {
+            return $store;
+        }
+        return $this->connectedSiblingStore($store) ?? $store;
+    }
+
+    /**
+     * Cari toko lain untuk SHOP yang sama (external_shop_id sama) yang aktif &
+     * benar-benar terhubung (punya access_token). Dipakai saat toko percakapan
+     * adalah record duplikat/mati.
+     */
+    protected function connectedSiblingStore(Store $store): ?Store
+    {
+        if (blank($store->external_shop_id)) {
+            return null;
+        }
+
+        return Store::where('external_shop_id', $store->external_shop_id)
+            ->where('id', '!=', $store->id)
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->get()
+            ->first(fn ($s) => filled($s->credential('access_token')));
     }
 
     /**

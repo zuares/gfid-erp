@@ -81,12 +81,12 @@ class MarketplaceChatController extends Controller
         $data = $request->validate(['text' => 'required|string|max:2000']);
 
         $store = $conversation->store;
-        if (! $store || blank($store->credential('access_token'))) {
-            return response()->json([
-                'message' => 'Toko percakapan ini belum terhubung ke Shopee. Buka menu Toko lalu Authorize/Re-authorize dulu.',
-            ], 422);
+        if (! $store) {
+            return response()->json(['message' => 'Toko percakapan tidak ditemukan.'], 422);
         }
 
+        // Catatan: kalau toko ini duplikat/mati (mis. "Insight"), service otomatis
+        // mengalihkan ke toko lain milik shop yang sama yang terhubung ("Insight Corps").
         $res = $this->chat->sendText($store, $conversation, $data['text']);
 
         if (! empty($res['error'])) {
@@ -138,6 +138,11 @@ class MarketplaceChatController extends Controller
         $order = MarketplaceOrder::where('store_id', $store->id)
             ->where('channel_order_id', $data['order_sn'])
             ->firstOrFail();
+
+        // Order tetap dicari di toko aslinya, tapi percakapan & pengiriman pakai
+        // toko yang benar-benar terhubung untuk shop ini (mis. record "Insight"
+        // yang mati → dialihkan ke "Insight Corps").
+        $store = $this->chat->usableStore($store);
 
         $buyerUserId   = data_get($order->raw_json, 'buyer_user_id');
         $buyerUsername = $order->buyer_username;
