@@ -89,6 +89,8 @@ class MarketplaceOrder extends Model
 
     public function getNeedsShippingArrangementAttribute(): bool
     {
-        return $this->order_status === 'READY_TO_SHIP' && is_null($this->shipping_arranged_at);
+        return $this->order_status === 'READY_TO_SHIP' 
+            && is_null($this->shipping_arranged_at)
+            && empty($this->shipping_awb_no);
     }
 }
