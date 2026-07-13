@@ -1020,8 +1020,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
     
     let activeTab        = sessionStorage.getItem('ord_active_tab') || 'ready';
-    let subTabProcessed  = 'packing';
-    let subTabReady      = 'process';
+    let subTabProcessed  = sessionStorage.getItem('ord_sub_tab_processed') || 'packing';
+    let subTabReady      = sessionStorage.getItem('ord_sub_tab_ready') || 'process';
     // store_id passed via URL is an ID, but activeStore in JS requires the store name.
     // We will resolve it later during data load if it's an ID, or just set it if it matches.
     let activeStore      = urlParams.get('store_id') || '';
@@ -1150,6 +1150,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     // ── Tab switch ────────────────────────────────────────────────────────
     window.switchSubTabProcessed = function (tab, btn) {
         subTabProcessed = tab;
+        sessionStorage.setItem('ord_sub_tab_processed', tab);
         document.querySelectorAll('#subTabProcessedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderTable();
@@ -1160,6 +1161,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     window.switchSubTabReady = function (tab, btn) {
         subTabReady = tab;
+        sessionStorage.setItem('ord_sub_tab_ready', tab);
         document.querySelectorAll('#subTabReadyContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderTable();
@@ -1227,10 +1229,27 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (btn) {
             document.querySelectorAll('.ord-tab').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            
             const subTabContainer = document.getElementById('subTabProcessedContainer');
             if (subTabContainer) {
                 subTabContainer.style.display = (saved === 'processed') ? 'flex' : 'none';
             }
+            const subTabReadyContainer = document.getElementById('subTabReadyContainer');
+            if (subTabReadyContainer) {
+                subTabReadyContainer.style.display = (saved === 'ready') ? 'flex' : 'none';
+            }
+        }
+        
+        // Restore sub-tabs
+        const subRBtn = document.querySelector(`#subTabReadyContainer .ord-subtab[data-sub="${subTabReady}"]`);
+        if (subRBtn) {
+            document.querySelectorAll('#subTabReadyContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+            subRBtn.classList.add('active');
+        }
+        const subPBtn = document.querySelector(`#subTabProcessedContainer .ord-subtab[data-sub="${subTabProcessed}"]`);
+        if (subPBtn) {
+            document.querySelectorAll('#subTabProcessedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+            subPBtn.classList.add('active');
         }
     }
 
