@@ -370,8 +370,11 @@
     <script>
       (function () {
         try {
+          var EchoClass = typeof Echo !== 'undefined' ? (Echo.default || Echo) : window.EchoClass;
+          if (!EchoClass) return;
+
           @if(config('broadcasting.default') === 'pusher')
-              window.Echo = new Echo({
+              window.Echo = new EchoClass({
                   broadcaster: 'pusher',
                   key: @json(config('broadcasting.connections.pusher.key')),
                   cluster: @json(config('broadcasting.connections.pusher.options.cluster')),
@@ -381,7 +384,7 @@
               var host = @json(config('broadcasting.connections.reverb.options.host')) || window.location.hostname;
               var port = Number(@json(config('broadcasting.connections.reverb.options.port', 443)));
               var scheme = @json(config('broadcasting.connections.reverb.options.scheme', 'https'));
-              window.Echo = new Echo({
+              window.Echo = new EchoClass({
                 broadcaster: 'reverb',
                 key: @json(config('broadcasting.connections.reverb.key')),
                 wsHost: host,
