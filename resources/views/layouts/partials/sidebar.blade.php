@@ -864,6 +864,13 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($router->has('marketplace.boost'))
+                        <x-sidebar.simple-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
+                            :active="request()->routeIs('marketplace.boost')">
+                            Naikkan Produk
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($router->has('marketplace.chat'))
                         <x-sidebar.simple-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
                             :active="request()->routeIs('marketplace.chat')">
@@ -1473,6 +1480,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.products') }}" icon="bi bi-tags"
                                 :active="request()->routeIs('marketplace.products')">
                                 Produk
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($router->has('marketplace.boost'))
+                            <x-sidebar.sub-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
+                                :active="request()->routeIs('marketplace.boost')">
+                                Naikkan Produk
                             </x-sidebar.sub-link>
                         @endif
                         @if ($router->has('marketplace.chat'))

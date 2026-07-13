@@ -127,6 +127,7 @@
             <div class="kpis" id="kpiRow"></div>
         </div>
         <div class="controls">
+            <a class="btn btn-pill btn-prd-outline" href="{{ route('marketplace.boost') }}" title="Atur jadwal & rotasi Naikkan Produk">🚀 Boost</a>
             <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()">⚡ Auto-map</button>
             <button class="btn btn-pill btn-prd-primary" id="btnSync" onclick="syncProducts()">⟳ Sync Shopee</button>
         </div>
@@ -387,6 +388,9 @@
                 <td>${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
                 <td>
                     <button class="btn btn-prd-outline btn-mini mb-1" onclick="showHistory(${p.id})" title="Riwayat harian: stok, harga, terjual">📈 Riwayat</button>
+                    ${st === 'NORMAL'
+                        ? `<button class="btn btn-prd-outline btn-mini mb-1" onclick="boostNow(${p.id}, this)" title="Naikkan produk ke urutan teratas (4 jam)">🚀 Naikkan</button>`
+                        : ''}
                     ${!multiModel && models.length ? inlineEditors(p.id, models[0]) : ''}
                     ${st === 'NORMAL'
                         ? `<button class="btn btn-prd-outline btn-mini mt-1" onclick="setUnlist(${p.id}, true)">🙈 Sembunyikan</button>`
@@ -444,6 +448,25 @@
             toast(unlist ? 'Produk disembunyikan' : 'Produk ditampilkan');
             loadProducts();
         } catch (e) { alert('Gagal: ' + e.message); }
+    };
+
+    // Naikkan (boost) satu produk sekarang — maks 5 aktif / 4 jam (dibatasi Shopee)
+    window.boostNow = async function (pid, btn) {
+        const p = products.find(x => x.id === pid);
+        if (!p) return;
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳'; }
+        try {
+            const res = await api('/api/marketplace/boost/now', {
+                method: 'POST',
+                body: JSON.stringify({ store_id: p.store_id, product_ids: [pid] }),
+            });
+            toast(res.message || 'Produk dinaikkan', res.success ? 'success' : 'warning');
+        } catch (e) {
+            toast('Gagal boost: ' + e.message, 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+        }
     };
 
     function toast(title, icon = 'success') {

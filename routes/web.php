@@ -71,6 +71,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/webhook-tests', [MarketplaceController::class, 'webhookTests'])->name('marketplace.webhook-tests');
     Route::get('/marketplace/chat',        [\App\Http\Controllers\MarketplaceChatController::class, 'page'])->name('marketplace.chat');
     Route::get('/marketplace/products',    [\App\Http\Controllers\MarketplaceProductController::class, 'page'])->name('marketplace.products');
+    Route::get('/marketplace/boost',       [\App\Http\Controllers\MarketplaceBoostController::class, 'page'])->name('marketplace.boost');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
@@ -155,8 +156,25 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
 
+    // Naikkan Produk (boost)
+    $noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
+    Route::get('/boost/status',            [\App\Http\Controllers\MarketplaceBoostController::class, 'status']);
+    Route::post('/boost/now',              [\App\Http\Controllers\MarketplaceBoostController::class, 'boostNow'])->withoutMiddleware($noCsrf);
+    Route::get('/boost/logs',              [\App\Http\Controllers\MarketplaceBoostController::class, 'logs']);
+    // Jadwal jam-tetap
+    Route::get('/boost/schedules',         [\App\Http\Controllers\MarketplaceBoostController::class, 'schedules']);
+    Route::post('/boost/schedules',        [\App\Http\Controllers\MarketplaceBoostController::class, 'storeSchedule'])->withoutMiddleware($noCsrf);
+    Route::post('/boost/schedules/{schedule}/toggle', [\App\Http\Controllers\MarketplaceBoostController::class, 'toggleSchedule'])->withoutMiddleware($noCsrf);
+    Route::delete('/boost/schedules/{schedule}',      [\App\Http\Controllers\MarketplaceBoostController::class, 'destroySchedule'])->withoutMiddleware($noCsrf);
+    // Antrian rotasi (pool)
+    Route::get('/boost/pool',              [\App\Http\Controllers\MarketplaceBoostController::class, 'pool']);
+    Route::post('/boost/pool',             [\App\Http\Controllers\MarketplaceBoostController::class, 'storePool'])->withoutMiddleware($noCsrf);
+    Route::post('/boost/pool/{poolItem}/toggle', [\App\Http\Controllers\MarketplaceBoostController::class, 'togglePool'])->withoutMiddleware($noCsrf);
+    Route::delete('/boost/pool/{poolItem}',      [\App\Http\Controllers\MarketplaceBoostController::class, 'destroyPool'])->withoutMiddleware($noCsrf);
+
     // Chat Marketplace
     Route::get('/chat/unread-count',                         [\App\Http\Controllers\MarketplaceChatController::class, 'unreadCount']);
+    Route::get('/chat/test-shopee-chat',                     [\App\Http\Controllers\MarketplaceChatController::class, 'diagnoseChat']);
     Route::get('/chat/conversations',                        [\App\Http\Controllers\MarketplaceChatController::class, 'conversations']);
     Route::get('/chat/conversations/{conversation}/messages', [\App\Http\Controllers\MarketplaceChatController::class, 'messages']);
     Route::post('/chat/conversations/{conversation}/send',    [\App\Http\Controllers\MarketplaceChatController::class, 'send'])

@@ -169,4 +169,30 @@ class MarketplaceChatController extends Controller
             'order_sn'       => $data['order_sn'],
         ]);
     }
+
+    /**
+     * Diagnose Shopee Token & Chat API
+     */
+    public function diagnoseChat()
+    {
+        $store = Store::where('is_active', true)
+            ->whereHas('channel', fn($q) => $q->whereIn('code', ['shopee', 'SHP', 'SHOPEE']))
+            ->first();
+
+        if (!$store) {
+            return response()->json(['error' => 'Tidak ada toko Shopee aktif.']);
+        }
+
+        /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
+        $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+
+        return response()->json([
+            'store_id' => $store->id,
+            'external_shop_id' => $store->external_shop_id,
+            'partner_id_used' => $store->credential('partner_id'),
+            'getShopInfo' => $shopee->getShopInfo($store),
+            'getUnread' => $shopee->getUnreadConversationCount($store),
+            'sendChatMessage_dummy_123' => $shopee->sendChatMessage($store, 123, 'test diagnostic'),
+        ]);
+    }
 }

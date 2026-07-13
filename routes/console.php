@@ -93,6 +93,12 @@ Schedule::command('marketplace:snapshot-products --sync')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
+Schedule::command('marketplace:run-boosts')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('marketplace:cleanup-labels')
     ->dailyAt('01:00')
     ->runInBackground();

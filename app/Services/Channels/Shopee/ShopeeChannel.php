@@ -600,4 +600,31 @@ class ShopeeChannel implements MarketplaceChannel
             'language' => $language,
         ]);
     }
+
+    // ─── Boost / Naikkan Produk ───────────────────────────────────────────────
+
+    /**
+     * Naikkan (boost) produk ke urutan teratas toko.
+     * Endpoint: POST /api/v2/product/boost_item
+     * Batas Shopee: maksimal 5 item per panggilan, durasi boost 4 jam,
+     * item baru bisa di-boost lagi setelah 4 jam.
+     *
+     * @param  array<int|string>  $itemIds  daftar item_id (maks 5)
+     */
+    public function boostItems(Store $store, array $itemIds): array
+    {
+        return $this->post($store, '/api/v2/product/boost_item', [
+            'item_id_list' => array_values(array_map('intval', $itemIds)),
+        ]);
+    }
+
+    /**
+     * Daftar produk yang sedang di-boost (maks 5).
+     * Endpoint: GET /api/v2/product/get_boosted_list
+     * Response: response.item_list = [item_id, ...]
+     */
+    public function getBoostedList(Store $store): array
+    {
+        return $this->get($store, '/api/v2/product/get_boosted_list', []);
+    }
 }
