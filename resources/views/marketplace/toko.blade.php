@@ -649,8 +649,11 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <span class="badge-status ${statusClass}">${statusLabel}</span>
                     ${inactive
-                        ? `<button class="btn btn-sm btn-outline-success" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan</button>`
-                        : `<a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>`}
+                        ? `<button class="btn btn-sm btn-outline-success" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan Toko</button>`
+                        : `<span style="display:flex; gap:.35rem; align-items:center;">
+                             <a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>
+                             <button class="btn btn-sm btn-outline-secondary" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})" title="Sembunyikan dari peringatan koneksi"><i class="bi bi-power"></i> Nonaktifkan</button>
+                           </span>`}
                 </div>
 
                 <div class="store-stats">
