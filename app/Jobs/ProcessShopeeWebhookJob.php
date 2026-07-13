@@ -70,8 +70,46 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             $this->handleReturnUpdatesPush();
         } elseif ($this->eventType === 'package_info_push') {
             $this->handlePackageInfoPush();
+        } elseif ($this->eventType === 'item_update') {
+            $this->handleItemUpdate();
         } else {
             Log::info("No specific handler for event: {$this->eventType}");
+        }
+    }
+
+    /**
+     * Push code 5: item di-update di Shopee (harga/stok/status berubah)
+     * → re-sync item tersebut + broadcast agar halaman Produk refresh.
+     */
+    protected function handleItemUpdate()
+    {
+        $shopId = $this->payload['shop_id'] ?? null;
+        if (!$shopId) return;
+
+        $store = Store::where('external_shop_id', (string)$shopId)
+            ->whereHas('channel', function($q) {
+                $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
+            })->first();
+        if (!$store) return;
+
+        // Payload bisa berisi satu item_id atau daftar item
+        $itemIds = [];
+        $data = $this->payload['data'] ?? [];
+        if (!empty($data['item_id'])) {
+            $itemIds[] = $data['item_id'];
+        }
+        foreach (($data['items'] ?? []) as $it) {
+            if (!empty($it['item_id'])) $itemIds[] = $it['item_id'];
+        }
+
+        $service = app(\App\Services\MarketplaceProductService::class);
+        foreach (array_unique($itemIds) as $itemId) {
+            try {
+                $service->syncSingleItem($store, $itemId);
+                event(new \App\Events\ProductUpdated($store->id, (string)$itemId));
+            } catch (\Throwable $e) {
+                Log::warning("item_update: gagal sync item {$itemId}: " . $e->getMessage());
+            }
         }
     }
 

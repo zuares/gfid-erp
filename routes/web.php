@@ -70,6 +70,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
     Route::get('/marketplace/webhook-tests', [MarketplaceController::class, 'webhookTests'])->name('marketplace.webhook-tests');
     Route::get('/marketplace/chat',        [\App\Http\Controllers\MarketplaceChatController::class, 'page'])->name('marketplace.chat');
+    Route::get('/marketplace/products',    [\App\Http\Controllers\MarketplaceProductController::class, 'page'])->name('marketplace.products');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
@@ -139,6 +140,17 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/documents/bulk-greetings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printBulkGreetings']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
+
+    // Produk Marketplace
+    Route::get('/products',                        [\App\Http\Controllers\MarketplaceProductController::class, 'index']);
+    Route::post('/products/sync',                  [\App\Http\Controllers\MarketplaceProductController::class, 'sync'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/stock',       [\App\Http\Controllers\MarketplaceProductController::class, 'updateStock'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/price',       [\App\Http\Controllers\MarketplaceProductController::class, 'updatePrice'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/unlist',      [\App\Http\Controllers\MarketplaceProductController::class, 'toggleUnlist'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     // Chat Marketplace
     Route::get('/chat/unread-count',                         [\App\Http\Controllers\MarketplaceChatController::class, 'unreadCount']);

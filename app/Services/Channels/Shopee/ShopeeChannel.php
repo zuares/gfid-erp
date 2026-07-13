@@ -467,4 +467,110 @@ class ShopeeChannel implements MarketplaceChannel
     {
         return $this->get($store, '/api/v2/sellerchat/get_unread_conversation_count');
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Product (v2.product.*)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Daftar item per status. item_status: NORMAL | BANNED | UNLIST | SELLER_DELETE
+     * Catatan: API hanya menerima 1 status per panggilan yang aman lintas region,
+     * jadi sync dilakukan per status.
+     */
+    public function getItemList(Store $store, string $itemStatus = 'NORMAL', int $offset = 0, int $pageSize = 100, ?int $updateTimeFrom = null, ?int $updateTimeTo = null): array
+    {
+        $params = [
+            'offset'      => $offset,
+            'page_size'   => $pageSize,
+            'item_status' => $itemStatus,
+        ];
+        if ($updateTimeFrom) $params['update_time_from'] = $updateTimeFrom;
+        if ($updateTimeTo)   $params['update_time_to']   = $updateTimeTo;
+
+        return $this->get($store, '/api/v2/product/get_item_list', $params);
+    }
+
+    /**
+     * Detail item (max 50 item_id per panggilan).
+     */
+    public function getItemBaseInfo(Store $store, array $itemIds): array
+    {
+        return $this->get($store, '/api/v2/product/get_item_base_info', [
+            'item_id_list'          => implode(',', $itemIds),
+            'need_tax_info'         => 'false',
+            'need_complaint_policy' => 'false',
+        ]);
+    }
+
+    /**
+     * Statistik item: sales, views, likes, rating (max 50 item_id).
+     */
+    public function getItemExtraInfo(Store $store, array $itemIds): array
+    {
+        return $this->get($store, '/api/v2/product/get_item_extra_info', [
+            'item_id_list' => implode(',', $itemIds),
+        ]);
+    }
+
+    /**
+     * Daftar model/varian sebuah item.
+     */
+    public function getProductModelList(Store $store, $itemId): array
+    {
+        return $this->get($store, '/api/v2/product/get_model_list', [
+            'item_id' => (int) $itemId,
+        ]);
+    }
+
+    /**
+     * Update stok. $stockList: [['model_id' => 0, 'stock' => 10], ...]
+     * model_id 0 untuk item tanpa varian.
+     */
+    public function updateProductStock(Store $store, $itemId, array $stockList): array
+    {
+        return $this->post($store, '/api/v2/product/update_stock', [
+            'item_id'    => (int) $itemId,
+            'stock_list' => array_map(fn ($s) => [
+                'model_id'     => (int) ($s['model_id'] ?? 0),
+                'seller_stock' => [['stock' => (int) $s['stock']]],
+            ], $stockList),
+        ]);
+    }
+
+    /**
+     * Update harga. $priceList: [['model_id' => 0, 'original_price' => 125000], ...]
+     */
+    public function updateProductPrice(Store $store, $itemId, array $priceList): array
+    {
+        return $this->post($store, '/api/v2/product/update_price', [
+            'item_id'    => (int) $itemId,
+            'price_list' => array_map(fn ($p) => [
+                'model_id'       => (int) ($p['model_id'] ?? 0),
+                'original_price' => (float) $p['original_price'],
+            ], $priceList),
+        ]);
+    }
+
+    /**
+     * Unlist / list kembali item. $items: [['item_id' => x, 'unlist' => true], ...]
+     */
+    public function unlistItems(Store $store, array $items): array
+    {
+        return $this->post($store, '/api/v2/product/unlist_item', [
+            'item_list' => array_map(fn ($i) => [
+                'item_id' => (int) $i['item_id'],
+                'unlist'  => (bool) $i['unlist'],
+            ], $items),
+        ]);
+    }
+
+    /**
+     * Pohon kategori Shopee.
+     */
+    public function getProductCategory(Store $store, string $language = 'id'): array
+    {
+        return $this->get($store, '/api/v2/product/get_category', [
+            'language' => $language,
+        ]);
+    }
 }
