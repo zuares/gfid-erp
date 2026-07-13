@@ -1012,15 +1012,19 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     const urlParams = new URLSearchParams(window.location.search);
     const urlTab = urlParams.get('tab');
-    if (urlTab === 'ready_to_ship') {
-        sessionStorage.setItem('ord_active_tab', 'ready');
-    } else if (urlTab) {
-        sessionStorage.setItem('ord_active_tab', urlTab);
-    }
     
-    let activeTab        = sessionStorage.getItem('ord_active_tab') || 'ready';
-    let subTabProcessed  = sessionStorage.getItem('ord_sub_tab_processed') || 'packing';
-    let subTabReady      = sessionStorage.getItem('ord_sub_tab_ready') || 'process';
+    let initialTab = 'ready';
+    if (urlTab === 'ready_to_ship') initialTab = 'ready';
+    else if (urlTab) initialTab = urlTab;
+    
+    // Selalu reset ke default saat halaman dimuat ulang / pindah halaman
+    sessionStorage.setItem('ord_active_tab', initialTab);
+    sessionStorage.setItem('ord_sub_tab_processed', 'packing');
+    sessionStorage.setItem('ord_sub_tab_ready', 'process');
+    
+    let activeTab        = initialTab;
+    let subTabProcessed  = 'packing';
+    let subTabReady      = 'process';
     // store_id passed via URL is an ID, but activeStore in JS requires the store name.
     // We will resolve it later during data load if it's an ID, or just set it if it matches.
     let activeStore      = urlParams.get('store_id') || '';
