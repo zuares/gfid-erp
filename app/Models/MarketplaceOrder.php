@@ -90,7 +90,7 @@ class MarketplaceOrder extends Model
     public function getNeedsShippingArrangementAttribute(): bool
     {
         $logisticsStatus = $this->raw_json['package_list'][0]['logistics_status'] ?? null;
-        $isArrangedViaApp = in_array($logisticsStatus, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP', 'LOGISTICS_SHIPPED']);
+        $isArrangedViaApp = in_array($logisticsStatus, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP', 'LOGISTICS_SHIPPED', 'LOGISTICS_READY']);
 
         return $this->order_status === 'READY_TO_SHIP' 
             && is_null($this->shipping_arranged_at)
