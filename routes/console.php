@@ -76,6 +76,18 @@ Schedule::command('marketplace:sync-returns')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
+Schedule::command('marketplace:sync-ads-daily --days=3')
+    ->dailyAt('23:30')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
+Schedule::command('marketplace:snapshot-products --sync')
+    ->dailyAt('23:45')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('marketplace:cleanup-labels')
     ->dailyAt('01:00')
     ->runInBackground();

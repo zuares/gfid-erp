@@ -1066,6 +1066,184 @@ class MarketplaceController extends Controller
         return response()->json(['days' => $rows]);
     }
 
+    /**
+     * Saldo iklan SEMUA toko Shopee aktif (untuk filter "semua toko").
+     */
+    public function adsBalanceAll(): JsonResponse
+    {
+        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('status', 'active')->get();
+
+        $rows = [];
+        $total = 0;
+        foreach ($stores as $store) {
+            try {
+                $res = $this->manager->driver($store)->getAdsTotalBalance($store);
+                $bal = data_get($res, 'response.total_balance') ?? data_get($res, 'response.balance');
+                if ($bal !== null) {
+                    $total += (float) $bal;
+                    \App\Models\MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => $bal]);
+                }
+                $rows[] = ['store_id' => $store->id, 'store' => $store->name, 'balance' => $bal, 'error' => $res['message'] ?? $res['error'] ?? null];
+            } catch (\Throwable $e) {
+                $rows[] = ['store_id' => $store->id, 'store' => $store->name, 'balance' => null, 'error' => $e->getMessage()];
+            }
+        }
+
+        return response()->json(['total' => $total, 'stores' => $rows]);
+    }
+
+    /**
+     * Sync performa iklan harian ke DB (semua toko Shopee atau satu toko).
+     * Simpan snapshot saldo sekalian.
+     */
+    public function syncAdsDaily(Request $request): JsonResponse
+    {
+        set_time_limit(120);
+
+        $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
+        $dateTo   = $request->input('date_to',   now()->toDateString());
+
+        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('status', 'active')
+            ->when($request->filled('store_id'), fn ($q) => $q->where('id', $request->integer('store_id')))
+            ->get();
+
+        $saved = 0;
+        $errors = [];
+
+        foreach ($stores as $store) {
+            $driver = $this->manager->driver($store);
+
+            // 1. Snapshot saldo
+            try {
+                $bal = data_get($driver->getAdsTotalBalance($store), 'response.total_balance');
+                if ($bal !== null) {
+                    \App\Models\MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => $bal]);
+                }
+            } catch (\Throwable $e) { /* non-fatal */ }
+
+            // 2. Performa harian → upsert per tanggal
+            try {
+                $res = $driver->getAdsShopDailyPerformance(
+                    $store,
+                    \Carbon\Carbon::parse($dateFrom)->format('d-m-Y'),
+                    \Carbon\Carbon::parse($dateTo)->format('d-m-Y'),
+                );
+
+                if (! empty($res['error'])) {
+                    $errors[] = "[{$store->name}] " . ($res['message'] ?? $res['error']);
+                    continue;
+                }
+
+                $days = data_get($res, 'response.day_list')
+                    ?? data_get($res, 'response.daily_performance')
+                    ?? (is_array($res['response'] ?? null) && array_is_list($res['response']) ? $res['response'] : []);
+
+                foreach ($days as $d) {
+                    $rawDate = $d['date'] ?? null;
+                    if (! $rawDate) continue;
+                    // Shopee kirim DD-MM-YYYY
+                    $date = \Carbon\Carbon::createFromFormat('d-m-Y', $rawDate)->toDateString();
+
+                    \App\Models\MarketplaceAdsDaily::updateOrCreate(
+                        ['store_id' => $store->id, 'date' => $date],
+                        [
+                            'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
+                            'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
+                            'ctr'         => $d['ctr'] ?? null,
+                            'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
+                            'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
+                            'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
+                            'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
+                            'raw_json'    => $d,
+                        ]
+                    );
+                    $saved++;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = "[{$store->name}] " . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'saved'   => $saved,
+            'stores'  => $stores->count(),
+            'errors'  => $errors,
+            'message' => "Tersimpan {$saved} baris harian dari {$stores->count()} toko." . ($errors ? ' Sebagian gagal.' : ''),
+        ]);
+    }
+
+    /**
+     * Riwayat saldo iklan (dari snapshot log) — saldo terakhir per hari.
+     */
+    public function adsBalanceHistory(Request $request): JsonResponse
+    {
+        $days = min(365, max(7, (int) $request->input('days', 60)));
+
+        $logs = \App\Models\MarketplaceAdsBalanceLog::where('created_at', '>=', now()->subDays($days))
+            ->when($request->filled('store_id'), fn ($q) => $q->where('store_id', $request->integer('store_id')))
+            ->with('store:id,name')
+            ->orderBy('created_at')
+            ->get();
+
+        // Saldo TERAKHIR per (tanggal, toko) → lalu total per tanggal
+        $byDayStore = [];
+        foreach ($logs as $log) {
+            $byDayStore[$log->created_at->toDateString()][$log->store_id] = (float) $log->balance;
+        }
+
+        $rows = collect($byDayStore)->map(fn ($stores, $date) => [
+            'date'    => $date,
+            'balance' => array_sum($stores),
+            'stores'  => count($stores),
+        ])->values();
+
+        return response()->json(['days' => $rows]);
+    }
+
+    /**
+     * Baca performa harian dari DB — mendukung "semua toko" (agregat) & per toko.
+     */
+    public function adsDaily(Request $request): JsonResponse
+    {
+        $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
+        $dateTo   = $request->input('date_to',   now()->toDateString());
+
+        $q = \App\Models\MarketplaceAdsDaily::query()
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->when($request->filled('store_id'), fn ($qq) => $qq->where('store_id', $request->integer('store_id')));
+
+        // Agregat per tanggal (kalau semua toko → dijumlahkan lintas toko)
+        $days = (clone $q)
+            ->selectRaw('date,
+                SUM(impressions) as impressions, SUM(clicks) as clicks,
+                SUM(spend) as spend, SUM(orders) as orders, SUM(gmv) as gmv')
+            ->groupBy('date')->orderBy('date')
+            ->get()
+            ->map(function ($r) {
+                $r->ctr  = $r->impressions > 0 ? round($r->clicks / $r->impressions * 100, 2) : null;
+                $r->roas = $r->spend > 0 ? round($r->gmv / $r->spend, 2) : null;
+                return $r;
+            });
+
+        // Ringkasan per toko (untuk perbandingan antar toko)
+        $perStore = (clone $q)
+            ->selectRaw('store_id, SUM(spend) as spend, SUM(orders) as orders, SUM(gmv) as gmv')
+            ->groupBy('store_id')
+            ->with('store:id,name')
+            ->get()
+            ->map(fn ($r) => [
+                'store' => $r->store?->name,
+                'spend' => (float) $r->spend,
+                'orders'=> (int) $r->orders,
+                'gmv'   => (float) $r->gmv,
+                'roas'  => $r->spend > 0 ? round($r->gmv / $r->spend, 2) : null,
+            ]);
+
+        return response()->json(['days' => $days, 'per_store' => $perStore]);
+    }
+
     /** Debug: lihat raw response Shopee Ads API (hapus setelah selesai debug) */
     public function debugAdApi(Request $request, Store $store): JsonResponse
     {

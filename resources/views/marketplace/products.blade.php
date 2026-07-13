@@ -386,6 +386,7 @@
                 <td class="muted">${p.sales ?? '—'}</td>
                 <td>${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
                 <td>
+                    <button class="btn btn-prd-outline btn-mini mb-1" onclick="showHistory(${p.id})" title="Riwayat harian: stok, harga, terjual">📈 Riwayat</button>
                     ${!multiModel && models.length ? inlineEditors(p.id, models[0]) : ''}
                     ${st === 'NORMAL'
                         ? `<button class="btn btn-prd-outline btn-mini mt-1" onclick="setUnlist(${p.id}, true)">🙈 Sembunyikan</button>`
@@ -511,6 +512,39 @@
             toast(`SKU ${sku} berhasil di-mapping ✔`);
             loadProducts();
         } catch (e) { alert('Gagal simpan mapping: ' + e.message); }
+    };
+
+    // ── Mesin waktu: riwayat harian produk ──────────────────────────────────
+    window.showHistory = async function (pid) {
+        const p = products.find(x => x.id === pid);
+        try {
+            const d = await api(`${API}/${pid}/history?days=90`);
+            const days = (d.days || []).slice().reverse(); // terbaru dulu
+            const body = days.length ? `
+                <div style="max-height:320px;overflow-y:auto">
+                <table style="width:100%;font-size:.75rem;text-align:right;border-collapse:collapse">
+                    <thead><tr style="color:#64748b;font-size:.65rem;text-transform:uppercase;position:sticky;top:0;background:#fff">
+                        <th style="text-align:left;padding:4px">Tanggal</th><th>Stok</th><th>Harga</th><th>Terjual/hari</th><th>Total Jual</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>${days.map(r => `<tr style="border-top:1px solid #f1f5f9">
+                        <td style="text-align:left;padding:4px">${(r.date || '').substring(0, 10)}</td>
+                        <td style="${r.stock_total === 0 ? 'color:#dc2626;font-weight:700' : ''}">${r.stock_total}</td>
+                        <td>${r.price_min != null ? 'Rp' + Number(r.price_min).toLocaleString('id-ID') : '—'}</td>
+                        <td>${r.sales_delta ?? '—'}</td>
+                        <td>${r.sales ?? '—'}</td>
+                        <td style="font-size:.65rem">${r.item_status || ''}</td>
+                    </tr>`).join('')}</tbody>
+                </table></div>`
+                : '<div class="text-muted p-3">Belum ada snapshot. Data terkumpul otomatis tiap malam (23:45), atau jalankan <code>php artisan marketplace:snapshot-products</code>.</div>';
+
+            Swal.fire({
+                title: `📈 ${p?.item_name || 'Produk'}`,
+                html: body,
+                width: 620,
+                showConfirmButton: false,
+                showCloseButton: true,
+            });
+        } catch (e) { alert('Gagal muat riwayat: ' + e.message); }
     };
 
     // ── Event listeners filter (instan) ─────────────────────────────────────

@@ -18,6 +18,7 @@ class MarketplaceConversation extends Model
         'last_message_text',
         'last_message_at',
         'unread_count',
+        'is_answered',
         'meta',
     ];
 

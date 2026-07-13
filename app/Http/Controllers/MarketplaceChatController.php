@@ -102,7 +102,9 @@ class MarketplaceChatController extends Controller
     public function unreadCount()
     {
         return response()->json([
-            'unread' => (int) MarketplaceConversation::sum('unread_count'),
+            'unread' => (int) MarketplaceConversation::where('unread_count', '>', 0)
+                            ->orWhere('is_answered', false)
+                            ->count(),
         ]);
     }
 

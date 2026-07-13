@@ -132,6 +132,7 @@ class MarketplaceChatService
                 'last_message_type' => 'text',
                 'last_message_text' => $text,
                 'last_message_at'   => $sentAt,
+                'is_answered'       => true,
             ]);
 
             event(new ChatMessageReceived(
@@ -341,6 +342,7 @@ class MarketplaceChatService
                     'last_message_type' => $type,
                     'last_message_text' => $text ?: "[{$type}]",
                     'last_message_at'   => $sentAt,
+                    'is_answered'       => $fromRole === 'seller',
                 ]);
             }
             return true;

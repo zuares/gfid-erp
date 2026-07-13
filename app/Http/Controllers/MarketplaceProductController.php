@@ -162,6 +162,24 @@ class MarketplaceProductController extends Controller
     }
 
     /**
+     * Riwayat harian sebuah produk (mesin waktu: stok, harga, terjual).
+     */
+    public function history(MarketplaceProduct $product, Request $request)
+    {
+        $days = min(365, max(7, (int) $request->input('days', 90)));
+
+        $rows = \App\Models\MarketplaceProductDaily::where('marketplace_product_id', $product->id)
+            ->where('date', '>=', now()->subDays($days)->toDateString())
+            ->orderBy('date')
+            ->get(['date', 'item_status', 'price_min', 'price_max', 'stock_total', 'sales', 'sales_delta', 'views', 'rating_star']);
+
+        return response()->json([
+            'product' => ['id' => $product->id, 'name' => $product->item_name, 'sku' => $product->item_sku],
+            'days'    => $rows,
+        ]);
+    }
+
+    /**
      * Toggle tampil/sembunyi (unlist).
      */
     public function toggleUnlist(MarketplaceProduct $product, Request $request)

@@ -170,10 +170,17 @@
     </x-gf.panel>
 
     {{-- ── Performa Harian Toko (live dari API) ─────────────────────────────── --}}
-    <x-gf.panel title="Performa Harian Toko" subtitle="Gabungan semua campaign CPC — live dari Shopee Ads API. Pilih toko lalu klik Muat.">
-        <div class="d-flex align-items-center gap-2 mb-2">
-            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnShopPerf" onclick="loadShopPerf()">📊 Muat Performa Harian</button>
+    <x-gf.panel title="Performa Harian Toko" subtitle="Tersimpan di database untuk analisa historis — mendukung agregat SEMUA toko. Scheduler otomatis menyimpan tiap malam 23:30.">
+        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+            <button class="btn btn-dark fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnSyncShopPerf" onclick="syncShopPerf()">↓ Sync ke DB</button>
+            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnShopPerf" onclick="loadShopPerf()">📊 Muat dari DB</button>
+            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnBackfill" onclick="backfillAds()" title="Tarik data 6 bulan ke belakang, per bulan">⏳ Tarik Riwayat 6 Bln</button>
+            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" onclick="showBalanceHistory()">💰 Riwayat Saldo</button>
             <span class="text-muted" style="font-size:.72rem" id="shopPerfInfo"></span>
+        </div>
+        <div id="perStoreWrap" class="mb-2" style="display:none">
+            <div style="font-size:.7rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Perbandingan per Toko</div>
+            <div id="perStoreChips" style="display:flex;gap:.4rem;flex-wrap:wrap"></div>
         </div>
         <div style="overflow-x:auto">
             <table class="table table-sm" style="font-size:.75rem" id="shopPerfTable">
@@ -286,18 +293,24 @@
     // ── Saldo Iklan (v2.ads.get_total_balance) ────────────────────────────────
     async function loadBalance() {
         const sid = $('adsStoreId').value;
-        if (!sid) {
-            $('kpiBalance').textContent = '—';
-            $('kpiBalanceSub').textContent = 'pilih toko untuk cek';
-            return;
-        }
         $('kpiBalance').textContent = '⏳';
         try {
-            const d = await api(`/api/marketplace/stores/${sid}/ads-balance`);
-            $('kpiBalance').textContent = d.balance != null ? fmtRp(d.balance) : '—';
-            $('kpiBalanceSub').textContent = 'sisa kredit iklan';
-            // Peringatan saldo menipis
-            if (d.balance != null && d.balance < 100000) {
+            let balance, sub;
+            if (sid) {
+                const d = await api(`/api/marketplace/stores/${sid}/ads-balance`);
+                balance = d.balance;
+                sub = 'sisa kredit iklan';
+            } else {
+                // Semua toko → total saldo gabungan
+                const d = await api('/api/marketplace/ads-balance-all');
+                balance = d.total;
+                const ok = (d.stores || []).filter(s => s.balance != null).length;
+                sub = `total ${ok}/${(d.stores || []).length} toko`;
+                $('kpiBalance').title = (d.stores || []).map(s => `${s.store}: ${s.balance != null ? fmtRp(s.balance) : (s.error || '—')}`).join('\n');
+            }
+            $('kpiBalance').textContent = balance != null ? fmtRp(balance) : '—';
+            $('kpiBalanceSub').textContent = sub;
+            if (balance != null && balance < 100000) {
                 $('kpiBalance').style.color = '#dc2626';
                 $('kpiBalanceSub').textContent = '⚠ saldo menipis — top up!';
             } else {
@@ -310,17 +323,33 @@
     }
 
     // ── Performa Harian Toko (v2.ads.get_all_cpc_ads_daily_performance) ──────
+    // Sync data harian semua toko (atau toko terpilih) ke database
+    window.syncShopPerf = async function () {
+        const btn = $('btnSyncShopPerf');
+        btn.disabled = true; btn.textContent = '⏳ Sync…';
+        try {
+            const sid = $('adsStoreId').value;
+            const d = await api(`/api/marketplace/ads-daily/sync?date_from=${$('dateFrom').value}&date_to=${$('dateTo').value}` + (sid ? `&store_id=${sid}` : ''), { method: 'POST' });
+            if (d.errors?.length) console.warn('Sync errors:', d.errors);
+            $('shopPerfInfo').textContent = d.message;
+            loadShopPerf();
+            loadBalance();
+        } catch (e) { alert('Sync gagal: ' + e.message); }
+        finally { btn.disabled = false; btn.textContent = '↓ Sync ke DB'; }
+    };
+
     window.loadShopPerf = async function () {
         const sid = $('adsStoreId').value;
-        if (!sid) { alert('Pilih toko dulu.'); return; }
         const btn = $('btnShopPerf');
         btn.disabled = true; btn.textContent = '⏳ Memuat…';
-        $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Memuat dari Shopee…</td></tr>';
+        $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Memuat dari database…</td></tr>';
         try {
-            const d = await api(`/api/marketplace/stores/${sid}/ads-shop-performance?date_from=${$('dateFrom').value}&date_to=${$('dateTo').value}`);
+            // Baca dari DB — mendukung agregat semua toko
+            const d = await api(`/api/marketplace/ads-daily?date_from=${$('dateFrom').value}&date_to=${$('dateTo').value}` + (sid ? `&store_id=${sid}` : ''));
             const days = d.days || [];
+            renderPerStore(d.per_store || []);
             if (!days.length) {
-                $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Tidak ada data di rentang ini.</td></tr>';
+                $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Belum ada data di rentang ini — klik "↓ Sync ke DB" dulu.</td></tr>';
             } else {
                 const tot = { imp:0, clk:0, spend:0, ord:0, gmv:0 };
                 $('shopPerfBody').innerHTML = days.map(r => {
@@ -351,9 +380,73 @@
         } catch (e) {
             $('shopPerfBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">${e.message}</td></tr>`;
         } finally {
-            btn.disabled = false; btn.textContent = '📊 Muat Performa Harian';
+            btn.disabled = false; btn.textContent = '📊 Muat dari DB';
         }
     };
+
+    // ── Mesin waktu: backfill 6 bulan ke belakang (per bulan, berurutan) ─────
+    window.backfillAds = async function () {
+        const btn = $('btnBackfill');
+        btn.disabled = true;
+        const sid = $('adsStoreId').value;
+        let total = 0;
+        try {
+            for (let i = 5; i >= 0; i--) {
+                const start = new Date(); start.setMonth(start.getMonth() - i, 1);
+                const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+                const today = new Date(); if (end > today) end.setTime(today.getTime());
+                const f = toDateStr(start), t = toDateStr(end);
+                btn.textContent = `⏳ ${f.substring(0,7)}…`;
+                const d = await api(`/api/marketplace/ads-daily/sync?date_from=${f}&date_to=${t}` + (sid ? `&store_id=${sid}` : ''), { method: 'POST' });
+                total += d.saved || 0;
+            }
+            $('shopPerfInfo').textContent = `Riwayat 6 bulan tertarik: ${total} baris tersimpan.`;
+            loadShopPerf();
+        } catch (e) {
+            alert('Backfill berhenti: ' + e.message + ' — data yang sudah tersimpan tetap aman, ulangi untuk melanjutkan.');
+        } finally {
+            btn.disabled = false; btn.textContent = '⏳ Tarik Riwayat 6 Bln';
+        }
+    };
+
+    // ── Riwayat saldo iklan ──────────────────────────────────────────────────
+    window.showBalanceHistory = async function () {
+        try {
+            const sid = $('adsStoreId').value;
+            const d = await api(`/api/marketplace/ads-balance-history?days=60` + (sid ? `&store_id=${sid}` : ''));
+            const days = (d.days || []).slice().reverse();
+            const body = days.length ? `
+                <div style="max-height:320px;overflow-y:auto">
+                <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+                    <thead><tr style="color:#64748b;font-size:.66rem;text-transform:uppercase;position:sticky;top:0;background:#fff">
+                        <th style="text-align:left;padding:4px">Tanggal</th><th style="text-align:right">Saldo</th><th style="text-align:right">Δ vs sebelumnya</th>
+                    </tr></thead>
+                    <tbody>${days.map((r, idx) => {
+                        const prev = days[idx + 1];
+                        const delta = prev ? r.balance - prev.balance : null;
+                        return `<tr style="border-top:1px solid #f1f5f9">
+                            <td style="padding:4px">${r.date}</td>
+                            <td style="text-align:right;font-weight:700">${fmtRp(r.balance)}</td>
+                            <td style="text-align:right;color:${delta > 0 ? '#166534' : (delta < 0 ? '#dc2626' : '#94a3b8')}">${delta != null ? (delta > 0 ? '+' : '') + fmtRp(delta) : '—'}</td>
+                        </tr>`;
+                    }).join('')}</tbody>
+                </table></div>`
+                : '<div class="text-muted p-3">Belum ada riwayat — snapshot saldo tercatat otomatis tiap sync & tiap malam 23:30.</div>';
+            Swal.fire({ title: '💰 Riwayat Saldo Iklan', html: body, width: 480, showConfirmButton: false, showCloseButton: true });
+        } catch (e) { alert('Gagal: ' + e.message); }
+    };
+
+    function renderPerStore(rows) {
+        const wrap = $('perStoreWrap');
+        if (!rows.length || $('adsStoreId').value) { wrap.style.display = 'none'; return; }
+        wrap.style.display = '';
+        $('perStoreChips').innerHTML = rows
+            .sort((a, b) => b.spend - a.spend)
+            .map(r => `<span style="border:1px solid rgba(148,163,184,.3);border-radius:8px;padding:4px 10px;font-size:.72rem">
+                <b>${r.store || '?'}</b> · spend ${fmtRp(r.spend)} · ${r.orders} order ·
+                ROAS <b style="color:${r.roas >= 4 ? '#166534' : (r.roas != null && r.roas < 2 ? '#dc2626' : 'inherit')}">${r.roas ?? '—'}</b>
+            </span>`).join('');
+    }
 
     // ── Sync dari API ─────────────────────────────────────────────────────────
     window.runSync = async function () {

@@ -414,7 +414,14 @@
       if (window.Echo) {
         try {
           window.Echo.channel('marketplace')
-            .listen('ChatMessageReceived', refreshChatBadge);
+            .listen('ChatMessageReceived', function(e) {
+                refreshChatBadge();
+                // Play notification sound
+                try {
+                    var snd = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqPb3F0eX2AhIqQc3R4en6BhYuQcnV5e3+ChoyRbnN4e36ChoyRcXR6fIGDh42ScHV6e4CCho2Tb3V7fIGDh4+TbnV6fIGDiI+UbnV6e4KDiY+VbXZ7fIOEiZCWbnZ7fIOEipGWbnZ8fISFipKWbXV8fYWFi5OWbHV8fYWFjJSWbHV8foWGjJWWa3V8foWGjZaWa3R8f4aHjpWYa3R9f4aHjZeXanR9f4eIjpeXanR9f4eIjpeYanN9gIiIjpiYanN+gImJj5iYanN+gYmJj5mYaXN+gYqKkJiZaXJ/gYqKkJmZaXJ/gomKkJqZaHJ/gomKkZqZZnKAgoqLkpqaZnKAgoqLk5qaZXKBg4uMk5qbZXKBg4uMk5qbZHKBg4uNk5ucZHKCg4yOk5ucY3KDhI2Pk5ycYnKDhI2Qk5ydYnKEhY+Qk5ydYXOFhpCRkpydYXOGh5GSk52eYHSGh5GSk52eX3SIiJKSk52eX3SJiZOSk56eX3SJipOSk56eXnaKipSTk56eXnaLi5WTk5+fXnaMjJWTk5+fXnaMjJaTk5+fXXaNjpWTk5+fXXaOj5aTk5+fXXaPj5aTkp+fXHaQkJWUkp+gXHaQkJaUkp+gW3aRkZaVkaCgW3aSkpeVkaCgWnaTk5iWkaCgWnaUlJiXkaGgWnaVlZiXkaGhw==');
+                    snd.play().catch(function(){}); // Catch autoplay policy block
+                } catch(err) {}
+            });
         } catch (e) {}
       }
     })();

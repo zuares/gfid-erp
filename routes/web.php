@@ -153,6 +153,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/unlist',      [\App\Http\Controllers\MarketplaceProductController::class, 'toggleUnlist'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
 
     // Chat Marketplace
     Route::get('/chat/unread-count',                         [\App\Http\Controllers\MarketplaceChatController::class, 'unreadCount']);
@@ -181,6 +182,11 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/ads-analytics',                     [MarketplaceController::class, 'adsAnalytics']);
     Route::get('/stores/{store}/ads-balance',           [MarketplaceController::class, 'adsBalance']);
     Route::get('/stores/{store}/ads-shop-performance',  [MarketplaceController::class, 'adsShopPerformance']);
+    Route::get('/ads-balance-all',                      [MarketplaceController::class, 'adsBalanceAll']);
+    Route::get('/ads-balance-history',                  [MarketplaceController::class, 'adsBalanceHistory']);
+    Route::get('/ads-daily',                            [MarketplaceController::class, 'adsDaily']);
+    Route::post('/ads-daily/sync',                      [MarketplaceController::class, 'syncAdsDaily'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-ad-campaigns', [MarketplaceController::class, 'syncAdCampaigns'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores/{store}/debug-ad-api', [MarketplaceController::class, 'debugAdApi']); // TODO: hapus setelah debug
