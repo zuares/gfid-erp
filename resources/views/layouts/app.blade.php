@@ -363,25 +363,34 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-  {{-- ✅ Realtime: Laravel Echo + Reverb (WebSocket) --}}
-  @if (config('broadcasting.default') === 'reverb' && config('broadcasting.connections.reverb.key'))
+  {{-- ✅ Realtime: Laravel Echo + Reverb/Pusher (WebSocket) --}}
+  @if (in_array(config('broadcasting.default'), ['reverb', 'pusher']))
     <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@2.3.7/dist/echo.iife.js"></script>
     <script>
       (function () {
         try {
-          var host = @json(config('broadcasting.connections.reverb.options.host')) || window.location.hostname;
-          var port = Number(@json(config('broadcasting.connections.reverb.options.port', 443)));
-          var scheme = @json(config('broadcasting.connections.reverb.options.scheme', 'https'));
-          window.Echo = new Echo({
-            broadcaster: 'reverb',
-            key: @json(config('broadcasting.connections.reverb.key')),
-            wsHost: host,
-            wsPort: port,
-            wssPort: port,
-            forceTLS: scheme === 'https',
-            enabledTransports: ['ws', 'wss'],
-          });
+          @if(config('broadcasting.default') === 'pusher')
+              window.Echo = new Echo({
+                  broadcaster: 'pusher',
+                  key: @json(config('broadcasting.connections.pusher.key')),
+                  cluster: @json(config('broadcasting.connections.pusher.options.cluster')),
+                  forceTLS: true
+              });
+          @elseif(config('broadcasting.default') === 'reverb')
+              var host = @json(config('broadcasting.connections.reverb.options.host')) || window.location.hostname;
+              var port = Number(@json(config('broadcasting.connections.reverb.options.port', 443)));
+              var scheme = @json(config('broadcasting.connections.reverb.options.scheme', 'https'));
+              window.Echo = new Echo({
+                broadcaster: 'reverb',
+                key: @json(config('broadcasting.connections.reverb.key')),
+                wsHost: host,
+                wsPort: port,
+                wssPort: port,
+                forceTLS: scheme === 'https',
+                enabledTransports: ['ws', 'wss'],
+              });
+          @endif
         } catch (e) {
           console.warn('Echo init failed:', e);
         }
@@ -427,27 +436,6 @@
       // Auto-refresh setiap 20 detik (selalu bisa play sound jika memang ada yang unread baru)
       setInterval(function() { refreshChatBadge(true); }, 20000);
 
-      // Instantiate Echo dynamically based on server .env without needing npm run build
-      if (window.EchoClass) {
-          @if(config('broadcasting.default') === 'pusher')
-              window.Echo = new window.EchoClass({
-                  broadcaster: 'pusher',
-                  key: '{{ config('broadcasting.connections.pusher.key') }}',
-                  cluster: '{{ config('broadcasting.connections.pusher.options.cluster') }}',
-                  forceTLS: true
-              });
-          @elseif(config('broadcasting.default') === 'reverb')
-              window.Echo = new window.EchoClass({
-                  broadcaster: 'reverb',
-                  key: '{{ config('broadcasting.connections.reverb.key') }}',
-                  wsHost: '{{ config('broadcasting.connections.reverb.options.host') }}',
-                  wsPort: {{ config('broadcasting.connections.reverb.options.port') ?? 80 }},
-                  wssPort: {{ config('broadcasting.connections.reverb.options.port') ?? 443 }},
-                  forceTLS: {{ config('broadcasting.connections.reverb.options.scheme') === 'https' ? 'true' : 'false' }},
-                  enabledTransports: ['ws', 'wss'],
-              });
-          @endif
-      }
 
       // Realtime: pesan baru masuk → update badge seketika
       if (window.Echo) {
