@@ -429,10 +429,7 @@ class MarketplaceLogisticsController extends Controller
                             $errorMsg = $resItem['fail_message'];
                             
                             // Translate common shopee error
-                            $isFallbackable = str_contains(strtolower($errorMsg), 'parcel has been shipped') 
-                                || str_contains(strtolower($errorMsg), 'tracking number is invalid');
-                                
-                            if ($isFallbackable) {
+                            if (str_contains($errorMsg, 'parcel has been shipped')) {
                                 return response()->view('marketplace.documents.fallback_awb', [
                                     'order' => $order,
                                     'store' => $store,
