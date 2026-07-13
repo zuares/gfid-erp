@@ -398,4 +398,73 @@ class ShopeeChannel implements MarketplaceChannel
 
         return $this->post($store, '/api/v2/logistics/download_shipping_document', $body);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Seller Chat (butuh permission Chat API di Shopee Open Platform Console)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Daftar percakapan. type: all | pinned | unread
+     */
+    public function getConversationList(Store $store, int $pageSize = 25, string $nextTimestampNano = '', string $type = 'all'): array
+    {
+        $params = [
+            'direction' => 'latest',
+            'type'      => $type,
+            'page_size' => $pageSize,
+        ];
+        if ($nextTimestampNano !== '') {
+            $params['next_timestamp_nano'] = $nextTimestampNano;
+        }
+
+        return $this->get($store, '/api/v2/sellerchat/get_conversation_list', $params);
+    }
+
+    public function getOneConversation(Store $store, string $conversationId): array
+    {
+        return $this->get($store, '/api/v2/sellerchat/get_one_conversation', [
+            'conversation_id' => $conversationId,
+        ]);
+    }
+
+    /**
+     * Riwayat pesan sebuah percakapan (terbaru dulu, offset untuk paging).
+     */
+    public function getChatMessages(Store $store, string $conversationId, int $pageSize = 25, string $offset = ''): array
+    {
+        $params = [
+            'conversation_id' => $conversationId,
+            'page_size'       => $pageSize,
+        ];
+        if ($offset !== '') {
+            $params['offset'] = $offset;
+        }
+
+        return $this->get($store, '/api/v2/sellerchat/get_message', $params);
+    }
+
+    /**
+     * Kirim pesan teks ke buyer. $toId = buyer user id (to_id).
+     */
+    public function sendChatMessage(Store $store, $toId, string $text): array
+    {
+        return $this->post($store, '/api/v2/sellerchat/send_message', [
+            'to_id'        => (int) $toId,
+            'message_type' => 'text',
+            'content'      => ['text' => $text],
+        ]);
+    }
+
+    public function readConversation(Store $store, string $conversationId, string $lastReadMessageId): array
+    {
+        return $this->post($store, '/api/v2/sellerchat/read_conversation', [
+            'conversation_id'      => $conversationId,
+            'last_read_message_id' => $lastReadMessageId,
+        ]);
+    }
+
+    public function getUnreadConversationCount(Store $store): array
+    {
+        return $this->get($store, '/api/v2/sellerchat/get_unread_conversation_count');
+    }
 }

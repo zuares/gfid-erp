@@ -64,7 +64,7 @@ class WebhookController extends Controller
                     case 3: $eventType = 'order_status_update'; break;
                     case 4: $eventType = 'tracking_no_update'; break;
                     case 5: $eventType = 'item_update'; break;
-                    case 10: $eventType = 'brand_register_update'; break;
+                    case 10: $eventType = 'webchat_push'; break;
                     case 12: $eventType = 'auth_expiry_push'; break;
                     case 15: $eventType = 'shipping_document_status_update'; break;
                     case 23: $eventType = 'booking_status_update'; break;
@@ -86,6 +86,9 @@ class WebhookController extends Controller
                 $eventType = 'order_status_update';
             } elseif (isset($payload['data']['tracking_no'])) {
                 $eventType = 'tracking_no_update';
+            } elseif (isset($payload['data']['content']['message_id']) || (($payload['data']['type'] ?? '') === 'message')) {
+                // Deteksi webchat push dari bentuk payload (lebih andal daripada kode)
+                $eventType = 'webchat_push';
             }
 
 
@@ -102,7 +105,9 @@ class WebhookController extends Controller
             // Di lokal/staging tetap longgar supaya gampang testing via ngrok/simulate.
             $shouldProcess = $verified || !app()->environment('production');
 
-            if ($shouldProcess && $eventType !== 'verify') {
+            if ($shouldProcess && $eventType === 'webchat_push') {
+                \App\Jobs\ProcessShopeeChatWebhookJob::dispatch($payload);
+            } elseif ($shouldProcess && $eventType !== 'verify') {
                 \App\Jobs\ProcessShopeeWebhookJob::dispatch($payload, $eventType);
             } elseif (!$shouldProcess) {
                 Log::warning('Shopee Webhook ditolak: signature tidak valid.', [

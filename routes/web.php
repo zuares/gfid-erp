@@ -69,6 +69,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/toko',        [MarketplaceController::class, 'toko'])->name('marketplace.toko');
     Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
     Route::get('/marketplace/webhook-tests', [MarketplaceController::class, 'webhookTests'])->name('marketplace.webhook-tests');
+    Route::get('/marketplace/chat',        [\App\Http\Controllers\MarketplaceChatController::class, 'page'])->name('marketplace.chat');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
@@ -138,6 +139,16 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/documents/bulk-greetings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printBulkGreetings']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
+
+    // Chat Marketplace
+    Route::get('/chat/conversations',                        [\App\Http\Controllers\MarketplaceChatController::class, 'conversations']);
+    Route::get('/chat/conversations/{conversation}/messages', [\App\Http\Controllers\MarketplaceChatController::class, 'messages']);
+    Route::post('/chat/conversations/{conversation}/send',    [\App\Http\Controllers\MarketplaceChatController::class, 'send'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/chat/conversations/{conversation}/read',    [\App\Http\Controllers\MarketplaceChatController::class, 'markRead'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/chat/start-from-order',                     [\App\Http\Controllers\MarketplaceChatController::class, 'startFromOrder'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
     Route::post('/stores/{store}/sync-settlements',  [MarketplaceController::class, 'syncSettlements'])

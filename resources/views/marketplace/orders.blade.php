@@ -2568,9 +2568,16 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>
                 </div>`;
             } else if (activeTab === 'ready') {
-                logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                if (o.order_status === 'UNPAID') {
+                    // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                } else {
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                }
             } else {
-                if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
+                if (o.order_status === 'UNPAID') {
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
@@ -3572,6 +3579,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     window.toggleDevPanel  = toggleDevPanel;
     window.devLoadStats    = devLoadStats;
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Buka halaman chat dengan konteks order (deep-link)
+    window.openChatForOrder = function (storeId, orderSn) {
+        window.location = `/marketplace/chat?store_id=${storeId}&order_sn=${encodeURIComponent(orderSn)}`;
+    };
 
     loadOrders();
 

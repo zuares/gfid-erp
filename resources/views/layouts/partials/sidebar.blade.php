@@ -857,6 +857,13 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($router->has('marketplace.chat'))
+                        <x-sidebar.simple-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
+                            :active="request()->routeIs('marketplace.chat')">
+                            Chat
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasMarketplaceSalesReport)
                         <x-sidebar.simple-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                             :active="request()->routeIs('marketplace.reports.sales')">
