@@ -76,6 +76,11 @@ Schedule::command('marketplace:sync-returns')
     ->withoutOverlapping()
     ->runInBackground();
 
+Schedule::command('marketplace:sync-chats')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
 Schedule::command('marketplace:sync-ads-daily --days=3')
     ->dailyAt('23:30')
