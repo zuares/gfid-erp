@@ -48,8 +48,11 @@ class ShopeeChannel implements MarketplaceChannel
     {
         $result = $this->doGet($store, $path, $params);
 
+        $error = $result['error'] ?? '';
+        $msg = strtolower((string)($result['message'] ?? ''));
+
         // Token kedaluwarsa → auto-refresh sekali lalu retry
-        if (isset($result['error']) && str_contains((string) ($result['error'] ?? ''), 'access_token')) {
+        if ($error === 'error_auth' || str_contains($msg, 'expired') || str_contains($msg, 'access_token') || str_contains((string)$error, 'access_token')) {
             $refreshed = $this->refreshToken($store);
             if (empty($refreshed['error'])) {
                 $store->refresh(); // reload credentials dari DB
@@ -64,8 +67,10 @@ class ShopeeChannel implements MarketplaceChannel
     {
         $result = $this->doPost($store, $path, $body);
 
-        $error = $result['error'] ?? null;
-        if ($error === 'error_auth' || str_contains(strtolower((string)($result['message'] ?? '')), 'expired')) {
+        $error = $result['error'] ?? '';
+        $msg = strtolower((string)($result['message'] ?? ''));
+
+        if ($error === 'error_auth' || str_contains($msg, 'expired') || str_contains($msg, 'access_token') || str_contains((string)$error, 'access_token')) {
             $refreshed = $this->refreshToken($store);
             if (empty($refreshed['error'])) {
                 $store->refresh();
