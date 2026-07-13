@@ -105,6 +105,7 @@ class OmnichannelSyncService
             DB::statement('PRAGMA foreign_keys=OFF');
         }
 
+        try {
         $count = DB::transaction(function () use ($store, $details) {
             $n = 0;
 
@@ -155,9 +156,12 @@ class OmnichannelSyncService
 
             return $n;
         });
-
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            DB::statement('PRAGMA foreign_keys=ON');
+        } finally {
+            // WAJIB di-finally: kalau transaction melempar exception,
+            // foreign_keys harus tetap dinyalakan kembali di koneksi ini.
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys=ON');
+            }
         }
 
         return $count;
@@ -187,8 +191,10 @@ class OmnichannelSyncService
 
     private function autoCreateFulfillments(Store $store): void
     {
+        // PROCESSED ikut: order bisa masuk GFID sudah berstatus PROCESSED
+        // (resi diproses langsung di Seller Centre sebelum GFID sempat sync)
         $orders = MarketplaceOrder::where('store_id', $store->id)
-            ->where('order_status', 'READY_TO_SHIP')
+            ->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])
             ->whereDoesntHave('fulfillment')
             ->get();
 

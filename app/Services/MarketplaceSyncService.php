@@ -59,7 +59,7 @@ class MarketplaceSyncService
         // Untuk Shopee, kita tarik spesifik per status agar tidak ada order (termasuk kilat) yang terlewat
         // Catatan: TO_CONFIRM_RECEIVE bukan parameter valid untuk filter di get_order_list (akan memicu error API)
         $statuses = $store->channel?->code === 'shopee'
-            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED']
+            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'IN_CANCEL', 'CANCELLED']
             : ['']; // Channel lain panggil tanpa filter status
 
         foreach ($statuses as $status) {
@@ -487,6 +487,7 @@ class MarketplaceSyncService
 
         $outerStats = ['new' => 0, 'updated' => 0, 'sku_empty' => 0, 'mapping_not_found' => 0, 'missing_hpp' => 0, 'ready' => 0, 'incomplete' => 0, 'skipped' => 0];
 
+        try {
         DB::transaction(function () use ($store, $details, &$outerStats, $dryRun) {
 
             foreach ($details as $detail) {
@@ -640,6 +641,12 @@ class MarketplaceSyncService
                 $orderStatus = $detail['order_status'] ?? '';
                 $orderHasIncomplete = false;
 
+                // Penomoran baris per pasangan item+model: bundle/add-on deal bisa
+                // punya item_id+model_id yang sama dalam 1 order — tanpa line_no
+                // baris kedua akan meng-overwrite baris pertama.
+                $lineSeq     = [];
+                $keptItemIds = [];
+
                 foreach (($detail['item_list'] ?? []) as $item) {
                     $itemExtId = isset($item['item_id']) ? (string) $item['item_id'] : null;
                     $modelExtId = isset($item['model_id']) ? (string) $item['model_id'] : null;
@@ -668,11 +675,15 @@ class MarketplaceSyncService
                     if ($mappingAttrs['cost_status']    === 'missing_hpp')           $outerStats['missing_hpp']++;
                     if (($mappingAttrs['data_status']   ?? null) === 'incomplete')   $orderHasIncomplete = true;
 
-                    MarketplaceOrderItem::updateOrCreate(
+                    $pairKey = ($itemExtId ?: 'null') . '_' . ($modelExtId ?: 'null');
+                    $lineSeq[$pairKey] = ($lineSeq[$pairKey] ?? 0) + 1;
+
+                    $itemRow = MarketplaceOrderItem::updateOrCreate(
                         [
                             'marketplace_order_id' => $order->id,
                             'external_item_id'     => $itemExtId,
                             'external_model_id'    => $modelExtId,
+                            'line_no'              => $lineSeq[$pairKey],
                         ],
                         array_merge([
                             'order_id'             => $order->id,
@@ -686,8 +697,15 @@ class MarketplaceSyncService
                             'raw_json'             => $item,
                         ], $mappingAttrs)
                     );
-                    
+
+                    $keptItemIds[] = $itemRow->id;
                     $existingItems->forget($itemKey);
+                }
+
+                // Bersihkan baris item lama yang tidak ada lagi di payload terbaru
+                // (termasuk baris legacy dengan line_no NULL agar tidak dobel)
+                if (!empty($keptItemIds)) {
+                    $order->items()->whereNotIn('id', $keptItemIds)->delete();
                 }
 
                 // Track order-level ready / incomplete
@@ -702,9 +720,12 @@ class MarketplaceSyncService
                 $store->update(['last_synced_at' => now()]);
             }
         });
-
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            DB::statement('PRAGMA foreign_keys=ON');
+        } finally {
+            // WAJIB di-finally: kalau transaction melempar exception,
+            // foreign_keys harus tetap dinyalakan kembali di koneksi ini.
+            if (DB::connection()->getDriverName() === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys=ON');
+            }
         }
 
         return $outerStats;
@@ -713,8 +734,10 @@ class MarketplaceSyncService
     private function autoCreateFulfillments(Store $store): void
     {
         // Hanya buat fulfillment draft untuk order yang SEMUA item-nya data_status = valid
+        // PROCESSED ikut: order bisa masuk GFID sudah berstatus PROCESSED
+        // (resi diproses langsung di Seller Centre sebelum GFID sempat sync)
         $orders = MarketplaceOrder::where('store_id', $store->id)
-            ->where('order_status', 'READY_TO_SHIP')
+            ->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])
             ->whereDoesntHave('fulfillment')
             ->whereDoesntHave('items', fn ($q) => $q->where('data_status', 'incomplete'))
             ->get();
