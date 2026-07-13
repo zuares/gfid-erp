@@ -1907,13 +1907,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (tab === 'ready') {
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';
-                    const isNormalReady = o.needs_shipping_arrangement === true && !isInstant(o);
+                    const isNormalReady = o.order_status === 'READY_TO_SHIP' && !isInstant(o);
                     return isUnpaid || isNormalReady;
                 } else if (tab === 'processed') {
                     // Gabungan processed + ready_to_handover
                     const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER' 
                         || (['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isPacked(o));
-                    const isNormalProcessed = !isPacked(o) && (o.order_status === 'PROCESSED' || (o.order_status === 'READY_TO_SHIP' && o.needs_shipping_arrangement === false)) && !isInstant(o);
+                    const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED' && !isInstant(o);
                     return isNormalProcessed || isReadyToHandover;
                 } else if (tab === 'processed_instant') {
                     if (isPacked(o)) return false;
