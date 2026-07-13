@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Store;
 use App\Models\MarketplaceOrder;
-use App\Services\Channels\MarketplaceManager;
+use App\Services\Channels\ChannelManager;
 use App\Services\ShippingLabelOverlayService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,7 +37,7 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(MarketplaceManager $manager)
+    public function handle(ChannelManager $manager)
     {
         $store = Store::find($this->storeId);
         if (!$store) return;
