@@ -255,7 +255,7 @@
             } else if (m.message_type === 'sticker') {
                 body = '✨ [stiker]';
             } else if (m.message_type === 'bundle_message' || m.message_type === 'faq_liveagent') {
-                body = '🤖 [Pesan FAQ / Otomatis]';
+                body = '🤖 <i style="opacity:0.8">[FAQ]</i> ' + (m.text ? esc(m.text) : '');
             } else if (!m.text && m.message_type !== 'text') {
                 // Format cantik jika ada tipe pesan lain yang nyasar
                 const niceType = (m.message_type || '').replace(/_/g, ' ');
