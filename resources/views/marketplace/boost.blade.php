@@ -295,13 +295,19 @@
         const shopee = stores.filter(s => (s.channel?.code || '').toLowerCase().includes('shp') || (s.channel?.code || '').toLowerCase() === 'shopee');
         const list = shopee.length ? shopee : stores;
         
-        $('fStore').innerHTML = list.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('') || '<option value="">— tidak ada toko —</option>';
+        $('fStore').innerHTML = '<option value="">— Pilih Toko —</option>' + list.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
         $('fStore').addEventListener('change', reloadAll);
         
         reloadAll();
     }
 
     async function reloadAll() {
+        if (!storeId()) {
+            products = [];
+            statusData = { error: 'Silakan pilih toko terlebih dahulu.' };
+            switchTab(activeTab);
+            return;
+        }
         await loadStatus(); // load status first so renderAllProducts has statusData
         await loadProducts();
         switchTab(activeTab); // refresh current tab
@@ -438,6 +444,10 @@
     // ── Jadwal ──
     async function loadSchedules() {
         const c = $('scheduleList');
+        if (!storeId()) {
+            c.innerHTML = '<div class="text-muted" style="font-size:.8rem;">Silakan pilih toko terlebih dahulu.</div>';
+            return;
+        }
         c.innerHTML = '<div class="text-muted" style="font-size:.8rem;">Memuat…</div>';
         let d;
         try { d = await api(`${API}/boost/schedules?store_id=${storeId()}`); }
@@ -481,6 +491,10 @@
 
     async function loadPool() {
         const c = $('poolList');
+        if (!storeId()) {
+            c.innerHTML = '<div class="text-muted" style="font-size:.8rem;">Silakan pilih toko terlebih dahulu.</div>';
+            return;
+        }
         c.innerHTML = '<div class="text-muted" style="font-size:.8rem;">Memuat…</div>';
         let d;
         try { d = await api(`${API}/boost/pool?store_id=${storeId()}`); }
@@ -506,6 +520,10 @@
     // ── Logs ──
     async function loadLogs() {
         const c = $('logList');
+        if (!storeId()) {
+            c.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">Silakan pilih toko terlebih dahulu.</td></tr>`;
+            return;
+        }
         c.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">Memuat...</td></tr>`;
         let d;
         try { d = await api(`${API}/boost/logs?store_id=${storeId()}`); }
