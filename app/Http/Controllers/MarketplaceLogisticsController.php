@@ -493,13 +493,15 @@ class MarketplaceLogisticsController extends Controller
                     }
                 }
                 
-                return response(
-                    "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
-                        <h2 style='color:#e11d48;'>Gagal Mencetak Resi</h2>
-                        <p>{$errorMsg}</p>
-                        <button onclick='window.close()' style='padding:10px 20px; background:#e2e8f0; border:none; border-radius:5px; cursor:pointer;'>Tutup Halaman</button>
-                    </div>", 400
-                );
+                if ($errorMsg !== null) {
+                    return response(
+                        "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
+                            <h2 style='color:#e11d48;'>Gagal Mencetak Resi</h2>
+                            <p>{$errorMsg}</p>
+                            <button onclick='window.close()' style='padding:10px 20px; background:#e2e8f0; border:none; border-radius:5px; cursor:pointer;'>Tutup Halaman</button>
+                        </div>", 400
+                    );
+                }
             }
             
             // Step 2: Download Document (PDF Stream from Shopee API)
