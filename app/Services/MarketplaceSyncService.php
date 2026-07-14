@@ -173,6 +173,53 @@ class MarketplaceSyncService
     }
 
     /**
+     * Sync order berdasarkan daftar order_sn spesifik (tanpa get_order_list).
+     * Dipakai backfill Pesanan Kilat: booking yang sudah MATCHED punya order_sn,
+     * tapi order-nya bisa saja belum pernah tersinkron ke marketplace_orders
+     * (mis. lebih lama dari rentang sync harian) sehingga tidak muncul di halaman Orders.
+     *
+     * @return array{found: int, new: int, updated: int}
+     */
+    public function syncOrdersBySn(Store $store, array $orderSnList): array
+    {
+        $orderSnList = array_values(array_unique(array_filter($orderSnList)));
+        if (empty($orderSnList)) {
+            return ['found' => 0, 'new' => 0, 'updated' => 0];
+        }
+
+        $driver  = $this->manager->driver($store);
+        $details = [];
+        foreach (array_chunk($orderSnList, 50) as $chunk) {
+            try {
+                $detailResponse = $driver->getOrderDetail($store, $chunk);
+                if (! empty($detailResponse['error'])) {
+                    \Illuminate\Support\Facades\Log::warning(
+                        "syncOrdersBySn [{$store->id}]: " . ($detailResponse['message'] ?? $detailResponse['error'])
+                    );
+                    continue;
+                }
+                $details = array_merge($details, data_get($detailResponse, 'response.order_list', []));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("syncOrdersBySn [{$store->id}]: " . $e->getMessage());
+            }
+        }
+
+        if (empty($details)) {
+            return ['found' => count($orderSnList), 'new' => 0, 'updated' => 0];
+        }
+
+        $stats = $this->upsertOrders($store, $details);
+        $this->autoCreateFulfillments($store);
+        $this->log($store, 'sync_orders_by_sn', 'success', "Backfill order kilat: {$stats['new']} baru + {$stats['updated']} update dari " . count($orderSnList) . " order_sn.", [
+            'found' => count($orderSnList),
+            'new'   => $stats['new'],
+            'updated' => $stats['updated'],
+        ]);
+
+        return ['found' => count($orderSnList), 'new' => $stats['new'], 'updated' => $stats['updated']];
+    }
+
+    /**
      * Sync settlement / escrow data per order dari marketplace.
      * Tarik order-order yang belum punya settlement (atau dalam rentang waktu),
      * fetch escrow detail satu per satu, simpan ke marketplace_order_settlements.

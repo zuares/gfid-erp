@@ -89,8 +89,18 @@ class SyncMarketplaceBookings implements ShouldQueue
                 } while ($more && $cursor !== '' && ++$guard < 50);
             }
 
+            // Sertakan juga booking tersimpan yang belum punya order_sn (mis. dari webhook)
+            // agar ikut di-enrich walau di luar jendela tanggal sync ini.
+            $pending = MarketplaceBooking::where('store_id', $this->store->id)
+                ->where(fn ($q) => $q->whereNull('order_sn')->orWhere('order_sn', ''))
+                ->orderByDesc('id')->limit(100)->pluck('booking_sn')->all();
+
             // Lengkapi order_sn / kurir / nomor paket / item dari get_booking_detail.
-            $this->enrichDetails($driver, array_values(array_unique($bookingSns)));
+            $this->enrichDetails($driver, array_values(array_unique(array_merge($bookingSns, $pending))));
+
+            // Backfill: tarik order kilat yang belum ada di marketplace_orders supaya
+            // muncul di halaman Orders (halaman itu hanya membaca marketplace_orders).
+            $this->backfillMissingOrders();
         } catch (\Throwable $e) {
             Log::error("Exception in SyncMarketplaceBookings [{$this->store->id}]: " . $e->getMessage());
         }
@@ -170,6 +180,49 @@ class SyncMarketplaceBookings implements ShouldQueue
                 Log::warning("SyncMarketplaceBookings enrichDetails [{$this->store->id}]: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Tarik order untuk booking yang punya order_sn tapi order-nya belum ada
+     * di marketplace_orders. Tanpa ini, Pesanan Kilat lama (MATCHED) tidak akan
+     * pernah tampil di halaman Orders. Dibatasi 500/run agar hemat kuota API.
+     */
+    protected function backfillMissingOrders(): void
+    {
+        $orderSns = MarketplaceBooking::where('store_id', $this->store->id)
+            ->whereNotNull('order_sn')->where('order_sn', '!=', '')
+            ->pluck('order_sn')->unique()->values();
+
+        if ($orderSns->isEmpty()) {
+            return;
+        }
+
+        // Cocokkan via channel_order_id ATAU external_order_id, lintas toko —
+        // konsisten dengan pencocokan is_kilat di MarketplaceController::localOrders().
+        $existing = MarketplaceOrder::where(function ($q) use ($orderSns) {
+                $q->whereIn('channel_order_id', $orderSns)
+                  ->orWhereIn('external_order_id', $orderSns);
+            })
+            ->get(['channel_order_id', 'external_order_id']);
+
+        $known = $existing->pluck('channel_order_id')
+            ->merge($existing->pluck('external_order_id'))
+            ->filter()->flip();
+
+        $missing = $orderSns->reject(fn ($sn) => $known->has($sn))->take(500)->values()->all();
+        if (empty($missing)) {
+            return;
+        }
+
+        $result = app(\App\Services\MarketplaceSyncService::class)->syncOrdersBySn($this->store, $missing);
+        Log::info("SyncMarketplaceBookings backfill [{$this->store->id}]: " . count($missing)
+            . " order_sn hilang → {$result['new']} baru, {$result['updated']} update.");
+
+        // Tautkan booking_sn ke order yang baru saja dibuat.
+        MarketplaceBooking::where('store_id', $this->store->id)
+            ->whereIn('order_sn', $missing)
+            ->get()
+            ->each(fn ($b) => $this->linkOrder($b->booking_sn, $b->order_sn));
     }
 
     /** Tautkan booking_sn ke order lokal (bila order-nya sudah tersimpan & belum punya booking_sn). */
