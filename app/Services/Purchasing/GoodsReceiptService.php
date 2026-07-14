@@ -1301,11 +1301,13 @@ class GoodsReceiptService
 
             $lineTotal = round($poPrice * (float) ($line->qty_received ?? 0), 2);
 
-            PurchaseReceiptLine::where('id', $line->id)->update([
-                'unit_price' => $poPrice,
-                'line_total' => $lineTotal,
-                'updated_at' => now(),
-            ]);
+            if (abs((float) $line->unit_price - $poPrice) > 0.0001 || abs((float) $line->line_total - $lineTotal) > 0.0001) {
+                PurchaseReceiptLine::where('id', $line->id)->update([
+                    'unit_price' => $poPrice,
+                    'line_total' => $lineTotal,
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         // Recalculate header

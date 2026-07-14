@@ -703,8 +703,16 @@ class MarketplaceController extends Controller
             ->limit(200)
             ->get();
 
-        return response()->json($orders->map(function ($o) use ($hasScanLog) {
+        // Tandai order yang termasuk "Pesanan Kilat" (punya booking) — cocokkan per store + order_sn.
+        $kilatKeys = \App\Models\MarketplaceBooking::query()
+            ->whereNotNull('order_sn')->where('order_sn', '!=', '')
+            ->get(['store_id', 'order_sn'])
+            ->mapWithKeys(fn ($b) => [$b->store_id . '|' . $b->order_sn => true])
+            ->all();
+
+        return response()->json($orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
             $arr = $o->toArray();
+            $arr['is_kilat']               = isset($kilatKeys[$o->store_id . '|' . $o->channel_order_id]);
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
             $arr['print_count']            = $o->print_count ?? 0;

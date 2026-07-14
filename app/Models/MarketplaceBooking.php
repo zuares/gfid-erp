@@ -32,10 +32,14 @@ class MarketplaceBooking extends Model
             ->first();
     }
 
-    /** Booking dianggap masih perlu diatur pengiriman bila belum ada tracking & status awal. */
+    /**
+     * Booking masih perlu diatur pengiriman bila belum ada resi DAN statusnya masih awal.
+     * Catatan: PROCESSED = pengiriman SUDAH diatur (sedang diproses), jadi tidak masuk daftar
+     * ini — tombol "Atur Kirim" otomatis hilang begitu pengiriman diatur.
+     */
     public function needsShipping(): bool
     {
         return blank($this->tracking_number)
-            && in_array((string) $this->booking_status, ['PENDING', 'PROCESSED', 'READY_TO_SHIP', ''], true);
+            && in_array((string) $this->booking_status, ['PENDING', 'READY_TO_SHIP', ''], true);
     }
 }

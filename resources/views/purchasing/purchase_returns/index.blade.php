@@ -39,8 +39,9 @@
   .purchase-return-index .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.45rem; }
   .purchase-return-index .kpi{
     display:inline-flex; align-items:baseline; gap:.42rem;
-    border-radius:7px; padding:.2rem .5rem;
-    border:1px solid rgba(148,163,184,.28); background:transparent; font-size:.72rem; text-decoration:none;
+    border-radius:8px; padding:.3rem .65rem;
+    border:1px solid rgba(148,163,184,.28); background:#f8fafc; font-size:.75rem; text-decoration:none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
   }
   .purchase-return-index .kpi .lbl{ font-size:.66rem; color:#94a3b8; }
   .purchase-return-index .kpi .val{ font-weight:650; color:var(--shp-accent); }
@@ -92,8 +93,8 @@
   body[data-theme="dark"] .purchase-return-index thead th{ background:rgba(15,23,42,.98); color:#9ca3af; }
   .purchase-return-index tbody td{ vertical-align:middle; border-top-color:rgba(148,163,184,.16); padding:.52rem .62rem; }
   body[data-theme="dark"] .purchase-return-index tbody td{ border-top-color:rgba(51,65,85,.85); }
-  .purchase-return-index .row-link{ cursor:pointer; }
-  .purchase-return-index .row-link:hover{ background:rgba(51,65,85,.035); }
+  .purchase-return-index .row-link{ cursor:pointer; transition: all 0.2s; }
+  .purchase-return-index .row-link:hover{ background:rgba(241, 245, 249, 0.8); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 
   @media (max-width:767.98px){
     .purchase-return-index .ship-topbar{ margin-inline:-.5rem; }
@@ -153,6 +154,9 @@
         <button type="button" class="btn btn-sm btn-ship-primary btn-pill" data-bs-toggle="modal" data-bs-target="#modalCreateReturn">
             <i class="bi bi-plus-lg me-1"></i> Tambah Retur
         </button>
+        <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSearchItem">
+            <i class="bi bi-search me-1"></i> Cari Barang
+        </button>
         <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
           Lihat GRN
         </a>
@@ -166,7 +170,7 @@
       <div class="alert alert-danger py-2">{{ session('error') }}</div>
     @endif
 
-    <form method="GET" class="card-clean p-3 mb-3">
+    <form method="GET" class="card-clean p-3 mb-3" style="background: #f8fafc;">
       <div class="row g-2 align-items-end">
         <div class="col-12 col-md-4">
           <label class="form-label small mb-1">Cari</label>
@@ -212,7 +216,7 @@
                 <th class="text-end">Nilai</th>
               @endif
               <th>Status / Efek</th>
-              <th class="text-end">Aksi</th>
+              <th style="width: 40px;"></th>
             </tr>
           </thead>
           <tbody>
@@ -246,8 +250,8 @@
                   <span class="badge-status {{ $statusCss }}">{{ $statusText }}</span>
                   <div class="effect-text">{{ $effectText }}</div>
                 </td>
-                <td class="text-end td-action" data-label="Aksi">
-                  <a href="{{ $href }}" class="btn btn-ship-outline btn-pill btn-sm">Buka</a>
+                <td class="text-end td-action" style="color: #94a3b8;">
+                  <i class="bi bi-chevron-right"></i>
                 </td>
               </tr>
             @empty
@@ -320,6 +324,41 @@
     </div>
   </div>
 </div>
+<!-- Modal Search Item -->
+<div class="modal fade" id="modalSearchItem" tabindex="-1" aria-labelledby="modalSearchItemLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 14px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="modalSearchItemLabel">Cari Barang untuk Diretur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formSearchItem" method="POST" action="">
+            @csrf
+            <div class="mb-3">
+                <label class="form-label fw-bold mb-1" style="font-size:.82rem;">
+                    Scan / Ketik Nama Barang
+                </label>
+                <select class="form-control" id="itemSearchSelect" name="grn_id" required style="width:100%;">
+                    <option value=""></option>
+                </select>
+                <div class="form-text" style="font-size:.74rem;">Ketik barang untuk mencari GRN (Penerimaan) yang memuat barang ini.</div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold mb-1" style="font-size:.82rem;">
+                    Tanggal Retur
+                </label>
+                <input type="date" name="date" class="form-control" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}">
+            </div>
+
+            <button type="submit" class="btn btn-ship-primary btn-pill w-100 fw-bold" id="btnSubmitItemReturn" disabled>Lanjut Buat Retur</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -423,6 +462,50 @@ document.addEventListener('DOMContentLoaded', function(){
       // Fokus ke supplier saat modal dibuka (focal point)
       $modal.on('shown.bs.modal', function () {
           $supplier.select2('open');
+      });
+
+      // ── Flow Search by Item ──
+      const $modalSearch = $('#modalSearchItem');
+      const $itemSearch = $('#itemSearchSelect');
+      const $btnSearch = $('#btnSubmitItemReturn');
+      const $formSearch = $('#formSearchItem');
+      const searchItemUrl = '{{ route("purchasing.purchase_returns.search_by_item") }}';
+
+      $itemSearch.select2({
+          theme: 'default',
+          placeholder: 'Ketik nama / kode barang...',
+          dropdownParent: $modalSearch,
+          ajax: {
+              url: searchItemUrl,
+              dataType: 'json',
+              delay: 350,
+              data: function (params) {
+                  return { q: params.term };
+              },
+              processResults: function (data) { return { results: data.results }; },
+              cache: true
+          }
+      });
+
+      $itemSearch.on('select2:select', function (e) {
+          const data = e.params.data;
+          if (data && data.id) {
+              $btnSearch.prop('disabled', false);
+              $formSearch.attr('action', '/purchasing/purchase-receipts/' + data.id + '/returns/create?item_id=' + data.item_id);
+          }
+      });
+      $itemSearch.on('select2:unselect', function () {
+          $btnSearch.prop('disabled', true);
+          $formSearch.attr('action', '');
+      });
+
+      $modalSearch.on('hidden.bs.modal', function () {
+          $itemSearch.val(null).trigger('change');
+          $itemSearch.empty().append(new Option('', '', true, true));
+      });
+
+      $modalSearch.on('shown.bs.modal', function () {
+          $itemSearch.select2('open');
       });
   } else {
       console.error('jQuery is required for Select2.');

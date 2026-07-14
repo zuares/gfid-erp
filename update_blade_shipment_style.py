@@ -1,4 +1,6 @@
-{{-- resources/views/purchasing/purchase_returns/show.blade.php --}}
+import re
+
+content = r"""{{-- resources/views/purchasing/purchase_returns/show.blade.php --}}
 @extends('layouts.app')
 @section('title', 'Return Pembelian ' . ($ret->code ?? ''))
 
@@ -26,8 +28,7 @@
 
 /* KPI Grid (aligned with shipments sd-grid) */
 .pr-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem; margin-bottom:.65rem; }
-.pr-card { background:var(--card,#fff); border:1px solid rgba(148,163,184,.2); border-radius:10px; overflow:hidden; margin-bottom:.65rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03), 0 2px 4px -1px rgba(0,0,0,0.02); transition: box-shadow 0.2s ease; }
-.pr-card:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.03); }
+.pr-card { background:var(--card,#fff); border:1px solid rgba(148,163,184,.18); border-radius:8px; overflow:hidden; margin-bottom:.65rem; }
 .pr-kpi { padding:.65rem .75rem; }
 .pr-label { font-size:.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.02em; }
 .pr-value { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.18rem; font-weight:900; color:#111827; margin-top:.12rem; }
@@ -45,30 +46,23 @@
 /* Form Elements */
 .pr-formbar { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.55rem; margin-bottom:.65rem; }
 .pr-form-group { display:flex; flex-direction:column; gap:.25rem; }
-.pr-form-group label { font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.02em; }
-.pr-input, .pr-select { border:1px solid #64748b; border-radius:7px; padding:.45rem .6rem; font-size:.86rem; outline:none; transition:all .2s; background:#ffffff; color:#0f172a; width:100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.04); font-weight: 500; }
-.pr-input::placeholder, .pr-select::placeholder { color:#94a3b8; font-weight: 400; }
-.pr-input:focus, .pr-select:focus { border-color:#4f46e5; background:#fff; box-shadow:inset 0 1px 2px rgba(0,0,0,0.02), 0 0 0 3px rgba(79,70,229,0.2); }
+.pr-form-group label { font-size:.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.02em; }
+.pr-input, .pr-select { border:1px solid rgba(148,163,184,.3); border-radius:7px; padding:.35rem .5rem; font-size:.86rem; outline:none; transition:border-color .15s; background:#fff; color:#334155; width:100%; }
+.pr-input:focus, .pr-select:focus { border-color:#334155; box-shadow:0 0 0 2px rgba(51,65,85,.1); }
 
 /* Table */
 .pr-table-wrap { overflow:auto; border:1px solid rgba(148,163,184,.16); border-radius:8px; }
 .pr-table { width:100%; border-collapse:collapse; }
-.pr-table th, .pr-table td { padding:.4rem .5rem; border-bottom:1px solid rgba(148,163,184,.12); vertical-align:top; }
+.pr-table th, .pr-table td { padding:.55rem .65rem; border-bottom:1px solid rgba(148,163,184,.12); vertical-align:middle; }
 .pr-table th { text-align:left; font-size:.72rem; color:#64748b; font-weight:900; text-transform:uppercase; letter-spacing:.02em; background:rgba(148,163,184,.04); }
-.pr-table td { font-size:.82rem; color:#334155; }
+.pr-table td { font-size:.86rem; color:#334155; }
 .pr-table tbody tr:last-child td { border-bottom:none; }
 .pr-table tbody tr.has-qty td { background:rgba(22,101,52,.03); }
 
-/* Segmented Radio Buttons */
-.pr-segmented { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #f1f5f9; padding: 3px; gap: 3px; width: fit-content; }
-.pr-segmented input[type="radio"] { display: none; }
-.pr-segmented label { padding: 0.35rem 1rem; font-size: 0.8rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 6px; margin: 0; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; }
-.pr-segmented input[type="radio"]:checked + label { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-
 /* Item Layout */
-.item-title { font-weight:900; color:#111827; font-size:.85rem; }
-.item-meta { font-size:.72rem; color:#64748b; margin-top:.1rem; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
-.item-actions { display:flex; gap:.3rem; margin-top:.3rem; flex-wrap:wrap; }
+.item-title { font-weight:900; color:#111827; }
+.item-meta { font-size:.75rem; color:#64748b; margin-top:.15rem; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.item-actions { display:flex; gap:.4rem; margin-top:.45rem; flex-wrap:wrap; }
 
 /* Metric Pills */
 .metric-pill { display:inline-flex; align-items:center; gap:.25rem; border:1px solid rgba(148,163,184,.25); border-radius:999px; padding:.1rem .45rem; font-size:.68rem; font-weight:700; color:#64748b; background:#f8fafc; }
@@ -228,22 +222,25 @@
       @if($canSeeMoney && ($isDraft || $isPosted))
       <div class="pr-meta-box">
         <div class="pr-label">Efek Return</div>
-        <div class="pr-value" id="effect-total" style="font-size:1rem;color:#b91c1c;">{{ rupiah($effectInv) }}</div>
+        <div class="pr-value" style="font-size:1rem;color:#b91c1c;">{{ rupiah($effectInv) }}</div>
         <div class="pr-muted">
-            Potong AP: <span id="effect-ap">{{ $isDraft && !$isVoided ? rupiah($effectAp) : '-' }}</span><br>
-            Klaim: <span id="effect-claim">{{ $isDraft && !$isVoided ? rupiah($effectClaim) : '-' }}</span>
+            Potong AP: {{ $isDraft && !$isVoided ? rupiah($effectAp) : '-' }}<br>
+            Klaim: {{ $isDraft && !$isVoided ? rupiah($effectClaim) : '-' }}
         </div>
       </div>
       @endif
     </div>
   </div>
 
-  <form id="main-return-form" method="POST" action="{{ route('purchasing.purchase_returns.update', $ret->id) }}" enctype="multipart/form-data">
+  <form method="POST" action="{{ route('purchasing.purchase_returns.update', $ret->id) }}" enctype="multipart/form-data">
     @csrf @method('PUT')
 
     <div class="pr-card">
       <div class="pr-head">
-        <div class="pr-title">Item Retur</div>
+        <div class="pr-title">Detail Item Return</div>
+        @if($isEditable)
+          <button type="submit" class="pr-btn pr-primary"><i class="bi bi-save2"></i> Simpan Draft</button>
+        @endif
       </div>
       <div class="pr-body">
         
@@ -253,10 +250,30 @@
               <label>Tanggal</label>
               <input type="text" name="date" class="pr-input gf-date-input pr-mono" value="{{ $dateValue }}" data-gf-date autocomplete="off" required>
             </div>
+            <div class="pr-form-group">
+              <label>Penyelesaian</label>
+              <select name="resolution_type" class="pr-select">
+                <option value="refund" {{ old('resolution_type', $ret->resolution_type) === 'refund' ? 'selected' : '' }}>Refund</option>
+                <option value="replacement" {{ old('resolution_type', $ret->resolution_type) === 'replacement' ? 'selected' : '' }}>Tukar Barang</option>
+              </select>
+            </div>
             <div class="pr-form-group" style="grid-column: span auto;">
-              <label>Catatan</label>
+              <label>Catatan Umum</label>
               <input type="text" name="notes" class="pr-input" value="{{ old('notes', $ret->notes) }}" placeholder="Opsional">
             </div>
+          </div>
+          
+          <div class="d-flex flex-wrap gap-2 mb-3 align-items-end" id="add-item-section">
+            <div class="flex-grow-1" style="max-width: 400px;">
+              <label class="pr-label" style="margin-bottom:.25rem;display:block;">Tambah Item Retur</label>
+              <select id="item-selector" class="pr-select">
+                <option value="">-- Pilih item yang ingin diretur --</option>
+                @foreach($returnRows as $i => $row)
+                  <option value="{{ $i }}">{{ $row->item?->name ?? '-' }} (Tersedia: {{ rtrim(rtrim(number_format((float)($row->max_return ?? $row->remaining ?? 0), 4, ',', '.'), '0'), ',') }})</option>
+                @endforeach
+              </select>
+            </div>
+            <button type="button" class="pr-btn pr-primary" id="btn-add-item"><i class="bi bi-plus"></i> Tambah</button>
           </div>
         @else
           <input type="hidden" name="date" value="{{ $dateValue }}">
@@ -268,10 +285,9 @@
           <table class="pr-table">
             <thead>
               <tr>
-                <th style="width: 30px; text-align: center;">#</th>
-                <th>Item</th>
-                <th style="text-align:right">Maks</th>
-                <th style="text-align:right;width:120px;">Qty</th>
+                <th>Item & Alasan</th>
+                <th style="text-align:right">Tersedia</th>
+                <th style="text-align:right;width:120px;">Qty Return</th>
                 @if($canSeeMoney)<th style="text-align:right">Nilai</th>@endif
               </tr>
             </thead>
@@ -292,7 +308,6 @@
                   $stockOk = $shownStock + .0001 >= $qty;
                 @endphp
                 <tr class="return-row {{ $rowClass }}" data-row-idx="{{ $i }}">
-                  <td data-label="#" style="text-align: center; font-weight: 700; color: #94a3b8;">{{ $loop->iteration }}</td>
                   <td data-label="Item">
                     <div class="td-content-left">
                       <div class="item-title">{{ $row->item?->name ?? '-' }}</div>
@@ -309,6 +324,8 @@
                               <option value="{{ $code }}" @selected(old("lines.$i.reason_code", $ln?->reason_code) === $code)>{{ $label }}</option>
                             @endforeach
                           </select>
+                          <input type="text" name="lines[{{ $i }}][notes]" class="pr-input notes-input" style="padding:.2rem .4rem; font-size:.75rem; min-width:150px;" placeholder="Catatan item..." value="{{ old("lines.$i.notes", $row->notes) }}">
+                          <button type="button" class="pr-btn pr-btn-danger btn-remove-row" style="padding:.2rem .4rem;min-height:auto;" title="Hapus"><i class="bi bi-trash"></i></button>
                         </div>
 
                         <div class="photo-upload-row">
@@ -358,7 +375,7 @@
                     <div class="td-content">
                       @if($isEditable)
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:.25rem;">
-                          <input type="text" name="lines[{{ $i }}][qty]" class="pr-input qty-input qty-return-input pr-mono gf-decimal text-end" value="{{ old("lines.$i.qty", $qty > 0.0001 ? rtrim(rtrim(number_format($qty, 4, ',', '.'), '0'), ',') : '') }}" placeholder="0,00" autocomplete="off" style="width:100px;" data-price="{{ $unitPrice }}" data-is-inv="{{ $isInventoryLine ? '1' : '0' }}" data-max="{{ $row->max_return ?? $row->remaining ?? 0 }}">
+                          <input type="number" name="lines[{{ $i }}][qty]" class="pr-input qty-input qty-return-input" value="{{ old("lines.$i.qty", $qty > 0.0001 ? $qty : '') }}" step="0.0001" min="0" max="{{ $maxReturn }}" placeholder="0">
                         </div>
                       @else
                         <div class="pr-mono" style="font-weight:900; font-size:1.1rem;">{{ rtrim(rtrim(number_format($qty, 4, ',', '.'), '0'), ',') }}</div>
@@ -382,46 +399,6 @@
 
       </div>
     </div>
-    
-    @if($isEditable)
-    <div class="modal fade" id="resolutionModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
-          <div class="modal-header" style="background: rgba(248, 250, 252, 0.8); border-bottom: 1px solid rgba(148, 163, 184, 0.15); backdrop-filter: blur(8px);">
-            <h5 class="modal-title" id="resolutionModalTitle" style="font-weight: 800; color: #1e293b;">Konfirmasi Item</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body" style="background: #ffffff; padding: 1.5rem;">
-            
-            <!-- STEP 1 -->
-            <div id="modal-step-1">
-              <h6 style="margin-bottom:1rem; color:#1e293b; font-weight:700;">Item yang akan diretur:</h6>
-              <div id="modal-item-summary" style="max-height: 250px; overflow-y: auto; text-align:left; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; margin-bottom: 0.5rem;">
-              </div>
-            </div>
-
-            <!-- STEP 2 -->
-            <div id="modal-step-2" style="display:none; text-align:center; padding: 1rem 0;">
-              <h6 style="margin-bottom:1.5rem; color:#64748b; font-weight:600;">Pilih bentuk penyelesaian untuk retur ini:</h6>
-              <div class="pr-segmented" style="transform: scale(1.15);">
-                 <input type="radio" id="res_refund" name="resolution_type" value="refund" {{ old('resolution_type', $ret->resolution_type) === 'refund' ? 'checked' : '' }}>
-                 <label for="res_refund"><i class="bi bi-cash me-1"></i> Refund</label>
-                 <input type="radio" id="res_replace" name="resolution_type" value="replacement" {{ old('resolution_type', $ret->resolution_type) === 'replacement' ? 'checked' : '' }}>
-                 <label for="res_replace"><i class="bi bi-box-seam me-1"></i> Tukar Barang</label>
-              </div>
-            </div>
-            
-          </div>
-          <div class="modal-footer" style="background: rgba(248, 250, 252, 0.5); border-top: 1px solid rgba(148, 163, 184, 0.1);">
-            <button type="button" class="pr-btn" id="btn-modal-back" style="display:none;"><i class="bi bi-arrow-left"></i> Kembali</button>
-            <button type="button" class="pr-btn" data-bs-dismiss="modal" id="btn-modal-cancel">Batal</button>
-            <button type="button" class="pr-btn pr-primary" id="btn-modal-next">Lanjut Penyelesaian <i class="bi bi-arrow-right"></i></button>
-            <button type="submit" name="action_btn" value="post" class="pr-btn pr-btn-success" id="btn-modal-post" style="display:none;"><i class="bi bi-check2-circle"></i> Posting Return</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    @endif
   </form>
 
   <div class="pr-card">
@@ -433,13 +410,18 @@
 
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
         @if($isDraft && !$isVoided)
-          <button type="submit" name="action_btn" value="submit" form="main-return-form" class="pr-btn"><i class="bi bi-send"></i> Ajukan</button>
+          <form method="POST" action="{{ route('purchasing.purchase_returns.submit', $ret->id) }}" style="margin:0;">
+            @csrf <button type="submit" class="pr-btn"><i class="bi bi-send"></i> Ajukan Persetujuan</button>
+          </form>
         @endif
 
         @if($isEditable)
-          <button type="button" class="pr-btn pr-btn-success" id="btn-pre-post" data-bs-toggle="modal" data-bs-target="#resolutionModal">
-            <i class="bi bi-save2"></i> Simpan
-          </button>
+          <form method="POST" action="{{ route('purchasing.purchase_returns.post', $ret->id) }}" class="js-post-return" style="margin:0;">
+            @csrf
+            <button type="submit" class="pr-btn {{ $stockReady ? 'pr-btn-success' : 'pr-btn-danger' }}" {{ $stockReady ? '' : 'disabled' }}>
+              <i class="bi bi-check2-circle"></i> {{ $stockReady ? 'Post Return' : 'Stok Kurang' }}
+            </button>
+          </form>
         @endif
 
         @if($isPosted && !$isVoided)
@@ -461,109 +443,15 @@
   </div>
 
 </div>
-
-{{-- MODAL: Terima Pengganti (Replacement) --}}
-@if($ret->resolution_type === 'replacement' && in_array($ret->replacement_status, ['pending', 'partial']))
-<div class="modal fade" id="receiveReplacementModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <form action="{{ route('purchasing.purchase_returns.receive_replacement', $ret->id) }}" method="POST" class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
-      @csrf
-      <div class="modal-header" style="background: rgba(248, 250, 252, 0.8); border-bottom: 1px solid rgba(148, 163, 184, 0.15); backdrop-filter: blur(8px);">
-        <h5 class="modal-title" style="font-weight: 800; color: #1e293b;">Terima Barang Pengganti</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" style="background: #ffffff;">
-        <div class="pr-alert pr-alert-info" style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 0.5rem 0.75rem; font-size: 0.85rem;">
-            <i class="bi bi-info-circle me-1"></i> Masukkan Qty pengganti. GRN akan otomatis dibuat.
-        </div>
-        
-        <div class="pr-formbar mb-4">
-          <div class="pr-form-group">
-            <label>Tanggal Diterima</label>
-            <input type="text" name="received_at" class="pr-input gf-date-input" value="{{ now()->toDateString() }}" required>
-          </div>
-          <div class="pr-form-group">
-            <label>Gudang Tujuan</label>
-            <select name="warehouse_id" class="pr-select" required>
-              <option value="">-- Pilih Gudang --</option>
-              @foreach(\App\Models\Warehouse::all() as $wh)
-                <option value="{{ $wh->id }}" {{ $wh->id == ($ret->grn->warehouse_id ?? '') ? 'selected' : '' }}>{{ $wh->name }}</option>
-              @endforeach
-            </select>
-          </div>
-        </div>
-        <div class="pr-formbar mb-4">
-          <div class="pr-form-group">
-            <label>No. Surat Jalan (Opsional)</label>
-            <input type="text" name="document_number" class="pr-input" placeholder="SJ-SUPP-123">
-          </div>
-          <div class="pr-form-group">
-            <label>Catatan (Opsional)</label>
-            <input type="text" name="notes" class="pr-input" placeholder="Catatan penerimaan...">
-          </div>
-        </div>
-
-        <label style="font-size: .72rem; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: .5rem; display: block;">Detail Barang</label>
-        <div class="pr-table-wrap">
-          <table class="pr-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th style="width:120px;text-align:right">Expected</th>
-                <th style="width:120px;text-align:right">Diterima</th>
-                <th style="width:150px;text-align:right">Terima Sekarang</th>
-              </tr>
-            </thead>
-            <tbody>
-              @foreach($returnRows as $i => $row)
-                @if($row->qty > 0 && $row->line)
-                  @php
-                    $expected = (float) $row->line->replacement_qty_expected;
-                    $received = (float) $row->line->replacement_qty_received;
-                    $outstanding = max(0, $expected - $received);
-                  @endphp
-                  <tr>
-                    <td data-label="Item">
-                      <div class="td-content-left">
-                        <div class="item-title">{{ $row->item->name }}</div>
-                        <div class="item-meta">{{ $row->item->code }}</div>
-                        <input type="hidden" name="lines[{{ $i }}][id]" value="{{ $row->line->id }}">
-                      </div>
-                    </td>
-                    <td data-label="Expected" class="pr-mono" style="text-align:right">
-                      {{ rtrim(rtrim(number_format($expected, 4, ',', '.'), '0'), ',') }}
-                    </td>
-                    <td data-label="Diterima" class="pr-mono" style="text-align:right">
-                      {{ rtrim(rtrim(number_format($received, 4, ',', '.'), '0'), ',') }}
-                    </td>
-                    <td data-label="Terima Sekarang" style="text-align:right">
-                      <input type="text" name="lines[{{ $i }}][qty]" class="pr-input pr-mono" value="{{ $outstanding > 0 ? $outstanding : 0 }}" {{ $outstanding <= 0 ? 'readonly' : '' }} style="text-align:right" data-gf-decimal>
-                    </td>
-                  </tr>
-                @endif
-              @endforeach
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="modal-footer" style="background: rgba(248, 250, 252, 0.5); border-top: 1px solid rgba(148, 163, 184, 0.1);">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #cbd5e1; font-weight: 600;">Batal</button>
-        <button type="submit" class="btn btn-primary" style="background: #334155; border-color: #334155; font-weight: 700; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">Simpan Penerimaan</button>
-      </div>
-    </form>
-  </div>
-</div>
-@endif
 @endsection
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const itemSelector = document.getElementById('item-selector');
+  const btnAddItem = document.getElementById('btn-add-item');
+  const tableWrap = document.getElementById('return-table-wrap');
   const qtyInputs = Array.from(document.querySelectorAll('.qty-return-input'));
-  const resolutionRadios = document.querySelectorAll('input[name="resolution_type"]');
-  const effectTotal = document.getElementById('effect-total');
-  const effectAp = document.getElementById('effect-ap');
-  const effectClaim = document.getElementById('effect-claim');
   const liveLines = document.getElementById('live-return-lines');
   const liveQty = document.getElementById('live-return-qty');
   const kpiLines = document.getElementById('kpi-lines');
@@ -580,156 +468,111 @@ document.addEventListener('DOMContentLoaded', function () {
   function refreshTotals() {
     let count = 0;
     let totalQtyVal = 0;
-    let invTotal = 0;
-    let expTotal = 0;
-    let anyError = false;
-    
     qtyInputs.forEach(function (input) {
       const qty = toNumber(input.value);
-      const price = Number(input.dataset.price) || 0;
-      const max = Number(input.dataset.max) || 0;
-      const isInv = input.dataset.isInv === '1';
-      const val = qty * price;
-      
-      if (qty > max + 0.0001) {
-          input.style.borderColor = '#dc2626';
-          input.style.backgroundColor = '#fef2f2';
-          input.style.color = '#dc2626';
-          anyError = true;
-      } else {
-          input.style.borderColor = '';
-          input.style.backgroundColor = '';
-          input.style.color = '';
-      }
-      
       if (qty > 0.0001) count++;
       totalQtyVal += qty;
-      if (isInv) invTotal += val; else expTotal += val;
       
       const row = input.closest('.return-row');
       if (row) row.classList.toggle('has-qty', qty > 0.0001);
     });
-    
     const formattedQty = formatQty(totalQtyVal);
     if (liveLines) liveLines.textContent = count;
     if (liveQty) liveQty.textContent = formattedQty;
     if (kpiLines) kpiLines.textContent = count;
     if (kpiQty) kpiQty.textContent = formattedQty;
-    
-    if (effectTotal) {
-      const total = invTotal + expTotal;
-      let isRefund = true;
-      resolutionRadios.forEach(r => { if(r.checked && r.value === 'replacement') isRefund = false; });
-      
-      effectTotal.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format(total);
-      if (isRefund) {
-        if(effectAp) effectAp.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format(total);
-        if(effectClaim) effectClaim.textContent = 'Rp 0';
-      } else {
-        if(effectAp) effectAp.textContent = 'Rp 0';
-        if(effectClaim) effectClaim.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format(total);
-      }
-    }
-    
-    const btnPrePost = document.getElementById('btn-pre-post');
-    if (btnPrePost) {
-        if (anyError) {
-            btnPrePost.disabled = true;
-            btnPrePost.innerHTML = '<i class="bi bi-exclamation-circle"></i> Qty Melebihi Maks';
-            btnPrePost.classList.remove('pr-btn-success');
-            btnPrePost.classList.add('pr-btn-danger');
-        } else {
-            btnPrePost.disabled = false;
-            btnPrePost.innerHTML = '<i class="bi bi-save2"></i> Simpan';
-            btnPrePost.classList.remove('pr-btn-danger');
-            btnPrePost.classList.add('pr-btn-success');
-        }
-    }
   }
 
-  resolutionRadios.forEach(r => r.addEventListener('change', refreshTotals));
-
-  const resolutionModalEl = document.getElementById('resolutionModal');
-  if (resolutionModalEl) {
-    const step1 = document.getElementById('modal-step-1');
-    const step2 = document.getElementById('modal-step-2');
-    const btnCancel = document.getElementById('btn-modal-cancel');
-    const btnBack = document.getElementById('btn-modal-back');
-    const btnNext = document.getElementById('btn-modal-next');
-    const btnPost = document.getElementById('btn-modal-post');
-    const summaryDiv = document.getElementById('modal-item-summary');
-    const modalTitle = document.getElementById('resolutionModalTitle');
+  function initDynamicRows() {
+    const isEditable = itemSelector !== null;
+    let visibleCount = 0;
     
-    resolutionModalEl.addEventListener('show.bs.modal', function () {
-      step1.style.display = 'block';
-      step2.style.display = 'none';
-      btnCancel.style.display = 'inline-flex';
-      btnBack.style.display = 'none';
-      btnNext.style.display = 'inline-flex';
-      btnPost.style.display = 'none';
-      if(modalTitle) modalTitle.textContent = "Konfirmasi Item";
-      
-      summaryDiv.innerHTML = '';
-      let hasItems = false;
-      document.querySelectorAll('.return-row').forEach(row => {
-          const qtyInput = row.querySelector('.qty-return-input');
-          if (!qtyInput) return;
-          const qty = toNumber(qtyInput.value);
-          if (qty > 0.0001) {
-              hasItems = true;
-              const name = row.querySelector('.item-title')?.textContent || '-';
-              const reasonSelect = row.querySelector('.reason-input');
-              const reason = reasonSelect?.options[reasonSelect.selectedIndex]?.text || '-';
+    document.querySelectorAll('.return-row').forEach(row => {
+        const qtyInput = row.querySelector('.qty-return-input');
+        const reasonInput = row.querySelector('.reason-input');
+        const notesInput = row.querySelector('.notes-input');
+        
+        let hasData = false;
+        if (qtyInput && toNumber(qtyInput.value) > 0.0001) hasData = true;
+        if (reasonInput && reasonInput.value !== '') hasData = true;
+        if (notesInput && notesInput.value !== '') hasData = true;
+        if (row.querySelector('.photo-thumb-wrap') || row.querySelector('.photo-thumb')) hasData = true;
+        
+        if (isEditable) {
+            const rowIdx = row.dataset.rowIdx;
+            const option = itemSelector.querySelector(`option[value="${rowIdx}"]`);
+            
+            if (!hasData) {
+                row.style.display = 'none';
+                if(option) option.style.display = '';
+            } else {
+                row.style.display = '';
+                if(option) option.style.display = 'none';
+                visibleCount++;
+            }
+        } else {
+            if (!hasData) row.style.display = 'none';
+            else visibleCount++;
+        }
+    });
+    
+    if (tableWrap) tableWrap.style.display = visibleCount > 0 ? '' : 'none';
+  }
+
+  if (itemSelector) {
+      btnAddItem.addEventListener('click', function() {
+          const idx = itemSelector.value;
+          if (!idx) return;
+          
+          const row = document.querySelector(`.return-row[data-row-idx="${idx}"]`);
+          if (row) {
+              row.style.display = '';
+              itemSelector.querySelector(`option[value="${idx}"]`).style.display = 'none';
+              itemSelector.value = '';
               
-              const itemDiv = document.createElement('div');
-              itemDiv.style.cssText = 'display:flex; justify-content:space-between; margin-bottom: 0.6rem; border-bottom: 1px dashed #cbd5e1; padding-bottom: 0.6rem;';
-              itemDiv.innerHTML = `
-                  <div>
-                    <div style="font-weight:700; color:#0f172a;">${name}</div>
-                    <div style="font-size:0.75rem; color:#64748b;">Alasan: ${reason}</div>
-                  </div>
-                  <div style="font-weight:800; font-size:1rem; font-family:monospace; color:#1d4ed8; white-space:nowrap; padding-left:10px;">${formatQty(qty)}</div>
-              `;
-              summaryDiv.appendChild(itemDiv);
+              if (tableWrap) tableWrap.style.display = '';
+              
+              setTimeout(() => {
+                  const qtyInput = row.querySelector('.qty-return-input');
+                  if(qtyInput) { qtyInput.focus(); qtyInput.select(); }
+              }, 50);
           }
       });
       
-      if (!hasItems) {
-          summaryDiv.innerHTML = '<div style="color:#b91c1c; font-weight:600; text-align:center; padding:1rem;">Tidak ada item yang di-retur (Qty = 0)</div>';
-          btnNext.disabled = true;
-          btnNext.style.opacity = '0.5';
-      } else {
-          btnNext.disabled = false;
-          btnNext.style.opacity = '1';
-      }
-    });
-
-    btnNext.addEventListener('click', function() {
-      step1.style.display = 'none';
-      step2.style.display = 'block';
-      btnCancel.style.display = 'none';
-      btnBack.style.display = 'inline-flex';
-      btnNext.style.display = 'none';
-      btnPost.style.display = 'inline-flex';
-      if(modalTitle) modalTitle.textContent = "Penyelesaian Retur";
-    });
-
-    btnBack.addEventListener('click', function() {
-      step1.style.display = 'block';
-      step2.style.display = 'none';
-      btnCancel.style.display = 'inline-flex';
-      btnBack.style.display = 'none';
-      btnNext.style.display = 'inline-flex';
-      btnPost.style.display = 'none';
-      if(modalTitle) modalTitle.textContent = "Konfirmasi Item";
-    });
+      document.querySelectorAll('.btn-remove-row').forEach(btn => {
+          btn.addEventListener('click', function() {
+              const row = this.closest('.return-row');
+              const idx = row.dataset.rowIdx;
+              
+              const qtyInput = row.querySelector('.qty-return-input');
+              const reasonInput = row.querySelector('.reason-input');
+              const notesInput = row.querySelector('.notes-input');
+              
+              if (qtyInput) qtyInput.value = '';
+              if (reasonInput) reasonInput.value = '';
+              if (notesInput) notesInput.value = '';
+              
+              const newPhotos = row.querySelectorAll('input[type="file"]');
+              newPhotos.forEach(input => input.value = '');
+              
+              row.style.display = 'none';
+              const option = itemSelector.querySelector(`option[value="${idx}"]`);
+              if (option) option.style.display = '';
+              
+              refreshTotals();
+              
+              const anyVisible = Array.from(document.querySelectorAll('.return-row')).some(r => r.style.display !== 'none');
+              if (!anyVisible && tableWrap) tableWrap.style.display = 'none';
+          });
+      });
   }
-
+  
   qtyInputs.forEach(function (input) {
     input.addEventListener('focus', function () { setTimeout(function () { input.select(); }, 0); });
     input.addEventListener('input', refreshTotals);
   });
 
+  initDynamicRows();
   refreshTotals();
 
   function confirmSubmit(form, options) {
@@ -753,36 +596,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  document.querySelectorAll('.js-confirm-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      if (btn.disabled) return;
-      if (!window.Swal) return;
-      
-      Swal.fire({
-        icon: 'question',
-        title: btn.dataset.confirmTitle,
-        text: btn.dataset.confirmText,
-        showCancelButton: true,
-        confirmButtonColor: btn.dataset.confirmColor,
-        confirmButtonText: btn.dataset.confirmBtn
-      }).then((result) => {
-        if (result.isConfirmed) {
-          const form = document.getElementById(btn.dataset.form);
-          const hiddenAction = document.createElement('input');
-          hiddenAction.type = 'hidden';
-          hiddenAction.name = 'action_btn';
-          hiddenAction.value = btn.dataset.actionVal;
-          form.appendChild(hiddenAction);
-          form.submit();
-        }
-      });
-    });
+  document.querySelectorAll('.js-post-return').forEach(function (form) {
+    confirmSubmit(form, { icon: 'question', title: 'Posting return?', text: 'Draft akan resmi: stok keluar dan jurnal tercatat.', confirmText: 'Ya, Posting', color: '#16a34a' });
   });
 
   document.querySelectorAll('.js-void-return').forEach(function (form) {
-    confirmSubmit(form, { icon: 'warning', title: 'Void return?', text: 'Lanjutkan void?', confirmText: 'Ya, Void', color: '#dc2626' });
+    confirmSubmit(form, { icon: 'warning', title: 'Void return?', text: 'Stok akan dikembalikan dan jurnal dibatalkan.', confirmText: 'Ya, Void', color: '#dc2626' });
   });
 });
 </script>
 @endpush
+"""
+
+with open('/Users/ariefmuhamad/Herd/gfid-dev/resources/views/purchasing/purchase_returns/show.blade.php', 'w') as f:
+    f.write(content)
+

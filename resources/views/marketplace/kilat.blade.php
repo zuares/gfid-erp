@@ -183,6 +183,14 @@
     .form-control-custom { border-radius: 7px; border: 1px solid rgba(148,163,184,.35); padding: 0.4rem 0.75rem; font-size: 0.78rem; transition: border-color .15s; background: transparent; }
     .form-control-custom:focus { border-color: var(--shp-accent); outline: none; }
     body[data-theme="dark"] .form-control-custom { border-color: rgba(148,163,184,.25); color: #f8fafc; }
+
+    /* Sub-tabs (selaras halaman Orders) */
+    .ord-subtab { display:inline-flex; align-items:center; gap:.3rem; background:transparent; border:none; padding:.3rem .7rem; font-size:.75rem; font-weight:600; color:#64748b; border-radius:6px; cursor:pointer; white-space:nowrap; }
+    .ord-subtab:hover { background:#eef2f7; color:#1e293b; }
+    .ord-subtab.active { background:#fff; color:#0f172a; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+    body[data-theme="dark"] .ord-subtab.active { background:rgba(255,255,255,0.12); color:#fff; }
+    .ord-badge.bg-secondary { background:#e2e8f0; color:#475569; border-color:transparent; }
+    .awb-track { text-decoration:none; margin-left:4px; }
 </style>
 @endpush
 
@@ -204,23 +212,37 @@
         </div>
     </div>
 
-    {{-- TABS --}}
+    {{-- Penjelasan singkat agar owner tidak bingung --}}
+    <div id="kiltHelp" style="display:flex; align-items:center; gap:.5rem; background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:.5rem .8rem; font-size:.75rem; margin-bottom:.75rem; line-height:1.4;">
+        <span style="font-size:1rem">💡</span>
+        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke DC</strong> → <strong>Dikirim ke Pembeli</strong>. Kolom di bawah menampilkan status tiap pesanan secara ringkas.</span>
+    </div>
+
+    {{-- TABS (label mengikuti alur Pesanan Kilat, ramah-owner) --}}
     <div class="ord-tabs" id="ordTabs">
-        <button class="ord-tab active" data-tab="all" onclick="switchTab('all', this)">
-            Semua <span class="ord-badge" id="badge-all">—</span>
+        <button class="ord-tab active" data-tab="all" onclick="switchTab('all', this)" title="Semua pesanan kilat">
+            📋 Semua <span class="ord-badge" id="badge-all">—</span>
         </button>
-        <button class="ord-tab" data-tab="ready" onclick="switchTab('ready', this)">
-            Perlu Kirim <span class="ord-badge urgent" id="badge-ready">—</span>
+        <button class="ord-tab" data-tab="ready" onclick="switchTab('ready', this)" title="Penjual perlu memproses / menyerahkan barang (READY_TO_SHIP/PROCESSED)">
+            📦 Perlu Proses Penjual <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
-        <button class="ord-tab" data-tab="processed" onclick="switchTab('processed', this)">
-            Sedang Proses <span class="ord-badge" id="badge-processed" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
+        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sudah dikirim ke gudang/DC Shopee (SHIPPED/COMPLETED)">
+            🚚 Dikirim ke DC <span class="ord-badge" id="badge-shipped" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
         </button>
-        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)">
-            Dikirim / Selesai <span class="ord-badge" id="badge-shipped">—</span>
+        <button class="ord-tab" data-tab="waiting" onclick="switchTab('waiting', this)" title="Barang di gudang Shopee, dalam perjalanan ke pembeli (MATCHED/PENDING)">
+            🏠 Dikirim ke Pembeli <span class="ord-badge" id="badge-waiting" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0">—</span>
         </button>
-        <button class="ord-tab" data-tab="cancelled" onclick="switchTab('cancelled', this)">
-            Dibatalkan <span class="ord-badge" id="badge-cancelled" style="background:#fef2f2;color:#dc2626;border-color:#fecaca">—</span>
+        <button class="ord-tab" data-tab="cancelled" onclick="switchTab('cancelled', this)" title="Dibatalkan / gagal (CANCELLED/FAILED)">
+            ✖️ Dibatalkan <span class="ord-badge" id="badge-cancelled" style="background:#fef2f2;color:#dc2626;border-color:#fecaca">—</span>
         </button>
+    </div>
+
+    {{-- Sub-tab untuk tab "Perlu Proses Penjual" (tampil hanya saat tab itu aktif) --}}
+    <div id="subTabReadyContainer" style="display:none; gap:0.25rem; align-items:center; background:#f8fafc; padding:3px; border-radius:8px; border:1px solid var(--shp-border); margin-bottom:1rem; width:fit-content;">
+        <button class="ord-subtab active" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
+        <button class="ord-subtab" data-sub="to_arrange" onclick="switchSubTabReady('to_arrange', this)">Perlu Diatur <span class="ord-badge bg-secondary urgent" id="badge-sub-ready-arrange">—</span></button>
+        <button class="ord-subtab" data-sub="packing" onclick="switchSubTabReady('packing', this)">📦 Sedang Dikemas <span class="ord-badge bg-secondary" id="badge-sub-ready-packing">—</span></button>
+        <button class="ord-subtab" data-sub="ready_ship" onclick="switchSubTabReady('ready_ship', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-ready-ship">—</span></button>
     </div>
 
     <div class="card-main">
@@ -232,7 +254,7 @@
                         <th>Booking / Pesanan</th>
                         <th>Status</th>
                         <th>Kurir</th>
-                        <th>Resi</th>
+                        <th>No. AWB / Resi</th>
                         <th>Dibuat</th>
                         <th style="text-align:right">Aksi</th>
                     </tr>
@@ -323,6 +345,7 @@
                 </div>
             </div>
             <div class="modal-footer" style="padding: .9rem 1.4rem; border-top: 1.5px solid #f1f5f9; background: #fff;">
+                <button type="button" class="btn-ship-outline" id="detTrackBtn" style="display:none">🔎 Lacak Pengiriman</button>
                 <button type="button" class="btn-ship-primary" data-bs-dismiss="modal">Tutup</button>
             </div>
         </div>
@@ -347,7 +370,8 @@
                 </div>
 
                 <div id="shipForm" style="display:none">
-                    <div class="mb-3 text-center" id="shipMethodInfo"></div>
+                    <label style="font-size: .65rem; font-weight: 800; color: #94a3b8; letter-spacing: .07em; text-transform: uppercase; display:block; margin-bottom:.4rem;">Metode Pengiriman</label>
+                    <div class="mb-3" id="shipMethods"></div>
 
                     <div class="mb-3" id="pickupAddrWrap" style="display:none">
                         <label style="font-size: .65rem; font-weight: 800; color: #94a3b8; letter-spacing: .07em; text-transform: uppercase; display:block; margin-bottom:.35rem;">Alamat Pickup</label>
@@ -387,6 +411,30 @@
         </div>
     </div>
 </div>
+<!-- Modal Lacak Pengiriman -->
+<div class="modal fade" id="trackModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="padding: 1.25rem 1.4rem .9rem; border-bottom: 1.5px solid #f1f5f9;">
+                <h5 class="modal-title fw-bold" style="font-size:1.05rem; color:#0f172a;">🔎 Lacak Pengiriman</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem 1.4rem;">
+                <div style="font-size:.65rem; font-weight:800; color:#94a3b8; letter-spacing:.07em; text-transform:uppercase; margin-bottom:.2rem;">No. Resi</div>
+                <div id="trkNo" class="ord-id" style="font-size:1rem; margin-bottom:1rem;">—</div>
+                <div id="trkLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary mb-2" style="width:1.5rem;height:1.5rem;border-width:2px;" role="status"></div>
+                    <div style="font-size:.85rem; font-weight:600;">Memuat pelacakan...</div>
+                </div>
+                <div id="trkEmpty" style="display:none; text-align:center; color:#64748b; padding:1.5rem; font-size:.85rem;"></div>
+                <div id="trkTimeline"></div>
+            </div>
+            <div class="modal-footer" style="padding:.9rem 1.4rem; border-top:1.5px solid #f1f5f9;">
+                <button type="button" class="btn-ship-outline" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -408,19 +456,62 @@
     let bookings = [];
     let loading = false;
     let currentTab = 'all';
+    let subReady = 'all'; // sub-tab di dalam "Perlu Proses Penjual": all | to_arrange | packing
 
     function fmtDate(ts){
         if(!ts) return '—';
         return new Date(ts*1000).toLocaleString('id-ID', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
     }
 
+    // Label status ramah-owner (bukan kode mentah Shopee).
+    const STATUS_LABEL = {
+        MATCHED:       ['Dikirim ke Pembeli',   'fstatus-done'],
+        PENDING:       ['Dikirim ke Pembeli',   'fstatus-done'],
+        READY_TO_SHIP: ['Perlu Proses Penjual', 'fstatus-draft'],
+        PROCESSED:     ['Sedang Diproses',      'fstatus-draft'],
+        SHIPPED:       ['Dikirim ke DC',        'fstatus-pending'],
+        COMPLETED:     ['Selesai',              'fstatus-done'],
+        CANCELLED:     ['Dibatalkan',           'fstatus-none'],
+        FAILED:        ['Gagal',                'fstatus-none'],
+    };
+
     function statusBadge(s){
         s = (s||'').toUpperCase();
-        if(['SHIPPED','COMPLETED','PROCESSED'].includes(s)) return `<span class="fstatus fstatus-done">${s||'—'}</span>`;
-        if(['CANCELLED','FAILED'].includes(s)) return `<span class="fstatus fstatus-none">${s}</span>`;
         if(!s) return `<span class="fstatus fstatus-none">—</span>`;
-        if(s === 'PROCESSED_INSTANT') return `<span class="fstatus fstatus-draft">${s}</span>`;
-        return `<span class="fstatus fstatus-pending">${s}</span>`;
+        const [label, cls] = STATUS_LABEL[s] || [s.replace(/_/g,' '), 'fstatus-pending'];
+        return `<span class="fstatus ${cls}" title="${s}">${label}</span>`;
+    }
+
+    // Satu sumber kebenaran pemetaan status → tab, supaya jumlah antar-tab pasti pas.
+    function bucketOf(b){
+        const s = (b.booking_status||'').toUpperCase();
+        if (s === 'CANCELLED' || s === 'FAILED') return 'cancelled';
+        if (s === 'SHIPPED' || s === 'COMPLETED') return 'shipped';
+        if (s === 'READY_TO_SHIP' || s === 'PROCESSED' || b.needs_shipping) return 'ready';
+        return 'waiting'; // MATCHED, PENDING, atau status lain yang belum diproses
+    }
+
+    // Bisa dilacak jika barang sudah bergerak (dikirim ke DC / ke pembeli) atau punya resi.
+    function isTrackable(b){
+        const s = (b.booking_status||'').toUpperCase();
+        return ['SHIPPED','COMPLETED','MATCHED'].includes(s) || !!(b.tracking_number);
+    }
+
+    // URL pelacakan resmi kurir berdasarkan pola resi. SPX (Shopee Express) → spx.co.id.
+    function courierTrackUrl(resi){
+        if(!resi) return null;
+        const r = String(resi).toUpperCase();
+        if(r.startsWith('SPX')) return `https://spx.co.id/#/track?tracking_number=${encodeURIComponent(resi)}`;
+        return null; // kurir lain: belum ada deep-link, cukup tombol salin
+    }
+
+    // HTML resi + tombol Lacak (SPX) + Salin, dipakai di modal Lacak & Detail.
+    function resiActionsHtml(resi){
+        if(!resi) return '<em>Belum Ada Resi</em>';
+        const url = courierTrackUrl(resi);
+        const track = url ? `<a href="${url}" target="_blank" rel="noopener" class="btn-toolbar" style="margin-left:.5rem">🔎 Lacak di SPX</a>` : '';
+        const copy  = `<button class="btn-toolbar" style="margin-left:.35rem" onclick="navigator.clipboard.writeText('${resi}').then(()=>{this.textContent='✅ Tersalin'})">📋 Salin</button>`;
+        return `<span style="font-family:monospace; font-weight:700">${resi}</span>${track}${copy}`;
     }
 
     function renderEmpty(filteredCount = 0) {
@@ -461,40 +552,72 @@
         document.querySelectorAll('.ord-tab').forEach(t => t.classList.remove('active'));
         if(el) el.classList.add('active');
         currentTab = tabName;
+        // Sub-tab hanya untuk "Perlu Proses Penjual".
+        const sc = document.getElementById('subTabReadyContainer');
+        if (sc) sc.style.display = (tabName === 'ready') ? 'inline-flex' : 'none';
         render();
     };
 
+    window.switchSubTabReady = function(sub, el) {
+        subReady = sub;
+        document.querySelectorAll('#subTabReadyContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+        if(el) el.classList.add('active');
+        render();
+    };
+
+    // Sub-bucket di dalam "Perlu Proses Penjual".
+    function readySub(b){
+        if (b.fulfillment_status === 'confirmed') return 'ready_ship';               // Siap Kirim
+        if (b.needs_shipping) return 'to_arrange';                                  // Perlu Diatur
+        if ((b.booking_status||'').toUpperCase() === 'PROCESSED') return 'packing';  // Sedang Dikemas
+        return 'to_arrange';
+    }
+
     function filterBookings(arr) {
         if (currentTab === 'all') return arr;
-        return arr.filter(b => {
-            const s = (b.booking_status||'').toUpperCase();
-            if (currentTab === 'ready') return b.needs_shipping === true;
-            if (currentTab === 'processed') return s === 'PROCESSED' || s === 'PROCESSED_INSTANT';
-            if (currentTab === 'shipped') return s === 'SHIPPED' || s === 'COMPLETED';
-            if (currentTab === 'cancelled') return s === 'CANCELLED' || s === 'FAILED';
-            return true;
-        });
+        let out = arr.filter(b => bucketOf(b) === currentTab);
+        if (currentTab === 'ready' && subReady !== 'all') {
+            out = out.filter(b => readySub(b) === subReady);
+        }
+        return out;
     }
 
     function updateBadges() {
-        let cntReady = 0, cntProcessed = 0, cntShipped = 0, cntCancelled = 0;
-        bookings.forEach(b => {
-            const s = (b.booking_status||'').toUpperCase();
-            if (b.needs_shipping === true) cntReady++;
-            if (s === 'PROCESSED' || s === 'PROCESSED_INSTANT') cntProcessed++;
-            if (s === 'SHIPPED' || s === 'COMPLETED') cntShipped++;
-            if (s === 'CANCELLED' || s === 'FAILED') cntCancelled++;
-        });
+        const cnt = { waiting: 0, ready: 0, shipped: 0, cancelled: 0 };
+        bookings.forEach(b => { cnt[bucketOf(b)]++; });
         document.getElementById('badge-all').textContent = bookings.length;
-        document.getElementById('badge-ready').textContent = cntReady;
-        document.getElementById('badge-processed').textContent = cntProcessed;
-        document.getElementById('badge-shipped').textContent = cntShipped;
-        document.getElementById('badge-cancelled').textContent = cntCancelled;
-        
-        const elTotal = document.getElementById('kpiTotal');
-        const elNeedShip = document.getElementById('kpiNeedShip');
-        if (elTotal) elTotal.textContent = bookings.length;
-        if (elNeedShip) elNeedShip.textContent = cntReady;
+        document.getElementById('badge-waiting').textContent = cnt.waiting;
+        document.getElementById('badge-ready').textContent = cnt.ready;
+        document.getElementById('badge-shipped').textContent = cnt.shipped;
+        document.getElementById('badge-cancelled').textContent = cnt.cancelled;
+
+        // Sembunyikan badge "urgent" (merah) di tab Siap Kirim bila memang 0.
+        const readyBadge = document.getElementById('badge-ready');
+        if (readyBadge) readyBadge.classList.toggle('urgent', cnt.ready > 0);
+
+        // Badge sub-tab "Perlu Proses Penjual".
+        let sAll = 0, sArrange = 0, sPacking = 0, sReadyShip = 0;
+        bookings.forEach(b => {
+            if (bucketOf(b) !== 'ready') return;
+            sAll++;
+            const sub = readySub(b);
+            if (sub === 'packing') sPacking++; 
+            else if (sub === 'ready_ship') sReadyShip++;
+            else sArrange++;
+        });
+        const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+        setTxt('badge-sub-ready-all', sAll);
+        setTxt('badge-sub-ready-arrange', sArrange);
+        setTxt('badge-sub-ready-packing', sPacking);
+        setTxt('badge-sub-ready-ship', sReadyShip);
+    }
+
+    // Sel AWB ringkas untuk tabel: nomor + ikon lacak SPX bila ada.
+    function awbCell(resi){
+        if(!resi) return '<span style="color:#cbd5e1">—</span>';
+        const url = courierTrackUrl(resi);
+        const link = url ? ` <a href="${url}" target="_blank" rel="noopener" class="awb-track" title="Lacak di SPX">🔎</a>` : '';
+        return `<span style="font-weight:700">${resi}</span>${link}`;
     }
 
     function render(){
@@ -512,6 +635,9 @@
             let aksi = `<button class="btn-toolbar" onclick="showDetail('${b.store_id}','${b.booking_sn}')">ℹ️ Detail</button>`;
             if(b.needs_shipping){
                 aksi += `<button class="btn-toolbar primary" onclick="arrangeShip('${b.store_id}','${b.booking_sn}')">🚚 Atur Kirim</button>`;
+            }
+            if(isTrackable(b)){
+                aksi += `<button class="btn-toolbar" onclick="trackShipment('${b.store_id}','${b.booking_sn}')">🔎 Lacak</button>`;
             }
             
             let metaStatusHtml = '';
@@ -556,7 +682,7 @@
                     <div>${metaStatusHtml}</div>
                 </td>
                 <td style="font-size:0.75rem;font-weight:600;color:var(--shp-accent)">${b.shipping_carrier || '—'}</td>
-                <td style="font-size:0.75rem;font-family:monospace">${b.tracking_number || '—'}</td>
+                <td style="font-size:0.75rem;font-family:monospace">${awbCell(b.tracking_number)}</td>
                 <td class="ord-date" style="margin-top:0">${fmtDate(b.create_time)}</td>
                 <td style="text-align:right">
                     <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
@@ -632,19 +758,39 @@
             // Ambil data lokal sebagai fallback jika API Shopee (getBookingDetail) tidak mereturn field tersebut
             const localBooking = bookings.find(b => b.booking_sn === sn || b.order_sn === sn);
             
-            const carrier = info.shipping_carrier || (localBooking ? localBooking.shipping_carrier : null) || '—';
-            const tracking = info.tracking_no || info.tracking_number || (localBooking ? localBooking.tracking_number : null);
+            // Resi & kurir bisa berada di package_list (get_order_detail) — bukan hanya top-level.
+            const pkg = (info.package_list && info.package_list[0]) ? info.package_list[0] : {};
+            const carrier = info.shipping_carrier || pkg.shipping_carrier || (localBooking ? localBooking.shipping_carrier : null) || '—';
+            let tracking = info.tracking_no || info.tracking_number || pkg.tracking_number
+                || (localBooking ? localBooking.tracking_number : null);
+            // OFG… = package_number (nomor paket internal Shopee), BUKAN resi kurir. Jangan tampilkan sebagai resi.
+            const packageNo = pkg.package_number || (tracking && String(tracking).toUpperCase().startsWith('OFG') ? tracking : null);
+            if (tracking && String(tracking).toUpperCase().startsWith('OFG')) tracking = null;
 
             document.getElementById('detSn').textContent = info.order_sn || (localBooking ? localBooking.order_sn : sn) || sn;
             document.getElementById('detCourier').textContent = carrier;
-            document.getElementById('detTracking').innerHTML = tracking 
-                ? `${tracking} <a href="https://shopee.co.id/search?keyword=${tracking}" target="_blank" style="text-decoration:none; margin-left:4px;" title="Lacak di Shopee">🔎</a>`
-                : '<em>Belum Ada Resi</em>';
+            document.getElementById('detTracking').innerHTML = tracking
+                ? resiActionsHtml(tracking)
+                : (packageNo
+                    ? `<em style="color:#94a3b8">Belum ada resi kurir</em><div style="font-size:.7rem; color:#94a3b8; margin-top:2px; font-family:monospace">Paket: ${packageNo}</div>`
+                    : '<em>Belum Ada Resi</em>');
+
+            // Tombol Lacak di modal detail — tampil bila pesanan sudah bisa dilacak.
+            const detTrackBtn = document.getElementById('detTrackBtn');
+            const canTrack = (localBooking && isTrackable(localBooking)) || !!tracking;
+            if (canTrack) {
+                detTrackBtn.style.display = '';
+                detTrackBtn.onclick = () => { bootstrap.Modal.getInstance(detailModalEl)?.hide(); trackShipment(storeId, sn); };
+            } else {
+                detTrackBtn.style.display = 'none';
+            }
             
             // Tampilkan meta logs apabila pesanan sudah diproses webhook
             const courierStatusEl = document.getElementById('detCourierStatus');
-            if (localBooking && localBooking.meta && localBooking.meta.courier_status) {
-                const cStat = localBooking.meta.courier_status.replace(/_/g, ' ');
+            const courierStatus = (localBooking && localBooking.meta && localBooking.meta.courier_status)
+                || pkg.logistics_status || info.order_status || (localBooking ? localBooking.booking_status : null);
+            if (courierStatus) {
+                const cStat = String(courierStatus).replace(/_/g, ' ');
                 courierStatusEl.innerHTML = `<span style="color:#2563eb; background:#eff6ff; padding:2px 6px; border-radius:4px;">🚚 ${cStat}</span>`;
             } else {
                 courierStatusEl.innerHTML = '<span style="color:#64748b">—</span>';
@@ -710,6 +856,8 @@
     const shipModalEl = document.getElementById('shipModal');
     const el = id => document.getElementById(id);
 
+    let shipAddrList = [];
+
     function resetShipModal(){
         el('shipLoading').style.display = 'block';
         el('shipForm').style.display = 'none';
@@ -722,7 +870,17 @@
         el('pickupAddr').innerHTML = '';
         el('pickupTime').innerHTML = '';
         el('dropoffBranch').innerHTML = '';
-        el('shipMethodInfo').innerHTML = '';
+        el('shipMethods').innerHTML = '';
+        shipAddrList = [];
+    }
+
+    // Tampilkan/sembunyikan bagian sesuai metode yang dipilih user (radio).
+    function applyShipMethod(method){
+        shipCtx.method = method;
+        el('pickupAddrWrap').style.display = (method === 'pickup') ? 'block' : 'none';
+        el('pickupTimeWrap').style.display = (method === 'pickup' && el('pickupTime').options.length) ? 'block' : 'none';
+        el('dropoffWrap').style.display  = (method === 'dropoff') ? 'block' : 'none';
+        el('shipNoParam').style.display  = (method === 'none') ? 'flex' : 'none';
     }
 
     window.arrangeShip = async (storeId, sn) => {
@@ -732,42 +890,59 @@
         bootstrap.Modal.getOrCreateInstance(shipModalEl).show();
 
         try {
-            const p = await api(`/api/marketplace/stores/${storeId}/bookings/${sn}/shipping-parameter`);
-            const info    = p.info_needed || {};
-            const pickup  = p.pickup || {};
-            const dropoff = p.dropoff || {};
-            const addrList   = pickup.address_list || [];
-            const branchList = dropoff.branch_list || [];
+            const p  = await api(`/api/marketplace/stores/${storeId}/bookings/${sn}/shipping-parameter`);
+            const rd = p.response || p;
+            const info = rd.info_needed || {};
 
+            // Tangani dua kemungkinan bentuk respons Shopee:
+            // (a) data di bawah info_needed.pickup/dropoff, atau (b) di top-level pickup/dropoff.
+            const pickupData  = (info.pickup && info.pickup.address_list) ? info.pickup : (rd.pickup || null);
+            const dropoffData = (info.dropoff && info.dropoff.branch_list) ? info.dropoff : (rd.dropoff || null);
+            const addrList   = (pickupData && pickupData.address_list) ? pickupData.address_list : [];
+            const branchList = (dropoffData && dropoffData.branch_list) ? dropoffData.branch_list : [];
+            const hasPickup  = ('pickup' in info) || addrList.length > 0;
+            const hasDropoff = ('dropoff' in info) || branchList.length > 0;
+
+            shipAddrList = addrList;
             el('shipLoading').style.display = 'none';
             el('shipForm').style.display = 'block';
 
-            // Pilih metode: utamakan pickup bila ada alamat, jika tidak pakai dropoff.
-            if (addrList.length && (info.pickup !== undefined || !branchList.length)) {
-                shipCtx.method = 'pickup';
-                el('shipMethodInfo').innerHTML = '<span class="fstatus fstatus-pending" style="font-size:0.75rem;">📦 Pickup (Dijemput Kurir)</span>';
-                el('pickupAddrWrap').style.display = 'block';
-                addrList.forEach((a, i) => {
-                    const label = [a.address, a.city, a.state, a.zipcode].filter(Boolean).join(', ');
-                    el('pickupAddr').insertAdjacentHTML('beforeend', `<option value="${a.address_id}" data-idx="${i}">${label || ('Alamat #'+a.address_id)}</option>`);
-                });
+            // Isi dropdown pickup (alamat + jadwal) & dropoff.
+            addrList.forEach((a, i) => {
+                const label = [a.address, a.city, a.state, a.zipcode].filter(Boolean).join(', ');
+                el('pickupAddr').insertAdjacentHTML('beforeend', `<option value="${a.address_id}" data-idx="${i}">${label || ('Alamat #'+a.address_id)}</option>`);
+            });
+            if (addrList.length) {
                 fillPickupTimes(addrList, 0);
-                el('pickupAddr').onchange = e => fillPickupTimes(addrList, e.target.selectedOptions[0].dataset.idx);
-                el('shipSubmit').disabled = false;
-            } else if (branchList.length) {
-                shipCtx.method = 'dropoff';
-                el('shipMethodInfo').innerHTML = '<span class="fstatus fstatus-warning" style="font-size:0.75rem;">🏪 Dropoff (Antar ke Titik)</span>';
-                el('dropoffWrap').style.display = 'block';
-                branchList.forEach(b => {
-                    const label = [b.address, b.city, b.state, b.zipcode].filter(Boolean).join(', ');
-                    el('dropoffBranch').insertAdjacentHTML('beforeend', `<option value="${b.branch_id}">${label || ('Titik #'+b.branch_id)}</option>`);
-                });
-                el('shipSubmit').disabled = false;
-            } else {
-                shipCtx.method = 'none';
-                el('shipNoParam').style.display = 'flex';
-                el('shipSubmit').disabled = false;
+                el('pickupAddr').onchange = e => { fillPickupTimes(addrList, e.target.selectedOptions[0].dataset.idx); applyShipMethod('pickup'); };
             }
+            branchList.forEach(b => {
+                const label = [b.address, b.city, b.state, b.zipcode].filter(Boolean).join(', ');
+                el('dropoffBranch').insertAdjacentHTML('beforeend', `<option value="${b.branch_id}">${label || ('Titik #'+b.branch_id)}</option>`);
+            });
+
+            // Bangun radio metode (Dropoff diutamakan tampil dulu, seperti halaman orders).
+            let radios = '';
+            if (hasDropoff) {
+                radios += `<label style="display:flex; align-items:center; gap:.5rem; padding:.5rem .7rem; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:.4rem; cursor:pointer;">
+                    <input type="radio" name="shipMethod" value="dropoff" checked>
+                    <span><strong>🏪 Drop-off</strong> — antar ke titik/cabang</span></label>`;
+            }
+            if (hasPickup) {
+                radios += `<label style="display:flex; align-items:center; gap:.5rem; padding:.5rem .7rem; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:.4rem; cursor:pointer;">
+                    <input type="radio" name="shipMethod" value="pickup" ${!hasDropoff ? 'checked' : ''}>
+                    <span><strong>📦 Pickup</strong> — dijemput kurir</span></label>`;
+            }
+            el('shipMethods').innerHTML = radios;
+
+            document.querySelectorAll('input[name="shipMethod"]').forEach(r => {
+                r.addEventListener('change', e => applyShipMethod(e.target.value));
+            });
+
+            // Metode awal sesuai yang tercentang; kalau tak ada opsi → 'none'.
+            const initial = document.querySelector('input[name="shipMethod"]:checked');
+            applyShipMethod(initial ? initial.value : 'none');
+            el('shipSubmit').disabled = false;
         } catch(e) {
             el('shipLoading').style.display = 'none';
             el('shipError').style.display = 'flex';
@@ -793,14 +968,17 @@
         const original = btn.innerHTML;
         btn.innerHTML = 'Memproses...';
 
+        const method = document.querySelector('input[name="shipMethod"]:checked')?.value || shipCtx.method;
         const body = {};
-        if (shipCtx.method === 'pickup') {
-            body.pickup = { address_id: Number(el('pickupAddr').value) };
+        if (method === 'pickup') {
+            body.pickup = {};
+            if (el('pickupAddr').value) body.pickup.address_id = Number(el('pickupAddr').value) || el('pickupAddr').value;
             if (el('pickupTimeWrap').style.display !== 'none' && el('pickupTime').value) {
                 body.pickup.pickup_time_id = el('pickupTime').value;
             }
-        } else if (shipCtx.method === 'dropoff') {
-            body.dropoff = { branch_id: Number(el('dropoffBranch').value) };
+        } else if (method === 'dropoff') {
+            body.dropoff = {};
+            if (el('dropoffBranch').value) body.dropoff.branch_id = Number(el('dropoffBranch').value) || el('dropoffBranch').value;
         }
 
         try {
@@ -819,6 +997,46 @@
             btn.innerHTML = original;
         }
     });
+
+    // ── Lacak Pengiriman ──────────────────────────────────────────────────────
+    const trackModalEl = document.getElementById('trackModal');
+    window.trackShipment = async (storeId, sn) => {
+        el('trkNo').textContent = '—';
+        el('trkLoading').style.display = 'block';
+        el('trkTimeline').innerHTML = '';
+        el('trkEmpty').style.display = 'none';
+        bootstrap.Modal.getOrCreateInstance(trackModalEl).show();
+        try {
+            const d = await api(`/api/marketplace/stores/${storeId}/bookings/${sn}/tracking`);
+            el('trkLoading').style.display = 'none';
+            el('trkNo').innerHTML = resiActionsHtml(d.tracking_number);
+            const list = (d.tracking_info || []).slice().sort((a,b) => (b.update_time||0) - (a.update_time||0));
+            if (!list.length) {
+                el('trkEmpty').style.display = 'block';
+                el('trkEmpty').textContent = d.message || 'Belum ada data pelacakan.';
+                return;
+            }
+            el('trkTimeline').innerHTML = list.map((t, i) => {
+                const dt = t.update_time ? new Date(t.update_time*1000).toLocaleString('id-ID') : '';
+                const desc = t.description || String(t.logistics_status || '').replace(/_/g, ' ');
+                const active = i === 0;
+                return `<div style="display:flex; gap:.7rem;">
+                    <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div style="width:11px;height:11px;border-radius:50%;background:${active?'#16a34a':'#cbd5e1'};margin-top:4px;flex:none"></div>
+                        ${i < list.length-1 ? '<div style="width:2px;flex:1;background:#e2e8f0;margin-top:2px;min-height:14px"></div>' : ''}
+                    </div>
+                    <div style="padding-bottom:.6rem;">
+                        <div style="font-weight:${active?700:600};color:${active?'#0f172a':'#475569'};font-size:.83rem;line-height:1.35">${desc}</div>
+                        <div style="font-size:.7rem;color:#94a3b8;margin-top:1px">${dt}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            el('trkLoading').style.display = 'none';
+            el('trkEmpty').style.display = 'block';
+            el('trkEmpty').textContent = 'Gagal memuat pelacakan: ' + e.message;
+        }
+    };
 
     load();
 </script>

@@ -361,6 +361,7 @@
 
   {{-- ✅ Flatpickr GLOBAL --}}
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   {{-- ✅ Realtime: Laravel Echo + Reverb/Pusher (WebSocket) --}}
@@ -518,14 +519,14 @@
       function baseOptions(){
         return {
           dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'j F Y',
           allowInput: true,
           disableMobile: true,
           monthSelectorType: 'static',
           nextArrow: '&rsaquo;',
           prevArrow: '&lsaquo;',
-          locale: {
-            firstDayOfWeek: 1
-          },
+          locale: 'id',
           onReady: function(selectedDates, dateStr, instance){
             instance.input.classList.add('gf-date-input');
             instance.calendarContainer.classList.add('gf-date-calendar');

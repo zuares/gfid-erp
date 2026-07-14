@@ -116,6 +116,79 @@ class PurchaseReturnController extends Controller
         return response()->json(['results' => $results]);
     }
 
+
+    public function searchByItem(Request $request)
+    {
+        $term = trim((string) $request->query('q', ''));
+        
+        if ($term === '') {
+            return response()->json(['results' => []]);
+        }
+
+        // Cari item yang namanya/kodenya cocok
+        $itemIds = \App\Models\Item::query()
+            ->where('name', 'LIKE', "%{$term}%")
+            ->orWhere('code', 'LIKE', "%{$term}%")
+            ->pluck('id');
+
+        if ($itemIds->isEmpty()) {
+            return response()->json(['results' => []]);
+        }
+
+        // Cari GRN line yang item_id-nya ada di list itemIds dan GRN-nya posted
+        $lines = \App\Models\PurchaseReceiptLine::query()
+            ->with(['receipt.supplier', 'item'])
+            ->whereIn('item_id', $itemIds)
+            ->whereHas('receipt', function ($q) {
+                $q->where('status', 'posted');
+            })
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get();
+
+        if ($lines->isEmpty()) {
+            return response()->json(['results' => []]);
+        }
+
+        // Hitung total retur yang sudah diposting untuk setiap line
+        $lineIds = $lines->pluck('id');
+        $returnedQty = \App\Models\PurchaseReturnLine::query()
+            ->whereIn('purchase_receipt_line_id', $lineIds)
+            ->whereHas('ret', function($q) {
+                $q->whereNull('voided_at')->where('status', 'posted');
+            })
+            ->groupBy('purchase_receipt_line_id')
+            ->selectRaw('purchase_receipt_line_id, SUM(qty) as total')
+            ->pluck('total', 'purchase_receipt_line_id');
+
+        $results = [];
+        $addedGrns = [];
+
+        foreach ($lines as $line) {
+            $rem = max(0, $line->qty_received - (float)($returnedQty[$line->id] ?? 0));
+            if ($rem <= 0.0001) continue;
+
+            $grn = $line->receipt;
+            
+            // Hindari memunculkan GRN yang sama berulang kali di pencarian yang sama, 
+            // cukup munculkan item pertama yang match di GRN tersebut
+            if (isset($addedGrns[$grn->id])) continue;
+            
+            $addedGrns[$grn->id] = true;
+
+            $date = $grn->date ? \Illuminate\Support\Carbon::parse($grn->date)->format('d/m/Y') : '';
+            $text = "{$line->item->name} · {$grn->code} ({$date}) · Sisa bisa diretur: " . rtrim(rtrim(number_format($rem, 4, ',', '.'), '0'), ',') . " pcs";
+            
+            $results[] = [
+                'id' => $grn->id,
+                'text' => $text,
+                'item_id' => $line->item_id
+            ];
+        }
+
+        return response()->json(['results' => $results]);
+    }
+
     public function createFromGrn(Request $request, PurchaseReceipt $purchase_receipt)
     {
         $purchase_receipt->loadMissing(['lines.item', 'order', 'supplier', 'warehouse']);
@@ -486,6 +559,13 @@ class PurchaseReturnController extends Controller
             $purchase_return->total = round($total, 2);
             $purchase_return->save();
         });
+
+        $actionBtn = $request->input('action_btn');
+        if ($actionBtn === 'post') {
+            return $this->post($request, $purchase_return);
+        } elseif ($actionBtn === 'submit') {
+            return $this->submit($request, $purchase_return);
+        }
 
         return back()->with('success', 'Draft Return tersimpan.');
     }
@@ -1127,22 +1207,29 @@ class PurchaseReturnController extends Controller
 
     protected function calcApOutstandingByGrn(PurchaseOrder $order): float
     {
-        $debt = (float) $order->purchaseReceipts()->where('status', 'posted')->sum('grand_total');
+        // 1. Hitung total hutang (hanya GRN asli, bukan GRN replacement)
+        $debt = (float) $order->purchaseReceipts()
+            ->where('status', 'posted')
+            ->where('is_replacement', false)
+            ->sum('grand_total');
 
+        // 2. Hitung total pembayaran yang sudah dilakukan
         $paid = (float) $order->activePayments()
             ->selectRaw("COALESCE(SUM(CASE WHEN type='payment' THEN amount ELSE 0 END),0) as n")
             ->value('n');
 
+        // 3. Hitung total DP yang sudah diaplikasikan
         $dpApplied = (float) $order->activePayments()
             ->selectRaw("COALESCE(SUM(CASE WHEN type='dp_apply' THEN amount ELSE 0 END),0) as n")
             ->value('n');
 
-        // Kurangi return yang sudah posted (bukan void) agar return ke-2, ke-3 dst
-        // tidak salah alokasi ke AP — seharusnya masuk Piutang Supplier (1305).
+        // 4. Kurangi return yang sudah posted (hanya tipe refund) agar mengurangi AP.
+        // Return tipe replacement TIDAK memotong AP, melainkan lari ke Claim (1305).
         $returned = (float) PurchaseReturn::query()
             ->where('purchase_order_id', $order->id)
             ->where('status', 'posted')
             ->whereNull('voided_at')
+            ->where('resolution_type', '!=', 'replacement')
             ->sum('total');
 
         return max(0, round($debt - $paid - $dpApplied - $returned, 2));
@@ -1164,7 +1251,9 @@ class PurchaseReturnController extends Controller
         $apOutstanding = 0.0;
 
         if (($ret->status ?? '') === 'draft' && ! $ret->voided_at && $ret->order) {
-            $apOutstanding = $this->calcApOutstandingByGrn($ret->order);
+            $apOutstanding = $ret->resolution_type === 'replacement' 
+                ? 0.0 
+                : $this->calcApOutstandingByGrn($ret->order);
         }
 
         $apPortion = min($apOutstanding, $total);

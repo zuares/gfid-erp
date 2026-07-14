@@ -208,6 +208,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/bookings/sync-all', [\App\Http\Controllers\MarketplaceBookingController::class, 'syncAll'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores/{store}/bookings/{bookingSn}/detail', [\App\Http\Controllers\MarketplaceBookingController::class, 'detail']);
+    Route::get('/stores/{store}/bookings/{bookingSn}/tracking', [\App\Http\Controllers\MarketplaceBookingController::class, 'tracking']);
     Route::get('/stores/{store}/bookings/{bookingSn}/shipping-parameter', [\App\Http\Controllers\MarketplaceBookingController::class, 'shippingParameter']);
     Route::post('/stores/{store}/bookings/{bookingSn}/ship', [\App\Http\Controllers\MarketplaceBookingController::class, 'ship'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

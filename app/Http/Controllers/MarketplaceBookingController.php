@@ -58,21 +58,31 @@ class MarketplaceBookingController extends Controller
 
         $bookings = $q->orderByDesc('create_time')->limit(1000)->get();
 
-        $data = $bookings->map(fn ($b) => [
-            'store_id'                 => $b->store_id,
-            'store_name'               => optional($b->store)->name,
-            'booking_sn'               => $b->booking_sn,
-            'order_sn'                 => $b->order_sn ?: optional($b->order_data)->channel_order_id,
-            'booking_status'           => $b->booking_status,
-            'shipping_carrier'         => $b->shipping_carrier,
-            'tracking_number'          => $b->tracking_number ?: optional($b->order_data)->booking_sn, // MarketplaceOrder stores tracking no in booking_sn
-            'package_number'           => $b->package_number,
-            'shipping_document_status' => $b->shipping_document_status,
-            'needs_shipping'           => $b->needsShipping(),
-            'create_time'              => $b->create_time,
-            'update_time'              => $b->update_time,
-            'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($b->order_data)->items ?? []),
-        ])->toArray();
+        $data = $bookings->map(function ($b) {
+            // Ambil order tertaut SEKALI saja (accessor ini query DB tiap akses).
+            $od = $b->order_data;
+            return [
+                'store_id'                 => $b->store_id,
+                'store_name'               => optional($b->store)->name,
+                'booking_sn'               => $b->booking_sn,
+                'order_sn'                 => $b->order_sn ?: optional($od)->channel_order_id,
+                'booking_status'           => $b->booking_status,
+                // Kurir & resi: pakai milik booking, jika kosong ambil dari order tertaut.
+                // (MarketplaceOrder menyimpan AWB di shipping_awb_no, sebagian juga di booking_sn.)
+                'shipping_carrier'         => $b->shipping_carrier ?: optional($od)->shipping_carrier,
+                'tracking_number'          => $b->tracking_number
+                    ?: optional($od)->shipping_awb_no
+                    ?: optional($od)->booking_sn,
+                'package_number'           => $b->package_number,
+                'shipping_document_status' => $b->shipping_document_status,
+                'needs_shipping'           => $b->needsShipping(),
+                'create_time'              => $b->create_time,
+                'update_time'              => $b->update_time,
+                'meta'                     => $b->meta,
+                'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items ?? []),
+                'fulfillment_status'       => optional($od)->fulfillment?->status,
+            ];
+        })->toArray();
 
         return response()->json([
             'data'           => $data,
@@ -102,7 +112,12 @@ class MarketplaceBookingController extends Controller
         return response()->json(['success' => true, 'stores_synced' => $synced, 'errors' => $errors]);
     }
 
-    /** Detail booking langsung dari API Shopee. */
+    /**
+     * Detail booking dari API Shopee.
+     * - Booking yang sudah tertaut order → get_order_detail (paling lengkap: alamat, item, resi).
+     * - Booking murni (belum ada order_sn) → get_booking_detail (booking_sn_list).
+     * Selalu dinormalisasi ke bentuk { order_list: [...] } agar UI seragam.
+     */
     public function detail(Store $store, string $bookingSn)
     {
         try {
@@ -110,17 +125,121 @@ class MarketplaceBookingController extends Controller
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
-            // get_booking_detail Shopee memakai order_sn; pakai order_sn bila ada.
-            $ref = $booking && $booking->order_sn ? $booking->order_sn : $bookingSn;
+            $orderSn = $booking?->order_sn;
+
+            if ($orderSn && method_exists($driver, 'getOrderDetail')) {
+                $res = $driver->getOrderDetail($store, [$orderSn]);
+                if (! empty($res['error'])) {
+                    return response()->json(['error' => $res['message'] ?? $res['error']], 400);
+                }
+                $list = $res['response']['order_list'] ?? [];
+                // Resi kurir ASLI (SPXID…) tidak ikut di get_order_detail — package_list hanya
+                // berisi package_number (OFG…). Ambil resi sebenarnya via get_tracking_number.
+                if (! empty($list) && method_exists($driver, 'getTrackingNumber')) {
+                    try {
+                        $trk    = $driver->getTrackingNumber($store, $orderSn);
+                        $realTn = $trk['response']['tracking_number'] ?? null;
+                        if ($realTn) {
+                            $list[0]['tracking_number'] = $realTn;
+                        }
+                    } catch (\Throwable $e) {
+                        // biarkan; resi bisa belum di-assign kurir
+                    }
+                }
+                return response()->json(['order_list' => $list]);
+            }
 
             if (! method_exists($driver, 'getBookingDetail')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
-            $res = $driver->getBookingDetail($store, $ref);
+            $res = $driver->getBookingDetail($store, $bookingSn);
             if (! empty($res['error'])) {
                 return response()->json(['error' => $res['message'] ?? $res['error']], 400);
             }
-            return response()->json($res['response'] ?? $res);
+            $list = $res['response']['booking_list'] ?? $res['response']['order_list'] ?? [];
+            if (! empty($list) && method_exists($driver, 'getBookingTrackingNumber')) {
+                try {
+                    $trk    = $driver->getBookingTrackingNumber($store, $bookingSn);
+                    $realTn = $trk['response']['tracking_number'] ?? null;
+                    if ($realTn) {
+                        $list[0]['tracking_number'] = $realTn;
+                    }
+                } catch (\Throwable $e) {
+                    // biarkan
+                }
+            }
+            return response()->json(['order_list' => $list]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Timeline pelacakan pengiriman booking (via order tertaut).
+     * Mengembalikan nomor resi asli + daftar riwayat status logistik.
+     */
+    public function tracking(Store $store, string $bookingSn)
+    {
+        try {
+            $driver  = $this->manager->driver($store);
+            $booking = MarketplaceBooking::where('store_id', $store->id)
+                ->where('booking_sn', $bookingSn)->first();
+            $orderSn = ($booking && $booking->order_sn) ? $booking->order_sn : null;
+
+            $tracking        = null;
+            $trackingInfo    = [];
+            $logisticsStatus = null;
+            $message         = null;
+
+            // 1) Timeline BOOKING — API paling tepat untuk Pesanan Kilat: pakai booking_sn
+            //    langsung, tidak butuh order_sn (get_booking_tracking_info).
+            if (method_exists($driver, 'getBookingTrackingInfo')) {
+                $res = $driver->getBookingTrackingInfo($store, $bookingSn);
+                if (empty($res['error'])) {
+                    $resp            = $res['response'] ?? [];
+                    $trackingInfo    = $resp['tracking_info'] ?? [];
+                    $logisticsStatus = $resp['logistics_status'] ?? null;
+                } else {
+                    $message = $res['message'] ?? $res['error'];
+                }
+            }
+
+            // 2) Nomor resi: coba resi booking dulu, lalu resi order (bila ada).
+            if (method_exists($driver, 'getBookingTrackingNumber')) {
+                try {
+                    $tracking = $driver->getBookingTrackingNumber($store, $bookingSn)['response']['tracking_number'] ?? null;
+                } catch (\Throwable $e) {
+                    // biarkan
+                }
+            }
+            if (! $tracking && $orderSn && method_exists($driver, 'getTrackingNumber')) {
+                try {
+                    $tracking = $driver->getTrackingNumber($store, $orderSn)['response']['tracking_number'] ?? null;
+                } catch (\Throwable $e) {
+                    // biarkan
+                }
+            }
+
+            // 3) Kalau timeline booking kosong tapi order tersedia → fallback timeline order.
+            if (empty($trackingInfo) && $orderSn && method_exists($driver, 'getTrackingInfo')) {
+                $res = $driver->getTrackingInfo($store, $orderSn);
+                if (empty($res['error'])) {
+                    $trackingInfo = $res['response']['tracking_info'] ?? [];
+                } elseif (! $message) {
+                    $message = $res['message'] ?? null;
+                }
+            }
+
+            if (empty($trackingInfo) && ! $message) {
+                $message = 'Belum ada riwayat pelacakan.';
+            }
+
+            return response()->json([
+                'tracking_number'  => $tracking,
+                'logistics_status' => $logisticsStatus,
+                'tracking_info'    => $trackingInfo,
+                'message'          => empty($trackingInfo) ? $message : null,
+            ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -153,24 +272,39 @@ class MarketplaceBookingController extends Controller
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 
-            // Terima pilihan pickup/dropoff dari UI (opsional).
+            // Terima pilihan pickup/dropoff dari UI. Kirim sebagai objek {} bukan array []
+            // (json_encode PHP mengubah array kosong jadi [] yang ditolak Shopee) — sama
+            // seperti arrangeShipment pada order.
             $params = [];
-            if ($request->filled('pickup')) {
-                $params['pickup'] = $request->input('pickup');
-            }
-            if ($request->filled('dropoff')) {
-                $params['dropoff'] = $request->input('dropoff');
+            foreach (['pickup', 'dropoff'] as $method) {
+                if ($request->has($method)) {
+                    $val = $request->input($method);
+                    if (is_array($val) && empty($val)) {
+                        $val = new \stdClass();
+                    }
+                    $params[$method] = $val;
+                }
             }
 
             $res = $driver->shipBooking($store, $bookingSn, $params);
+
+            // Toleransi: sebagian kuril instan/otomatis mengembalikan "already/unsupported"
+            // padahal sudah berhasil diatur — perlakukan sebagai sukses.
             if (! empty($res['error'])) {
-                return response()->json(['error' => $res['message'] ?? $res['error']], 400);
+                $err = (string) $res['error'];
+                $tolerable = str_contains($err, 'already')
+                    || str_contains($err, 'unsupported')
+                    || str_contains($err, 'status_invalid');
+                if (! $tolerable) {
+                    return response()->json(['error' => $res['message'] ?? $err], 400);
+                }
             }
 
-            // Coba tarik nomor resi terbaru & simpan ke DB.
+            // Coba tarik nomor resi terbaru & simpan ke DB (AWB Shopee asinkron → beri jeda).
             $tracking = null;
             if (method_exists($driver, 'getBookingTrackingNumber')) {
                 try {
+                    sleep(2);
                     $trk = $driver->getBookingTrackingNumber($store, $bookingSn);
                     $tracking = $trk['response']['tracking_number'] ?? null;
                 } catch (\Throwable $e) {

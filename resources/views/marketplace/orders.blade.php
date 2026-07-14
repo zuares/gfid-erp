@@ -793,6 +793,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
             <div id="subTabReadyContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
                 <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Diproses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
+                <button class="ord-subtab" data-sub="kilat" onclick="switchSubTabReady('kilat', this)">⚡ Pengiriman Kilat <span class="ord-badge bg-secondary" id="badge-sub-ready-kilat">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
             </div>
             <div id="subTabRrcContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
@@ -1988,8 +1989,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         const readyRows = filterByTab(rows, 'ready');
         let unpaidCount = 0;
         let processCount = 0;
+        let kilatCount = 0;
         readyRows.forEach(o => {
-            if (o.order_status === 'UNPAID') unpaidCount++;
+            if (o.is_kilat) kilatCount++;
+            else if (o.order_status === 'UNPAID') unpaidCount++;
             else processCount++;
         });
         const badgeSubReadyAll = $('badge-sub-ready-all');
@@ -1998,6 +2001,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (badgeSubReadyUnpaid) badgeSubReadyUnpaid.textContent = unpaidCount;
         const badgeSubReadyProcess = $('badge-sub-ready-process');
         if (badgeSubReadyProcess) badgeSubReadyProcess.textContent = processCount;
+        const badgeSubReadyKilat = $('badge-sub-ready-kilat');
+        if (badgeSubReadyKilat) badgeSubReadyKilat.textContent = kilatCount;
 
     }
 
@@ -2114,15 +2119,26 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 return carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
             };
 
+            // Kilat yang MASIH perlu diatur pengiriman (belum diatur / masih READY_TO_SHIP tanpa resi).
+            const kilatNeedsArrange = o => o.is_kilat && (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no));
+
             return rows.filter(o => {
                 if (tab === 'ready') {
+                    // Kilat yang BELUM diatur → tetap di "Perlu Dikirim" (sub Pengiriman Kilat).
+                    // Yang sudah diatur dipindah ke tab "Sedang Dikemas".
+                    if (o.is_kilat) return kilatNeedsArrange(o);
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';
                     const isNormalReady = o.order_status === 'READY_TO_SHIP' && !isInstant(o);
                     return isUnpaid || isNormalReady;
                 } else if (tab === 'processed') {
+                    // Kilat yang SUDAH diatur pengiriman (belum dikirim) → tab "Sedang Dikemas".
+                    if (o.is_kilat) {
+                        return !kilatNeedsArrange(o)
+                            && !['SHIPPED','TO_CONFIRM_RECEIVE','COMPLETED','CANCELLED','UNPAID'].includes(o.order_status);
+                    }
                     // Gabungan processed + ready_to_handover
-                    const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER' 
+                    const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER'
                         || (['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isPacked(o));
                     const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED' && !isInstant(o);
                     return isNormalProcessed || isReadyToHandover;
@@ -2295,6 +2311,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             let orderIdHtml = esc(o.channel_order_id || '—');
+            if (o.is_kilat) orderIdHtml = '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' + orderIdHtml;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
@@ -2538,6 +2555,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             let orderIdHtml = esc(o.channel_order_id || '—');
+            if (o.is_kilat) orderIdHtml = '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' + orderIdHtml;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
@@ -2680,8 +2698,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
         if (activeTab === 'ready' && subTabReady !== 'all') {
             rows = rows.filter(o => {
-                if (subTabReady === 'unpaid') return o.order_status === 'UNPAID';
-                if (subTabReady === 'process') return o.order_status !== 'UNPAID';
+                // Order kilat dipisahkan ke sub-tab "Pengiriman Kilat" (keluar dari yang lain).
+                if (subTabReady === 'kilat')   return o.is_kilat;
+                if (subTabReady === 'unpaid')  return o.order_status === 'UNPAID' && !o.is_kilat;
+                if (subTabReady === 'process') return o.order_status !== 'UNPAID' && !o.is_kilat;
                 return true;
             });
         }
@@ -2863,6 +2883,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             let orderIdHtml = esc(o.channel_order_id || '—');
+            if (o.is_kilat) orderIdHtml = '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' + orderIdHtml;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }

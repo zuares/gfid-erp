@@ -448,6 +448,14 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
+    /** Timeline pelacakan sebuah booking (get_booking_tracking_info, pakai booking_sn). */
+    public function getBookingTrackingInfo(Store $store, string $bookingSn): array
+    {
+        return $this->get($store, '/api/v2/logistics/get_booking_tracking_info', [
+            'booking_sn' => $bookingSn,
+        ]);
+    }
+
     public function shipOrder(Store $store, string $orderSn, array $params = []): array
     {
         // Parameter utama ship_order: order_sn, dan salah satu dari pickup/dropoff
@@ -458,6 +466,16 @@ class ShopeeChannel implements MarketplaceChannel
     public function getTrackingNumber(Store $store, string $orderSn): array
     {
         return $this->get($store, '/api/v2/logistics/get_tracking_number', ['order_sn' => $orderSn]);
+    }
+
+    /** Timeline pelacakan pengiriman (get_tracking_info). */
+    public function getTrackingInfo(Store $store, string $orderSn, ?string $packageNumber = null): array
+    {
+        $params = ['order_sn' => $orderSn];
+        if ($packageNumber) {
+            $params['package_number'] = $packageNumber;
+        }
+        return $this->get($store, '/api/v2/logistics/get_tracking_info', $params);
     }
 
     public function createShippingDocument(Store $store, array $orderSnList): array
