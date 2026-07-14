@@ -103,7 +103,7 @@
 
             <!-- Store Select -->
             <select id="storeSelect" class="form-select form-select-sm border bg-light rounded fw-medium px-3 shadow-sm" style="width: 150px; outline:none; box-shadow:none;">
-                <option value="">Pilih Toko...</option>
+                <option value="all">Semua Toko</option>
                 @foreach($stores as $store)
                     <option value="{{ $store->id }}">{{ $store->name }}</option>
                 @endforeach
@@ -111,10 +111,14 @@
 
             <!-- Refresh & Last Sync -->
             <span id="lastSyncTime" class="d-none d-md-inline" style="font-size: 0.75rem; color: #6c757d; margin-right: 0.5rem; align-self: center; font-weight: 500;"></span>
-            <button class="btn btn-sm btn-dark rounded shadow-sm" id="btnRefresh" onclick="fetchReturns()" disabled>
+            <button class="btn btn-sm btn-dark rounded shadow-sm" id="btnRefresh" title="Muat ulang dari database (cepat)" disabled>
                 <i class="bi bi-arrow-clockwise"></i>
             </button>
-            
+
+            <button class="btn btn-sm btn-success fw-medium rounded px-3 shadow-sm" id="btnSyncShopee" title="Tarik data terbaru dari Shopee lalu simpan ke database">
+                <i class="bi bi-cloud-arrow-down me-1"></i> Sinkron Shopee
+            </button>
+
             <button class="btn btn-sm btn-outline-primary fw-medium rounded px-3 shadow-sm" id="btnSyncHistorical" onclick="triggerHistoricalBackfill()" disabled>
                 <i class="bi bi-cloud-download me-1"></i> Tarik Histori
             </button>
@@ -164,18 +168,19 @@
             <table class="ret-table" id="returnsTable">
                 <thead>
                     <tr>
-                        <th class="ps-4">Tanggal</th>
-                        <th>Return & Order SN</th>
-                        <th>Tipe</th>
-                        <th>Alasan Retur</th>
+                        <th class="ps-4">Toko</th>
+                        <th>Tanggal</th>
+                        <th>No. Retur / Pesanan</th>
+                        <th>Produk</th>
+                        <th>Tipe & Alasan</th>
                         <th>Status</th>
-                        <th>Pengembalian</th>
+                        <th>Nilai</th>
                         <th class="text-center pe-4">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="returnsBody">
                     <tr>
-                        <td colspan="7" class="text-center py-5 text-muted">Silakan pilih toko terlebih dahulu.</td>
+                        <td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data dari semua toko...</div></td>
                     </tr>
                 </tbody>
             </table>
@@ -269,16 +274,25 @@
         return data;
     };
 
-    let selectedStoreId = '';
+    let selectedStoreId = 'all';
     let currentReturnSn = '';
     let currentPage = 0;
     let isLoading = false;
     let allReturnsData = [];
 
+    // Peta id → nama toko, untuk kolom "Toko" di tabel.
+    const STORE_NAMES = {};
+    @foreach($stores as $s)
+    STORE_NAMES[{{ $s->id }}] = @json($s->name);
+    @endforeach
+
     const storeSelect = document.getElementById('storeSelect');
     const btnRefresh = document.getElementById('btnRefresh');
     const tbody = document.getElementById('returnsBody');
     const dateRangeEl = document.getElementById('dateRange');
+
+    // Set default store selection to 'all'
+    storeSelect.value = 'all';
 
     // Init Flatpickr untuk rentang 15 hari ke belakang (inklusif = -14 hari kalender)
     const today = new Date();
@@ -308,15 +322,25 @@
 
     storeSelect.addEventListener('change', function() {
         selectedStoreId = this.value;
-        btnSyncHistorical.disabled = !selectedStoreId;
+        btnSyncHistorical.disabled = !selectedStoreId || selectedStoreId === 'all';
         currentPage = 0;
         fetchReturns(true, false);
     });
 
+    // Refresh = muat ulang dari DATABASE saja (instan, tanpa panggil Shopee).
     btnRefresh.addEventListener('click', function() {
         currentPage = 0;
-        fetchReturns(true, true);
+        fetchReturns(true, false);
     });
+
+    // Sinkron Shopee = tarik data terbaru dari Shopee → simpan ke DB → muat ulang.
+    const btnSyncShopee = document.getElementById('btnSyncShopee');
+    if (btnSyncShopee) {
+        btnSyncShopee.addEventListener('click', function() {
+            currentPage = 0;
+            fetchReturns(true, true);
+        });
+    }
 
     let searchTimeout = null;
     const searchInput = document.getElementById('searchInput');
@@ -356,10 +380,12 @@
     async function fetchReturns(reset = false, forceSync = false) {
         if (isLoading) return;
         isLoading = true;
-        btnRefresh.disabled = true;        
+        btnRefresh.disabled = true;
+        const _btnSync = document.getElementById('btnSyncShopee');
+        if (_btnSync) _btnSync.disabled = true;
 
         if (reset) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data...</div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data...</div></td></tr>`;
             allReturnsData = [];
         }
 
@@ -386,7 +412,7 @@
 
             // Update teks loading jika manual refresh
             if (reset && forceSync) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Menarik data langsung dari server Shopee...</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Menarik data langsung dari server Shopee...</div></td></tr>`;
             }
 
             // Sinkronisasi paksa jika tombol Refresh ditekan
@@ -405,8 +431,12 @@
             const returnType = document.querySelector('input[name="returnType"]:checked')?.value || 'return';
             const searchQuery = document.getElementById('searchInput').value.trim();
 
-            const promises = storesToFetch.map(sId => 
-                api(`/api/marketplace/stores/${sId}/returns/list?page_no=${currentPage}&page_size=40&create_time_from=${tsFrom}&create_time_to=${tsTo}&type=${returnType}&search=${encodeURIComponent(searchQuery)}`)
+            // Baca semua baris dalam rentang sekaligus (data dari DB lokal, jumlahnya kecil).
+            // Menghindari bug paginasi lintas-toko: offset yang sama diterapkan ke tiap toko
+            // lalu digabung, sehingga baris bisa terlewat/lompat. Dengan sekali muat penuh,
+            // gabungan antar-toko sudah benar dan diurutkan di klien.
+            const promises = storesToFetch.map(sId =>
+                api(`/api/marketplace/stores/${sId}/returns/list?page_no=0&page_size=1000&create_time_from=${tsFrom}&create_time_to=${tsTo}&type=${returnType}&search=${encodeURIComponent(searchQuery)}`)
                 .then(res => {
                     if (res && res.return) {
                         res.return.forEach(r => r.store_id = sId);
@@ -425,19 +455,32 @@
             });
 
             allReturnsData = reset ? newReturns : allReturnsData.concat(newReturns);
+
+            // Jaring pengaman anti-duplikat: satu return_sn hanya boleh muncul sekali
+            // (jaga-jaga bila ada jalur yang menggabungkan data dua kali).
+            const seenReturns = new Set();
+            allReturnsData = allReturnsData.filter(r => {
+                const key = r.return_sn || (r.store_id + '|' + r.order_sn);
+                if (seenReturns.has(key)) return false;
+                seenReturns.add(key);
+                return true;
+            });
+
             allReturnsData.sort((a, b) => b.create_time - a.create_time);
 
             renderTable(hasMore);
 
         } catch (e) {
             if (reset) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Gagal mengambil data retur: ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Gagal mengambil data retur: ${e.message}</td></tr>`;
             } else {
                 alert('Gagal mengambil data lebih lanjut: ' + e.message);
             }
         } finally {
             isLoading = false;
             btnRefresh.disabled = false;
+            const _btnSyncDone = document.getElementById('btnSyncShopee');
+            if (_btnSyncDone) _btnSyncDone.disabled = false;
             updateLastSyncTime();
         }
     }
@@ -472,7 +515,7 @@
         document.getElementById('kpiValue').innerText = 'Rp ' + totalValue.toLocaleString('id-ID');
 
         if (allReturnsData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted">Saat ini tidak ada data retur. Semua aman! 🎉</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Saat ini tidak ada data retur. Semua aman! 🎉</td></tr>';
             return;
         }
 
@@ -489,12 +532,16 @@
             if (r.item && r.item.length > 0) {
                 itemsHtml = '<div class="d-flex flex-column gap-1">';
                 r.item.forEach(itm => {
-                    const sku = itm.item_sku || itm.variation_sku || '';
-                    const skuBadge = sku ? `<span class="badge bg-light text-dark border me-1">${sku}</span>` : '';
+                    // Tampilkan item_sku DAN variation_sku bila keduanya ada, agar dua varian
+                    // dari produk yang sama (item_sku sama, variation_sku beda) tidak terlihat
+                    // seperti item kembar.
+                    const skuText = [itm.item_sku, itm.variation_sku].filter(Boolean).join(' / ');
+                    const skuBadge = skuText ? `<span class="badge bg-light text-dark border me-1">${skuText}</span>` : '';
+                    const itemLabel = itm.variation_name || itm.internal_name || itm.item_name || itm.variation_sku || itm.item_sku || 'Item';
                     itemsHtml += `<div class="d-flex align-items-center gap-2">
                         <img src="${itm.images && itm.images.length ? itm.images[0] : ''}" style="width:30px; height:30px; object-fit:cover; border-radius:4px;" onerror="this.style.display='none'">
                         <div>
-                            <div class="small fw-semibold text-wrap" style="max-width:200px; line-height: 1.3;">${itm.internal_name || itm.variation_name || itm.item_name || 'Item'}</div>
+                            <div class="small fw-semibold text-wrap" style="max-width:200px; line-height: 1.3;">${itemLabel}</div>
                             <div class="small text-muted mt-1">${skuBadge} Qty: ${itm.return_item_quantity || 1}</div>
                         </div>
                     </div>`;
@@ -526,17 +573,26 @@
                 day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
             }) : '—';
 
+            const storeName = STORE_NAMES[r.store_id] || ('Toko #' + r.store_id);
+            const reasonText = r.reason_text_code || r.reason || '';
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="ps-4 text-muted small"><i class="bi bi-calendar3 me-1"></i>${createDate}</td>
+                <td class="ps-4">
+                    <span class="badge bg-dark-subtle text-dark-emphasis border fw-semibold"><i class="bi bi-shop me-1"></i>${storeName}</span>
+                </td>
+                <td class="text-muted small text-nowrap"><i class="bi bi-calendar3 me-1"></i>${createDate}</td>
                 <td>
                     <div class="fw-semibold text-primary mb-1">${r.return_sn}</div>
                     <div class="small text-muted"><i class="bi bi-box-seam me-1"></i>${r.order_sn}</div>
                 </td>
-                <td>${typeBadge}</td>
-                <td>${r.reason_text_code || r.reason || '—'}</td>
+                <td>${itemsHtml || '<span class="text-muted small">—</span>'}</td>
+                <td>
+                    ${typeBadge}
+                    ${reasonText ? `<div class="small text-muted mt-1">${reasonText}</div>` : ''}
+                </td>
                 <td class="text-center align-middle">${cleanStatus}</td>
-                <td class="fw-bold">Rp ${Number(r.amount_before_discount || 0).toLocaleString('id-ID')}</td>
+                <td class="fw-bold text-nowrap">Rp ${Number(r.amount_before_discount || 0).toLocaleString('id-ID')}</td>
                 <td class="text-center pe-4">${btnHtml}</td>
             `;
             tbody.appendChild(tr);
@@ -545,7 +601,7 @@
         if (hasMore) {
             const trMore = document.createElement('tr');
             trMore.innerHTML = `
-                <td colspan="7" class="text-center py-3 bg-light">
+                <td colspan="8" class="text-center py-3 bg-light">
                     <button class="btn btn-sm btn-outline-primary fw-bold" onclick="loadMore()">Muat Lebih Banyak</button>
                 </td>
             `;

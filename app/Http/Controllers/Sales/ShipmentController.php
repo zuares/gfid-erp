@@ -564,6 +564,13 @@ class ShipmentController extends Controller
 
         $shipment->load(['store', 'lines.item.category', 'creator', 'invoice']);
 
+        // Hitung kekurangan stok secara live agar panel tetap muncul saat reload
+        // dan otomatis hilang begitu stok/qty sudah beres.
+        $warehouse = $this->whRts();
+        $stockInsufficient = $warehouse
+            ? $this->checkStockSufficiency($shipment, $warehouse)
+            : [];
+
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
 
@@ -575,7 +582,7 @@ class ShipmentController extends Controller
             'posted'  => Shipment::whereDate('created_at', $today)->where('status', 'posted')->count(),
         ];
 
-        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'kpi'));
+        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'kpi', 'stockInsufficient'));
     }
 
 
@@ -887,6 +894,7 @@ class ShipmentController extends Controller
                     'total_qty' => $result['total_qty'],
                     'total_lines' => $result['total_lines'],
                 ],
+                'stock_insufficient' => $this->stockInsufficientPayload($shipment),
             ]);
         }
 
@@ -934,6 +942,21 @@ class ShipmentController extends Controller
         }
 
         return $errors;
+    }
+
+    /**
+     * Payload kekurangan stok WH-RTS untuk response AJAX (dipakai scan/ubah/hapus baris),
+     * supaya panel "Stok WH-RTS tidak mencukupi" bisa diupdate live tanpa reload.
+     */
+    protected function stockInsufficientPayload(Shipment $shipment): array
+    {
+        $warehouse = $this->whRts();
+        if (!$warehouse) {
+            return [];
+        }
+
+        $shipment->load('lines.item');
+        return $this->checkStockSufficiency($shipment, $warehouse);
     }
 
     /**
@@ -1274,6 +1297,7 @@ class ShipmentController extends Controller
                 'status' => 'ok',
                 'message' => 'Semua baris berhasil dibersihkan.',
                 'totals' => ['total_qty' => 0, 'total_lines' => 0],
+                'stock_insufficient' => [],
             ]);
         }
 
@@ -1321,6 +1345,7 @@ class ShipmentController extends Controller
                 'status' => 'ok',
                 'message' => 'Baris berhasil dihapus.',
                 'totals' => ['total_qty' => $totalQty, 'total_lines' => $totalLines],
+                'stock_insufficient' => $this->stockInsufficientPayload($shipment),
             ]);
         }
 
@@ -1392,6 +1417,7 @@ class ShipmentController extends Controller
                 'deleted' => $qty === 0,
                 'qty' => $qty,
                 'totals' => ['total_qty' => $totalQty, 'total_lines' => $totalLines],
+                'stock_insufficient' => $this->stockInsufficientPayload($shipment),
             ]);
         }
 

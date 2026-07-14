@@ -43,18 +43,25 @@ class SyncMarketplaceReturns implements ShouldQueue
             // Untuk fullSync kita pecah ~12 bulan ke belakang menjadi jendela 15 hari,
             // sehingga seluruh riwayat masuk DB tanpa terbentur batas rentang tanggal.
             // Karena penyimpanan pakai updateOrCreate(return_sn), data TIDAK terduplikat.
-            $windows = [];
+            $span = 15 * 86400;
             if ($this->fullSync) {
                 $end   = time();
                 $start = strtotime('-12 months', $end);
-                $span  = 15 * 86400;
+            } else {
+                $end   = $this->createTimeTo ?? time();
+                $start = $this->createTimeFrom ?? ($end - (14 * 86400));
+            }
+
+            // Selalu pecah rentang menjadi jendela <=15 hari — bukan hanya saat fullSync.
+            // Ini mencegah error batas rentang Shopee saat user memilih rentang lebar
+            // di tombol Refresh (mis. 30/90 hari). Karena upsert(return_sn), tidak duplikat.
+            $windows = [];
+            if ($end <= $start) {
+                $windows[] = [$start, max($start, $end)];
+            } else {
                 for ($s = $start; $s < $end; $s += $span) {
                     $windows[] = [$s, min($s + $span - 1, $end)];
                 }
-            } else {
-                $tsTo   = $this->createTimeTo ?? time();
-                $tsFrom = $this->createTimeFrom ?? ($tsTo - (14 * 86400));
-                $windows[] = [$tsFrom, $tsTo];
             }
 
             $syncFloor = $windows[0][0] ?? null; // batas bawah waktu yang sudah dicakup
@@ -102,7 +109,11 @@ class SyncMarketplaceReturns implements ShouldQueue
                     try {
                         $detailResult = $driver->getReturnDetail($this->store, $oldReturn->return_sn);
                         if (!isset($detailResult['error']) && isset($detailResult['response'])) {
-                            $this->processReturn($detailResult['response']);
+                            // Hanya perbarui header (status dsb). Item TIDAK di-resync dari
+                            // payload detail karena bentuk field item-nya berbeda dari list
+                            // (model_sku/model_name/amount) — kalau dipaksa bisa membuat
+                            // baris item duplikat ber-SKU null. Item sudah tersimpan dari sync list.
+                            $this->processReturn($detailResult['response'], false);
                         }
                     } catch (\Exception $e) {
                         Log::warning("Failed to fetch detail for old return {$oldReturn->return_sn}: " . $e->getMessage());
@@ -115,7 +126,7 @@ class SyncMarketplaceReturns implements ShouldQueue
         }
     }
 
-    protected function processReturn(array $data)
+    protected function processReturn(array $data, bool $syncItems = true)
     {
         $returnSn = $data['return_sn'] ?? null;
         if (!$returnSn) return;
@@ -139,7 +150,7 @@ class SyncMarketplaceReturns implements ShouldQueue
             ]
         );
 
-        if (isset($data['item']) && is_array($data['item'])) {
+        if ($syncItems && isset($data['item']) && is_array($data['item'])) {
             // Kita bisa sinkronisasi ulang item-itemnya
             $existingItemIds = [];
             foreach ($data['item'] as $itm) {
@@ -152,15 +163,18 @@ class SyncMarketplaceReturns implements ShouldQueue
                     }
                 }
 
+                // Kunci upsert sejajar dengan unique index DB
+                // (marketplace_return_id, item_sku, variation_sku) — item_name dipindah
+                // ke nilai agar perubahan nama produk tidak memunculkan baris duplikat.
                 $retItem = MarketplaceReturnItem::updateOrCreate(
                     [
                         'marketplace_return_id' => $returnObj->id,
                         'item_sku' => $itm['item_sku'] ?? null,
                         'variation_sku' => $itm['variation_sku'] ?? null,
-                        'item_name' => $itm['item_name'] ?? null,
                     ],
                     [
                         'item_id' => $internalItemId,
+                        'item_name' => $itm['item_name'] ?? null,
                         'variation_name' => $itm['variation_name'] ?? null,
                         'return_item_quantity' => $itm['return_item_quantity'] ?? 1,
                         'images' => isset($itm['images']) && is_array($itm['images']) ? $itm['images'] : null,

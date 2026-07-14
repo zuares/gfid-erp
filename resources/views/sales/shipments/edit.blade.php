@@ -401,36 +401,60 @@ body[data-theme="dark"] .shp-scan-error {
    STOCK ERROR PANEL
 ══════════════════════════════════════════════════ */
 .shp-error-panel {
-    border-radius: 16px;
-    border: 1.5px solid rgba(245,158,11,.38);
-    background: rgba(255,251,235,.96);
-    color: #78350f;
-    padding: 1.1rem 1.35rem;
+    border-radius: 14px;
+    border: 1px solid rgba(244,63,94,.16);
+    background: rgba(255,244,246,.85);
+    color: #9f1239;
+    padding: .85rem 1rem;
     margin-top: .85rem;
 }
 body[data-theme="dark"] .shp-error-panel {
-    background: rgba(69,26,3,.7);
-    border-color: rgba(245,158,11,.5);
-    color: #fef3c7;
+    background: rgba(76,5,25,.45);
+    border-color: rgba(244,63,94,.32);
+    color: #fecdd3;
 }
-.shp-error-title { font-weight: 900; font-size: 1rem; }
-.shp-error-copy { font-size: .85rem; line-height: 1.5; }
-.shp-error-list { margin: .45rem 0 0; padding-left: 1.15rem; }
-.shp-error-list li { margin-bottom: .25rem; font-size: .83rem; }
-.shp-stock-table-wrap {
-    overflow: hidden;
-    border-radius: 12px;
-    border: 1px solid rgba(245,158,11,.22);
-    margin-top: .9rem;
+.shp-error-head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
 }
-.shp-stock-table-wrap table { margin-bottom: 0; }
-.shp-stock-table-wrap th {
-    font-size: .67rem; text-transform: uppercase; letter-spacing: .06em;
-    color: #92400e; background: rgba(254,243,199,.8);
+.shp-error-dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    background: #f43f5e; flex: 0 0 auto;
+    box-shadow: 0 0 0 4px rgba(244,63,94,.14);
 }
-body[data-theme="dark"] .shp-stock-table-wrap th {
-    background: rgba(120,53,15,.65); color: #fde68a;
+.shp-error-title { font-weight: 700; font-size: .9rem; letter-spacing: .01em; }
+.shp-error-count {
+    margin-left: auto;
+    font-size: .72rem; font-weight: 600;
+    padding: .15rem .55rem; border-radius: 999px;
+    background: rgba(244,63,94,.12); color: #e11d48;
 }
+body[data-theme="dark"] .shp-error-count { background: rgba(244,63,94,.22); color: #fda4af; }
+.shp-lack-list { margin-top: .6rem; display: flex; flex-direction: column; gap: .2rem; }
+.shp-lack-row {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .32rem .55rem; border-radius: 9px;
+    background: rgba(255,255,255,.55);
+}
+body[data-theme="dark"] .shp-lack-row { background: rgba(255,255,255,.05); }
+.shp-lack-code {
+    font-family: monospace; font-weight: 700; font-size: .8rem;
+    letter-spacing: .03em; flex: 0 0 auto;
+}
+.shp-lack-name {
+    font-size: .8rem; color: #9f5768; opacity: .85;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1 1 auto; min-width: 0;
+}
+body[data-theme="dark"] .shp-lack-name { color: #fda4af; }
+.shp-lack-chip {
+    flex: 0 0 auto;
+    font-size: .74rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    padding: .1rem .5rem; border-radius: 999px;
+    background: rgba(244,63,94,.14); color: #e11d48;
+}
+body[data-theme="dark"] .shp-lack-chip { background: rgba(244,63,94,.26); color: #fecdd3; }
 
 /* ══════════════════════════════════════════════════
    ITEMS TABLE CARD
@@ -1183,7 +1207,9 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     $totalQty          = $shipment->lines->sum('qty_scanned');
     $totalLines        = $shipment->lines->count();
     $lastScannedLineId = $shipment->lines()->latest('updated_at')->value('id');
-    $stockInsufficient = collect(session('stock_insufficient', []));
+    // Utamakan hasil hitung live dari controller (persist saat reload, hilang saat resolved);
+    // fallback ke flash session bila tidak tersedia.
+    $stockInsufficient = collect($stockInsufficient ?? session('stock_insufficient', []));
     $hasStockError     = $stockInsufficient->isNotEmpty();
 
     $storeName = $shipment->store->name ?? '';
@@ -1334,42 +1360,26 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     </div>
 
     {{-- ═════════════════ STOCK ERROR ═════════════════ --}}
+    <div id="stockErrorMount">
     @if ($hasStockError)
         <div class="shp-error-panel">
-            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                <div class="shp-error-title">Stok WH-RTS tidak mencukupi</div>
-                <span class="shp-pill">Kurang: <b>{{ $stockInsufficient->count() }} barang</b></span>
+            <div class="shp-error-head">
+                <span class="shp-error-dot"></span>
+                <span class="shp-error-title">Stok belum cukup</span>
+                <span class="shp-error-count">{{ $stockInsufficient->count() }} item</span>
             </div>
-            <ul class="shp-error-list shp-error-copy mt-2">
-                <li>Retur belum masuk WH-RTS, atau GRN belum diposting</li>
-                <li>Qty yang discan melebihi stok yang tersedia</li>
-                <li>Kurangi qty item yang bermasalah, lalu lanjutkan alur lagi</li>
-            </ul>
-            <div class="shp-stock-table-wrap">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Kode</th><th>Nama</th>
-                            <th class="text-end">Stok RTS</th>
-                            <th class="text-end">Perlu</th>
-                            <th class="text-end">Kurang</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($stockInsufficient as $row)
-                            <tr>
-                                <td class="fw-bold font-monospace">{{ $row['code'] ?? '-' }}</td>
-                                <td>{{ $row['name'] ?? '-' }}</td>
-                                <td class="text-end">{{ number_format((int)($row['stock'] ?? 0), 0, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format((int)($row['needed'] ?? 0), 0, ',', '.') }}</td>
-                                <td class="text-end fw-bold text-danger">{{ number_format((int)($row['short'] ?? 0), 0, ',', '.') }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            <div class="shp-lack-list">
+                @foreach ($stockInsufficient as $row)
+                    <div class="shp-lack-row">
+                        <span class="shp-lack-code">{{ $row['code'] ?? '-' }}</span>
+                        <span class="shp-lack-name">{{ $row['name'] ?? '-' }}</span>
+                        <span class="shp-lack-chip">−{{ number_format((int)($row['short'] ?? 0), 0, ',', '.') }}</span>
+                    </div>
+                @endforeach
             </div>
         </div>
     @endif
+    </div>
 
     {{-- ═════════════════ ITEMS TABLE CARD ═════════════════ --}}
     <div class="shp-table-card">
@@ -1866,6 +1876,37 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         }
     }
 
+    /* ── stock-error panel live update ── */
+    const stockErrorMount = document.getElementById('stockErrorMount');
+    function renderStockPanel(list) {
+        if (!stockErrorMount) return;
+        if (!Array.isArray(list) || list.length === 0) {
+            stockErrorMount.innerHTML = '';
+            return;
+        }
+        const rows = list.map(r => `
+            <div class="shp-lack-row">
+                <span class="shp-lack-code">${escPrint(r.code ?? '-')}</span>
+                <span class="shp-lack-name">${escPrint(r.name ?? '-')}</span>
+                <span class="shp-lack-chip">−${FMT.format(Number(r.short ?? 0))}</span>
+            </div>`).join('');
+        stockErrorMount.innerHTML = `
+            <div class="shp-error-panel">
+                <div class="shp-error-head">
+                    <span class="shp-error-dot"></span>
+                    <span class="shp-error-title">Stok belum cukup</span>
+                    <span class="shp-error-count">${list.length} item</span>
+                </div>
+                <div class="shp-lack-list">${rows}</div>
+            </div>`;
+    }
+
+    function maybeRenderStockPanel(data) {
+        if (data && typeof data.stock_insufficient !== 'undefined') {
+            renderStockPanel(data.stock_insufficient);
+        }
+    }
+
     function syncRekonButton(totalLines) {
         if (!rekonBtn) return;
         const count = parseInt(totalLines ?? summaryLines?.textContent ?? '0', 10) || 0;
@@ -1954,6 +1995,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     form.classList.add('d-none'); qtyEl.classList.remove('d-none');
                 }
                 updateTotals(data.totals);
+                maybeRenderStockPanel(data);
                 showToast('ok', data.message || 'Qty diperbarui.');
                 focusScan();
             }).catch(() => form.submit());
@@ -1989,6 +2031,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 if (row) row.remove();
                 renumberRows();
                 updateTotals(data.totals);
+                maybeRenderStockPanel(data);
                 showToast('ok', data.message || 'Baris dihapus.');
                 focusScan();
             }).catch(() => form.submit());
@@ -2255,6 +2298,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 bumpScanCount();
                 const line   = data.line;
                 const totals = data.totals || {};
+                maybeRenderStockPanel(data);
 
                 if (line && line.id) {
                     syncPickingLine(line);

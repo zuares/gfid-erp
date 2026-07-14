@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('status')->nullable()->index();
             $table->string('reason')->nullable();
             $table->string('reason_text_code')->nullable();
-            $table->tinyInteger('return_solution')->nullable()->comment('1: Refund Saja, 2: Retur & Refund');
+            $table->tinyInteger('return_solution')->nullable()->comment('Shopee: 0 = RETURN_REFUND (Retur & Refund), 1 = REFUND (Refund saja)');
             $table->decimal('amount_before_discount', 15, 2)->default(0);
             $table->boolean('needs_logistics')->default(false);
             $table->string('tracking_number')->nullable()->index();

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Store;
 use App\Models\Channel;
+use App\Models\MarketplaceReturn;
+use App\Models\MarketplaceOrder;
 use App\Services\Channels\ChannelManager;
 
 class MarketplaceReturnController extends Controller
@@ -18,7 +20,15 @@ class MarketplaceReturnController extends Controller
 
     public function index(Request $request)
     {
-        $stores = Store::with('channel')->get();
+        // Hanya toko Shopee aktif yang sudah terkoneksi (punya access_token).
+        // Menghindari loop sync/list ke toko non-Shopee / nonaktif / tanpa token.
+        $stores = Store::with('channel')
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->get()
+            ->filter(fn ($s) => ! blank($s->credential('access_token')))
+            ->values();
+
         return view('marketplace.returns', compact('stores'));
     }
 
@@ -151,9 +161,16 @@ class MarketplaceReturnController extends Controller
                                 }
                                 $seen[$sn] = true;
 
-                                $solution     = strtoupper((string) ($r['return_solution'] ?? ''));
-                                // RETURN_REFUND = barang dikembalikan (Retur); REFUND/REFUND_ONLY = refund saja
-                                $isRefundOnly = str_contains($solution, 'REFUND') && ! str_contains($solution, 'RETURN');
+                                // Shopee get_return_list mengirim return_solution sebagai INTEGER
+                                // (0 = RETURN_REFUND / barang dikembalikan, 1 = REFUND / refund saja).
+                                // Sebagian endpoint lawas bisa mengirim string, jadi tangani keduanya.
+                                $rawSolution = $r['return_solution'] ?? null;
+                                if (is_numeric($rawSolution)) {
+                                    $isRefundOnly = ((int) $rawSolution) === 1;
+                                } else {
+                                    $sol          = strtoupper((string) $rawSolution);
+                                    $isRefundOnly = str_contains($sol, 'REFUND') && ! str_contains($sol, 'RETURN');
+                                }
 
                                 if ($type === 'refund' && ! $isRefundOnly) {
                                     continue;
@@ -467,6 +484,16 @@ class MarketplaceReturnController extends Controller
                 $q->with('item:id,code,name');
             }])->where('store_id', $store->id);
 
+            // Pisahkan Retur vs Refund (konsisten dengan storedRrc()).
+            // Shopee: return_solution 1 = REFUND (refund saja), 0/2 = RETURN_REFUND (retur).
+            if ($type === 'refund') {
+                $query->where('return_solution', 1);
+            } elseif ($type === 'return') {
+                $query->where(function ($w) {
+                    $w->where('return_solution', '!=', 1)->orWhereNull('return_solution');
+                });
+            }
+
             if (!empty($search)) {
                 $query->where(function($q) use ($search) {
                     $q->where('return_sn', 'like', "%{$search}%")
@@ -594,6 +621,20 @@ class MarketplaceReturnController extends Controller
             $driver = $this->manager->driver($store);
             if (!method_exists($driver, 'confirmReturn')) {
                 return response()->json(['error' => 'Not supported on this channel'], 400);
+            }
+
+            // 0. Idempoten: kalau draf retur untuk return_sn ini sudah pernah dibuat,
+            //    jangan konfirmasi ulang ke Shopee & jangan bikin draf ganda —
+            //    langsung arahkan ke draf yang sudah ada.
+            $existing = \App\Models\ShipmentReturn::where('store_id', $store->id)
+                ->where('notes', 'like', '%Return SN: ' . $returnSn . '%')
+                ->first();
+            if ($existing) {
+                return response()->json([
+                    'success'      => true,
+                    'message'      => 'Retur ini sudah pernah dikonfirmasi. Membuka draf retur yang sudah ada.',
+                    'redirect_url' => route('shipment_returns.edit', $existing->id),
+                ]);
             }
 
             // 1. Confirm directly to marketplace
