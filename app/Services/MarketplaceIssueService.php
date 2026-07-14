@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\Item;
+use App\Models\MarketplaceBooking;
+use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\ProductNameSkuMapping;
 use App\Models\SkuMapping;
 
 class MarketplaceIssueService
@@ -36,9 +39,16 @@ class MarketplaceIssueService
         ?string $modelSku,
         ?string $itemSku,
         ?string $externalSku,
-        ?string $channelCode
+        ?string $channelCode,
+        ?string $itemName = null,
+        ?string $variantName = null
     ): array {
         $sku = $modelSku ?? $itemSku ?? $externalSku ?? null;
+
+        // ── 0. SKU kosong → coba auto-fill dari mapping nama produk+variant ─
+        if (empty($sku)) {
+            $sku = $this->autoFillSkuFromNameMapping($itemName, $variantName, $channelCode);
+        }
 
         // ── 1. SKU kosong ────────────────────────────────────────────────────
         if (empty($sku)) {
@@ -110,6 +120,15 @@ class MarketplaceIssueService
             ?? $item->item_sku
             ?? $item->external_sku
             ?? null;
+
+        // SKU kosong → coba auto-fill dari mapping nama produk+variant
+        // (hasil perbaikan manual sebelumnya di Data Perlu Diperbaiki)
+        if (empty($sku)) {
+            $sku = $this->autoFillSkuFromNameMapping($item->item_name, $item->variant_name, $channelCode);
+            if ($sku) {
+                $item->update(['model_sku' => $sku, 'marketplace_sku' => $sku]);
+            }
+        }
 
         if (empty($sku)) {
             $item->update([
@@ -195,6 +214,62 @@ class MarketplaceIssueService
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Auto-fill SKU kosong dari mapping nama produk + variant
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Cari SKU untuk produk+variant yang SKU-nya kosong.
+     *   1. Cek tabel product_name_sku_mappings (hasil perbaikan manual).
+     *   2. Fallback: cari order item lama dengan nama+variant identik yang
+     *      sudah punya SKU & ter-mapping — lalu simpan ke tabel supaya
+     *      lookup berikutnya cepat.
+     */
+    private function autoFillSkuFromNameMapping(
+        ?string $itemName,
+        ?string $variantName,
+        ?string $channelCode
+    ): ?string {
+        if (empty(trim((string) $itemName))) {
+            return null;
+        }
+
+        // 1. Tabel mapping nama → SKU
+        $sku = ProductNameSkuMapping::resolveSku($itemName, $variantName, $channelCode);
+        if ($sku) {
+            return $sku;
+        }
+
+        // 2. Fallback: data historis yang sudah pernah diperbaiki / ter-mapping
+        $previous = MarketplaceOrderItem::where('item_name', $itemName)
+            ->where(function ($q) use ($variantName) {
+                if (empty($variantName)) {
+                    $q->whereNull('variant_name')->orWhere('variant_name', '');
+                } else {
+                    $q->where('variant_name', $variantName);
+                }
+            })
+            ->whereNotNull('marketplace_sku')
+            ->where('marketplace_sku', '!=', '')
+            ->where('mapping_status', self::MAPPING_MAPPED)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($previous) {
+            ProductNameSkuMapping::remember(
+                $itemName,
+                $variantName,
+                $channelCode,
+                $previous->marketplace_sku,
+                'Auto-learned dari order item lama yang sudah ter-mapping'
+            );
+
+            return $previous->marketplace_sku;
+        }
+
+        return null;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Quick actions (dipakai dari Data Perlu Diperbaiki)
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -212,6 +287,16 @@ class MarketplaceIssueService
 
         $item->update(['model_sku' => $sku, 'marketplace_sku' => $sku]);
         $this->resolveItem($item->fresh(), $channelCode);
+
+        // Ingat mapping nama produk+variant → SKU, supaya order berikutnya
+        // dengan produk & variant yang sama otomatis terisi SKU ini.
+        ProductNameSkuMapping::remember(
+            $item->item_name,
+            $item->variant_name,
+            $channelCode,
+            $sku,
+            'Diisi manual dari Data Perlu Diperbaiki'
+        );
 
         $affected = 1;
 
@@ -468,6 +553,223 @@ class MarketplaceIssueService
         });
 
         return ['updated' => $updated, 'errors' => $errors];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Pesanan Kilat (booking) — item yang belum ter-mapping ikut masuk Issues
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Booking kilat yang BELUM punya order lokal (belum MATCHED / belum
+     * di-backfill) — item-nya hanya ada sebagai JSON di marketplace_bookings,
+     * jadi tidak lewat pipeline MarketplaceOrderItem. Method ini mengevaluasi
+     * item tersebut secara live agar tetap muncul di Data Perlu Diperbaiki.
+     *
+     * $tab: all|sku_empty|mapping_not_found|missing_hpp
+     */
+    public function bookingIssueRows(?int $storeId = null, ?string $q = null, string $tab = 'all'): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
+            return [];
+        }
+
+        $bookings = MarketplaceBooking::with('store.channel')
+            ->whereNotNull('items')
+            ->whereNotIn('booking_status', ['CANCELLED', 'IN_CANCEL'])
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->orderByDesc('create_time')
+            ->limit(300)
+            ->get();
+
+        if ($bookings->isEmpty()) {
+            return [];
+        }
+
+        // Booking yang sudah punya order lokal → item-nya sudah lewat pipeline
+        // normal (muncul sebagai MarketplaceOrderItem), skip agar tidak dobel.
+        $sns = $bookings->map(fn ($b) => $b->order_sn ?: $b->booking_sn)->filter()->values();
+        $knownSns = MarketplaceOrder::where(function ($query) use ($sns) {
+                $query->whereIn('channel_order_id', $sns)
+                      ->orWhereIn('external_order_id', $sns);
+            })
+            ->get(['channel_order_id', 'external_order_id'])
+            ->flatMap(fn ($o) => [$o->channel_order_id, $o->external_order_id])
+            ->filter()->flip();
+
+        $rows = [];
+
+        foreach ($bookings as $booking) {
+            $sn = $booking->order_sn ?: $booking->booking_sn;
+            if ($sn && $knownSns->has($sn)) {
+                continue;
+            }
+
+            $channelCode = $booking->store?->channel?->code;
+            $items       = is_array($booking->items) ? $booking->items : [];
+
+            foreach ($items as $idx => $item) {
+                $itemName    = $item['item_name'] ?? null;
+                $variantName = $item['model_name'] ?? null;
+
+                $attrs = $this->buildMappingAttributes(
+                    modelSku:    $item['model_sku'] ?? null,
+                    itemSku:     $item['item_sku']  ?? null,
+                    externalSku: null,
+                    channelCode: $channelCode,
+                    itemName:    $itemName,
+                    variantName: $variantName,
+                );
+
+                // Hanya tampilkan yang bermasalah
+                if (($attrs['data_status'] ?? null) !== self::DATA_INCOMPLETE) {
+                    continue;
+                }
+
+                $issue = $attrs['issue_reason'];
+
+                $match = match ($tab) {
+                    'sku_empty'         => $issue === self::MAPPING_SKU_EMPTY,
+                    'mapping_not_found' => $issue === self::MAPPING_NOT_FOUND,
+                    'missing_hpp'       => $issue === self::COST_MISSING_HPP,
+                    'all'               => true,
+                    default             => false,
+                };
+                if (! $match) {
+                    continue;
+                }
+
+                // Search filter
+                if ($q) {
+                    $haystack = mb_strtolower(implode(' ', array_filter([
+                        $itemName, $variantName, $attrs['marketplace_sku'],
+                        $booking->booking_sn, $booking->order_sn,
+                    ])));
+                    if (! str_contains($haystack, mb_strtolower($q))) {
+                        continue;
+                    }
+                }
+
+                $internalItem = $attrs['internal_item_id'] ? Item::find($attrs['internal_item_id']) : null;
+
+                $rows[] = [
+                    'id'                 => 'b' . $booking->id . '_' . $idx,
+                    'is_booking'         => true,
+                    'booking_id'         => $booking->id,
+                    'item_index'         => $idx,
+                    'order_id'           => null,
+                    'order_number'       => $sn,
+                    'ordered_at'         => $booking->create_time
+                        ? \Carbon\Carbon::createFromTimestamp($booking->create_time)->toIso8601String()
+                        : optional($booking->created_at)->toIso8601String(),
+                    'store_name'         => $booking->store?->name,
+                    'channel_code'       => $channelCode,
+                    'item_name'          => $itemName,
+                    'variant_name'       => $variantName,
+                    'marketplace_sku'    => $attrs['marketplace_sku'],
+                    'qty'                => (int) ($item['quantity'] ?? $item['model_quantity_purchased'] ?? 1),
+                    'mapping_status'     => $attrs['mapping_status'],
+                    'cost_status'        => $attrs['cost_status'],
+                    'profit_status'      => $attrs['profit_status'],
+                    'data_status'        => $attrs['data_status'],
+                    'issue_reason'       => $issue,
+                    'internal_item_id'   => $attrs['internal_item_id'],
+                    'internal_item_name' => $internalItem?->name,
+                    'internal_item_code' => $internalItem?->code,
+                    'hpp_current'        => $internalItem ? (float) ($internalItem->base_unit_cost ?: $internalItem->hpp ?: 0) : 0,
+                    'hpp_snapshot'       => $attrs['hpp_snapshot'],
+                    'recommended_item'   => null,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    /** Ringkasan jumlah issue dari booking kilat (untuk digabung ke KPI). */
+    public function bookingIssueSummary(?int $storeId = null): array
+    {
+        $counts = ['sku_empty' => 0, 'mapping_not_found' => 0, 'missing_hpp' => 0, 'total_issues' => 0];
+
+        foreach ($this->bookingIssueRows($storeId) as $row) {
+            $counts['total_issues']++;
+            match ($row['issue_reason']) {
+                self::MAPPING_SKU_EMPTY => $counts['sku_empty']++,
+                self::MAPPING_NOT_FOUND => $counts['mapping_not_found']++,
+                self::COST_MISSING_HPP  => $counts['missing_hpp']++,
+                default                 => null,
+            };
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Isi SKU untuk satu item booking kilat (item tersimpan sebagai JSON).
+     * Juga menyimpan mapping nama→SKU supaya order/booking lain otomatis terisi.
+     */
+    public function fillBookingItemSku(MarketplaceBooking $booking, int $index, string $sku): array
+    {
+        $sku = trim($sku);
+        if ($sku === '') {
+            throw new \InvalidArgumentException('SKU tidak boleh kosong.');
+        }
+
+        $items = is_array($booking->items) ? $booking->items : [];
+        if (! array_key_exists($index, $items)) {
+            throw new \InvalidArgumentException('Item booking tidak ditemukan.');
+        }
+
+        $items[$index]['model_sku'] = $sku;
+        $booking->update(['items' => $items]);
+
+        $channelCode = $booking->store?->channel?->code;
+
+        ProductNameSkuMapping::remember(
+            $items[$index]['item_name'] ?? null,
+            $items[$index]['model_name'] ?? null,
+            $channelCode,
+            $sku,
+            'Diisi manual dari Data Perlu Diperbaiki (Pesanan Kilat)'
+        );
+
+        return ['affected' => 1];
+    }
+
+    /**
+     * Mapping SKU item booking kilat ke item internal (buat SkuMapping).
+     */
+    public function mapBookingItemSku(MarketplaceBooking $booking, int $index, int $internalItemId): array
+    {
+        $items = is_array($booking->items) ? $booking->items : [];
+        if (! array_key_exists($index, $items)) {
+            throw new \InvalidArgumentException('Item booking tidak ditemukan.');
+        }
+
+        $sku = $items[$index]['model_sku'] ?? $items[$index]['item_sku'] ?? null;
+        if (empty($sku)) {
+            throw new \InvalidArgumentException('Item ini tidak punya marketplace SKU — isi SKU dulu.');
+        }
+
+        if (! Item::find($internalItemId)) {
+            throw new \InvalidArgumentException("Item internal #{$internalItemId} tidak ditemukan.");
+        }
+
+        $channelCode = $booking->store?->channel?->code;
+
+        SkuMapping::updateOrCreate(
+            ['marketplace_sku' => $sku, 'channel_code' => $channelCode],
+            ['item_id' => $internalItemId]
+        );
+
+        ProductNameSkuMapping::remember(
+            $items[$index]['item_name'] ?? null,
+            $items[$index]['model_name'] ?? null,
+            $channelCode,
+            $sku,
+            'Mapping dari Data Perlu Diperbaiki (Pesanan Kilat)'
+        );
+
+        return ['affected' => 1];
     }
 
     // ─────────────────────────────────────────────────────────────────────────

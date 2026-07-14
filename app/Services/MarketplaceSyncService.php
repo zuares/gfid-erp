@@ -624,6 +624,8 @@ class MarketplaceSyncService
                             itemSku:     $item['item_sku']  ?? null,
                             externalSku: null,
                             channelCode: $store->channel?->code,
+                            itemName:    $item['item_name'] ?? null,
+                            variantName: $item['model_name'] ?? null,
                         );
                         if ($mappingAttrs['mapping_status'] === 'marketplace_sku_empty') $outerStats['sku_empty']++;
                         if ($mappingAttrs['mapping_status'] === 'mapping_not_found')     $outerStats['mapping_not_found']++;
@@ -718,6 +720,8 @@ class MarketplaceSyncService
                         itemSku:     $item['item_sku']  ?? null,
                         externalSku: null,
                         channelCode: $channelCode,
+                        itemName:    $item['item_name'] ?? null,
+                        variantName: $item['model_name'] ?? null,
                     );
                     
                     // Proteksi HPP manual override

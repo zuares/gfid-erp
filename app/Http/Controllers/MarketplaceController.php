@@ -1789,11 +1789,30 @@ class MarketplaceController extends Controller
             ];
         });
 
+        // ── Pesanan Kilat (booking tanpa order lokal) — sisipkan di halaman 1 ──
+        $bookingRows = [];
+        if ($page === 1 && in_array($tab, ['all', 'sku_empty', 'mapping_not_found', 'missing_hpp'], true)) {
+            $bookingRows = $this->issueService->bookingIssueRows(
+                $storeId ? (int) $storeId : null, $q ?: null, $tab
+            );
+
+            // Filter tanggal (booking pakai create_time → ordered_at ISO string)
+            if ($dateFrom || $dateTo) {
+                $bookingRows = array_values(array_filter($bookingRows, function ($r) use ($dateFrom, $dateTo) {
+                    if (! $r['ordered_at']) return false;
+                    $t = \Carbon\Carbon::parse($r['ordered_at']);
+                    if ($dateFrom && $t->lt(\Carbon\Carbon::parse($dateFrom)->startOfDay())) return false;
+                    if ($dateTo   && $t->gt(\Carbon\Carbon::parse($dateTo)->endOfDay()))   return false;
+                    return true;
+                }));
+            }
+        }
+
         return response()->json([
-            'data'         => $items->items(),
+            'data'         => array_merge($bookingRows, $items->items()),
             'current_page' => $paginator->currentPage(),
             'last_page'    => $paginator->lastPage(),
-            'total'        => $paginator->total(),
+            'total'        => $paginator->total() + count($bookingRows),
             'per_page'     => $perPage,
         ]);
     }

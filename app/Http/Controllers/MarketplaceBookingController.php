@@ -319,6 +319,11 @@ class MarketplaceBookingController extends Controller
                     'tracking_number' => $tracking,
                 ]));
 
+            // Setelah diatur: lengkapi order_sn (booking → MATCHED) dan tarik order-nya
+            // ke marketplace_orders, supaya halaman Orders menampilkan NOMOR PESANAN
+            // (bukan nomor booking) di tab Sedang Dikemas dan seterusnya.
+            $this->promoteBookingToOrder($store, $bookingSn);
+
             return response()->json([
                 'success'         => true,
                 'message'         => 'Pengiriman kilat berhasil diatur.',
@@ -326,6 +331,58 @@ class MarketplaceBookingController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Lengkapi order_sn booking (dari get_booking_detail) lalu tarik order-nya ke
+     * marketplace_orders bila belum ada. Dipanggil setelah arrange sukses — dengan
+     * begitu baris pseudo-booking di halaman Orders otomatis digantikan baris order
+     * asli bernomor pesanan. Kegagalan di sini tidak menggagalkan proses arrange.
+     */
+    protected function promoteBookingToOrder(Store $store, string $bookingSn): void
+    {
+        try {
+            $booking = MarketplaceBooking::where('store_id', $store->id)
+                ->where('booking_sn', $bookingSn)->first();
+            if (! $booking) {
+                return;
+            }
+
+            $driver = $this->manager->driver($store);
+
+            // order_sn belum tercatat → ambil dari get_booking_detail (muncul saat MATCHED).
+            if (blank($booking->order_sn) && method_exists($driver, 'getBookingDetail')) {
+                $det  = $driver->getBookingDetail($store, $bookingSn);
+                $list = $det['response']['booking_list'] ?? $det['response']['order_list'] ?? [];
+                $d    = collect($list)->firstWhere('booking_sn', $bookingSn) ?? ($list[0] ?? null);
+                if (! empty($d['order_sn'])) {
+                    $booking->order_sn = $d['order_sn'];
+                    $booking->save();
+                }
+            }
+
+            if (blank($booking->order_sn)) {
+                return; // belum MATCHED — nanti dilengkapi webhook/sync per jam.
+            }
+
+            // Order lokal belum ada → backfill via detail order.
+            $exists = \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)
+                ->orWhere('external_order_id', $booking->order_sn)
+                ->exists();
+            if (! $exists) {
+                app(\App\Services\MarketplaceSyncService::class)->syncOrdersBySn($store, [$booking->order_sn]);
+            }
+
+            // Tautkan booking_sn ke order lokal.
+            \App\Models\MarketplaceOrder::where('store_id', $store->id)
+                ->where('channel_order_id', $booking->order_sn)
+                ->whereNull('booking_sn')
+                ->update(['booking_sn' => $bookingSn]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                "promoteBookingToOrder [{$store->id}] {$bookingSn}: " . $e->getMessage()
+            );
         }
     }
 }
