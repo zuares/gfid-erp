@@ -635,6 +635,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="checkBookingList(${s.id}, '${esc(s.name)}')"><i class="bi bi-list-check text-primary me-2"></i>Tes API: get_booking_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
                             <li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>
