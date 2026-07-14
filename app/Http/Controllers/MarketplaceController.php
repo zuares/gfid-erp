@@ -703,25 +703,28 @@ class MarketplaceController extends Controller
         // order_sn milik Pesanan Kilat (punya booking) — untuk penanda is_kilat, sekaligus
         // supaya order kilat tetap ikut ditarik walau lebih lama dari 200 order terbaru.
         // Guard hasTable agar Orders tidak error bila migration booking belum jalan di server.
-        $kilatKeys = [];
+        // Cocokkan hanya via order_sn (unik global) — JANGAN pakai store_id, karena record
+        // booking & order bisa tersimpan di store_id lokal berbeda sehingga match gagal.
+        $kilatKeys = [];      // key: order_sn => true
         $kilatOrderSns = [];
         if (\Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
-            foreach (
-                \App\Models\MarketplaceBooking::whereNotNull('order_sn')->where('order_sn', '!=', '')
-                    ->get(['store_id', 'order_sn']) as $b
-            ) {
-                $kilatKeys[$b->store_id . '|' . $b->order_sn] = true;
-                $kilatOrderSns[$b->order_sn] = true;
+            $kilatOrderSns = \App\Models\MarketplaceBooking::whereNotNull('order_sn')->where('order_sn', '!=', '')
+                ->pluck('order_sn')->unique()->values()->all();
+            foreach ($kilatOrderSns as $sn) {
+                $kilatKeys[$sn] = true;
             }
-            $kilatOrderSns = array_keys($kilatOrderSns);
         }
 
         $orders = MarketplaceOrder::with($with)->latest('ordered_at')->limit(200)->get();
 
         // Sertakan order kilat yang TIDAK masuk 200 terbaru (mis. booking MATCHED yang lama).
+        // Cocokkan channel_order_id ATAU external_order_id (sebagian toko simpan order_sn di sana).
         if (! empty($kilatOrderSns)) {
             $extra = MarketplaceOrder::with($with)
-                ->whereIn('channel_order_id', $kilatOrderSns)
+                ->where(function ($q) use ($kilatOrderSns) {
+                    $q->whereIn('channel_order_id', $kilatOrderSns)
+                      ->orWhereIn('external_order_id', $kilatOrderSns);
+                })
                 ->whereNotIn('id', $orders->pluck('id')->all())
                 ->latest('ordered_at')
                 ->limit(300)
@@ -737,7 +740,7 @@ class MarketplaceController extends Controller
             // Instan dideteksi dari nama kurir, ditangani di tab "Instan" tersendiri.
             $carrier   = strtolower((string) $o->shipping_carrier);
             $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');
-            $arr['is_kilat']               = isset($kilatKeys[$o->store_id . '|' . $o->channel_order_id]) && ! $isInstant;
+            $arr['is_kilat']               = (isset($kilatKeys[$o->channel_order_id]) || isset($kilatKeys[$o->external_order_id])) && ! $isInstant;
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
             $arr['print_count']            = $o->print_count ?? 0;
