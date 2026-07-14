@@ -689,30 +689,46 @@ class MarketplaceController extends Controller
             ? 'id,marketplace_order_id,status,scan_log'
             : 'id,marketplace_order_id,status';
 
-        $orders = MarketplaceOrder::with([
-                'store.channel',
-                'items',
-                'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
-                'fulfillment:' . $fulfillmentSelect,
-                'fulfillment.lines',
-                'fulfillment.lines.item:id,code,name',
-                'fulfillment.lines.splitChildren',
-                'fulfillment.lines.splitChildren.item:id,code,name',
-            ])
-            ->latest('ordered_at')
-            ->limit(200)
-            ->get();
+        $with = [
+            'store.channel',
+            'items',
+            'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
+            'fulfillment:' . $fulfillmentSelect,
+            'fulfillment.lines',
+            'fulfillment.lines.item:id,code,name',
+            'fulfillment.lines.splitChildren',
+            'fulfillment.lines.splitChildren.item:id,code,name',
+        ];
 
-        // Tandai order yang termasuk "Pesanan Kilat" (punya booking) — cocokkan per store + order_sn.
-        // Di-scope ke order yang sedang ditampilkan saja (ringan) + guard bila tabel booking
-        // belum ada di server (mis. migration belum jalan) supaya halaman Orders tidak error.
+        // order_sn milik Pesanan Kilat (punya booking) — untuk penanda is_kilat, sekaligus
+        // supaya order kilat tetap ikut ditarik walau lebih lama dari 200 order terbaru.
+        // Guard hasTable agar Orders tidak error bila migration booking belum jalan di server.
         $kilatKeys = [];
-        $orderSns = $orders->pluck('channel_order_id')->filter()->values()->all();
-        if (! empty($orderSns) && \Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
-            $kilatKeys = \App\Models\MarketplaceBooking::whereIn('order_sn', $orderSns)
-                ->get(['store_id', 'order_sn'])
-                ->mapWithKeys(fn ($b) => [$b->store_id . '|' . $b->order_sn => true])
-                ->all();
+        $kilatOrderSns = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
+            foreach (
+                \App\Models\MarketplaceBooking::whereNotNull('order_sn')->where('order_sn', '!=', '')
+                    ->get(['store_id', 'order_sn']) as $b
+            ) {
+                $kilatKeys[$b->store_id . '|' . $b->order_sn] = true;
+                $kilatOrderSns[$b->order_sn] = true;
+            }
+            $kilatOrderSns = array_keys($kilatOrderSns);
+        }
+
+        $orders = MarketplaceOrder::with($with)->latest('ordered_at')->limit(200)->get();
+
+        // Sertakan order kilat yang TIDAK masuk 200 terbaru (mis. booking MATCHED yang lama).
+        if (! empty($kilatOrderSns)) {
+            $extra = MarketplaceOrder::with($with)
+                ->whereIn('channel_order_id', $kilatOrderSns)
+                ->whereNotIn('id', $orders->pluck('id')->all())
+                ->latest('ordered_at')
+                ->limit(300)
+                ->get();
+            if ($extra->isNotEmpty()) {
+                $orders = $orders->concat($extra)->sortByDesc('ordered_at')->values();
+            }
         }
 
         return response()->json($orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
