@@ -27,6 +27,12 @@ class Kernel extends ConsoleKernel
         $schedule->command('marketplace:sync-orders')
                  ->hourly()
                  ->withoutOverlapping();
+
+        // Cron Job: Tarik data Pesanan Kilat (booking) + enrichment order_sn setiap jam.
+        // withoutOverlapping mencegah dua sync menulis bersamaan (kurangi "database is locked").
+        $schedule->command('marketplace:sync-bookings')
+                 ->hourly()
+                 ->withoutOverlapping();
     }
 
     protected function commands(): void
