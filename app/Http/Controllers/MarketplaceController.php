@@ -733,7 +733,11 @@ class MarketplaceController extends Controller
 
         return response()->json($orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
             $arr = $o->toArray();
-            $arr['is_kilat']               = isset($kilatKeys[$o->store_id . '|' . $o->channel_order_id]);
+            // Kilat = punya booking DAN BUKAN Instan (same-day). Keduanya berbeda:
+            // Instan dideteksi dari nama kurir, ditangani di tab "Instan" tersendiri.
+            $carrier   = strtolower((string) $o->shipping_carrier);
+            $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');
+            $arr['is_kilat']               = isset($kilatKeys[$o->store_id . '|' . $o->channel_order_id]) && ! $isInstant;
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
             $arr['print_count']            = $o->print_count ?? 0;

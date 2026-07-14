@@ -1090,12 +1090,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     const getSearch = () => ($('filterSearch').value || '').toLowerCase().trim();
 
     // Status order yang dianggap "aktif" (perlu proses / sedang packing)
-    const ACTIVE_ORDER_STATUSES = ['READY_TO_SHIP', 'PROCESSED'];
+    const ACTIVE_ORDER_STATUSES = ['READY_TO_SHIP', 'MATCHED', 'PROCESSED'];
 
     const TAB_STATUSES = {
         all:        null,
         unpaid:     ['UNPAID'],
-        ready:      ['READY_TO_SHIP'],
+        ready:      ['READY_TO_SHIP', 'MATCHED'],
         processed:  ['PROCESSED'],
         shipped:    ['SHIPPED', 'TO_CONFIRM_RECEIVE'],
         completed:  ['COMPLETED'],
@@ -2130,19 +2130,14 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
             return rows.filter(o => {
                 if (tab === 'ready') {
-                    // SEMUA Pesanan Kilat masuk "Perlu Dikirim" → tampil di sub ⚡ Pengiriman Kilat
-                    // (satu tempat untuk semua kilat, apa pun statusnya).
-                    if (o.is_kilat) return true;
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';
-                    const isNormalReady = o.order_status === 'READY_TO_SHIP' && !isInstant(o);
+                    const isNormalReady = ['READY_TO_SHIP', 'MATCHED'].includes(o.order_status) && !isInstant(o);
                     return isUnpaid || isNormalReady;
                 } else if (tab === 'processed') {
-                    // Kilat tidak ditaruh di sini — semua kilat sudah ada di sub Pengiriman Kilat.
-                    if (o.is_kilat) return false;
                     // Gabungan processed + ready_to_handover
                     const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER'
-                        || (['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isPacked(o));
+                        || (['READY_TO_SHIP', 'PROCESSED', 'MATCHED'].includes(o.order_status) && isPacked(o));
                     const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED' && !isInstant(o);
                     return isNormalProcessed || isReadyToHandover;
                 } else if (tab === 'processed_instant') {
@@ -2650,6 +2645,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             return `<div class="pk-row ${isPrinted ? 'row-printed' : ''}">
                 <div class="pk-row-left">
                     <div class="pk-order-id">
+                        ${o.is_kilat ? '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' : ''}
                         ${esc(o.channel_order_id || '—')}
                         ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; margin-left:8px; font-weight:600; padding:2px 6px; background:#d1fae5; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                     </div>
