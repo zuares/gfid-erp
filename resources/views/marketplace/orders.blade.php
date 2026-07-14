@@ -2933,7 +2933,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             const orderIdContent = `
-                <div class="ord-id">${esc(o.channel_order_id || '—')}</div>
+                <div class="ord-id">${orderIdHtml}</div>
                 <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
                     ${perluKirimBadge}
