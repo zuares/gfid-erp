@@ -93,6 +93,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/analytics',  [MarketplaceController::class, 'analytics'])->name('marketplace.analytics');
     Route::get('/marketplace/issues',      [MarketplaceController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
+    Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');
 });
 
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -200,6 +201,15 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/returns/{returnSn}/detail', [\App\Http\Controllers\MarketplaceReturnController::class, 'getReturnDetail']);
     Route::get('/stores/{store}/returns/{returnSn}/tracking', [\App\Http\Controllers\MarketplaceReturnController::class, 'getTracking']);
     Route::post('/stores/{store}/returns/{returnSn}/confirm', [\App\Http\Controllers\MarketplaceReturnController::class, 'confirmAndRestock'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+    // Pesanan Kilat (Booking) Module
+    Route::get('/bookings/stored', [\App\Http\Controllers\MarketplaceBookingController::class, 'stored']);
+    Route::post('/bookings/sync-all', [\App\Http\Controllers\MarketplaceBookingController::class, 'syncAll'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/stores/{store}/bookings/{bookingSn}/detail', [\App\Http\Controllers\MarketplaceBookingController::class, 'detail']);
+    Route::get('/stores/{store}/bookings/{bookingSn}/shipping-parameter', [\App\Http\Controllers\MarketplaceBookingController::class, 'shippingParameter']);
+    Route::post('/stores/{store}/bookings/{bookingSn}/ship', [\App\Http\Controllers\MarketplaceBookingController::class, 'ship'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/ads-analytics',                     [MarketplaceController::class, 'adsAnalytics']);
     Route::get('/stores/{store}/ads-balance',           [MarketplaceController::class, 'adsBalance']);

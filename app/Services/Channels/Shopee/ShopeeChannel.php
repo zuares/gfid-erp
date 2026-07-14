@@ -396,10 +396,12 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
-    public function getBookingDetail(Store $store, string $orderSn): array
+    public function getBookingDetail(Store $store, string $bookingSn): array
     {
+        // Shopee get_booking_detail memakai booking_sn_list (bukan order_sn).
         return $this->get($store, '/api/v2/order/get_booking_detail', [
-            'order_sn' => $orderSn
+            'booking_sn_list' => $bookingSn,
+            'response_optional_fields' => 'item_list,cancel_by,cancel_reason,fulfillment_flag,pickup_done_time,shipping_carrier,recipient_address,dropshipper,dropshipper_phone',
         ]);
     }
 
@@ -419,6 +421,31 @@ class ShopeeChannel implements MarketplaceChannel
             $params['booking_status'] = $bookingStatus;
         }
         return $this->get($store, '/api/v2/order/get_booking_list', $params);
+    }
+
+    // ─── Booking / Pesanan Kilat: pengiriman ──────────────────────────────────
+
+    /** Parameter pengiriman untuk booking (pickup/dropoff yang tersedia). */
+    public function getBookingShippingParameter(Store $store, string $bookingSn): array
+    {
+        return $this->get($store, '/api/v2/logistics/get_booking_shipping_parameter', [
+            'booking_sn' => $bookingSn,
+        ]);
+    }
+
+    /** Atur pengiriman booking. $params berisi salah satu dari pickup / dropoff. */
+    public function shipBooking(Store $store, string $bookingSn, array $params = []): array
+    {
+        $body = array_merge(['booking_sn' => $bookingSn], $params);
+        return $this->post($store, '/api/v2/logistics/ship_booking', $body);
+    }
+
+    /** Ambil nomor resi (tracking number) sebuah booking. */
+    public function getBookingTrackingNumber(Store $store, string $bookingSn): array
+    {
+        return $this->get($store, '/api/v2/logistics/get_booking_tracking_number', [
+            'booking_sn' => $bookingSn,
+        ]);
     }
 
     public function shipOrder(Store $store, string $orderSn, array $params = []): array

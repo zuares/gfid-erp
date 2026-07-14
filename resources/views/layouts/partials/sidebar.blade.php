@@ -284,6 +284,7 @@
     $openMarketplaceTools =
         $open('marketplace.toko') ||
         $open('marketplace.returns') ||
+        $open('marketplace.kilat') ||
         $open('marketplace.settings') ||
         $open('marketplace.orders') ||
         $open('marketplace.orders.*') ||
@@ -1462,6 +1463,11 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.returns') }}" icon="bi bi-arrow-return-left"
                                 :active="request()->routeIs('marketplace.returns')">
                                 Retur
+                            </x-sidebar.sub-link>
+
+                            <x-sidebar.sub-link href="{{ route('marketplace.kilat') }}" icon="bi bi-lightning-charge"
+                                :active="request()->routeIs('marketplace.kilat')">
+                                Pesanan Kilat
                             </x-sidebar.sub-link>
 
                             <x-sidebar.sub-link href="{{ route('marketplace.settings') }}" icon="bi bi-gear"

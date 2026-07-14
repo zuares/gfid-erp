@@ -72,6 +72,7 @@ class WebhookController extends Controller
                     case 25: $eventType = 'booking_shipping_document_status_update'; break;
                     case 29: $eventType = 'return_updates_push'; break;
                     case 30: $eventType = 'package_fulfillment_status_update'; break;
+                    case 37: $eventType = 'courier_delivery_binding_status_update'; break;
                     case 47: $eventType = 'package_info_push'; break;
                     default: $eventType = 'code_' . $payload['code'];
                 }

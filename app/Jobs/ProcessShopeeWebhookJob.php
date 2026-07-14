@@ -84,6 +84,8 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             $this->handleReturnUpdatesPush();
         } elseif ($this->eventType === 'package_info_push') {
             $this->handlePackageInfoPush();
+        } elseif ($this->eventType === 'courier_delivery_binding_status_update') {
+            $this->handleCourierDeliveryBindingStatusUpdate();
         } elseif ($this->eventType === 'item_update') {
             $this->handleItemUpdate();
         } else {
@@ -313,6 +315,13 @@ class ProcessShopeeWebhookJob implements ShouldQueue
 
         if (!$store) return;
 
+        // Simpan/masukkan booking ke tabel bookings (sumber kebenaran Pesanan Kilat).
+        // Dibuat walau order_sn belum ada — inilah kasus booking murni / kilat.
+        \App\Models\MarketplaceBooking::updateOrCreate(
+            ['store_id' => $store->id, 'booking_sn' => $bookingSn],
+            ['booking_status' => $bookingStatus]
+        );
+
         // Try to find by order_sn (since usually booking_sn is ordersn, or we sync it)
         $localOrder = MarketplaceOrder::where('channel_order_id', $bookingSn)
             ->where('store_id', $store->id)
@@ -355,6 +364,13 @@ class ProcessShopeeWebhookJob implements ShouldQueue
 
         if (!$store) return;
 
+        // Simpan nomor resi ke tabel bookings — TERPISAH dari booking_sn (tidak lagi
+        // menimpa identitas booking). Ini yang benar untuk Pesanan Kilat.
+        \App\Models\MarketplaceBooking::updateOrCreate(
+            ['store_id' => $store->id, 'booking_sn' => $bookingSn],
+            ['tracking_number' => $trackingNo]
+        );
+
         $localOrder = MarketplaceOrder::where('channel_order_id', $bookingSn)
             ->where('store_id', $store->id)
             ->first();
@@ -394,6 +410,12 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ->first();
 
         if (!$store) return;
+
+        // Simpan status dokumen kirim booking ke tabel bookings.
+        \App\Models\MarketplaceBooking::updateOrCreate(
+            ['store_id' => $store->id, 'booking_sn' => $bookingSn],
+            ['shipping_document_status' => $status]
+        );
 
         $localOrder = MarketplaceOrder::where('channel_order_id', $bookingSn)
             ->where('store_id', $store->id)
@@ -629,6 +651,60 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             } catch (\Exception $e) {
                 Log::error("Failed to sync missing order {$orderSn}: " . $e->getMessage());
             }
+        }
+    }
+
+    /**
+     * Handle courier_delivery_binding_status_push (Code 37)
+     */
+    protected function handleCourierDeliveryBindingStatusUpdate()
+    {
+        $data = $this->payload['data'] ?? [];
+        $trackingNo = $data['first_mile_tracking_number'] ?? null;
+        $status = $data['status'] ?? null; // e.g., ORDER_RECEIVED, PICKED_UP, CANCELED
+        $shopId = $this->payload['shop_id'] ?? null;
+
+        if (!$trackingNo || !$status || !$shopId) {
+            return;
+        }
+
+        $store = Store::where('external_shop_id', (string)$shopId)
+            ->whereHas('channel', function($q) {
+                $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
+            })
+            ->first();
+
+        if (!$store) return;
+
+        // Find booking by tracking number
+        $booking = \App\Models\MarketplaceBooking::where('store_id', $store->id)
+            ->where('tracking_number', $trackingNo)
+            ->first();
+
+        // Also check if there is an order that has this tracking number as booking_sn
+        $localOrder = MarketplaceOrder::where('store_id', $store->id)
+            ->where('booking_sn', $trackingNo)
+            ->first();
+
+        // If neither found, we can't reliably update anything since we don't know the order_sn
+        if (!$booking && !$localOrder) {
+            Log::info("Tracking number {$trackingNo} not found locally during courier_delivery_binding_status_update.");
+            return;
+        }
+
+        if ($booking) {
+            $meta = $booking->meta ?? [];
+            $meta['courier_status'] = $status;
+            $booking->update(['meta' => $meta]);
+        }
+
+        if ($localOrder) {
+            $meta = $localOrder->meta ?? [];
+            $meta['courier_status'] = $status;
+            $localOrder->update(['meta' => $meta]);
+            Log::info("Updated local order for tracking {$trackingNo} courier_status to: {$status}");
+            
+            event(new \App\Events\OrderUpdated($store->id, $localOrder->channel_order_id, $localOrder->order_status));
         }
     }
 
