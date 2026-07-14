@@ -2106,6 +2106,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         </div>`;
     }
 
+    // Kilat yang MASIH perlu diatur pengiriman (belum diatur / READY_TO_SHIP tanpa resi).
+    // Dipakai untuk memilih tombol aksi: yang sudah diatur TIDAK menampilkan "Atur Pengiriman".
+    function kilatNeedsArrange(o) {
+        return o.is_kilat && (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no));
+    }
+
     // ── Table ─────────────────────────────────────────────────────────────
     function filterByTab(rows, tab) {
         if (tab === 'issues') return rows.filter(TAB_FILTERS.issues);
@@ -2122,24 +2128,18 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 return carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
             };
 
-            // Kilat yang MASIH perlu diatur pengiriman (belum diatur / masih READY_TO_SHIP tanpa resi).
-            const kilatNeedsArrange = o => o.is_kilat && (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no));
-
             return rows.filter(o => {
                 if (tab === 'ready') {
-                    // Kilat yang BELUM diatur → tetap di "Perlu Dikirim" (sub Pengiriman Kilat).
-                    // Yang sudah diatur dipindah ke tab "Sedang Dikemas".
-                    if (o.is_kilat) return kilatNeedsArrange(o);
+                    // SEMUA Pesanan Kilat masuk "Perlu Dikirim" → tampil di sub ⚡ Pengiriman Kilat
+                    // (satu tempat untuk semua kilat, apa pun statusnya).
+                    if (o.is_kilat) return true;
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';
                     const isNormalReady = o.order_status === 'READY_TO_SHIP' && !isInstant(o);
                     return isUnpaid || isNormalReady;
                 } else if (tab === 'processed') {
-                    // Kilat yang SUDAH diatur pengiriman (belum dikirim) → tab "Sedang Dikemas".
-                    if (o.is_kilat) {
-                        return !kilatNeedsArrange(o)
-                            && !['SHIPPED','TO_CONFIRM_RECEIVE','COMPLETED','CANCELLED','UNPAID'].includes(o.order_status);
-                    }
+                    // Kilat tidak ditaruh di sini — semua kilat sudah ada di sub Pengiriman Kilat.
+                    if (o.is_kilat) return false;
                     // Gabungan processed + ready_to_handover
                     const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER'
                         || (['READY_TO_SHIP', 'PROCESSED'].includes(o.order_status) && isPacked(o));
@@ -2207,6 +2207,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (activeTab === 'ready') {
                 if (o.order_status === 'UNPAID') {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                } else if (o.is_kilat && !kilatNeedsArrange(o)) {
+                    // Kilat yang sudah diatur/terkirim: jangan tampilkan "Atur Pengiriman" (akan error).
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
                 } else {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 }
@@ -2482,10 +2485,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             let logisticsBtn = '';
 
             // Logistics Buttons
-            if (o.order_status === 'READY_TO_SHIP') {
+            if (o.order_status === 'READY_TO_SHIP' && !(o.is_kilat && !kilatNeedsArrange(o))) {
                 logisticsBtn = `<button class="btn-review" style="background:#fef9c3;color:#854d0e;border-color:#fef08a"
                     onclick="openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Kirim</button>`;
-            } else if (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
+            } else if (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED' || (o.is_kilat && !kilatNeedsArrange(o))) {
                 logisticsBtn = `<button class="btn-review" style="background:#f1f5f9;color:#475569;border-color:#e2e8f0"
                     onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
             }
