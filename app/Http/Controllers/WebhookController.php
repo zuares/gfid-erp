@@ -82,6 +82,20 @@ class WebhookController extends Controller
                 $eventType = 'type_' . $payload['type'];
             }
             
+            // Booking push (Pesanan Kilat): deteksi dari bentuk payload, bukan hanya kode.
+            // Sample di docs Shopee menunjukkan code bisa 3/4 (sama dengan push order),
+            // jadi keberadaan data.booking_sn adalah penanda paling andal.
+            if (isset($payload['data']['booking_sn'])) {
+                if (isset($payload['data']['tracking_number'])) {
+                    $eventType = 'booking_trackingno_update';      // push code 24
+                } elseif (isset($payload['data']['booking_status'])) {
+                    $eventType = 'booking_status_update';          // push code 23
+                } elseif (isset($payload['data']['status'])) {
+                    // Field push code 25 bernama "status" (READY/FAILED) sesuai docs.
+                    $eventType = 'booking_shipping_document_status_update';
+                }
+            }
+
             // Just for debugging, try to figure out what type of push it is
             if (isset($payload['data']['ordersn'])) {
                 $eventType = 'order_status_update';

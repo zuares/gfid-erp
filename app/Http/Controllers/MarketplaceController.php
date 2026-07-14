@@ -878,18 +878,23 @@ class MarketplaceController extends Controller
                 ->filter()->flip();
 
             $pureBookings = \App\Models\MarketplaceBooking::with('store.channel')
-                ->whereIn('booking_status', ['PENDING', 'READY_TO_SHIP'])
+                ->whereIn('booking_status', ['PENDING', 'READY_TO_SHIP', 'PROCESSED'])
                 ->get()
                 ->reject(fn ($b) => $b->order_sn && $knownSns->has($b->order_sn));
 
             $bookingRows = $pureBookings->map(function ($b) {
-                $items = collect(is_array($b->items) ? $b->items : [])->map(fn ($i) => [
-                    'qty'           => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
-                    'variant_name'  => trim(($i['item_name'] ?? '') . (! empty($i['model_name']) ? ' - ' . $i['model_name'] : '')) ?: null,
-                    'model_sku'     => $i['model_sku'] ?? null,
-                    'item_sku'      => $i['item_sku'] ?? null,
-                    'internal_item' => null,
-                ])->values()->all();
+                $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) {
+                    // Tampilkan SKU marketplace (bukan judul produk); judul hanya fallback.
+                    $sku = $i['model_sku'] ?? $i['item_sku'] ?? null;
+                    $title = trim(($i['item_name'] ?? '') . (! empty($i['model_name']) ? ' - ' . $i['model_name'] : '')) ?: null;
+                    return [
+                        'qty'           => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
+                        'variant_name'  => $sku ?: $title,
+                        'model_sku'     => $sku,
+                        'item_sku'      => $i['item_sku'] ?? null,
+                        'internal_item' => null,
+                    ];
+                })->values()->all();
 
                 return [
                     'id'                          => -$b->id, // negatif = baris booking (bukan order)
@@ -905,7 +910,8 @@ class MarketplaceController extends Controller
                     'channel_order_id'            => $b->order_sn ?: $b->booking_sn,
                     'external_order_id'           => $b->order_sn,
                     'booking_sn'                  => $b->booking_sn,
-                    'order_status'                => 'READY_TO_SHIP',
+                    // PROCESSED → tab "Sedang Dikemas"; PENDING/READY_TO_SHIP → "Perlu Dikirim" (sub-tab ⚡).
+                    'order_status'                => $b->booking_status === 'PROCESSED' ? 'PROCESSED' : 'READY_TO_SHIP',
                     'ordered_at'                  => $b->create_time
                         ? \Carbon\Carbon::createFromTimestamp($b->create_time)->toIso8601String()
                         : optional($b->created_at)->toIso8601String(),
