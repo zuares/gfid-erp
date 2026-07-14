@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
 
@@ -32,9 +33,22 @@ class ProcessShopeeWebhookJob implements ShouldQueue
      */
     public function handle(): void
     {
+        $shopId = $this->payload['shop_id'] ?? null;
+
+        // Idempotensi: Shopee kerap mengirim push yang sama beberapa kali dalam
+        // hitungan detik. Tanpa guard, tiap salinan jadi job terpisah dan memicu
+        // sync API berulang (bahkan race saat insert order yang sama). Hanya proses
+        // salinan pertama untuk kombinasi event+shop+data yang identik.
+        $dedupKey = 'shopee:webhook:' . md5(
+            $this->eventType . '|' . ($shopId ?? '') . '|' . json_encode($this->payload['data'] ?? [])
+        );
+        if (! Cache::add($dedupKey, true, now()->addSeconds(60))) {
+            Log::info("Shopee Webhook duplikat dilewati: {$this->eventType}" . ($shopId ? " (shop {$shopId})" : ''));
+            return;
+        }
+
         Log::info("Processing Shopee Webhook Event: {$this->eventType}");
 
-        $shopId = $this->payload['shop_id'] ?? null;
         if ($shopId) {
             $store = \App\Models\Store::where('external_shop_id', (string)$shopId)
                 ->whereHas('channel', function($q) {

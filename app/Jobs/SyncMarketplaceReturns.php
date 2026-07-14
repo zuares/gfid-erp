@@ -39,48 +39,60 @@ class SyncMarketplaceReturns implements ShouldQueue
                 return;
             }
 
-            // Jika fullSync aktif, kita tarik data secara menyeluruh (null)
+            // Shopee membatasi rentang create_time maksimal 15 hari per panggilan.
+            // Untuk fullSync kita pecah ~12 bulan ke belakang menjadi jendela 15 hari,
+            // sehingga seluruh riwayat masuk DB tanpa terbentur batas rentang tanggal.
+            // Karena penyimpanan pakai updateOrCreate(return_sn), data TIDAK terduplikat.
+            $windows = [];
             if ($this->fullSync) {
-                $tsFrom = null;
-                $tsTo = null;
+                $end   = time();
+                $start = strtotime('-12 months', $end);
+                $span  = 15 * 86400;
+                for ($s = $start; $s < $end; $s += $span) {
+                    $windows[] = [$s, min($s + $span - 1, $end)];
+                }
             } else {
-                // Sync 15 hari terakhir jika tidak ditentukan
-                $tsTo = $this->createTimeTo ?? time();
+                $tsTo   = $this->createTimeTo ?? time();
                 $tsFrom = $this->createTimeFrom ?? ($tsTo - (14 * 86400));
+                $windows[] = [$tsFrom, $tsTo];
             }
 
-            $pageNo = 0;
-            $pageSize = 40;
-            $hasMore = true;
+            $syncFloor = $windows[0][0] ?? null; // batas bawah waktu yang sudah dicakup
 
-            while ($hasMore) {
-                $result = $driver->getReturnList($this->store, $pageNo, $pageSize, $tsFrom, $tsTo);
-                
-                if (isset($result['error']) && !empty($result['error'])) {
-                    Log::error("SyncMarketplaceReturns Error for Store {$this->store->id}: " . ($result['message'] ?? $result['error']));
-                    break;
+            foreach ($windows as [$tsFrom, $tsTo]) {
+                $pageNo   = 0;
+                $pageSize = 40;
+                $hasMore  = true;
+                $guard    = 0;
+
+                while ($hasMore) {
+                    $result = $driver->getReturnList($this->store, $pageNo, $pageSize, $tsFrom, $tsTo);
+
+                    if (isset($result['error']) && !empty($result['error'])) {
+                        Log::error("SyncMarketplaceReturns Error for Store {$this->store->id}: " . ($result['message'] ?? $result['error']));
+                        break;
+                    }
+
+                    $returns = $result['response']['return'] ?? [];
+                    $hasMore = $result['response']['more'] ?? false;
+
+                    foreach ($returns as $r) {
+                        $this->processReturn($r);
+                    }
+
+                    $pageNo += $pageSize;
+                    if (++$guard > 50) break; // safety net per jendela
                 }
-
-                $returns = $result['response']['return'] ?? [];
-                $hasMore = $result['response']['more'] ?? false;
-
-                foreach ($returns as $r) {
-                    $this->processReturn($r);
-                }
-
-                $pageNo += $pageSize;
-                // Safety net
-                if ($pageNo > 1000) break;
             }
 
             // --- Sync Active Old Returns ---
-            // Cari retur di DB lokal yang statusnya masih belum selesai, tapi umurnya lebih dari 15 hari
-            // Kita fetch ulang manual per return_sn untuk update status terakhirnya
+            // Cari retur di DB lokal yang statusnya masih belum selesai, tapi umurnya lebih tua
+            // dari batas bawah sync. Kita fetch ulang per return_sn untuk update status terakhirnya.
             $query = MarketplaceReturn::where('store_id', $this->store->id)
                 ->whereNotIn('status', ['COMPLETED', 'CLOSED', 'CANCELLED', 'REFUND_PAID']);
-                
-            if ($tsFrom !== null) {
-                $query->where('create_time', '<', $tsFrom);
+
+            if ($syncFloor !== null) {
+                $query->where('create_time', '<', $syncFloor);
             }
             
             $activeOldReturns = $query->get();

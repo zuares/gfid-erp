@@ -22,6 +22,374 @@ class MarketplaceReturnController extends Controller
         return view('marketplace.returns', compact('stores'));
     }
 
+    /**
+     * Data LIVE Retur / Refund / Batal langsung dari API Shopee.
+     * Dipakai oleh tab "Retur/Refund/Batal" di halaman Order Lokal.
+     *
+     * Query:
+     *   type      = return | refund | cancel   (default: return)
+     *   date_from = Y-m-d
+     *   date_to   = Y-m-d
+     *   search    = filter opsional (return_sn / order_sn)
+     *
+     * Loop semua toko Shopee aktif & terkoneksi, agregasi hasilnya.
+     */
+    public function live(Request $request)
+    {
+        $type     = $request->query('type', 'return'); // return | refund | cancel
+        $dateFrom = $request->query('date_from');
+        $dateTo   = $request->query('date_to');
+        $search   = trim((string) $request->query('search', ''));
+
+        // Rentang waktu → unix timestamp
+        $from = $dateFrom ? strtotime($dateFrom . ' 00:00:00') : strtotime('-7 days');
+        $to   = $dateTo   ? strtotime($dateTo . ' 23:59:59')   : time();
+
+        // Toko Shopee aktif & sudah terkoneksi (punya access_token)
+        $stores = Store::with('channel')
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->get()
+            ->filter(fn ($s) => ! blank($s->credential('access_token')))
+            ->values();
+
+        // Shopee membatasi rentang create_time maksimal 15 hari per panggilan,
+        // jadi rentang lebar dipecah menjadi beberapa jendela.
+        $windows = $this->timeWindows($from, $to, 15 * 86400);
+
+        $data   = [];
+        $errors = [];
+
+        foreach ($stores as $store) {
+            try {
+                $driver = $this->manager->driver($store);
+
+                if ($type === 'cancel') {
+                    // Order dibatalkan → get_order_list status CANCELLED lalu ambil detail item
+                    if (! method_exists($driver, 'getOrderList')) {
+                        continue;
+                    }
+                    $orderSns = [];
+                    foreach ($windows as [$wFrom, $wTo]) {
+                        $cursor = '';
+                        $guard  = 0;
+                        do {
+                            $listRes = $driver->getOrderList($store, $wFrom, $wTo, 50, $cursor, 'CANCELLED');
+                            if (! empty($listRes['error'])) {
+                                $errors[] = "[{$store->name}] " . ($listRes['message'] ?? $listRes['error']);
+                                break;
+                            }
+                            foreach (($listRes['response']['order_list'] ?? []) as $o) {
+                                if (! empty($o['order_sn'])) {
+                                    $orderSns[] = $o['order_sn'];
+                                }
+                            }
+                            $cursor = (string) ($listRes['response']['next_cursor'] ?? '');
+                            $more   = ! empty($listRes['response']['more']);
+                        } while ($more && $cursor !== '' && ++$guard < 20);
+                    }
+                    $orderSns = array_values(array_unique($orderSns));
+                    if (empty($orderSns)) {
+                        continue;
+                    }
+
+                    foreach (array_chunk($orderSns, 50) as $chunk) {
+                        $detRes = $driver->getOrderDetail($store, $chunk);
+                        foreach (($detRes['response']['order_list'] ?? []) as $d) {
+                            $sn = $d['order_sn'] ?? '';
+                            if ($search !== '' && stripos($sn, $search) === false) {
+                                continue;
+                            }
+                            $items = array_map(function ($it) {
+                                return [
+                                    'item_sku'       => $it['item_sku'] ?? null,
+                                    'variation_sku'  => $it['model_sku'] ?? null,
+                                    'item_name'      => $it['item_name'] ?? null,
+                                    'variation_name' => $it['model_name'] ?? null,
+                                    'quantity'       => $it['model_quantity_purchased'] ?? ($it['active_qty'] ?? 0),
+                                    'images'         => ! empty($it['image_info']['image_url']) ? [$it['image_info']['image_url']] : [],
+                                ];
+                            }, $d['item_list'] ?? []);
+
+                            $data[] = [
+                                'store_id'        => $store->id,
+                                'store_name'      => $store->name,
+                                'kind'            => 'cancel',
+                                'order_sn'        => $sn,
+                                'return_sn'       => null,
+                                'status'          => $d['order_status'] ?? 'CANCELLED',
+                                'reason'          => $d['cancel_reason'] ?? (! empty($d['cancel_by']) ? ('Dibatalkan oleh ' . $d['cancel_by']) : 'Dibatalkan'),
+                                'amount'          => (float) ($d['total_amount'] ?? 0),
+                                'tracking_number' => $d['package_list'][0]['tracking_number'] ?? null,
+                                'create_time'     => $d['create_time'] ?? null,
+                                'update_time'     => $d['update_time'] ?? null,
+                                'items'           => $items,
+                            ];
+                        }
+                    }
+                } else {
+                    // return | refund → get_return_list (satu API, dipisah via return_solution)
+                    if (! method_exists($driver, 'getReturnList')) {
+                        continue;
+                    }
+                    $seen = [];
+                    foreach ($windows as [$wFrom, $wTo]) {
+                        $pageNo = 0;
+                        $guard  = 0;
+                        do {
+                            $res = $driver->getReturnList($store, $pageNo, 50, $wFrom, $wTo);
+                            if (! empty($res['error'])) {
+                                $errors[] = "[{$store->name}] " . ($res['message'] ?? $res['error']);
+                                break;
+                            }
+                            $returns = $res['response']['return'] ?? [];
+
+                            foreach ($returns as $r) {
+                                $sn  = $r['return_sn'] ?? '';
+                                if ($sn !== '' && isset($seen[$sn])) {
+                                    continue; // hindari duplikat antar-jendela/halaman
+                                }
+                                $seen[$sn] = true;
+
+                                $solution     = strtoupper((string) ($r['return_solution'] ?? ''));
+                                // RETURN_REFUND = barang dikembalikan (Retur); REFUND/REFUND_ONLY = refund saja
+                                $isRefundOnly = str_contains($solution, 'REFUND') && ! str_contains($solution, 'RETURN');
+
+                                if ($type === 'refund' && ! $isRefundOnly) {
+                                    continue;
+                                }
+                                if ($type === 'return' && $isRefundOnly) {
+                                    continue;
+                                }
+
+                                $osn = $r['order_sn'] ?? '';
+                                if ($search !== '' && stripos($sn, $search) === false && stripos($osn, $search) === false) {
+                                    continue;
+                                }
+
+                                $items = array_map(function ($it) {
+                                    return [
+                                        'item_sku'       => $it['item_sku'] ?? null,
+                                        'variation_sku'  => $it['variation_sku'] ?? ($it['model_sku'] ?? null),
+                                        'item_name'      => $it['name'] ?? ($it['item_name'] ?? null),
+                                        'variation_name' => $it['variation_name'] ?? null,
+                                        'quantity'       => $it['amount'] ?? ($it['return_item_quantity'] ?? ($it['quantity'] ?? 0)),
+                                        'images'         => ! empty($it['images']) ? (array) $it['images'] : [],
+                                    ];
+                                }, $r['item'] ?? []);
+
+                                $data[] = [
+                                    'store_id'        => $store->id,
+                                    'store_name'      => $store->name,
+                                    'kind'            => $isRefundOnly ? 'refund' : 'return',
+                                    'order_sn'        => $osn,
+                                    'return_sn'       => $sn,
+                                    'status'          => $r['status'] ?? null,
+                                    'reason'          => $r['reason'] ?? null,
+                                    'return_solution' => $r['return_solution'] ?? null,
+                                    'amount'          => (float) ($r['refund_amount'] ?? ($r['amount_before_discount'] ?? 0)),
+                                    'tracking_number' => $r['tracking_number'] ?? null,
+                                    'needs_logistics' => $r['needs_logistics'] ?? false,
+                                    'create_time'     => $r['create_time'] ?? null,
+                                    'update_time'     => $r['update_time'] ?? null,
+                                    'items'           => $items,
+                                ];
+                            }
+
+                            $more = ! empty($res['response']['more']);
+                            $pageNo++;
+                        } while ($more && ++$guard < 20);
+                    }
+                }
+            } catch (\Throwable $e) {
+                $errors[] = "[{$store->name}] " . $e->getMessage();
+            }
+        }
+
+        // Terbaru dulu
+        usort($data, fn ($a, $b) => ($b['create_time'] ?? 0) <=> ($a['create_time'] ?? 0));
+
+        return response()->json([
+            'type'           => $type,
+            'data'           => $data,
+            'count'          => count($data),
+            'errors'         => $errors,
+            'stores_queried' => $stores->count(),
+        ]);
+    }
+
+    /** Pecah rentang [from, to] menjadi jendela berukuran maksimal $maxSpan detik. */
+    private function timeWindows(int $from, int $to, int $maxSpan): array
+    {
+        if ($to <= $from) {
+            return [[$from, max($from, $to)]];
+        }
+        $windows = [];
+        $start = $from;
+        while ($start < $to) {
+            $end = min($start + $maxSpan - 1, $to);
+            $windows[] = [$start, $end];
+            $start = $end + 1;
+        }
+        return $windows;
+    }
+
+    /**
+     * Baca data Retur / Refund / Batal dari DATABASE (agregat lintas toko).
+     * Tanpa batas rentang tanggal (kalau tidak diberi date_from/date_to → semua riwayat).
+     * Sumbernya tersimpan & anti-duplikat: retur/refund via unique return_sn,
+     * batal via order yang sudah tersimpan (unik per toko).
+     */
+    public function storedRrc(Request $request)
+    {
+        $type     = $request->query('type', 'return'); // return | refund | cancel
+        $dateFrom = $request->query('date_from');
+        $dateTo   = $request->query('date_to');
+        $search   = trim((string) $request->query('search', ''));
+
+        $from = $dateFrom ? strtotime($dateFrom . ' 00:00:00') : null;
+        $to   = $dateTo   ? strtotime($dateTo . ' 23:59:59')   : null;
+
+        $storeIds = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->pluck('id');
+
+        $data = [];
+
+        if ($type === 'cancel') {
+            $q = \App\Models\MarketplaceOrder::with(['items', 'store'])
+                ->whereIn('store_id', $storeIds)
+                ->where('status', 'cancelled');
+
+            if ($from && $to) {
+                $q->where(function ($w) use ($from, $to) {
+                    $w->whereBetween('cancelled_at', [date('Y-m-d H:i:s', $from), date('Y-m-d H:i:s', $to)])
+                      ->orWhereBetween('order_date', [date('Y-m-d H:i:s', $from), date('Y-m-d H:i:s', $to)]);
+                });
+            }
+            if ($search !== '') {
+                $q->where(fn ($w) => $w->where('external_order_id', 'like', "%{$search}%")->orWhere('shipping_awb_no', 'like', "%{$search}%"));
+            }
+
+            $orders = $q->orderByRaw('COALESCE(cancelled_at, order_date) DESC')->limit(1000)->get();
+            foreach ($orders as $o) {
+                $items = $o->items->map(fn ($it) => [
+                    'item_sku'       => $it->item_sku,
+                    'variation_sku'  => $it->model_sku,
+                    'item_name'      => $it->item_name,
+                    'variation_name' => $it->variant_name,
+                    'quantity'       => $it->qty,
+                    'images'         => $it->image_url ? [$it->image_url] : [],
+                ])->toArray();
+
+                $data[] = [
+                    'store_id'        => $o->store_id,
+                    'store_name'      => optional($o->store)->name,
+                    'kind'            => 'cancel',
+                    'order_sn'        => $o->external_order_id,
+                    'return_sn'       => null,
+                    'status'          => $o->order_status ?? 'CANCELLED',
+                    'reason'          => 'Dibatalkan',
+                    'amount'          => (float) $o->total_amount,
+                    'tracking_number' => $o->shipping_awb_no,
+                    'create_time'     => $o->cancelled_at ? $o->cancelled_at->timestamp : ($o->order_date ? strtotime($o->order_date) : null),
+                    'items'           => $items,
+                ];
+            }
+        } else {
+            $q = MarketplaceReturn::with(['items', 'store'])->whereIn('store_id', $storeIds);
+
+            // Shopee: return_solution 1 = REFUND (refund saja), 0/2 = RETURN_REFUND (retur).
+            if ($type === 'refund') {
+                $q->where('return_solution', 1);
+            } else {
+                $q->where(function ($w) {
+                    $w->where('return_solution', '!=', 1)->orWhereNull('return_solution');
+                });
+            }
+            if ($from && $to) {
+                $q->whereBetween('create_time', [$from, $to]);
+            }
+            if ($search !== '') {
+                $q->where(fn ($w) => $w->where('return_sn', 'like', "%{$search}%")
+                    ->orWhere('order_sn', 'like', "%{$search}%")
+                    ->orWhere('tracking_number', 'like', "%{$search}%"));
+            }
+
+            $returns = $q->orderBy('create_time', 'desc')->limit(1000)->get();
+            foreach ($returns as $r) {
+                $items = $r->items->map(fn ($it) => [
+                    'item_sku'       => $it->item_sku,
+                    'variation_sku'  => $it->variation_sku,
+                    'item_name'      => $it->item_name,
+                    'variation_name' => $it->variation_name,
+                    'quantity'       => $it->return_item_quantity,
+                    'images'         => is_array($it->images) ? $it->images : [],
+                ])->toArray();
+
+                $data[] = [
+                    'store_id'        => $r->store_id,
+                    'store_name'      => optional($r->store)->name,
+                    'kind'            => ((int) $r->return_solution === 1) ? 'refund' : 'return',
+                    'order_sn'        => $r->order_sn,
+                    'return_sn'       => $r->return_sn,
+                    'status'          => $r->status,
+                    'reason'          => $r->reason,
+                    'return_solution' => $r->return_solution,
+                    'amount'          => (float) $r->amount_before_discount,
+                    'tracking_number' => $r->tracking_number,
+                    'needs_logistics' => $r->needs_logistics,
+                    'create_time'     => $r->create_time,
+                    'update_time'     => $r->update_time,
+                    'items'           => $items,
+                ];
+            }
+        }
+
+        return response()->json([
+            'type'           => $type,
+            'data'           => $data,
+            'count'          => count($data),
+            'source'         => 'db',
+            'stores_queried' => $storeIds->count(),
+        ]);
+    }
+
+    /**
+     * Tarik & simpan retur/refund dari Shopee untuk SEMUA toko aktif (anti-duplikat via upsert).
+     * full=true → riwayat penuh (dipecah 15 harian di dalam job).
+     */
+    public function syncAllReturns(Request $request)
+    {
+        @set_time_limit(300);
+
+        $full = $request->boolean('full', true);
+        $from = $request->query('create_time_from');
+        $to   = $request->query('create_time_to');
+
+        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn ($s) => ! blank($s->credential('access_token')));
+
+        $synced = 0;
+        $errors = [];
+        foreach ($stores as $store) {
+            try {
+                dispatch_sync(new \App\Jobs\SyncMarketplaceReturns(
+                    $store,
+                    $from ? (int) $from : null,
+                    $to ? (int) $to : null,
+                    $full
+                ));
+                $synced++;
+            } catch (\Throwable $e) {
+                $errors[] = "[{$store->name}] " . $e->getMessage();
+            }
+        }
+
+        return response()->json(['success' => true, 'stores_synced' => $synced, 'errors' => $errors]);
+    }
+
     public function getReturnList(Store $store, Request $request)
     {
         try {

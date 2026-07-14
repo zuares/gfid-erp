@@ -190,6 +190,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/order-profits',                     [MarketplaceController::class, 'orderProfits']);
     
     // Returns Module
+    Route::get('/returns/live', [\App\Http\Controllers\MarketplaceReturnController::class, 'live']);
+    Route::get('/returns/stored', [\App\Http\Controllers\MarketplaceReturnController::class, 'storedRrc']);
+    Route::post('/returns/sync-all', [\App\Http\Controllers\MarketplaceReturnController::class, 'syncAllReturns'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores/{store}/returns/list', [\App\Http\Controllers\MarketplaceReturnController::class, 'getReturnList']);
     Route::post('/stores/{store}/returns/sync', [\App\Http\Controllers\MarketplaceReturnController::class, 'syncReturns'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

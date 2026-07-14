@@ -778,9 +778,10 @@ class ShipmentController extends Controller
             $warehouse = $this->whRts();
             if ($warehouse) {
                 app(\App\Services\Inventory\InventoryService::class)->reserveStock(
-                    $warehouse->id,
-                    $item->id,
-                    $qty
+                    warehouseId: $warehouse->id,
+                    itemId: $item->id,
+                    qty: $qty,
+                    allowNegative: true // izinkan over-reserve saat edit; blokir di submit/post
                 );
             }
 
@@ -1354,9 +1355,10 @@ class ShipmentController extends Controller
             
             if ($diff > 0 && $warehouse) {
                 app(\App\Services\Inventory\InventoryService::class)->reserveStock(
-                    $warehouse->id,
-                    $line->item_id,
-                    $diff
+                    warehouseId: $warehouse->id,
+                    itemId: $line->item_id,
+                    qty: $diff,
+                    allowNegative: true // izinkan over-reserve saat edit; blokir di submit/post
                 );
             } elseif ($diff < 0 && $warehouse) {
                 app(\App\Services\Inventory\InventoryService::class)->releaseStock(

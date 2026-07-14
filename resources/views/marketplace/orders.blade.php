@@ -775,6 +775,9 @@ body[data-theme="dark"] .ord-table tbody tr td {
         <button class="ord-tab" data-tab="completed" onclick="switchTab('completed',this)">
             Selesai <span class="ord-badge" id="badge-completed">—</span>
         </button>
+        <button class="ord-tab" data-tab="rrc" onclick="switchTab('rrc',this)">
+            🔁 Retur/Refund/Batal <span class="ord-badge" id="badge-rrc" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">—</span>
+        </button>
     </div>
     {{-- Toolbar: Actions & Sub-Tabs --}}
     <div class="process-toolbar" id="processToolbar" style="margin-bottom:1rem; border:1px solid var(--shp-border); background:var(--card); border-radius:8px; padding:6px;">
@@ -791,6 +794,13 @@ body[data-theme="dark"] .ord-table tbody tr td {
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
                 <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Diproses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
+            </div>
+            <div id="subTabRrcContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
+                <button class="ord-subtab active" data-sub="return" onclick="switchSubTabRrc('return', this)">↩️ Retur <span class="ord-badge bg-secondary" id="badge-sub-rrc-return">—</span></button>
+                <button class="ord-subtab" data-sub="refund" onclick="switchSubTabRrc('refund', this)">💸 Refund <span class="ord-badge bg-secondary" id="badge-sub-rrc-refund">—</span></button>
+                <button class="ord-subtab" data-sub="cancel" onclick="switchSubTabRrc('cancel', this)">🚫 Batal <span class="ord-badge bg-secondary" id="badge-sub-rrc-cancel">—</span></button>
+                <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.1rem 0.5rem;margin-left:4px" onclick="loadRrc(true)" title="Muat ulang dari database">🔄 Segarkan</button>
+                <button class="btn btn-sm btn-outline-primary" id="btnSyncRrc" style="font-size:0.7rem;padding:0.1rem 0.5rem" onclick="syncRrc()" title="Tarik data terbaru dari Shopee lalu simpan ke database">⬇️ Tarik dari Shopee</button>
             </div>
         </div>
 
@@ -1228,15 +1238,165 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (subTabReadyContainer) {
             subTabReadyContainer.style.display = (tab === 'ready') ? 'flex' : 'none';
         }
-        
+
+        const subTabRrcContainer = document.getElementById('subTabRrcContainer');
+        if (subTabRrcContainer) {
+            subTabRrcContainer.style.display = (tab === 'rrc') ? 'flex' : 'none';
+        }
+
+        // Tab Retur/Refund/Batal: data diambil LIVE dari API Shopee, bukan dari
+        // array `orders` lokal. Jadi jangan panggil renderTable() — panggil loadRrc().
+        if (tab === 'rrc') {
+            updateToolbar();
+            loadRrc();
+            return;
+        }
+
         renderTable();
         updateToolbar();
         updatePickingPrintStrip();
-        
+
         if (tab === 'processed') {
             autoFetchMissingAwbs();
         }
     };
+
+    // ── Tab Retur / Refund / Batal (data LIVE dari API Shopee) ──────────────
+    let rrcSub = 'return';
+    let rrcLoadSeq = 0;
+    const rrcLabels = { return: 'Retur', refund: 'Refund', cancel: 'Batal' };
+
+    window.switchSubTabRrc = function (sub, btn) {
+        rrcSub = sub;
+        document.querySelectorAll('#subTabRrcContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        loadRrc();
+    };
+
+    function fmtUnix(ts) {
+        if (!ts) return '—';
+        try {
+            return new Date(ts * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        } catch (e) { return '—'; }
+    }
+
+    async function loadRrc(force) {
+        if (activeTab !== 'rrc') return;
+        const seq = ++rrcLoadSeq;
+        const body = $('ordersBody');
+        body.innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat data ${rrcLabels[rrcSub]} dari database…</div>`;
+
+        // Baca dari DATABASE (tersimpan, tanpa batas rentang tanggal). Untuk menarik
+        // data terbaru dari Shopee, gunakan tombol "Tarik dari Shopee" (syncRrc()).
+        const params = new URLSearchParams({ type: rrcSub });
+        // Filter tanggal bersifat opsional; kirim hanya bila user membatasi rentang.
+        if (getFrom()) params.set('date_from', getFrom());
+        if (getTo())   params.set('date_to', getTo());
+        const search = getSearch();
+        if (search) params.set('search', search);
+        if (force) params.set('_', Date.now());
+
+        let res;
+        try {
+            res = await api('/api/marketplace/returns/stored?' + params.toString());
+        } catch (e) {
+            if (seq !== rrcLoadSeq) return;
+            body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal mengambil data dari Shopee: ${esc(e.message || 'error')}</div>`;
+            return;
+        }
+        if (seq !== rrcLoadSeq) return; // sudah ada permintaan lebih baru
+
+        let rows = (res && res.data) ? res.data : [];
+        if (activeStore) rows = rows.filter(r => r.store_name === activeStore);
+
+        const badge = document.getElementById('badge-sub-rrc-' + rrcSub);
+        if (badge) badge.textContent = rows.length;
+        const badgeMain = document.getElementById('badge-rrc');
+        if (badgeMain) badgeMain.textContent = rows.length;
+
+        renderRrcList(rows, (res && res.errors) ? res.errors : [], (res && res.stores_queried) || 0);
+    }
+    window.loadRrc = loadRrc;
+
+    // Tarik data terbaru dari Shopee → simpan ke DB (anti-duplikat via upsert) → muat ulang.
+    window.syncRrc = async function () {
+        const btn = document.getElementById('btnSyncRrc');
+        const prev = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menarik…'; }
+        const body = $('ordersBody');
+        body.innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Menarik data dari Shopee & menyimpan ke database… (retur/refund; ini bisa memakan waktu)</div>`;
+        try {
+            const res = await api('/api/marketplace/returns/sync-all?full=1', { method: 'POST' });
+            if (res && res.errors && res.errors.length) {
+                console.warn('sync-all errors:', res.errors);
+            }
+        } catch (e) {
+            if (body) body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal menarik dari Shopee: ${esc(e.message || 'error')}</div>`;
+            if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+            return;
+        }
+        if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+        loadRrc(true);
+    };
+
+    function renderRrcList(rows, errors, storesQueried) {
+        const body = $('ordersBody');
+        let warn = '';
+        if (errors && errors.length) {
+            warn = `<div style="margin:0 0 8px;font-size:.72rem;color:#b45309">⚠️ Sebagian toko gagal diambil dari API: ${esc(errors.join('; '))}</div>`;
+        }
+
+        if (!rows.length) {
+            const hint = `<div style="margin-top:6px;font-size:.72rem;color:#94a3b8">Diperiksa ${storesQueried || 0} toko Shopee untuk periode ${esc(getFrom())} s/d ${esc(getTo())}. Coba lebarkan rentang tanggal di atas (retur/refund biasanya jarang).</div>`;
+            body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">📭</div>Tidak ada data ${rrcLabels[rrcSub]} pada periode ini.${hint}</div>` + (warn ? `<div style="text-align:center">${warn}</div>` : '');
+            return;
+        }
+
+        const kindBadge = (kind) => {
+            if (kind === 'cancel') return `<span style="font-size:.65rem;background:#fee2e2;color:#991b1b;border-radius:99px;padding:2px 8px;font-weight:800;">🚫 Batal</span>`;
+            if (kind === 'refund') return `<span style="font-size:.65rem;background:#fef9c3;color:#854d0e;border-radius:99px;padding:2px 8px;font-weight:800;">💸 Refund</span>`;
+            return `<span style="font-size:.65rem;background:#e0e7ff;color:#3730a3;border-radius:99px;padding:2px 8px;font-weight:800;">↩️ Retur</span>`;
+        };
+
+        const cards = rows.map(r => {
+            const itemsHtml = (r.items || []).map(it => `
+                <div class="ord-item-card">
+                    ${(it.images && it.images[0]) ? `<img src="${esc(it.images[0])}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;margin-right:6px" onerror="this.style.display='none'">` : ''}
+                    <div class="ord-item-qty">${it.quantity || 0}×</div>
+                    <div class="ord-item-body">
+                        <div class="ord-item-name">${esc(it.item_name || it.item_sku || '—')}</div>
+                        ${it.variation_name ? `<div class="ord-item-variant">${esc(it.variation_name)}</div>` : ''}
+                        ${(it.variation_sku || it.item_sku) ? `<div class="ord-item-variant" style="color:#94a3b8">SKU: ${esc(it.variation_sku || it.item_sku)}</div>` : ''}
+                    </div>
+                </div>`).join('');
+
+            const idLabel = r.return_sn || r.order_sn || '—';
+            const amount = r.amount ? ('Rp ' + Number(r.amount).toLocaleString('id-ID')) : '';
+
+            return `
+            <div class="ord-card" style="border:1px solid var(--shp-border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--card)">
+                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+                    <div style="min-width:180px">
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+                            ${kindBadge(r.kind)}
+                            <span style="font-weight:800;font-size:.85rem">${esc(idLabel)}</span>
+                        </div>
+                        <div style="font-size:.7rem;color:#64748b">Order: ${esc(r.order_sn || '—')}</div>
+                        <div style="font-size:.7rem;color:#94a3b8">${fmtUnix(r.create_time)} · ${esc(r.store_name || '')}</div>
+                        ${r.status ? `<div style="margin-top:4px"><span style="font-size:.65rem;background:#f1f5f9;color:#475569;border-radius:4px;padding:1px 6px;font-weight:700">${esc(r.status)}</span></div>` : ''}
+                        ${r.reason ? `<div style="margin-top:4px;font-size:.7rem;color:#b45309">Alasan: ${esc(r.reason)}</div>` : ''}
+                        ${r.tracking_number ? `<div style="margin-top:4px;font-size:.65rem;color:#059669;font-weight:700">Resi: ${esc(r.tracking_number)}</div>` : ''}
+                    </div>
+                    <div style="text-align:right;min-width:120px">
+                        ${amount ? `<div style="font-weight:800;color:#dc2626;font-size:.9rem">${amount}</div>` : ''}
+                    </div>
+                </div>
+                ${itemsHtml ? `<div class="ord-items-cell" style="margin-top:8px">${itemsHtml}</div>` : ''}
+            </div>`;
+        }).join('');
+
+        body.innerHTML = warn + cards;
+    }
 
     async function autoFetchMissingAwbs() {
         const rows = orders.filter(o => (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') && !o.shipping_awb_no);
@@ -1279,6 +1439,14 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const subTabReadyContainer = document.getElementById('subTabReadyContainer');
             if (subTabReadyContainer) {
                 subTabReadyContainer.style.display = (saved === 'ready') ? 'flex' : 'none';
+            }
+            const subTabRrcContainer = document.getElementById('subTabRrcContainer');
+            if (subTabRrcContainer) {
+                subTabRrcContainer.style.display = (saved === 'rrc') ? 'flex' : 'none';
+            }
+            // Bila halaman dibuka langsung di tab rrc (mis. ?tab=rrc), muat data live.
+            if (saved === 'rrc') {
+                setTimeout(() => loadRrc(), 0);
             }
         }
         
@@ -2031,6 +2199,18 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 } else {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; font-weight:700; border:1px solid #cbd5e1" onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
                 }
+            } else if (activeTab === 'processed_instant') {
+                // Tab Instan (mobile): sediakan Atur Pengiriman manual + Cetak Resi
+                // supaya user tidak bingung. Backend aman meski sudah auto-arrange.
+                if (o.order_status === 'UNPAID') {
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                } else {
+                    actionBtn = `
+                    <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
+                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
+                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>
+                    </div>`;
+                }
             } else {
                 if (o.order_status === 'UNPAID') {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
@@ -2480,6 +2660,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     function renderTable() {
+        // Tab Retur/Refund/Batal dikelola terpisah oleh loadRrc() (data live API).
+        // Jangan timpa isinya dengan data order lokal.
+        if (activeTab === 'rrc') return;
         const body = $('ordersBody');
         let rows = applyFilters(orders.filter(inRange));
         rows = filterByTab(rows, activeTab);
@@ -2628,7 +2811,21 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             let logisticsBtn = '';
 
             // Logistics Buttons
-            if (activeTab === 'processed') {
+            if (activeTab === 'processed_instant') {
+                // Tab Instan: selalu sediakan tombol "Atur Pengiriman" manual (+ Cetak
+                // Resi) supaya user tidak bingung. Order instan Shopee umumnya sudah
+                // auto-arrange, tapi backend aman — error already_arranged diperlakukan
+                // sebagai sukses (lihat MarketplaceLogisticsController::arrangeShipment).
+                if (o.order_status === 'UNPAID') {
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                } else {
+                    logisticsBtn = `
+                    <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+                        <button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>
+                    </div>`;
+                }
+            } else if (activeTab === 'processed') {
                 logisticsBtn = `
                 <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
                     <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>

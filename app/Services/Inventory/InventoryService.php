@@ -284,7 +284,8 @@ class InventoryService
         float | int | string $qty,
         ?string $sourceType = null,
         ?int $sourceId = null,
-        ?int $sourceLineId = null
+        ?int $sourceLineId = null,
+        bool $allowNegative = false
     ): void {
         $qty = $this->num($qty);
         if ($qty <= 0) {
@@ -306,12 +307,16 @@ class InventoryService
             ]);
         }
 
-        $available = $stock->qty - $stock->allocated_qty;
-        if (($available + 0.0000001) < $qty) {
-            throw new \RuntimeException(
-                "Stok tersedia tidak mencukupi untuk di-reserve. Item {$itemId} Gudang {$warehouseId}. "
-                . "Tersedia: {$available}, Mau di-reserve: {$qty}"
-            );
+        // $allowNegative = true => izinkan over-reserve (mis. saat edit shipment),
+        // pemblokiran stok kurang dilakukan di tahap submit/post (checkStockSufficiency).
+        if (!$allowNegative) {
+            $available = $stock->qty - $stock->allocated_qty;
+            if (($available + 0.0000001) < $qty) {
+                throw new \RuntimeException(
+                    "Stok tersedia tidak mencukupi untuk di-reserve. Item {$itemId} Gudang {$warehouseId}. "
+                    . "Tersedia: {$available}, Mau di-reserve: {$qty}"
+                );
+            }
         }
 
         $stock->allocated_qty = $this->num($stock->allocated_qty) + $qty;
