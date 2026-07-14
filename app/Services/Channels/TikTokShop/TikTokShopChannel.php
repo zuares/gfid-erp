@@ -199,6 +199,11 @@ class TikTokShopChannel implements MarketplaceChannel
 
     public function refreshToken(Store $store): array
     {
+        if (! $store->is_active) {
+            // Toko nonaktif: jangan hubungi API auth TikTok sama sekali.
+            return ['error' => 'store_inactive', 'message' => 'Toko nonaktif, refresh token dilewati'];
+        }
+
         $authUrl   = rtrim(config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com'), '/');
         $appKey    = $this->appKey($store);
         $appSecret = $this->appSecret($store);

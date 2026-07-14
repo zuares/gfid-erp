@@ -301,6 +301,9 @@ class ShopeeChannel implements MarketplaceChannel
      */
     protected function ensureFreshToken(Store $store): void
     {
+        if (! $store->is_active) {
+            return; // toko nonaktif: jangan ambil/refresh token
+        }
         if ($store->token_expires_at && $store->token_expires_at->isAfter(now()->addMinutes(2))) {
             return; // masih segar
         }
@@ -322,6 +325,11 @@ class ShopeeChannel implements MarketplaceChannel
      */
     public function refreshToken(Store $store): array
     {
+        if (! $store->is_active) {
+            // Toko nonaktif: jangan hubungi API auth Shopee sama sekali.
+            return ['error' => 'store_inactive', 'message' => 'Toko nonaktif, refresh token dilewati'];
+        }
+
         $lock    = Cache::lock("shopee:refresh:{$store->id}", 35); // > HTTP timeout (30s)
         $gotLock = false;
         try { $gotLock = $lock->block(15); } catch (\Throwable $e) { $gotLock = false; }

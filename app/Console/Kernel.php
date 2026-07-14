@@ -12,9 +12,10 @@ class Kernel extends ConsoleKernel
         
         // Cron Job Penjaga Masa Kini: Tarik data retur 15 hari terakhir setiap jam
         $schedule->call(function () {
-            $stores = \App\Models\Store::whereHas('channel', function($q) {
-                $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
-            })->get();
+            $stores = \App\Models\Store::where('is_active', true) // toko nonaktif dilewati
+                ->whereHas('channel', function($q) {
+                    $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
+                })->get();
             
             foreach ($stores as $store) {
                 // Biarkan parameter tanggal kosong agar otomatis menggunakan 15 hari terakhir

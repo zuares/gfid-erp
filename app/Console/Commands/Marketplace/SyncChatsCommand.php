@@ -28,7 +28,8 @@ class SyncChatsCommand extends Command
     public function handle(MarketplaceChatService $chatService)
     {
         $this->info('Starting chat sync...');
-        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))->get();
+        $stores = Store::where('is_active', true) // toko nonaktif dilewati
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))->get();
 
         foreach ($stores as $store) {
             $this->info("Syncing chats for store: {$store->name}");

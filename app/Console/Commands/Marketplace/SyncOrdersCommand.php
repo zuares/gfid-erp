@@ -33,6 +33,7 @@ class SyncOrdersCommand extends Command
         $this->line('');
 
         $query = Store::where('status', 'active')
+            ->where('is_active', true) // toko nonaktif dilewati: jangan tarik/refresh token
             ->whereHas('channel', function ($q) {
                 $q->where('code', 'shopee');
             });
