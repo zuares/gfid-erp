@@ -37,9 +37,12 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
+            // Anti "database is locked": WAL mengizinkan banyak pembaca + satu penulis
+            // bersamaan, dan busy_timeout membuat penulis MENUNGGU (ms) saat file terkunci
+            // alih-alih langsung gagal. synchronous NORMAL aman dipakai bersama WAL.
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
             'transaction_mode' => 'DEFERRED',
         ],
 

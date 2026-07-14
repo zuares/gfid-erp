@@ -704,11 +704,16 @@ class MarketplaceController extends Controller
             ->get();
 
         // Tandai order yang termasuk "Pesanan Kilat" (punya booking) — cocokkan per store + order_sn.
-        $kilatKeys = \App\Models\MarketplaceBooking::query()
-            ->whereNotNull('order_sn')->where('order_sn', '!=', '')
-            ->get(['store_id', 'order_sn'])
-            ->mapWithKeys(fn ($b) => [$b->store_id . '|' . $b->order_sn => true])
-            ->all();
+        // Di-scope ke order yang sedang ditampilkan saja (ringan) + guard bila tabel booking
+        // belum ada di server (mis. migration belum jalan) supaya halaman Orders tidak error.
+        $kilatKeys = [];
+        $orderSns = $orders->pluck('channel_order_id')->filter()->values()->all();
+        if (! empty($orderSns) && \Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
+            $kilatKeys = \App\Models\MarketplaceBooking::whereIn('order_sn', $orderSns)
+                ->get(['store_id', 'order_sn'])
+                ->mapWithKeys(fn ($b) => [$b->store_id . '|' . $b->order_sn => true])
+                ->all();
+        }
 
         return response()->json($orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
             $arr = $o->toArray();
