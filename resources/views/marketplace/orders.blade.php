@@ -1530,6 +1530,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     function inRange(o) {
+        // Pesanan Kilat selalu ditampilkan, tidak terikat rentang tanggal (booking sering
+        // berstatus lama/MATCHED sehingga kalau difilter tanggal jadi tak pernah muncul).
+        if (o.is_kilat) return true;
         if (!o.ordered_at) return true;
         const d = new Date(o.ordered_at);
         return d >= new Date(getFrom() + 'T00:00:00') && d <= new Date(getTo() + 'T23:59:59');

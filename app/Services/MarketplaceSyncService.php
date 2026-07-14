@@ -488,9 +488,12 @@ class MarketplaceSyncService
         $outerStats = ['new' => 0, 'updated' => 0, 'sku_empty' => 0, 'mapping_not_found' => 0, 'missing_hpp' => 0, 'ready' => 0, 'incomplete' => 0, 'skipped' => 0];
 
         try {
-        DB::transaction(function () use ($store, $details, &$outerStats, $dryRun) {
+        // Proses per-batch kecil; tiap batch transaksi sendiri agar kunci tulis SQLite tidak
+        // ditahan lama sepanjang seluruh sync (mengurangi "database is locked" saat bersamaan).
+        foreach (array_chunk($details, 50) as $chunk) {
+        DB::transaction(function () use ($store, $chunk, &$outerStats, $dryRun) {
 
-            foreach ($details as $detail) {
+            foreach ($chunk as $detail) {
                 if (empty($detail['order_sn'])) continue;
 
                 $orderedAt   = ! empty($detail['create_time']) ? now()->setTimestamp((int) $detail['create_time']) : null;
@@ -722,11 +725,12 @@ class MarketplaceSyncService
                     $outerStats['ready']++;
                 }
             }
-
-            if (!$dryRun) {
-                $store->update(['last_synced_at' => now()]);
-            }
         });
+        } // akhir per-batch (array_chunk)
+
+        if (!$dryRun) {
+            $store->update(['last_synced_at' => now()]);
+        }
         } finally {
             // WAJIB di-finally: kalau transaction melempar exception,
             // foreign_keys harus tetap dinyalakan kembali di koneksi ini.
