@@ -635,6 +635,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testBookingDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-file-earmark-text text-warning me-2"></i>Tes API: get_booking_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="checkBookingList(${s.id}, '${esc(s.name)}')"><i class="bi bi-list-check text-primary me-2"></i>Tes API: get_booking_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
@@ -942,6 +943,17 @@
         new bootstrap.Modal($('apiTestModal')).show();
     };
 
+    window.testBookingDetail = function(storeId, storeName) {
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'booking_detail';
+        $('apiTestModalTitle').textContent = 'Tes API: get_booking_detail — ' + storeName;
+        $('apiTestInputLabel').textContent = 'Booking SN';
+        $('apiTestInput').value = '';
+        $('apiTestOutput').textContent = 'Masukkan Booking SN lalu klik Fetch JSON.';
+        
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
     $('btnTestApi').onclick = async function() {
         const storeId = window.testApiStoreId;
         const inputVal = $('apiTestInput').value.trim();
@@ -957,6 +969,8 @@
             url = '/api/marketplace/stores/' + storeId + '/packages/' + inputVal + '/raw-detail';
         } else if (type === 'return_list') {
             url = '/api/marketplace/stores/' + storeId + '/return-list/raw-detail?page_no=' + (inputVal || 0);
+        } else if (type === 'booking_detail') {
+            url = '/api/marketplace/stores/' + storeId + '/orders/' + inputVal + '/booking-detail';
         }
 
         $('apiTestOutput').textContent = 'Memanggil ' + url + ' ...\\nTunggu sebentar...';

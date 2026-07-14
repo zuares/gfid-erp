@@ -734,7 +734,7 @@ class MarketplaceController extends Controller
             }
         }
 
-        return response()->json($orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
+        $mapped = $orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
             $arr = $o->toArray();
             // Kilat = punya booking DAN BUKAN Instan (same-day). Keduanya berbeda:
             // Instan dideteksi dari nama kurir, ditangani di tab "Instan" tersendiri.
@@ -865,7 +865,74 @@ class MarketplaceController extends Controller
             }
 
             return $arr;
-        }));
+        });
+
+        // ── Pesanan Kilat murni (booking READY_TO_SHIP tanpa order lokal) ──────
+        // Booking baru berstatus READY_TO_SHIP sering belum MATCHED ke order
+        // (order_sn baru diberikan Shopee setelah MATCHED). Supaya tetap tampil
+        // di halaman Orders (sub-tab ⚡ Pengiriman Kilat), sertakan sebagai baris
+        // pseudo-order dengan flag is_booking = true.
+        if (\Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
+            $knownSns = $orders->pluck('channel_order_id')
+                ->merge($orders->pluck('external_order_id'))
+                ->filter()->flip();
+
+            $pureBookings = \App\Models\MarketplaceBooking::with('store.channel')
+                ->whereIn('booking_status', ['PENDING', 'READY_TO_SHIP'])
+                ->get()
+                ->reject(fn ($b) => $b->order_sn && $knownSns->has($b->order_sn));
+
+            $bookingRows = $pureBookings->map(function ($b) {
+                $items = collect(is_array($b->items) ? $b->items : [])->map(fn ($i) => [
+                    'qty'           => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
+                    'variant_name'  => trim(($i['item_name'] ?? '') . (! empty($i['model_name']) ? ' - ' . $i['model_name'] : '')) ?: null,
+                    'model_sku'     => $i['model_sku'] ?? null,
+                    'item_sku'      => $i['item_sku'] ?? null,
+                    'internal_item' => null,
+                ])->values()->all();
+
+                return [
+                    'id'                          => -$b->id, // negatif = baris booking (bukan order)
+                    'store_id'                    => $b->store_id,
+                    'store'                       => $b->store ? [
+                        'id'      => $b->store->id,
+                        'name'    => $b->store->name,
+                        'channel' => $b->store->channel ? [
+                            'code' => strtolower((string) $b->store->channel->code),
+                            'name' => $b->store->channel->name,
+                        ] : null,
+                    ] : null,
+                    'channel_order_id'            => $b->order_sn ?: $b->booking_sn,
+                    'external_order_id'           => $b->order_sn,
+                    'booking_sn'                  => $b->booking_sn,
+                    'order_status'                => 'READY_TO_SHIP',
+                    'ordered_at'                  => $b->create_time
+                        ? \Carbon\Carbon::createFromTimestamp($b->create_time)->toIso8601String()
+                        : optional($b->created_at)->toIso8601String(),
+                    'items'                       => $items,
+                    'shipping_carrier'            => $b->shipping_carrier,
+                    'shipping_awb_no'             => $b->tracking_number,
+                    'is_kilat'                    => true,
+                    'is_booking'                  => true,
+                    'needs_shipping_arrangement'  => $b->needsShipping(),
+                    'fulfillment_id'              => null,
+                    'fulfillment_status'          => null,
+                    'print_count'                 => 0,
+                    'printed_at'                  => null,
+                    'has_unresolved_lines'        => false,
+                    'has_data_issues'             => false,
+                    'logistics_status'            => null,
+                    'fulfillment_scan_log'        => null,
+                    'fulfillment_resolve_lines'   => [],
+                    'fulfillment_packing_summary' => null,
+                    'fulfillment_lines'           => [],
+                ];
+            });
+
+            $mapped = $mapped->concat($bookingRows);
+        }
+
+        return response()->json($mapped->values());
     }
 
     public function syncSettlements(Request $request, Store $store): JsonResponse

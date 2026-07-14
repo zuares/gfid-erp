@@ -2206,7 +2206,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     // Kilat yang sudah diatur/terkirim: jangan tampilkan "Atur Pengiriman" (akan error).
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
                 } else {
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                    const bkArg = o.is_booking ? `, '${o.booking_sn}'` : '';
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
                 }
             } else if (activeTab === 'processed') {
                 if (isFulfilled) {
@@ -2858,7 +2859,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
                     logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                    const bkArg = o.is_booking ? `, '${o.booking_sn}'` : '';
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
                 }
             } else {
                 if (o.order_status === 'UNPAID') {
@@ -3201,14 +3203,18 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         modal.show();
 
         try {
-            const res = await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/raw-detail`);
-            
+            // Booking murni (belum MATCHED) tidak punya order → pakai endpoint booking detail.
+            const detailUrl = o.is_booking
+                ? `/api/marketplace/stores/${o.store_id}/bookings/${o.booking_sn}/detail`
+                : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/raw-detail`;
+            const res = await api(detailUrl);
+
             if (res.error) {
                 document.getElementById('detailModalBody').innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px">❌ Gagal mengambil data: ${esc(res.message || res.error)}</div>`;
                 return;
             }
 
-            const liveData = res.response?.order_list?.[0] || {};
+            const liveData = res.response?.order_list?.[0] || res.order_list?.[0] || {};
             
             let itemsHtml = (liveData.item_list || []).map(item => `
                 <div style="display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px;">
@@ -3284,22 +3290,28 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     };
 
     // ── Logistics ────────────────────────────────────────────────────────
-    window.openArrangeShipment = async function (storeId, orderSn) {
+    // bookingSn diisi hanya untuk Pesanan Kilat murni (booking belum MATCHED ke
+    // order lokal) — pengiriman diatur lewat endpoint booking, bukan order.
+    window.openArrangeShipment = async function (storeId, orderSn, bookingSn = null) {
         $('asLoading').style.display = 'block';
         $('asContent').style.display = 'none';
         $('asStoreId').value = storeId;
         $('asOrderSn').value = orderSn;
+        window._asBookingSn = bookingSn || null;
         $('asOptions').innerHTML = '';
         $('asSubmitBtn').disabled = true;
-        
+
         const modal = new bootstrap.Modal($('arrangeShipmentModal'));
         modal.show();
 
         try {
-            let res = shippingParamCache.get(orderSn);
+            const cacheKey = bookingSn || orderSn;
+            let res = shippingParamCache.get(cacheKey);
             if (!res) {
-                res = await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/shipping-parameter`);
-                shippingParamCache.set(orderSn, res);
+                res = bookingSn
+                    ? await api(`/api/marketplace/stores/${storeId}/bookings/${bookingSn}/shipping-parameter`)
+                    : await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/shipping-parameter`);
+                shippingParamCache.set(cacheKey, res);
             }
             
             $('asLoading').style.display = 'none';
@@ -3419,7 +3431,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         }
 
         try {
-            await api(`/api/marketplace/stores/${storeId}/orders/${orderSn}/ship`, {
+            const shipUrl = window._asBookingSn
+                ? `/api/marketplace/stores/${storeId}/bookings/${window._asBookingSn}/ship`
+                : `/api/marketplace/stores/${storeId}/orders/${orderSn}/ship`;
+            await api(shipUrl, {
                 method: 'POST',
                 body: JSON.stringify(params)
             });
