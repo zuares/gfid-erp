@@ -330,6 +330,13 @@ class ShopeeChannel implements MarketplaceChannel
             return ['error' => 'store_inactive', 'message' => 'Toko nonaktif, refresh token dilewati'];
         }
 
+        if (blank($store->credential('refresh_token')) || blank($this->shopId($store))) {
+            // Toko belum terkonfigurasi (record placeholder tanpa shop_id/refresh_token).
+            // Memanggil API auth dengan kredensial kosong hanya menghasilkan warning
+            // "refresh token or shop_id is wrong" yang membanjiri log. Lewati saja.
+            return ['error' => 'not_configured', 'message' => 'Kredensial toko belum lengkap, refresh dilewati'];
+        }
+
         $lock    = Cache::lock("shopee:refresh:{$store->id}", 35); // > HTTP timeout (30s)
         $gotLock = false;
         try { $gotLock = $lock->block(15); } catch (\Throwable $e) { $gotLock = false; }

@@ -19,6 +19,13 @@ class MarketplaceChatService
      */
     public function syncConversations(Store $store, int $pages = 2, int $pageSize = 25): int
     {
+        if (! $store->is_active || blank($store->credential('access_token'))) {
+            // Toko nonaktif atau belum terkonfigurasi (record placeholder tanpa token):
+            // tidak ada percakapan untuk disinkron, dan memanggil API hanya menghasilkan
+            // warning "Invalid access_token". Lewati diam-diam.
+            return 0;
+        }
+
         $driver = $this->manager->driver($store);
         $synced = 0;
         $cursor = '';

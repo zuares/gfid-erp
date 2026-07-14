@@ -204,6 +204,11 @@ class TikTokShopChannel implements MarketplaceChannel
             return ['error' => 'store_inactive', 'message' => 'Toko nonaktif, refresh token dilewati'];
         }
 
+        if (blank($store->credential('refresh_token'))) {
+            // Toko belum terkonfigurasi (tanpa refresh_token). Jangan panggil API auth.
+            return ['error' => 'not_configured', 'message' => 'Kredensial toko belum lengkap, refresh dilewati'];
+        }
+
         $authUrl   = rtrim(config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com'), '/');
         $appKey    = $this->appKey($store);
         $appSecret = $this->appSecret($store);

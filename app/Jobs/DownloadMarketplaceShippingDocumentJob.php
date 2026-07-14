@@ -22,7 +22,7 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
     public $orderSn;
 
     // Retry configurations
-    public $tries = 3;
+    public $tries = 6;
     public $backoff = [60, 180, 300]; // Wait 1min, then 3mins, then 5mins on failures
 
     /**
@@ -90,6 +90,42 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
                         }
                     }
                 }
+                // Kasus transient: dokumen label belum siap dicetak. Shopee butuh
+                // beberapa saat setelah order untuk menyiapkan PDF-nya. Ini BUKAN
+                // kegagalan sungguhan — cukup coba lagi nanti tanpa membisingkan log.
+                $notReady = false;
+                if (isset($createRes['response']['result_list']) && is_array($createRes['response']['result_list'])) {
+                    foreach ($createRes['response']['result_list'] as $resItem) {
+                        $fe = strtolower((string) ($resItem['fail_error'] ?? ''));
+                        $fm = strtolower((string) ($resItem['fail_message'] ?? ''));
+                        if (str_contains($fe, 'package_can_not_print')
+                            || str_contains($fm, 'not yet ready')
+                            || str_contains($fm, 'try again later')) {
+                            $notReady = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($notReady) {
+                    if ($this->attempts() >= $this->tries) {
+                        // Sudah dicoba maksimal tapi Shopee belum juga menyiapkan label.
+                        // Hentikan diam-diam (delete) agar TIDAK memicu ERROR
+                        // MaxAttemptsExceededException + stacktrace di log.
+                        Log::info("AutoDownloadLabel: label {$this->orderSn} belum siap setelah {$this->tries} percobaan, berhenti.");
+                        $this->delete();
+                        return;
+                    }
+                    Log::info("AutoDownloadLabel: label belum siap untuk {$this->orderSn}, coba lagi nanti");
+                    $this->release(180); // beri waktu Shopee menyiapkan dokumen
+                    return;
+                }
+
+                if ($this->attempts() >= $this->tries) {
+                    Log::warning("AutoDownloadLabel: Create gagal untuk {$this->orderSn} setelah {$this->tries} percobaan, berhenti.", ['res' => $createRes]);
+                    $this->delete();
+                    return;
+                }
                 Log::warning("AutoDownloadLabel: Create failed for {$this->orderSn}", ['res' => $createRes]);
                 $this->release(60); // Retry in 1 min
                 return;
@@ -113,6 +149,11 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
             
             // If it returns normal JSON error (e.g., document not ready)
             if (isset($downloadRes['error'])) {
+                if ($this->attempts() >= $this->tries) {
+                    Log::warning("AutoDownloadLabel: Document {$this->orderSn} tak kunjung siap setelah {$this->tries} percobaan, berhenti.", ['res' => $downloadRes]);
+                    $this->delete();
+                    return;
+                }
                 Log::warning("AutoDownloadLabel: Document not ready for {$this->orderSn}", ['res' => $downloadRes]);
                 $this->release(120); // Retry in 2 mins
                 return;
@@ -122,5 +163,14 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
             Log::error("AutoDownloadLabel: Error processing {$this->orderSn} - " . $e->getMessage());
             throw $e; // Throw to trigger retries
         }
+    }
+
+    /**
+     * Dipanggil bila job benar-benar gagal permanen (mis. exception terus-menerus).
+     * Dicatat ringkas agar tidak perlu menelusuri stacktrace panjang.
+     */
+    public function failed(\Throwable $e): void
+    {
+        Log::warning("AutoDownloadLabel: job untuk {$this->orderSn} gagal permanen: " . $e->getMessage());
     }
 }
