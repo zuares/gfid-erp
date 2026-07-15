@@ -1038,6 +1038,19 @@
         }
     };
 
+    // ── Polling (tanpa Reverb) ───────────────────────────────────────────────
+    let lastPollAt = Date.now();
+    setInterval(() => {
+        // Polling setiap 15 detik
+        if (Date.now() - lastPollAt >= 15000) {
+            lastPollAt = Date.now();
+            // Hanya poll jika halaman sedang aktif/terlihat
+            if (!document.hidden) {
+                load();
+            }
+        }
+    }, 5000);
+
     load();
 </script>
 @endpush

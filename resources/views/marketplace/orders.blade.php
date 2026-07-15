@@ -2207,7 +2207,15 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
                 } else {
                     const bkArg = o.is_booking ? `, '${o.booking_sn}'` : '';
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
+                    let ofgLabel = '';
+                    if (o.shipping_awb_no) {
+                        ofgLabel = `<div style="margin-bottom:6px"><span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px; display:inline-block; word-break:break-all;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
+                    }
+                    actionBtn = `
+                    <div style="display:flex; flex-direction:column; align-items:center; width:100%">
+                        ${ofgLabel}
+                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>
+                    </div>`;
                 }
             } else if (activeTab === 'processed') {
                 if (isFulfilled) {
@@ -2570,7 +2578,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                             ${isProcessed ? `<input type="checkbox" class="form-check-input chk-print-order" data-order-sn="${esc(o.channel_order_id)}" style="width:1.2rem;height:1.2rem;cursor:pointer;accent-color:#0284c7;margin-right:2px;">` : ''}
                             <span class="pk-order-id">${orderIdHtml}</span>
                             ${instantBadge}
-                            ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                             ${logBadge}
                             ${isPrinted && !isFulfilled ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0369a1; border-radius:4px; padding:1px 6px; font-weight:700; border:1px solid #7dd3fc;">🖨 ${cetakTeks}</span>` : ''}
                             ${fBadgeHtml}
@@ -2584,9 +2591,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                             </div>
                         </div>
                     </div>
-                    <div style="display:flex; gap:0.5rem; align-items:center;">
-                        ${logisticsBtn}
-                        ${actionBtn}
+                    <div style="display:flex; flex-direction:column; gap:0.4rem; align-items:flex-end;">
+                        ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            ${logisticsBtn}
+                            ${actionBtn}
+                        </div>
                     </div>
                 </div>
                 ${isProcessed ? `<div style="margin-top:0.8rem">${itemsSection}</div>` : ''}
@@ -3912,37 +3922,16 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         }
     }
 
-    // ── Realtime push via Reverb (webhook Shopee → OrderUpdated broadcast) ──
-    let echoConnected = false;
-    let rtDebounce = null;
-    if (window.Echo) {
-        try {
-            window.Echo.channel('marketplace')
-                .listen('OrderUpdated', () => {
-                    // Debounce: webhook sering datang beruntun (status+resi+dokumen)
-                    clearTimeout(rtDebounce);
-                    rtDebounce = setTimeout(silentRefresh, 800);
-                });
-
-            const conn = window.Echo.connector?.pusher?.connection;
-            if (conn) {
-                conn.bind('connected',    () => { echoConnected = true;  });
-                conn.bind('disconnected', () => { echoConnected = false; });
-                conn.bind('unavailable',  () => { echoConnected = false; });
-                echoConnected = conn.state === 'connected';
-            }
-        } catch (e) { console.warn('Realtime listener gagal:', e); }
-    }
-
-    // ── Fallback polling ─────────────────────────────────────────────────────
-    // WebSocket konek  → safety-net tiap 5 menit.
-    // WebSocket putus  → polling dipercepat tiap 30 detik supaya tidak ada yang nyangkut.
+    // ── Polling (tanpa Reverb) ───────────────────────────────────────────────
     let lastPollAt = Date.now();
     setInterval(() => {
-        const interval = echoConnected ? 300000 : 30000;
-        if (Date.now() - lastPollAt >= interval) {
+        // Polling setiap 15 detik
+        if (Date.now() - lastPollAt >= 15000) {
             lastPollAt = Date.now();
-            silentRefresh();
+            // Hanya poll jika halaman sedang aktif/terlihat
+            if (!document.hidden) {
+                silentRefresh();
+            }
         }
     }, 5000);
 

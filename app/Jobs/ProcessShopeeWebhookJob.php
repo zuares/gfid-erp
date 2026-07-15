@@ -339,8 +339,11 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             try {
                 // If bookingSn is actually an orderSn, this will pull the order details
                 app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $bookingSn);
+                event(new \App\Events\OrderUpdated($store->id, $bookingSn, null));
             } catch (\Exception $e) {
                 Log::error("Failed to sync missing booking/order {$bookingSn}: " . $e->getMessage());
+                // Still dispatch event so the UI can at least refresh with the updated MarketplaceBooking status
+                event(new \App\Events\OrderUpdated($store->id, $bookingSn, null));
             }
         }
     }
