@@ -626,6 +626,7 @@ class MarketplaceController extends Controller
         }
 
         try {
+            // Sinkronisasi order reguler
             $result = $this->sync->syncOrders(
                 $store,
                 (int) $request->time_from,
@@ -633,6 +634,12 @@ class MarketplaceController extends Controller
                 (int) ($request->page_size ?? 50),
                 (bool) $request->dry_run
             );
+            
+            // Sinkronisasi pesanan kilat (bookings) agar statusnya ter-update di UI
+            if (class_exists(\App\Jobs\SyncMarketplaceBookings::class)) {
+                dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, null, null, false));
+            }
+            
         } catch (\RuntimeException $e) {
             $lock->release();
             
