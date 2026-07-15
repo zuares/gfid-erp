@@ -275,16 +275,14 @@
             <i class="bi bi-pencil me-1"></i>Edit
           </a>
 
-          @if($receipt->is_replacement)
-            <form action="{{ route('purchasing.purchase_receipts.destroy', $receipt->id) }}" method="POST"
-                  onsubmit="return confirm('Hapus/Batalkan Draft Pengganti ini?');" class="d-inline">
-              @csrf
-              @method('DELETE')
-              <button type="submit" class="btn btn-outline-danger btn-sm">
-                <i class="bi bi-trash me-1"></i>Batal Draft
-              </button>
-            </form>
-          @endif
+          <form action="{{ route('purchasing.purchase_receipts.destroy', $receipt->id) }}" method="POST"
+                onsubmit="return confirm('Hapus dokumen Draft Penerimaan Barang ini?');" class="d-inline">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-trash me-1"></i>Hapus Draft
+            </button>
+          </form>
 
           @if ($isAdmin && !$grnHasPrice)
             <button type="button" class="btn btn-success btn-pill btn-sm disabled"

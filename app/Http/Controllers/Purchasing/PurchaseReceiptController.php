@@ -686,9 +686,7 @@ class PurchaseReceiptController extends Controller
             return back()->with('error', 'Hanya dokumen berstatus Draft yang dapat dihapus.');
         }
 
-        if (!$purchase_receipt->is_replacement) {
-            return back()->with('error', 'Fitur hapus ini hanya untuk Draft GRN Pengganti.');
-        }
+
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($purchase_receipt) {
             $purchase_receipt->lines()->delete();

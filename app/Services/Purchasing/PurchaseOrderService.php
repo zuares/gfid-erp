@@ -423,7 +423,7 @@ class PurchaseOrderService
                 continue;
             }
             $expectedType = $orderType === 'packing' ? 'material' : $orderType;
-            if ((string) $item->type !== (string) $expectedType) {
+            if (empty($referencedByItem[$itemId]) && (string) $item->type !== (string) $expectedType) {
                 throw ValidationException::withMessages([
                     "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
                 ]);
