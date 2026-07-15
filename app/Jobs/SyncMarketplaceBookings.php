@@ -167,6 +167,20 @@ class SyncMarketplaceBookings implements ShouldQueue
                     $pkg = $d['package_number'] ?? ($d['package_list'][0]['package_number'] ?? null);
                     if (! empty($pkg))                   $m->package_number = $pkg;
                     if (! empty($d['item_list']))        $m->items = $d['item_list'];
+                    if (! empty($d['booking_status']))   $m->booking_status = $d['booking_status']; // Pastikan status terupdate
+
+                    // Jika sudah diproses tapi belum punya resi, coba tarik resinya
+                    if (in_array((string) $m->booking_status, ['PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED']) && blank($m->tracking_number) && method_exists($driver, 'getBookingTrackingNumber')) {
+                        try {
+                            $trk = $driver->getBookingTrackingNumber($this->store, $sn);
+                            $trkNum = $trk['response']['tracking_number'] ?? null;
+                            if (! empty($trkNum)) {
+                                $m->tracking_number = $trkNum;
+                            }
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::warning("Gagal narik resi booking {$sn}: " . $e->getMessage());
+                        }
+                    }
 
                     if ($m->isDirty()) {
                         $m->save();
