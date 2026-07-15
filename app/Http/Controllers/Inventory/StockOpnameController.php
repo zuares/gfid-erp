@@ -540,6 +540,24 @@ class StockOpnameController extends Controller
             // 2) Mark reviewed validation (harus semua counted)
             // ==========================================================
             if ($markReviewed) {
+                if (!$isOpening) {
+                    foreach ($stockOpname->lines as $line) {
+                        if (!$line->is_counted || $line->physical_qty === null) {
+                            $line->physical_qty = 0;
+                            $line->difference_qty = 0 - (float) ($line->system_qty ?? 0);
+                            $line->is_counted = true;
+
+                            if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
+                                $fallback = (float) ($line->item->hpp ?? 0);
+                                if ($fallback > 0) {
+                                    $line->unit_cost = $fallback;
+                                }
+                            }
+                            $line->save();
+                        }
+                    }
+                }
+
                 $notCountedExists = $stockOpname->lines->contains(
                     fn($line) => !$line->is_counted || $line->physical_qty === null
                 );

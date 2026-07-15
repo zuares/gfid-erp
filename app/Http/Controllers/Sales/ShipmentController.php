@@ -915,12 +915,15 @@ class ShipmentController extends Controller
     protected function checkStockSufficiency(Shipment $shipment, Warehouse $warehouse): array
     {
         $lines = $shipment->lines()->with('item:id,code,name')->get();
+        if ($lines->isEmpty()) {
+            return [];
+        }
 
-        // Ambil stok WH-RTS untuk semua item sekaligus (1 query)
-        $itemIds = $lines->pluck('item_id')->filter()->unique()->values();
+        $itemIds = $lines->pluck('item_id')->unique()->toArray();
         $stocks  = InventoryStock::where('warehouse_id', $warehouse->id)
             ->whereIn('item_id', $itemIds)
-            ->pluck('qty', 'item_id'); // [item_id => qty]
+            ->get(['item_id', 'qty', 'allocated_qty'])
+            ->keyBy('item_id');
 
         $errors = [];
         foreach ($lines as $line) {
@@ -928,15 +931,22 @@ class ShipmentController extends Controller
             if ($qty <= 0) continue;
 
             $itemId  = (int) $line->item_id;
-            $current = (float) ($stocks[$itemId] ?? 0);
+            $stock   = $stocks->get($itemId);
+            
+            $physQty    = (float) ($stock->qty ?? 0);
+            $totalAlloc = (float) ($stock->allocated_qty ?? 0);
+            $myAlloc    = (float) ($line->allocated_qty ?? 0);
 
-            if (($current + 0.0000001) < $qty) {
+            // True available = Stok fisik - Total alokasi semua draft + Alokasi milik shipment ini sendiri
+            $trueAvailable = $physQty - $totalAlloc + $myAlloc;
+
+            if (($trueAvailable + 0.0000001) < $qty) {
                 $errors[] = [
                     'code'    => $line->item->code ?? "item#{$itemId}",
                     'name'    => $line->item->name ?? '',
-                    'stock'   => (int) $current,
+                    'stock'   => (int) $trueAvailable,
                     'needed'  => (int) $qty,
-                    'short'   => (int) ($qty - $current),
+                    'short'   => (int) ($qty - $trueAvailable),
                 ];
             }
         }
