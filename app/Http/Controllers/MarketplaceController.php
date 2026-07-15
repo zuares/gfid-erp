@@ -739,8 +739,8 @@ class MarketplaceController extends Controller
             $carrier   = strtolower((string) $o->shipping_carrier);
             $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');
             $bookingSn = $o->booking_sn ?? ($kilatMap[$o->channel_order_id] ?? ($kilatMap[$o->external_order_id] ?? null));
-            $arr['is_kilat']               = ($bookingSn !== null) && ! $isInstant;
-            $arr['booking_sn']             = $bookingSn;
+            $arr['is_kilat']               = (!empty($bookingSn)) && ! $isInstant;
+            $arr['booking_sn']             = $bookingSn ?: null;
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
             $arr['print_count']            = $o->print_count ?? 0;

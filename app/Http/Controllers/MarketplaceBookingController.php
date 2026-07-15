@@ -421,7 +421,7 @@ class MarketplaceBookingController extends Controller
 
             if ($disk->exists($cachePath)) {
                 if ($booking) {
-                    $booking->increment('print_count');
+                    if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
                     if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
                 }
                 $content = gzdecode($disk->get($cachePath));
@@ -505,7 +505,7 @@ class MarketplaceBookingController extends Controller
             $disk->put($cachePath, gzencode($pdfContent, 9));
 
             if ($booking) {
-                $booking->increment('print_count');
+                if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
                 if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
             }
 
@@ -606,7 +606,7 @@ class MarketplaceBookingController extends Controller
                                     $dlRes = $driver->getShippingDocument($store, [['order_sn' => $booking->order_sn]]);
                                     if (isset($dlRes['error']) && $dlRes['error'] === 'invalid_response' && str_starts_with($dlRes['message'] ?? '', '%PDF')) {
                                         $pdfPages[] = $dlRes['message'];
-                                        if ($booking) $booking->increment('print_count');
+                                        if ($booking) if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
                                         continue;
                                     }
                                 }
@@ -633,7 +633,7 @@ class MarketplaceBookingController extends Controller
 
                         if (str_starts_with($pdfContent, '%PDF')) {
                             $pdfPages[] = $pdfContent;
-                            if ($booking) $booking->increment('print_count');
+                            if ($booking) if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
                         } else {
                             $errors[] = "Booking {$bookingSn}: Format dokumen tidak valid";
                         }
