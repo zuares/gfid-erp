@@ -422,7 +422,8 @@ class PurchaseOrderService
             if (!$item) {
                 continue;
             }
-            if ((string) $item->type !== (string) $orderType) {
+            $expectedType = $orderType === 'packing' ? 'material' : $orderType;
+            if ((string) $item->type !== (string) $expectedType) {
                 throw ValidationException::withMessages([
                     "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
                 ]);
@@ -581,7 +582,8 @@ class PurchaseOrderService
             }
 
             // Guard item type must match order type
-            if ((string) $item->type !== (string) $orderType) {
+            $expectedType = $orderType === 'packing' ? 'material' : $orderType;
+            if ((string) $item->type !== (string) $expectedType) {
                 throw ValidationException::withMessages([
                     "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
                 ]);
