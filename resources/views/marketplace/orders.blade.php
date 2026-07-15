@@ -2847,6 +2847,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             let logisticsBtn = '';
+            const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
 
             // Logistics Buttons
             if (activeTab === 'processed_instant') {
@@ -2883,7 +2884,6 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
                     logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
                 }
             }
