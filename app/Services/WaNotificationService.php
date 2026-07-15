@@ -60,6 +60,27 @@ class WaNotificationService
     }
 
     /**
+     * Kirim pesan WA ke semua user dengan role 'operating'.
+     */
+    public function sendToOperatingRole(string $message): void
+    {
+        $token = env('FONNTE_TOKEN');
+        if (! $token) return;
+
+        $operatings = \App\Models\User::where('role', 'operating')
+            ->whereHas('employee', fn($q) => $q->whereNotNull('phone'))
+            ->with('employee')
+            ->get();
+
+        foreach ($operatings as $user) {
+            $phone = $user->employee->phone ?? null;
+            if ($phone) {
+                $this->sendFonnte($token, $phone, $message);
+            }
+        }
+    }
+
+    /**
      * Kirim OTP via WhatsApp ke nomor customer.
      * Fallback ke log jika Fonnte belum dikonfigurasi.
      */

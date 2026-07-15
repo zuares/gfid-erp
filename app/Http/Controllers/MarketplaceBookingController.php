@@ -272,16 +272,14 @@ class MarketplaceBookingController extends Controller
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 
-            // Terima pilihan pickup/dropoff dari UI. Shopee mewajibkan field
-            // pickup dan dropoff tetap dikirim sebagai object kosong {} meskipun tidak dipilih.
-            $params = [
-                'pickup'  => new \stdClass(),
-                'dropoff' => new \stdClass(),
-            ];
-            foreach (['pickup', 'dropoff'] as $method) {
+            // Terima pilihan pickup/dropoff dari UI. Pastikan array kosong jadi object JSON {}
+            $params = [];
+            foreach (['pickup', 'dropoff', 'non_integrated'] as $method) {
                 if ($request->has($method)) {
                     $val = $request->input($method);
-                    if (!is_array($val) || !empty($val)) {
+                    if (is_array($val) && empty($val)) {
+                        $params[$method] = new \stdClass();
+                    } else {
                         $params[$method] = $val;
                     }
                 }

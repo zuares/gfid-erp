@@ -215,30 +215,35 @@ class RtsStockRequestController extends Controller
             ]);
         }
 
-        // ✅ Tolak jika stok WH-PRD kosong untuk salah satu item
+        // ✅ Cek stok WH-PRD untuk notifikasi jika minus
         $srcWhId = (int) $data['source_warehouse_id'];
+        $itemIds = array_map(fn($r) => (int) $r['item_id'], $data['lines'] ?? []);
         $prdStocks = DB::table('inventory_stocks')
             ->where('warehouse_id', $srcWhId)
             ->whereIn('item_id', $itemIds)
             ->pluck('qty', 'item_id');
 
-        $emptyErrors = [];
-        foreach ($data['lines'] as $idx => $row) {
+        $shortageItems = [];
+        foreach ($data['lines'] as $row) {
             $iid = (int) $row['item_id'];
+            $qtyReq = (float) $row['qty_request'];
             $stock = (float) ($prdStocks[$iid] ?? 0);
-            if ($stock <= 0) {
-                $itemCode = DB::table('items')->where('id', $iid)->value('code') ?? "item #{$iid}";
-                $emptyErrors["lines.{$idx}.qty_request"] = "{$itemCode}: stok WH-PRD kosong (0), permintaan ditolak.";
+            
+            if ($qtyReq > $stock) {
+                $item = DB::table('items')->where('id', $iid)->first();
+                $itemStr = $item ? ($item->code) : "Item #{$iid}";
+                $shortageItems[] = "• {$itemStr}: diambil " . ($qtyReq + 0) . ", stok sistem " . ($stock + 0);
             }
         }
-        if (!empty($emptyErrors)) {
-            throw ValidationException::withMessages($emptyErrors);
-        }
 
-        return DB::transaction(function () use ($data) {
+        $srCode = '';
+        $srModel = null;
+
+        $result = DB::transaction(function () use ($data, $shortageItems, &$srCode, &$srModel) {
             $date = Carbon::parse($data['date'])->toDateString();
 
             $code = $this->generateRtsCode($date);
+            $srCode = $code;
 
             $sr = new StockRequest();
             $sr->code = $code;
@@ -258,6 +263,7 @@ class RtsStockRequestController extends Controller
             }
 
             $sr->save();
+            $srModel = $sr;
 
             $lineNo = 1;
 
@@ -293,8 +299,25 @@ class RtsStockRequestController extends Controller
 
             return redirect()
                 ->route('rts.stock-requests.show', $sr)
-                ->with('success', 'Terima Jadi berhasil. Stok WH-PRD langsung berpindah ke WH-RTS.');
+                ->with('success', 'Terima Barang berhasil. Stok WH-PRD langsung berpindah ke WH-RTS.');
         });
+
+        // 🔔 Kirim notifikasi WA ke role operating jika ada stok minus
+        if (!empty($shortageItems)) {
+            $msg = "⚠️ *INFO STOK MINUS DI WH-PRD* ⚠️\n\n"
+                 . "Ada pengambilan RTS (*{$srCode}*) yang membuat stok PRD menjadi minus.\n\n"
+                 . "*Rincian barang kurang:*\n"
+                 . implode("\n", $shortageItems) . "\n\n"
+                 . "Tolong tim Operating segera cek fisik barang di area PRD ya agar stok sistem dan fisik sinkron kembali. Semangat! 💪";
+                 
+            try {
+                app(\App\Services\WaNotificationService::class)->sendToOperatingRole($msg);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Gagal kirim notif WA stok minus: ' . $e->getMessage());
+            }
+        }
+
+        return $result;
     }
 
 /**

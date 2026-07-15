@@ -705,14 +705,12 @@ class MarketplaceController extends Controller
         // Guard hasTable agar Orders tidak error bila migration booking belum jalan di server.
         // Cocokkan hanya via order_sn (unik global) — JANGAN pakai store_id, karena record
         // booking & order bisa tersimpan di store_id lokal berbeda sehingga match gagal.
-        $kilatKeys = [];      // key: order_sn => true
+        $kilatMap = [];      // key: order_sn => booking_sn
         $kilatOrderSns = [];
         if (\Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
-            $kilatOrderSns = \App\Models\MarketplaceBooking::whereNotNull('order_sn')->where('order_sn', '!=', '')
-                ->pluck('order_sn')->unique()->values()->all();
-            foreach ($kilatOrderSns as $sn) {
-                $kilatKeys[$sn] = true;
-            }
+            $kilatMap = \App\Models\MarketplaceBooking::whereNotNull('order_sn')->where('order_sn', '!=', '')
+                ->pluck('booking_sn', 'order_sn')->all();
+            $kilatOrderSns = array_keys($kilatMap);
         }
 
         $orders = MarketplaceOrder::with($with)->latest('ordered_at')->limit(200)->get();
@@ -734,13 +732,15 @@ class MarketplaceController extends Controller
             }
         }
 
-        $mapped = $orders->map(function ($o) use ($hasScanLog, $kilatKeys) {
+        $mapped = $orders->map(function ($o) use ($hasScanLog, $kilatMap) {
             $arr = $o->toArray();
             // Kilat = punya booking DAN BUKAN Instan (same-day). Keduanya berbeda:
             // Instan dideteksi dari nama kurir, ditangani di tab "Instan" tersendiri.
             $carrier   = strtolower((string) $o->shipping_carrier);
             $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');
-            $arr['is_kilat']               = (isset($kilatKeys[$o->channel_order_id]) || isset($kilatKeys[$o->external_order_id])) && ! $isInstant;
+            $bookingSn = $o->booking_sn ?? ($kilatMap[$o->channel_order_id] ?? ($kilatMap[$o->external_order_id] ?? null));
+            $arr['is_kilat']               = ($bookingSn !== null) && ! $isInstant;
+            $arr['booking_sn']             = $bookingSn;
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
             $arr['print_count']            = $o->print_count ?? 0;
@@ -1970,7 +1970,56 @@ class MarketplaceController extends Controller
         public function issueSummary(Request $request): JsonResponse
     {
         $storeId = $request->input('store_id');
-        return response()->json($this->issueService->summary($storeId ? (int) $storeId : null));
+        $summary = $this->issueService->summary($storeId ? (int) $storeId : null);
+
+        // Gabungkan issue dari Pesanan Kilat (booking tanpa order lokal)
+        $booking = $this->issueService->bookingIssueSummary($storeId ? (int) $storeId : null);
+        $summary['sku_empty']         += $booking['sku_empty'];
+        $summary['mapping_not_found'] += $booking['mapping_not_found'];
+        $summary['missing_hpp']       += $booking['missing_hpp'];
+        $summary['total_issues']      += $booking['total_issues'];
+        $summary['data_incomplete']   += $booking['total_issues'];
+        $summary['booking_issues']     = $booking['total_issues'];
+
+        return response()->json($summary);
+    }
+
+    // ── Quick actions untuk item Pesanan Kilat (booking) ─────────────────────
+
+    public function fillBookingItemSku(Request $request, \App\Models\MarketplaceBooking $booking): JsonResponse
+    {
+        $data = $request->validate([
+            'index' => 'required|integer|min:0',
+            'sku'   => 'required|string|max:100',
+        ]);
+
+        try {
+            $result = $this->issueService->fillBookingItemSku($booking, (int) $data['index'], $data['sku']);
+            return response()->json([
+                'message'  => 'SKU berhasil diisi. Mapping nama produk tersimpan — order berikutnya otomatis terisi.',
+                'affected' => $result['affected'],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function mapBookingItemSku(Request $request, \App\Models\MarketplaceBooking $booking): JsonResponse
+    {
+        $data = $request->validate([
+            'index'            => 'required|integer|min:0',
+            'internal_item_id' => 'required|integer|exists:items,id',
+        ]);
+
+        try {
+            $result = $this->issueService->mapBookingItemSku($booking, (int) $data['index'], (int) $data['internal_item_id']);
+            return response()->json([
+                'message'  => 'SKU berhasil dihubungkan ke item internal.',
+                'affected' => $result['affected'],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function remapOrderItems(Request $request): JsonResponse

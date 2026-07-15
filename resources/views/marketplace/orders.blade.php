@@ -2207,7 +2207,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
                 } else {
-                    const bkArg = o.is_kilat ? `, '${o.channel_order_id}'` : '';
+                    const bkArg = o.is_kilat ? `, '${o.booking_sn || o.channel_order_id}'` : '';
                     let ofgLabel = '';
                     if (o.shipping_awb_no) {
                         ofgLabel = `<div style="margin-bottom:6px"><span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px; display:inline-block; word-break:break-all;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
@@ -2860,13 +2860,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     logisticsBtn = `
                     <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
                         <button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
                     </div>`;
                 }
             } else if (activeTab === 'processed') {
                 logisticsBtn = `
                 <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                    <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>
+                    <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
                     <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>
                 </div>`;
             } else if (activeTab === 'ready') {
@@ -2874,7 +2874,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
                     logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
-                    const bkArg = o.is_kilat ? `, '${o.channel_order_id}'` : '';
+                    const bkArg = o.is_kilat ? `, '${o.booking_sn || o.channel_order_id}'` : '';
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
                 }
             } else {
@@ -3339,23 +3339,28 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const responseData = res.response || res;
             const infoNeeded = responseData.info_needed || {};
             
+            // Tangani dua kemungkinan bentuk respons Shopee:
+            // (a) data di bawah info_needed.pickup/dropoff, atau (b) di top-level pickup/dropoff.
+            const pickupData  = (infoNeeded.pickup && infoNeeded.pickup.address_list) ? infoNeeded.pickup : (responseData.pickup || null);
+            const dropoffData = (infoNeeded.dropoff && infoNeeded.dropoff.branch_list) ? infoNeeded.dropoff : (responseData.dropoff || null);
+            
             let html = '';
             
             if (infoNeeded.dropoff) {
                 // Determine if pickup should be default (if it exists and has addresses)
-                const shouldDefaultToPickup = responseData.pickup && responseData.pickup.address_list && responseData.pickup.address_list.length > 0;
+                const shouldDefaultToPickup = pickupData && pickupData.address_list && pickupData.address_list.length > 0;
                 
                 html += `<div class="form-check mb-2">
                     <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asDropoff" value="dropoff" ${!shouldDefaultToPickup ? 'checked' : ''}>
                     <label class="form-check-label" for="asDropoff"><strong>Drop-off</strong> (Antar ke Cabang)</label>
                 </div>`;
 
-                if (responseData.dropoff && responseData.dropoff.branch_list && responseData.dropoff.branch_list.length > 0) {
+                if (dropoffData && dropoffData.branch_list && dropoffData.branch_list.length > 0) {
                     html += `<div class="dropoff-options ps-4 mt-2" id="dropoffOptionsWrapper" style="${!shouldDefaultToPickup ? 'display:block;' : 'display:none;'}">
                         <div class="mb-2">
                             <label class="form-label" style="font-size:0.8rem">Pilih Cabang / Titik Drop-off</label>
                             <select class="form-select form-select-sm" id="asDropoffBranch">`;
-                    responseData.dropoff.branch_list.forEach((branch) => {
+                    dropoffData.branch_list.forEach((branch) => {
                         let label = [branch.address, branch.city, branch.state, branch.zipcode].filter(Boolean).join(', ');
                         html += `<option value="${branch.branch_id}">${label || ('Titik #' + branch.branch_id)}</option>`;
                     });
@@ -3364,21 +3369,22 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     </div>`;
                 }
             }
+            
             if (infoNeeded.pickup) {
                 // If dropoff doesn't exist, or we decided pickup is default
-                const shouldDefaultToPickup = !infoNeeded.dropoff || (responseData.pickup && responseData.pickup.address_list && responseData.pickup.address_list.length > 0);
+                const shouldDefaultToPickup = !infoNeeded.dropoff || (pickupData && pickupData.address_list && pickupData.address_list.length > 0);
                 
                 html += `<div class="form-check mb-2">
                     <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asPickup" value="pickup" ${shouldDefaultToPickup ? 'checked' : ''}>
                     <label class="form-check-label" for="asPickup"><strong>Pickup</strong> (Kurir Jemput)</label>
                 </div>`;
                 
-                if (responseData.pickup && responseData.pickup.address_list && responseData.pickup.address_list.length > 0) {
+                if (pickupData && pickupData.address_list && pickupData.address_list.length > 0) {
                     html += `<div class="pickup-options ps-4 mt-2" id="pickupOptionsWrapper" style="${shouldDefaultToPickup ? 'display:block;' : 'display:none;'}">
                         <div class="mb-2">
                             <label class="form-label" style="font-size:0.8rem">Alamat Pickup</label>
                             <select class="form-select form-select-sm" id="asPickupAddress">`;
-                    responseData.pickup.address_list.forEach((addr, idx) => {
+                    pickupData.address_list.forEach((addr, idx) => {
                         let timeslots = JSON.stringify(addr.time_slot_list || []);
                         let isDefault = (addr.address_flag && addr.address_flag.includes('default_address')) ? 'selected' : '';
                         html += `<option value="${addr.address_id}" data-timeslots='${timeslots.replace(/'/g, "&#39;")}' ${isDefault}>${addr.address || addr.address_id}</option>`;
@@ -3472,8 +3478,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const timeSelect = document.getElementById('asPickupTime');
             if (addressSelect && timeSelect) {
                 // Ensure address_id is sent as an integer or string based on original value (typically integer)
-                if (addressSelect.value) params.pickup.address_id = Number(addressSelect.value) || addressSelect.value;
-                if (timeSelect.value) params.pickup.pickup_time_id = timeSelect.value;
+                params.pickup.address_id = Number(addressSelect.value) || addressSelect.value || 0;
+                params.pickup.pickup_time_id = timeSelect.value || "";
             }
         }
 

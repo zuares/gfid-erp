@@ -1,7 +1,7 @@
 {{-- resources/views/inventory/rts_stock_requests/create.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'RTS • Terima Jadi')
+@section('title', 'RTS • Terima Barang')
 
 @push('head')
     <style>
@@ -382,18 +382,6 @@
         #confirmReceiveModal .modal-footer{ border-color:var(--shp-border); padding:.85rem 1.15rem; }
         #confirmReceiveModal .modal-title{ font-weight:800; font-size:1rem; }
         #confirmReceiveModal .modal-body{ padding:1.15rem; }
-        #confirmReceiveModal .btn{
-            border-radius:999px!important; font-size:.8rem!important; font-weight:700!important;
-            padding:.4rem 1.2rem!important; text-transform:uppercase; letter-spacing:.03em;
-        }
-        #confirmReceiveModal .btn-confirm-primary{
-            background:var(--shp-accent)!important; border:1px solid var(--shp-accent)!important; color:#fff!important;
-        }
-        #confirmReceiveModal .btn-confirm-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; }
-        #confirmReceiveModal .btn-confirm-outline{
-            background:transparent!important; border:1px solid rgba(148,163,184,.5)!important; color:#6b7280!important;
-        }
-        #confirmReceiveModal .btn-confirm-outline:hover{ background:rgba(226,232,240,.7)!important; color:#374151!important; }
 
         .page-wrap{
             max-width:1040px!important;
@@ -733,7 +721,7 @@
     <div class="page-wrap">
         <div class="ship-topbar">
             <div>
-                <div class="ship-title">RTS • Terima Jadi</div>
+                <div class="ship-title">RTS • Terima Barang</div>
                 <div class="ship-sub">
                     Ambil barang jadi dari <b>{{ $prdWarehouse->code }}</b> ke <b>{{ $rtsWarehouse->code }}</b>.
                 </div>
@@ -801,7 +789,7 @@
                 <div class="card" style="margin-top:.85rem">
                     <div style="display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap;align-items:center">
                         <div>
-                            <div style="font-weight:900">Item Terima Jadi</div>
+                            <div style="font-weight:900">Item Terima Barang</div>
                             <div class="muted small">Pilih item, cek stok WH-PRD, lalu isi qty yang diterima.</div>
                         </div>
                     </div>
@@ -820,7 +808,7 @@
                         <div class="rts-summary">
                             <span class="rts-pill">Item <b id="sumItems">0</b></span>
                             <span class="rts-pill rts-pill-accent">Total Terima <b id="sumTotal">0</b></span>
-                            <span class="rts-pill rts-pill-danger d-none" id="sumShortWrap">Stok Kurang <b id="sumShort">0</b></span>
+                            <span class="rts-pill rts-pill-danger d-none" id="sumShortWrap"><b id="sumShort">0</b> Item Minus di PRD</span>
                         </div>
                     </div>
 
@@ -858,10 +846,10 @@
 
 
                 <div class="btn-row">
-                    <div class="muted small">Klik Terima Jadi untuk konfirmasi perpindahan stok.</div>
+                    <div class="muted small">Klik Terima Barang untuk konfirmasi perpindahan stok.</div>
                     <div class="btns">
                         <a class="btn" href="{{ route('rts.stock-requests.index') }}">Batal</a>
-                        <button type="submit" class="btn btn-primary">Terima Jadi</button>
+                        <button type="submit" class="btn btn-primary">Terima Barang</button>
                     </div>
                 </div>
             </form>
@@ -871,7 +859,7 @@
                     <div class="modal-content" style="border-radius:16px;">
                         <div class="modal-header">
                             <div>
-                                <h5 class="modal-title" style="margin:0;">Konfirmasi Terima Jadi</h5>
+                                <h5 class="modal-title" style="margin:0;">Konfirmasi Terima Barang</h5>
                                 <div class="text-muted mono" style="font-size:.78rem;font-weight:800;margin-top:.15rem;">
                                     <span id="m-kode">—</span>
                                     &nbsp;·&nbsp;
@@ -892,7 +880,7 @@
                                 </div>
                                 <div class="mt-2 d-flex gap-3 flex-wrap" style="font-size:.88rem;font-weight:800;">
                                     <div>Total Terima&nbsp;<span class="mono" id="m-total" style="font-size:1rem;">0</span></div>
-                                    <div id="m-short-wrap" class="d-none" style="color:#ef4444;">Stok Kurang&nbsp;<span class="mono" id="m-short">0</span></div>
+                                    <div id="m-short-wrap" class="d-none" style="color:#ef4444;"><span class="mono" id="m-short">0</span> Item Minus di PRD</div>
                                 </div>
                             </div>
 
@@ -931,9 +919,9 @@
                         </div>
 
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-sm btn-confirm-outline"
+                            <button type="button" class="btn btn-ship-outline"
                                 data-bs-dismiss="modal">Batal</button>
-                            <button type="button" class="btn btn-sm btn-confirm-primary" id="btn-confirm-submit">Simpan</button>
+                            <button type="button" class="btn btn-ship-primary" id="btn-confirm-submit">Simpan</button>
                         </div>
                     </div>
                 </div>
