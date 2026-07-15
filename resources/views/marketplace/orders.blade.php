@@ -787,7 +787,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
             
             <div id="subTabProcessedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabProcessed('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-all">—</span></button>
-                <button class="ord-subtab active" data-sub="packing" onclick="switchSubTabProcessed('packing', this)">Belum Packing <span class="ord-badge bg-secondary urgent" id="badge-sub-packing">—</span></button>
+                <button class="ord-subtab active" data-sub="packing" onclick="switchSubTabProcessed('packing', this)">Belum Dipacking <span class="ord-badge bg-secondary urgent" id="badge-sub-packing">—</span></button>
                 <button class="ord-subtab" data-sub="ready" onclick="switchSubTabProcessed('ready', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-ready">—</span></button>
             </div>
             <div id="subTabReadyContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
@@ -2141,7 +2141,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER'
                         || (['READY_TO_SHIP', 'PROCESSED', 'MATCHED'].includes(o.order_status) && isPacked(o));
                     
-                    if (o.is_kilat) return !isPacked(o) && !kilatNeedsArrange(o);
+                    if (o.is_kilat) {
+                        const validProcessedStatus = ['READY_TO_SHIP', 'PROCESSED', 'MATCHED'].includes(o.order_status);
+                        return validProcessedStatus && !isPacked(o) && !kilatNeedsArrange(o);
+                    }
 
                     const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED' && !isInstant(o);
                     return isNormalProcessed || isReadyToHandover;
