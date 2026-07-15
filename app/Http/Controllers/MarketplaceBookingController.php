@@ -272,17 +272,18 @@ class MarketplaceBookingController extends Controller
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 
-            // Terima pilihan pickup/dropoff dari UI. Kirim sebagai objek {} bukan array []
-            // (json_encode PHP mengubah array kosong jadi [] yang ditolak Shopee) — sama
-            // seperti arrangeShipment pada order.
-            $params = [];
+            // Terima pilihan pickup/dropoff dari UI. Shopee mewajibkan field
+            // pickup dan dropoff tetap dikirim sebagai object kosong {} meskipun tidak dipilih.
+            $params = [
+                'pickup'  => new \stdClass(),
+                'dropoff' => new \stdClass(),
+            ];
             foreach (['pickup', 'dropoff'] as $method) {
                 if ($request->has($method)) {
                     $val = $request->input($method);
-                    if (is_array($val) && empty($val)) {
-                        $val = new \stdClass();
+                    if (!is_array($val) || !empty($val)) {
+                        $params[$method] = $val;
                     }
-                    $params[$method] = $val;
                 }
             }
 
@@ -384,5 +385,315 @@ class MarketplaceBookingController extends Controller
                 "promoteBookingToOrder [{$store->id}] {$bookingSn}: " . $e->getMessage()
             );
         }
+    }
+
+    /**
+     * Cetak resi tunggal booking. Alur:
+     * 1. Ambil tracking_number dari getBookingTrackingNumber
+     * 2. Create booking shipping document
+     * 3. Download booking shipping document (PDF)
+     * 4. Jika gagal (booking belum punya order), fallback ke cetak via order biasa
+     */
+    public function printDocument(Store $store, string $bookingSn)
+    {
+        try {
+            $driver  = $this->manager->driver($store);
+            $booking = MarketplaceBooking::where('store_id', $store->id)
+                ->where('booking_sn', $bookingSn)->first();
+
+            // Parameter cetak — tracking_number wajib untuk booking document API
+            $trackingNumber = $booking->tracking_number ?? null;
+
+            // Ambil tracking number terbaru jika belum ada
+            if (!$trackingNumber && method_exists($driver, 'getBookingTrackingNumber')) {
+                try {
+                    $trk = $driver->getBookingTrackingNumber($store, $bookingSn);
+                    $trackingNumber = $trk['response']['tracking_number'] ?? null;
+                    if ($trackingNumber && $booking) {
+                        $booking->update(['tracking_number' => $trackingNumber]);
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // Cek cache lokal
+            $cardParam   = request()->query('card');
+            $cacheSuffix = $cardParam === '0' ? '_nocard' : '';
+            $disk        = \Illuminate\Support\Facades\Storage::disk('local');
+            $cachePath   = "shipping_labels/{$store->id}/BK_{$bookingSn}{$cacheSuffix}.pdf.gz";
+
+            if ($disk->exists($cachePath)) {
+                if ($booking) {
+                    $booking->increment('print_count');
+                    if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
+                }
+                $content = gzdecode($disk->get($cachePath));
+                return response($content, 200, [
+                    'Content-Type'        => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="Resi_BK_' . $bookingSn . '.pdf"',
+                ]);
+            }
+
+            // Jika tidak ada tracking number, coba fallback ke cetak order biasa
+            if (!$trackingNumber) {
+                return $this->fallbackToOrderPrint($store, $booking, $bookingSn);
+            }
+
+            // Step 1: Create Booking Shipping Document
+            $bookingPayload = [['booking_sn' => $bookingSn, 'tracking_number' => $trackingNumber]];
+
+            if (!method_exists($driver, 'createBookingShippingDocument')) {
+                return $this->fallbackToOrderPrint($store, $booking, $bookingSn);
+            }
+
+            $createRes = $driver->createBookingShippingDocument($store, $bookingPayload);
+
+            // Cek error pada create
+            if (!empty($createRes['error'])) {
+                $failMsg = null;
+                if (isset($createRes['response']['result_list'])) {
+                    foreach ($createRes['response']['result_list'] as $item) {
+                        $failMsg = $item['fail_message'] ?? $item['fail_error'] ?? null;
+                        break;
+                    }
+                }
+                $failMsg = $failMsg ?? $createRes['message'] ?? 'Gagal membuat dokumen resi booking.';
+
+                // Jika tracking invalid, coba refresh tracking number
+                if (str_contains(strtolower($failMsg), 'tracking number is invalid')) {
+                    try {
+                        $trk = $driver->getBookingTrackingNumber($store, $bookingSn);
+                        $freshTn = $trk['response']['tracking_number'] ?? null;
+                        if ($freshTn && $freshTn !== $trackingNumber) {
+                            $trackingNumber = $freshTn;
+                            if ($booking) $booking->update(['tracking_number' => $trackingNumber]);
+                            $bookingPayload = [['booking_sn' => $bookingSn, 'tracking_number' => $trackingNumber]];
+                            $createRes = $driver->createBookingShippingDocument($store, $bookingPayload);
+                            if (empty($createRes['error'])) {
+                                $failMsg = null;
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+                }
+
+                if ($failMsg) {
+                    // Fallback ke cetak order biasa
+                    return $this->fallbackToOrderPrint($store, $booking, $bookingSn, $failMsg);
+                }
+            }
+
+            // Step 2: Download Booking Shipping Document (PDF)
+            $pdfContent = $driver->downloadBookingShippingDocument($store, $bookingPayload);
+
+            // Jika hasilnya array, bukan string PDF — artinya error
+            if (is_array($pdfContent)) {
+                $errorMsg = $pdfContent['message'] ?? 'Dokumen booking belum siap.';
+                return $this->fallbackToOrderPrint($store, $booking, $bookingSn, $errorMsg);
+            }
+
+            // Jika bukan PDF valid
+            if (!str_starts_with($pdfContent, '%PDF')) {
+                return $this->fallbackToOrderPrint($store, $booking, $bookingSn, 'Format dokumen tidak valid.');
+            }
+
+            // Overlay greeting card jika perlu
+            $config = [];
+            if ($cardParam !== null) {
+                $config['marketplace_print_greeting_card'] = $cardParam === '1' ? '1' : '0';
+            }
+            $overlayService = new \App\Services\ShippingLabelOverlayService();
+            $pdfContent = $overlayService->overlayPdfContent($pdfContent, $config);
+
+            // Cache
+            $disk->put($cachePath, gzencode($pdfContent, 9));
+
+            if ($booking) {
+                $booking->increment('print_count');
+                if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
+            }
+
+            return response($pdfContent, 200, [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="Resi_BK_' . $bookingSn . '.pdf"',
+            ]);
+        } catch (\Exception $e) {
+            return response(
+                "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
+                    <h2 style='color:#e11d48;'>Gagal Mencetak Resi Booking</h2>
+                    <p>{$e->getMessage()}</p>
+                    <button onclick='window.close()' style='padding:10px 20px; background:#e2e8f0; border:none; border-radius:5px; cursor:pointer;'>Tutup Halaman</button>
+                </div>", 500
+            );
+        }
+    }
+
+    /**
+     * Fallback: jika cetak via booking API gagal, coba cetak via order biasa
+     * (jika booking sudah dipromote ke order_sn).
+     */
+    protected function fallbackToOrderPrint(Store $store, ?MarketplaceBooking $booking, string $bookingSn, ?string $reason = null)
+    {
+        // Coba promote dulu jika belum
+        if ($booking && blank($booking->order_sn)) {
+            $this->promoteBookingToOrder($store, $bookingSn);
+            $booking->refresh();
+        }
+
+        if ($booking && !blank($booking->order_sn)) {
+            // Redirect ke cetak order biasa
+            $orderSn = $booking->order_sn;
+            $card = request()->query('card');
+            $url = "/api/marketplace/stores/{$store->id}/orders/{$orderSn}/document" . ($card !== null ? "?card={$card}" : '');
+            return redirect($url);
+        }
+
+        // Tidak bisa fallback — tampilkan pesan error
+        $reason = $reason ?? 'Pesanan kilat ini belum memiliki nomor resi (tracking number). Resi belum bisa dicetak sampai Shopee memproses pesanan ini.';
+        return response(
+            "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
+                <h2 style='color:#f59e0b;'>Resi Belum Siap</h2>
+                <p>{$reason}</p>
+                <button onclick='window.close()' style='padding:10px 20px; background:#e2e8f0; border:none; border-radius:5px; cursor:pointer;'>Tutup Halaman</button>
+            </div>", 400
+        );
+    }
+
+    /**
+     * Bulk print booking documents.
+     * Menerima array booking_sn, mencetak semua, dan merge ke satu PDF.
+     */
+    public function createBulkPrintJob(Request $request)
+    {
+        try {
+            $items = $request->input('bookings', []); // [{store_id, booking_sn}]
+            if (empty($items)) {
+                return response()->json(['error' => 'Tidak ada booking yang dipilih.'], 400);
+            }
+
+            $uuid = (string) \Illuminate\Support\Str::uuid();
+            $disk = \Illuminate\Support\Facades\Storage::disk('local');
+            $pdfPages = [];
+            $errors = [];
+
+            // Group by store
+            $grouped = collect($items)->groupBy('store_id');
+
+            foreach ($grouped as $storeId => $storeBookings) {
+                $store = Store::find($storeId);
+                if (!$store) continue;
+
+                $driver = $this->manager->driver($store);
+                if (!method_exists($driver, 'createBookingShippingDocument')) continue;
+
+                foreach ($storeBookings as $item) {
+                    $bookingSn = $item['booking_sn'];
+                    $booking = MarketplaceBooking::where('store_id', $storeId)
+                        ->where('booking_sn', $bookingSn)->first();
+                    $tn = $booking->tracking_number ?? null;
+
+                    // Ambil tracking number jika belum ada
+                    if (!$tn && method_exists($driver, 'getBookingTrackingNumber')) {
+                        try {
+                            $trk = $driver->getBookingTrackingNumber($store, $bookingSn);
+                            $tn = $trk['response']['tracking_number'] ?? null;
+                            if ($tn && $booking) $booking->update(['tracking_number' => $tn]);
+                        } catch (\Throwable $e) {}
+                    }
+
+                    if (!$tn) {
+                        // Coba fallback: jika sudah punya order_sn, cetak via order
+                        if ($booking && $booking->order_sn) {
+                            try {
+                                $createRes = $driver->createShippingDocument($store, [['order_sn' => $booking->order_sn]]);
+                                if (empty($createRes['error'])) {
+                                    $dlRes = $driver->getShippingDocument($store, [['order_sn' => $booking->order_sn]]);
+                                    if (isset($dlRes['error']) && $dlRes['error'] === 'invalid_response' && str_starts_with($dlRes['message'] ?? '', '%PDF')) {
+                                        $pdfPages[] = $dlRes['message'];
+                                        if ($booking) $booking->increment('print_count');
+                                        continue;
+                                    }
+                                }
+                            } catch (\Throwable $e) {}
+                        }
+                        $errors[] = "Booking {$bookingSn}: Belum ada nomor resi";
+                        continue;
+                    }
+
+                    $payload = [['booking_sn' => $bookingSn, 'tracking_number' => $tn]];
+
+                    try {
+                        $createRes = $driver->createBookingShippingDocument($store, $payload);
+                        if (!empty($createRes['error']) && !empty($createRes['response']['result_list'][0]['fail_message'])) {
+                            $errors[] = "Booking {$bookingSn}: " . $createRes['response']['result_list'][0]['fail_message'];
+                            continue;
+                        }
+
+                        $pdfContent = $driver->downloadBookingShippingDocument($store, $payload);
+                        if (is_array($pdfContent)) {
+                            $errors[] = "Booking {$bookingSn}: " . ($pdfContent['message'] ?? 'Download gagal');
+                            continue;
+                        }
+
+                        if (str_starts_with($pdfContent, '%PDF')) {
+                            $pdfPages[] = $pdfContent;
+                            if ($booking) $booking->increment('print_count');
+                        } else {
+                            $errors[] = "Booking {$bookingSn}: Format dokumen tidak valid";
+                        }
+                    } catch (\Throwable $e) {
+                        $errors[] = "Booking {$bookingSn}: " . $e->getMessage();
+                    }
+                }
+            }
+
+            if (empty($pdfPages)) {
+                return response()->json([
+                    'error' => 'Tidak ada resi yang berhasil dicetak.',
+                    'details' => $errors,
+                ], 400);
+            }
+
+            // Merge PDFs
+            $merger = new \setasign\Fpdi\Fpdi();
+            foreach ($pdfPages as $pdfData) {
+                $tmpFile = tempnam(sys_get_temp_dir(), 'bk_resi_');
+                file_put_contents($tmpFile, $pdfData);
+                $pageCount = $merger->setSourceFile($tmpFile);
+                for ($p = 1; $p <= $pageCount; $p++) {
+                    $tpl = $merger->importPage($p);
+                    $size = $merger->getTemplateSize($tpl);
+                    $merger->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $merger->useTemplate($tpl);
+                }
+                @unlink($tmpFile);
+            }
+
+            $mergedPath = "tmp/booking_bulk_print_{$uuid}.pdf";
+            $merger->Output('F', storage_path("app/{$mergedPath}"));
+
+            $downloadUrl = "/api/marketplace/documents/booking-bulk-print/{$uuid}";
+
+            return response()->json([
+                'success'      => true,
+                'download_url' => $downloadUrl,
+                'total'        => count($pdfPages),
+                'errors'       => $errors,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /** Download merged bulk print PDF. */
+    public function downloadBulkPrintJob(string $uuid)
+    {
+        $path = storage_path("app/tmp/booking_bulk_print_{$uuid}.pdf");
+        if (!file_exists($path)) {
+            return response()->json(['error' => 'File tidak ditemukan atau sudah kedaluwarsa.'], 404);
+        }
+
+        return response()->file($path, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="Resi_Booking_Bulk_' . $uuid . '.pdf"',
+        ]);
     }
 }

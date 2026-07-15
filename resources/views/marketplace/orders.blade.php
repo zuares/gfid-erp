@@ -2204,7 +2204,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else if (o.is_kilat && !kilatNeedsArrange(o)) {
                     // Kilat yang sudah diatur/terkirim: jangan tampilkan "Atur Pengiriman" (akan error).
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
+                    const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
                 } else {
                     const bkArg = o.is_kilat ? `, '${o.channel_order_id}'` : '';
                     let ofgLabel = '';
@@ -2231,10 +2232,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (o.order_status === 'UNPAID') {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
+                    const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
                     actionBtn = `
                     <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
                         <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>
+                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
                     </div>`;
                 }
             } else {
@@ -2243,7 +2245,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
+                    const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
                 }
             }
 
@@ -2493,8 +2496,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 logisticsBtn = `<button class="btn-review" style="background:#fef9c3;color:#854d0e;border-color:#fef08a"
                     onclick="openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Kirim</button>`;
             } else if (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED' || (o.is_kilat && !kilatNeedsArrange(o))) {
+                const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
                 logisticsBtn = `<button class="btn-review" style="background:#f1f5f9;color:#475569;border-color:#e2e8f0"
-                    onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
+                    onclick="printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
             }
             if (isInstant && (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED')) {
                 logisticsBtn += `<button class="btn-review mt-1" style="background:#fffbeb;color:#b45309;border-color:#fde68a"
@@ -2651,7 +2655,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (printCount === 0 && printedOrderIds.has(o.id)) printCount = 1;
             const isPrinted  = printCount > 0;
             const cetakTeks  = printCount > 1 ? `Sudah Cetak (ke-${printCount})` : 'Sudah Cetak';
-            const printBtn = `<button class="btn-review" style="background:${isPrinted ? '#e0f2fe' : '#f1f5f9'};color:${isPrinted ? '#0369a1' : '#475569'};border-color:${isPrinted ? '#7dd3fc' : '#e2e8f0'}" onclick="printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 ${isPrinted ? cetakTeks : 'Cetak'}</button>`;
+            const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
+            const printBtn = `<button class="btn-review" style="background:${isPrinted ? '#e0f2fe' : '#f1f5f9'};color:${isPrinted ? '#0369a1' : '#475569'};border-color:${isPrinted ? '#7dd3fc' : '#e2e8f0'}" onclick="printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 ${isPrinted ? cetakTeks : 'Cetak'}</button>`;
 
             return `<div class="pk-row ${isPrinted ? 'row-printed' : ''}">
                 <div class="pk-row-left">
@@ -2878,7 +2883,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
+                    const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
                 }
             }
 
@@ -3336,25 +3342,46 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             let html = '';
             
             if (infoNeeded.dropoff) {
+                // Determine if pickup should be default (if it exists and has addresses)
+                const shouldDefaultToPickup = responseData.pickup && responseData.pickup.address_list && responseData.pickup.address_list.length > 0;
+                
                 html += `<div class="form-check mb-2">
-                    <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asDropoff" value="dropoff" checked>
+                    <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asDropoff" value="dropoff" ${!shouldDefaultToPickup ? 'checked' : ''}>
                     <label class="form-check-label" for="asDropoff"><strong>Drop-off</strong> (Antar ke Cabang)</label>
                 </div>`;
+
+                if (responseData.dropoff && responseData.dropoff.branch_list && responseData.dropoff.branch_list.length > 0) {
+                    html += `<div class="dropoff-options ps-4 mt-2" id="dropoffOptionsWrapper" style="${!shouldDefaultToPickup ? 'display:block;' : 'display:none;'}">
+                        <div class="mb-2">
+                            <label class="form-label" style="font-size:0.8rem">Pilih Cabang / Titik Drop-off</label>
+                            <select class="form-select form-select-sm" id="asDropoffBranch">`;
+                    responseData.dropoff.branch_list.forEach((branch) => {
+                        let label = [branch.address, branch.city, branch.state, branch.zipcode].filter(Boolean).join(', ');
+                        html += `<option value="${branch.branch_id}">${label || ('Titik #' + branch.branch_id)}</option>`;
+                    });
+                    html += `       </select>
+                        </div>
+                    </div>`;
+                }
             }
             if (infoNeeded.pickup) {
+                // If dropoff doesn't exist, or we decided pickup is default
+                const shouldDefaultToPickup = !infoNeeded.dropoff || (responseData.pickup && responseData.pickup.address_list && responseData.pickup.address_list.length > 0);
+                
                 html += `<div class="form-check mb-2">
-                    <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asPickup" value="pickup" ${!infoNeeded.dropoff ? 'checked' : ''}>
+                    <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asPickup" value="pickup" ${shouldDefaultToPickup ? 'checked' : ''}>
                     <label class="form-check-label" for="asPickup"><strong>Pickup</strong> (Kurir Jemput)</label>
                 </div>`;
                 
-                if (infoNeeded.pickup.address_list && infoNeeded.pickup.address_list.length > 0) {
-                    html += `<div class="pickup-options ps-4 mt-2" id="pickupOptionsWrapper" style="${!infoNeeded.dropoff ? 'display:block;' : 'display:none;'}">
+                if (responseData.pickup && responseData.pickup.address_list && responseData.pickup.address_list.length > 0) {
+                    html += `<div class="pickup-options ps-4 mt-2" id="pickupOptionsWrapper" style="${shouldDefaultToPickup ? 'display:block;' : 'display:none;'}">
                         <div class="mb-2">
                             <label class="form-label" style="font-size:0.8rem">Alamat Pickup</label>
                             <select class="form-select form-select-sm" id="asPickupAddress">`;
-                    infoNeeded.pickup.address_list.forEach((addr, idx) => {
+                    responseData.pickup.address_list.forEach((addr, idx) => {
                         let timeslots = JSON.stringify(addr.time_slot_list || []);
-                        html += `<option value="${addr.address_id}" data-timeslots='${timeslots.replace(/'/g, "&#39;")}'>${addr.address || addr.address_id}</option>`;
+                        let isDefault = (addr.address_flag && addr.address_flag.includes('default_address')) ? 'selected' : '';
+                        html += `<option value="${addr.address_id}" data-timeslots='${timeslots.replace(/'/g, "&#39;")}' ${isDefault}>${addr.address || addr.address_id}</option>`;
                     });
                     html += `       </select>
                         </div>
@@ -3377,6 +3404,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             // Bind events for dynamically added options
             const methodRadios = document.querySelectorAll('.as-method-radio, input[name="asMethod"]');
             const pickupWrapper = document.getElementById('pickupOptionsWrapper');
+            const dropoffWrapper = document.getElementById('dropoffOptionsWrapper');
             const addressSelect = document.getElementById('asPickupAddress');
             const timeSelect = document.getElementById('asPickupTime');
             
@@ -3384,6 +3412,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 r.addEventListener('change', (e) => {
                     if (pickupWrapper) {
                         pickupWrapper.style.display = (e.target.value === 'pickup') ? 'block' : 'none';
+                    }
+                    if (dropoffWrapper) {
+                        dropoffWrapper.style.display = (e.target.value === 'dropoff') ? 'block' : 'none';
                     }
                 });
             });
@@ -3399,7 +3430,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                         timeslots.forEach(ts => {
                             let text = ts.time_text || ts.pickup_time_id || 'Pilih Waktu';
                             let dateStr = ts.date ? new Date(ts.date * 1000).toLocaleDateString('id-ID') + ' ' : '';
-                            timeSelect.innerHTML += `<option value="${ts.pickup_time_id}">${dateStr}${text}</option>`;
+                            // Auto select the recommended timeslot
+                            let isRecommended = (ts.flags && ts.flags.includes('recommended')) ? 'selected' : '';
+                            timeSelect.innerHTML += `<option value="${ts.pickup_time_id}" ${isRecommended}>${dateStr}${text}</option>`;
                         });
                     } else {
                         timeSelect.innerHTML = '<option value="">(Tidak ada waktu tersedia)</option>';
@@ -3429,6 +3462,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         let params = {};
         if (method === 'dropoff') {
             params = { dropoff: {} };
+            const branchSelect = document.getElementById('asDropoffBranch');
+            if (branchSelect && branchSelect.value) {
+                params.dropoff.branch_id = Number(branchSelect.value) || branchSelect.value;
+            }
         } else if (method === 'pickup') {
             params = { pickup: {} };
             const addressSelect = document.getElementById('asPickupAddress');
@@ -3466,7 +3503,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             loadOrders();
 
             if ($('asPrintDocument') && $('asPrintDocument').checked) {
-                printDocument(storeId, orderSn);
+                printDocument(storeId, orderSn, window._asBookingSn);
             }
         } catch (e) {
             btn.disabled = false;
@@ -3479,8 +3516,14 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         }
     };
 
-    window.printDocument = async function (storeId, orderSn) {
-        const url = `/api/marketplace/stores/${storeId}/orders/${orderSn}/document`;
+    window.printDocument = async function (storeId, orderSn, bookingSn = null) {
+        // Jika order ini punya booking_sn, gunakan booking document API
+        let url;
+        if (bookingSn) {
+            url = `/api/marketplace/stores/${storeId}/bookings/${bookingSn}/document`;
+        } else {
+            url = `/api/marketplace/stores/${storeId}/orders/${orderSn}/document`;
+        }
         
         const alertHtml = `<div id="printAlert" style="position:fixed;top:20px;right:20px;background:#3b82f6;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi dari Marketplace...</div>`;
         document.body.insertAdjacentHTML('beforeend', alertHtml);

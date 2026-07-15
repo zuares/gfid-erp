@@ -635,7 +635,10 @@
             let aksi = `<button class="btn-toolbar" onclick="showDetail('${b.store_id}','${b.booking_sn}')">ℹ️ Detail</button>`;
             if(b.needs_shipping){
                 aksi += `<button class="btn-toolbar primary" onclick="arrangeShip('${b.store_id}','${b.booking_sn}')">🚚 Atur Kirim</button>`;
+            } else if ((b.booking_status||'').toUpperCase() !== 'CANCELLED') {
+                aksi += `<button class="btn-toolbar" onclick="printDocument('${b.store_id}','${b.booking_sn}')">🖨 Cetak Resi</button>`;
             }
+            
             if(isTrackable(b)){
                 aksi += `<button class="btn-toolbar" onclick="trackShipment('${b.store_id}','${b.booking_sn}')">🔎 Lacak</button>`;
             }
@@ -908,12 +911,15 @@
             el('shipForm').style.display = 'block';
 
             // Isi dropdown pickup (alamat + jadwal) & dropoff.
+            let defaultAddrIdx = 0;
             addrList.forEach((a, i) => {
                 const label = [a.address, a.city, a.state, a.zipcode].filter(Boolean).join(', ');
-                el('pickupAddr').insertAdjacentHTML('beforeend', `<option value="${a.address_id}" data-idx="${i}">${label || ('Alamat #'+a.address_id)}</option>`);
+                let isDefault = (a.address_flag && a.address_flag.includes('default_address')) ? 'selected' : '';
+                if (isDefault) defaultAddrIdx = i;
+                el('pickupAddr').insertAdjacentHTML('beforeend', `<option value="${a.address_id}" data-idx="${i}" ${isDefault}>${label || ('Alamat #'+a.address_id)}</option>`);
             });
             if (addrList.length) {
-                fillPickupTimes(addrList, 0);
+                fillPickupTimes(addrList, defaultAddrIdx);
                 el('pickupAddr').onchange = e => { fillPickupTimes(addrList, e.target.selectedOptions[0].dataset.idx); applyShipMethod('pickup'); };
             }
             branchList.forEach(b => {
@@ -921,16 +927,18 @@
                 el('dropoffBranch').insertAdjacentHTML('beforeend', `<option value="${b.branch_id}">${label || ('Titik #'+b.branch_id)}</option>`);
             });
 
-            // Bangun radio metode (Dropoff diutamakan tampil dulu, seperti halaman orders).
+            // Bangun radio metode (Pickup diutamakan jika ada alamat pickup).
             let radios = '';
+            const shouldDefaultToPickup = hasPickup && addrList.length > 0;
+            
             if (hasDropoff) {
                 radios += `<label style="display:flex; align-items:center; gap:.5rem; padding:.5rem .7rem; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:.4rem; cursor:pointer;">
-                    <input type="radio" name="shipMethod" value="dropoff" checked>
+                    <input type="radio" name="shipMethod" value="dropoff" ${!shouldDefaultToPickup ? 'checked' : ''}>
                     <span><strong>🏪 Drop-off</strong> — antar ke titik/cabang</span></label>`;
             }
             if (hasPickup) {
                 radios += `<label style="display:flex; align-items:center; gap:.5rem; padding:.5rem .7rem; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:.4rem; cursor:pointer;">
-                    <input type="radio" name="shipMethod" value="pickup" ${!hasDropoff ? 'checked' : ''}>
+                    <input type="radio" name="shipMethod" value="pickup" ${shouldDefaultToPickup ? 'checked' : ''}>
                     <span><strong>📦 Pickup</strong> — dijemput kurir</span></label>`;
             }
             el('shipMethods').innerHTML = radios;
@@ -958,7 +966,8 @@
         el('pickupTimeWrap').style.display = 'block';
         slots.forEach(s => {
             const d = s.date ? new Date(s.date*1000).toLocaleDateString('id-ID', {weekday:'short',day:'numeric',month:'short'}) : '';
-            sel.insertAdjacentHTML('beforeend', `<option value="${s.pickup_time_id}">${[d, s.time_text].filter(Boolean).join(' ')}</option>`);
+            let isRecommended = (s.flags && s.flags.includes('recommended')) ? 'selected' : '';
+            sel.insertAdjacentHTML('beforeend', `<option value="${s.pickup_time_id}" ${isRecommended}>${[d, s.time_text].filter(Boolean).join(' ')}</option>`);
         });
     }
 
@@ -1036,6 +1045,22 @@
             el('trkEmpty').style.display = 'block';
             el('trkEmpty').textContent = 'Gagal memuat pelacakan: ' + e.message;
         }
+    };
+
+    // ── Cetak Resi ───────────────────────────────────────────────────────────
+    window.printDocument = async function (storeId, bookingSn) {
+        const url = `/api/marketplace/stores/${storeId}/bookings/${bookingSn}/document`;
+        
+        const alertHtml = `<div id="printAlert" style="position:fixed;top:20px;right:20px;background:#3b82f6;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi kilat...</div>`;
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+        
+        window.open(url, '_blank');
+        
+        setTimeout(() => {
+            const el = document.getElementById('printAlert');
+            if (el) el.remove();
+            load();
+        }, 5000);
     };
 
     // ── Polling (tanpa Reverb) ───────────────────────────────────────────────

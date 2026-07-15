@@ -212,6 +212,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/bookings/{bookingSn}/shipping-parameter', [\App\Http\Controllers\MarketplaceBookingController::class, 'shippingParameter']);
     Route::post('/stores/{store}/bookings/{bookingSn}/ship', [\App\Http\Controllers\MarketplaceBookingController::class, 'ship'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/stores/{store}/bookings/{bookingSn}/document', [\App\Http\Controllers\MarketplaceBookingController::class, 'printDocument']);
+    Route::post('/documents/booking-bulk-print', [\App\Http\Controllers\MarketplaceBookingController::class, 'createBulkPrintJob'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/documents/booking-bulk-print/{uuid}', [\App\Http\Controllers\MarketplaceBookingController::class, 'downloadBulkPrintJob']);
     Route::get('/ads-analytics',                     [MarketplaceController::class, 'adsAnalytics']);
     Route::get('/stores/{store}/ads-balance',           [MarketplaceController::class, 'adsBalance']);
     Route::get('/stores/{store}/ads-shop-performance',  [MarketplaceController::class, 'adsShopPerformance']);

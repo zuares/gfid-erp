@@ -247,12 +247,12 @@ class MarketplaceLogisticsController extends Controller
             // e.g. ['pickup' => ['address_id' => 123, 'pickup_time_id' => 'abc']]
             $params = $request->except(['_token', 'store', 'orderSn']);
             
-            // Fix for PHP json_encode converting empty associative arrays to JSON arrays []
-            // Shopee expects dropoff/pickup to be JSON objects {}
-            if (isset($params['dropoff']) && is_array($params['dropoff']) && empty($params['dropoff'])) {
+            // Shopee mewajibkan field pickup dan dropoff tetap dikirim sebagai object kosong {} 
+            // meskipun tidak dipilih atau bernilai kosong.
+            if (!isset($params['dropoff']) || (is_array($params['dropoff']) && empty($params['dropoff']))) {
                 $params['dropoff'] = new \stdClass();
             }
-            if (isset($params['pickup']) && is_array($params['pickup']) && empty($params['pickup'])) {
+            if (!isset($params['pickup']) || (is_array($params['pickup']) && empty($params['pickup']))) {
                 $params['pickup'] = new \stdClass();
             }
             
@@ -605,6 +605,7 @@ class MarketplaceLogisticsController extends Controller
             
             $groupedByStore[$storeId][] = [
                 'order_sn' => $orderSn,
+                'booking_sn' => $reqOrder['booking_sn'] ?? null,
                 'position' => $pos
             ];
         }
@@ -659,6 +660,11 @@ class MarketplaceLogisticsController extends Controller
                 }
                 
                 $payload = ['order_sn' => $orderSn];
+                if (!empty($item['booking_sn'])) {
+                    $payload['is_booking'] = true;
+                    $payload['booking_sn'] = $item['booking_sn'];
+                }
+                
                 if ($order->shipping_awb_no) {
                     $payload['tracking_number'] = $order->shipping_awb_no;
                 }
@@ -673,13 +679,23 @@ class MarketplaceLogisticsController extends Controller
             }
             
             // Chunk by 50 for createShippingDocument
-            $chunks = array_chunk(array_values($payloadListAll), 50);
-            foreach ($chunks as $chunk) {
+            $regularChunks = array_chunk(array_values(array_filter($payloadListAll, fn($p) => !isset($p['is_booking']))), 50);
+            foreach ($regularChunks as $chunk) {
                 try {
                     $driver->createShippingDocument($store, $chunk);
-                } catch (\Exception $e) {
-                    // Ignore, we will try to download anyway
-                }
+                } catch (\Exception $e) {}
+            }
+            
+            // Create booking shipping document in bulk
+            $bookingChunks = array_chunk(array_values(array_filter($payloadListAll, fn($p) => isset($p['is_booking']))), 50);
+            foreach ($bookingChunks as $chunk) {
+                try {
+                    if (method_exists($driver, 'createBookingShippingDocument')) {
+                        // For booking payload, Shopee expects only booking_sn and tracking_number
+                        $cleanedChunk = array_map(fn($c) => ['booking_sn' => $c['booking_sn'], 'tracking_number' => $c['tracking_number']], $chunk);
+                        $driver->createBookingShippingDocument($store, $cleanedChunk);
+                    }
+                } catch (\Exception $e) {}
             }
 
             // Sleep a bit to allow Shopee to generate documents
@@ -694,7 +710,19 @@ class MarketplaceLogisticsController extends Controller
                 $payload = $payloadListAll[$orderSn];
                 
                 try {
-                    $downloadRes = $driver->getShippingDocument($store, [$payload]);
+                    $downloadRes = [];
+                    if (isset($payload['is_booking']) && method_exists($driver, 'downloadBookingShippingDocument')) {
+                        $cleanedPayload = ['booking_sn' => $payload['booking_sn'], 'tracking_number' => $payload['tracking_number']];
+                        $bookingRes = $driver->downloadBookingShippingDocument($store, [$cleanedPayload]);
+                        if (is_array($bookingRes)) {
+                            $downloadRes = $bookingRes; // Contains error/message
+                        } elseif (str_starts_with($bookingRes, '%PDF')) {
+                            $downloadRes = ['error' => 'invalid_response', 'message' => $bookingRes];
+                        }
+                    } else {
+                        $downloadRes = $driver->getShippingDocument($store, [$payload]);
+                    }
+                    
                     if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
                         $content = $downloadRes['message']; 
                         if (str_starts_with($content, '%PDF')) {

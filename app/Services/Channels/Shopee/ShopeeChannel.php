@@ -535,6 +535,117 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->post($store, '/api/v2/logistics/download_shipping_document', $body);
     }
 
+    // ─── Booking / Pesanan Kilat: cetak dokumen resi ─────────────────────────
+
+    /**
+     * Ambil parameter dokumen resi booking (tipe dokumen yang tersedia).
+     * Shopee endpoint: /api/v2/logistics/get_booking_shipping_document_parameter
+     */
+    public function getBookingShippingDocumentParameter(Store $store, array $bookingList): array
+    {
+        $body = [
+            'booking_list' => array_map(function ($item) {
+                return is_array($item) ? $item : ['booking_sn' => $item];
+            }, $bookingList),
+        ];
+        return $this->post($store, '/api/v2/logistics/get_booking_shipping_document_parameter', $body);
+    }
+
+    /**
+     * Minta Shopee membuat dokumen resi booking.
+     * Shopee endpoint: /api/v2/logistics/create_booking_shipping_document
+     *
+     * PENTING: booking_list harus berisi booking_sn + tracking_number.
+     */
+    public function createBookingShippingDocument(Store $store, array $bookingList, ?string $docType = null): array
+    {
+        if (!$docType) {
+            $defaultFormat = \App\Models\SystemSetting::get('marketplace_print_default_format', 'THERMAL_AIR_WAYBILL');
+            $docType = $store->meta['shipping_document_type'] ?? $defaultFormat;
+        }
+        $body = [
+            'booking_list' => $bookingList,
+            'shipping_document_type' => $docType,
+        ];
+        return $this->post($store, '/api/v2/logistics/create_booking_shipping_document', $body);
+    }
+
+    /**
+     * Download dokumen resi booking (PDF).
+     * Shopee endpoint: /api/v2/logistics/download_booking_shipping_document
+     *
+     * Alur: create → poll result → download.
+     * Method ini menggabungkan poll + download.
+     */
+    public function downloadBookingShippingDocument(Store $store, array $bookingList, ?string $docType = null): mixed
+    {
+        if (!$docType) {
+            $defaultFormat = \App\Models\SystemSetting::get('marketplace_print_default_format', 'THERMAL_AIR_WAYBILL');
+            $docType = $store->meta['shipping_document_type'] ?? $defaultFormat;
+        }
+        $body = [
+            'booking_list' => $bookingList,
+            'shipping_document_type' => $docType,
+        ];
+
+        // Poll get_booking_shipping_document_result up to 5 times
+        $allReady = false;
+        for ($i = 0; $i < 5; $i++) {
+            $result = $this->post($store, '/api/v2/logistics/get_booking_shipping_document_result', $body);
+
+            $allReady = true;
+            if (isset($result['response']['result_list']) && is_array($result['response']['result_list'])) {
+                foreach ($result['response']['result_list'] as $resItem) {
+                    if (isset($resItem['status']) && $resItem['status'] !== 'READY') {
+                        $allReady = false;
+                        break;
+                    }
+                }
+            } else {
+                $allReady = false;
+            }
+
+            if ($allReady) {
+                break;
+            }
+
+            sleep(1);
+        }
+
+        if (!$allReady) {
+            return [
+                'error' => 'timeout',
+                'message' => 'Dokumen resi booking sedang diproses oleh Shopee dan belum siap. Silakan coba cetak lagi beberapa saat lagi.',
+            ];
+        }
+
+        // Download returns raw PDF bytes, not JSON
+        $timestamp = time();
+        $path = '/api/v2/logistics/download_booking_shipping_document';
+        $query = [
+            'partner_id'   => (int) $this->partnerId($store),
+            'timestamp'    => $timestamp,
+            'access_token' => $this->accessToken($store),
+            'shop_id'      => (int) $this->shopId($store),
+            'sign'         => $this->sign($store, $path, $timestamp),
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::timeout(30)
+            ->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
+
+        // If response is JSON, it's an error
+        $contentType = $response->header('Content-Type');
+        if (str_contains($contentType ?? '', 'application/json')) {
+            return $response->json() ?? [
+                'error'   => 'download_failed',
+                'message' => 'Gagal download dokumen resi booking.',
+            ];
+        }
+
+        // Return raw PDF bytes
+        return $response->body();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Seller Chat (butuh permission Chat API di Shopee Open Platform Console)
     // ─────────────────────────────────────────────────────────────────────────
