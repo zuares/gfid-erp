@@ -693,7 +693,12 @@ class PurchaseReceiptController extends Controller
             $purchase_receipt->delete();
         });
 
-        return redirect()->route('purchasing.purchase_returns.show', $purchase_receipt->purchase_return_id)
-            ->with('success', 'Draft Penerimaan Barang Pengganti telah dibatalkan.');
+        if ($purchase_receipt->is_replacement && $purchase_receipt->purchase_return_id) {
+            return redirect()->route('purchasing.purchase_returns.show', $purchase_receipt->purchase_return_id)
+                ->with('success', 'Draft Penerimaan Barang Pengganti telah dibatalkan.');
+        }
+
+        return redirect()->route('purchasing.purchase_receipts.index')
+            ->with('success', 'Draft Penerimaan Barang telah dihapus.');
     }
 }
