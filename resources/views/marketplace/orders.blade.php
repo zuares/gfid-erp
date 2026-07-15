@@ -2132,17 +2132,21 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (tab === 'ready') {
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';
+                    
+                    if (o.is_kilat) return kilatNeedsArrange(o);
+                    
                     const isNormalReady = ['READY_TO_SHIP', 'MATCHED'].includes(o.order_status) && !isInstant(o);
                     return isUnpaid || isNormalReady;
                 } else if (tab === 'processed') {
-                    // Gabungan processed + ready_to_handover
                     const isReadyToHandover = o.order_status === 'READY_TO_HANDOVER'
                         || (['READY_TO_SHIP', 'PROCESSED', 'MATCHED'].includes(o.order_status) && isPacked(o));
+                    
+                    if (o.is_kilat) return !isPacked(o) && !kilatNeedsArrange(o);
+
                     const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED' && !isInstant(o);
                     return isNormalProcessed || isReadyToHandover;
                 } else if (tab === 'processed_instant') {
                     if (isPacked(o)) return false;
-                    // Semua pesanan instan, baik yang sudah maupun belum diatur pengirimannya
                     return (o.order_status === 'PROCESSED' || o.order_status === 'READY_TO_SHIP') && isInstant(o);
                 }
                 return false;
