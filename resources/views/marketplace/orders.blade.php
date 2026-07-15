@@ -3683,6 +3683,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             store_id: o.store_id,
             channel_order_id: o.channel_order_id,
             order_sn: o.channel_order_id,
+            booking_sn: (o.is_kilat || o.is_booking) ? o.booking_sn : null,
+            is_booking: !!o.is_booking,
+            is_kilat: !!o.is_kilat,
             position: idx
         }));
 

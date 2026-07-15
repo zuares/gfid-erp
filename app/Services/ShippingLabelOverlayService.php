@@ -45,16 +45,16 @@ class ShippingLabelOverlayService
         }
         
         $outputContent = $pdfContent;
-        if ($qpdfPath && function_exists('exec')) {
+        if ($gsPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
-            @exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
+            @exec(sprintf("%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null", escapeshellarg($gsPath), escapeshellarg($uncompressedFile), escapeshellarg($tmpFile)), $output, $returnVar);
             if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
                 $outputContent = file_get_contents($uncompressedFile);
                 @unlink($uncompressedFile);
             }
-        } else if ($gsPath && function_exists('exec')) {
+        } else if ($qpdfPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
-            @exec(sprintf("%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null", escapeshellarg($gsPath), escapeshellarg($uncompressedFile), escapeshellarg($tmpFile)), $output, $returnVar);
+            @exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
             if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
                 $outputContent = file_get_contents($uncompressedFile);
                 @unlink($uncompressedFile);
@@ -152,18 +152,23 @@ class ShippingLabelOverlayService
             if ($footerImageFull && file_exists($footerImageFull)) {
                 $ext = strtolower(pathinfo($footerImageFull, PATHINFO_EXTENSION));
                 if ($ext === 'pdf') {
-                    $isFooterPdf = true;
                     try {
-                        $pdf->setSourceFile($footerImageFull);
+                        $rawFooter = file_get_contents($footerImageFull);
+                        $safeFooter = $this->uncompressPdfContent($rawFooter);
+                        $tmpFooterFile = tempnam(sys_get_temp_dir(), 'footer_') . '.pdf';
+                        file_put_contents($tmpFooterFile, $safeFooter);
+                        
+                        $pdf->setSourceFile($tmpFooterFile);
                         $footerPdfTpl = $pdf->importPage(1);
-                        $rawSize = $pdf->getTemplateSize($footerPdfTpl);
-                        $footerImgSize = [$rawSize['width'], $rawSize['height']];
-                        // Reset source back to main PDF
-                        $pdf->setSourceFile($tmpFile);
+                        $footerImgSize = $pdf->getTemplateSize($footerPdfTpl);
+                        $pdf->setSourceFile($tmpFile); // restore original source
+                        $isFooterPdf = true;
+                        @unlink($tmpFooterFile);
                     } catch (\Exception $e) {
-                        Log::error("Failed to load PDF footer: " . $e->getMessage());
-                        $footerImgSize = false;
+                        \Illuminate\Support\Facades\Log::error("Failed to load footer PDF: " . $e->getMessage());
                         $pdf->setSourceFile($tmpFile);
+                        $footerImageFull = null; // skip
+                        if (isset($tmpFooterFile) && file_exists($tmpFooterFile)) @unlink($tmpFooterFile);
                     }
                 } else {
                     $footerImgSize = @getimagesize($footerImageFull);
@@ -359,13 +364,20 @@ class ShippingLabelOverlayService
                         $ext = strtolower(pathinfo($greetingImageFull, PATHINFO_EXTENSION));
                         if ($ext === 'pdf') {
                             try {
-                                $pdf->setSourceFile($greetingImageFull);
+                                $rawGreeting = file_get_contents($greetingImageFull);
+                                $safeGreeting = $this->uncompressPdfContent($rawGreeting);
+                                $tmpGreetingFile = tempnam(sys_get_temp_dir(), 'greeting_') . '.pdf';
+                                file_put_contents($tmpGreetingFile, $safeGreeting);
+                                
+                                $pdf->setSourceFile($tmpGreetingFile);
                                 $gTplId = $pdf->importPage(1);
                                 $pdf->useTemplate($gTplId, 0, 0, $width, $height);
                                 $pdf->setSourceFile($tmpFile); // reset source
+                                @unlink($tmpGreetingFile);
                             } catch (\Exception $e) {
                                 \Illuminate\Support\Facades\Log::error("Failed to load PDF greeting card: " . $e->getMessage());
                                 $pdf->setSourceFile($tmpFile);
+                                if (isset($tmpGreetingFile) && file_exists($tmpGreetingFile)) @unlink($tmpGreetingFile);
                             }
                         } else {
                             // Add 4mm safe margin to prevent thermal printer cutoff

@@ -630,6 +630,12 @@ class MarketplaceLogisticsController extends Controller
                 ->get()
                 ->keyBy('channel_order_id');
                 
+            $bookingSns = array_filter(array_column($items, 'booking_sn'));
+            $bookings = \App\Models\MarketplaceBooking::where('store_id', $storeId)
+                ->whereIn('booking_sn', $bookingSns)
+                ->get()
+                ->keyBy('booking_sn');
+                
             try {
                 $driver = app(\App\Services\Channels\ChannelManager::class)->driver($store);
             } catch (\Exception $e) {
@@ -648,8 +654,11 @@ class MarketplaceLogisticsController extends Controller
             $payloadListAll = [];
             foreach ($items as $item) {
                 $orderSn = $item['order_sn'];
+                $bookingSn = $item['booking_sn'] ?? null;
                 $order = $orders->get($orderSn);
-                if (!$order) {
+                $booking = $bookingSn ? $bookings->get($bookingSn) : null;
+                
+                if (!$order && !$booking) {
                     $failedOrders[] = [
                         'store_id' => $store->id,
                         'store_name' => $store->name,
@@ -660,19 +669,25 @@ class MarketplaceLogisticsController extends Controller
                 }
                 
                 $payload = ['order_sn' => $orderSn];
-                if (!empty($item['booking_sn'])) {
+                if (!empty($bookingSn)) {
                     $payload['is_booking'] = true;
-                    $payload['booking_sn'] = $item['booking_sn'];
+                    $payload['booking_sn'] = $bookingSn;
                 }
                 
-                if ($order->shipping_awb_no) {
-                    $payload['tracking_number'] = $order->shipping_awb_no;
-                }
-                $rawJson = $order->raw_json ?? [];
-                if (isset($rawJson['package_list']) && is_array($rawJson['package_list'])) {
-                    $packageList = $rawJson['package_list'];
-                    if (count($packageList) > 0 && isset($packageList[0]['package_number'])) {
-                        $payload['package_number'] = $packageList[0]['package_number'];
+                if ($booking) {
+                    if ($booking->tracking_number) {
+                        $payload['tracking_number'] = $booking->tracking_number;
+                    }
+                } elseif ($order) {
+                    if ($order->shipping_awb_no) {
+                        $payload['tracking_number'] = $order->shipping_awb_no;
+                    }
+                    $rawJson = $order->raw_json ?? [];
+                    if (isset($rawJson['package_list']) && is_array($rawJson['package_list'])) {
+                        $packageList = $rawJson['package_list'];
+                        if (count($packageList) > 0 && isset($packageList[0]['package_number'])) {
+                            $payload['package_number'] = $packageList[0]['package_number'];
+                        }
                     }
                 }
                 $payloadListAll[$orderSn] = $payload;
@@ -692,7 +707,7 @@ class MarketplaceLogisticsController extends Controller
                 try {
                     if (method_exists($driver, 'createBookingShippingDocument')) {
                         // For booking payload, Shopee expects only booking_sn and tracking_number
-                        $cleanedChunk = array_map(fn($c) => ['booking_sn' => $c['booking_sn'], 'tracking_number' => $c['tracking_number']], $chunk);
+                        $cleanedChunk = array_map(fn($c) => ['booking_sn' => $c['booking_sn'] ?? '', 'tracking_number' => $c['tracking_number'] ?? ''], $chunk);
                         $driver->createBookingShippingDocument($store, $cleanedChunk);
                     }
                 } catch (\Exception $e) {}
@@ -712,7 +727,7 @@ class MarketplaceLogisticsController extends Controller
                 try {
                     $downloadRes = [];
                     if (isset($payload['is_booking']) && method_exists($driver, 'downloadBookingShippingDocument')) {
-                        $cleanedPayload = ['booking_sn' => $payload['booking_sn'], 'tracking_number' => $payload['tracking_number']];
+                        $cleanedPayload = ['booking_sn' => $payload['booking_sn'] ?? '', 'tracking_number' => $payload['tracking_number'] ?? ''];
                         $bookingRes = $driver->downloadBookingShippingDocument($store, [$cleanedPayload]);
                         if (is_array($bookingRes)) {
                             $downloadRes = $bookingRes; // Contains error/message
@@ -781,6 +796,18 @@ class MarketplaceLogisticsController extends Controller
                     } else {
                         $order->increment('print_count');
                         if (!$order->printed_at) $order->update(['printed_at' => now()]);
+                    }
+                });
+                
+            \App\Models\MarketplaceBooking::where('store_id', $storeId)
+                ->whereIn('booking_sn', $sns)
+                ->get()
+                ->each(function($booking) use ($mode) {
+                    if ($mode === 'reprint') {
+                        $booking->increment('print_count');
+                    } else {
+                        $booking->increment('print_count');
+                        if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
                     }
                 });
         }
