@@ -439,9 +439,25 @@
                             </td>
 
                             <td class="text-end ship-row-action mobile-hide">
-                                <a href="{{ $actionRoute }}" class="btn btn-sm btn-ship-outline btn-pill">
-                                    {{ $actionLabel }}
-                                </a>
+                                <div class="d-inline-flex gap-1 justify-content-end">
+                                    <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}" class="btn btn-sm btn-ship-outline btn-pill">
+                                        Detail
+                                    </a>
+                                    @if ($uiStatus === 'draft')
+                                        <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}" class="btn btn-sm btn-ship-outline btn-pill px-2" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        @if(!$order->isLocked())
+                                            <form action="{{ route('purchasing.purchase_orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('Hapus PO ini?');" class="d-inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger btn-pill px-2" title="Hapus">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @endforeach
