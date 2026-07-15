@@ -1454,6 +1454,52 @@
                 return null;
             }
 
+            function playTone(type = 'ok') {
+                if (!window.AudioContext && !window.webkitAudioContext) return;
+
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioCtx();
+
+                const presets = {
+                    ok: [
+                        { freq: 2500, duration: 0.1, gap: 0 },
+                    ],
+                    error: [
+                        { freq: 300, duration: 0.15, gap: 0 },
+                        { freq: 300, duration: 0.2, gap: 0.05 },
+                    ],
+                };
+
+                const notes = presets[type] || presets.ok;
+                let cursor = ctx.currentTime;
+
+                notes.forEach(note => {
+                    cursor += Number(note.gap || 0);
+
+                    const oscillator = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    oscillator.type = type === 'error' ? 'square' : 'sine';
+                    oscillator.frequency.setValueAtTime(note.freq, cursor);
+
+                    gain.gain.setValueAtTime(0.0001, cursor);
+                    gain.gain.exponentialRampToValueAtTime(0.6, cursor + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, cursor + Number(note.duration || 0.06));
+
+                    oscillator.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    oscillator.start(cursor);
+                    oscillator.stop(cursor + Number(note.duration || 0.06) + 0.025);
+
+                    cursor += Number(note.duration || 0.06);
+                });
+
+                window.setTimeout(() => {
+                    try { ctx.close(); } catch (e) {}
+                }, Math.ceil((cursor - ctx.currentTime) * 1000) + 180);
+            }
+
             window.__rtsScan = function () {
                 const code = (scanInput?.value || '').trim();
                 if (!code) { scanInput?.focus(); return; }
@@ -1462,7 +1508,11 @@
                 const it = items.find(x => String(x.code || '').toUpperCase() === up)
                         || items.find(x => String(x.code || '').toUpperCase().startsWith(up));
 
-                if (!it) { setScanStatus('❌ "' + code + '" tidak ditemukan (hanya barang jadi)', 'err'); return; }
+                if (!it) { 
+                    playTone('error');
+                    setScanStatus('❌ "' + code + '" tidak ditemukan (hanya barang jadi)', 'err'); 
+                    return; 
+                }
 
                 const existingTr = findRowByItemId(it.id);
                 if (existingTr) {
@@ -1477,6 +1527,7 @@
                 }
 
                 renderDashboard();
+                playTone('ok');
                 setScanStatus('✅ ' + String(it.code).toUpperCase() + ' ditambahkan', 'ok');
                 scanInput.value = '';
                 scanInput.focus();
