@@ -754,6 +754,12 @@
         @error('supplier_id')
             <div class="invalid-feedback">{{ $message }}</div>
         @enderror
+        @if (auth()->user()?->role === 'owner')
+            <div class="text-muted mt-1" style="font-size: .75rem;">
+                <i class="bi bi-info-circle me-1"></i>
+                List supplier dan pengaturannya diambil dari menu <a href="{{ route('master.suppliers.index') }}" target="_blank" class="text-decoration-none fw-bold">Master Supplier</a>.
+            </div>
+        @endif
     </div>
 </div>
 
