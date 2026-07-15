@@ -317,10 +317,24 @@ class ProcessShopeeWebhookJob implements ShouldQueue
 
         // Simpan/masukkan booking ke tabel bookings (sumber kebenaran Pesanan Kilat).
         // Dibuat walau order_sn belum ada — inilah kasus booking murni / kilat.
-        \App\Models\MarketplaceBooking::updateOrCreate(
+        $bModel = \App\Models\MarketplaceBooking::updateOrCreate(
             ['store_id' => $store->id, 'booking_sn' => $bookingSn],
             ['booking_status' => $bookingStatus]
         );
+
+        // Jika status webhook jadi PROCESSED/SHIPPED, otomatis coba tarik resinya
+        if (in_array(strtoupper((string) $bookingStatus), ['PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED']) && blank($bModel->tracking_number)) {
+            try {
+                $driver = app(\App\Services\Channels\ChannelManager::class)->driver($store);
+                if (method_exists($driver, 'getBookingTrackingNumber')) {
+                    $trk = $driver->getBookingTrackingNumber($store, $bookingSn);
+                    $trkNum = $trk['response']['tracking_number'] ?? null;
+                    if ($trkNum) {
+                        $bModel->update(['tracking_number' => $trkNum]);
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
 
         // Cari order berdasarkan channel_order_id ATAU booking_sn
         $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
