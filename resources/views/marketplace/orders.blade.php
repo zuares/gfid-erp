@@ -2847,7 +2847,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             let logisticsBtn = '';
-            const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
+            const bkArg = (o.is_kilat && o.booking_sn) ? `, '${o.booking_sn}'` : '';
 
             // Logistics Buttons
             if (activeTab === 'processed_instant') {
@@ -2861,13 +2861,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     logisticsBtn = `
                     <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
                         <button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
                     </div>`;
                 }
             } else if (activeTab === 'processed') {
                 logisticsBtn = `
                 <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                    <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
+                    <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
                     <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>
                 </div>`;
             } else if (activeTab === 'ready') {
