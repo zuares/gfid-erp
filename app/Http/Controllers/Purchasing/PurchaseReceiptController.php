@@ -680,7 +680,6 @@ class PurchaseReceiptController extends Controller
      */
     public function destroy(Request $request, PurchaseReceipt $purchase_receipt)
     {
-        $this->ensureCanAccess($request);
 
         if ($purchase_receipt->status !== 'draft') {
             return back()->with('error', 'Hanya dokumen berstatus Draft yang dapat dihapus.');
