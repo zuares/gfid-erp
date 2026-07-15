@@ -45,20 +45,25 @@ class ShippingLabelOverlayService
         }
         
         $outputContent = $pdfContent;
+        $success = false;
+        
         if ($gsPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
             @exec(sprintf("%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null", escapeshellarg($gsPath), escapeshellarg($uncompressedFile), escapeshellarg($tmpFile)), $output, $returnVar);
-            if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
+            if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile) && filesize($uncompressedFile) > 100) {
                 $outputContent = file_get_contents($uncompressedFile);
-                @unlink($uncompressedFile);
+                $success = true;
             }
-        } else if ($qpdfPath && function_exists('exec')) {
+            @unlink($uncompressedFile);
+        }
+        
+        if (!$success && $qpdfPath && function_exists('exec')) {
             $uncompressedFile = tempnam(sys_get_temp_dir(), 'resi_uncomp_') . '.pdf';
             @exec(sprintf("%s --object-streams=disable --stream-data=uncompress %s %s 2>/dev/null", escapeshellarg($qpdfPath), escapeshellarg($tmpFile), escapeshellarg($uncompressedFile)), $output, $returnVar);
-            if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile)) {
+            if (isset($returnVar) && $returnVar === 0 && file_exists($uncompressedFile) && filesize($uncompressedFile) > 100) {
                 $outputContent = file_get_contents($uncompressedFile);
-                @unlink($uncompressedFile);
             }
+            @unlink($uncompressedFile);
         }
         
         @unlink($tmpFile);
@@ -251,10 +256,14 @@ class ShippingLabelOverlayService
                     // We allow it to overlap the social media's top margin slightly since the image has white space
                     $imgY = $socialMediaY - $footerImgHeight + 2.5; // +2.5mm pushes the image DOWN
                     
-                    if ($isFooterPdf && $footerPdfTpl) {
-                        $pdf->useTemplate($footerPdfTpl, $xPos, $imgY, $footerImgWidth, $footerImgHeight);
-                    } else {
-                        $pdf->Image($footerImageFull, $xPos, $imgY, $footerImgWidth, $footerImgHeight);
+                    try {
+                        if ($isFooterPdf && $footerPdfTpl) {
+                            $pdf->useTemplate($footerPdfTpl, $xPos, $imgY, $footerImgWidth, $footerImgHeight);
+                        } else {
+                            $pdf->Image($footerImageFull, $xPos, $imgY, $footerImgWidth, $footerImgHeight);
+                        }
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to render footer image/template: " . $e->getMessage());
                     }
                     
                     // Set Y for social media at its fixed position
@@ -382,7 +391,11 @@ class ShippingLabelOverlayService
                         } else {
                             // Add 4mm safe margin to prevent thermal printer cutoff
                             $m = 4;
-                            $pdf->Image($greetingImageFull, $m, $m, $width - ($m * 2), $height - ($m * 2));
+                            try {
+                                $pdf->Image($greetingImageFull, $m, $m, $width - ($m * 2), $height - ($m * 2));
+                            } catch (\Exception $e) {
+                                \Illuminate\Support\Facades\Log::error("Failed to render greeting card image: " . $e->getMessage());
+                            }
                         }
                     } else {
                         // Fallback text if no image
