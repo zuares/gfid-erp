@@ -322,15 +322,58 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ['booking_status' => $bookingStatus]
         );
 
-        // Try to find by order_sn (since usually booking_sn is ordersn, or we sync it)
-        $localOrder = MarketplaceOrder::where('channel_order_id', $bookingSn)
+        // Cari order berdasarkan channel_order_id ATAU booking_sn
+        $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
+                $q->where('channel_order_id', $bookingSn)
+                  ->orWhere('booking_sn', $bookingSn);
+            })
             ->where('store_id', $store->id)
             ->first();
 
         if ($localOrder) {
             $meta = $localOrder->meta ?? [];
             $meta['booking_status'] = $bookingStatus;
-            $localOrder->update(['meta' => $meta]);
+            
+            $updates = ['meta' => $meta];
+            
+            // Mapping optimis status booking ke order_status agar UI langsung memindahkannya ke Sedang Dikemas
+            if (strtoupper($bookingStatus) === 'PROCESSED') {
+                $updates['order_status'] = 'PROCESSED';
+                $updates['logistics_status'] = 'LOGISTICS_READY_TO_SHIP';
+            } elseif (strtoupper($bookingStatus) === 'CANCELLED_BEFORE_SHIPPING') {
+                $updates['order_status'] = 'CANCELLED';
+            }
+            
+            // Ambil detail booking untuk menukar booking_sn menjadi order_sn asli
+            try {
+                $manager = app(\App\Services\Channels\ChannelManager::class);
+                $driver = $manager->driver($store);
+                if (method_exists($driver, 'getBookingDetail')) {
+                    $detailRes = $driver->getBookingDetail($store, $bookingSn);
+                    if (empty($detailRes['error'])) {
+                        $bookings = $detailRes['response']['booking_list'] ?? [];
+                        foreach ($bookings as $b) {
+                            if ($b['booking_sn'] === $bookingSn) {
+                                $ordersList = $b['order_list'] ?? [];
+                                if (!empty($ordersList[0]['order_sn'])) {
+                                    $realOrderSn = $ordersList[0]['order_sn'];
+                                    if ($localOrder->channel_order_id !== $realOrderSn) {
+                                        $updates['channel_order_id'] = $realOrderSn;
+                                        $updates['external_order_id'] = $realOrderSn;
+                                        $updates['booking_sn'] = $bookingSn;
+                                        Log::info("Swapped order {$bookingSn} channel_order_id to real order_sn: {$realOrderSn}");
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to get booking detail to swap order_sn for {$bookingSn}: " . $e->getMessage());
+            }
+
+            $localOrder->update($updates);
             Log::info("Updated local order {$bookingSn} booking_status to: {$bookingStatus}");
             
             event(new \App\Events\OrderUpdated($store->id, $bookingSn, $localOrder->order_status));
@@ -374,20 +417,27 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ['tracking_number' => $trackingNo]
         );
 
-        $localOrder = MarketplaceOrder::where('channel_order_id', $bookingSn)
+        $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
+                $q->where('channel_order_id', $bookingSn)
+                  ->orWhere('booking_sn', $bookingSn);
+            })
             ->where('store_id', $store->id)
             ->first();
 
         if ($localOrder) {
-            // Update the booking_sn (tracking number) for the order
-            $localOrder->update(['booking_sn' => $trackingNo]);
-            Log::info("Updated local order {$bookingSn} with booking_trackingno: {$trackingNo}");
-            event(new \App\Events\OrderUpdated($store->id, $bookingSn, $localOrder->order_status));
+            $updates = [
+                'booking_sn' => $bookingSn, // keep the booking_sn explicitly
+                'shipping_awb_no' => $trackingNo
+            ];
+            
+            // If the tracking number is essentially the booking sn, we just keep it in shipping_awb_no
+            $localOrder->update($updates);
+            Log::info("Updated local order {$bookingSn} with shipping_awb_no: {$trackingNo}");
+            event(new \App\Events\OrderUpdated($store->id, $localOrder->channel_order_id, $localOrder->order_status));
         } else {
             Log::info("Order/Booking {$bookingSn} not found locally during booking_trackingno_update. Syncing via API.");
             try {
                 app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $bookingSn);
-                // The sync process should fetch the new tracking number automatically
                 event(new \App\Events\OrderUpdated($store->id, $bookingSn, null));
             } catch (\Exception $e) {
                 Log::error("Failed to sync missing booking/order {$bookingSn}: " . $e->getMessage());

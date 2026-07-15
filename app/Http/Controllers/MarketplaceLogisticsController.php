@@ -348,6 +348,32 @@ class MarketplaceLogisticsController extends Controller
                 ->where('channel_order_id', $orderSn)
                 ->first();
 
+            // Jika order masih menggunakan booking_sn sebagai ID utamanya, usahakan tukar ke order_sn asli
+            if ($order && method_exists($driver, 'getBookingDetail') && $order->booking_sn && $order->channel_order_id === $order->booking_sn) {
+                try {
+                    $detailRes = $driver->getBookingDetail($store, $order->booking_sn);
+                    if (empty($detailRes['error'])) {
+                        $bookings = $detailRes['response']['booking_list'] ?? [];
+                        foreach ($bookings as $b) {
+                            if ($b['booking_sn'] === $order->booking_sn && !empty($b['order_list'][0]['order_sn'])) {
+                                $realOrderSn = $b['order_list'][0]['order_sn'];
+                                if ($realOrderSn !== $order->channel_order_id) {
+                                    $order->update([
+                                        'channel_order_id' => $realOrderSn,
+                                        'external_order_id' => $realOrderSn
+                                    ]);
+                                    $orderSn = $realOrderSn; // Gunakan order_sn untuk mencetak
+                                    \Illuminate\Support\Facades\Log::info("Swapped {$order->booking_sn} to {$realOrderSn} before printing");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed to check booking detail before print: " . $e->getMessage());
+                }
+            }
+
             $payload = ['order_sn' => $orderSn];
             if ($order) {
                 if ($order->shipping_awb_no) {

@@ -2206,7 +2206,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     // Kilat yang sudah diatur/terkirim: jangan tampilkan "Atur Pengiriman" (akan error).
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}')">🖨 Cetak Resi</button>`;
                 } else {
-                    const bkArg = o.is_booking ? `, '${o.booking_sn}'` : '';
+                    const bkArg = o.is_kilat ? `, '${o.channel_order_id}'` : '';
                     let ofgLabel = '';
                     if (o.shipping_awb_no) {
                         ofgLabel = `<div style="margin-bottom:6px"><span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px; display:inline-block; word-break:break-all;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
@@ -2869,7 +2869,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
                     logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
-                    const bkArg = o.is_booking ? `, '${o.booking_sn}'` : '';
+                    const bkArg = o.is_kilat ? `, '${o.channel_order_id}'` : '';
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
                 }
             } else {
@@ -3214,8 +3214,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
         try {
             // Booking murni (belum MATCHED) tidak punya order → pakai endpoint booking detail.
-            const detailUrl = o.is_booking
-                ? `/api/marketplace/stores/${o.store_id}/bookings/${o.booking_sn}/detail`
+            const detailUrl = o.is_kilat
+                ? `/api/marketplace/stores/${o.store_id}/bookings/${o.channel_order_id}/detail`
                 : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/raw-detail`;
             const res = await api(detailUrl);
 
