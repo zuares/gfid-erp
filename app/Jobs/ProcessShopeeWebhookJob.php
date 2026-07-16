@@ -356,11 +356,9 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             $bookingStatusUpper = strtoupper((string) $bookingStatus);
             if ($bookingStatusUpper === 'PROCESSED') {
                 $updates['order_status'] = 'PROCESSED';
-                $updates['logistics_status'] = 'LOGISTICS_READY_TO_SHIP';
             } elseif (in_array($bookingStatusUpper, ['SHIPPED', 'READY_TO_HANDOVER'])) {
                 // Kurir sudah mengambil / sedang dalam perjalanan → pindah ke tab Sedang Dikirim
                 $updates['order_status'] = 'SHIPPED';
-                $updates['logistics_status'] = 'LOGISTICS_PICKUP_DONE';
             } elseif ($bookingStatusUpper === 'COMPLETED') {
                 $updates['order_status'] = 'COMPLETED';
             } elseif (in_array($bookingStatusUpper, ['CANCELLED_BEFORE_SHIPPING', 'CANCELLED'])) {
@@ -555,17 +553,14 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             if (in_array($fulfillmentUpper, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_PICKUP_RETRY'])) {
                 // Kurir sudah mengambil paket → Sedang Dikirim
                 $updates['order_status'] = 'SHIPPED';
-                $updates['logistics_status'] = $fulfillmentStatus;
             } elseif ($fulfillmentUpper === 'LOGISTICS_DELIVERY_DONE') {
                 // Paket sudah diterima pembeli → Menunggu Konfirmasi
                 $updates['order_status'] = 'TO_CONFIRM_RECEIVE';
-                $updates['logistics_status'] = $fulfillmentStatus;
             } elseif ($fulfillmentUpper === 'LOGISTICS_INVALID_OR_LOST') {
                 // Paket hilang / tidak valid — simpan di meta saja, jangan ubah status
                 Log::warning("Package {$orderSn} marked as LOGISTICS_INVALID_OR_LOST.");
             } elseif (in_array($fulfillmentUpper, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP'])) {
                 // Pengiriman diatur, belum diambil kurir → tetap PROCESSED
-                $updates['logistics_status'] = $fulfillmentStatus;
             }
             
             $localOrder->update($updates);

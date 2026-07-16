@@ -318,7 +318,6 @@ class SyncMarketplaceBookings implements ShouldQueue
                             'external_order_id'=> $bSn,
                             'booking_sn'       => $bSn,
                             'order_status'     => $orderStatus,
-                            'logistics_status' => $orderStatus === 'SHIPPED' ? 'LOGISTICS_PICKUP_DONE' : 'LOGISTICS_READY_TO_SHIP',
                             'status'           => $legacyStatus,
                             'shipping_carrier' => $bk->shipping_carrier ?? null,
                             'shipping_awb_no'  => $bk->tracking_number  ?? null,
@@ -365,7 +364,6 @@ class SyncMarketplaceBookings implements ShouldQueue
             if ($order) {
                 $order->update([
                     'order_status'    => $targetStatus,
-                    'logistics_status'=> 'LOGISTICS_PICKUP_DONE',
                     'booking_sn'      => $bk->booking_sn,
                 ]);
                 Log::info("SyncMarketplaceBookings propagate: {$order->channel_order_id} PROCESSED → {$targetStatus} (booking {$bk->booking_sn})");
