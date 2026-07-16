@@ -242,40 +242,130 @@ class SyncMarketplaceBookings implements ShouldQueue
      */
     protected function backfillMissingOrders(): void
     {
+        // JALUR 1: Booking yang punya order_sn → sync via order_sn (cara lama)
         $orderSns = MarketplaceBooking::where('store_id', $this->store->id)
             ->whereNotNull('order_sn')->where('order_sn', '!=', '')
             ->pluck('order_sn')->unique()->values();
 
-        if ($orderSns->isEmpty()) {
-            return;
+        if ($orderSns->isNotEmpty()) {
+            $existing = MarketplaceOrder::where(function ($q) use ($orderSns) {
+                    $q->whereIn('channel_order_id', $orderSns)
+                      ->orWhereIn('external_order_id', $orderSns);
+                })
+                ->get(['channel_order_id', 'external_order_id']);
+
+            $known = $existing->pluck('channel_order_id')
+                ->merge($existing->pluck('external_order_id'))
+                ->filter()->flip();
+
+            $missing = $orderSns->reject(fn ($sn) => $known->has($sn))->take(500)->values()->all();
+            if (! empty($missing)) {
+                $result = app(\App\Services\MarketplaceSyncService::class)->syncOrdersBySn($this->store, $missing);
+                Log::info("SyncMarketplaceBookings backfill (order_sn) [{$this->store->id}]: " . count($missing)
+                    . " → {$result['new']} baru, {$result['updated']} update.");
+
+                MarketplaceBooking::where('store_id', $this->store->id)
+                    ->whereIn('order_sn', $missing)
+                    ->get()
+                    ->each(fn ($b) => $this->linkOrder($b->booking_sn, $b->order_sn));
+            }
         }
 
-        // Cocokkan via channel_order_id ATAU external_order_id, lintas toko —
-        // konsisten dengan pencocokan is_kilat di MarketplaceController::localOrders().
-        $existing = MarketplaceOrder::where(function ($q) use ($orderSns) {
-                $q->whereIn('channel_order_id', $orderSns)
-                  ->orWhereIn('external_order_id', $orderSns);
-            })
-            ->get(['channel_order_id', 'external_order_id']);
+        // JALUR 2: Booking yang order_sn-nya kosong (khas Pesanan Kilat murni Shopee)
+        // → gunakan booking_sn itu sendiri sebagai channel_order_id untuk sync
+        $pureSns = MarketplaceBooking::where('store_id', $this->store->id)
+            ->where(fn ($q) => $q->whereNull('order_sn')->orWhere('order_sn', ''))
+            ->pluck('booking_sn')->filter()->unique()->values();
 
-        $known = $existing->pluck('channel_order_id')
-            ->merge($existing->pluck('external_order_id'))
-            ->filter()->flip();
+        if ($pureSns->isNotEmpty()) {
+            $existingPure = MarketplaceOrder::where('store_id', $this->store->id)
+                ->where(function ($q) use ($pureSns) {
+                    $q->whereIn('channel_order_id', $pureSns)
+                      ->orWhereIn('booking_sn', $pureSns);
+                })
+                ->pluck('channel_order_id')->flip();
 
-        $missing = $orderSns->reject(fn ($sn) => $known->has($sn))->take(500)->values()->all();
-        if (empty($missing)) {
-            return;
+            $missingPure = $pureSns->reject(fn ($sn) => $existingPure->has($sn))->take(300)->values()->all();
+            if (! empty($missingPure)) {
+                // booking_sn tidak bisa di-query via getOrderDetail (itu hanya untuk order_sn biasa).
+                // Solusi: buat order stub langsung dari data booking yang sudah ada di DB.
+                $bookingMap = MarketplaceBooking::where('store_id', $this->store->id)
+                    ->whereIn('booking_sn', $missingPure)
+                    ->get()->keyBy('booking_sn');
+
+                \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
+                $newCount = 0;
+                foreach ($missingPure as $bSn) {
+                    $bk = $bookingMap->get($bSn);
+                    if (! $bk) continue;
+
+                    $bkStatusUpper = strtoupper((string) $bk->booking_status);
+                    $orderStatus   = match ($bkStatusUpper) {
+                        'SHIPPED', 'READY_TO_HANDOVER' => 'SHIPPED',
+                        'COMPLETED'                    => 'COMPLETED',
+                        default                        => 'PROCESSED',
+                    };
+                    $legacyStatus = match ($orderStatus) {
+                        'SHIPPED'   => 'shipped',
+                        'COMPLETED' => 'completed',
+                        default     => 'processed',
+                    };
+
+                    try {
+                        MarketplaceOrder::create([
+                            'store_id'         => $this->store->id,
+                            'channel_order_id' => $bSn,
+                            'external_order_id'=> $bSn,
+                            'booking_sn'       => $bSn,
+                            'order_status'     => $orderStatus,
+                            'logistics_status' => $orderStatus === 'SHIPPED' ? 'LOGISTICS_PICKUP_DONE' : 'LOGISTICS_READY_TO_SHIP',
+                            'status'           => $legacyStatus,
+                            'shipping_carrier' => $bk->shipping_carrier ?? null,
+                            'shipping_awb_no'  => $bk->tracking_number  ?? null,
+                            'order_date'       => $bk->create_time ? date('Y-m-d', $bk->create_time) : now()->toDateString(),
+                            'ordered_at'       => $bk->create_time ? date('Y-m-d H:i:s', $bk->create_time) : now(),
+                            'synced_at'        => now(),
+                            'currency'         => 'IDR',
+                        ]);
+                        $newCount++;
+                    } catch (\Throwable $e) {
+                        Log::warning("SyncMarketplaceBookings stub [{$this->store->id}] {$bSn}: " . $e->getMessage());
+                    }
+                }
+                \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
+                Log::info("SyncMarketplaceBookings stub (booking_sn) [{$this->store->id}]: {$newCount} order baru dari booking murni.");
+            }
         }
 
-        $result = app(\App\Services\MarketplaceSyncService::class)->syncOrdersBySn($this->store, $missing);
-        Log::info("SyncMarketplaceBookings backfill [{$this->store->id}]: " . count($missing)
-            . " order_sn hilang → {$result['new']} baru, {$result['updated']} update.");
+        // JALUR 3: Propagate booking_status ke order_status untuk semua booking SHIPPED/READY_TO_HANDOVER/COMPLETED
+        // yang ordernya masih PROCESSED di marketplace_orders
+        $shippedBookings = MarketplaceBooking::where('store_id', $this->store->id)
+            ->whereIn('booking_status', ['SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED'])
+            ->get(['booking_sn', 'order_sn', 'booking_status']);
 
-        // Tautkan booking_sn ke order yang baru saja dibuat.
-        MarketplaceBooking::where('store_id', $this->store->id)
-            ->whereIn('order_sn', $missing)
-            ->get()
-            ->each(fn ($b) => $this->linkOrder($b->booking_sn, $b->order_sn));
+        foreach ($shippedBookings as $bk) {
+            $targetStatus = in_array(strtoupper($bk->booking_status), ['SHIPPED', 'READY_TO_HANDOVER']) ? 'SHIPPED' : 'COMPLETED';
+
+            $order = MarketplaceOrder::where('store_id', $this->store->id)
+                ->where(function ($q) use ($bk) {
+                    $q->where('channel_order_id', $bk->booking_sn)
+                      ->orWhere('booking_sn', $bk->booking_sn);
+                    if (! empty($bk->order_sn)) {
+                        $q->orWhere('channel_order_id', $bk->order_sn);
+                    }
+                })
+                ->where('order_status', 'PROCESSED')
+                ->first();
+
+            if ($order) {
+                $order->update([
+                    'order_status'    => $targetStatus,
+                    'logistics_status'=> 'LOGISTICS_PICKUP_DONE',
+                    'booking_sn'      => $bk->booking_sn,
+                ]);
+                Log::info("SyncMarketplaceBookings propagate: {$order->channel_order_id} PROCESSED → {$targetStatus} (booking {$bk->booking_sn})");
+            }
+        }
     }
 
     /** Tautkan booking_sn ke order lokal (bila order-nya sudah tersimpan & belum punya booking_sn). */

@@ -536,7 +536,10 @@ class ProcessShopeeWebhookJob implements ShouldQueue
 
         if (!$store) return;
 
-        $localOrder = MarketplaceOrder::where('channel_order_id', $orderSn)
+        $localOrder = MarketplaceOrder::where(function($q) use ($orderSn) {
+                $q->where('channel_order_id', $orderSn)
+                  ->orWhere('booking_sn', $orderSn);
+            })
             ->where('store_id', $store->id)
             ->first();
 
