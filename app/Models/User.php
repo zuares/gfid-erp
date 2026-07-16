@@ -70,14 +70,14 @@ class User extends Authenticatable
      *
      * Yang boleh melihat harga PO/GRN (unit_price, subtotal, diskon, pajak,
      * grand_total, last_purchase_price, nilai persediaan, nominal jurnal/AP,
-     * expense_account_id): owner, developer, dan role accounting.
+     * expense_account_id): owner, developer, admin, dan role accounting.
      *
-     * Admin gudang (role 'admin') & operating TIDAK boleh melihat harga.
+     * Role operating TIDAK boleh melihat harga.
      * Dipakai di controller, blade, dan JSON/API sebagai satu gerbang.
      */
     public function canSeePurchasePrices(): bool
     {
-        return $this->isOwner() || in_array(strtolower((string) $this->role), ['accounting'], true);
+        return $this->isOwner() || in_array(strtolower((string) $this->role), ['accounting', 'admin'], true);
     }
 
     public function hasRole(string | array $roles): bool
