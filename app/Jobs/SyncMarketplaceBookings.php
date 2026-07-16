@@ -337,14 +337,19 @@ class SyncMarketplaceBookings implements ShouldQueue
             }
         }
 
-        // JALUR 3: Propagate booking_status ke order_status untuk semua booking SHIPPED/READY_TO_HANDOVER/COMPLETED
+        // JALUR 3: Propagate booking_status ke order_status untuk semua booking SHIPPED/READY_TO_HANDOVER/COMPLETED/CANCELLED
         // yang ordernya masih PROCESSED di marketplace_orders
         $shippedBookings = MarketplaceBooking::where('store_id', $this->store->id)
-            ->whereIn('booking_status', ['SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED'])
+            ->whereIn('booking_status', ['SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED', 'CANCELLED', 'CANCELLED_BEFORE_SHIPPING'])
             ->get(['booking_sn', 'order_sn', 'booking_status']);
 
         foreach ($shippedBookings as $bk) {
-            $targetStatus = in_array(strtoupper($bk->booking_status), ['SHIPPED', 'READY_TO_HANDOVER']) ? 'SHIPPED' : 'COMPLETED';
+            $upperStatus = strtoupper((string) $bk->booking_status);
+            $targetStatus = match(true) {
+                in_array($upperStatus, ['SHIPPED', 'READY_TO_HANDOVER']) => 'SHIPPED',
+                in_array($upperStatus, ['CANCELLED', 'CANCELLED_BEFORE_SHIPPING']) => 'CANCELLED',
+                default => 'COMPLETED',
+            };
 
             $order = MarketplaceOrder::where('store_id', $this->store->id)
                 ->where(function ($q) use ($bk) {

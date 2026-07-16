@@ -363,7 +363,7 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                 $updates['logistics_status'] = 'LOGISTICS_PICKUP_DONE';
             } elseif ($bookingStatusUpper === 'COMPLETED') {
                 $updates['order_status'] = 'COMPLETED';
-            } elseif ($bookingStatusUpper === 'CANCELLED_BEFORE_SHIPPING') {
+            } elseif (in_array($bookingStatusUpper, ['CANCELLED_BEFORE_SHIPPING', 'CANCELLED'])) {
                 $updates['order_status'] = 'CANCELLED';
             }
             
