@@ -1708,7 +1708,7 @@ class ShipmentController extends Controller
 
         // Validasi Status: Order baru bisa discan jika sedang diproses / packing (memiliki AWB)
         // Kita juga izinkan jika sudah READY_TO_HANDOVER (agar jika ter-scan dua kali tidak error melainkan bisa diproses ulang)
-        if (!in_array($marketplaceOrder->order_status, ['PROCESSED', 'READY_TO_HANDOVER'])) {
+        if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['PROCESSED', 'READY_TO_HANDOVER'])) {
             return response()->json([
                 'status'  => 'error',
                 'message' => "Order {$no} berstatus {$marketplaceOrder->order_status}. Hanya pesanan di tahap 'Sedang Dikemas' (PROCESSED) yang bisa di-scan.",
