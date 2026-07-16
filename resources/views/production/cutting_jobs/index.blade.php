@@ -69,15 +69,17 @@
 
     .table-list{ margin-bottom:0; }
     .table-list thead th{
-        border-bottom-width:1px; font-size:.68rem; text-transform:none; letter-spacing:0;
-        color:#64748b; background:var(--card,#fff); padding:.52rem .62rem; white-space:nowrap;
+        border-bottom: 2px solid rgba(148,163,184,.15); font-size: .65rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
+        color: #64748b; background: var(--card,#fff); padding: .75rem .65rem; white-space: nowrap;
     }
     body[data-theme="dark"] .table-list thead th{
-        background:rgba(15,23,42,.98); color:#9ca3af; border-bottom-color:rgba(30,64,175,.6);
+        background: rgba(15,23,42,.98); color: #94a3b8; border-bottom-color: rgba(30,64,175,.3);
     }
-    .table-list tbody td{ vertical-align:middle; border-top-color:rgba(148,163,184,.16); padding:.52rem .62rem; }
-    body[data-theme="dark"] .table-list tbody td{ border-top-color:rgba(51,65,85,.85); }
-    .table-list tbody tr.is-void{ opacity:.55; }
+    .table-list tbody td{ vertical-align: middle; border-top: 1px solid rgba(148,163,184,.1); padding: .85rem .65rem; transition: background 0.15s ease; }
+    body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51,65,85,.6); }
+    .table-list tbody tr:hover td { background: rgba(248,250,252,0.6); }
+    body[data-theme="dark"] .table-list tbody tr:hover td { background: rgba(30,41,59,0.4); }
+    .table-list tbody tr.is-void{ opacity: .55; }
 
     /* Header tabel sticky + area tabel bisa di-scroll (desktop) */
     @media (min-width: 769px){
@@ -138,6 +140,19 @@
     body[data-theme="dark"] .divider{ background:rgba(51,65,85,.85); }
     .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
 
+    /* Custom badges for list */
+    .split-badge { display: inline-flex; align-items: stretch; border-radius: 6px; overflow: hidden; border: 1px solid rgba(148,163,184,0.25); vertical-align: middle; }
+    body[data-theme="dark"] .split-badge { border-color: rgba(51,65,85,0.8); }
+
+    .split-badge .sb-left { padding: 0.15rem 0.45rem; background: rgba(241,245,249,0.8); color: #475569; font-weight: 600; display: flex; align-items: center; }
+    body[data-theme="dark"] .split-badge .sb-left { background: rgba(30,41,59,0.7); color: #cbd5e1; }
+
+    .split-badge .sb-right { padding: 0.15rem 0.45rem; background: rgba(59,130,246,0.08); color: #3b82f6; font-weight: 600; border-left: 1px solid rgba(148,163,184,0.2); display: flex; align-items: center; }
+    body[data-theme="dark"] .split-badge .sb-right { background: rgba(59,130,246,0.15); color: #93c5fd; border-left-color: rgba(51,65,85,0.7); }
+    
+    .badge-fabric-usage { font-size: 0.7rem; border-radius: 6px; padding: 0.15rem 0.4rem; background: rgba(148,163,184,0.08); border: 1px solid var(--shp-border); color: var(--shp-accent); display: inline-flex; align-items: center; gap: 0.25rem; }
+    body[data-theme="dark"] .badge-fabric-usage { background: rgba(15,23,42,0.6); color: #cbd5e1; }
+
     @media (max-width: 768px){
         .page-wrap{ padding:.5rem .5rem 4rem; }
         .ship-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
@@ -153,13 +168,26 @@
         .table-responsive{ overflow:visible; }
         .table-list thead{ display:none; }
         .table-list, .table-list tbody, .table-list tr, .table-list td{ display:block; width:100%; }
-        .table-list tbody tr{ padding:.66rem; border-top:1px solid rgba(148,163,184,.16); }
+        .table-list tbody tr{ 
+            padding:0.85rem; 
+            margin-bottom:0.75rem; 
+            border:1px solid rgba(148,163,184,.15); 
+            border-radius:8px; 
+            box-shadow:0 2px 8px rgba(0,0,0,0.04); 
+            background:var(--card, #fff);
+        }
+        body[data-theme="dark"] .table-list tbody tr{
+            border-color:rgba(255,255,255,0.08);
+            box-shadow:0 2px 8px rgba(0,0,0,0.2);
+            background:#1e293b;
+        }
         .table-list tbody td{ border:0; padding:0; }
         .table-list tbody td.mobile-hide{ display:none; }
         .cj-row-main{ display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; }
         .cj-row-meta{ display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; margin-top:.35rem; color:#64748b; font-size:.78rem; }
-        .cj-row-action{ margin-top:.55rem; }
-        .cj-row-action .btn{ width:100%; min-height:38px; }
+        .cj-row-action{ margin-top:.55rem; display:flex; gap:0.4rem; justify-content:flex-end; }
+        .cj-row-action .btn{ flex:1; min-height:38px; display:inline-flex; align-items:center; justify-content:center; }
+        .cj-row-action .btn-icon{ flex:0 0 44px; padding:0; }
     }
 </style>
 @endpush
@@ -169,6 +197,7 @@
     @php
         $user    = auth()->user();
         $isOwner = ($user?->role ?? null) === 'owner';
+        $isOperating = strtolower((string) ($user?->role ?? '')) === 'operating';
 
         $currentStatus    = request('status', '');
         $currentWarehouse = request('warehouse_id', '');
@@ -305,8 +334,14 @@
                                     $detailUrl   = route('production.cutting_jobs.show', $job);
                                     $qcUrl       = Route::has('production.qc.cutting.edit')
                                         ? route('production.qc.cutting.edit', $job) : $detailUrl;
-                                    $actionUrl   = (!$isVoid && !$isQcDone) ? $qcUrl : ($isQcDone ? $qcUrl : $detailUrl);
-                                    $actionLabel = (!$isVoid && !$isQcDone) ? 'Input QC' : ($isQcDone ? 'Lihat QC' : 'Detail');
+                                    
+                                    if ($isOperating) {
+                                        $actionUrl = $detailUrl;
+                                        $actionLabel = 'Detail';
+                                    } else {
+                                        $actionUrl   = (!$isVoid && !$isQcDone) ? $qcUrl : ($isQcDone ? $qcUrl : $detailUrl);
+                                        $actionLabel = (!$isVoid && !$isQcDone) ? 'Input QC' : ($isQcDone ? 'Lihat QC' : 'Detail');
+                                    }
                                 @endphp
 
                                 <tr class="{{ $isVoid ? 'is-void' : '' }}">
@@ -319,12 +354,40 @@
                                     <td>
                                         <div class="cj-row-main">
                                             <div>
-                                                <a class="code-link" href="{{ $detailUrl }}">{{ $job->code }}</a>
+                                                @php
+                                                    $itemSummary = $job->bundles->groupBy(fn($b) => $b->finishedItem?->code ?? $b->finished_item_code ?? 'N/A')
+                                                                     ->map(fn($group) => $group->sum('qty_pcs'));
+                                                @endphp
+                                                
+                                                <!-- Desktop: Job Code is Title -->
+                                                <a class="code-link d-none d-md-inline" href="{{ $detailUrl }}">{{ $job->code }}</a>
+                                                
+                                                <!-- Mobile: Item Summary is Title -->
+                                                <a class="code-link d-md-none" href="{{ $detailUrl }}" style="display: block; font-size: 1.05rem; margin-bottom: 0.3rem; line-height: 1.3;">
+                                                    <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                                                        @foreach($itemSummary as $code => $qty)
+                                                            <span class="split-badge" style="font-size: 0.9rem;">
+                                                                <span class="sb-left">{{ $code }}</span>
+                                                                <span class="sb-right">{{ (float)$qty }}</span>
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                </a>
+
                                                 <div class="cj-row-meta d-md-none">
-                                                    <span>{{ $job->date?->format('d M Y') ?? '-' }}</span>
+                                                    <span class="mono fw-semibold" style="color: var(--shp-text);">{{ $job->code }}</span>
+                                                    <span>{{ $job->date?->format('d/m/y') ?? '-' }}</span>
                                                     @if ($job->operator)<span>{{ $job->operator->name }}</span>@endif
-                                                    <span>{{ $bundleCount }} iket</span>
-                                                    @if ($qtyPcs > 0)<span>{{ number_format($qtyPcs, 0, ',', '.') }} pcs</span>@endif
+                                                </div>
+
+                                                <!-- Desktop: Item Summary Badges -->
+                                                <div class="mt-2 d-none d-md-flex" style="flex-wrap: wrap; gap: 0.35rem;">
+                                                    @foreach($itemSummary as $code => $qty)
+                                                        <span class="split-badge" style="font-size: 0.72rem;">
+                                                            <span class="sb-left">{{ $code }}</span>
+                                                            <span class="sb-right">{{ (float)$qty }}</span>
+                                                        </span>
+                                                    @endforeach
                                                 </div>
                                             </div>
                                             <span class="badge-status {{ $cfg['class'] }} d-md-none">{{ $cfg['label'] }}</span>
@@ -332,10 +395,16 @@
                                     </td>
 
                                     <td>
-                                        <div class="fabric-name mono">{{ $job->lot?->item?->code ?? '-' }}</div>
-                                        @if ($job->lot?->code)
-                                            <span class="lot-badge">{{ $job->lot->code }}</span>
-                                        @endif
+                                        @php
+                                            $dipotong = $job->lots->sum('planned_fabric_qty');
+                                        @endphp
+                                        <div class="text-muted" style="font-size: 0.72rem; margin-bottom: 0.35rem;">
+                                            <span class="mono fw-semibold">{{ $job->fabricItem?->code ?? $job->lot?->item?->code ?? '-' }}</span>
+                                            @if($dipotong > 0)
+                                                &bull; <span>{{ (float)$dipotong }} kg</span>
+                                            @endif
+                                        </div>
+                                        <!-- Removed fabric usage badges per user request -->
                                     </td>
 
                                     <td class="mobile-hide">{{ $job->operator?->name ?? '-' }}</td>
@@ -350,7 +419,12 @@
                                         <span class="badge-status {{ $cfg['class'] }}" title="{{ $cfg['hint'] }}">{{ $cfg['label'] }}</span>
                                     </td>
 
-                                    <td class="text-end cj-row-action">
+                                    <td class="text-end cj-row-action" style="white-space:nowrap;">
+                                        @if($actionLabel === 'Input QC')
+                                            <a href="{{ $detailUrl }}" class="btn btn-sm btn-ship-outline btn-pill btn-icon" title="Detail" style="width:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                            </a>
+                                        @endif
                                         <a href="{{ $actionUrl }}" class="btn btn-sm {{ $actionLabel === 'Input QC' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill">
                                             {{ $actionLabel }}
                                         </a>

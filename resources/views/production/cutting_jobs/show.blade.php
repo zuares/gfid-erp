@@ -299,6 +299,35 @@
             }
         }
 
+        @media (max-width: 767.98px) {
+            .mobile-sticky-actions {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: #ffffff;
+                border-top: 1px solid rgba(148,163,184,0.2);
+                padding: 0.75rem 1rem;
+                z-index: 1020;
+                box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+                display: block;
+            }
+            body[data-theme="dark"] .mobile-sticky-actions {
+                background: #1e293b;
+                border-top-color: rgba(255,255,255,0.1);
+            }
+            /* Reduce mb-2 margin inside sticky bar */
+            .mobile-sticky-actions .mb-2 {
+                margin-bottom: 0.5rem !important;
+            }
+            .mobile-sticky-actions .mb-2:last-child {
+                margin-bottom: 0 !important;
+            }
+            /* Add padding to page-wrap to prevent overlap */
+            .page-wrap {
+                padding-bottom: 6rem !important;
+            }
+        }
     </style>
 @endpush
 
@@ -479,7 +508,9 @@
                 // Selesai Cutting (Quick OK)
                 if ($canQuickOkCutting) {
                     echo '<button type="button" class="' . e($btn) . ' btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting"><i class="bi bi-check-circle me-1"></i>Simpan & Konfirmasi</button>';
-                    echo '<form id="formQuickOk" action="' . e(route('production.qc.cutting.quick_ok', $job)) . '" method="post" style="display:none;">' . csrf_field() . '</form>';
+                    if (!$isMobile) {
+                        echo '<form id="formQuickOk" action="' . e(route('production.qc.cutting.quick_ok', $job)) . '" method="post" style="display:none;">' . csrf_field() . '</form>';
+                    }
                 }
 
                 // Input QC / Kirim QC
@@ -1257,6 +1288,14 @@
             </script>
         @endpush
     @endif
+    
+    {{-- MOBILE ACTIONS (Sticky Bottom Bar) --}}
+    <div class="d-block d-md-none mobile-sticky-actions">
+        @if (strtolower((string) (auth()->user()->role ?? '')) !== 'operating')
+            {!! $renderActions(true) !!}
+        @endif
+    </div>
+
 @push('scripts')
 <script>
 // ── Autofill scrap di form sisa kain: scrap = dipakai − sisa layak − potongan ──

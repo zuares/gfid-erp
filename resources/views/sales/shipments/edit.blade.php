@@ -1422,7 +1422,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         </div>
 
         {{-- table --}}
-        <div class="lines-wrapper" id="linesWrapper">
+        <div class="lines-wrapper" id="linesWrapper" style="max-height: 50vh; overflow-y: auto;">
             <table class="table align-middle shp-table">
                 <thead>
                     <tr>

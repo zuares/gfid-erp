@@ -949,9 +949,14 @@
                                                 @endif
                                             </div>
                                         </td>
-                                        <td>
+                                        <td style="white-space:nowrap;">
                                             <div class="d-flex gap-1 flex-wrap">
                                             @if (Route::has('production.qc.sewing.edit'))
+                                                @if(!$hasQc && Route::has('production.sewing.returns.show'))
+                                                    <a href="{{ route('production.sewing.returns.show', $ret) }}" class="btn btn-sm btn-outline-secondary" title="Detail" style="width:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;" onclick="event.stopPropagation();">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                                    </a>
+                                                @endif
                                                 <a href="{{ route('production.qc.sewing.edit', $ret) }}"
                                                    class="btn btn-sm {{ $hasQc ? 'btn-outline-secondary' : 'btn-outline-primary' }}"
                                                    onclick="event.stopPropagation();"

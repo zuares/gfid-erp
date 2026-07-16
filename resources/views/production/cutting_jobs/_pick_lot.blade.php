@@ -1129,6 +1129,7 @@
                                             name="selected_lots[]" value="{{ $row->lot_id }}"
                                             data-item-id="{{ $item->id }}"
                                             autocomplete="off"
+                                            @checked(in_array($row->lot_id, $selectedLotsExisting ?? []))
                                             tabindex="-1">
 
                                         <div class="lot-qty-main">
@@ -1186,8 +1187,10 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Reset checkbox saat load — cegah browser restore
+            // Reset checkbox saat load — cegah browser restore (kecuali form edit yg sdh pny initial value)
+            @if(!isset($isEdit) || !$isEdit)
             document.querySelectorAll('.lot-checkbox').forEach(cb => { cb.checked = false; });
+            @endif
 
             const lotGrid    = document.getElementById('lot-grid');
             const step1Panel = document.getElementById('lot-step1-panel');

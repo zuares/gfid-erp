@@ -275,6 +275,8 @@ class CuttingJobController extends Controller
             ->with([
                 'warehouse',
                 'lot.item',
+                'lots',
+                'fabricItem',
                 'bundles.finishedItem',
                 'operator',
             ])
@@ -517,12 +519,9 @@ class CuttingJobController extends Controller
             throw new \RuntimeException('Warehouse RM belum dikonfigurasi di tabel warehouses (code = RM).');
         }
 
-        // 2) list LOT available (fallback legacy)
-        $lotStocks = $this->inventory->getAvailableLots(
-            warehouseId: $rmWarehouseId,
-            itemId: null
-        );
-        $lotStocks = $this->onlyMainRawMaterialLots($lotStocks);
+        // 2) list LOT available
+        $lotStocks = $this->availableCuttingLotStocks($rmWarehouseId);
+        $lotSupplierMap = $this->lotSupplierMap($lotStocks->pluck('lot_id')->filter()->unique()->values()->all());
 
         // 3) items FG (buat suggest API, tapi di blade kita pakai item-suggest fetch)
         $items = Item::query()
@@ -539,7 +538,78 @@ class CuttingJobController extends Controller
             ->orderBy('code')
             ->get();
 
-        // 5) selected lots: sumber utama CuttingJobLot
+        // 5) warehouses
+        $warehouses = Warehouse::orderBy('code')->get();
+
+        // 6) BOM data
+        $bomLines = \App\Models\ItemBomLine::query()
+            ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
+            ->whereHas('bom', fn($q) => $q->where('active', true))
+            ->with('bom:id,item_id')
+            ->get();
+
+        $bomData = $bomLines
+            ->groupBy(fn($line) => (int) $line->bom->item_id)
+            ->map(fn($lines) => $lines->keyBy(fn($l) => (int) $l->material_item_id)
+                ->map(fn($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
+            );
+
+        $bomEditUrls = $bomLines
+            ->unique(fn($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn($l) => [
+                (int) $l->bom->item_id => route('master.item_boms.edit', $l->bom->id),
+            ]);
+
+        $bomQuickUrls = $bomLines
+            ->unique(fn($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn($l) => [
+                (int) $l->bom->item_id => route('master.item_boms.quick_line', $l->bom->id),
+            ]);
+
+        // 7) Riwayat pemakaian kain
+        $usageRows = \DB::table('cutting_job_bundles as b')
+            ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
+            ->join('lots as l', 'l.id', '=', 'b.lot_id')
+            ->where('j.status', '!=', 'voided')
+            ->where('b.qty_pcs', '>', 0)
+            ->where('b.qty_used_fabric', '>', 0)
+            ->orderByDesc('j.date')
+            ->orderByDesc('b.id')
+            ->limit(600)
+            ->get([
+                'b.finished_item_id',
+                'l.item_id as fabric_item_id',
+                'b.qty_pcs',
+                'b.qty_used_fabric',
+                'j.code as job_code',
+                'j.date',
+            ]);
+
+        $lastUsage = [];
+        foreach ($usageRows as $row) {
+            $fid = (int) $row->finished_item_id;
+            $mid = (int) $row->fabric_item_id;
+            $kgPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
+            $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
+
+            if (!isset($lastUsage[$fid][$mid])) {
+                $lastUsage[$fid][$mid] = [
+                    'kg_per_pcs' => $kgPerPcs,
+                    'job_code'   => $row->job_code,
+                    'date'       => $dateStr,
+                    'history'    => [],
+                ];
+            }
+
+            $hist = &$lastUsage[$fid][$mid]['history'];
+            $lastJob = end($hist);
+            if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
+                $hist[] = ['kg_per_pcs' => $kgPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
+            }
+            unset($hist);
+        }
+
+        // 8) selected lots: sumber utama CuttingJobLot
         $selectedLotsExisting = $cuttingJob->lots
             ->pluck('lot_id')
             ->filter()
@@ -617,14 +687,20 @@ class CuttingJobController extends Controller
         return view('production.cutting_jobs.edit', [
             'job' => $cuttingJob,
             'lotStocks' => $lotStocks,
+            'lotSupplierMap' => $lotSupplierMap,
             'items' => $items,
             'operators' => $operators,
+            'warehouses' => $warehouses,
 
             'rows' => $rows,
             'selectedLotsExisting' => $selectedLotsExisting,
             'selectedLotSummaries' => $selectedLotSummaries,
 
             'lotBalance' => $lotBalance,
+            'bomData' => $bomData,
+            'bomEditUrls' => $bomEditUrls,
+            'bomQuickUrls' => $bomQuickUrls,
+            'lastUsage' => $lastUsage,
         ]);
     }
 
@@ -1234,13 +1310,49 @@ class CuttingJobController extends Controller
 
         $validated['bundles'] = $validBundles;
 
+        // Hitung total planned fabric per LOT dari bundle yang sudah dihitung (kayak di create)
+        $fabricByLot = [];
+        foreach ($validBundles as $b) {
+            $lotId = (int) ($b['lot_id'] ?? 0);
+            $fabricByLot[$lotId] = ($fabricByLot[$lotId] ?? 0.0) + (float) ($b['qty_used_fabric'] ?? 0);
+        }
+
         // selected_lots tidak dipakai cutting service
         unset($validated['selected_lots']);
 
-        $job = $this->cutting->update($validated, $cuttingJob);
+        try {
+            DB::beginTransaction();
 
-        // Sinkron used_fabric_qty per LOT setelah bundle berubah
-        $this->syncCuttingJobLotUsedFabric($job);
+            // 1. Reverse stock lama
+            $this->inventory->reverseBySource('cutting_job', $cuttingJob->id);
+
+            // 2. Hapus referensi LOT lama
+            $cuttingJob->lots()->delete();
+
+            // 3. Update job & bundles
+            $job = $this->cutting->update($validated, $cuttingJob);
+
+            // 4. Buat pivot LOT baru
+            foreach ($selectedLotIds as $lotId) {
+                \App\Models\CuttingJobLot::create([
+                    'cutting_job_id'     => $job->id,
+                    'lot_id'             => $lotId,
+                    'planned_fabric_qty' => $fabricByLot[$lotId] ?? 0.0,
+                ]);
+            }
+
+            // 5. Potong ulang stok
+            $this->cutting->reconsumeFabricFromLots($job);
+
+            // 6. Sinkron used_fabric_qty per LOT (ini buat form Sisa Kain)
+            $this->syncCuttingJobLotUsedFabric($job);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            // Optionally log error here
+            return back()->withErrors(['error' => 'Gagal menyimpan update: ' . $e->getMessage()])->withInput();
+        }
 
         return redirect()
             ->route('production.cutting_jobs.show', $job)

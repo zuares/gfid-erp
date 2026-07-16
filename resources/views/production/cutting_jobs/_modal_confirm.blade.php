@@ -101,8 +101,11 @@
                 <div class="row g-3 cutting-modal-section cutting-modal-section-meta">
                     <div class="col-md-4 col-6">
                         <label class="form-label small">Tanggal</label>
+                        @php
+                            $defaultDate = isset($isEdit) && $isEdit && isset($job) ? $job->date : now()->toDateString();
+                        @endphp
                         <input type="date" name="date" class="form-control form-control-sm"
-                            value="{{ old('date', now()->toDateString()) }}">
+                            value="{{ old('date', $defaultDate) }}">
                     </div>
                     <div class="col-md-4 col-6">
                         <label class="form-label small">Warehouse</label>
@@ -120,8 +123,11 @@
                     </div>
                     <div class="col-12 cutting-notes-modal-field">
                         <label class="form-label small">Catatan</label>
+                        @php
+                            $defaultNotes = isset($isEdit) && $isEdit && isset($job) ? $job->notes : '';
+                        @endphp
                         <input type="text" name="notes" class="form-control form-control-sm"
-                            value="{{ old('notes') }}">
+                            value="{{ old('notes', $defaultNotes) }}">
                     </div>
                 </div>
             </div>
@@ -467,7 +473,9 @@
             });
 
             // Tombol di modal yang benar-benar submit form
-            btnModalSaveCutting?.addEventListener('click', () => {
+            btnModalSaveCutting?.addEventListener('click', function () {
+                if (form.dataset.submitted === 'true') return;
+
                 if (window.cuttingValidateBundleItems && !window.cuttingValidateBundleItems(true)) {
                     cuttingInfoModalInstance?.hide?.();
                     return;
@@ -478,6 +486,10 @@
                     operatorSelect?.focus();
                     return;
                 }
+
+                form.dataset.submitted = 'true';
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Menyimpan...';
 
                 form?.submit();
             });

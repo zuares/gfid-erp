@@ -43,6 +43,14 @@
   .cf-actions .cf-btn,.cf-actions .cf-primary{width:100%;text-align:center}
   .cf-order{align-items:flex-start;flex-direction:column}
 }
+.cf-tabs{display:flex;gap:.25rem;margin-bottom:.75rem;border-bottom:1px solid rgba(148,163,184,.2);flex-wrap:wrap;margin-top:.5rem}
+.cf-tab{appearance:none;display:inline-flex;align-items:center;gap:.4rem;border:none;background:transparent;color:#94a3b8;font-family:inherit;font-weight:800;font-size:.84rem;padding:.55rem .85rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.cf-tab:hover{color:#475569}
+.cf-tab.active{color:#334155;border-bottom-color:#334155}
+.cf-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;border-radius:999px;background:rgba(148,163,184,.18);color:#64748b;font-family:monospace;font-size:.72rem;font-weight:900}
+.cf-tab.active .cf-tab-count{background:#334155;color:#fff}
+.cf-tabpane{display:none}
+.cf-tabpane.active{display:block}
 </style>
 @endpush
 
@@ -69,41 +77,50 @@
         <span class="cf-step">Simpan &amp; Kurangi Stok</span>
     </div>
 
-    <div class="cf-card">
-        <div class="cf-card-h">
-            <div>
-                <div class="cf-title">Pesanan Siap Dikonfirmasi</div>
-                <div class="cf-muted">Nomor pesanan masih mode belum tertaut. Konfirmasi akan mencatat daftar pesanan ke shipment.</div>
+    <div class="cf-tabs">
+        <button class="cf-tab active" data-target="tab-pesanan">Pesanan Dikonfirmasi <span class="cf-tab-count" id="tabPesananBadge">0</span></button>
+        <button class="cf-tab" data-target="tab-batch">Stok Batch <span class="cf-tab-count">{{ $batchPool->count() }}</span></button>
+    </div>
+
+    <div class="cf-tabpane active" id="tab-pesanan">
+        <div class="cf-card">
+            <div class="cf-card-h">
+                <div>
+                    <div class="cf-title">Pesanan Siap Dikonfirmasi</div>
+                    <div class="cf-muted">Nomor pesanan masih mode belum tertaut. Konfirmasi akan mencatat daftar pesanan ke shipment.</div>
+                </div>
+                <span class="cf-spacer"></span>
+                <span class="cf-pill">Pesanan <b id="orderCount">0</b></span>
             </div>
-            <span class="cf-spacer"></span>
-            <span class="cf-pill">Pesanan <b id="orderCount">0</b></span>
-        </div>
-        <div class="cf-body">
-            <div id="orderList" class="cf-list"></div>
-            <div id="emptyOrders" class="cf-empty">
-                Belum ada pesanan yang discan. Kembali ke Scan Pesanan dulu.
+            <div class="cf-body">
+                <div id="orderList" class="cf-list"></div>
+                <div id="emptyOrders" class="cf-empty">
+                    Belum ada pesanan yang discan. Kembali ke Scan Pesanan dulu.
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="cf-card">
-        <div class="cf-card-h">
-            <div>
-                <div class="cf-title">Stok Batch</div>
-                <div class="cf-muted">Saat ini belum dialokasikan ke pesanan karena tautan invoice/order belum dipakai.</div>
+    <div class="cf-tabpane" id="tab-batch">
+        <div class="cf-card">
+            <div class="cf-card-h">
+                <div>
+                    <div class="cf-title">Stok Batch</div>
+                    <div class="cf-muted">Saat ini belum dialokasikan ke pesanan karena tautan invoice/order belum dipakai.</div>
+                </div>
             </div>
-        </div>
-        <div class="cf-body">
-            <div class="cf-batch">
-                @forelse($batchPool as $item)
-                    <div class="cf-batch-row">
-                        <span class="cf-item-code">{{ $item['item_code'] }}</span>
-                        <span class="cf-item-name">{{ $item['item_name'] }}</span>
-                        <span class="cf-item-qty">{{ number_format($item['qty'],0,',','.') }}</span>
-                    </div>
-                @empty
-                    <div class="cf-empty">Belum ada item batch.</div>
-                @endforelse
+            <div class="cf-body">
+                <div class="cf-batch">
+                    @forelse($batchPool as $item)
+                        <div class="cf-batch-row">
+                            <span class="cf-item-code">{{ $item['item_code'] }}</span>
+                            <span class="cf-item-name">{{ $item['item_name'] }}</span>
+                            <span class="cf-item-qty">{{ number_format($item['qty'],0,',','.') }}</span>
+                        </div>
+                    @empty
+                        <div class="cf-empty">Belum ada item batch.</div>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>
@@ -155,6 +172,7 @@
     function render() {
         const orders = loadOrders();
         orderCount.textContent = orders.length;
+        document.getElementById('tabPesananBadge').textContent = orders.length;
         confirmBtn.disabled = orders.length === 0;
         emptyOrders.style.display = orders.length ? 'none' : '';
         orderList.innerHTML = orders.map(o => {
@@ -209,6 +227,16 @@
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Konfirmasi Pesanan';
         }
+    });
+
+    // Tab switching
+    document.querySelectorAll('.cf-tab').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.cf-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.cf-tabpane').forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById(this.dataset.target).classList.add('active');
+        });
     });
 
     render();

@@ -452,6 +452,7 @@ class InventoryAdjustmentController extends Controller
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'exists:items,id'],
+            'lines.*.lot_id' => ['nullable', 'exists:lots,id'],
             'lines.*.qty_change' => ['required', 'numeric'],
             'lines.*.notes' => ['nullable', 'string'],
         ];
@@ -489,6 +490,7 @@ class InventoryAdjustmentController extends Controller
 
             foreach ($validated['lines'] as $lineData) {
                 $itemId = (int) $lineData['item_id'];
+                $lotId = isset($lineData['lot_id']) && $lineData['lot_id'] ? (int) $lineData['lot_id'] : null;
                 $signedChange = (float) $lineData['qty_change'];
 
                 if (abs($signedChange) < 0.000001) {
@@ -500,10 +502,18 @@ class InventoryAdjustmentController extends Controller
                 $qtyAfter = null;
 
                 if ($isOwner) {
-                    $qtyBefore = $inventory->getOnHandQty(
-                        warehouseId: $adjustment->warehouse_id,
-                        itemId: $itemId
-                    );
+                    if ($lotId) {
+                        $qtyBefore = $inventory->getLotBalance(
+                            warehouseId: $adjustment->warehouse_id,
+                            itemId: $itemId,
+                            lotId: $lotId
+                        );
+                    } else {
+                        $qtyBefore = $inventory->getOnHandQty(
+                            warehouseId: $adjustment->warehouse_id,
+                            itemId: $itemId
+                        );
+                    }
 
                     // ✅ resolve cost saat eksekusi langsung (owner)
                     $item = Item::find($itemId);
@@ -522,7 +532,7 @@ class InventoryAdjustmentController extends Controller
                         sourceType: InventoryAdjustment::class,
                         sourceId: $adjustment->id,
                         notes: $lineData['notes'] ?? $adjustment->reason,
-                        lotId: null,
+                        lotId: $lotId,
                         allowNegative: false,
                         unitCostOverride: $unitCostOverride,
                         affectLotCost: false,
@@ -532,10 +542,18 @@ class InventoryAdjustmentController extends Controller
                         continue;
                     }
 
-                    $qtyAfter = $inventory->getOnHandQty(
-                        warehouseId: (int) $adjustment->warehouse_id,
-                        itemId: $itemId
-                    );
+                    if ($lotId) {
+                        $qtyAfter = $inventory->getLotBalance(
+                            warehouseId: (int) $adjustment->warehouse_id,
+                            itemId: $itemId,
+                            lotId: $lotId
+                        );
+                    } else {
+                        $qtyAfter = $inventory->getOnHandQty(
+                            warehouseId: (int) $adjustment->warehouse_id,
+                            itemId: $itemId
+                        );
+                    }
                 }
 
                 $adjustment->lines()->create([
@@ -545,7 +563,7 @@ class InventoryAdjustmentController extends Controller
                     'qty_change' => $signedChange,
                     'direction' => $direction,
                     'notes' => $lineData['notes'] ?? null,
-                    'lot_id' => null,
+                    'lot_id' => $lotId,
                 ]);
             }
 
@@ -890,6 +908,44 @@ class InventoryAdjustmentController extends Controller
      * Endpoint AJAX: item yang punya stok (qty != 0) di gudang
      * GET /inventory/adjustments/items?warehouse_id=xx&q=KODE
      */
+    protected function getLotStockRowsForItems(array $itemIds, int $warehouseId, $itemsCollection = null): array
+    {
+        $mutations = \App\Models\InventoryMutation::query()
+            ->selectRaw('item_id, lot_id, SUM(qty_change) as lot_qty')
+            ->where('warehouse_id', $warehouseId)
+            ->whereIn('item_id', $itemIds)
+            ->whereNotNull('lot_id')
+            ->groupBy('item_id', 'lot_id')
+            ->havingRaw('SUM(qty_change) != 0')
+            ->get();
+            
+        $results = [];
+        if ($mutations->isEmpty()) {
+            return $results;
+        }
+        
+        $lots = \App\Models\Lot::whereIn('id', $mutations->pluck('lot_id')->unique())->get()->keyBy('id');
+        $items = $itemsCollection ? $itemsCollection->keyBy('id') : \App\Models\Item::whereIn('id', $itemIds)->get()->keyBy('id');
+
+        foreach ($mutations as $mut) {
+            $item = $items[$mut->item_id] ?? null;
+            $lot = $lots[$mut->lot_id] ?? null;
+            if (!$item || !$lot) continue;
+
+            $results[] = [
+                'id' => $item->id,
+                'code' => $item->code ?? '',
+                'name' => $item->name ?? '',
+                'on_hand' => (float) $mut->lot_qty,
+                'lot_id' => $lot->id,
+                'lot_code' => $lot->code,
+                'not_in_warehouse' => abs((float) $mut->lot_qty) < 0.000001,
+            ];
+        }
+
+        return $results;
+    }
+
     public function itemsForWarehouse(Request $request): JsonResponse
     {
         $warehouseId = $request->integer('warehouse_id');
@@ -901,9 +957,16 @@ class InventoryAdjustmentController extends Controller
         $itemId = $request->integer('item_id');
 
         if ($itemId) {
-            $item = Item::find($itemId);
+            $item = Item::with('itemRole')->find($itemId);
             if (!$item) {
                 return response()->json([], 404);
+            }
+
+            if (($item->itemRole->code ?? '') === 'RM') {
+                $lots = $this->getLotStockRowsForItems([$item->id], $warehouseId);
+                if (!empty($lots)) {
+                    return response()->json($lots);
+                }
             }
 
             $qty = (float) InventoryStock::query()
@@ -916,57 +979,108 @@ class InventoryAdjustmentController extends Controller
                 'code' => $item->code ?? '',
                 'name' => $item->name ?? '',
                 'on_hand' => $qty,
+                'lot_id' => null,
+                'lot_code' => null,
                 'not_in_warehouse' => abs($qty) < 0.000001,
             ]]);
         }
 
         if ($q === '') {
-            $rows = InventoryStock::query()
-                ->with('item')
+            $stocks = InventoryStock::query()
+                ->with(['item.itemRole'])
                 ->where('warehouse_id', $warehouseId)
                 ->where('qty', '!=', 0)
                 ->orderBy('item_id')
                 ->limit(500)
                 ->get();
 
-            return response()->json(
-                $rows->map(fn(InventoryStock $row) => [
-                    'id' => $row->item_id,
-                    'code' => $row->item?->code ?? '',
-                    'name' => $row->item?->name ?? '',
-                    'on_hand' => (float) $row->qty,
-                ])
-            );
+            $results = [];
+            $rmItemIds = [];
+            
+            foreach ($stocks as $stock) {
+                if (($stock->item?->itemRole->code ?? '') === 'RM') {
+                    $rmItemIds[] = $stock->item_id;
+                } else {
+                    $results[] = [
+                        'id' => $stock->item_id,
+                        'code' => $stock->item?->code ?? '',
+                        'name' => $stock->item?->name ?? '',
+                        'on_hand' => (float) $stock->qty,
+                        'lot_id' => null,
+                        'lot_code' => null,
+                        'not_in_warehouse' => false,
+                    ];
+                }
+            }
+
+            if (!empty($rmItemIds)) {
+                $rmLots = $this->getLotStockRowsForItems($rmItemIds, $warehouseId);
+                $results = array_merge($results, $rmLots);
+            }
+
+            return response()->json($results);
         }
 
-        $stocks = InventoryStock::query()
-            ->where('warehouse_id', $warehouseId)
-            ->whereIn('item_id', function ($sub) use ($q) {
-                $sub->select('id')
-                    ->from('items')
-                    ->where('code', 'like', '%' . $q . '%')
-                    ->orWhere('name', 'like', '%' . $q . '%');
-            })
-            ->pluck('qty', 'item_id');
-
         $items = Item::query()
+            ->with('itemRole')
             ->where(function ($sub) use ($q) {
                 $sub->where('code', 'like', '%' . $q . '%')
                     ->orWhere('name', 'like', '%' . $q . '%');
             })
             ->orderBy('code')
             ->limit(50)
-            ->get(['id', 'code', 'name']);
+            ->get();
 
-        return response()->json(
-            $items->map(fn(Item $item) => [
-                'id' => $item->id,
-                'code' => $item->code ?? '',
-                'name' => $item->name ?? '',
-                'on_hand' => (float) ($stocks[$item->id] ?? 0),
-                'not_in_warehouse' => !isset($stocks[$item->id]) || abs((float) ($stocks[$item->id] ?? 0)) < 0.000001,
-            ])
-        );
+        $itemIds = $items->pluck('id')->toArray();
+        if (empty($itemIds)) {
+            return response()->json([]);
+        }
+
+        $stocks = InventoryStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->whereIn('item_id', $itemIds)
+            ->pluck('qty', 'item_id');
+
+        $results = [];
+        $rmItemIds = [];
+
+        foreach ($items as $item) {
+            if (($item->itemRole->code ?? '') === 'RM') {
+                $rmItemIds[] = $item->id;
+            } else {
+                $results[] = [
+                    'id' => $item->id,
+                    'code' => $item->code ?? '',
+                    'name' => $item->name ?? '',
+                    'on_hand' => (float) ($stocks[$item->id] ?? 0),
+                    'lot_id' => null,
+                    'lot_code' => null,
+                    'not_in_warehouse' => !isset($stocks[$item->id]) || abs((float) ($stocks[$item->id] ?? 0)) < 0.000001,
+                ];
+            }
+        }
+
+        if (!empty($rmItemIds)) {
+            $rmLots = $this->getLotStockRowsForItems($rmItemIds, $warehouseId, $items);
+            $foundItemIds = array_column($rmLots, 'id');
+            foreach ($rmItemIds as $rmId) {
+                if (!in_array($rmId, $foundItemIds)) {
+                    $item = $items->firstWhere('id', $rmId);
+                    $rmLots[] = [
+                        'id' => $item->id,
+                        'code' => $item->code ?? '',
+                        'name' => $item->name ?? '',
+                        'on_hand' => 0,
+                        'lot_id' => null,
+                        'lot_code' => null,
+                        'not_in_warehouse' => true,
+                    ];
+                }
+            }
+            $results = array_merge($results, $rmLots);
+        }
+
+        return response()->json($results);
     }
 
     public function storeQuickItem(Request $request): JsonResponse
@@ -1201,6 +1315,7 @@ class InventoryAdjustmentController extends Controller
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'exists:items,id'],
+            'lines.*.lot_id' => ['nullable', 'exists:lots,id'],
             'lines.*.qty_in' => ['required', 'numeric', 'min:0'],
             'lines.*.notes' => ['nullable', 'string'],
         ]);

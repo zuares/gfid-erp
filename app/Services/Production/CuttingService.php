@@ -232,6 +232,14 @@ class CuttingService
      * Konsumsi kain per LOT saat cutting create.
      * (kode kamu tetap)
      */
+    /**
+     * Potong kain dari LOT setelah dilakukan update bundles & pivot lots.
+     */
+    public function reconsumeFabricFromLots(CuttingJob $job): void
+    {
+        $this->consumeFabricFromLots($job);
+    }
+
     protected function consumeFabricFromLots(CuttingJob $job): void
     {
         $job->loadMissing(['bundles', 'lots']);

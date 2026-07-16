@@ -794,7 +794,7 @@
                         <li>
                             <a href="{{ route('inventory.stocks.items') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.stocks.items') ? 'active' : '' }}">
-                                <span class="icon">📦</span><span>Stok Barang</span>
+                                <span class="icon"><i class="bi bi-box-seam"></i></span><span>Stok Barang</span>
                             </a>
                         </li>
                     @endif
@@ -803,7 +803,7 @@
                         <li>
                             <a href="{{ route('inventory.stock_card.index') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.stock_card.*') ? 'active' : '' }}">
-                                <span class="icon">📋</span><span>Kartu Stok</span>
+                                <span class="icon"><i class="bi bi-list-ul"></i></span><span>Kartu Stok</span>
                             </a>
                         </li>
                     @endif
@@ -812,7 +812,7 @@
                         <li>
                             <a href="{{ route('inventory.stock_opnames.index') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.stock_opnames.*') ? 'active' : '' }}">
-                                <span class="icon">📊</span><span>Stok Opname</span>
+                                <span class="icon"><i class="bi bi-bar-chart"></i></span><span>Stok Opname</span>
                             </a>
                         </li>
                     @endif
@@ -821,7 +821,7 @@
                         <li>
                             <a href="{{ route('inventory.adjustments.index') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.adjustments.*') ? 'active' : '' }}">
-                                <span class="icon">📝</span><span>Koreksi Persediaan</span>
+                                <span class="icon"><i class="bi bi-pencil-square"></i></span><span>Koreksi Persediaan</span>
                             </a>
                         </li>
                     @endif
@@ -830,7 +830,7 @@
                         <li>
                             <a href="{{ route('inventory.wip_adjustments.index') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('inventory.wip_adjustments.*') ? 'active' : '' }}">
-                                <span class="icon">🧾</span><span>Koreksi WIP</span>
+                                <span class="icon"><i class="bi bi-receipt"></i></span><span>Koreksi WIP</span>
                             </a>
                         </li>
                     @endif
@@ -845,7 +845,7 @@
                                    class="mobile-sidebar-link {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}"
                                    @if($canManageRts && $hasRtsNeedReceive) title="{{ $rtsBadgeTitle }}" @endif
                                 >
-                                    <span class="icon">🛒</span><span>Permintaan Stok (RTS)</span>
+                                    <span class="icon"><i class="bi bi-cart"></i></span><span>Permintaan Stok (RTS)</span>
                                     @if($canManageRts && $hasRtsNeedReceive)
                                         <span class="ms-dot" aria-hidden="true"></span>
                                     @endif
@@ -857,7 +857,7 @@
                             <li>
                                 <a href="{{ route('rts.direct-receives.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
-                                    <span class="icon">⚡</span><span>RTS Dadakan</span>
+                                    <span class="icon"><i class="bi bi-lightning"></i></span><span>RTS Dadakan</span>
                                 </a>
                             </li>
                         @endif
@@ -949,7 +949,7 @@
                             <li>
                                 <a href="{{ route('production.dashboard') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.dashboard') ? 'active' : '' }}">
-                                    <span class="icon">📊</span><span>Beranda Produksi</span>
+                                    <span class="icon"><i class="bi bi-bar-chart"></i></span><span>Beranda Produksi</span>
                                 </a>
                             </li>
                         @endif
@@ -958,7 +958,7 @@
                             <li>
                                 <a href="{{ route('production.cutting_jobs.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.cutting_jobs.*') ? 'active' : '' }}">
-                                    <span class="icon">✂️</span><span>Daftar Pekerjaan Potong</span>
+                                    <span class="icon"><i class="bi bi-scissors"></i></span><span>Pekerjaan Potong</span>
                                 </a>
                             </li>
                         @endif
@@ -967,7 +967,7 @@
                             <li>
                                 <a href="{{ route('production.sewing.pickups.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.sewing.pickups.*') ? 'active' : '' }}">
-                                    <span class="icon">🧵</span><span>Daftar Ambil Jahit</span>
+                                    <span class="icon"><i class="bi bi-send"></i></span><span>Ambil Jahit</span>
                                 </a>
                             </li>
                         @endif
@@ -976,7 +976,7 @@
                             <li>
                                 <a href="{{ route('production.sewing.returns.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.sewing.returns.*') ? 'active' : '' }}">
-                                    <span class="icon">📥</span><span>Daftar Setoran Jahit</span>
+                                    <span class="icon"><i class="bi bi-inbox"></i></span><span>Setoran Jahit</span>
                                 </a>
                             </li>
                         @endif
@@ -985,7 +985,7 @@
                             <li>
                                 <a href="{{ route('production.sewing.reject_returns.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.sewing.reject_returns.*') ? 'active' : '' }}">
-                                    <span class="icon">♻️</span><span>Setor Reject Jahit</span>
+                                    <span class="icon"><i class="bi bi-arrow-clockwise"></i></span><span>Setor Reject Jahit</span>
                                 </a>
                             </li>
                         @endif
@@ -994,7 +994,7 @@
                             <li>
                                 <a href="{{ route('production.finishing_jobs.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
-                                    <span class="icon">🧶</span><span>Daftar Finishing</span>
+                                    <span class="icon"><i class="bi bi-patch-check"></i></span><span>Pekerjaan Finishing</span>
                                 </a>
                             </li>
                         @endif
@@ -1003,7 +1003,7 @@
                             <li>
                                 <a href="{{ route('production.finishing_repairs.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.finishing_repairs.*') ? 'active' : '' }}">
-                                    <span class="icon">🩹</span><span>Perbaikan Finishing</span>
+                                    <span class="icon"><i class="bi bi-tools"></i></span><span>Perbaikan Finishing</span>
                                 </a>
                             </li>
                         @endif
@@ -1012,7 +1012,7 @@
                             <li>
                                 <a href="{{ $prodQcHref }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                                    <span class="icon">✅</span><span>{{ $prodQcLabel }}</span>
+                                    <span class="icon"><i class="bi bi-check-circle"></i></span><span>{{ $prodQcLabel }}</span>
                                 </a>
                             </li>
                         @endif
@@ -1021,7 +1021,7 @@
                             <li>
                                 <a href="{{ route('production.packing_jobs.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.packing_jobs.*') ? 'active' : '' }}">
-                                    <span class="icon">📦</span><span>Packing</span>
+                                    <span class="icon"><i class="bi bi-box-seam"></i></span><span>Packing</span>
                                 </a>
                             </li>
                         @endif
@@ -1030,7 +1030,7 @@
                             <li>
                                 <a href="{{ route('production.priority.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.priority.*') ? 'active' : '' }}">
-                                    <span class="icon">🎯</span><span>Prioritas Produksi</span>
+                                    <span class="icon"><i class="bi bi-ui-checks"></i></span><span>Prioritas Produksi</span>
                                 </a>
                             </li>
                         @endif
@@ -1039,7 +1039,7 @@
                             <li>
                                 <a href="{{ route('production.reports.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.reports.*') ? 'active' : '' }}">
-                                    <span class="icon">📈</span><span>Laporan Produksi</span>
+                                    <span class="icon"><i class="bi bi-graph-up-arrow"></i></span><span>Laporan Produksi</span>
                                 </a>
                             </li>
                         @endif
