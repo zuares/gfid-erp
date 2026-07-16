@@ -1581,6 +1581,7 @@ class ShipmentController extends Controller
                 if (!empty($scan->raw_payload)) {
                     $payload = $scan->raw_payload;
                     $payload['decision'] = $scan->status ?: 'pending';
+                    $payload['scanned_at'] = $scan->created_at?->format('d/m/Y H:i:s');
                     return $payload;
                 }
                 return [
@@ -1596,6 +1597,7 @@ class ShipmentController extends Controller
                     'pool_full' => [],
                     'decision' => $scan->status ?: 'pending',
                     'subs' => [],
+                    'scanned_at' => $scan->created_at?->format('d/m/Y H:i:s'),
                 ];
             })
             ->values();
@@ -1687,7 +1689,7 @@ class ShipmentController extends Controller
                 'decision' => 'pending',
             ];
 
-            \App\Models\ShipmentOrderScan::updateOrCreate(
+            $scanModel = \App\Models\ShipmentOrderScan::updateOrCreate(
                 [
                     'shipment_id' => $shipment->id,
                     'order_no' => $no,
@@ -1700,6 +1702,7 @@ class ShipmentController extends Controller
                 ]
             );
 
+            $rawPayload['scanned_at'] = $scanModel->created_at?->format('d/m/Y H:i:s');
             return response()->json(array_merge(['status' => 'ok'], $rawPayload));
         }
 
@@ -1812,6 +1815,8 @@ class ShipmentController extends Controller
                 'raw_payload' => $rawPayload,
             ]
         );
+        
+        $rawPayload['scanned_at'] = now()->format('d/m/Y H:i:s');
 
         return response()->json(array_merge(['status' => 'ok'], $rawPayload));
     }
@@ -1971,6 +1976,15 @@ class ShipmentController extends Controller
             ->firstOrFail();
 
         $payload = $scan->raw_payload;
+        if ($request->has('new_order_no')) {
+            $newNo = trim($request->input('new_order_no'));
+            $scan->order_no = $newNo;
+            $payload['no'] = $newNo;
+            if (isset($payload['order'])) {
+                $payload['order']['order_no'] = $newNo;
+            }
+        }
+        
         if ($request->has('decision')) {
             $payload['decision'] = $request->input('decision');
             $scan->status = $request->input('decision') ?: 'pending';
@@ -1992,6 +2006,19 @@ class ShipmentController extends Controller
         $scan->raw_payload = $payload;
         $scan->save();
 
+        return response()->json(['status' => 'ok']);
+    }
+
+    public function deleteRekonScan(Request $request, Shipment $shipment, $orderNo)
+    {
+        if ($shipment->status !== 'draft') abort(403);
+        
+        $scan = \App\Models\ShipmentOrderScan::where('shipment_id', $shipment->id)
+            ->where('order_no', $orderNo)
+            ->firstOrFail();
+            
+        $scan->delete();
+        
         return response()->json(['status' => 'ok']);
     }
 

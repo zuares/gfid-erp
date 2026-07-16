@@ -679,12 +679,13 @@ body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
 .rk-empty-sub { font-size: .8rem; margin-top: .3rem; }
 
 /* Compact neutral override, aligned with shipment edit */
+:root,
 .page-theme-shopee,
 .page-theme-tiktok {
-    --shp-accent: #334155;
-    --shp-accent-2: #1f2937;
-    --shp-accent-bg: rgba(148,163,184,.08);
-    --shp-accent-ring: rgba(148,163,184,.18);
+    --shp-accent: #334155 !important;
+    --shp-accent-2: #1f2937 !important;
+    --shp-accent-bg: rgba(148,163,184,.08) !important;
+    --shp-accent-ring: rgba(148,163,184,.18) !important;
 }
 .rk-wrap,
 body[data-theme="light"] .rk-wrap,
@@ -1048,12 +1049,12 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 @endphp
 
 <div class="shp-topbar">
-    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline btn-return-scan" style="text-decoration:none">
+    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline btn-return-scan btn-sm" style="text-decoration:none;font-size:0.75rem;padding:0.25rem 0.6rem;">
         <span aria-hidden="true">&larr;</span>
-        <span>Kembali ke Scan Barang</span>
+        <span>Scan Barang</span>
     </a>
-    <a href="/marketplace/orders" class="btn-shp-outline" style="text-decoration:none; background:#f8fafc; border-color:#e2e8f0; color:#475569;">
-        📦 Order Marketplace
+    <a href="/marketplace/orders" class="btn-shp-outline btn-sm" style="text-decoration:none; background:#f8fafc; border-color:#e2e8f0; color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
+        📦 List Order
     </a>
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
@@ -1061,38 +1062,32 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     <span class="shp-pill">Batch <b>{{ $totalLines }}</b> SKU</span>
     <span class="shp-pill shp-pill-accent">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     <span class="shp-pill" id="topPillOrders" style="display:none">Pesanan <b id="topOrderCount">0</b></span>
-    <button id="topConfirmBtn" class="btn-shp-submit" disabled>Konfirmasi Pesanan</button>
 </div>
 
 <div class="rk-wrap">
 
-    {{-- PHASE BAR --}}
-    <div class="rk-phases">
-        <span class="rk-phase done">Scan Barang</span>
-        <span class="rk-sep">→</span>
-        <span class="rk-phase active">Scan Pesanan</span>
-        <span class="rk-sep">→</span>
-        <span class="rk-phase" id="ph3">Konfirmasi Pesanan</span>
-    </div>
+
 
     {{-- TABS --}}
     <div class="rk-tabs" role="tablist">
         <button type="button" class="rk-tab active" data-tab="pesanan">Pesanan <span class="rk-tab-count" id="rkOrderCount">0</span></button>
+        <button type="button" class="rk-tab" data-tab="sisa">Belum Alokasi <span class="rk-tab-count" id="rkSisaCount">0</span></button>
         <button type="button" class="rk-tab" data-tab="batch">Isi Batch <span class="rk-tab-count">{{ $batchPool->count() }}</span></button>
     </div>
 
     {{-- TAB: PESANAN --}}
     <div class="rk-tabpane active" id="rk-tab-pesanan" role="tabpanel">
         {{-- HERO SCAN CARD --}}
-        <div class="shp-scan-card">
-            <div class="shp-scan-header">
-                <span class="shp-scan-label">Scan Pesanan</span>
-                <span class="shp-scan-counter" id="scanCounter">0 pesanan</span>
+        <div class="shp-scan-card" style="padding: 1rem 1.25rem 0.8rem; margin-bottom: 0.75rem; border-radius: 12px; border-width: 1px;">
+            <div class="shp-scan-header" style="margin-bottom: 0.35rem;">
+                <span class="shp-scan-label" style="font-size:0.75rem;">Scan Pesanan</span>
+                <span class="shp-scan-counter" id="scanCounter" style="font-size:0.75rem;">0 pesanan</span>
             </div>
 
             <input type="text" id="orderInput" class="shp-scan-input"
-                   placeholder="Scan atau ketik nomor pesanan, lalu Enter"
-                   autocomplete="off" spellcheck="false">
+                   placeholder="Scan / ketik no pesanan lalu Enter"
+                   style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
+                   autocomplete="off" spellcheck="false" autofocus>
 
         </div>
 
@@ -1106,7 +1101,15 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             <div class="rk-empty-sub">Bisa dari barcode scanner atau ketik manual lalu tekan Enter</div>
         </div>
 
-        {{-- SISA STOK CARD --}}
+        <div class="mt-4 mb-2 text-end">
+            <button id="topConfirmBtn" class="btn-shp-submit" disabled style="font-size: 0.95rem; padding: 0.6rem 2rem; border-radius: 8px;">
+                Konfirmasi Pesanan
+            </button>
+        </div>
+    </div>
+
+    {{-- TAB: SISA STOK --}}
+    <div class="rk-tabpane" id="rk-tab-sisa" role="tabpanel">
         <div id="sisaCard" style="display:none"></div>
     </div>
 
@@ -1265,6 +1268,7 @@ const UPDATE_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_u
 const LINK_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_link_scan', [$shipment, '__NO__']), PHP_URL_PATH)) !!};
 const SERVER_ORDER_SCANS = @json($savedOrderScans ?? []);
 const SHIPMENT_TYPE = @json($shipment->shipment_type ?? 'marketplace');
+const IS_OWNER = @json(auth()->user()?->hasRole('owner') ?? false);
 
 // Batch pool dari server — sumber kebenaran qty total per item
 const BATCH_POOL = @json(array_values($batchPool->toArray()));
@@ -1396,6 +1400,55 @@ function saveOrderScan(idx) {
         body: JSON.stringify({ decision: o.decision, subs: o.subs })
     }).catch(err => console.error('Failed to sync scan', err));
 }
+
+window.editManualOrder = function(idx, oldNo) {
+    const newNo = prompt('Masukkan nomor pesanan baru:', oldNo);
+    if (!newNo || newNo.trim() === oldNo) return;
+    
+    const url = UPDATE_SCAN_URL.replace('__NO__', encodeURIComponent(oldNo));
+    fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': CSRF,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ new_order_no: newNo.trim() })
+    }).then(r => r.json()).then(res => {
+        if (res.status === 'ok') {
+            orders[idx].no = newNo.trim();
+            if (orders[idx].order) orders[idx].order.order_no = newNo.trim();
+            toast('ok', 'Nomor pesanan berhasil diubah.');
+            renderAll();
+        } else {
+            toast('err', res.message || 'Gagal mengubah nomor pesanan.');
+        }
+    }).catch(err => toast('err', 'Terjadi kesalahan sistem.'));
+};
+
+window.deleteManualOrder = function(idx, no) {
+    if (!confirm('Hapus pesanan ' + no + ' dari daftar?')) return;
+    
+    const url = UPDATE_SCAN_URL.replace('__NO__', encodeURIComponent(no));
+    fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': CSRF,
+            'Accept': 'application/json'
+        }
+    }).then(r => r.json()).then(res => {
+        if (res.status === 'ok') {
+            orders.splice(idx, 1);
+            toast('ok', 'Pesanan dihapus.');
+            rebuildPoolUsed();
+            recalculateAllocations();
+            renderAll();
+        } else {
+            toast('err', res.message || 'Gagal menghapus pesanan.');
+        }
+    }).catch(err => toast('err', 'Terjadi kesalahan sistem.'));
+};
+
 function loadState() {
     orders = Array.isArray(SERVER_ORDER_SCANS) ? SERVER_ORDER_SCANS : [];
     rebuildPoolUsed();
@@ -1671,6 +1724,7 @@ function renderCard(o, idx) {
               <div class="rk-order-hdr" onclick="toggleCard(${idx})">
                 <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
                 <span class="rk-order-store">Pesanan Manual</span>
+                ${o.scanned_at ? `<span style="font-size:0.7rem; color:#94a3b8; margin-left:0.3rem">${o.scanned_at}</span>` : ''}
                 ${decBadge}${dupeBadge}
                 <span class="rk-order-chev" id="chev-${idx}">▼</span>
               </div>
@@ -1684,6 +1738,11 @@ function renderCard(o, idx) {
                     <button class="rk-act-btn fulfill ${decision==='fulfill'?'on':''}" data-idx="${idx}" data-action="fulfill">Siap Kirim</button>
                     <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
                     <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
+                    ${IS_OWNER ? `
+                    <div style="flex:1"></div>
+                    <button class="rk-act-btn" style="color:#64748b" onclick="editManualOrder(${idx}, '${no}')">Edit</button>
+                    <button class="rk-act-btn btn-del" onclick="deleteManualOrder(${idx}, '${no}')">Hapus</button>
+                    ` : ''}
                   </div>
                 </div>
               </div>
@@ -1719,6 +1778,7 @@ function renderCard(o, idx) {
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
             <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
             <span class="rk-order-store">Belum tertaut</span>
+            ${o.scanned_at ? `<span style="font-size:0.7rem; color:#94a3b8; margin-left:0.3rem">${o.scanned_at}</span>` : ''}
             ${decBadge}${dupeBadge}
             <span class="rk-order-chev" id="chev-${idx}">▼</span>
           </div>
@@ -1731,6 +1791,11 @@ function renderCard(o, idx) {
                 <span style="font-size:.77rem;color:#9ca3af;font-weight:600">Status:</span>
                 <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
                 <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
+                ${IS_OWNER ? `
+                <div style="flex:1"></div>
+                <button class="rk-act-btn" style="color:#64748b" onclick="editManualOrder(${idx}, '${no}')">Edit</button>
+                <button class="rk-act-btn btn-del" onclick="deleteManualOrder(${idx}, '${no}')">Hapus</button>
+                ` : ''}
               </div>
             </div>
           </div>
@@ -1909,10 +1974,10 @@ window.promptLinkScan = async function(idx) {
 function updateConfirmBtn() {
     const validOrders = orders.filter(o => o.found || SHIPMENT_TYPE === 'manual');
     const allDecided  = validOrders.length > 0 && validOrders.every(o => o.decision);
-    topConfirmBtn.disabled = !allDecided;
-    topConfirmBtn.classList.toggle('active', allDecided);
-    if (allDecided) document.getElementById('ph3').classList.add('active');
-    else            document.getElementById('ph3').classList.remove('active');
+    if (topConfirmBtn) {
+        topConfirmBtn.disabled = !allDecided;
+        topConfirmBtn.classList.toggle('active', allDecided);
+    }
 }
 
 /* ══════════════════════════════════════════════
@@ -2111,6 +2176,9 @@ function renderSisa() {
         }))
         .filter(s => s.qty_sisa > 0);
 
+    const rkSisaCount = document.getElementById('rkSisaCount');
+    if (rkSisaCount) rkSisaCount.textContent = sisa.length;
+
     if (!sisa.length) {
         sisaCard.style.display = 'none';
         return;
@@ -2143,14 +2211,13 @@ function renderSisa() {
 
     sisaCard.innerHTML = `
         <div class="rk-sisa-card ${isWarning ? 'has-sisa' : ''}" id="sisaCardInner">
-            <div class="rk-sisa-hdr" onclick="toggleSisa()">
+            <div class="rk-sisa-hdr" style="cursor:default;">
                 <span class="rk-sisa-title">${hasAllocation ? 'Sisa Stok Batch' : 'Stok Batch Belum Dialokasikan'}${isWarning ? ' — Ada Kelebihan' : ''}</span>
-                <span class="shp-pill" style="font-size:.7rem;padding:.12rem .55rem">
+                <span class="shp-pill" style="margin-left:auto; font-size:.7rem;padding:.12rem .55rem">
                     ${FMT.format(totalSisa)} pcs · ${sisa.length} SKU
                 </span>
-                <span style="margin-left:auto;color:#94a3b8;font-size:.75rem;transition:transform .2s" id="sisaChev">▼</span>
             </div>
-            <div id="sisaBody" style="display:none">
+            <div id="sisaBody">
                 <div class="rk-sisa-body">
                     ${rows}
                     ${note}

@@ -499,7 +499,7 @@ body[data-theme="dark"] .shp-table-actions { border-bottom-color: rgba(51,65,85,
 
 /* scrollable area */
 .lines-wrapper {
-    max-height: 44vh;
+    max-height: 400px;
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-behavior: smooth;
@@ -645,6 +645,14 @@ body[data-theme="dark"] .btn-del:hover { background: rgba(127,29,29,.55); }
 .shp-toast-err { background: #b91c1c; color: #fee2e2; }
 
 /* Compact neutral override */
+:root,
+.page-theme-shopee,
+.page-theme-tiktok {
+    --shp-accent: #334155 !important;
+    --shp-accent-2: #1f2937 !important;
+    --shp-accent-bg: rgba(148,163,184,.08) !important;
+    --shp-accent-ring: rgba(148,163,184,.18) !important;
+}
 .shp-wrap,
 .page-theme-shopee,
 .page-theme-tiktok,
@@ -1242,27 +1250,20 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
-    <a href="/marketplace/orders" class="btn btn-shp-outline" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;">
-        📦 Order Marketplace
+    <a href="/marketplace/orders" class="btn btn-shp-outline btn-sm" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
+        📦 List Order
     </a>
 
-    <button type="button" class="btn btn-shp-submit" onclick="printPickingList()">
-        Cetak Picking List
+    <button type="button" class="btn btn-shp-submit btn-sm" onclick="printPickingList()" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
+        Cetak Picking
     </button>
 
     <a href="{{ route('sales.shipments.scan_order', $shipment) }}"
-       class="btn btn-shp-outline">
-        Scan Order Dulu
+       class="btn btn-shp-outline btn-sm" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
+        Scan Pesanan
     </a>
 
-    <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
-       id="rekonBtn"
-       data-is-manual="0"
-       data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
-       class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
-       aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}">
-        {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
-    </a>
+
 </div>
 
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
@@ -1279,40 +1280,13 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     @endif
 
     {{-- ═════════════════ KPI GRID ═════════════════ --}}
-    <div class="shp-kpi-grid">
-        <div class="shp-kpi-card">
-            <div class="shp-kpi-label">Shipment hari ini</div>
-            <div class="shp-kpi-value">{{ $kpi['created'] }}</div>
-        </div>
-        <div class="shp-kpi-card">
-            <div class="shp-kpi-label">Item keluar hari ini</div>
-            <div class="shp-kpi-value">{{ number_format($kpi['qty'], 0, ',', '.') }}</div>
-        </div>
-        <div class="shp-kpi-card">
-            <div class="shp-kpi-label">Masih draft</div>
-            <div class="shp-kpi-value">{{ $kpi['draft'] }}</div>
-        </div>
-        <div class="shp-kpi-card">
-            <div class="shp-kpi-label">Sudah selesai</div>
-            <div class="shp-kpi-value">{{ $kpi['posted'] }}</div>
-        </div>
-    </div>
 
-    <div class="shp-flow">
-        <span class="shp-flow-step active">Scan Barang</span>
-        <span class="shp-flow-sep">→</span>
-        <span class="shp-flow-step">Scan Pesanan</span>
-        <span class="shp-flow-sep">→</span>
-        <span class="shp-flow-step">Konfirmasi Pesanan</span>
-        <span class="shp-flow-sep">→</span>
-        <span class="shp-flow-step">Simpan &amp; Kurangi Stok</span>
-    </div>
 
     {{-- ═════════════════ HERO SCAN CARD ═════════════════ --}}
-    <div class="shp-scan-card">
-        <div class="shp-scan-header">
-            <span class="shp-scan-label">Scan Barang</span>
-            <span class="shp-scan-counter" id="sessionCounter">0 scan sesi ini</span>
+    <div class="shp-scan-card" style="padding: 1rem 1.25rem 0.8rem; margin-top: 0.5rem; border-radius: 12px; border-width: 1px;">
+        <div class="shp-scan-header" style="margin-bottom: 0.35rem;">
+            <span class="shp-scan-label" style="font-size:0.75rem;">Scan Barang</span>
+            <span class="shp-scan-counter" id="sessionCounter" style="font-size:0.75rem;">0 scan sesi ini</span>
         </div>
 
         <form id="scanForm" method="POST"
@@ -1320,7 +1294,8 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             @csrf
             <input type="text" name="scan_code"
                    class="form-control shp-scan-input" id="scanInput"
-                   placeholder="Scan / ketik kode atau nama barang"
+                   placeholder="Scan / ketik kode barang lalu tekan Enter"
+                   style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
                    autocomplete="off" spellcheck="false"
                    role="combobox" aria-autocomplete="list"
                    aria-expanded="false" aria-controls="scanSuggest" required>
@@ -1330,24 +1305,24 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         </form>
 
         {{-- last scanned ticker --}}
-        <div class="shp-last-scan" id="lastScanBox">
-            <span class="shp-ls-icon"></span>
+        <div class="shp-last-scan" id="lastScanBox" style="padding: 0.5rem 0.8rem; gap: 0.5rem; border-radius: 8px;">
+            <span class="shp-ls-icon" style="font-size:1.25rem;"></span>
             <div>
-                <div class="shp-ls-code" id="lastScanCode">—</div>
-                <div class="shp-ls-name" id="lastScanName"></div>
+                <div class="shp-ls-code" id="lastScanCode" style="font-size: 1.05rem;">—</div>
+                <div class="shp-ls-name" id="lastScanName" style="font-size: 0.8rem; margin-top: 0;"></div>
             </div>
             <div class="d-flex align-items-center gap-3 ms-auto">
                 <div class="shp-ls-qty-wrap" style="text-align: right; margin-left: 0;">
-                    <div class="shp-ls-qty-label" style="color: var(--shp-warn);">Sedang Packing</div>
-                    <div class="shp-ls-qty" style="color: var(--shp-warn);" id="lastScanPacking">—</div>
+                    <div class="shp-ls-qty-label" style="color: var(--shp-warn); font-size: 0.6rem;">Packing</div>
+                    <div class="shp-ls-qty" style="color: var(--shp-warn); font-size: 1.25rem;" id="lastScanPacking">—</div>
                 </div>
                 <div class="shp-ls-qty-wrap" style="text-align: right; margin-left: 0;">
-                    <div class="shp-ls-qty-label" style="color: #0284c7;">Stok Tersedia</div>
-                    <div class="shp-ls-qty" style="color: #0284c7;" id="lastScanAvailable">—</div>
+                    <div class="shp-ls-qty-label" style="color: #0284c7; font-size: 0.6rem;">Tersedia</div>
+                    <div class="shp-ls-qty" style="color: #0284c7; font-size: 1.25rem;" id="lastScanAvailable">—</div>
                 </div>
                 <div class="shp-ls-qty-wrap" style="text-align: right; margin-left: 0;">
-                    <div class="shp-ls-qty-label">Scan / Order</div>
-                    <div class="shp-ls-qty" id="lastScanQty">—</div>
+                    <div class="shp-ls-qty-label" style="font-size: 0.6rem;">Scan / Order</div>
+                    <div class="shp-ls-qty" id="lastScanQty" style="font-size: 1.25rem;">—</div>
                 </div>
             </div>
         </div>
@@ -1517,6 +1492,18 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             <span>Diupdate: {{ id_datetime($shipment->updated_at) }}</span>
             <span>Total qty: <strong id="footerTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</strong></span>
         </div>
+    </div>
+
+    <div class="mt-4 mb-2 text-end">
+        <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
+           id="rekonBtn"
+           data-is-manual="0"
+           data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
+           class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
+           aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}"
+           style="font-size: 0.95rem; padding: 0.6rem 2rem; border-radius: 8px;">
+            {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
+        </a>
     </div>
 </div>
 
