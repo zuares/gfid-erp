@@ -73,6 +73,76 @@
 
 @push('head')
     <style>
+        /* ══════════════════════════════════════════════════
+           ITEMS TABLE CARD (SHP STYLE)
+        ══════════════════════════════════════════════════ */
+        .shp-table-card {
+            background: var(--card, #fff);
+            border-radius: 8px;
+            border: 1px solid rgba(148,163,184,.18);
+            box-shadow: 0 1px 6px rgba(15,23,42,.07);
+            margin-top: .85rem;
+            overflow: hidden;
+        }
+        body[data-theme="dark"] .shp-table-card {
+            border-color: rgba(30,64,175,.55);
+            box-shadow: 0 12px 36px rgba(15,23,42,.8);
+        }
+        .shp-table-head {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            flex-wrap: wrap;
+            padding: .85rem 1.25rem .7rem;
+            border-bottom: 1px solid rgba(148,163,184,.14);
+        }
+        body[data-theme="dark"] .shp-table-head { border-bottom-color: rgba(51,65,85,.8); }
+        .shp-table-title {
+            font-size: .68rem;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: #9ca3af;
+            font-weight: 700;
+        }
+        
+        .shp-table { margin-bottom: 0; }
+        .shp-table thead th {
+            position: sticky; top: 0; z-index: 6;
+            border-bottom-width: 1px;
+            font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af;
+            background: rgba(248,250,252,.98);
+            padding: .55rem .85rem;
+            white-space: nowrap;
+        }
+        body[data-theme="dark"] .shp-table thead th {
+            background: rgba(15,23,42,.98);
+            border-bottom-color: rgba(30,64,175,.7);
+            color: #6b7280;
+        }
+        .shp-table tbody td {
+            vertical-align: middle;
+            border-top-color: rgba(148,163,184,.12);
+            padding: .6rem .85rem;
+        }
+        body[data-theme="dark"] .shp-table tbody td { border-top-color: rgba(51,65,85,.65); }
+        .shp-table tbody tr:nth-child(even) { background: rgba(249,250,251,.7); }
+        body[data-theme="dark"] .shp-table tbody tr:nth-child(even) { background: rgba(15,23,42,.8); }
+
+        .btn-remove-line {
+            width: 32px; height: 32px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 10px !important;
+            padding: 0;
+            font-size: 1.1rem;
+            background: transparent;
+            color: #ef4444;
+            border: none;
+            transition: all .15s;
+        }
+        .btn-remove-line:hover {
+            background: rgba(239,68,68,.1);
+        }
+
         .po-card {
             background: var(--card);
             border: 1px solid var(--line);
@@ -289,13 +359,7 @@
             font-weight: 800;
             font-size: .9rem;
         }
-        .po-row.has-qty {
-            background: rgba(37,99,235,.045);
-            box-shadow: inset 3px 0 0 rgba(37,99,235,.45);
-        }
-        .po-row.is-empty {
-            opacity: .76;
-        }
+
         .po-row-item-main {
             font-weight: 850;
             line-height: 1.15;
@@ -655,16 +719,7 @@
             .po-lines-no-money .po-td-qty { grid-column: 1 / span 2; }
             .po-lines-table tbody td[data-label]::before { display: none !important; }
             .po-num-display { text-align: left; font-weight: 800; }
-            .po-row.has-qty {
-                background: color-mix(in srgb, var(--card) 93%, rgba(37,99,235,.12));
-                box-shadow:
-                    inset 3px 0 0 rgba(37,99,235,.55),
-                    0 8px 24px rgba(15, 23, 42, .08),
-                    0 0 0 1px rgba(15, 23, 42, .02);
-            }
-            .po-row.is-empty {
-                opacity: 1;
-            }
+
             .po-meta-wrap {
                 padding: .15rem .55rem .7rem;
             }
@@ -702,8 +757,11 @@
 @endpush
 
 {{-- FOCAL: JENIS PO + SUPPLIER + TANGGAL --}}
-<div class="card po-card po-focal mb-3" data-order-type="{{ $orderType }}">
-    <div class="card-body" style="padding:1.1rem 1.1rem .9rem;">
+<div class="shp-table-card mb-3" data-order-type="{{ $orderType }}">
+    <div class="shp-table-head">
+        <div class="shp-table-title">Informasi PO</div>
+    </div>
+    <div style="padding:1.1rem 1.25rem .9rem;">
 
         {{-- Row atas: Jenis PO (kiri) + Tanggal (kanan) --}}
         <div class="po-focal-top d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
@@ -764,26 +822,15 @@
 </div>
 
 {{-- LINES --}}
-<div class="card po-card mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center"
-        style="background: transparent; border-bottom: 1px solid var(--line);">
-        <div class="po-section-title">Detail Barang</div>
-        <span class="text-muted small d-none d-md-inline">Isi qty barang yang ingin dibeli.</span>
-    </div>
-
-    <div class="po-toolbar">
-        <button type="button" id="btn-add-line" class="btn btn-sm btn-outline-primary">+ Barang</button>
-        <button type="button" id="btn-reset-empty-lines" class="btn btn-sm btn-outline-secondary">Reset Kosong</button>
-        <span class="po-toolbar-summary">
-            <span class="mono po-total-live" id="po-live-lines">0</span> item
-            ·
-            <span class="mono po-total-live" id="po-live-qty">0</span> qty
-        </span>
+<div class="shp-table-card mb-3">
+    <div class="shp-table-head d-flex justify-content-between align-items-center">
+        <div class="shp-table-title">Detail Barang</div>
+        <span class="text-muted" style="font-size: .75rem;">Isi qty barang yang ingin dibeli.</span>
     </div>
 
     <div class="table-responsive po-table-wrapper">
-        <table class="table table-sm mb-0 po-lines-table {{ $canSeeMoney ? 'po-lines-has-money' : 'po-lines-no-money' }}" id="po-lines-table">
-            <thead class="table-light">
+        <table class="table shp-table mb-0 po-lines-table {{ $canSeeMoney ? 'po-lines-has-money' : 'po-lines-no-money' }}" id="po-lines-table">
+            <thead>
                 <tr>
                     <th class="po-col-no text-center">No</th>
                     <th style="width:40%">Item</th>
@@ -825,7 +872,7 @@
                         );
                     @endphp
 
-                    <tr class="po-row {{ ((float) ($qtyRaw ?: 0)) > 0 ? 'has-qty' : 'is-empty' }}">
+                    <tr class="po-row">
                         <td class="text-center align-middle line-index po-col-no">{{ $loop->iteration }}</td>
 
                         <td class="po-td-item" data-label="Item">
@@ -837,10 +884,29 @@
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
 
-                            <input type="hidden" name="lines[{{ $i }}][allocation]" class="line-alloc-raw"
-                                value="{{ $alloc }}">
-                            <input type="hidden" name="lines[{{ $i }}][expense_account_id]"
-                                class="line-expacc-raw" value="{{ $expAcc }}">
+                            <input type="hidden" name="lines[{{ $i }}][allocation]" class="line-alloc-raw" value="{{ $alloc }}">
+                            <div class="line-expacc-text mt-1" style="{{ $expAcc ? '' : 'display:none;' }}">
+                                @php
+                                    $selectedAcc = collect($expenseAccounts)->firstWhere('id', $expAcc);
+                                    $accLabel = $selectedAcc ? ($selectedAcc->code . ' - ' . $selectedAcc->name) : '';
+                                @endphp
+                                <span class="text-muted" style="font-size: .68rem;">Biaya: <span class="expacc-label-text fw-semibold">{{ $accLabel }}</span>
+                                    <a href="javascript:void(0)" class="btn-edit-expacc ms-1 text-decoration-none" title="Ubah Akun Biaya"><i class="bi bi-pencil-fill"></i></a>
+                                </span>
+                            </div>
+                            <div class="line-expacc-wrapper mt-2" style="{{ ($alloc === 'expense' && !$expAcc) ? '' : 'display:none;' }}">
+                                <div style="font-size: 0.68rem; color: #d97706; font-weight: 700; margin-bottom: 2px;">
+                                    <i class="bi bi-exclamation-circle"></i> Item Biaya - Pilih Akun
+                                </div>
+                                <select name="lines[{{ $i }}][expense_account_id]" class="form-select form-select-sm line-expacc-raw" style="border-color: #fcd34d;">
+                                    <option value="">— Pilih Akun Biaya —</option>
+                                    @foreach ($expenseAccounts as $acc)
+                                        <option value="{{ $acc->id }}" data-text="{{ $acc->code }} - {{ $acc->name }}" @selected((string)$expAcc === (string)$acc->id)>
+                                            {{ $acc->code }} - {{ $acc->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </td>
 
                         <td data-label="Qty Beli" class="po-td-qty">
@@ -868,14 +934,13 @@
                         @endif
 
                         <td class="text-center po-td-action">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
-                                style="border-radius:12px;">
-                                &times;
+                            <button type="button" class="btn-remove-line" title="Hapus Baris">
+                                <i class="bi bi-trash"></i>
                             </button>
                         </td>
                     </tr>
                 @empty
-                    <tr class="po-row is-empty">
+                    <tr class="po-row">
                         <td class="text-center align-middle line-index po-col-no">1</td>
 
                         <td class="po-td-item" data-label="Item">
@@ -883,8 +948,24 @@
                                 :showName="false" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
                                 placeholder="Masukan kode barang" />
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">
-                            <input type="hidden" name="lines[0][expense_account_id]" class="line-expacc-raw"
-                                value="">
+                            <div class="line-expacc-text mt-1" style="display:none;">
+                                <span class="text-muted" style="font-size: .68rem;">Biaya: <span class="expacc-label-text fw-semibold"></span>
+                                    <a href="javascript:void(0)" class="btn-edit-expacc ms-1 text-decoration-none" title="Ubah Akun Biaya"><i class="bi bi-pencil-fill"></i></a>
+                                </span>
+                            </div>
+                            <div class="line-expacc-wrapper mt-2" style="display:none;">
+                                <div style="font-size: 0.68rem; color: #d97706; font-weight: 700; margin-bottom: 2px;">
+                                    <i class="bi bi-exclamation-circle"></i> Item Biaya - Pilih Akun
+                                </div>
+                                <select name="lines[0][expense_account_id]" class="form-select form-select-sm line-expacc-raw" style="border-color: #fcd34d;">
+                                    <option value="">— Pilih Akun Biaya —</option>
+                                    @foreach ($expenseAccounts as $acc)
+                                        <option value="{{ $acc->id }}" data-text="{{ $acc->code }} - {{ $acc->name }}">
+                                            {{ $acc->code }} - {{ $acc->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </td>
 
                         <td data-label="Qty Beli" class="po-td-qty">
@@ -904,9 +985,8 @@
                         @endif
 
                         <td class="text-center po-td-action">
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-line"
-                                style="border-radius:12px;">
-                                &times;
+                            <button type="button" class="btn-remove-line" title="Hapus Baris">
+                                <i class="bi bi-trash"></i>
                             </button>
                         </td>
                     </tr>
@@ -916,11 +996,20 @@
         </table>
     </div>
 
-    <div class="d-block d-lg-none text-center py-2">
-        <button type="button" id="btn-add-line-bottom" class="btn btn-outline-primary btn-sm"
-            style="border-radius:12px;">
-            + Barang
-        </button>
+    <div class="p-3 border-top d-flex justify-content-between align-items-center" style="background: rgba(148, 163, 184, .02); flex-wrap: wrap; gap: 1rem;">
+        <div class="text-muted" style="font-size: .88rem; font-weight: 600;">
+            <span class="mono po-total-live" id="po-live-lines" style="color:var(--primary); font-size:1.05rem;">0</span> item
+            <span class="mx-2">·</span>
+            <span class="mono po-total-live" id="po-live-qty" style="color:var(--primary); font-size:1.05rem;">0</span> qty
+        </div>
+        <div>
+            <button type="button" id="btn-reset-empty-lines" class="btn-shp-outline me-2">
+                Reset Kosong
+            </button>
+            <button type="button" id="btn-add-line" class="btn-shp-submit">
+                <i class="bi bi-plus-lg me-1"></i> Tambah Barang
+            </button>
+        </div>
     </div>
 
     {{-- META --}}
@@ -1248,14 +1337,29 @@
                 const alloc = (meta.default_allocation === 'expense') ? 'expense' : 'hpp';
                 allocRaw.value = alloc;
 
-                if (alloc === 'expense') {
+                    const wrapper = tr.querySelector('.line-expacc-wrapper');
+                    const textWrap = tr.querySelector('.line-expacc-text');
+                    const textLabel = tr.querySelector('.expacc-label-text');
+                    
                     if (force || !expAccRaw.value) {
-                        expAccRaw.value = meta.default_expense_account_id ? String(meta
-                            .default_expense_account_id) : '';
+                        expAccRaw.value = meta.default_expense_account_id ? String(meta.default_expense_account_id) : '';
                     }
-                } else {
-                    if (force) expAccRaw.value = '';
-                }
+                    
+                    if (meta.default_expense_account_id && meta.default_expense_account_id != '') {
+                        if(wrapper) wrapper.style.display = 'none';
+                        if(textWrap) textWrap.style.display = '';
+                        if(textLabel) {
+                            const opt = expAccRaw.querySelector(`option[value="${meta.default_expense_account_id}"]`);
+                            textLabel.textContent = opt ? opt.dataset.text : 'Terpilih';
+                        }
+                    } else {
+                        if (alloc === 'expense') {
+                            if(wrapper) wrapper.style.display = '';
+                        } else {
+                            if(wrapper) wrapper.style.display = 'none';
+                        }
+                        if(textWrap) textWrap.style.display = 'none';
+                    }
 
                 recalcAll();
             }
@@ -1282,7 +1386,12 @@
                     inp.value = 'hpp';
                     inp.dataset.userEdited = '0';
                 });
-                newRow.querySelectorAll('.line-expacc-raw').forEach(inp => inp.value = '');
+                newRow.querySelectorAll('.line-expacc-wrapper, .line-expacc-text').forEach(wrap => {
+                    wrap.style.display = 'none';
+                });
+                newRow.querySelectorAll('.line-expacc-raw').forEach(inp => {
+                    inp.value = '';
+                });
 
                 const totalCell = newRow.querySelector('.line-total');
                 if (totalCell) totalCell.textContent = '';
@@ -1331,7 +1440,12 @@
 
                     // ✅ reset mapping
                     row.querySelectorAll('.line-alloc-raw').forEach(inp => inp.value = 'hpp');
-                    row.querySelectorAll('.line-expacc-raw').forEach(inp => inp.value = '');
+                    row.querySelectorAll('.line-expacc-wrapper, .line-expacc-text').forEach(wrap => {
+                        wrap.style.display = 'none';
+                    });
+                    row.querySelectorAll('.line-expacc-raw').forEach(inp => {
+                        inp.value = '';
+                    });
 
                     const totalCell = row.querySelector('.line-total');
                     if (totalCell) totalCell.textContent = '';
@@ -1347,7 +1461,7 @@
             });
 
             // Tab: item -> qty -> price (navigasi dalam baris)
-            // Enter: tambah baris baru dari manapun
+            // Enter: tambah baris baru dari manapun (dan cegah submit form)
             tableBody.addEventListener('keydown', function(e) {
                 const el = e.target;
                 const tr = el.closest('tr');
@@ -1356,6 +1470,22 @@
                 const isItem  = el.classList.contains('js-item-suggest-input');
                 const isQty   = el.classList.contains('line-qty-display');
                 const isPrice = el.classList.contains('line-price-display');
+
+                if (e.key === 'Enter') {
+                    // Cegah enter submit form
+                    e.preventDefault();
+
+                    // Jika item suggest sedang terbuka, biarkan dropdown handle pilih item
+                    const dropdown = tr.querySelector('.item-suggest-dropdown');
+                    if (isItem && dropdown && dropdown.classList.contains('show')) {
+                        // Jangan tambah baris, tunggu item terpilih
+                        return;
+                    }
+
+                    // Tambah baris baru
+                    addNewRow();
+                    return;
+                }
 
                 if (!isItem && !isQty && !isPrice) return;
 
@@ -1380,16 +1510,14 @@
                     }
                     return;
                 }
-
-                if (e.key === 'Enter') {
-                    // Jika item suggest sedang terbuka, biarkan dropdown handle dulu
-                    const dropdown = tr.querySelector('.item-suggest-dropdown');
-                    if (isItem && dropdown && dropdown.children.length > 0) return;
-
-                    e.preventDefault();
-                    addNewRow();
-                }
             }, true);
+
+            // Mencegah global form submit saat tekan enter di mana saja di dalam tabel
+            tableBody.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                }
+            });
 
             // focus select
             tableBody.addEventListener('focusin', function(e) {
@@ -1460,6 +1588,67 @@
                 applyLastPriceToRow(tr, {
                     force: false
                 });
+            });
+
+            // ✅ auto update master item expense account when changed
+            tableBody.addEventListener('change', async function(e) {
+                if (!e.target.classList.contains('line-expacc-raw')) return;
+                
+                const select = e.target;
+                const tr = select.closest('tr');
+                if (!tr || !select.value) return;
+
+                const itemId = tr.querySelector('.js-item-suggest-id')?.value;
+                if (!itemId) return;
+
+                const wrapper = tr.querySelector('.line-expacc-wrapper');
+                const originalBorder = select.style.borderColor;
+                select.style.borderColor = '#94a3b8'; // loading state
+                
+                try {
+                    const url = `{{ url('master/items') }}/${itemId}/update-expense-account`;
+                    const res = await fetch(url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                        },
+                        body: JSON.stringify({ expense_account_id: select.value })
+                    });
+                    
+                    const json = await res.json();
+                    if (json.ok) {
+                        if(wrapper) wrapper.style.display = 'none';
+                        const textWrap = tr.querySelector('.line-expacc-text');
+                        const textLabel = tr.querySelector('.expacc-label-text');
+                        if (textWrap) textWrap.style.display = '';
+                        if (textLabel) {
+                            const opt = select.querySelector(`option[value="${select.value}"]`);
+                            textLabel.textContent = opt ? opt.dataset.text : 'Terpilih';
+                        }
+                    } else {
+                        select.style.borderColor = originalBorder;
+                    }
+                } catch (err) {
+                    select.style.borderColor = originalBorder;
+                    console.error('Gagal update akun biaya master:', err);
+                }
+            });
+
+            // ✅ Edit expense account button
+            tableBody.addEventListener('click', function(e) {
+                const btn = e.target.closest('.btn-edit-expacc');
+                if (!btn) return;
+                
+                const tr = btn.closest('tr');
+                if (!tr) return;
+                
+                const wrapper = tr.querySelector('.line-expacc-wrapper');
+                const textWrap = tr.querySelector('.line-expacc-text');
+                
+                if (wrapper) wrapper.style.display = '';
+                if (textWrap) textWrap.style.display = 'none';
             });
 
             // supplier change -> refresh last price on rows not edited

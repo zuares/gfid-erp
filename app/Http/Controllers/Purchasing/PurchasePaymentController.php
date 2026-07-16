@@ -400,6 +400,7 @@ class PurchasePaymentController extends Controller
             $order->paid_amount = 0;
             $order->payment_status = 'unpaid';
             $order->save();
+            $order->evaluateAutoClose();
             return;
         }
 
@@ -426,6 +427,8 @@ class PurchasePaymentController extends Controller
         $order->paid_amount = $paidForAp;
         $order->payment_status = $status;
         $order->save();
+        
+        $order->evaluateAutoClose();
     }
 
     /**

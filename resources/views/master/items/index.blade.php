@@ -32,953 +32,363 @@
 
 @push('head')
 <style>
-
     :root{
-        --line: rgba(148,163,184,.18);
-        --line2: rgba(148,163,184,.22);
-        --ink: rgba(15,23,42,.92);
-        --muted: rgba(100,116,139,1);
-        --soft: rgba(148,163,184,.06);
-        --soft2: rgba(148,163,184,.10);
-        --shadow: 0 10px 24px rgba(15,23,42,.05);
+        --item-accent:#334155;
+        --item-accent-2:#1f2937;
+        --item-border:rgba(148,163,184,.18);
+        --item-border-strong:rgba(148,163,184,.30);
+        --item-muted:#64748b;
     }
-    body[data-theme="dark"]{
-        --ink: rgba(226,232,240,.92);
-        --muted: rgba(148,163,184,.85);
-        --line: rgba(148,163,184,.14);
-        --line2: rgba(148,163,184,.18);
-        --soft: rgba(148,163,184,.08);
-        --soft2: rgba(148,163,184,.12);
-        --shadow: 0 12px 28px rgba(0,0,0,.35);
+    .page-wrap{ max-width:1280px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+
+    .card-main{
+        background: var(--card);
+        border-radius: 8px;
+        border: 1px solid var(--item-border);
+        box-shadow: none;
+        overflow:hidden;
+    }
+    body[data-theme="dark"] .card-main{
+        border-color: rgba(51,65,85,.85);
+        box-shadow: none;
     }
 
-    .gf-category-page {
-        max-width: 1480px;
-        margin: 0 auto;
-        padding: 18px 14px 30px;
-        color: var(--ink);
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    .item-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--item-border);
     }
+    body[data-theme="dark"] .item-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--item-muted); font-size:.78rem; }
+    body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .gf-category-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: stretch;
-        gap: 14px;
-        margin-bottom: 14px;
-        padding: 18px;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        background: var(--card, #fff);
-        box-shadow: var(--shadow);
-        overflow: hidden;
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+    .kpi{
+        display:inline-flex; align-items:baseline; gap:.45rem;
+        border-radius:7px; padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28);
+        background: transparent;
+        font-size:.72rem;
     }
-
-    .gf-items-head-left {
-        display: flex;
-        align-items: center;
-        gap: 13px;
-        min-width: 0;
+    body[data-theme="dark"] .kpi{
+        background: rgba(15, 23, 42, 0.96);
+        border-color: rgba(51, 65, 85, 0.85);
     }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
+    body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
+    .kpi .val{ font-weight:650; color:var(--item-accent); }
 
-    .gf-items-head-icon {
-        width: 48px;
-        height: 48px;
-        flex: 0 0 48px;
-        border-radius: 17px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: #ffffff;
-        background: var(--ink);
-        box-shadow: 0 14px 28px rgba(15, 23, 42, .18);
-        font-size: 1.28rem;
-    }
+    .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .filter-label{ font-size:.8rem; color:#6b7280; }
+    body[data-theme="dark"] .filter-label{ color:#9ca3af; }
+    .filter-select{ border-radius:7px; padding-left:.75rem; padding-right:2rem; font-size:.82rem; }
+    .filter-input{ border-radius:7px; padding-left:.75rem; font-size:.82rem; min-height:30px; }
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+    .btn-item-primary{ background:var(--item-accent)!important; border-color:var(--item-accent)!important; color:#fff!important; }
+    .btn-item-primary:hover{ background:var(--item-accent-2)!important; border-color:var(--item-accent-2)!important; color:#fff!important; }
+    .btn-item-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-item-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+    body[data-theme="dark"] .btn-item-outline { color: #cbd5e1!important; }
+    body[data-theme="dark"] .btn-item-outline:hover { color: #f8fafc!important; background: rgba(148,163,184,.15)!important; }
+    .btn-fresh{ border-color:#fecaca; color:#b91c1c; background:transparent; }
+    .btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
 
-    .gf-category-eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        padding: 5px 10px;
-        border-radius: 999px;
-        background: var(--soft);
-        border: 1px solid var(--line);
-        color: var(--ink);
-        font-size: .72rem;
-        font-weight: 900;
-        margin-bottom: 7px;
-    }
-
-    .gf-category-title {
-        color: var(--ink);
-        font-size: 1.34rem;
-        font-weight: 950;
-        letter-spacing: -.05em;
-        line-height: 1.1;
-        margin: 0;
-    }
-
-    .gf-category-subtitle {
-        color: var(--muted);
-        font-size: .86rem;
-        font-weight: 600;
-        margin-top: 4px;
-    }
-
-    .gf-items-head-right {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-    }
-
-    .gf-items-head-stat {
-        min-width: 112px;
-        padding: 10px 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(226, 232, 240, .9);
-        background: var(--card, #fff);
-        backdrop-filter: blur(10px);
-        box-shadow: var(--shadow);
-    }
-
-    .gf-items-head-stat-label {
-        color: var(--muted);
-        font-size: .68rem;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: .045em;
-    }
-
-    .gf-items-head-stat-value {
-        color: var(--ink);
-        font-size: 1.08rem;
-        font-weight: 950;
-        letter-spacing: -.04em;
-        margin-top: 2px;
-    }
-
-    .gf-category-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: flex-end;
-    }
-
-    .gf-category-actions .btn,
-    .gf-category-filter .btn,
-    .gf-category-row-actions .btn {
-        border-radius: 999px;
-        font-weight: 850;
-        letter-spacing: -.01em;
-    }
-
-    .gf-category-actions .btn-primary,
-    .modal-footer .btn-primary {
-        color: #fff;
-        background: var(--ink);
-        border-color: transparent;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, .10);
-    }
-
-    .gf-category-actions .btn-outline-secondary {
-        background: var(--card, #fff);
-        border-color: var(--line2);
-        color: var(--muted);
-    }
-
-    .gf-category-kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 12px;
-    }
-
-    .gf-category-kpi-card {
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 14px;
-        background: var(--card, #fff);
-        box-shadow: var(--shadow);
-    }
-
-    .gf-category-kpi-label {
-        font-size: .7rem;
-        font-weight: 900;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: .045em;
-    }
-
-    .gf-category-kpi-value {
-        font-size: 1.28rem;
-        font-weight: 900;
-        color: var(--ink);
-        letter-spacing: -.04em;
-        margin-top: 5px;
-    }
-
-    .gf-category-kpi-note {
-        font-size: .74rem;
-        color: var(--muted);
-        margin-top: 2px;
-    }
-
-    .gf-panel {
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        background: var(--card, #fff);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-    }
-
-    .gf-panel-body {
-        padding: 14px;
-    }
-
-    .gf-category-filter {
-        display: grid;
-        grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .8fr) minmax(170px, .9fr) minmax(190px, 1fr) auto;
-        gap: 10px;
-        align-items: end;
-        margin-bottom: 12px;
-    }
-
-    .gf-category-filter .form-label {
-        font-size: .72rem;
-        font-weight: 900;
-        color: var(--ink);
-        margin-bottom: 4px;
-    }
-
-    .gf-category-filter .form-control,
-    .gf-category-filter .form-select,
-    .modal-content .form-control,
-    .modal-content .form-select {
-        border-radius: 14px;
-        border-color: var(--line);
-        font-size: .84rem;
-        min-height: 38px;
-        color: var(--ink);
-        font-weight: 600;
-    }
-
-    .gf-category-filter .form-control::placeholder {
-        color: var(--muted);
-        font-weight: 500;
-    }
-
-    .gf-category-filter .form-control:focus,
-    .gf-category-filter .form-select:focus,
-    .modal-content .form-control:focus,
-    .modal-content .form-select:focus {
-        border-color: rgba(37, 99, 235, .55);
-        box-shadow: 0 0 0 .22rem rgba(37, 99, 235, .1);
-    }
-
-    .gf-filter-live-wrap {
-        position: relative;
-    }
-
-    .gf-filter-live-indicator {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        display: none;
-        align-items: center;
-        gap: 6px;
-        color: var(--ink);
-        font-size: .72rem;
-        font-weight: 850;
-        pointer-events: none;
-        background: var(--card, #fff);
-        padding-left: 8px;
-    }
-
-    .gf-filter-live-indicator.is-show {
-        display: inline-flex;
-    }
-
-    .gf-filter-live-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: var(--ink);
-        animation: gfPulse .8s ease-in-out infinite alternate;
-    }
-
-    @keyframes gfPulse {
-        from { opacity: .35; transform: scale(.86); }
-        to { opacity: 1; transform: scale(1.12); }
-    }
-
-    .gf-filter-hint {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--muted);
-        font-size: .72rem;
-        font-weight: 700;
-        margin: -4px 0 10px;
-    }
-
-    .gf-filter-hint i {
-        color: var(--ink);
-    }
-
-    .gf-marketplace-tabs {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 2px 0 12px;
-    }
-
-    .gf-marketplace-tab {
-        flex: 0 0 auto;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 7px 12px;
-        color: var(--muted);
-        background: var(--card, #fff);
-        font-size: .78rem;
-        font-weight: 850;
-        transition: .15s ease;
-    }
-
-    .gf-marketplace-tab:hover {
-        color: var(--ink);
-        background: var(--soft);
-        border-color: var(--line2);
-    }
-
-    .gf-marketplace-tab.is-active {
-        color: #ffffff;
-        background: var(--ink);
-        border-color: transparent;
-        box-shadow: var(--shadow);
-    }
-
-    #bulkToolbar {
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        background: var(--soft);
-        padding: 10px 12px;
-        margin-bottom: 12px;
-        box-shadow: var(--shadow);
-    }
-
-    .gf-table-scroll {
-        max-height: 68vh;
-        overflow: auto;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-    }
-
-    .gf-clean-table {
-        font-size: .82rem;
-        color: var(--ink);
-    }
-
-    .gf-clean-table thead th {
-        background: var(--soft);
-        color: var(--muted);
-        font-size: .7rem;
-        text-transform: uppercase;
-        letter-spacing: .045em;
-        font-weight: 900;
-        border-bottom: 1px solid var(--line);
-        padding: 12px 10px;
-        white-space: nowrap;
-    }
-
-    .gf-sticky-table thead th {
+    .table-list{ margin-bottom:0; }
+    .table-list thead th{
+        border-bottom-width:1px;
+        font-size:.68rem;
+        text-transform:none;
+        letter-spacing:0;
+        color:#64748b;
+        background: var(--card,#fff);
+        padding:.52rem .62rem;
+        white-space:nowrap;
         position: sticky;
         top: 0;
-        z-index: 8;
+        z-index: 10;
     }
-
-    .gf-clean-table tbody td {
-        border-color: var(--line);
-        padding: 12px 10px;
-        vertical-align: middle;
+    body[data-theme="dark"] .table-list thead th{
+        background: rgba(15, 23, 42, 0.98);
+        color:#9ca3af;
+        border-bottom-color: rgba(30, 64, 175, 0.6);
     }
-
-    .gf-clean-table tbody tr {
-        transition: .14s ease;
+    .table-list tbody td{
+        vertical-align:middle;
+        border-top-color: rgba(148, 163, 184, 0.16);
+        padding:.52rem .62rem;
     }
+    body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
-    .gf-clean-table tbody tr:hover {
-        background: var(--soft);
+    .code-link{ font-weight:700; text-decoration:none; color:inherit; }
+    .code-link:hover{ text-decoration:underline; }
+    .muted{ font-size:.82rem; color:#6b7280; }
+    body[data-theme="dark"] .muted{ color:#9ca3af; }
+    .item-name{ font-weight:600; }
+
+    .badge-status{
+        border-radius:7px; padding:.16rem .48rem;
+        font-size:.68rem; letter-spacing:0; text-transform:none;
+        border:1px solid transparent;
+        display:inline-flex; align-items:center; gap:.35rem;
+        white-space:nowrap;
     }
+    .badge-status::before{ content:''; width:7px; height:7px; border-radius:999px; display:inline-block; }
 
-    .gf-category-code {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 5px 9px;
-        background: var(--soft);
-        color: var(--ink);
-        border: 1px solid var(--line);
-        font-size: .73rem;
-        font-weight: 900;
+    .st-active{ background: rgba(34, 197, 94, 0.10); color:#166534; border-color: rgba(34, 197, 94, 0.30); }
+    .st-active::before{ background: rgba(34, 197, 94, 0.95); }
+    .st-inactive{ background: rgba(239, 68, 68, 0.10); color:#991b1b; border-color: rgba(239, 68, 68, 0.30); }
+    .st-inactive::before{ background: rgba(239, 68, 68, 0.95); }
+    .st-draft{ background: rgba(148, 163, 184, 0.10); color:#475569; border-color: rgba(148, 163, 184, 0.30); }
+    .st-draft::before{ background: rgba(100, 116, 139, 0.95); }
+    .st-warning{ background: #fef3c7; color: #92400e; border-color: #fde68a; }
+
+    body[data-theme="dark"] .st-active{ background: rgba(34, 197, 94, 0.20); color:#dcfce7; border-color: rgba(34, 197, 94, 0.55); }
+    body[data-theme="dark"] .st-inactive{ background: rgba(239, 68, 68, 0.18); color:#fecaca; border-color: rgba(239, 68, 68, 0.55); }
+
+    .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
+    body[data-theme="dark"] .empty{ color:#9ca3af; }
+    .divider{ height:1px; background: rgba(148, 163, 184, 0.20); }
+    body[data-theme="dark"] .divider{ background: rgba(51, 65, 85, 0.85); }
+    .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
+
+    /* Bulk toolbar adjustments */
+    #bulkToolbar {
+        border-bottom: 1px solid var(--item-border);
+        background: var(--card);
+        padding: 10px 12px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
-
-    .gf-category-name {
-        font-weight: 850;
-        color: var(--ink);
-        letter-spacing: -.02em;
-    }
-
-    .gf-category-sub {
-        color: var(--muted);
-        font-size: .74rem;
-        margin-top: 2px;
-    }
-
-    .gf-category-type,
-    .gf-category-count {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        border-radius: 999px;
-        padding: 5px 9px;
-        background: var(--soft);
-        border: 1px solid var(--line);
-        color: var(--ink);
-        font-size: .73rem;
-        font-weight: 850;
-    }
-
-    .gf-category-count {
-        min-width: 34px;
-    }
-
-    .gf-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        padding: 5px 10px;
-        font-size: .72rem;
-        font-weight: 850;
-        letter-spacing: -.01em;
-        border: 1px solid transparent;
-    }
-
-    .gf-badge-green {
-        background: #dcfce7;
-        color: #166534;
-        border-color: #bbf7d0;
-    }
-
-    .gf-badge-red {
-        background: #fee2e2;
-        color: #991b1b;
-        border-color: #fecaca;
-    }
-
-    .gf-badge-yellow {
-        background: #fef3c7;
-        color: #92400e;
-        border-color: #fde68a;
-    }
-
-    .gf-category-row-actions {
-        display: inline-flex;
-        gap: 6px;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-    }
-
-    .gf-category-row-actions .btn {
-        min-width: 58px;
-    }
-
-    .gf-category-empty {
-        text-align: center;
-        color: var(--muted);
-        padding: 40px 16px;
-        border: 1px dashed var(--line2);
-        border-radius: 14px;
-        background: var(--soft);
-    }
-
-    .gf-category-empty-title {
-        color: var(--ink);
-        font-weight: 900;
-        letter-spacing: -.02em;
-        margin-bottom: 4px;
-    }
-
-    .gf-category-foot {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        padding-top: 12px;
-        color: var(--muted);
-        font-size: .78rem;
-        font-weight: 700;
-    }
-
-    .pagination {
-        margin: 0;
-        gap: 4px;
-    }
-
-    .pagination .page-link {
-        border-radius: 11px;
-        border-color: var(--line);
-        color: var(--muted);
-        font-size: .78rem;
-        font-weight: 700;
-    }
-
-    .pagination .active .page-link,
-    .pagination .page-item.active .page-link {
-        color: #fff;
-        background: var(--ink);
-        border-color: var(--ink);
-    }
-
-    .modal-content {
-        border: 0;
-        border-radius: 14px;
-        box-shadow: 0 24px 70px rgba(15, 23, 42, .2);
-        overflow: hidden;
-    }
-
-    .modal-header {
-        background: var(--card, #fff);
-        border-bottom: 1px solid var(--line);
-    }
-
-    .modal-title {
-        font-weight: 900;
-        color: var(--ink);
-        letter-spacing: -.02em;
-    }
-
-    .modal-footer {
-        background: var(--soft);
-        border-top: 1px solid #e2e8f0;
-    }
-
-    @media (max-width: 992px) {
-        .gf-category-head {
-            flex-direction: column;
-        }
-
-        .gf-items-head-right {
-            justify-content: flex-start;
-        }
-
-        .gf-category-kpi-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .gf-category-filter {
-            grid-template-columns: 1fr 1fr;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .gf-category-page {
-            padding: 12px 10px 24px;
-        }
-
-        .gf-category-head {
-            padding: 15px;
-            border-radius: 14px;
-        }
-
-        .gf-items-head-left {
-            align-items: flex-start;
-        }
-
-        .gf-items-head-icon {
-            width: 42px;
-            height: 42px;
-            flex-basis: 42px;
-            border-radius: 15px;
-            font-size: 1.08rem;
-        }
-
-        .gf-items-head-right,
-        .gf-category-actions {
-            width: 100%;
-        }
-
-        .gf-items-head-stat {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .gf-category-actions .btn {
-            flex: 1;
-            justify-content: center;
-        }
-
-        .gf-category-kpi-grid,
-        .gf-category-filter {
-            grid-template-columns: 1fr;
-        }
-
-        .gf-category-foot {
-            flex-direction: column;
-            align-items: flex-start;
-        }
+    body[data-theme="dark"] #bulkToolbar {
+        border-bottom-color: rgba(51, 65, 85, 0.85);
+        background: rgba(15, 23, 42, 0.98);
     }
 </style>
 @endpush
 
 @section('content')
-    <div class="gf-category-page">
-        <div class="gf-category-head">
-            <div class="gf-items-head-left">
-                <div class="gf-items-head-icon">
-                    <i class="bi bi-box-seam"></i>
-                </div>
+<div class="page-wrap">
+    @if(session('success'))
+        <div class="flash-clean alert alert-success mb-2">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="flash-clean alert alert-danger mb-2">{{ session('error') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="flash-clean alert alert-danger mb-2">{{ $errors->first() }}</div>
+    @endif
 
-                <div>
-                    <div class="gf-category-eyebrow">
-                        <i class="bi bi-stars"></i>
-                        Master Data
-                    </div>
+    <div class="item-topbar">
+        <div>
+            <div class="title">Master Item</div>
+            <div class="sub">Kelola SKU, kategori, barcode, status, dan HPP.</div>
 
-                    <h1 class="gf-category-title">Master Item</h1>
-
-                    <div class="gf-category-subtitle">
-                        Kelola SKU, kategori, barcode, status, dan HPP aktif produk.
-                    </div>
-                </div>
-            </div>
-
-            <div class="gf-items-head-right">
-                <div class="gf-items-head-stat">
-                    <div class="gf-items-head-stat-label">Total</div>
-                    <div class="gf-items-head-stat-value">{{ $fmt($totalItems) }}</div>
-                </div>
-
-                <div class="gf-items-head-stat">
-                    <div class="gf-items-head-stat-label">Aktif</div>
-                    <div class="gf-items-head-stat-value">{{ $fmt($activeCount) }}</div>
-                </div>
-
-                <div class="gf-category-actions">
-                    <a href="{{ route('master.item_categories.index') }}" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-tags"></i>
-                        Kategori
-                    </a>
-
-                    <a href="{{ route('master.items.create') }}" class="btn btn-primary btn-sm text-white">
-                        <i class="bi bi-plus-lg"></i>
-                        Tambah Item
-                    </a>
-                </div>
+            <div class="kpis">
+                <span class="kpi"><span class="lbl">Total</span><span class="val">{{ $fmt($totalItems) }}</span></span>
+                <span class="kpi"><span class="lbl">Aktif</span><span class="val">{{ $fmt($activeCount) }}</span></span>
+                <span class="kpi"><span class="lbl">Ber-barcode</span><span class="val">{{ $fmt($withBarcodeCount) }}</span></span>
+                <span class="kpi"><span class="lbl">HPP Kosong</span><span class="val">{{ $fmt($missingHppCount) }}</span></span>
             </div>
         </div>
 
-        @if (session('success'))
-            <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('success') }}</div>
+        <div class="controls">
+            <a href="{{ route('master.item_categories.index') }}" class="btn btn-sm btn-item-outline btn-pill">
+                Kategori
+            </a>
+            <a href="{{ route('master.items.create') }}" class="btn btn-sm btn-item-primary btn-pill">
+                Tambah Item
+            </a>
+        </div>
+    </div>
+
+    <form method="GET" action="{{ route('master.items.index') }}" class="gf-category-filter d-flex gap-2 flex-wrap mb-3 align-items-center" style="background: var(--card); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--item-border);">
+        <div style="flex: 1 1 200px;">
+            <input type="search" name="q" class="form-control form-control-sm filter-input w-100"
+                value="{{ request('q') }}" placeholder="Cari Kode/SKU/Nama...">
+        </div>
+
+        <select name="type" class="form-select form-select-sm filter-select" onchange="this.form.submit()" style="width: auto;">
+            <option value="">Semua Tipe</option>
+            @foreach ($typeLabels as $key => $label)
+                <option value="{{ $key }}" @selected(request('type') == $key)>{{ $label }}</option>
+            @endforeach
+        </select>
+
+        <select name="category_kind" class="form-select form-select-sm filter-select" onchange="this.form.submit()" style="width: auto;">
+            <option value="">Semua Kelompok</option>
+            @foreach ($categoryKinds ?? [] as $key => $label)
+                <option value="{{ $key }}" @selected(request('category_kind') == $key)>{{ $label }}</option>
+            @endforeach
+        </select>
+
+        <select name="item_category_id" class="form-select form-select-sm filter-select" onchange="this.form.submit()" style="width: auto;">
+            <option value="">Semua Kategori</option>
+            @foreach ($categories as $cat)
+                <option value="{{ $cat->id }}" @selected((string) request('item_category_id') === (string) $cat->id)>
+                    {{ $cat->code }}
+                </option>
+            @endforeach
+        </select>
+
+        @if ($hasFilters)
+            <a href="{{ route('master.items.index') }}" class="btn btn-sm btn-item-outline btn-pill" style="min-height: 30px; display: inline-flex; align-items: center;">Reset</a>
         @endif
+    </form>
 
-        @if (session('error'))
-            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.82rem;">{{ session('error') }}</div>
-        @endif
-
-        @if ($errors->any())
-            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.82rem;">
-                {{ $errors->first() }}
-            </div>
-        @endif
-
-        <div class="gf-category-kpi-grid">
-            <div class="gf-category-kpi-card">
-                <div class="gf-category-kpi-label">Total Item</div>
-                <div class="gf-category-kpi-value">{{ $fmt($totalItems) }}</div>
-                <div class="gf-category-kpi-note">berdasarkan filter aktif</div>
-            </div>
-
-            <div class="gf-category-kpi-card">
-                <div class="gf-category-kpi-label">Aktif</div>
-                <div class="gf-category-kpi-value">{{ $fmt($activeCount) }}</div>
-                <div class="gf-category-kpi-note">di halaman saat ini</div>
-            </div>
-
-            <div class="gf-category-kpi-card">
-                <div class="gf-category-kpi-label">Ada Barcode</div>
-                <div class="gf-category-kpi-value">{{ $fmt($withBarcodeCount) }}</div>
-                <div class="gf-category-kpi-note">siap untuk scan</div>
-            </div>
-
-            <div class="gf-category-kpi-card">
-                <div class="gf-category-kpi-label">HPP Kosong</div>
-                <div class="gf-category-kpi-value">{{ $fmt($missingHppCount) }}</div>
-                <div class="gf-category-kpi-note">perlu dilengkapi</div>
+    <div class="card card-main">
+        <div id="bulkToolbar" class="d-none">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-bold" style="font-size:.82rem;">
+                    <span id="selectedCount">0</span> terpilih
+                </span>
+                <span class="text-muted" style="font-size:.78rem;">— aksi:</span>
+                <button type="button" class="btn btn-item-outline btn-sm btn-pill" data-bs-toggle="modal" data-bs-target="#bulkCategoryModal">Kategori</button>
+                <button type="button" class="btn btn-item-outline btn-sm btn-pill" data-bs-toggle="modal" data-bs-target="#bulkTypeModal">Tipe</button>
+                <button type="button" class="btn btn-item-outline btn-sm btn-pill" data-bs-toggle="modal" data-bs-target="#bulkHppModal">Set HPP</button>
+                <button type="button" class="btn btn-link btn-sm text-muted ms-auto" id="bulkClear">Batal</button>
             </div>
         </div>
 
-        <div class="gf-panel">
-            <div class="gf-panel-body">
-                <form method="GET" action="{{ route('master.items.index') }}" class="gf-category-filter">
-                    <div>
-                        <label class="form-label">Cari</label>
-                        <input type="search" name="q" class="form-control"
-                            value="{{ request('q') }}"
-                            placeholder="Kode, nama, SKU..." autofocus>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Tipe</label>
-                        <select name="type" class="form-select">
-                            <option value="">Semua tipe</option>
-                            @foreach ($typeLabels as $key => $label)
-                                <option value="{{ $key }}" @selected(request('type') == $key)>
-                                    {{ $label }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Kelompok</label>
-                        <select name="category_kind" class="form-select">
-                            <option value="">Semua kelompok</option>
-                            @foreach ($categoryKinds as $key => $label)
-                                <option value="{{ $key }}" @selected(request('category_kind') == $key)>
-                                    {{ $label }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Kategori</label>
-                        <select name="item_category_id" class="form-select">
-                            <option value="">Semua kategori</option>
-                            @foreach ($categories as $cat)
-                                <option value="{{ $cat->id }}" @selected((string) request('item_category_id') === (string) $cat->id)>
-                                    {{ $cat->code }} — {{ $cat->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-secondary w-100">
-                            <i class="bi bi-funnel me-1"></i>
-                            Filter
-                        </button>
-
-                        @if ($hasFilters)
-                            <a href="{{ route('master.items.index') }}" class="btn btn-outline-light border">
-                                Reset
-                            </a>
-                        @endif
-                    </div>
-                </form>
-
-                <div class="gf-marketplace-tabs" aria-label="Filter tipe item">
-                    <a href="{{ $buildUrl(['type' => null]) }}"
-                        class="gf-marketplace-tab text-decoration-none {{ $activeType === '' ? 'is-active' : '' }}">
-                        Semua
-                    </a>
-
-                    @foreach ($typeLabels as $key => $label)
-                        <a href="{{ $buildUrl(['type' => $key]) }}"
-                            class="gf-marketplace-tab text-decoration-none {{ $activeType === (string) $key ? 'is-active' : '' }}">
-                            {{ $label }}
-                        </a>
-                    @endforeach
+        <div class="card-body p-0">
+            @if ($items->count() === 0)
+                <div class="empty">
+                    Tidak ada item yang cocok.
+                    <div class="mt-1">Ubah filter atau klik <b>Tambah Item</b>.</div>
                 </div>
-
-                <div id="bulkToolbar" class="d-none">
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span class="fw-bold" style="font-size:.82rem;">
-                            <span id="selectedCount">0</span> item dipilih
-                        </span>
-
-                        <span class="text-muted" style="font-size:.78rem;">— pilih aksi:</span>
-
-                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
-                            data-bs-target="#bulkCategoryModal">
-                            Ubah Kategori
-                        </button>
-
-                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
-                            data-bs-target="#bulkTypeModal">
-                            Ubah Tipe
-                        </button>
-
-                        <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
-                            data-bs-target="#bulkHppModal">
-                            Set HPP
-                        </button>
-
-                        <button type="button" class="btn btn-link btn-sm text-muted ms-auto" id="bulkClear">
-                            Batal pilih
-                        </button>
-                    </div>
-                </div>
-
-                @if ($items->count())
-                    <div class="gf-table-scroll">
-                        <table class="table table-hover align-middle mb-0 gf-clean-table gf-sticky-table">
-                            <thead>
+            @else
+                <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                    <table class="table table-hover align-middle table-list">
+                        <thead>
+                            <tr>
+                                <th style="width: 44px;" class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="checkAll">
+                                </th>
+                                <th style="width: 120px;">Kode / Kategori</th>
+                                <th style="min-width: 200px;">Item / Tipe</th>
+                                <th class="text-center" style="width: 90px;">Satuan</th>
+                                <th class="text-center" style="width: 90px;">Barcode</th>
+                                <th class="text-end" style="width: 120px;">HPP</th>
+                                <th class="text-center" style="width: 100px;">Status</th>
+                                <th class="text-end" style="width: 160px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($items as $item)
+                                @php
+                                    $hpp = (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0);
+                                    $barcodeCount = (int) ($item->barcodes_count ?? optional($item->barcodes ?? null)->count() ?? 0);
+                                @endphp
                                 <tr>
-                                    <th style="width: 44px;" class="text-center">
-                                        <input type="checkbox" class="form-check-input" id="checkAll">
-                                    </th>
-                                    <th style="width: 68px;" class="text-center">No.</th>
-                                    <th style="width: 125px;">Kode</th>
-                                    <th>Item</th>
-                                    <th style="width: 170px;">Kategori</th>
-                                    <th style="width: 140px;">Tipe</th>
-                                    <th style="width: 100px;" class="text-center">Satuan</th>
-                                    <th style="width: 92px;" class="text-center">Barcode</th>
-                                    <th style="width: 130px;" class="text-end">HPP</th>
-                                    <th style="width: 105px;" class="text-center">Status</th>
-                                    <th style="width: 150px;" class="text-end">Aksi</th>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input row-check" value="{{ $item->id }}">
+                                    </td>
+                                    <td>
+                                        <div class="item-name">{{ $item->code }}</div>
+                                        <div class="muted">
+                                            @if($item->category)
+                                                {{ $item->category->code }}
+                                            @else
+                                                -
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="item-name">{{ $item->name }}</div>
+                                        <div class="muted">
+                                            @if(!empty($item->sku)) SKU: {{ $item->sku }} | @endif
+                                            {{ $typeLabels[$item->type] ?? $item->type }}
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        {{ $item->unit ?: '-' }}
+                                    </td>
+                                    <td class="text-center">
+                                        @if ($barcodeCount > 0)
+                                            <span class="badge-status st-active" style="padding:.1rem .35rem;">{{ $fmt($barcodeCount) }}</span>
+                                        @else
+                                            <span class="badge-status st-warning" style="padding:.1rem .35rem;">0</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        @if ($hpp > 0)
+                                            <span class="fw-semibold">Rp {{ number_format($hpp, 0, ',', '.') }}</span>
+                                        @else
+                                            <span class="muted">Kosong</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        @if ($item->active)
+                                            <span class="badge-status st-active">Aktif</span>
+                                        @else
+                                            <span class="badge-status st-inactive">Nonaktif</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-1 align-items-center">
+                                            <a href="{{ route('master.items.edit', $item) }}" class="btn btn-sm btn-item-outline btn-pill px-3 fw-bold" style="font-size: 0.78rem;">
+                                                Edit
+                                            </a>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm px-2 py-1 shadow-none border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--item-muted); background: transparent;">
+                                                    <i class="bi bi-three-dots-vertical"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; font-size: 0.82rem; border-color: var(--item-border);">
+                                                    <li>
+                                                        <a class="dropdown-item py-2 fw-medium" href="{{ route('master.items.hpp_temp.edit', $item) }}">
+                                                            <i class="bi bi-tag-fill me-2 text-success"></i> Set HPP
+                                                        </a>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <form method="POST" action="{{ route('master.items.destroy', $item) }}" onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}?');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="dropdown-item py-2 text-danger fw-medium">
+                                                                <i class="bi bi-trash3 me-2"></i> Hapus
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
-                            <tbody>
-                                @foreach ($items as $item)
-                                    @php
-                                        $hpp = (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0);
-                                        $barcodeCount = (int) ($item->barcodes_count ?? optional($item->barcodes ?? null)->count() ?? 0);
-                                    @endphp
+                <div class="divider"></div>
 
-                                    <tr>
-                                        <td class="text-center">
-                                            <input type="checkbox" class="form-check-input row-check" value="{{ $item->id }}">
-                                        </td>
-
-                                        <td class="text-center text-muted">
-                                            {{ method_exists($items, 'firstItem') ? $items->firstItem() + $loop->index : $loop->iteration }}
-                                        </td>
-
-                                        <td>
-                                            <span class="gf-category-code">{{ $item->code }}</span>
-                                        </td>
-
-                                        <td>
-                                            <div class="gf-category-name">{{ $item->name }}</div>
-                                            <div class="gf-category-sub">
-                                                @if (!empty($item->sku))
-                                                    SKU: {{ $item->sku }}
-                                                @else
-                                                    {{ $item->active ? 'Aktif di master item' : 'Nonaktif di master item' }}
-                                                @endif
-                                            </div>
-                                        </td>
-
-                                        <td>
-                                            @if ($item->category)
-                                                <div class="gf-category-name">{{ $item->category->code }}</div>
-                                                <div class="gf-category-sub">{{ $item->category->name }}</div>
-                                            @else
-                                                <span class="text-muted small">Tanpa kategori</span>
-                                            @endif
-                                        </td>
-
-                                        <td>
-                                            <span class="gf-category-type">
-                                                {{ $typeLabels[$item->type] ?? $item->type }}
-                                            </span>
-
-                                            @if (!empty($item->production_source_label))
-                                                <div class="gf-category-sub mt-1">{{ $item->production_source_label }}</div>
-                                            @endif
-                                        </td>
-
-                                        <td class="text-center">
-                                            <span class="gf-category-type">{{ $item->unit ?: '-' }}</span>
-                                        </td>
-
-                                        <td class="text-center">
-                                            @if ($barcodeCount > 0)
-                                                <span class="gf-category-count">{{ $fmt($barcodeCount) }}</span>
-                                            @else
-                                                <span class="gf-badge gf-badge-yellow">Kosong</span>
-                                            @endif
-                                        </td>
-
-                                        <td class="text-end">
-                                            @if ($hpp > 0)
-                                                <strong>Rp {{ number_format($hpp, 0, ',', '.') }}</strong>
-                                            @else
-                                                <span class="text-muted small">Belum di-set</span>
-                                            @endif
-                                        </td>
-
-                                        <td class="text-center">
-                                            @if ($item->active)
-                                                <span class="gf-badge gf-badge-green">Aktif</span>
-                                            @else
-                                                <span class="gf-badge gf-badge-red">Nonaktif</span>
-                                            @endif
-                                        </td>
-
-                                        <td class="text-end">
-                                            <div class="gf-category-row-actions">
-                                                <a href="{{ route('master.items.hpp_temp.edit', $item) }}"
-                                                    class="btn btn-outline-success btn-sm">
-                                                    HPP
-                                                </a>
-
-                                                <a href="{{ route('master.items.edit', $item) }}"
-                                                    class="btn btn-outline-primary btn-sm">
-                                                    Edit
-                                                </a>
-
-                                                <form method="POST"
-                                                    action="{{ route('master.items.destroy', $item) }}"
-                                                    onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}? Tindakan ini tidak bisa dibatalkan.')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
-                                                        Hapus
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="gf-category-empty">
-                        <div class="gf-category-empty-title">Tidak ada item yang cocok.</div>
-                        <div>Ubah filter atau tambah item baru untuk mulai mengisi master item.</div>
-
-                        <a href="{{ route('master.items.create') }}" class="btn btn-primary btn-sm text-white mt-3">
-                            Tambah Item
-                        </a>
-                    </div>
-                @endif
-
-                <div class="gf-category-foot">
-                    <div>
+                <div class="p-3 d-flex justify-content-between align-items-center flex-wrap">
+                    <div class="muted">
                         @if (method_exists($items, 'firstItem') && $items->total())
                             Menampilkan {{ $items->firstItem() }}–{{ $items->lastItem() }} dari {{ $fmt($items->total()) }} item
                         @else
                             Total {{ $fmt($items->count()) }} item
                         @endif
                     </div>
-
-                    <div class="ms-auto">
+                    <div>
                         {{ $items->links() }}
                     </div>
                 </div>
-            </div>
+            @endif
         </div>
     </div>
+</div>
+
 
     {{-- MODAL BULK: KATEGORI --}}
     <div class="modal fade" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">

@@ -2146,11 +2146,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                         return validProcessedStatus && !isPacked(o) && !kilatNeedsArrange(o);
                     }
 
-                    const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED' && !isInstant(o);
+                    const isNormalProcessed = !isPacked(o) && o.order_status === 'PROCESSED';
                     return isNormalProcessed || isReadyToHandover;
                 } else if (tab === 'processed_instant') {
                     if (isPacked(o)) return false;
-                    return (o.order_status === 'PROCESSED' || o.order_status === 'READY_TO_SHIP') && isInstant(o);
+                    return o.order_status === 'READY_TO_SHIP' && isInstant(o);
                 }
                 return false;
             });
@@ -2736,6 +2736,32 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">${icon}</div>${text}</div>`;
             return;
         }
+
+        // Urutkan pesanan: Instan diletakkan paling atas
+        rows.sort((a, b) => {
+            const carrierA = (a.shipping_carrier || '').toLowerCase();
+            const carrierB = (b.shipping_carrier || '').toLowerCase();
+            
+            const isInstA = carrierA.includes('instant') || carrierA.includes('same day') || carrierA.includes('sameday');
+            const isInstB = carrierB.includes('instant') || carrierB.includes('same day') || carrierB.includes('sameday');
+            
+            // Urutan prioritas: Instan (2) -> Reguler (1) -> Kilat (0)
+            const scoreA = isInstA ? 2 : (a.is_kilat ? 0 : 1);
+            const scoreB = isInstB ? 2 : (b.is_kilat ? 0 : 1);
+            
+            if (scoreA !== scoreB) return scoreB - scoreA;
+            
+            // Waktu pesanan
+            const timeA = new Date(a.ordered_at || a.created_at || 0).getTime();
+            const timeB = new Date(b.ordered_at || b.created_at || 0).getTime();
+            
+            // Jika Reguler (bukan Instan, bukan Kilat): Urutkan Terbaru (Descending)
+            if (scoreA === 1) {
+                return timeB - timeA;
+            }
+            // Jika Instan atau Kilat: Urutkan Terlama (Ascending - agar yang paling lama menunggu diproses duluan)
+            return timeA - timeB;
+        });
 
         if (isMobile()) {
             body.innerHTML = renderMobileCards(rows);
@@ -3346,6 +3372,15 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const responseData = res.response || res;
             const infoNeeded = responseData.info_needed || {};
             
+            // Permintaan USER: Untuk pesanan Reguler dan Kilat (Bukan Instan), tampilkan HANYA Drop-off.
+            const o = typeof orders !== 'undefined' ? orders.find(x => x.channel_order_id === orderSn) : null;
+            const isInst = o ? (o.shipping_carrier || '').toLowerCase().match(/instant|same day|sameday/) : false;
+            
+            if (!isInst && infoNeeded.dropoff) {
+                // Hapus opsi pickup agar kurir reguler/kilat hanya bisa di-dropoff
+                delete infoNeeded.pickup;
+            }
+            
             // Tangani dua kemungkinan bentuk respons Shopee:
             // (a) data di bawah info_needed.pickup/dropoff, atau (b) di top-level pickup/dropoff.
             const pickupData  = (infoNeeded.pickup && infoNeeded.pickup.address_list) ? infoNeeded.pickup : (responseData.pickup || null);
@@ -3355,7 +3390,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             
             if (infoNeeded.dropoff) {
                 // Determine if pickup should be default (if it exists and has addresses)
-                const shouldDefaultToPickup = pickupData && pickupData.address_list && pickupData.address_list.length > 0;
+                const shouldDefaultToPickup = false; // Selalu default ke dropoff jika tersedia (karena instruksi user: drop off saja)
                 
                 html += `<div class="form-check mb-2">
                     <input class="form-check-input as-method-radio" type="radio" name="asMethod" id="asDropoff" value="dropoff" ${!shouldDefaultToPickup ? 'checked' : ''}>
@@ -3458,7 +3493,21 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         } catch (e) {
             $('asLoading').style.display = 'none';
             $('asContent').style.display = 'block';
-            $('asOptions').innerHTML = `<div class="alert alert-danger py-1" style="font-size:0.75rem">Gagal: ${e.message}</div>`;
+            
+            const errMsg = (e.message || '').toLowerCase();
+            if (errMsg.includes('can only be obtained') || errMsg.includes('already') || errMsg.includes('invalid status')) {
+                $('asOptions').innerHTML = `
+                    <div class="alert alert-warning py-1" style="font-size:0.75rem">
+                        Shopee menginformasikan bahwa pesanan ini kemungkinan besar <strong>sudah diatur pengirimannya</strong> di pusat.<br>
+                        Silakan klik tombol <b>Konfirmasi Pengiriman</b> di bawah untuk menarik resi secara otomatis dan mensinkronkan statusnya.
+                    </div>
+                    <input type="hidden" name="asMethod" value="auto">
+                    <input type="hidden" name="auto_sync_only" value="1">
+                `;
+                $('asSubmitBtn').disabled = false;
+            } else {
+                $('asOptions').innerHTML = `<div class="alert alert-danger py-1" style="font-size:0.75rem">Gagal: ${e.message}</div>`;
+            }
         }
     };
 
@@ -3484,10 +3533,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const addressSelect = document.getElementById('asPickupAddress');
             const timeSelect = document.getElementById('asPickupTime');
             if (addressSelect && timeSelect) {
-                // Ensure address_id is sent as an integer or string based on original value (typically integer)
                 params.pickup.address_id = Number(addressSelect.value) || addressSelect.value || 0;
                 params.pickup.pickup_time_id = timeSelect.value || "";
             }
+        }
+        
+        if (document.querySelector('input[name="auto_sync_only"]')) {
+            params.auto_sync_only = 1;
         }
 
         try {

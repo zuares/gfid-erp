@@ -19,7 +19,6 @@
     body[data-theme="dark"] .card-main{ border-color:rgba(51,65,85,.85); }
 
     .ship-topbar{
-        position:sticky; top:0; z-index:300;
         display:flex; justify-content:space-between; align-items:flex-start;
         gap:.6rem; flex-wrap:wrap;
         padding:.55rem .75rem; margin-inline:-.75rem; margin-bottom:.65rem;
@@ -100,7 +99,6 @@
         .title{ font-size:1.05rem; }
         .sub{ display:none; }
         .kpis{ gap:.3rem; }
-        .table-responsive{ overflow:visible; }
         .table-list thead{ display:none; }
         .table-list, .table-list tbody, .table-list tr, .table-list td{ display:block; width:100%; }
         .table-list tbody tr{ padding:.7rem .8rem; border-top:1px solid rgba(148,163,184,.16); }
@@ -218,16 +216,16 @@
     {{-- TABLE (satu tabel responsif; mobile → kartu) --}}
     <div class="card card-main">
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive" style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 210px);">
                 <table class="table table-hover align-middle table-list">
                     <thead>
                         <tr>
-                            <th style="width:46px;">#</th>
-                            <th style="width:120px;">Tanggal</th>
-                            <th style="width:210px;">GRN</th>
-                            <th>Supplier / Gudang</th>
-                            <th style="width:120px;">Status</th>
-                            <th style="width:100px;"></th>
+                            <th style="width:46px; position: sticky; top: 0; z-index: 10;">#</th>
+                            <th style="width:120px; position: sticky; top: 0; z-index: 10;">Tanggal</th>
+                            <th style="width:210px; position: sticky; top: 0; z-index: 10;">GRN</th>
+                            <th style="position: sticky; top: 0; z-index: 10;">Supplier / Gudang</th>
+                            <th style="width:120px; position: sticky; top: 0; z-index: 10;">Status</th>
+                            <th style="width:100px; position: sticky; top: 0; z-index: 10;"></th>
                         </tr>
                     </thead>
                     <tbody id="grn-table-body">
@@ -236,11 +234,8 @@
                 </table>
             </div>
 
-            <div id="grn-loading" class="text-center py-2 text-muted d-none" style="font-size:.8rem;">Memuat data…</div>
-            <div id="grn-load-more-trigger"></div>
-
             @if (method_exists($receipts, 'links'))
-                <div class="px-3 py-2">{{ $receipts->links() }}</div>
+                <div class="px-3 py-2 border-top">{{ $receipts->links() }}</div>
             @endif
         </div>
     </div>
@@ -313,33 +308,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const href = row.dataset.href;
         if (href) window.location = href;
     });
-
-    // Infinite scroll
-    let nextPageUrl = @json($receipts->nextPageUrl());
-    const tableBody = document.getElementById('grn-table-body');
-    const loadingEl = document.getElementById('grn-loading');
-    const triggerEl = document.getElementById('grn-load-more-trigger');
-    let isLoading = false;
-
-    async function loadMore() {
-        if (!nextPageUrl || isLoading) return;
-        isLoading = true;
-        if (loadingEl) loadingEl.classList.remove('d-none');
-        try {
-            const res = await fetch(nextPageUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
-            const data = await res.json();
-            if (data.html && tableBody) tableBody.insertAdjacentHTML('beforeend', data.html);
-            nextPageUrl = data.next_page_url;
-            if (!nextPageUrl && observer) observer.unobserve(triggerEl);
-        } catch (e) { console.error(e); }
-        finally { if (loadingEl) loadingEl.classList.add('d-none'); isLoading = false; }
-    }
-
-    const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => { if (e.isIntersecting && nextPageUrl) loadMore(); });
-    }, { rootMargin: '200px', threshold: 0.1 });
-
-    if (nextPageUrl && triggerEl) observer.observe(triggerEl);
 });
 </script>
 @endpush

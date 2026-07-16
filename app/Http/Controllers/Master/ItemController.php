@@ -62,10 +62,10 @@ class ItemController extends Controller
     {
         $item = null;
 
-        // kalau kamu punya list kategori, lempar juga ke view:
         $categories = $this->categoryOptions();
-        return view('master.items.create', compact('item', 'categories'));
-
+        $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
+        $activeSnapshot = null;
+        return view('master.items.create', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot'));
     }
 
     public function show(Item $item)
@@ -160,6 +160,7 @@ class ItemController extends Controller
 
             $item = Item::create([
                 'code' => $data['code'],
+                'sku' => empty($data['sku']) ? $data['code'] : $data['sku'],
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
                 'type' => $data['type'] ?? 'material',
@@ -170,10 +171,34 @@ class ItemController extends Controller
                 'hpp_behavior' => $classification['hpp_behavior'],
                 'production_source' => $productionSource,
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
-                // last_purchase_price & hpp biarkan default (0) dari DB
+                'default_allocation' => $data['default_allocation'] ?? 'hpp',
+                'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
+                'last_purchase_price' => $data['last_purchase_price'] ?? 0,
             ]);
 
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
+
+            if (isset($data['unit_cost'])) {
+                $item->update(['hpp' => $data['unit_cost']]);
+                ItemCostSnapshot::create([
+                    'item_id' => $item->id,
+                    'warehouse_id' => null,
+                    'snapshot_date' => Carbon::now()->toDateString(),
+                    'reference_type' => 'master_temp',
+                    'reference_id' => null,
+                    'qty_basis' => 0,
+                    'rm_unit_cost' => $data['unit_cost'],
+                    'cutting_unit_cost' => 0,
+                    'sewing_unit_cost' => 0,
+                    'finishing_unit_cost' => 0,
+                    'packaging_unit_cost' => 0,
+                    'overhead_unit_cost' => 0,
+                    'unit_cost' => $data['unit_cost'],
+                    'notes' => $data['hpp_notes'] ?? 'HPP awal dari Master Item',
+                    'is_active' => 1,
+                    'created_by' => Auth::id(),
+                ]);
+            }
         });
 
         return redirect()
@@ -185,11 +210,11 @@ class ItemController extends Controller
     {
         $item->load('barcodes');
 
-        // kalau ada kategori:
         $categories = $this->categoryOptions();
-        return view('master.items.edit', compact('item', 'categories'));
-
-        return view('master.items.edit', compact('item'));
+        $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
+        $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+        
+        return view('master.items.edit', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot'));
     }
 
     public function update(Request $request, Item $item)
@@ -208,6 +233,7 @@ class ItemController extends Controller
 
             $item->update([
                 'code' => $data['code'],
+                'sku' => empty($data['sku']) ? $data['code'] : $data['sku'],
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
                 'type' => $data['type'] ?? 'material',
@@ -218,10 +244,42 @@ class ItemController extends Controller
                 'hpp_behavior' => $classification['hpp_behavior'],
                 'production_source' => $productionSource,
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
-                // last_purchase_price & hpp tetap dikelola proses lain
+                'default_allocation' => $data['default_allocation'] ?? 'hpp',
+                'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
+                'last_purchase_price' => array_key_exists('last_purchase_price', $data) ? $data['last_purchase_price'] : $item->last_purchase_price,
             ]);
 
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
+
+            if (isset($data['unit_cost'])) {
+                $unitCost = $data['unit_cost'];
+                $hppNotes = $data['hpp_notes'] ?? 'HPP diperbarui dari form Master Item';
+                $currentSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+                
+                if (!$currentSnapshot || (float)$currentSnapshot->unit_cost !== (float)$unitCost || $currentSnapshot->notes !== $hppNotes) {
+                    ItemCostSnapshot::where('item_id', $item->id)->active()->update(['is_active' => 0]);
+                    $item->update(['hpp' => $unitCost]);
+                    
+                    ItemCostSnapshot::create([
+                        'item_id' => $item->id,
+                        'warehouse_id' => null,
+                        'snapshot_date' => Carbon::now()->toDateString(),
+                        'reference_type' => 'master_temp',
+                        'reference_id' => null,
+                        'qty_basis' => 0,
+                        'rm_unit_cost' => $unitCost,
+                        'cutting_unit_cost' => 0,
+                        'sewing_unit_cost' => 0,
+                        'finishing_unit_cost' => 0,
+                        'packaging_unit_cost' => 0,
+                        'overhead_unit_cost' => 0,
+                        'unit_cost' => $unitCost,
+                        'notes' => $hppNotes,
+                        'is_active' => 1,
+                        'created_by' => Auth::id(),
+                    ]);
+                }
+            }
         });
 
         return redirect()
@@ -378,6 +436,7 @@ class ItemController extends Controller
                 Rule::unique('items', 'code')->ignore($idToIgnore),
             ],
             'name' => ['required', 'string', 'max:190'],
+            'sku' => ['nullable', 'string', 'max:100'],
 
             'unit' => ['required', 'string', 'max:20'],
 
@@ -393,6 +452,13 @@ class ItemController extends Controller
             'production_source' => ['nullable', 'string', Rule::in(array_keys(Item::productionSourceLabels()))],
 
             'active' => ['nullable'],
+            
+            'default_allocation' => ['nullable', 'string', Rule::in(['hpp', 'expense'])],
+            'default_expense_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+
+            'last_purchase_price' => ['nullable', 'numeric', 'min:0'],
+            'unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'hpp_notes' => ['nullable', 'string', 'max:255'],
 
             // Barcodes
             'barcodes' => ['array'],
@@ -532,6 +598,22 @@ class ItemController extends Controller
                 'is_active' => isset($row['is_active']) && (int) $row['is_active'] === 1,
             ]);
         }
+    }
+
+    public function updateExpenseAccount(Request $request, Item $item)
+    {
+        $request->validate([
+            'expense_account_id' => 'required|exists:accounts,id',
+        ]);
+
+        $item->default_expense_account_id = $request->expense_account_id;
+        $item->save();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Akun biaya berhasil diperbarui',
+            'expense_account_id' => $item->default_expense_account_id
+        ]);
     }
 
     public function meta(Request $request)

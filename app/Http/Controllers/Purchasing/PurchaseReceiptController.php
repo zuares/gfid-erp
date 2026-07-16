@@ -78,18 +78,6 @@ class PurchaseReceiptController extends Controller
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
 
-        if ($request->ajax()) {
-            $html = view('purchasing.purchase_receipts._rows', [
-                'receipts' => $receipts,
-                'startIndex' => method_exists($receipts, 'firstItem') ? ($receipts->firstItem() ?? 1) : 1,
-            ])->render();
-
-            return response()->json([
-                'html' => $html,
-                'next_page_url' => $receipts->nextPageUrl(),
-            ]);
-        }
-
         return view('purchasing.purchase_receipts.index', compact(
             'receipts',
             'suppliers',

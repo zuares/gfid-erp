@@ -6,6 +6,7 @@ use App\Helpers\CodeGenerator;
 use App\Models\Account;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\ItemCostSnapshot;
 use App\Models\Lot;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
@@ -871,6 +872,31 @@ class GoodsReceiptService
         $item->last_purchase_price = $unitPrice;
         $item->save();
 
+        if (isset($newHpp)) {
+            // Nonaktifkan snapshot aktif lama
+            ItemCostSnapshot::where('item_id', $itemId)->active()->update(['is_active' => 0]);
+            
+            // Simpan riwayat perubahan
+            ItemCostSnapshot::create([
+                'item_id' => $itemId,
+                'warehouse_id' => null,
+                'snapshot_date' => \Illuminate\Support\Carbon::now()->toDateString(),
+                'reference_type' => 'purchase_receipt',
+                'reference_id' => $grn->id,
+                'qty_basis' => $totalQtyAfter,
+                'rm_unit_cost' => round($newHpp, 2),
+                'cutting_unit_cost' => 0,
+                'sewing_unit_cost' => 0,
+                'finishing_unit_cost' => 0,
+                'packaging_unit_cost' => 0,
+                'overhead_unit_cost' => 0,
+                'unit_cost' => round($newHpp, 2),
+                'notes' => "Auto-calculated dari GRN {$grn->code}",
+                'is_active' => 1,
+                'created_by' => auth()->id() ?? null,
+            ]);
+        }
+
         SupplierPrice::updateOrCreate(
             ['supplier_id' => $grn->supplier_id, 'item_id' => $itemId],
             ['last_price' => $unitPrice]
@@ -925,7 +951,28 @@ class GoodsReceiptService
             $runningQty = $newQty;
         }
 
-        Item::where('id', $itemId)->update(['hpp' => round($runningHpp, 2)]);
+        $runningHppRound = round($runningHpp, 2);
+        Item::where('id', $itemId)->update(['hpp' => $runningHppRound]);
+        
+        // Catat sebagai snapshot koreksi dari Unpost
+        ItemCostSnapshot::where('item_id', $itemId)->active()->update(['is_active' => 0]);
+        ItemCostSnapshot::create([
+            'item_id' => $itemId,
+            'warehouse_id' => null,
+            'snapshot_date' => \Illuminate\Support\Carbon::now()->toDateString(),
+            'reference_type' => 'recalculation',
+            'qty_basis' => $runningQty,
+            'rm_unit_cost' => $runningHppRound,
+            'cutting_unit_cost' => 0,
+            'sewing_unit_cost' => 0,
+            'finishing_unit_cost' => 0,
+            'packaging_unit_cost' => 0,
+            'overhead_unit_cost' => 0,
+            'unit_cost' => $runningHppRound,
+            'notes' => 'Recalculated HPP (UNPOST GRN)',
+            'is_active' => 1,
+            'created_by' => auth()->id() ?? null,
+        ]);
     }
 
     /**
@@ -1265,6 +1312,12 @@ class GoodsReceiptService
 
         DB::table('purchase_orders')->where('id', $purchaseOrderId)
             ->update(['received_status' => $status, 'updated_at' => now()]);
+
+        // Auto Close / Re-open evaluation
+        $po = \App\Models\PurchaseOrder::find($purchaseOrderId);
+        if ($po) {
+            $po->evaluateAutoClose();
+        }
     }
 
     /**

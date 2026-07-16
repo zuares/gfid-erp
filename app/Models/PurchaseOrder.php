@@ -127,10 +127,34 @@ class PurchaseOrder extends Model
         return $this->status === 'cancelled';
     }
 
-    /** Closed ditandai oleh closed_at (additive — tidak mengubah kolom status) */
+    /** Closed ditandai oleh closed_at (additive — status = closed) */
     public function isClosed(): bool
     {
-        return !is_null($this->closed_at);
+        return $this->status === 'closed' || !is_null($this->closed_at);
+    }
+
+    /**
+     * Otomatis meng-close atau meng-approved (reopen) PO berdasarkan kelengkapan status.
+     * Dipanggil tiap kali ada update pada received_status atau payment_status.
+     */
+    public function evaluateAutoClose(): void
+    {
+        if (in_array($this->status, ['draft', 'cancelled'])) {
+            return;
+        }
+
+        $isComplete = $this->received_status === 'fully_received' && $this->payment_status === 'paid';
+
+        if ($isComplete && $this->status !== 'closed') {
+            $this->status = 'closed';
+            $this->closed_at = now();
+            $this->save();
+        } elseif (!$isComplete && $this->status === 'closed') {
+            $this->status = 'approved';
+            $this->closed_at = null;
+            $this->closed_by = null;
+            $this->save();
+        }
     }
 
     /**

@@ -18,20 +18,15 @@
     );
 @endphp
 
-<div class="card mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">
-            Barcode Item
-        </span>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-barcode-row">
+<div class="card card-main mb-4">
+    <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+        <h6 class="mb-0 fw-bold">Barcode Item</h6>
+        <button type="button" class="btn btn-sm btn-item-outline btn-pill" id="btn-add-barcode-row">
             + Tambah Baris
         </button>
     </div>
-
-    <div class="card-body p-2">
-        <div class="small text-muted mb-2">
-            Gunakan barcode utama di label produk, dan barcode tambahan untuk alias atau SKU marketplace.
-        </div>
+    
+    <div class="card-body p-0">
 
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0" id="table-barcodes">

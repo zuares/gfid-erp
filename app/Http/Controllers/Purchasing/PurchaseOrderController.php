@@ -108,16 +108,7 @@ class PurchaseOrderController extends Controller
 
         $orders = $q->paginate(20)->withQueryString();
 
-        if ($request->ajax()) {
-            $html = view('purchasing.purchase_orders._table_rows', [
-                'orders' => $orders,
-            ])->render();
 
-            return response()->json([
-                'html' => $html,
-                'next_page_url' => $orders->nextPageUrl(),
-            ]);
-        }
 
         $suppliers = Supplier::orderBy('name')->get();
 
@@ -170,6 +161,12 @@ class PurchaseOrderController extends Controller
             ->where('type', 'asset')
             ->where('is_active', 1)
             ->where('is_cash', 1)
+            ->orderBy('code')
+            ->get();
+
+        $expenseAccounts = Account::query()
+            ->where('type', 'expense')
+            ->where('is_active', true)
             ->orderBy('code')
             ->get();
 
@@ -228,6 +225,7 @@ class PurchaseOrderController extends Controller
             'items'          => $items,
             'lines'          => $lines,
             'cashAccounts'   => $cashAccounts,
+            'expenseAccounts'=> $expenseAccounts,
             'orderType'      => $orderType,
             'fromPr'         => $fromPr, // PR-D: null atau PurchaseRequest model
         ]);
@@ -469,6 +467,12 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
+        $expenseAccounts = Account::query()
+            ->where('type', 'expense')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
+
         $orderType = $this->normalizeOrderType(
             (string) ($purchase_order->getAttribute('order_type') ?: $request->input('order_type', 'material'))
         );
@@ -516,6 +520,7 @@ class PurchaseOrderController extends Controller
             'paymentMethods' => $paymentMethods,
             'items' => $items,
             'lines' => $lines,
+            'expenseAccounts' => $expenseAccounts,
             'orderType' => $orderType,
         ]);
     }
@@ -1145,6 +1150,7 @@ class PurchaseOrderController extends Controller
             return back()->with('error', 'PO belum bisa di-close: ' . implode('; ', $blockers));
         }
 
+        $purchase_order->status = 'closed';
         $purchase_order->closed_at = now();
         $purchase_order->closed_by = (int) $request->user()->id;
         $purchase_order->save();

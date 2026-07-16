@@ -247,17 +247,32 @@ class MarketplaceLogisticsController extends Controller
             // e.g. ['pickup' => ['address_id' => 123, 'pickup_time_id' => 'abc']]
             $params = $request->except(['_token', 'store', 'orderSn']);
             
-            // Shopee mewajibkan field pickup dan dropoff tetap dikirim sebagai object kosong {} 
-            // meskipun tidak dipilih atau bernilai kosong.
-            if (!isset($params['dropoff']) || (is_array($params['dropoff']) && empty($params['dropoff']))) {
-                $params['dropoff'] = new \stdClass();
-            }
-            if (!isset($params['pickup']) || (is_array($params['pickup']) && empty($params['pickup']))) {
+            // Shopee hanya mengizinkan SATU metode pengiriman (pickup ATAU dropoff).
+            // Jika frontend tidak mengirim apapun (misal 'auto'), kirim salah satu sebagai pancingan.
+            if (empty($params['pickup']) && empty($params['dropoff']) && empty($params['non_integrated'])) {
                 $params['pickup'] = new \stdClass();
+            } else {
+                // Jika dikirim tapi berupa array kosong, ubah jadi object {}
+                if (isset($params['dropoff']) && is_array($params['dropoff']) && empty($params['dropoff'])) {
+                    $params['dropoff'] = new \stdClass();
+                }
+                if (isset($params['pickup']) && is_array($params['pickup']) && empty($params['pickup'])) {
+                    $params['pickup'] = new \stdClass();
+                }
             }
+            // Cek apakah frontend memaksa auto_sync_only
+            $isAutoSync = $request->input('auto_sync_only');
             
             $driver = $this->manager->driver($store);
-            $rawResult = $driver->shipOrder($store, $orderSn, $params);
+            
+            if ($isAutoSync) {
+                // Bypass pemanggilan API Shopee shipOrder (yang pasti akan gagal jika sudah dikirim).
+                // Kita langsung simulasikan seolah API mengembalikan error 'already_arranged'
+                // agar sistem otomatis masuk ke blok penarikan resi.
+                $rawResult = ['error' => 'logistics.already_arranged'];
+            } else {
+                $rawResult = $driver->shipOrder($store, $orderSn, $params);
+            }
             
             // Allow if it's already arranged by marketplace (e.g. Instant/Sameday orders)
             // or has invalid status due to being already processed

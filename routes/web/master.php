@@ -31,6 +31,9 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         // ✅ Bulk update (kategori / tipe / HPP) untuk beberapa item sekaligus
         Route::post('items/bulk-update', [ItemController::class, 'bulkUpdate'])
             ->name('items.bulk_update');
+            
+        Route::patch('items/{item}/update-expense-account', [ItemController::class, 'updateExpenseAccount'])
+            ->name('items.update_expense_account');
 
         Route::resource('items', ItemController::class);
 

@@ -111,13 +111,18 @@
                 left: 0;
                 right: 0;
                 top: calc(100% + 4px);
-                background: var(--card, #fff);
+                background: #ffffff;
                 border: 1px solid #e5e7eb;
                 border-radius: 10px;
                 max-height: 240px;
                 overflow-y: auto;
                 z-index: 9999;
-                /* ✅ higher */
+                box-shadow: 0 4px 18px rgba(15,23,42,.1);
+            }
+            body[data-theme="dark"] .item-suggest-dropdown {
+                background: #1e293b;
+                border-color: rgba(51,65,85,.8);
+                box-shadow: 0 4px 18px rgba(0,0,0,.5);
             }
 
             .item-suggest-option {
@@ -128,6 +133,10 @@
             .item-suggest-option:hover,
             .item-suggest-option.is-active {
                 background: rgba(59, 130, 246, .12);
+            }
+            body[data-theme="dark"] .item-suggest-option:hover,
+            body[data-theme="dark"] .item-suggest-option.is-active {
+                background: rgba(59,130,246,.25);
             }
 
             .item-suggest-option-code {

@@ -519,8 +519,8 @@
                                     </td>
                                     <td class="po-hide-mobile"><span class="po-code-cell" style="font-weight:normal;">{{ $p->reference_number ?? '-' }}</span></td>
                                     <td class="po-r">
-                                        <form action="{{ route('purchasing.purchase_orders.payments.destroy', [$order->id, $p->id]) }}" method="POST" onsubmit="return confirm('Hapus/Void pembayaran ini?');">
-                                            @csrf @method('DELETE')
+                                        <form action="{{ route('purchasing.purchase_orders.payments.void', [$order->id, $p->id]) }}" method="POST" onsubmit="return confirm('Hapus/Void pembayaran ini?');">
+                                            @csrf
                                             <button type="submit" class="po-btn" style="color:#b91c1c;min-height:28px;padding:.1rem .5rem;"><i class="bi bi-trash"></i> Void</button>
                                         </form>
                                     </td>

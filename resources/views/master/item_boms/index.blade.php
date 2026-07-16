@@ -3,323 +3,133 @@
 @section('title','Master • BOM SKU')
 
 @push('head')
-
 <style>
-    /* GF BOM UI FINAL - selaras Master Items */
-    .gf-category-page,
-    .page-wrap {
-        max-width: 1180px !important;
-        margin: 0 auto !important;
-        padding: 16px 12px 28px !important;
-        color: #0f172a !important;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    :root{
+        --bom-accent:#334155;
+        --bom-accent-2:#1f2937;
+        --bom-border:rgba(148,163,184,.18);
+        --bom-border-strong:rgba(148,163,184,.30);
+        --bom-muted:#64748b;
+    }
+    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+
+    .card-main{
+        background: var(--card);
+        border-radius: 8px;
+        border: 1px solid var(--bom-border);
+        box-shadow: none;
+        overflow:hidden;
+    }
+    body[data-theme="dark"] .card-main{
+        border-color: rgba(51,65,85,.85);
+        box-shadow: none;
     }
 
-    .cardx {
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 24px !important;
-        background: #ffffff !important;
-        box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
-        padding: 16px !important;
-        overflow: hidden !important;
+    .bom-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--bom-border);
     }
+    body[data-theme="dark"] .bom-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--bom-muted); font-size:.78rem; }
+    body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .cardx.gf-category-head,
-    .gf-bom-form {
-        margin-bottom: 14px !important;
-        padding: 18px !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 24px !important;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 58%, #f1f5f9 100%) !important;
-        box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+    .kpi{
+        display:inline-flex; align-items:baseline; gap:.45rem;
+        border-radius:7px; padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28);
+        background: transparent;
+        font-size:.72rem;
     }
-
-    .cardx.sub {
-        margin-top: 14px !important;
-        background: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 24px !important;
-        box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
+    body[data-theme="dark"] .kpi{
+        background: rgba(15, 23, 42, 0.96);
+        border-color: rgba(51, 65, 85, 0.85);
     }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
+    body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
+    .kpi .val{ font-weight:650; color:var(--bom-accent); }
 
-    .rowx {
-        display: flex !important;
-        gap: 10px !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
+    .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .filter-label{ font-size:.8rem; color:#6b7280; }
+    body[data-theme="dark"] .filter-label{ color:#9ca3af; }
+    .filter-input{ border-radius:7px; padding-left:.75rem; font-size:.82rem; min-height:30px; }
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+    .btn-bom-primary{ background:var(--bom-accent)!important; border-color:var(--bom-accent)!important; color:#fff!important; }
+    .btn-bom-primary:hover{ background:var(--bom-accent-2)!important; border-color:var(--bom-accent-2)!important; color:#fff!important; }
+    .btn-bom-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-bom-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+    body[data-theme="dark"] .btn-bom-outline { color: #cbd5e1!important; }
+    body[data-theme="dark"] .btn-bom-outline:hover { color: #f8fafc!important; background: rgba(148,163,184,.15)!important; }
+
+    .table-list{ margin-bottom:0; }
+    .table-list thead th{
+        border-bottom-width:1px;
+        font-size:.68rem;
+        text-transform:none;
+        letter-spacing:0;
+        color:#64748b;
+        background: var(--card,#fff);
+        padding:.52rem .62rem;
+        white-space:nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
-
-    .h1 {
-        color: #0f172a !important;
-        font-size: 1.34rem !important;
-        font-weight: 950 !important;
-        letter-spacing: -.05em !important;
-        line-height: 1.1 !important;
-        margin: 0 !important;
+    body[data-theme="dark"] .table-list thead th{
+        background: rgba(15, 23, 42, 0.98);
+        color:#9ca3af;
+        border-bottom-color: rgba(30, 64, 175, 0.6);
     }
-
-    .subt,
-    .small {
-        color: #64748b !important;
-        font-size: .82rem !important;
-        font-weight: 650 !important;
-        line-height: 1.45 !important;
+    .table-list tbody td{
+        vertical-align:middle;
+        border-top-color: rgba(148, 163, 184, 0.16);
+        padding:.52rem .62rem;
     }
+    body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
-    .chip {
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 7px !important;
-        padding: 6px 10px !important;
-        border-radius: 999px !important;
-        background: #f1f5f9 !important;
-        border: 1px solid #e2e8f0 !important;
-        color: #334155 !important;
-        font-size: .72rem !important;
-        font-weight: 900 !important;
+    .code-link{ font-weight:700; text-decoration:none; color:inherit; }
+    .code-link:hover{ text-decoration:underline; }
+    .muted{ font-size:.82rem; color:#6b7280; }
+    body[data-theme="dark"] .muted{ color:#9ca3af; }
+    .bom-name{ font-weight:600; }
+
+    .badge-status{
+        border-radius:7px; padding:.16rem .48rem;
+        font-size:.68rem; letter-spacing:0; text-transform:none;
+        border:1px solid transparent;
+        display:inline-flex; align-items:center; gap:.35rem;
+        white-space:nowrap;
     }
+    .badge-status::before{ content:''; width:7px; height:7px; border-radius:999px; display:inline-block; }
 
-    .dot {
-        width: 7px !important;
-        height: 7px !important;
-        border-radius: 999px !important;
-        background: #0f172a !important;
-        display: inline-block !important;
-    }
+    .st-active{ background: rgba(34, 197, 94, 0.10); color:#166534; border-color: rgba(34, 197, 94, 0.30); }
+    .st-active::before{ background: rgba(34, 197, 94, 0.95); }
+    .st-inactive{ background: rgba(148, 163, 184, 0.10); color:#475569; border-color: rgba(148, 163, 184, 0.30); }
+    .st-inactive::before{ background: rgba(100, 116, 139, 0.95); }
+    .st-warning{ background: #fef3c7; color: #92400e; border-color: #fde68a; }
 
-    .mono {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
-        letter-spacing: -.02em !important;
-    }
+    body[data-theme="dark"] .st-active{ background: rgba(34, 197, 94, 0.20); color:#dcfce7; border-color: rgba(34, 197, 94, 0.55); }
+    body[data-theme="dark"] .st-inactive{ background: rgba(148, 163, 184, 0.18); color:#cbd5e1; border-color: rgba(148, 163, 184, 0.55); }
 
-    .hr {
-        height: 1px !important;
-        background: #e2e8f0 !important;
-        border: 0 !important;
-        margin: 14px 0 !important;
-    }
-
-    .lbl {
-        font-size: .72rem !important;
-        font-weight: 900 !important;
-        color: #334155 !important;
-        margin-bottom: 5px !important;
-        text-transform: uppercase !important;
-        letter-spacing: .045em !important;
-    }
-
-    .grid {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 12px !important;
-    }
-
-    .inp,
-    .form-control,
-    .form-select {
-        border-radius: 14px !important;
-        border: 1px solid #e2e8f0 !important;
-        min-height: 38px !important;
-        color: #0f172a !important;
-        font-size: .84rem !important;
-        font-weight: 650 !important;
-        background: #ffffff !important;
-        box-shadow: none !important;
-    }
-
-    .inp:focus,
-    .form-control:focus,
-    .form-select:focus {
-        border-color: #94a3b8 !important;
-        box-shadow: 0 0 0 .22rem rgba(15, 23, 42, .08) !important;
-    }
-
-    .btnx,
-    .btn {
-        border-radius: 999px !important;
-        font-weight: 850 !important;
-        letter-spacing: -.01em !important;
-        min-height: 34px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 6px !important;
-        text-decoration: none !important;
-    }
-
-    .btnx {
-        padding: 8px 13px !important;
-        border: 1px solid #cbd5e1 !important;
-        background: rgba(255,255,255,.78) !important;
-        color: #475569 !important;
-    }
-
-    .btnx:hover {
-        background: #f8fafc !important;
-        color: #0f172a !important;
-        box-shadow: 0 10px 22px rgba(15, 23, 42, .08) !important;
-    }
-
-    .btnx.primary,
-    .btnx.success,
-    .btn-primary {
-        color: #ffffff !important;
-        background: linear-gradient(135deg, #0f172a, #334155) !important;
-        border-color: transparent !important;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, .12) !important;
-    }
-
-    .btnx.ghost {
-        background: #ffffff !important;
-        color: #64748b !important;
-        border-color: #e2e8f0 !important;
-    }
-
-    .btnx.danger,
-    .btn-outline-danger {
-        color: #991b1b !important;
-        background: #fee2e2 !important;
-        border-color: #fecaca !important;
-    }
-
-    .alert-successx,
-    .alert-success {
-        margin-top: 14px !important;
-        border-radius: 16px !important;
-        padding: 10px 12px !important;
-        background: #dcfce7 !important;
-        color: #166534 !important;
-        border: 1px solid #bbf7d0 !important;
-        font-size: .82rem !important;
-        font-weight: 800 !important;
-    }
-
-    .alert,
-    .alert-danger {
-        border-radius: 16px !important;
-        font-size: .82rem !important;
-    }
-
-    .table-wrap {
-        max-height: 68vh !important;
-        overflow: auto !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 18px !important;
-        background: #ffffff !important;
-    }
-
-    .table-bom,
-    .gf-clean-table {
-        min-width: 860px !important;
-        margin: 0 !important;
-        background: #ffffff !important;
-        color: #0f172a !important;
-        font-size: .82rem !important;
-    }
-
-    .table-bom thead th,
-    .gf-clean-table thead th,
-    .gf-sticky-table thead th {
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 8 !important;
-        background: #f8fafc !important;
-        color: #64748b !important;
-        font-size: .7rem !important;
-        text-transform: uppercase !important;
-        letter-spacing: .045em !important;
-        font-weight: 900 !important;
-        border-bottom: 1px solid #e2e8f0 !important;
-        padding: 12px 10px !important;
-        white-space: nowrap !important;
-    }
-
-    .table-bom td,
-    .gf-clean-table td {
-        border-color: #eef2f7 !important;
-        padding: 12px 10px !important;
-        vertical-align: middle !important;
-        color: #0f172a !important;
-    }
-
-    .table-bom tbody tr:hover td,
-    .gf-clean-table tbody tr:hover td {
-        background: #f8fbff !important;
-    }
-
-    .badge {
-        border-radius: 999px !important;
-        padding: 6px 10px !important;
-        font-weight: 850 !important;
-    }
-
-    .pagination {
-        margin: 0 !important;
-        gap: 4px !important;
-    }
-
-    .pagination .page-link {
-        border-radius: 11px !important;
-        border-color: #e2e8f0 !important;
-        color: #475569 !important;
-        font-size: .78rem !important;
-        font-weight: 700 !important;
-    }
-
-    .pagination .active .page-link,
-    .pagination .page-item.active .page-link {
-        color: #ffffff !important;
-        background: #0f172a !important;
-        border-color: #0f172a !important;
-    }
-
-    .select2-container {
-        width: 100% !important;
-    }
-
-    .select2-container .select2-selection--single {
-        height: 40px !important;
-        border-radius: 14px !important;
-        border: 1px solid #e2e8f0 !important;
-        display: flex !important;
-        align-items: center !important;
-        background: #ffffff !important;
-    }
-
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
-        line-height: 40px !important;
-        color: #0f172a !important;
-        font-size: .84rem !important;
-        font-weight: 650 !important;
-        padding-left: 12px !important;
-    }
-
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 40px !important;
-        right: 8px !important;
-    }
-
-    .select2-dropdown {
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 14px !important;
-        overflow: hidden !important;
-        box-shadow: 0 18px 46px rgba(15, 23, 42, .14) !important;
-    }
-
-    .select2-results__option {
-        font-size: .84rem !important;
-        padding: 8px 12px !important;
-    }
-
-    .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
-        background: #0f172a !important;
-        color: #ffffff !important;
-    }
-
-    .gf-live-filter-wrap {
-        position: relative !important;
-    }
-
+    .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
+    body[data-theme="dark"] .empty{ color:#9ca3af; }
+    .divider{ height:1px; background: rgba(148, 163, 184, 0.20); }
+    body[data-theme="dark"] .divider{ background: rgba(51, 65, 85, 0.85); }
+    .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
+    
+    .gf-live-filter-wrap { position: relative !important; }
     .gf-live-filter-indicator {
         position: absolute !important;
         right: 12px !important;
@@ -332,238 +142,217 @@
         font-size: .72rem !important;
         font-weight: 850 !important;
     }
-
-    .gf-live-filter-indicator.is-show {
-        display: inline-flex !important;
-    }
-
-    @media (max-width: 992px) {
-        .cardx.gf-category-head,
-        .gf-bom-form {
-            border-radius: 22px !important;
-        }
-
-        .grid {
-            grid-template-columns: 1fr !important;
-        }
-    }
+    body[data-theme="dark"] .gf-live-filter-indicator { background: rgba(15, 23, 42, .88)!important; color:#cbd5e1!important; }
+    .gf-live-filter-indicator.is-show { display: inline-flex !important; }
 
     @media (max-width: 768px) {
-        .gf-category-page,
-        .page-wrap {
-            padding: 12px 10px 24px !important;
+        .page-wrap{ padding:.5rem .5rem 4rem; }
+        .bom-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
+        .title{ font-size:1.05rem; }
+        .sub{ display:none; }
+        .controls{ width:100%; align-items:stretch; }
+        .controls form{ flex:1 1 100%; }
+        .controls .btn,
+        .controls form button{ min-height:40px; }
+        .kpis{ display:none; }
+        .table-responsive{ overflow:visible; }
+        .table-list thead{ display:none; }
+        .table-list,
+        .table-list tbody,
+        .table-list tr,
+        .table-list td{ display:block; width:100%; }
+        .table-list tbody tr{
+            padding:.66rem;
+            border-top:1px solid rgba(148,163,184,.16);
         }
-
-        .cardx,
-        .cardx.gf-category-head,
-        .gf-bom-form {
-            border-radius: 20px !important;
-            padding: 14px !important;
+        .table-list tbody td{
+            border:0;
+            padding:0;
+            margin-bottom:.35rem;
         }
-
-        .rowx {
-            align-items: stretch !important;
+        .table-list tbody td.mobile-hide{ display:none; }
+        .bom-row-main{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:.75rem;
         }
-
-        .btnx,
-        .btn {
-            width: auto;
+        .bom-row-action{
+            margin-top:.55rem;
         }
-
-        form.rowx {
-            display: grid !important;
-            grid-template-columns: 1fr !important;
-        }
-
-        form.rowx > div {
-            width: 100% !important;
-        }
-
-        form.rowx .btnx {
-            width: 100% !important;
-        }
-    }
-
-    .gf-bom-head-layout {
-        display: flex !important;
-        align-items: flex-start !important;
-        gap: 13px !important;
-        min-width: 0 !important;
-    }
-
-    .gf-bom-head-icon {
-        width: 48px !important;
-        height: 48px !important;
-        flex: 0 0 48px !important;
-        border-radius: 17px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        color: #ffffff !important;
-        background: linear-gradient(135deg, #0f172a, #334155) !important;
-        box-shadow: 0 14px 28px rgba(15, 23, 42, .18) !important;
-        font-size: 1.22rem !important;
-    }
-
-    .gf-bom-head-content {
-        min-width: 0 !important;
-    }
-
-    @media (max-width: 768px) {
-        .gf-bom-head-icon {
-            width: 42px !important;
-            height: 42px !important;
-            flex-basis: 42px !important;
-            border-radius: 15px !important;
-            font-size: 1.08rem !important;
+        .bom-row-action .btn{
+            width:100%;
+            min-height:38px;
         }
     }
-
 </style>
-
 @endpush
 
 @section('content')
-<div class="gf-category-page">
+<div class="page-wrap">
+    @if(session('success'))
+        <div class="flash-clean alert alert-success mb-2">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="flash-clean alert alert-danger mb-2">{{ session('error') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="flash-clean alert alert-danger mb-2">{{ $errors->first() }}</div>
+    @endif
 
-  <div class="cardx gf-category-head">
-    <div class="rowx" style="justify-content:space-between;align-items:flex-start">
-      <div class="gf-bom-head-layout">
-        <div class="gf-bom-head-icon"><i class="bi bi-diagram-3"></i></div>
-        <div class="gf-bom-head-content">
-          <div class="h1">BOM per SKU</div>
-          <div class="subt">1 SKU = 1 BOM (paling cepat jalan). Material ambil dari <span class="mono">items</span>.</div>
+    <div class="bom-topbar">
+        <div>
+            <div class="title">BOM per SKU</div>
+            <div class="sub">1 SKU = 1 BOM (paling cepat jalan). Material ambil dari <span style="font-family: monospace;">items</span>.</div>
 
-        <div class="rowx" style="margin-top:10px">
-          <span class="chip"><span class="dot"></span> GFID • BOM SKU</span>
-          <span class="chip">Total: <span class="mono">{{ $boms->total() }}</span></span>
-          </div>
+            <div class="kpis">
+                <span class="kpi"><span class="lbl">Total BOM</span><span class="val">{{ number_format($boms->total(), 0, ',', '.') }}</span></span>
+            </div>
         </div>
-      </div>
 
-      <div class="rowx">
-        <a class="btnx" href="{{ route('master.item_boms.import_form') }}"><i class="bi bi-upload"></i> Import CSV</a>
-        <a class="btnx" href="{{ route('master.item_boms.duplicate_form') }}"><i class="bi bi-files"></i> Duplicate BOM</a>
-        <a class="btnx primary" href="{{ route('master.item_boms.create') }}"><i class="bi bi-plus-lg"></i> BOM Baru</a>
-      </div>
+        <div class="controls">
+            <a href="{{ route('master.item_boms.import_form') }}" class="btn btn-sm btn-bom-outline btn-pill">
+                <i class="bi bi-upload"></i> Import CSV
+            </a>
+            <a href="{{ route('master.item_boms.duplicate_form') }}" class="btn btn-sm btn-bom-outline btn-pill">
+                <i class="bi bi-files"></i> Duplicate BOM
+            </a>
+            <a href="{{ route('master.item_boms.create') }}" class="btn btn-sm btn-bom-primary btn-pill">
+                BOM Baru
+            </a>
+        </div>
     </div>
 
-    <div class="hr"></div>
+    <form method="get" class="d-flex gap-2 flex-wrap mb-3 align-items-start" style="background: var(--card); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--bom-border);">
+        <div style="flex: 1 1 240px;">
+            <div class="position-relative gf-live-filter-wrap">
+                <i class="bi bi-search position-absolute" style="left: 10px; top: 50%; transform: translateY(-50%); color: var(--bom-muted); font-size: 0.8rem;"></i>
+                <input type="search" name="q" class="form-control form-control-sm filter-input w-100"
+                    value="{{ request('q') }}" placeholder="Ketik SKU atau Nama Item..." autocomplete="off" autofocus
+                    style="padding-left: 32px; font-family: monospace; font-size: 0.88rem;">
+            </div>
+            <div class="text-muted mt-2" style="font-size: 0.72rem;">Contoh: <span style="font-family: monospace; background: rgba(148,163,184,.1); padding: 2px 4px; border-radius: 4px;">C5BLK</span>, <span style="font-family: monospace; background: rgba(148,163,184,.1); padding: 2px 4px; border-radius: 4px;">J3MST</span>, <span style="font-family: monospace; background: rgba(148,163,184,.1); padding: 2px 4px; border-radius: 4px;">K1NVY</span></div>
+        </div>
 
-    <form class="rowx" method="get" style="align-items:flex-end">
-      <div style="flex:1;min-width:240px">
-        <div class="lbl">Cari SKU</div>
-        <input class="inp mono" name="q" value="{{ $q }}" placeholder="Cari SKU (code / nama)..." / autofocus>
-        <div class="small" style="margin-top:6px">Contoh: <span class="mono">C5BLK</span>, <span class="mono">J3MST</span>, <span class="mono">K1NVY</span></div>
-      </div>
-      <div class="rowx">
-        <button class="btnx success" type="submit"><i class="bi bi-funnel"></i> Cari</button>
-        <a class="btnx ghost" href="{{ route('master.item_boms.index') }}">Reset</a>
-      </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-bom-primary btn-pill" style="min-height: 32px; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="bi bi-funnel"></i> Cari
+            </button>
+            @if(request('q'))
+                <a href="{{ route('master.item_boms.index') }}" class="btn btn-sm btn-bom-outline btn-pill" style="min-height: 32px; display: inline-flex; align-items: center;">Reset</a>
+            @endif
+        </div>
     </form>
-  </div>
 
-  <div style="height:12px"></div>
-
-  @if(session('success'))
-    <div class="alert-successx">{{ session('success') }}</div>
-    <div style="height:12px"></div>
-  @endif
-
-  <div class="cardx sub">
-    <div class="table-wrap">
-      <table class="table table-hover table-sm table-bom gf-clean-table gf-sticky-table align-middle mb-0">
-        <thead>
-          <tr>
-            <th style="width:56px">#</th>
-            <th style="width:170px">SKU</th>
-            <th>Nama</th>
-            <th style="width:260px">Struktur BOM</th>
-            <th style="width:120px">Status</th>
-            <th style="width:180px">Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse($boms as $i => $b)
-            <tr>
-              <td class="mono" style="font-weight:950">{{ ($boms->currentPage()-1)*$boms->perPage() + $i + 1 }}</td>
-              <td class="mono" style="font-weight:950">{{ $b->item->code }}</td>
-              <td>{{ $b->item->name }}</td>
-              <td>
-                <div class="d-flex flex-wrap gap-1">
-                  <span class="badge bg-light text-dark border">Utama {{ (int) $b->main_material_lines_count }}</span>
-                  <span class="badge bg-primary-subtle text-primary border">Jahit {{ (int) $b->sewing_supply_lines_count }}</span>
-                  <span class="badge bg-info-subtle text-info border">Packing {{ (int) $b->packing_supply_lines_count }}</span>
+    <div class="card card-main">
+        <div class="card-body p-0">
+            @if ($boms->count() === 0)
+                <div class="empty">
+                    Belum ada BOM.
+                    <div class="mt-1">Klik <b>BOM Baru</b> untuk membuat BOM.</div>
                 </div>
-                <div class="small text-muted mt-1">Total {{ (int) $b->lines_count }} material</div>
-                @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
-                @if($ub)
-                  <div class="small mt-1">
-                    Aktual terakhir:
-                    <span class="mono fw-semibold">{{ number_format($ub['kg_per_pcs'], 4) }}</span>/pcs
-                    <span class="text-muted">· {{ $ub['job_code'] }}</span>
-                    @if($ub['status'] === 'over')
-                      <span class="badge bg-danger-subtle text-danger border ms-1"
-                            title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">⚠ melebihi standar</span>
-                    @elseif($ub['status'] === 'under')
-                      <span class="badge bg-success-subtle text-success border ms-1"
-                            title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">lebih hemat</span>
-                    @elseif($ub['status'] === 'ok')
-                      <span class="badge bg-secondary-subtle text-secondary border ms-1">sesuai standar</span>
-                    @endif
-                  </div>
-                @endif
-              </td>
-              <td>
-                @if($b->active)
-                  <span class="badge bg-success">Active</span>
-                @else
-                  <span class="badge bg-secondary">Off</span>
-                @endif
-              </td>
-              <td>
-                <div class="d-flex gap-1">
-                  <a class="btn btn-sm btn-outline-primary" href="{{ route('master.item_boms.edit',$b) }}">Edit</a>
-                  <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" class="js-delete-bom-form">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
-                  </form>
+            @else
+                <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                    <table class="table table-hover align-middle table-list">
+                        <thead>
+                            <tr>
+                                <th style="width: 44px;" class="text-center">#</th>
+                                <th style="width: 130px;">SKU</th>
+                                <th style="min-width: 200px;">Nama</th>
+                                <th style="width: 220px;">Struktur BOM</th>
+                                <th class="text-center" style="width: 100px;">Status</th>
+                                <th class="text-end" style="width: 140px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($boms as $i => $b)
+                                <tr>
+                                    <td class="text-center text-muted mobile-hide">{{ ($boms->currentPage()-1)*$boms->perPage() + $i + 1 }}</td>
+                                    <td>
+                                        <div class="bom-row-main">
+                                            <div class="bom-name" style="font-family: monospace;">{{ $b->item->code }}</div>
+                                            <span class="badge-status {{ $b->active ? 'st-active' : 'st-inactive' }} d-md-none">{{ $b->active ? 'Active' : 'Off' }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="bom-name">{{ $b->item->name }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1 mb-1">
+                                            <span class="badge-status" style="border: 1px solid rgba(148,163,184,.3); color: #475569; background: #f8fafc;">Utama {{ (int) $b->main_material_lines_count }}</span>
+                                            <span class="badge-status" style="border: 1px solid rgba(59,130,246,.3); color: #1d4ed8; background: rgba(59,130,246,.1);">Jahit {{ (int) $b->sewing_supply_lines_count }}</span>
+                                            <span class="badge-status" style="border: 1px solid rgba(6,182,212,.3); color: #0e7490; background: rgba(6,182,212,.1);">Packing {{ (int) $b->packing_supply_lines_count }}</span>
+                                        </div>
+                                        <div class="muted">Total {{ (int) $b->lines_count }} material</div>
+                                        @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
+                                        @if($ub)
+                                            <div class="muted mt-1">
+                                                Aktual terakhir:
+                                                <span style="font-family: monospace;" class="fw-semibold">{{ number_format($ub['kg_per_pcs'], 4) }}</span>/pcs
+                                                <span>· {{ $ub['job_code'] }}</span>
+                                                @if($ub['status'] === 'over')
+                                                    <span class="badge-status" style="background: rgba(239, 68, 68, 0.1); color: #991b1b; border-color: rgba(239, 68, 68, 0.3);" title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">⚠ melebihi standar</span>
+                                                @elseif($ub['status'] === 'under')
+                                                    <span class="badge-status" style="background: rgba(34, 197, 94, 0.1); color: #166534; border-color: rgba(34, 197, 94, 0.3);" title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">lebih hemat</span>
+                                                @elseif($ub['status'] === 'ok')
+                                                    <span class="badge-status" style="background: rgba(148, 163, 184, 0.1); color: #475569; border-color: rgba(148, 163, 184, 0.3);">sesuai standar</span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-center mobile-hide">
+                                        @if($b->active)
+                                            <span class="badge-status st-active">Active</span>
+                                        @else
+                                            <span class="badge-status st-inactive">Off</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end bom-row-action">
+                                        <div class="d-inline-flex gap-1 align-items-center">
+                                            <a href="{{ route('master.item_boms.edit', $b) }}" class="btn btn-sm btn-bom-outline btn-pill px-3 fw-bold" style="font-size: 0.78rem;">
+                                                Edit
+                                            </a>
+                                            <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" class="js-delete-bom-form">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm px-2 py-1 shadow-none border-0 text-danger" style="background: transparent;">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-              </td>
-            </tr>
-          @empty
-            <tr><td colspan="6" class="text-muted">Belum ada BOM.</td></tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
 
-    <div class="mt-3">
-      {{ $boms->links() }}
-    </div>
-  </div>
+                <div class="divider"></div>
 
+                <div class="p-3 d-flex justify-content-between align-items-center flex-wrap">
+                    <div class="muted">
+                        Menampilkan {{ $boms->firstItem() }}–{{ $boms->lastItem() }} dari {{ number_format($boms->total(), 0, ',', '.') }} BOM
+                    </div>
+                    <div>
+                        {{ $boms->links() }}
+                    </div>
+                </div>
+            @endif
+        </div>
+    </div>
 </div>
 @endsection
 
-
 @push('scripts')
-{{-- GF_BOM_AUTO_FOCUS_SEARCH --}}
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.querySelector('input[name="q"]');
-
     if (!searchInput) return;
 
-    // Fokus otomatis saat masuk halaman
     setTimeout(function () {
         searchInput.focus();
-
-        // Cursor langsung di akhir teks kalau ada query sebelumnya
         const value = searchInput.value || '';
-        searchInput.setSelectionRange(value.length, value.length);
+        try { searchInput.setSelectionRange(value.length, value.length); } catch (e) {}
     }, 120);
 });
 </script>

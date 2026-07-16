@@ -1,226 +1,131 @@
-
+@push('head')
 <style>
-    .page-wrap {
-        max-width: 1120px;
-        margin: 0 auto;
-        padding: 18px 14px 28px;
+    :root{
+        --item-accent:#334155;
+        --item-accent-2:#1f2937;
+        --item-border:rgba(148,163,184,.18);
+        --item-muted:#64748b;
+    }
+    .page-wrap{ max-width:1120px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+
+    .card-main{
+        background: var(--card, #fff);
+        border-radius: 8px;
+        border: 1px solid var(--item-border);
+        box-shadow: none;
+        overflow:hidden;
+    }
+    body[data-theme="dark"] .card-main{
+        border-color: rgba(51,65,85,.85);
+        box-shadow: none;
     }
 
-    .gf-form-shell {
-        border: 1px solid #e2e8f0;
-        border-radius: 24px;
-        background: #fff;
-        box-shadow: 0 18px 45px rgba(15, 23, 42, .07);
-        overflow: hidden;
+    .item-topbar{
+        position:sticky;
+        top:0;
+        z-index:300;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:.6rem;
+        flex-wrap:wrap;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:1rem;
+        background:var(--card,#fff);
+        border-bottom:1px solid var(--item-border);
     }
+    body[data-theme="dark"] .item-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--item-muted); font-size:.78rem; }
+    body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .gf-form-head {
-        padding: 18px 18px 14px;
-        background:
-            radial-gradient(circle at top left, rgba(37, 99, 235, .13), transparent 35%),
-            linear-gradient(135deg, #ffffff, #f8fafc 55%, #eef2ff);
-        border-bottom: 1px solid #e2e8f0;
-    }
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+    .btn-item-primary{ background:var(--item-accent)!important; border-color:var(--item-accent)!important; color:#fff!important; }
+    .btn-item-primary:hover{ background:var(--item-accent-2)!important; border-color:var(--item-accent-2)!important; color:#fff!important; }
+    .btn-item-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-item-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+    body[data-theme="dark"] .btn-item-outline { color: #cbd5e1!important; }
+    body[data-theme="dark"] .btn-item-outline:hover { color: #f8fafc!important; background: rgba(148,163,184,.15)!important; }
 
-    .gf-form-title {
-        font-size: 1.05rem;
-        font-weight: 850;
-        color: #0f172a;
-        letter-spacing: -.03em;
-        margin: 0;
-    }
+    .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
 
-    .gf-form-subtitle {
-        color: #64748b;
-        font-size: .82rem;
-        margin-top: 3px;
-    }
-
-    .gf-section-title {
-        font-size: .78rem;
-        font-weight: 850;
-        color: #334155;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        margin-bottom: 12px;
-    }
-
-    .gf-form-body {
-        padding: 18px;
-    }
-
-    .gf-form-shell .card,
-    .gf-inner-card {
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 20px !important;
-        box-shadow: 0 10px 25px rgba(15, 23, 42, .04) !important;
-        overflow: hidden;
-    }
-
-    .gf-form-shell .card-header {
-        background: #f8fafc !important;
-        border-bottom: 1px solid #e2e8f0 !important;
-        font-weight: 850 !important;
-        color: #0f172a;
-    }
-
-    .gf-form-shell .form-label {
-        font-size: .75rem;
-        font-weight: 800 !important;
-        color: #334155;
-    }
-
-    .gf-form-shell .form-control,
-    .gf-form-shell .form-select {
-        border-radius: 13px !important;
-        border-color: #e2e8f0 !important;
-        font-size: .84rem;
-    }
-
-    .gf-form-shell .form-control:focus,
-    .gf-form-shell .form-select:focus {
-        border-color: rgba(37, 99, 235, .55) !important;
-        box-shadow: 0 0 0 .22rem rgba(37, 99, 235, .10) !important;
-    }
-
-    .gf-form-shell .form-text {
-        color: #94a3b8;
-        font-size: .74rem;
-    }
-
-    .gf-form-actions {
-        position: sticky;
-        bottom: 0;
-        padding: 14px 18px;
-        background: rgba(255, 255, 255, .92);
-        backdrop-filter: blur(10px);
-        border-top: 1px solid #e2e8f0;
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        z-index: 5;
-    }
-
-    .gf-form-shell .btn {
-        border-radius: 13px !important;
-        font-weight: 800;
-    }
-
-    .gf-form-shell .btn-primary {
-        background: linear-gradient(135deg, #2563eb, #4f46e5) !important;
-        border-color: transparent !important;
-        box-shadow: 0 10px 20px rgba(37, 99, 235, .18);
-    }
-
-    @media (max-width: 768px) {
-        .page-wrap {
-            padding: 12px 10px 24px;
-        }
-
-        .gf-form-actions {
-            flex-direction: column-reverse;
-        }
-
-        .gf-form-actions .btn {
-            width: 100%;
-        }
-    }
+    .form-label { font-size: .78rem; font-weight: 600; color: #334155; }
+    body[data-theme="dark"] .form-label { color: #cbd5e1; }
+    .form-control-sm, .form-select-sm { border-radius: 6px; font-size: .82rem; border-color: #cbd5e1; }
+    .form-control-sm:focus, .form-select-sm:focus { border-color: #94a3b8; box-shadow: 0 0 0 .2rem rgba(148,163,184,.15); }
+    body[data-theme="dark"] .form-control-sm, body[data-theme="dark"] .form-select-sm { background: rgba(15,23,42,.6); border-color: #475569; color: #f1f5f9; }
 </style>
+@endpush
 
 @php
     /** @var \App\Models\Item|null $item */
     $isEdit = isset($item) && $item?->id;
 @endphp
 
-<div class="gf-form-shell mb-4">
-    <div class="gf-form-head">
-        <h5 class="gf-form-title">{{ isset($item) && $item->exists ? 'Edit Item' : 'Tambah Item' }}</h5>
-        <div class="gf-form-subtitle">Lengkapi data SKU, kategori, satuan, status, dan barcode item.</div>
-    </div>
-    <div class="gf-form-body">
-        <div class="card shadow-sm mb-4 gf-inner-card"
-    style="border-radius: 14px; background: var(--card); border: 1px solid rgba(148,163,184,.28);">
-    <div class="card-header fw-semibold py-2" style="font-size:.9rem; letter-spacing:-.01em;">
-        {{ $isEdit ? 'Edit Item' : 'Tambah Item Baru' }}
-    </div>
-
-    <div class="card-body pb-3">
-        <div class="row g-3">
-
+<div class="card card-main mb-4">
+    <div class="card-body">
+        <h6 class="mb-3 fw-bold">Informasi Dasar</h6>
+        <div class="row g-3 mb-4">
             {{-- CODE --}}
             <div class="col-md-3">
-                <label class="form-label fw-semibold small mb-1">Kode Item</label>
+                <label class="form-label mb-1">Kode Item</label>
                 <input type="text" name="code"
                     class="form-control form-control-sm @error('code') is-invalid @enderror"
                     value="{{ old('code', $item->code ?? '') }}" autocomplete="off" required>
                 @error('code')
-                    <div class="invalid-feedback">
-                        {{ $message }}
-                    </div>
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+
+            {{-- SKU --}}
+            <div class="col-md-3">
+                <label class="form-label mb-1">SKU (opsional)</label>
+                <input type="text" name="sku"
+                    class="form-control form-control-sm @error('sku') is-invalid @enderror"
+                    value="{{ old('sku', $item->sku ?? '') }}" autocomplete="off" placeholder="Sama dengan Kode jika kosong">
+                @error('sku')
+                    <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
 
             {{-- NAME --}}
-            <div class="col-md-5">
-                <label class="form-label fw-semibold small mb-1">Nama Item</label>
+            <div class="col-md-4">
+                <label class="form-label mb-1">Nama Item</label>
                 <input type="text" name="name"
                     class="form-control form-control-sm @error('name') is-invalid @enderror"
+                    placeholder="Contoh: Kemeja Flannel Pria"
                     value="{{ old('name', $item->name ?? '') }}" required>
                 @error('name')
-                    <div class="invalid-feedback">
-                        {{ $message }}
-                    </div>
+                    <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
 
             {{-- UNIT --}}
             <div class="col-md-2">
-                <label class="form-label fw-semibold small mb-1">Satuan</label>
+                <label class="form-label mb-1">Satuan</label>
                 <input type="text" name="unit"
                     class="form-control form-control-sm @error('unit') is-invalid @enderror"
                     value="{{ old('unit', $item->unit ?? 'pcs') }}" required>
                 @error('unit')
-                    <div class="invalid-feedback">
-                        {{ $message }}
-                    </div>
+                    <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+        </div>
 
-            {{-- ACTIVE FLAG --}}
-            <div class="col-md-2">
-                <label class="form-label fw-semibold small mb-1 d-block">Aktif?</label>
-                <input type="hidden" name="active" value="0">
-                <div class="form-check form-switch">
-                    <input type="checkbox" class="form-check-input" name="active" value="1"
-                        @checked(old('active', $item->active ?? 1) == 1)>
-                    <label class="form-check-label small text-muted">
-                        Centang jika item aktif
-                    </label>
-                </div>
-            </div>
+        <hr class="mb-4" style="border-color: var(--item-border);">
 
-            {{-- SKU (opsional, kompatibel dengan index yang tampilkan SKU) --}}
-            <div class="col-md-3">
-                <label class="form-label fw-semibold small mb-1">SKU (opsional)</label>
-                <input type="text" name="sku"
-                    class="form-control form-control-sm @error('sku') is-invalid @enderror"
-                    value="{{ old('sku', $item->sku ?? '') }}" autocomplete="off">
-                @error('sku')
-                    <div class="invalid-feedback">
-                        {{ $message }}
-                    </div>
-                @enderror
-            </div>
-
+        <h6 class="mb-3 fw-bold">Klasifikasi & Akuntansi</h6>
+        <div class="row g-3">
             {{-- TYPE --}}
-            <div class="col-md-4">
-                <label class="form-label fw-semibold small mb-1">Tipe Item</label>
+            <div class="col-md-3">
+                <label class="form-label mb-1">Tipe Item</label>
                 <select name="type" data-item-type class="form-select form-select-sm @error('type') is-invalid @enderror" required>
                     @php
                         $types = [
-                            'material' => 'Material',
-                            'wip' => 'WIP',
-                            'finished_good' => 'Finished Good',
+                            'material' => 'Bahan Baku / Material',
+                            'wip' => 'Setengah Jadi (WIP)',
+                            'finished_good' => 'Barang Jadi (Produk)',
                         ];
                     @endphp
                     @foreach ($types as $key => $label)
@@ -230,15 +135,13 @@
                     @endforeach
                 </select>
                 @error('type')
-                    <div class="invalid-feedback d-block">
-                        {{ $message }}
-                    </div>
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
 
             {{-- CATEGORY --}}
             <div class="col-md-3">
-                <label class="form-label fw-semibold small mb-1">Kategori</label>
+                <label class="form-label mb-1">Kategori</label>
                 <select name="item_category_id"
                     data-item-category class="form-select form-select-sm @error('item_category_id') is-invalid @enderror">
                     <option value="">- Tidak Ada -</option>
@@ -248,19 +151,14 @@
                         </option>
                     @endforeach
                 </select>
-                <div class="form-text small" data-item-category-help>
-                    Pilih tipe item dulu agar pilihan kategori lebih relevan.
-                </div>
                 @error('item_category_id')
-                    <div class="invalid-feedback d-block">
-                        {{ $message }}
-                    </div>
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
 
             {{-- PRODUCTION SOURCE --}}
-            <div class="col-md-2" data-production-source-wrap>
-                <label class="form-label fw-semibold small mb-1">Sumber Produksi</label>
+            <div class="col-md-3" data-production-source-wrap>
+                <label class="form-label mb-1">Sumber Produksi</label>
                 <select name="production_source" data-production-source
                     class="form-select form-select-sm @error('production_source') is-invalid @enderror">
                     @foreach (\App\Models\Item::productionSourceLabels() as $key => $label)
@@ -269,14 +167,97 @@
                         </option>
                     @endforeach
                 </select>
-                <div class="form-text small">Untuk FG/WIP.</div>
                 @error('production_source')
-                    <div class="invalid-feedback d-block">
-                        {{ $message }}
-                    </div>
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
 
+            {{-- DEFAULT ALLOCATION --}}
+            <div class="col-md-3">
+                <label class="form-label mb-1">Sifat Pembelian</label>
+                <select name="default_allocation" id="default_allocation" class="form-select form-select-sm @error('default_allocation') is-invalid @enderror">
+                    <option value="hpp" @selected(old('default_allocation', $item->default_allocation ?? 'hpp') === 'hpp')>Masuk Stok (Aset)</option>
+                    <option value="expense" @selected(old('default_allocation', $item->default_allocation ?? '') === 'expense')>Langsung Biaya (Expense)</option>
+                </select>
+                @error('default_allocation')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+
+            {{-- DEFAULT EXPENSE ACCOUNT --}}
+            <div class="col-md-4" id="expense_account_wrap" style="display: none;">
+                <label class="form-label mb-1">Akun Biaya Pembelian</label>
+                <select name="default_expense_account_id" id="default_expense_account_id" class="form-select form-select-sm @error('default_expense_account_id') is-invalid @enderror">
+                    <option value="">- Pilih Akun -</option>
+                    @foreach ($expenseAccounts ?? [] as $acc)
+                        <option value="{{ $acc->id }}" @selected(old('default_expense_account_id', $item->default_expense_account_id ?? '') == $acc->id)>
+                            {{ $acc->code }} — {{ $acc->name }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('default_expense_account_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+            </div>
+
+            {{-- ACTIVE FLAG --}}
+            <div class="col-md-2" id="active_wrap">
+                <label class="form-label mb-1 d-block">Status Item</label>
+                <input type="hidden" name="active" value="0">
+                <div class="form-check form-switch mt-2">
+                    <input type="checkbox" class="form-check-input" name="active" value="1" id="activeCheck"
+                        @checked(old('active', $item->active ?? 1) == 1)>
+                    <label class="form-check-label small text-muted" for="activeCheck">Aktif / Bisa dipakai</label>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="card card-main mb-4">
+    <div class="card-body">
+        <h6 class="mb-3 fw-bold">Harga & Biaya Dasar</h6>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label mb-1">Harga Beli Terakhir (Rp)</label>
+                <input type="number" step="0.01" name="last_purchase_price"
+                    class="form-control form-control-sm @error('last_purchase_price') is-invalid @enderror"
+                    value="{{ old('last_purchase_price', $item->last_purchase_price ?? '') }}" placeholder="0">
+                <div class="form-text small" style="font-size: .7rem;">Bisa otomatis terupdate saat ada PO.</div>
+                @error('last_purchase_price')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label mb-1">HPP Sementara (Rp / unit)</label>
+                <input type="number" step="0.01" name="unit_cost"
+                    class="form-control form-control-sm @error('unit_cost') is-invalid @enderror"
+                    value="{{ old('unit_cost', $activeSnapshot->unit_cost ?? '') }}" placeholder="0">
+                @error('unit_cost')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label mb-1">Catatan HPP (opsional)</label>
+                <input type="text" name="hpp_notes"
+                    class="form-control form-control-sm @error('hpp_notes') is-invalid @enderror"
+                    value="{{ old('hpp_notes', $activeSnapshot->notes ?? '') }}" placeholder="Contoh: HPP awal dari faktur bulan lalu">
+                @error('hpp_notes')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            
+            @if(isset($activeSnapshot))
+                <div class="col-12 mt-1">
+                    <div class="small text-muted" style="font-size: .75rem;">
+                        HPP aktif saat ini: <strong>Rp {{ number_format($activeSnapshot->unit_cost, 0, ',', '.') }}</strong>
+                        <span class="opacity-75">(Diperbarui: {{ $activeSnapshot->snapshot_date?->format('d/m/Y') ?? '-' }})</span>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </div>
@@ -284,12 +265,12 @@
 {{-- === Include BARCODE FORM === --}}
 @include('master.items._barcodes_form')
 
-<div class="gf-form-actions">
-    <a href="{{ route('master.items.index') }}" class="btn btn-outline-secondary btn-sm px-3">
+<div class="d-flex justify-content-end gap-2 mt-4">
+    <a href="{{ route('master.items.index') }}" class="btn btn-sm btn-item-outline btn-pill px-4" style="padding-top: .45rem; padding-bottom: .45rem;">
         Batal
     </a>
-    <button class="btn btn-primary btn-sm px-4 py-2" style="border-radius: 10px;">
-        Simpan
+    <button class="btn btn-sm btn-item-primary btn-pill px-4" style="padding-top: .45rem; padding-bottom: .45rem;">
+        Simpan Item
     </button>
 </div>
 
@@ -326,7 +307,6 @@
                     const keepSelected = selected && option.value === selected.value;
                     option.hidden = !allowed.includes(option.dataset.kind || 'other') && !keepSelected;
                 });
-                if (help) help.textContent = labels[typeSelect.value] || 'Pilih kategori yang sesuai dengan tipe item.';
 
                 const usesProductionSource = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
                 if (productionSourceWrap) productionSourceWrap.hidden = !usesProductionSource;
@@ -335,10 +315,16 @@
 
             typeSelect.addEventListener('change', refreshCategoryOptions);
             refreshCategoryOptions();
+
+            const allocationSelect = document.getElementById('default_allocation');
+            const expenseWrap = document.getElementById('expense_account_wrap');
+            if (allocationSelect && expenseWrap) {
+                function toggleExpense() {
+                    expenseWrap.style.display = allocationSelect.value === 'expense' ? 'block' : 'none';
+                }
+                allocationSelect.addEventListener('change', toggleExpense);
+                toggleExpense();
+            }
         })();
     </script>
 @endpush
-
-</div>
-</div>
-</div>
