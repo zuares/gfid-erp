@@ -96,13 +96,19 @@ class WebhookController extends Controller
                 }
             }
 
-            // Just for debugging, try to figure out what type of push it is
-            if (isset($payload['data']['ordersn'])) {
-                $eventType = 'order_status_update';
-            } elseif (isset($payload['data']['tracking_no'])) {
-                $eventType = 'tracking_no_update';
-            } elseif (isset($payload['data']['content']['message_id']) || (($payload['data']['type'] ?? '') === 'message')) {
-                // Deteksi webchat push dari bentuk payload (lebih andal daripada kode)
+            // Payload-based detection sebagai FALLBACK — HANYA jika code-based switch tidak mengenal kodenya.
+            // Jika eventType sudah ditentukan oleh switch (bukan 'unknown' dan bukan 'code_*'), jangan override.
+            $codeResolved = isset($payload['code']) && !str_starts_with($eventType, 'code_') && $eventType !== 'unknown';
+            if (!$codeResolved) {
+                if (isset($payload['data']['ordersn']) && !isset($payload['data']['booking_sn'])) {
+                    // Hanya route ke order_status_update jika bukan booking dan bukan package_fulfillment
+                    $eventType = 'order_status_update';
+                } elseif (isset($payload['data']['tracking_no'])) {
+                    $eventType = 'tracking_no_update';
+                }
+            }
+            if (isset($payload['data']['content']['message_id']) || (($payload['data']['type'] ?? '') === 'message')) {
+                // Deteksi webchat push dari bentuk payload (lebih andal daripada kode) — selalu override
                 $eventType = 'webchat_push';
             }
 

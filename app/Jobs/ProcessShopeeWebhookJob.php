@@ -167,7 +167,9 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                 }
 
                 // Prevent reverting a locally 'PROCESSED' (sedang dikemas) order back to 'READY_TO_SHIP'
-                if ($localOrder->order_status === 'PROCESSED' && $status === 'READY_TO_SHIP') {
+                // tapi JANGAN blok status yang maju ke depan (SHIPPED, TO_CONFIRM_RECEIVE, COMPLETED).
+                $isRollback = $localOrder->order_status === 'PROCESSED' && $status === 'READY_TO_SHIP';
+                if ($isRollback) {
                     Log::info("Order {$orderSn} is already PROCESSED locally. Ignoring READY_TO_SHIP webhook.");
                     // Still update meta just in case
                     $localOrder->update(['meta' => $meta]);
@@ -219,8 +221,8 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ->first();
 
         if ($localOrder) {
-            $localOrder->update(['booking_sn' => $trackingNo]);
-            Log::info("Updated local order {$orderSn} with tracking_no: {$trackingNo}");
+            $localOrder->update(['shipping_awb_no' => $trackingNo]);
+            Log::info("Updated local order {$orderSn} with tracking_no (shipping_awb_no): {$trackingNo}");
             event(new \App\Events\OrderUpdated($store->id, $orderSn, $localOrder->order_status));
         } else {
             Log::info("Order {$orderSn} not found locally during tracking_no_update. Syncing via API.");
@@ -350,11 +352,18 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             
             $updates = ['meta' => $meta];
             
-            // Mapping optimis status booking ke order_status agar UI langsung memindahkannya ke Sedang Dikemas
-            if (strtoupper($bookingStatus) === 'PROCESSED') {
+            // Mapping optimis status booking ke order_status agar UI langsung memindahkannya
+            $bookingStatusUpper = strtoupper((string) $bookingStatus);
+            if ($bookingStatusUpper === 'PROCESSED') {
                 $updates['order_status'] = 'PROCESSED';
                 $updates['logistics_status'] = 'LOGISTICS_READY_TO_SHIP';
-            } elseif (strtoupper($bookingStatus) === 'CANCELLED_BEFORE_SHIPPING') {
+            } elseif (in_array($bookingStatusUpper, ['SHIPPED', 'READY_TO_HANDOVER'])) {
+                // Kurir sudah mengambil / sedang dalam perjalanan → pindah ke tab Sedang Dikirim
+                $updates['order_status'] = 'SHIPPED';
+                $updates['logistics_status'] = 'LOGISTICS_PICKUP_DONE';
+            } elseif ($bookingStatusUpper === 'COMPLETED') {
+                $updates['order_status'] = 'COMPLETED';
+            } elseif ($bookingStatusUpper === 'CANCELLED_BEFORE_SHIPPING') {
                 $updates['order_status'] = 'CANCELLED';
             }
             
@@ -484,7 +493,10 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ['shipping_document_status' => $status]
         );
 
-        $localOrder = MarketplaceOrder::where('channel_order_id', $bookingSn)
+        $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
+                $q->where('channel_order_id', $bookingSn)
+                  ->orWhere('booking_sn', $bookingSn);
+            })
             ->where('store_id', $store->id)
             ->first();
 
@@ -531,10 +543,33 @@ class ProcessShopeeWebhookJob implements ShouldQueue
         if ($localOrder) {
             $meta = $localOrder->meta ?? [];
             $meta['package_fulfillment_status'] = $fulfillmentStatus;
-            $localOrder->update(['meta' => $meta]);
-            Log::info("Updated local order {$orderSn} package_fulfillment_status to: {$fulfillmentStatus}");
             
-            event(new \App\Events\OrderUpdated($store->id, $orderSn, $localOrder->order_status));
+            $updates = ['meta' => $meta];
+            
+            // Map fulfillment status → order_status agar tab UI otomatis berubah
+            // Ref: Shopee V2 PackageFulfillmentStatus data definition
+            $fulfillmentUpper = strtoupper((string) $fulfillmentStatus);
+            if (in_array($fulfillmentUpper, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_PICKUP_RETRY'])) {
+                // Kurir sudah mengambil paket → Sedang Dikirim
+                $updates['order_status'] = 'SHIPPED';
+                $updates['logistics_status'] = $fulfillmentStatus;
+            } elseif ($fulfillmentUpper === 'LOGISTICS_DELIVERY_DONE') {
+                // Paket sudah diterima pembeli → Menunggu Konfirmasi
+                $updates['order_status'] = 'TO_CONFIRM_RECEIVE';
+                $updates['logistics_status'] = $fulfillmentStatus;
+            } elseif ($fulfillmentUpper === 'LOGISTICS_INVALID_OR_LOST') {
+                // Paket hilang / tidak valid — simpan di meta saja, jangan ubah status
+                Log::warning("Package {$orderSn} marked as LOGISTICS_INVALID_OR_LOST.");
+            } elseif (in_array($fulfillmentUpper, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP'])) {
+                // Pengiriman diatur, belum diambil kurir → tetap PROCESSED
+                $updates['logistics_status'] = $fulfillmentStatus;
+            }
+            
+            $localOrder->update($updates);
+            Log::info("Updated local order {$orderSn} package_fulfillment_status to: {$fulfillmentStatus}" .
+                (isset($updates['order_status']) ? " (order_status → {$updates['order_status']})" : ''));
+            
+            event(new \App\Events\OrderUpdated($store->id, $orderSn, $localOrder->fresh()->order_status));
         } else {
             Log::info("Order {$orderSn} not found locally during package_fulfillment_status_update. Syncing via API.");
             try {
