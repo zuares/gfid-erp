@@ -796,6 +796,11 @@ body[data-theme="dark"] .ord-table tbody tr td {
                 <button class="ord-subtab" data-sub="kilat" onclick="switchSubTabReady('kilat', this)">⚡ Pengiriman Kilat <span class="ord-badge bg-secondary" id="badge-sub-ready-kilat">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
             </div>
+            <div id="subTabShippedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
+                <button class="ord-subtab" data-sub="all" onclick="switchSubTabShipped('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-shipped-all">—</span></button>
+                <button class="ord-subtab active" data-sub="shipped" onclick="switchSubTabShipped('shipped', this)">Dikirim <span class="ord-badge bg-secondary" id="badge-sub-shipped-shipped">—</span></button>
+                <button class="ord-subtab" data-sub="confirm" onclick="switchSubTabShipped('confirm', this)">Menunggu Konfirmasi <span class="ord-badge bg-secondary" id="badge-sub-shipped-confirm">—</span></button>
+            </div>
             <div id="subTabRrcContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab active" data-sub="return" onclick="switchSubTabRrc('return', this)">↩️ Retur <span class="ord-badge bg-secondary" id="badge-sub-rrc-return">—</span></button>
                 <button class="ord-subtab" data-sub="refund" onclick="switchSubTabRrc('refund', this)">💸 Refund <span class="ord-badge bg-secondary" id="badge-sub-rrc-refund">—</span></button>
@@ -1075,6 +1080,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     let activeTab        = initialTab;
     let subTabProcessed  = 'packing';
     let subTabReady      = 'process';
+    let subTabShipped    = 'shipped';
     // store_id passed via URL is an ID, but activeStore in JS requires the store name.
     // We will resolve it later during data load if it's an ID, or just set it if it matches.
     let activeStore      = urlParams.get('store_id') || '';
@@ -1223,6 +1229,16 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         btn.querySelector('.ord-badge')?.classList.add('urgent');
     };
 
+    window.switchSubTabShipped = function (tab, btn) {
+        subTabShipped = tab;
+        sessionStorage.setItem('ord_sub_tab_shipped', tab);
+        document.querySelectorAll('#subTabShippedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderTable();
+        document.querySelectorAll('#subTabShippedContainer .ord-badge').forEach(b => b.classList.remove('urgent'));
+        btn.querySelector('.ord-badge')?.classList.add('urgent');
+    };
+
     window.switchTab = function (tab, btn) {
         activeTab = tab;
         sessionStorage.setItem('ord_active_tab', tab);
@@ -1238,6 +1254,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         const subTabReadyContainer = document.getElementById('subTabReadyContainer');
         if (subTabReadyContainer) {
             subTabReadyContainer.style.display = (tab === 'ready') ? 'flex' : 'none';
+        }
+
+        const subTabShippedContainer = document.getElementById('subTabShippedContainer');
+        if (subTabShippedContainer) {
+            subTabShippedContainer.style.display = (tab === 'shipped') ? 'flex' : 'none';
         }
 
         const subTabRrcContainer = document.getElementById('subTabRrcContainer');
@@ -1441,6 +1462,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (subTabReadyContainer) {
                 subTabReadyContainer.style.display = (saved === 'ready') ? 'flex' : 'none';
             }
+            const subTabShippedContainer = document.getElementById('subTabShippedContainer');
+            if (subTabShippedContainer) {
+                subTabShippedContainer.style.display = (saved === 'shipped') ? 'flex' : 'none';
+            }
             const subTabRrcContainer = document.getElementById('subTabRrcContainer');
             if (subTabRrcContainer) {
                 subTabRrcContainer.style.display = (saved === 'rrc') ? 'flex' : 'none';
@@ -1461,6 +1486,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (subPBtn) {
             document.querySelectorAll('#subTabProcessedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
             subPBtn.classList.add('active');
+        }
+        
+        subTabShipped = sessionStorage.getItem('ord_sub_tab_shipped') || 'shipped';
+        const subSBtn = document.querySelector(`#subTabShippedContainer .ord-subtab[data-sub="${subTabShipped}"]`);
+        if (subSBtn) {
+            document.querySelectorAll('#subTabShippedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+            subSBtn.classList.add('active');
         }
     }
 
@@ -1596,7 +1628,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     function updateToolbar() {
         const toolbar = $('processToolbar');
-        if (!['ready', 'processed', 'issues'].includes(activeTab)) { toolbar.classList.remove('visible'); return; }
+        if (!['ready', 'processed', 'issues', 'shipped', 'rrc'].includes(activeTab)) { toolbar.classList.remove('visible'); return; }
 
         const isIssues = activeTab === 'issues';
         $('toolbarActionsReady').style.display = (activeTab === 'ready') ? '' : 'none';
@@ -1612,9 +1644,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             const rows = getPackingRows();
             toolbar.classList.toggle('visible', true);
             $('toolbarInfo').style.display = 'none';
-        } else {
+        } else if (activeTab === 'ready') {
             const rows = getProcessRows();
             toolbar.classList.toggle('visible', rows.length > 0);
+            $('toolbarInfo').style.display = 'none';
+        } else {
+            toolbar.classList.toggle('visible', true);
             $('toolbarInfo').style.display = 'none';
         }
     }
@@ -2006,6 +2041,20 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (badgeSubReadyProcess) badgeSubReadyProcess.textContent = processCount;
         const badgeSubReadyKilat = $('badge-sub-ready-kilat');
         if (badgeSubReadyKilat) badgeSubReadyKilat.textContent = kilatCount;
+        
+        const shippedRows = filterByTab(rows, 'shipped');
+        let shippedOnlyCount = 0;
+        let confirmCount = 0;
+        shippedRows.forEach(o => {
+            if (o.order_status === 'SHIPPED') shippedOnlyCount++;
+            else confirmCount++;
+        });
+        const badgeSubShippedAll = $('badge-sub-shipped-all');
+        if (badgeSubShippedAll) badgeSubShippedAll.textContent = shippedRows.length;
+        const badgeSubShippedShipped = $('badge-sub-shipped-shipped');
+        if (badgeSubShippedShipped) badgeSubShippedShipped.textContent = shippedOnlyCount;
+        const badgeSubShippedConfirm = $('badge-sub-shipped-confirm');
+        if (badgeSubShippedConfirm) badgeSubShippedConfirm.textContent = confirmCount;
 
     }
 
@@ -2730,6 +2779,14 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 return true;
             });
         }
+        
+        if (activeTab === 'shipped' && subTabShipped !== 'all') {
+            rows = rows.filter(o => {
+                if (subTabShipped === 'shipped') return o.order_status === 'SHIPPED';
+                if (subTabShipped === 'confirm') return o.order_status === 'TO_CONFIRM_RECEIVE';
+                return true;
+            });
+        }
 
         if (!rows.length) {
             const { icon, text } = TAB_EMPTY[activeTab] || TAB_EMPTY.all;
@@ -2917,7 +2974,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
+                    logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>`;
                 }
             }
 
