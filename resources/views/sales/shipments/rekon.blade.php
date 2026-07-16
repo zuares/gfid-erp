@@ -1918,6 +1918,11 @@ function renderCard(o, idx) {
             <button class="rk-act-btn fulfill ${decision==='fulfill'?'on':''}" data-idx="${idx}" data-action="fulfill">Siap Kirim</button>
             <button class="rk-act-btn pending ${decision==='pending'?'on':''}" data-idx="${idx}" data-action="pending">Tunda</button>
             <button class="rk-act-btn skip    ${decision==='skip'   ?'on':''}" data-idx="${idx}" data-action="skip">Abaikan</button>
+            ${IS_OWNER ? `
+            <div style="flex:1"></div>
+            <button class="rk-act-btn" style="color:#64748b" onclick="editManualOrder(${idx}, '${no}')">Edit</button>
+            <button class="rk-act-btn btn-del" onclick="deleteManualOrder(${idx}, '${no}')">Hapus</button>
+            ` : ''}
           </div>
         </div>
       </div>
