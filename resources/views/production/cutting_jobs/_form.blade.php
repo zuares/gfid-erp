@@ -2035,7 +2035,7 @@
                     if (idx === allRows.length - 1) {
                         createBundleRow(true);
                     } else {
-                        allRows[idx + 1]?.querySelector('td:nth-child(3) input[type="text"]')?.focus();
+                        allRows[idx + 1]?.querySelector('.bundle-qty-pcs')?.focus();
                     }
                 }
 
@@ -2212,7 +2212,7 @@
 
                 if (autoFocusItem) {
                     setTimeout(() => {
-                        const inp = tr.querySelector('td:nth-child(3) input[type="text"]');
+                        const inp = tr.querySelector('.bundle-qty-pcs');
                         if (inp) {
                             scrollRowIntoCenter(tr);
                             inp.focus();
