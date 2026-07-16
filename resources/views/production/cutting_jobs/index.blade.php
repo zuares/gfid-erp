@@ -307,23 +307,58 @@
                     <div class="mt-1">Klik <b>Cutting Job Baru</b> untuk mulai.</div>
                 </div>
             @else
-                <div class="table-responsive table-scroll">
-                    <table class="table table-hover align-middle table-list">
-                        <thead>
-                            <tr>
-                                <th style="width:46px;">#</th>
-                                <th style="width:120px;">Tanggal</th>
-                                <th style="width:200px;">Cutting</th>
-                                <th>Item Kain</th>
-                                <th style="width:150px;">Operator</th>
-                                <th class="text-end" style="width:80px;">Iket</th>
-                                <th class="text-end" style="width:100px;">Qty (pcs)</th>
-                                <th style="width:130px;">Status</th>
-                                <th style="width:110px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($jobs as $job)
+                @php
+                    $groupedJobs = $jobs->groupBy(function($job) {
+                        return $job->date ? $job->date->format('Y-m-d') : '9999-12-31';
+                    })->sortKeysDesc();
+                    $accIndex = 0;
+                @endphp
+                <div class="accordion" id="accordionCuttingJobs">
+                    @foreach ($groupedJobs as $dateKey => $jobsInDate)
+                        @php
+                            $accIndex++;
+                            $dateLabel = $dateKey === '9999-12-31' ? 'Tanpa Tanggal' : \Carbon\Carbon::parse($dateKey)->translatedFormat('l, d M Y');
+                            $fabrics = $jobsInDate->map(fn($j) => $j->fabricItem?->code ?? $j->lot?->item?->code)->filter()->unique()->implode(', ');
+                            $totalIket = $jobsInDate->sum('bundles_count');
+                            $totalPcs = $jobsInDate->sum(fn($j) => $j->bundles_sum_qty_pcs ?? $j->bundles->sum('qty_pcs'));
+                        @endphp
+                        
+                        <div class="accordion-item" style="border: none; border-bottom: 1px solid rgba(148,163,184,.15); background: transparent;">
+                            <h2 class="accordion-header" id="heading-{{ $accIndex }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $accIndex }}" aria-expanded="false" aria-controls="collapse-{{ $accIndex }}" style="background: rgba(248, 250, 252, 0.8); padding: 0.75rem 1.25rem; font-weight: 700; color: var(--shp-text); box-shadow: none; border-radius: 8px 8px 0 0;">
+                                    <div style="display: flex; flex-direction: column;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calendar-event me-2 text-primary"></i> {{ $dateLabel }}
+                                            <span class="badge bg-secondary ms-2 rounded-pill" title="Total Pcs">{{ number_format((float)$totalPcs, 0, ',', '.') }} Pcs</span>
+                                            <span class="badge bg-info ms-1 rounded-pill" title="Total Iket" style="color: #fff; background-color: #0ea5e9 !important;">{{ number_format($totalIket, 0, ',', '.') }} Iket</span>
+                                        </div>
+                                        @if($fabrics)
+                                        <div style="font-size: 0.75rem; font-weight: normal; color: #64748b; margin-top: 0.25rem; margin-left: 1.5rem;">
+                                            <i class="bi bi-box-seam me-1"></i>{{ str($fabrics)->limit(60) }}
+                                        </div>
+                                        @endif
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse-{{ $accIndex }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ $accIndex }}" data-bs-parent="#accordionCuttingJobs">
+                                <div class="accordion-body p-0 pb-2">
+                                    <div class="table-responsive table-scroll" style="border: none;">
+                                        <table class="table table-hover align-middle table-list mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width:46px;">#</th>
+                                                    <th style="width:120px;" class="mobile-hide">Tanggal</th>
+                                                    <th style="width:200px;">Cutting</th>
+                                                    <th class="mobile-hide">Item Kain</th>
+                                                    <th style="width:150px;" class="mobile-hide">Operator</th>
+                                                    <th class="text-end mobile-hide" style="width:80px;">Iket</th>
+                                                    <th class="text-end mobile-hide" style="width:100px;">Qty (pcs)</th>
+                                                    <th style="width:130px;" class="mobile-hide">Status</th>
+                                                    <th style="width:110px;"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($jobsInDate as $job)
                                 @php
                                     $st  = $job->status ?? 'draft';
                                     $cfg = $statusMap[$st] ?? ['label' => ucfirst($st), 'class' => 'st-draft', 'hint' => ''];
@@ -448,9 +483,14 @@
                                         </a>
                                     </td>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
 
                 <div class="divider"></div>

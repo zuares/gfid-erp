@@ -8,21 +8,19 @@
     $isInventory = request()->routeIs('inventory.*');
     $isProfile = request()->routeIs('profile.*') || request()->routeIs('settings.*');
 
-    // Khusus operating: dashboard = Dashboard Produksi
-    if ($userRole === 'operating') {
-        $isDashboardTab =
-            request()->routeIs('production.dashboard') ||
-            request()->is('production/dashboard');
-    } else {
-        $isDashboardTab = $isDashboard;
-    }
-
     // Tab khusus
     $isCuttingTab = request()->routeIs('production.cutting_jobs.*');
     $isQcTab = request()->routeIs('production.qc.*');
     $isSewingTab =
         request()->routeIs('production.sewing.pickups.*') || request()->routeIs('production.sewing.returns.*');
-    $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
+    
+    if ($userRole === 'operating') {
+        $isDashboardTab = request()->routeIs('dashboard') || request()->is('dashboard');
+        $isFinishingTab = request()->routeIs('production.dashboard') || request()->routeIs('production.finishing_jobs.*');
+    } else {
+        $isDashboardTab = $isDashboard;
+        $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
+    }
 @endphp
 
 <style>
@@ -232,10 +230,7 @@
     @if ($userRole === 'operating')
         {{-- ====== VARIAN UNTUK ROLE OPERATING ====== --}}
         @php
-            // Dashboard = Dashboard Produksi (konsolidasi)
-            $dashboardHref = Route::has('production.dashboard')
-                ? route('production.dashboard')
-                : url('/production/dashboard');
+            $dashboardHref = Route::has('dashboard') ? route('dashboard') : url('/dashboard');
 
             // ✅ Cutting: ke INDEX, bukan CREATE
             $cuttingIndexHref = Route::has('production.cutting_jobs.index')
@@ -251,9 +246,9 @@
                 ? route('production.sewing.returns.create')
                 : '#';
 
-            $finishingCreateHref = Route::has('production.finishing_jobs.create')
-                ? route('production.finishing_jobs.create')
-                : '#';
+            $finishingCreateHref = Route::has('production.dashboard')
+                ? route('production.dashboard')
+                : url('/production/dashboard');
         @endphp
 
         {{-- CUTTING (Index) --}}
@@ -309,12 +304,12 @@
         <a href="{{ $finishingCreateHref }}" class="nav-item {{ $isFinishingTab ? 'active' : '' }}">
             <span class="icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 4.5a1.75 1.75 0 0 1 1.7 2.3L12 8.5l-1 1" />
-                    <path d="M4 19.5 5.5 11 12 8.5 18.5 11 20 19.5" />
-                    <path d="M4 19.5h16" />
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
                 </svg>
             </span>
-            <span class="label">Finishing</span>
+            <span class="label">Prioritas</span>
         </a>
     @else
         {{-- ====== VARIAN DEFAULT (owner/admin, dll) ====== --}}

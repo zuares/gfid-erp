@@ -13,13 +13,13 @@
     $isQcTab = request()->routeIs('production.qc.*');
     $isSewingTab =
         request()->routeIs('production.sewing.pickups.*') || request()->routeIs('production.sewing.returns.*');
-    $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
-
-    // Dashboard tab khusus operating → Dashboard Produksi
+    // Dashboard tab khusus operating → Dashboard Utama (Home), Finishing → Dashboard Produksi
     if ($userRole === 'operating') {
-        $isDashboardTab = request()->routeIs('production.dashboard');
+        $isFinishingTab = request()->routeIs('production.dashboard') || request()->routeIs('production.finishing_jobs.*');
+        $isDashboardTab = request()->routeIs('dashboard');
     } else {
-        $isDashboardTab = $isDashboard;
+        $isFinishingTab = request()->routeIs('production.finishing_jobs.*');
+        $isDashboardTab = request()->routeIs('dashboard');
     }
 @endphp
 
@@ -221,11 +221,7 @@
     @if ($userRole === 'operating')
         {{-- ====== VARIAN UNTUK ROLE OPERATING ====== --}}
         @php
-            $dashboardHref = Route::has('production.dashboard')
-                ? route('production.dashboard')
-                : (Route::has('dashboard')
-                    ? route('dashboard')
-                    : '#');
+            $dashboardHref = Route::has('dashboard') ? route('dashboard') : url('/dashboard');
 
             $cuttingCreateHref = Route::has('production.cutting_jobs.create')
                 ? route('production.cutting_jobs.create')
@@ -240,9 +236,9 @@
                 ? route('production.sewing.returns.create')
                 : '#';
 
-            $finishingCreateHref = Route::has('production.finishing_jobs.create')
-                ? route('production.finishing_jobs.create')
-                : '#';
+            $finishingCreateHref = Route::has('production.dashboard')
+                ? route('production.dashboard')
+                : url('/production/dashboard');
         @endphp
 
         {{-- CUTTING (Create) --}}
