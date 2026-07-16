@@ -920,47 +920,121 @@ body[data-theme="dark"] .ord-table tbody tr td {
         </div>
     </div>
 </div>
-<div class="modal fade" id="quickSyncModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:400px">
-        <div class="modal-content" style="border-radius:20px">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-black" style="font-size:1rem">🔄 Sync Terbaru</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body pt-2">
-                <p style="font-size:.8rem;color:#64748b;margin-bottom:1rem">
-                    Sync order dari semua toko yang terhubung.
-                </p>
-                <div class="mb-3">
-                    <label style="font-size:.68rem;font-weight:700;color:#94a3b8;display:block;margin-bottom:.3rem">RENTANG WAKTU</label>
-                    <select id="qsSyncRange" class="form-select form-select-sm" style="border-radius:10px;font-size:.8rem">
-                        <option value="1">1 hari terakhir</option>
-                        <option value="3" selected>3 hari terakhir</option>
-                        <option value="7">7 hari terakhir</option>
-                        <option value="14">14 hari terakhir</option>
-                    </select>
+{{-- Quick Sync Modal (Premium Redesign) --}}
+<div class="modal fade" id="quickSyncModal" tabindex="-1" aria-labelledby="quickSyncModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+        <div class="modal-content" style="border-radius:24px;border:none;box-shadow:0 25px 60px rgba(0,0,0,.18);overflow:hidden">
+
+            {{-- Header --}}
+            <div class="modal-header border-0" style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:1.25rem 1.5rem">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width:38px;height:38px;background:rgba(255,255,255,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem">🔄</div>
+                    <div>
+                        <h5 class="modal-title fw-black text-white mb-0" id="quickSyncModalLabel" style="font-size:.95rem;letter-spacing:-.01em">Sync Pesanan</h5>
+                        <p class="mb-0" style="font-size:.72rem;color:#94a3b8">Perbarui data dari semua toko terhubung</p>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <div class="form-check form-switch" title="Jalankan sync tanpa menyimpan ke database">
-                        <input class="form-check-input" type="checkbox" role="switch" id="qsSyncDryRun" style="cursor:pointer">
-                        <label class="form-check-label fw-bold" for="qsSyncDryRun" style="font-size:.75rem;color:#64748b;cursor:pointer">Mode Dry Run</label>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal" style="opacity:.6"></button>
+            </div>
+
+            {{-- Body --}}
+            <div class="modal-body" style="padding:1.25rem 1.5rem">
+
+                {{-- Config Panel --}}
+                <div id="qsConfigPanel">
+                    {{-- Rentang Waktu --}}
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.7rem;font-weight:700;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.4rem">Rentang Waktu</label>
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem">
+                            <button class="qs-range-btn" data-days="1" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">1 Hari</button>
+                            <button class="qs-range-btn active" data-days="3" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #0f172a;border-radius:10px;background:#0f172a;color:#fff;cursor:pointer;transition:all .2s">3 Hari</button>
+                            <button class="qs-range-btn" data-days="7" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">7 Hari</button>
+                            <button class="qs-range-btn" data-days="14" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">14 Hari</button>
+                        </div>
+                        <input type="hidden" id="qsSyncRangeDays" value="3">
+                    </div>
+
+                    {{-- Tipe Sync --}}
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.7rem;font-weight:700;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.4rem">Yang Di-sync</label>
+                        <div style="display:flex;flex-direction:column;gap:.4rem">
+                            <label style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border:1.5px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:border-color .2s" id="qsTypeOrdersLabel">
+                                <input type="checkbox" id="qsSyncOrders" checked style="cursor:pointer;accent-color:#0f172a">
+                                <div style="flex:1">
+                                    <div style="font-size:.78rem;font-weight:700;color:#1e293b">📦 Pesanan Reguler</div>
+                                    <div style="font-size:.68rem;color:#94a3b8">Order normal dari Shopee</div>
+                                </div>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;border:1.5px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:border-color .2s" id="qsTypeBookingsLabel">
+                                <input type="checkbox" id="qsSyncBookings" checked style="cursor:pointer;accent-color:#0f172a">
+                                <div style="flex:1">
+                                    <div style="font-size:.78rem;font-weight:700;color:#1e293b">⚡ Pesanan Kilat</div>
+                                    <div style="font-size:.68rem;color:#94a3b8">Booking & status pengiriman kilat</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    {{-- Dry Run toggle --}}
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;background:#f8fafc;border-radius:10px;margin-bottom:.75rem">
+                        <div>
+                            <div style="font-size:.75rem;font-weight:600;color:#475569">Mode Dry Run</div>
+                            <div style="font-size:.65rem;color:#94a3b8">Simulasi tanpa menyimpan ke database</div>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="qsSyncDryRun" style="cursor:pointer;accent-color:#0f172a">
+                        </div>
                     </div>
                 </div>
 
-                <div id="qsAlert" class="alert d-none mb-3" style="font-size:.8rem;border-radius:12px"></div>
-                <div id="qsProgress" style="display:none">
-                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size:.8rem;color:#475569">
-                        <span class="prod-tab-spinner"></span>
-                        <span id="qsProgressText">Syncing…</span>
+                {{-- Progress Panel --}}
+                <div id="qsProgressPanel" style="display:none">
+                    {{-- Overall progress bar --}}
+                    <div style="margin-bottom:1rem">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span id="qsProgressText" style="font-size:.78rem;font-weight:600;color:#475569">Mempersiapkan…</span>
+                            <span id="qsProgressPct" style="font-size:.72rem;color:#94a3b8">0%</span>
+                        </div>
+                        <div style="height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden">
+                            <div id="qsProgressBar" style="height:100%;background:linear-gradient(90deg,#0f172a,#334155);border-radius:999px;width:0%;transition:width .5s cubic-bezier(.4,0,.2,1)"></div>
+                        </div>
                     </div>
-                    <div class="progress" style="height:4px;border-radius:999px">
-                        <div id="qsProgressBar" class="progress-bar bg-dark" style="width:0%;transition:width .3s"></div>
+
+                    {{-- Per-store cards --}}
+                    <div id="qsStoreList" style="display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto"></div>
+
+                    {{-- Live stats --}}
+                    <div id="qsLiveStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.75rem">
+                        <div style="text-align:center;padding:.5rem;background:#f0fdf4;border-radius:10px">
+                            <div id="qsStatNew" style="font-size:1.15rem;font-weight:800;color:#16a34a">0</div>
+                            <div style="font-size:.62rem;color:#15803d;font-weight:600">Order Baru</div>
+                        </div>
+                        <div style="text-align:center;padding:.5rem;background:#eff6ff;border-radius:10px">
+                            <div id="qsStatUpdated" style="font-size:1.15rem;font-weight:800;color:#2563eb">0</div>
+                            <div style="font-size:.62rem;color:#1d4ed8;font-weight:600">Diperbarui</div>
+                        </div>
+                        <div style="text-align:center;padding:.5rem;background:#fff7ed;border-radius:10px">
+                            <div id="qsStatIssues" style="font-size:1.15rem;font-weight:800;color:#ea580c">0</div>
+                            <div style="font-size:.62rem;color:#c2410c;font-weight:600">Perlu Cek</div>
+                        </div>
                     </div>
                 </div>
-                <div class="d-flex justify-content-end gap-2 mt-3">
-                    <button class="btn btn-light border fw-bold" style="border-radius:999px;font-size:.78rem" data-bs-dismiss="modal">Batal</button>
-                    <button class="btn btn-dark fw-bold" style="border-radius:999px;font-size:.78rem" id="qsRunBtn" onclick="runQuickSync()">↓ Sync Sekarang</button>
+
+                {{-- Result Panel --}}
+                <div id="qsResultPanel" style="display:none;text-align:center;padding:.5rem 0">
+                    <div id="qsResultIcon" style="font-size:2.5rem;margin-bottom:.5rem">✅</div>
+                    <div id="qsResultTitle" style="font-size:.95rem;font-weight:800;color:#1e293b;margin-bottom:.25rem">Sync Selesai!</div>
+                    <div id="qsResultSub" style="font-size:.78rem;color:#64748b"></div>
                 </div>
+
+                {{-- Alert --}}
+                <div id="qsAlert" class="alert d-none" style="font-size:.78rem;border-radius:12px;margin-top:.75rem;margin-bottom:0"></div>
+            </div>
+
+            {{-- Footer --}}
+            <div class="modal-footer border-0" style="padding:.75rem 1.5rem 1.25rem;gap:.5rem">
+                <button id="qsCancelBtn" class="btn btn-light border fw-bold flex-fill" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">Tutup</button>
+                <button id="qsRunBtn" class="btn btn-dark fw-bold flex-fill" style="border-radius:999px;font-size:.8rem" onclick="runQuickSync()">🔄 Sync Sekarang</button>
             </div>
         </div>
     </div>
@@ -3121,103 +3195,248 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     // ── Quick Sync ────────────────────────────────────────────────────────
+    // ── Quick Sync — Range Picker ────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.qs-range-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.qs-range-btn').forEach(b => {
+                    b.style.background = '#fff'; b.style.color = '#475569';
+                    b.style.borderColor = '#e2e8f0';
+                });
+                this.style.background = '#0f172a'; this.style.color = '#fff';
+                this.style.borderColor = '#0f172a';
+                document.getElementById('qsSyncRangeDays').value = this.dataset.days;
+            });
+        });
+    });
+
+    // ── Quick Sync — Open ────────────────────────────────────────────────
     window.openQuickSync = function () {
-        $('qsAlert').className = 'alert d-none';
-        $('qsProgress').style.display = 'none';
-        $('qsProgressBar').style.width = '0%';
-        $('qsRunBtn').disabled = false;
-        $('qsRunBtn').textContent = '↓ Sync Sekarang';
-        new bootstrap.Modal($('quickSyncModal')).show();
+        // Reset ke config panel
+        document.getElementById('qsConfigPanel').style.display = '';
+        document.getElementById('qsProgressPanel').style.display = 'none';
+        document.getElementById('qsResultPanel').style.display = 'none';
+        document.getElementById('qsAlert').className = 'alert d-none';
+        const runBtn = document.getElementById('qsRunBtn');
+        const cancelBtn = document.getElementById('qsCancelBtn');
+        runBtn.disabled = false;
+        runBtn.innerHTML = '🔄 Sync Sekarang';
+        runBtn.onclick = runQuickSync;
+        cancelBtn.textContent = 'Tutup';
+        cancelBtn.setAttribute('data-bs-dismiss', 'modal');
+        new bootstrap.Modal(document.getElementById('quickSyncModal')).show();
     };
 
-    window.runQuickSync = async function () {
-        const days = parseInt($('qsSyncRange').value) || 3;
-        const now  = Math.floor(Date.now() / 1000);
-        const from = now - days * 86400;
-        const btn  = $('qsRunBtn');
+    // ── Quick Sync — Store Card Helpers ──────────────────────────────────
+    function qsAddStoreCard(store) {
+        const list = document.getElementById('qsStoreList');
+        const card = document.createElement('div');
+        card.id = 'qs-store-' + store.id;
+        card.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.55rem .75rem;background:#f8fafc;border-radius:12px;border:1.5px solid #e2e8f0;transition:all .3s';
+        card.innerHTML = `
+            <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">🏪</div>
+            <div style="flex:1;min-width:0">
+                <div style="font-size:.76rem;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${store.name}</div>
+                <div id="qs-store-status-${store.id}" style="font-size:.65rem;color:#94a3b8">Menunggu…</div>
+            </div>
+            <div id="qs-store-icon-${store.id}" style="font-size:1rem;flex-shrink:0">⏳</div>
+        `;
+        list.appendChild(card);
+        return card;
+    }
 
-        btn.disabled = true; btn.textContent = '⏳ Syncing…';
-        $('qsAlert').className = 'alert d-none';
-        $('qsProgress').style.display = 'block';
-        $('qsProgressBar').style.width = '10%';
-        $('qsProgressText').textContent = 'Mengambil daftar toko…';
+    function qsUpdateStoreCard(storeId, statusText, icon, bgColor, borderColor) {
+        const statusEl = document.getElementById('qs-store-status-' + storeId);
+        const iconEl   = document.getElementById('qs-store-icon-'   + storeId);
+        const card     = document.getElementById('qs-store-' + storeId);
+        if (statusEl) statusEl.textContent = statusText;
+        if (iconEl)   iconEl.textContent   = icon;
+        if (card && bgColor) {
+            card.style.background   = bgColor;
+            card.style.borderColor  = borderColor || bgColor;
+        }
+    }
+
+    let qsTotalNew = 0, qsTotalUpdated = 0, qsTotalIssues = 0;
+    function qsAddStat(newN, updN, issN) {
+        qsTotalNew     += (newN  || 0);
+        qsTotalUpdated += (updN  || 0);
+        qsTotalIssues  += (issN  || 0);
+        document.getElementById('qsStatNew').textContent     = qsTotalNew;
+        document.getElementById('qsStatUpdated').textContent = qsTotalUpdated;
+        document.getElementById('qsStatIssues').textContent  = qsTotalIssues;
+    }
+
+    function qsSetProgress(pct, text) {
+        document.getElementById('qsProgressBar').style.width = pct + '%';
+        document.getElementById('qsProgressPct').textContent  = pct + '%';
+        document.getElementById('qsProgressText').textContent = text;
+    }
+
+    // ── Quick Sync — Run ─────────────────────────────────────────────────
+    window.runQuickSync = async function () {
+        const days    = parseInt(document.getElementById('qsSyncRangeDays').value) || 3;
+        const now     = Math.floor(Date.now() / 1000);
+        const from    = now - days * 86400;
+        const dryRun  = document.getElementById('qsSyncDryRun').checked;
+        const doOrders   = document.getElementById('qsSyncOrders').checked;
+        const doBookings = document.getElementById('qsSyncBookings').checked;
+
+        if (!doOrders && !doBookings) {
+            document.getElementById('qsAlert').className = 'alert alert-warning';
+            document.getElementById('qsAlert').textContent = 'Pilih minimal satu tipe sync.';
+            return;
+        }
+
+        // Switch panel ke progress
+        document.getElementById('qsConfigPanel').style.display = 'none';
+        document.getElementById('qsProgressPanel').style.display = '';
+        document.getElementById('qsResultPanel').style.display = 'none';
+        document.getElementById('qsAlert').className = 'alert d-none';
+        document.getElementById('qsStoreList').innerHTML = '';
+        qsTotalNew = 0; qsTotalUpdated = 0; qsTotalIssues = 0;
+        document.getElementById('qsStatNew').textContent = '0';
+        document.getElementById('qsStatUpdated').textContent = '0';
+        document.getElementById('qsStatIssues').textContent = '0';
+
+        const runBtn = document.getElementById('qsRunBtn');
+        runBtn.disabled = true;
+        runBtn.innerHTML = '⏳ Sedang Sync…';
 
         try {
+            qsSetProgress(5, 'Mengambil daftar toko…');
             const stores = await api('/api/marketplace/stores');
             const active = stores.filter(s => s.connection_status === 'CONNECTED');
+
             if (!active.length) {
-                showQsAlert('warning', 'Tidak ada toko aktif yang terhubung.');
-                btn.disabled = false; btn.textContent = '↓ Sync Sekarang'; return;
+                document.getElementById('qsResultIcon').textContent = '⚠️';
+                document.getElementById('qsResultTitle').textContent = 'Tidak Ada Toko Aktif';
+                document.getElementById('qsResultSub').textContent = 'Hubungkan minimal satu toko Shopee terlebih dahulu.';
+                document.getElementById('qsProgressPanel').style.display = 'none';
+                document.getElementById('qsResultPanel').style.display = '';
+                runBtn.innerHTML = '🔄 Coba Lagi';
+                runBtn.disabled = false;
+                runBtn.onclick = openQuickSync;
+                return;
             }
-            let totalNew = 0, totalIssues = 0;
-            for (let i = 0; i < active.length; i++) {
-                const s = active[i];
-                $('qsProgressBar').style.width = (10 + Math.round(((i+1)/active.length)*85)) + '%';
-                $('qsProgressText').textContent = `Sync ${s.name} (${i+1}/${active.length})…`;
-                try {
-                    const d = await api('/api/marketplace/stores/' + s.id + '/sync-orders', {
-                        method: 'POST',
-                        body: JSON.stringify({ 
-                            time_from: from, 
-                            time_to: now, 
-                            page_size: 50,
-                            dry_run: $('qsSyncDryRun').checked ? 1 : 0
-                        }),
-                    });
-                    totalNew    += d.new || d.synced || 0;
-                    totalIssues += (d.sku_empty||0) + (d.mapping_not_found||0) + (d.missing_hpp||0);
-                } catch (e) {
-                    if (e.data && e.data.action && e.data.action.type === 'redirect') {
-                        // Tutup modal quick sync jika terbuka
-                        const qsModalEl = document.getElementById('quickSyncModal');
-                        if (qsModalEl) {
-                            const qsModal = bootstrap.Modal.getInstance(qsModalEl);
-                            if (qsModal) qsModal.hide();
-                        }
-                        
-                        if (window.Swal) {
-                            Swal.fire({
-                                icon: 'warning',
-                                title: e.data.code === 'STORE_NOT_CONNECTED' ? 'Toko Belum Terhubung' : 'Koneksi Bermasalah',
-                                html: e.data.message + '<br><br>Silakan ' + (e.data.code === 'STORE_NOT_CONNECTED' ? 'hubungkan toko' : 'login ulang') + ' agar pesanan dapat disinkronkan.',
-                                showCancelButton: true,
-                                confirmButtonText: e.data.action.label,
-                                cancelButtonText: 'Nanti',
-                                confirmButtonColor: '#1e293b'
-                            }).then((result) => {
-                                if (result.isConfirmed) {
-                                    window.location.href = e.data.action.url;
-                                }
-                            });
-                        } else {
-                            if (confirm(e.data.message + "\n\nBuka halaman login sekarang?")) {
-                                window.location.href = e.data.action.url;
+
+            // Buat semua store cards
+            active.forEach(s => qsAddStoreCard(s));
+
+            // Hitung total langkah
+            const totalSteps = active.length * (doOrders ? 1 : 0) + active.length * (doBookings ? 1 : 0);
+            let doneSteps = 0;
+            let hasAuthError = false;
+
+            // ── Sync Orders ──────────────────────────────────────────────
+            if (doOrders) {
+                for (let i = 0; i < active.length; i++) {
+                    if (hasAuthError) break;
+                    const s = active[i];
+                    const pct = Math.round(5 + ((doneSteps / totalSteps) * 88));
+                    qsSetProgress(pct, `Sync pesanan reguler: ${s.name}…`);
+                    qsUpdateStoreCard(s.id, 'Sync pesanan reguler…', '🔄', '', '');
+                    try {
+                        const d = await api('/api/marketplace/stores/' + s.id + '/sync-orders', {
+                            method: 'POST',
+                            body: JSON.stringify({ time_from: from, time_to: now, page_size: 50, dry_run: dryRun ? 1 : 0 }),
+                        });
+                        const newN = d.new || d.synced || 0;
+                        const updN = d.updated || 0;
+                        const issN = (d.sku_empty||0) + (d.mapping_not_found||0) + (d.missing_hpp||0);
+                        qsAddStat(newN, updN, issN);
+                        const statusParts = [];
+                        if (newN)  statusParts.push(`${newN} baru`);
+                        if (updN)  statusParts.push(`${updN} update`);
+                        if (issN)  statusParts.push(`${issN} perlu cek`);
+                        const statusText = doBookings
+                            ? '✅ Order selesai' + (statusParts.length ? ` (${statusParts.join(', ')})` : '')
+                            : '✅ Selesai' + (statusParts.length ? ` · ${statusParts.join(', ')}` : '');
+                        qsUpdateStoreCard(s.id, statusText, doBookings ? '🔄' : '✅', doBookings ? '' : '#f0fdf4', doBookings ? '' : '#bbf7d0');
+                    } catch (e) {
+                        if (e.data && e.data.action && e.data.action.type === 'redirect') {
+                            hasAuthError = true;
+                            qsUpdateStoreCard(s.id, 'Perlu login ulang', '🔐', '#fff7ed', '#fed7aa');
+                            const qsModalEl = document.getElementById('quickSyncModal');
+                            if (qsModalEl) { const m = bootstrap.Modal.getInstance(qsModalEl); if (m) m.hide(); }
+                            if (window.Swal) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Koneksi Bermasalah',
+                                    html: (e.data.message || '') + '<br><br>Silakan login ulang agar pesanan dapat disinkronkan.',
+                                    showCancelButton: true,
+                                    confirmButtonText: e.data.action?.label || 'Login Ulang',
+                                    cancelButtonText: 'Nanti',
+                                    confirmButtonColor: '#1e293b'
+                                }).then(r => { if (r.isConfirmed) window.location.href = e.data.action.url; });
                             }
+                            break;
                         }
-                        
-                        // Stop the entire sync loop if we need auth
-                        $('qsProgress').style.display = 'none';
-                        $('qsRunBtn').textContent = '↓ Sync Sekarang';
-                        $('qsRunBtn').disabled = false;
-                        return; 
-                    } else {
-                        showQsAlert('danger', `Gagal sync toko ${s.name}: ${e.message}`);
-                        await new Promise(r => setTimeout(r, 2000)); // Beri waktu user membaca pesan
+                        qsUpdateStoreCard(s.id, 'Gagal: ' + (e.message || 'Error'), '❌', '#fff1f2', '#fecdd3');
                     }
+                    doneSteps++;
                 }
             }
-            $('qsProgressBar').style.width = '100%';
-            $('qsProgress').style.display = 'none';
-            let msg = `Sync selesai. ${totalNew} order baru.`;
-            if (totalIssues > 0) msg += ` ⚠ ${totalIssues} item perlu diperbaiki.`;
-            showQsAlert('success', msg);
-            btn.textContent = '✓ Selesai';
-            
-            loadOrders();
+
+            // ── Sync Bookings (Kilat) ─────────────────────────────────────
+            if (doBookings && !hasAuthError) {
+                for (let i = 0; i < active.length; i++) {
+                    const s = active[i];
+                    const pct = Math.round(5 + ((doneSteps / totalSteps) * 88));
+                    qsSetProgress(pct, `Sync pesanan kilat: ${s.name}…`);
+                    qsUpdateStoreCard(s.id, 'Sync pesanan kilat…', '⚡', '', '');
+                    try {
+                        await api('/api/marketplace/stores/' + s.id + '/sync-bookings', {
+                            method: 'POST',
+                            body: JSON.stringify({ time_from: from, time_to: now }),
+                        });
+                        qsUpdateStoreCard(s.id, '✅ Kilat selesai', '✅', '#f0fdf4', '#bbf7d0');
+                    } catch (e) {
+                        // sync-bookings mungkin tidak return error kritis — lanjut saja
+                        qsUpdateStoreCard(s.id, '⚠ Kilat partial', '⚠️', '#fff7ed', '#fde68a');
+                    }
+                    doneSteps++;
+                }
+            }
+
+            // ── Selesai ───────────────────────────────────────────────────
+            qsSetProgress(100, 'Selesai!');
+            await new Promise(r => setTimeout(r, 500));
+
+            document.getElementById('qsProgressPanel').style.display = 'none';
+            document.getElementById('qsResultPanel').style.display = '';
+
+            if (hasAuthError) {
+                document.getElementById('qsResultIcon').textContent = '⚠️';
+                document.getElementById('qsResultTitle').textContent = 'Sync Sebagian';
+                document.getElementById('qsResultSub').textContent = 'Beberapa toko memerlukan login ulang.';
+            } else {
+                document.getElementById('qsResultIcon').textContent = dryRun ? '🔍' : '✅';
+                document.getElementById('qsResultTitle').textContent = dryRun ? 'Simulasi Selesai' : 'Sync Berhasil!';
+                const parts = [];
+                if (qsTotalNew)     parts.push(`<strong>${qsTotalNew}</strong> order baru`);
+                if (qsTotalUpdated) parts.push(`<strong>${qsTotalUpdated}</strong> diperbarui`);
+                if (qsTotalIssues)  parts.push(`<strong>${qsTotalIssues}</strong> perlu dicek`);
+                document.getElementById('qsResultSub').innerHTML = parts.length
+                    ? parts.join(' · ')
+                    : 'Semua pesanan sudah terkini.';
+            }
+
+            runBtn.innerHTML = '🔄 Sync Lagi';
+            runBtn.disabled  = false;
+            runBtn.onclick   = openQuickSync;
+
+            document.getElementById('qsCancelBtn').textContent = 'Tutup';
+
+            if (!dryRun) loadOrders();
+
         } catch (e) {
-            $('qsProgress').style.display = 'none';
-            showQsAlert('danger', 'Gagal: ' + e.message);
-            btn.disabled = false; btn.textContent = '↓ Sync Sekarang';
+            document.getElementById('qsProgressPanel').style.display = 'none';
+            document.getElementById('qsAlert').className = 'alert alert-danger';
+            document.getElementById('qsAlert').textContent = 'Gagal: ' + (e.message || 'Terjadi kesalahan.');
+            runBtn.innerHTML = '🔄 Sync Sekarang';
+            runBtn.disabled  = false;
+            runBtn.onclick   = runQuickSync;
         }
     };
 

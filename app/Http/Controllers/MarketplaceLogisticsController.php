@@ -189,48 +189,16 @@ class MarketplaceLogisticsController extends Controller
     public function syncBookings(Store $store, Request $request): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (!method_exists($driver, 'getBookingList')) {
-                return response()->json(['success' => false, 'message' => 'Not supported on this channel'], 400);
-            }
+            $timeFrom = $request->input('time_from') ? (int) $request->input('time_from') : (time() - 86400 * 14);
+            $timeTo   = $request->input('time_to')   ? (int) $request->input('time_to')   : time();
 
-            // Sync bookings for the last 15 days
-            $timeFrom = time() - (86400 * 15);
-            $timeTo = time();
-            $cursor = "";
-            $updated = 0;
-
-            do {
-                $result = $driver->getBookingList($store, $timeFrom, $timeTo, 50, $cursor);
-                if (isset($result['error']) && $result['error']) {
-                    break;
-                }
-
-                $list = $result['response']['booking_list'] ?? [];
-                foreach ($list as $booking) {
-                    $orderSn = $booking['order_sn'] ?: $booking['booking_sn'];
-                    $bookingSn = $booking['booking_sn'];
-                    
-                    if ($bookingSn) {
-                        $order = \App\Models\MarketplaceOrder::where('store_id', $store->id)
-                            ->where('channel_order_id', $orderSn)
-                            ->first();
-
-                        if ($order && empty($order->booking_sn)) {
-                            $order->booking_sn = $bookingSn;
-                            $order->save();
-                            $updated++;
-                        }
-                    }
-                }
-
-                $more = $result['response']['has_more'] ?? $result['response']['more'] ?? false;
-                $cursor = (string) ($result['response']['next_cursor'] ?? "");
-            } while ($more && $cursor);
+            // Gunakan SyncMarketplaceBookings yang sudah memiliki logika propagasi
+            // booking_status → order_status secara otomatis.
+            dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, $timeFrom, $timeTo, false));
 
             return response()->json([
-                'success' => true, 
-                'message' => "Berhasil sinkronisasi $updated resi/booking."
+                'success' => true,
+                'message' => 'Sinkronisasi Pesanan Kilat selesai.',
             ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e);

@@ -186,6 +186,45 @@ class SyncMarketplaceBookings implements ShouldQueue
                         $m->save();
                     }
 
+                    // Propagate booking_status ke order_status di marketplace_orders
+                    // agar tab UI otomatis berubah tanpa menunggu webhook.
+                    if (! empty($d['order_sn']) || ! empty($m->order_sn)) {
+                        $realOrderSn = $d['order_sn'] ?? $m->order_sn;
+                        $bookingStatusUpper = strtoupper((string) ($d['booking_status'] ?? $m->booking_status ?? ''));
+                        
+                        if (! empty($bookingStatusUpper)) {
+                            $orderStatusMap = [
+                                'PROCESSED'               => ['order_status' => 'PROCESSED', 'logistics_status' => 'LOGISTICS_READY_TO_SHIP'],
+                                'READY_TO_HANDOVER'       => ['order_status' => 'SHIPPED',    'logistics_status' => 'LOGISTICS_PICKUP_DONE'],
+                                'SHIPPED'                 => ['order_status' => 'SHIPPED',    'logistics_status' => 'LOGISTICS_PICKUP_DONE'],
+                                'COMPLETED'               => ['order_status' => 'COMPLETED',  'logistics_status' => null],
+                                'CANCELLED_BEFORE_SHIPPING' => ['order_status' => 'CANCELLED', 'logistics_status' => null],
+                            ];
+                            
+                            if (isset($orderStatusMap[$bookingStatusUpper])) {
+                                $targetStatus = $orderStatusMap[$bookingStatusUpper]['order_status'];
+                                $targetLogistics = $orderStatusMap[$bookingStatusUpper]['logistics_status'];
+                                
+                                $orderQuery = MarketplaceOrder::where('store_id', $this->store->id)
+                                    ->where('channel_order_id', $realOrderSn);
+                                
+                                $localOrder = $orderQuery->first();
+                                if ($localOrder && $localOrder->order_status !== $targetStatus) {
+                                    $updateData = ['order_status' => $targetStatus];
+                                    if ($targetLogistics) {
+                                        $updateData['logistics_status'] = $targetLogistics;
+                                    }
+                                    // Jangan rollback: SHIPPED/COMPLETED tidak boleh kembali ke PROCESSED
+                                    $noRollback = ['SHIPPED', 'COMPLETED', 'TO_CONFIRM_RECEIVE'];
+                                    if (! (in_array($localOrder->order_status, $noRollback) && ! in_array($targetStatus, $noRollback))) {
+                                        $localOrder->update($updateData);
+                                        Log::info("SyncMarketplaceBookings: Propagated booking_status {$bookingStatusUpper} → order_status {$targetStatus} for order {$realOrderSn}");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (! empty($d['order_sn'])) {
                         $this->linkOrder($sn, $d['order_sn']);
                     }
