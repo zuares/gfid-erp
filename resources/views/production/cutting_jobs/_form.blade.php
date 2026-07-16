@@ -563,6 +563,7 @@
                 overflow: visible;
                 transition: border-left-color .14s, box-shadow .14s;
                 position: relative;
+                scroll-margin-top: 140px;
             }
 
             .bundles-table tbody tr.bundle-row.lot-assigned {
@@ -2050,12 +2051,15 @@
                         if (e.key === 'Enter') { e.preventDefault(); goNextRow(); }
                     });
                     qtyInput.addEventListener('focus', () => {
-                        setTimeout(() => {
-                            qtyInput.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center'
-                            });
-                        }, 100);
+                        if (window.matchMedia('(max-width: 767.98px)').matches) {
+                            // Beri sedikit jeda agar keyboard selesai muncul
+                            setTimeout(() => {
+                                tr.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'start'
+                                });
+                            }, 350);
+                        }
                     });
                 }
 

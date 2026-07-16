@@ -581,9 +581,13 @@
                             <span class="badge bg-{{ $statusClass }} d-md-none"
                                   style="font-size:.68rem;white-space:normal;line-height:1.3;max-width:100px;text-align:center;margin-left:auto">{{ $statusLabel }}</span>
                         </div>
-                        <div class="sub">
-                            {{ $job->lot?->item?->code ?? '-' }} • {{ $job->lot?->code ?? '-' }} • {{ $job->warehouse?->code ?? '-' }}
-                            @if ($job->date) • {{ $job->date->format('d/m/Y') }} @endif
+                        <div class="sub" style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            <span>{{ $job->lot?->item?->code ?? '-' }} • {{ $job->lot?->code ?? '-' }} • {{ $job->warehouse?->code ?? '-' }}</span>
+                            @if ($job->date) 
+                                <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.2); font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 6px;">
+                                    <i class="bi bi-calendar3 me-1"></i>{{ $job->date->format('d M Y') }}
+                                </span>
+                            @endif
                         </div>
                     </div>
                     <div class="hdr-right d-flex align-items-center gap-2 flex-wrap">
@@ -657,7 +661,9 @@
                     @endif
                     @if ($job->date)
                         <span>•</span>
-                        <span>{{ $job->date?->format('d/m/Y') }}</span>
+                        <span style="color: #2563eb; font-weight: 700; background: rgba(37, 99, 235, 0.1); padding: 0.15rem 0.4rem; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.2);">
+                            <i class="bi bi-calendar3" style="margin-right: 3px;"></i>{{ $job->date?->format('d M Y') }}
+                        </span>
                     @endif
                 </div>
             </div>

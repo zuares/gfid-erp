@@ -353,31 +353,54 @@
 
                                     <td>
                                         <div class="cj-row-main">
-                                            <div>
+                                            <div style="flex: 1; min-width: 0;">
                                                 @php
                                                     $itemSummary = $job->bundles->groupBy(fn($b) => $b->finishedItem?->code ?? $b->finished_item_code ?? 'N/A')
                                                                      ->map(fn($group) => $group->sum('qty_pcs'));
+                                                    $dipotong = $job->lots->sum('planned_fabric_qty');
+                                                    $fabricCode = $job->fabricItem?->code ?? $job->lot?->item?->code ?? '-';
                                                 @endphp
                                                 
                                                 <!-- Desktop: Job Code is Title -->
                                                 <a class="code-link d-none d-md-inline" href="{{ $detailUrl }}">{{ $job->code }}</a>
                                                 
-                                                <!-- Mobile: Item Summary is Title -->
-                                                <a class="code-link d-md-none" href="{{ $detailUrl }}" style="display: block; font-size: 1.05rem; margin-bottom: 0.3rem; line-height: 1.3;">
-                                                    <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
-                                                        @foreach($itemSummary as $code => $qty)
-                                                            <span class="split-badge" style="font-size: 0.9rem;">
-                                                                <span class="sb-left">{{ $code }}</span>
-                                                                <span class="sb-right">{{ (float)$qty }}</span>
-                                                            </span>
-                                                        @endforeach
+                                                <!-- Mobile Layout -->
+                                                <div class="d-md-none">
+                                                    <!-- Date & Status -->
+                                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                                                        <span style="color: #2563eb; font-weight: 700; background: rgba(37, 99, 235, 0.1); padding: 0.15rem 0.4rem; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.2); font-size: 0.75rem;">
+                                                            <i class="bi bi-calendar3 me-1"></i>{{ $job->date?->format('d M Y') ?? '-' }}
+                                                        </span>
+                                                        <span class="badge-status {{ $cfg['class'] }}">{{ $cfg['label'] }}</span>
                                                     </div>
-                                                </a>
 
-                                                <div class="cj-row-meta d-md-none">
-                                                    <span class="mono fw-semibold" style="color: var(--shp-text);">{{ $job->code }}</span>
-                                                    <span>{{ $job->date?->format('d/m/y') ?? '-' }}</span>
-                                                    @if ($job->operator)<span>{{ $job->operator->name }}</span>@endif
+                                                    <!-- Item Code & Qty (Focal) -->
+                                                    <a href="{{ $detailUrl }}" style="text-decoration: none; display: block; margin-bottom: 0.5rem;">
+                                                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                                            @foreach($itemSummary as $code => $qty)
+                                                                <span class="split-badge" style="font-size: 0.95rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                                                    <span class="sb-left">{{ $code }}</span>
+                                                                    <span class="sb-right">{{ (float)$qty }} pcs</span>
+                                                                </span>
+                                                            @endforeach
+                                                        </div>
+                                                    </a>
+
+                                                    <!-- Fabric (Focal) -->
+                                                    <div style="background: rgba(148, 163, 184, 0.08); padding: 0.35rem 0.5rem; border-radius: 6px; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between;">
+                                                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--shp-text);">
+                                                            <i class="bi bi-box-seam me-1"></i>{{ $fabricCode }}
+                                                        </div>
+                                                        @if($dipotong > 0)
+                                                            <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">{{ (float)$dipotong }} kg</div>
+                                                        @endif
+                                                    </div>
+                                                    
+                                                    <!-- Operator & Job Code -->
+                                                    <div style="font-size: 0.7rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+                                                        <span class="mono">{{ $job->code }}</span>
+                                                        @if ($job->operator)<span>Cut: <span style="color: #64748b; font-weight: 600;">{{ $job->operator->name }}</span></span>@endif
+                                                    </div>
                                                 </div>
 
                                                 <!-- Desktop: Item Summary Badges -->
@@ -390,21 +413,16 @@
                                                     @endforeach
                                                 </div>
                                             </div>
-                                            <span class="badge-status {{ $cfg['class'] }} d-md-none">{{ $cfg['label'] }}</span>
                                         </div>
                                     </td>
 
-                                    <td>
-                                        @php
-                                            $dipotong = $job->lots->sum('planned_fabric_qty');
-                                        @endphp
+                                    <td class="mobile-hide">
                                         <div class="text-muted" style="font-size: 0.72rem; margin-bottom: 0.35rem;">
-                                            <span class="mono fw-semibold">{{ $job->fabricItem?->code ?? $job->lot?->item?->code ?? '-' }}</span>
+                                            <span class="mono fw-semibold">{{ $fabricCode }}</span>
                                             @if($dipotong > 0)
                                                 &bull; <span>{{ (float)$dipotong }} kg</span>
                                             @endif
                                         </div>
-                                        <!-- Removed fabric usage badges per user request -->
                                     </td>
 
                                     <td class="mobile-hide">{{ $job->operator?->name ?? '-' }}</td>
