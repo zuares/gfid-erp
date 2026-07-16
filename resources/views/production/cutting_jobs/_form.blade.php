@@ -370,41 +370,46 @@
         }
 
         .cutting-save-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: .5rem;
-            margin-top: .5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        /* === FLOATING SAVE (mobile only) === */
-        .cutting-save-fab-wrap {
+        .cutting-fab-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .cutting-fab-btn:disabled {
+            background: #94a3b8 !important;
+            box-shadow: none !important;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* === FLOATING FAB (mobile only) === */
+        .cutting-fab-wrap {
             display: none;
             position: fixed;
-            right: .9rem;
-            bottom: 5.5rem;
-            z-index: 40;
+            right: 1.25rem;
+            bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+            z-index: 1040;
         }
 
-        #cutting-save-fab {
+        .cutting-fab-btn {
+            height: 48px;
+            padding: 0 1.25rem;
             border-radius: 999px;
             border: none;
-            padding: .45rem 1.1rem .45rem .85rem;
-            font-size: .82rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #0d6efd 0%, #2563eb 60%, #1d4ed8 100%);
-            color: #f9fafb;
-            box-shadow:
-                0 12px 24px rgba(15, 23, 42, .35),
-                0 0 0 1px rgba(191, 219, 254, .9);
-            display: inline-flex;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #ffffff;
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+            display: flex;
             align-items: center;
-            gap: .38rem;
+            justify-content: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 0.95rem;
             white-space: nowrap;
-        }
-
-        #cutting-save-fab:active {
-            transform: scale(.97);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .cutting-selected-lot-strip {
@@ -761,21 +766,7 @@
                 justify-content: center;
             }
 
-            .cutting-save-fab-wrap {
-                left: .8rem;
-                right: .8rem;
-                bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
-                display: none;
-            }
 
-            #cutting-save-fab {
-                width: 100%;
-                justify-content: center;
-                min-height: 50px;
-                border-radius: 14px;
-                font-size: .92rem;
-                box-shadow: 0 12px 26px rgba(37, 99, 235, .28);
-            }
         }
     </style>
 @endpush
@@ -970,7 +961,7 @@
             </div>
         @endif
 
-        <div class="cutting-save-bar">
+        <div class="cutting-save-bar d-none d-md-flex">
             <a href="{{ route('production.cutting_jobs.index') }}" class="btn btn-outline-secondary btn-sm">
                 Batal
             </a>
@@ -981,11 +972,10 @@
         </div>
     </div> {{-- /#cutting-main-content --}}
 
-    {{-- FLOATING SAVE BUTTON (mobile) --}}
-    <div class="cutting-save-fab-wrap d-md-none" id="cutting-save-fab-wrap">
-        <button type="button" id="cutting-save-fab">
-            <span class="bi bi-person-check-fill" style="font-size:.9rem;"></span>
-            Pilih Operator &amp; Simpan
+    {{-- FLOATING FAB (mobile) --}}
+    <div class="cutting-fab-wrap d-md-none" id="cutting-save-fab-wrap">
+        <button type="button" class="cutting-fab-btn" id="cutting-save-fab">
+            Pilih Operator <i class="bi bi-person-check-fill" style="font-size:1.1rem;"></i>
         </button>
     </div>
 
@@ -1133,8 +1123,10 @@
                 // Sembunyikan seluruh footer picker ketika hasil cutting tampil
                 const pickerFooterEl = document.getElementById('lot-picker-footer');
                 if (pickerFooterEl) pickerFooterEl.style.display = 'none';
+                const lotFab = document.getElementById('lot-confirm-fab-wrap');
+                if (lotFab) lotFab.style.display = 'none';
 
-                // Tampilkan FAB mobile
+                // Tampilkan FAB mobile (Simpan Job)
                 const saveFab = document.getElementById('cutting-save-fab-wrap');
                 if (saveFab) saveFab.style.display = 'flex';
 
@@ -1167,9 +1159,17 @@
                     if (mainContent) mainContent.classList.add('d-none');
                 }
 
-                // Sembunyikan FAB saat kembali ke picker
+                // Sembunyikan FAB simpan job
                 const saveFab = document.getElementById('cutting-save-fab-wrap');
                 if (saveFab) saveFab.style.display = 'none';
+                
+                // Munculkan FAB lot picker
+                const lotFab = document.getElementById('lot-confirm-fab-wrap');
+                if (lotFab) lotFab.style.display = 'flex';
+                
+                // Tampilkan kembali footer picker
+                const pickerFooterEl = document.getElementById('lot-picker-footer');
+                if (pickerFooterEl) pickerFooterEl.style.display = 'flex';
 
                 pickLotSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -1534,7 +1534,7 @@
                             scrapPct: Number(bom.scrap_pct || 0),
                             totalQtyPcs: 0,
                             suggestedBomQty: 0,
-                            targetTotalKg: 0,
+                            targetTotalKg: totalStock,
                         };
                     }
 
@@ -1549,7 +1549,6 @@
                         return;
                     }
 
-                    c.targetTotalKg = totalStock;
                     c.suggestedBomQty = totalStock / denominator;
                 });
 
@@ -1655,6 +1654,7 @@
             }
 
             function updateCurrentLotSummary() {
+                recalcLotBalanceFromCheckedLots(); // Pastikan balance terupdate dulu
                 const lotCount = getCheckedLots().length;
                 const balance = parseFloat(lotBalanceInput.value || '0');
 
@@ -1677,6 +1677,23 @@
 
                 if (currentLotCount) currentLotCount.textContent = `${lotCount} LOT`;
                 if (currentLotBalance) currentLotBalance.textContent = balance.toFixed(2);
+
+                const btnConfirmLots = document.getElementById('btn-confirm-lots');
+                if (btnConfirmLots) {
+                    btnConfirmLots.disabled = (balance <= 0);
+                }
+                const lotFab = document.getElementById('lot-confirm-fab-wrap');
+                const lotFabBtn = document.getElementById('lot-confirm-fab');
+                if (lotFab) {
+                    const saveFab = document.getElementById('cutting-save-fab-wrap');
+                    // Karena saveFab awalnya disembunyikan via CSS class, style.display bernilai ""
+                    if (!saveFab || saveFab.style.display !== 'flex') {
+                        lotFab.style.display = 'flex'; 
+                    }
+                }
+                if (lotFabBtn) {
+                    lotFabBtn.disabled = (balance <= 0);
+                }
             }
 
             function scrollRowIntoCenter(tr) {
@@ -2343,9 +2360,13 @@
             if (isLotsLocked) {
                 // If lots are locked, main content is directly shown
                 document.getElementById('cutting-main-content').classList.remove('d-none');
+                const saveFab = document.getElementById('cutting-save-fab-wrap');
+                if (saveFab) saveFab.style.display = 'flex';
             } else {
                 recalcLotBalanceFromCheckedLots();
                 updateCurrentLotSummary();
+                const lotFab = document.getElementById('lot-confirm-fab-wrap');
+                if (lotFab) lotFab.style.display = 'flex';
             }
 
             if (rowsExisting && rowsExisting.length > 0) {

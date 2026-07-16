@@ -1178,8 +1178,15 @@
         <div class="small text-muted" id="lot-footer-hint">
             Pilih kain dulu untuk melihat LOT yang tersedia.
         </div>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-lots">
+        <button type="button" class="btn btn-primary btn-sm d-none d-md-inline-block" id="btn-confirm-lots">
             Simpan LOT &amp; Lanjut
+        </button>
+    </div>
+
+    {{-- FLOATING FAB SIMPAN LOT (mobile) --}}
+    <div class="cutting-fab-wrap d-md-none" id="lot-confirm-fab-wrap" style="display: none;">
+        <button type="button" class="cutting-fab-btn" id="lot-confirm-fab">
+            Simpan LOT <i class="bi bi-arrow-right-circle-fill" style="font-size:1.2rem;"></i>
         </button>
     </div>
 </div>
@@ -1187,6 +1194,10 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('lot-confirm-fab')?.addEventListener('click', () => {
+                document.getElementById('btn-confirm-lots')?.click();
+            });
+            
             // Reset checkbox saat load — cegah browser restore (kecuali form edit yg sdh pny initial value)
             @if(!isset($isEdit) || !$isEdit)
             document.querySelectorAll('.lot-checkbox').forEach(cb => { cb.checked = false; });

@@ -151,12 +151,11 @@
         }
 
         .operator-focus-card {
-            border-radius: 12px;
-            border: 1px solid rgba(59, 130, 246, 0.35);
-            background: linear-gradient(to right,
-                    rgba(59, 130, 246, 0.08),
-                    rgba(59, 130, 246, 0.02));
-            padding: .75rem .9rem;
+            border-radius: 16px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: linear-gradient(135deg, rgba(239, 246, 255, 1) 0%, rgba(219, 234, 254, 0.4) 100%);
+            padding: 1rem;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.08);
         }
 
         body[data-theme="dark"] .operator-focus-card {
@@ -171,30 +170,42 @@
                    ============================================================ */
         @media (max-width: 767.98px) {
 
-            /* Modal tidak full lebar + dinaikkan sedikit dari bawah */
+            /* Modal dijauhkan dari area bawah agar tidak tertutup bottom nav */
             #cuttingInfoModal .modal-dialog {
-                max-width: 92%;
-                margin: 1rem auto 2.25rem;
-                /* bottom margin agak besar supaya footer naik */
+                max-width: 96%;
+                /* Top margin kecil, margin bawah dilindungi dari bottom nav (sekitar 6rem) */
+                margin: 1.5rem auto calc(6.5rem + env(safe-area-inset-bottom, 0px));
             }
 
-            /* Modal lebih pendek, tidak mepet atas, tidak overflow X */
+            /* UI Modal lebih modern, tidak terlalu tinggi */
             #cuttingInfoModal .modal-content {
-                border-radius: 16px;
-                max-height: 78vh;
+                border-radius: 20px;
+                max-height: 65vh; /* Jangan terlalu tinggi, sisakan ruang */
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
+                border: none;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            }
+            
+            #cuttingInfoModal .modal-header {
+                border-bottom: none;
+                padding: 1.25rem 1.25rem 0.5rem;
+            }
+            
+            #cuttingInfoModal .modal-title {
+                font-weight: 800;
+                font-size: 1.25rem;
             }
 
             /* Body hanya boleh scroll vertical, fleksibel urutan section */
             #cuttingInfoModal .modal-body {
-                padding: .75rem .9rem;
+                padding: 0.5rem 1.25rem 1.25rem;
                 overflow-y: auto;
                 overflow-x: hidden;
                 display: flex;
                 flex-direction: column;
-                gap: .75rem;
+                gap: 1rem;
             }
 
             #cuttingInfoModal .modal-body>* {
@@ -217,22 +228,30 @@
 
             .cutting-modal-section-agg {
                 order: 2;
-                border-radius: 12px;
-                border: 1px solid rgba(148, 163, 184, 0.4);
-                background: var(--card, #fff);
-                padding: .5rem .6rem;
+                border-radius: 14px;
+                border: none;
+                background: #f8fafc;
+                padding: .85rem;
             }
 
             .cutting-modal-section-bundles {
                 order: 3;
-                border-radius: 12px;
-                border: 1px solid rgba(148, 163, 184, 0.4);
-                background: var(--card, #fff);
-                padding: .5rem .6rem;
+                border-radius: 14px;
+                border: none;
+                background: #f8fafc;
+                padding: .85rem;
             }
 
             .cutting-modal-section-summary {
                 order: 4;
+                border-radius: 14px;
+                border: none !important;
+                background: #eff6ff !important;
+                color: #1e3a8a;
+                padding: 1rem !important;
+            }
+            .cutting-modal-section-summary .fw-semibold {
+                color: #1d4ed8;
             }
 
             .cutting-modal-section-meta {
@@ -244,19 +263,33 @@
                 display: none;
             }
 
-            /* Footer dinaikkan sedikit + aman dari bottom bar */
+            /* Footer dengan tombol besar (modern) */
             #cuttingInfoModal .modal-footer {
-                padding-top: .4rem;
-                padding-right: .9rem;
-                padding-left: .9rem;
-                padding-bottom: 1.1rem;
-                /* agak besar supaya tidak ketutup UI browser */
+                padding: 1rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+                border-top: 1px solid rgba(148, 163, 184, 0.15);
+                display: flex;
+                flex-wrap: nowrap;
+                gap: 0.5rem;
             }
-
-            @supports (padding-bottom: env(safe-area-inset-bottom)) {
-                #cuttingInfoModal .modal-footer {
-                    padding-bottom: calc(1.1rem + env(safe-area-inset-bottom));
-                }
+            
+            #cuttingInfoModal .modal-footer .btn {
+                flex: 1;
+                border-radius: 14px;
+                padding: 0.75rem;
+                font-weight: 700;
+                font-size: 1rem;
+            }
+            
+            #cuttingInfoModal .modal-footer .btn-light {
+                flex: 0 0 30%;
+                background: #f1f5f9;
+                border: none;
+                color: #475569;
+            }
+            
+            #cuttingInfoModal .modal-footer .btn-primary {
+                background: linear-gradient(135deg, #3b82f6, #2563eb);
+                border: none;
             }
         }
     </style>
