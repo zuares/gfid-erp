@@ -669,7 +669,7 @@
     }
 </style>
 
-<aside class="sidebar-modern flex-column">
+<aside class="sidebar-modern flex-column" hx-boost="true" hx-target=".app-main" hx-select=".app-main" hx-swap="outerHTML" hx-indicator=".app-main">
     <div class="sidebar-brand">
         <div>GFID</div>
         @if($user)

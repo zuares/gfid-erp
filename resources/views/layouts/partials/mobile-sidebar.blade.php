@@ -595,7 +595,7 @@
 <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay"></div>
 
 {{-- PANEL --}}
-<aside id="mobileSidebarPanel" class="mobile-sidebar-panel">
+<aside id="mobileSidebarPanel" class="mobile-sidebar-panel" hx-boost="true" hx-target=".app-main" hx-select=".app-main" hx-swap="outerHTML" hx-indicator=".app-main">
     <div class="mobile-sidebar-header">
         <div class="mobile-sidebar-title">{{ config('app.name', 'GFID') }}</div>
         <button type="button" class="mobile-sidebar-close-btn" id="mobileSidebarCloseBtn">✕</button>
