@@ -109,8 +109,8 @@ class CuttingService
                 'total_qty_pcs' => $totalQtyPcs,
             ]);
 
-            // Potong kain per LOT saat create
-            $this->consumeFabricFromLots($job);
+            // Catatan: pemotongan kain (consumeFabricFromLots) SEKARANG dilakukan di Controller
+            // setelah pivot CuttingJobLot dibuat (karena multi-LOT).
 
             return $job->fresh(['bundles']);
         });

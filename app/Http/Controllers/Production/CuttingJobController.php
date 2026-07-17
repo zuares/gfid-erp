@@ -1125,6 +1125,10 @@ class CuttingJobController extends Controller
             // ✅ Sinkron used_fabric_qty per LOT dari total bundle —
             //    tanpa ini form "Catat Sisa Kain" tidak pernah muncul.
             $this->syncCuttingJobLotUsedFabric($job);
+
+            // ✅ Lakukan pemotongan stok fisik kain (RM OUT) di sini,
+            //    karena pivot CuttingJobLot baru saja dibuat.
+            $this->cutting->reconsumeFabricFromLots($job);
         } catch (\RuntimeException $e) {
             if ($devRollback && DB::transactionLevel() > 0) {
                 DB::rollBack();
