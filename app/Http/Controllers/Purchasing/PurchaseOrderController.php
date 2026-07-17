@@ -286,6 +286,7 @@ class PurchaseOrderController extends Controller
             'supplier',
             'paymentMethod',
             'lines.item',
+            'lines.expenseAccount',
             'createdBy',
             'approvedBy',
             'cancelledBy',

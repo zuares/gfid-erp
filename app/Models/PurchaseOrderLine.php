@@ -67,4 +67,9 @@ class PurchaseOrderLine extends Model
             });
     }
 
+    public function expenseAccount()
+    {
+        return $this->belongsTo(Account::class, 'expense_account_id');
+    }
+
 }

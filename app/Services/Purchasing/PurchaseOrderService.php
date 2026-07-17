@@ -443,7 +443,17 @@ class PurchaseOrderService
                 $keep->discount = round($discount, 2);
                 $keep->line_total = $lineTotal;
                 $keep->notes = $notes;
-                // item_id, allocation, expense_account_id SENGAJA tidak diubah.
+
+                // item_id, allocation, expense_account_id SENGAJA tidak diubah, KECUALI bila expense_account_id masih kosong.
+                if ($hasLineExpenseAcc && $keep->allocation === 'expense' && empty($keep->expense_account_id)) {
+                    $fromLine = $row['expense_account_id'] ?? null;
+                    if ($fromLine !== null && $fromLine !== '' && (int) $fromLine > 0) {
+                        $keep->expense_account_id = (int) $fromLine;
+                    } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                        $keep->expense_account_id = (int) $item->default_expense_account_id;
+                    }
+                }
+
                 $keep->save();
                 $consumedReferenced[] = $itemId;
 

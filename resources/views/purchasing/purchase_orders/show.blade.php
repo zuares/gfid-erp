@@ -333,6 +333,9 @@
                                         <td>
                                             <div class="po-code-cell">{{ $line->item->code ?? '-' }}</div>
                                             <div class="po-name">{{ $line->item->name ?? '-' }}</div>
+                                            @if($line->expenseAccount)
+                                                <div class="text-muted mt-1" style="font-size: .7rem;"><i class="bi bi-wallet2"></i> {{ $line->expenseAccount->code }} - {{ $line->expenseAccount->name }}</div>
+                                            @endif
                                             
                                             {{-- MOBILE EXTRA INFO --}}
                                             <div class="d-md-none mt-1">
