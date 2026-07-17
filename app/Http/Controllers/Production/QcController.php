@@ -713,6 +713,7 @@ class QcController extends Controller
             ->keyBy('cutting_job_bundle_id');
 
         $rows = [];
+        $filterItems = [];
         foreach ($sewingReturn->lines as $line) {
             $bundle = $line->pickupLine?->bundle;
             if (! $bundle) {
@@ -724,29 +725,53 @@ class QcController extends Controller
             // Qty maksimal = total yang disetor penjahit. Setelah QC, line dipecah OK + reject.
             $maxQty = (float) ($line->qty_ok ?? 0) + (float) ($line->qty_reject ?? 0);
 
+            $qtyRejectJahit = 0;
+            $qtyRejectBahan = 0;
+            if ($qc) {
+                if ($qc->reject_reason === 'Reject Bahan') {
+                    $qtyRejectBahan = $qc->qty_reject;
+                } elseif ($qc->reject_reason === 'Reject Jahit & Bahan') {
+                    // fallback jika ada mixed reason
+                    $qtyRejectJahit = $qc->qty_reject; 
+                } else {
+                    $qtyRejectJahit = $qc->qty_reject;
+                }
+            }
+
             $rows[] = [
                 'sewing_return_line_id' => $line->id,
                 'bundle_id'        => $bundle->id,
                 'bundle_code'      => $bundle->bundle_code,
+                'item_id'          => $bundle->finished_item_id,
                 'item_code'        => $bundle->finishedItem?->code,
                 'item_name'        => $bundle->finishedItem?->name,
                 'cutting_job_code' => $bundle->cuttingJob?->code,
                 'qty_max'          => $maxQty,
                 'qty_ok'           => $qc?->qty_ok ?? $maxQty,
-                'qty_reject'       => $qc?->qty_reject ?? 0,
-                'reject_reason'    => $qc?->reject_reason,
+                'qty_reject_jahit' => $qtyRejectJahit,
+                'qty_reject_bahan' => $qtyRejectBahan,
                 'notes'            => $qc?->notes,
             ];
+
+            if ($bundle->finishedItem) {
+                $filterItems[$bundle->finished_item_id] = [
+                    'id' => $bundle->finished_item_id,
+                    'code' => $bundle->finishedItem->code,
+                    'name' => $bundle->finishedItem->name,
+                ];
+            }
         }
 
         $loginOperator = Auth::user()->employee ?? null;
         $hasQcSewing   = $existingQc->isNotEmpty();
+        $filterItems   = collect($filterItems)->values();
 
         return view('production.qc.sewing_edit', compact(
             'sewingReturn',
             'rows',
             'loginOperator',
             'hasQcSewing',
+            'filterItems'
         ));
     }
 
@@ -761,10 +786,10 @@ class QcController extends Controller
             'results'                 => ['required', 'array', 'min:1'],
             'results.*.sewing_return_line_id' => ['nullable', 'exists:sewing_return_lines,id'],
             'results.*.bundle_id'     => ['required', 'exists:cutting_job_bundles,id'],
-            'results.*.qty_ok'        => ['nullable', 'numeric', 'min:0'],
-            'results.*.qty_reject'    => ['nullable', 'numeric', 'min:0'],
-            'results.*.reject_reason' => ['nullable', 'string', 'max:100'],
-            'results.*.notes'         => ['nullable', 'string'],
+            'results.*.qty_ok'           => ['nullable', 'numeric', 'min:0'],
+            'results.*.qty_reject_jahit' => ['nullable', 'numeric', 'min:0'],
+            'results.*.qty_reject_bahan' => ['nullable', 'numeric', 'min:0'],
+            'results.*.notes'            => ['nullable', 'string'],
         ]);
 
         if (empty($validated['operator_id'])) {

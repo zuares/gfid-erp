@@ -39,7 +39,11 @@ Route::middleware(['auth'])
 
         Route::middleware('role:owner')->group(function () {
             Route::get('access-control', [AccessControlController::class, 'index'])->name('access-control.index');
+            Route::post('access-control/reset-password', [AccessControlController::class, 'resetPassword'])->name('access-control.reset-password');
             Route::put('access-control', [AccessControlController::class, 'update'])->name('access-control.update');
+            
+            // Activity Logs
+            Route::get('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'index'])->name('activity-logs.index');
         });
 
         Route::post('database-mode', [DatabaseModeController::class, 'switch'])->name('database-mode.switch');
@@ -340,3 +344,6 @@ if (app()->environment(['local', 'testing'])) {
     Route::post('/dev/dummy/bulk-print', [\App\Http\Controllers\Dev\DummyBulkPrintController::class, 'createBulkPrintJob'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 }
+
+// API endpoint for tracking
+Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'store'])->name('activity-logs.store')->middleware('auth')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

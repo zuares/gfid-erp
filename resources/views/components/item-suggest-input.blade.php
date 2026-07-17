@@ -76,6 +76,10 @@
                 width: 100%;
             }
 
+            .js-item-suggest-input {
+                text-transform: uppercase;
+            }
+
             .item-suggest-dropdown {
                 background: var(--card, #fff);
                 border: 1px solid var(--line, #e5e7eb);
@@ -241,7 +245,7 @@
                         return;
                     }
 
-                    let url = `/api/v1/items/suggest?q=${encodeURIComponent(q)}`;
+                    let url = `/api/v1/items/suggest?q=${encodeURIComponent(q)}&limit=3`;
 
                     if (type) {
                         url += `&type=${encodeURIComponent(type)}`;
@@ -386,6 +390,11 @@
 
                 // input → debounce + minChars
                 input.addEventListener('input', function() {
+                    // Force uppercase
+                    const cursor = this.selectionStart;
+                    this.value = this.value.toUpperCase();
+                    this.setSelectionRange(cursor, cursor);
+
                     const q = this.value.trim();
 
                     if (q.length === 0) {

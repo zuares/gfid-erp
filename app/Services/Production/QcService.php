@@ -11,6 +11,8 @@ use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
 use App\Services\Costing\FinishingRmHppService;
 use App\Services\Inventory\InventoryService;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use Illuminate\Support\Facades\DB;
 
 class QcService
@@ -20,6 +22,29 @@ class QcService
         protected FinishingRmHppService $finishingRmHpp,
         protected JournalService $journal,
     ) {}
+
+    private function resolveRejectItem(int $originalItemId): Item
+    {
+        $original = Item::with('category')->find($originalItemId);
+        if (!$original) {
+            throw new \RuntimeException("Item ID {$originalItemId} tidak ditemukan.");
+        }
+
+        $category = $original->category;
+        if (!$category) {
+            $category = ItemCategory::firstOrCreate(['code' => 'UNCAT'], ['name' => 'Uncategorized']);
+        }
+
+        return Item::firstOrCreate([
+            'code' => 'REJ-' . $category->code,
+        ], [
+            'name' => 'Reject ' . $category->name,
+            'item_category_id' => $category->id,
+            'unit_id' => $original->unit_id ?? null,
+            'is_stockable' => true,
+            'is_active' => true,
+        ]);
+    }
 
     /* ============================================================
      * 1) QC CUTTING
@@ -170,7 +195,8 @@ class QcService
             // membawa cutting_job_bundle_id (readiness ledger butuh atribusi per bundle).
             $processedByBundleItem = []; // [bundle_id => [item_id => qty (OK+Reject)]]
             $okByBundleItem = []; // [bundle_id => [item_id => qty OK]]
-            $rejectByBundleItem = []; // [bundle_id => [item_id => qty Reject]]
+            $rejectJahitByBundleItem = []; // [bundle_id => [item_id => qty Reject Jahit]]
+            $rejectBahanByBundleItem = []; // [bundle_id => [item_id => qty Reject Bahan]]
             $hasAnyMovement = false;
             $touchedPickupIds = [];
 
@@ -198,27 +224,43 @@ class QcService
                     : (float) ($bundle->qty_qc_ok ?? $bundle->qty_pcs ?? 0);
 
                 $qtyOk = (float) ($row['qty_ok'] ?? 0);
-                $qtyReject = (float) ($row['qty_reject'] ?? 0);
+                $qtyRejectJahit = (float) ($row['qty_reject_jahit'] ?? 0);
+                $qtyRejectBahan = (float) ($row['qty_reject_bahan'] ?? 0);
+                $qtyReject = $qtyRejectJahit + $qtyRejectBahan;
 
-                if ($qtyOk < 0) {
-                    $qtyOk = 0;
-                }
-                if ($qtyReject < 0) {
-                    $qtyReject = 0;
-                }
+                if ($qtyOk < 0) { $qtyOk = 0; }
+                if ($qtyRejectJahit < 0) { $qtyRejectJahit = 0; }
+                if ($qtyRejectBahan < 0) { $qtyRejectBahan = 0; }
+                $qtyReject = $qtyRejectJahit + $qtyRejectBahan;
 
                 if ($qtyOk + $qtyReject > $bundleQtyBase) {
                     $diff = ($qtyOk + $qtyReject) - $bundleQtyBase;
 
                     if ($qtyReject >= $diff) {
-                        $qtyReject -= $diff;
+                        // kurangi dari salah satu reject (prioritas kurang dari jahit)
+                        if ($qtyRejectJahit >= $diff) {
+                            $qtyRejectJahit -= $diff;
+                        } else {
+                            $qtyRejectBahan -= ($diff - $qtyRejectJahit);
+                            $qtyRejectJahit = 0;
+                        }
+                        $qtyReject = $qtyRejectJahit + $qtyRejectBahan;
                     } else {
                         $qtyOk = max(0, $bundleQtyBase - $qtyReject);
                     }
                 }
 
                 $status = $this->resolveBundleStatus($qtyOk, $qtyReject, $bundleQtyBase);
-                $rejectReason = $row['reject_reason'] ?? null;
+                
+                $rejectReason = null;
+                if ($qtyRejectJahit > 0 && $qtyRejectBahan > 0) {
+                    $rejectReason = 'Reject Jahit & Bahan';
+                } elseif ($qtyRejectJahit > 0) {
+                    $rejectReason = 'Reject Jahit';
+                } elseif ($qtyRejectBahan > 0) {
+                    $rejectReason = 'Reject Bahan';
+                }
+
                 $notes = $row['notes'] ?? null;
 
                 // 1.a Simpan QC ke qc_results (stage sewing)
@@ -288,8 +330,14 @@ class QcService
                     if ($qtyReject > 0) {
                         $totalRejectByItem[$itemId] =
                             ($totalRejectByItem[$itemId] ?? 0) + $qtyReject;
-                        $rejectByBundleItem[$bundleId][$itemId] =
-                            ($rejectByBundleItem[$bundleId][$itemId] ?? 0) + $qtyReject;
+                        if ($qtyRejectBahan > 0) {
+                            $rejectBahanByBundleItem[$bundleId][$itemId] =
+                                ($rejectBahanByBundleItem[$bundleId][$itemId] ?? 0) + $qtyRejectBahan;
+                        }
+                        if ($qtyRejectJahit > 0) {
+                            $rejectJahitByBundleItem[$bundleId][$itemId] =
+                                ($rejectJahitByBundleItem[$bundleId][$itemId] ?? 0) + $qtyRejectJahit;
+                        }
                     }
                 }
             }
@@ -359,8 +407,8 @@ class QcService
                 }
             }
 
-            // 2.c IN ke REJ-SEW (Reject, per bundle)
-            foreach ($rejectByBundleItem as $bundleId => $byItem) {
+            // 2.c IN ke REJ-SEW (Reject Jahit, per bundle)
+            foreach ($rejectJahitByBundleItem as $bundleId => $byItem) {
                 foreach ($byItem as $itemId => $qtyRejectItem) {
                     if ($qtyRejectItem <= 0) {
                         continue;
@@ -373,7 +421,32 @@ class QcService
                         date: $qcDate,
                         sourceType: 'sewing_qc_reject',
                         sourceId: $sewingReturn->id,
-                        notes: "QC Sewing REJECT {$qtyRejectItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
+                        notes: "QC Sewing REJECT JAHIT {$qtyRejectItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
+                        lotId: null,
+                        unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
+                        affectLotCost: false,
+                        cuttingJobBundleId: $bundleId,
+                    );
+                }
+            }
+
+            // 2.d IN ke WH-PRD (Reject Bahan, dikonversi jadi REJ-kategori, per bundle)
+            foreach ($rejectBahanByBundleItem as $bundleId => $byItem) {
+                foreach ($byItem as $itemId => $qtyRejectItem) {
+                    if ($qtyRejectItem <= 0) {
+                        continue;
+                    }
+
+                    $rejectItem = $this->resolveRejectItem($itemId);
+
+                    $this->inventory->stockIn(
+                        warehouseId: $whPrdWarehouseId,
+                        itemId: $rejectItem->id,
+                        qty: $qtyRejectItem,
+                        date: $qcDate,
+                        sourceType: 'sewing_qc_reject',
+                        sourceId: $sewingReturn->id,
+                        notes: "QC Sewing REJECT BAHAN {$qtyRejectItem} pcs dikonversi ke {$rejectItem->code} untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
                         unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,

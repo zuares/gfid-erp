@@ -902,6 +902,81 @@
     @endif
 @endauth
 
+
+@auth
+@if(!in_array(auth()->user()->role, ['owner', 'developer']))
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startTime = Date.now();
+    const endpoint = '{{ url('/activity-logs') }}';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    function sendLog(action, data) {
+        const payload = JSON.stringify({
+            _token: csrfToken,
+            url: window.location.href.substring(0, 500),
+            action: action,
+            ...data
+        });
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: payload,
+            keepalive: true
+        }).catch(e => console.error(e));
+    }
+
+    // Track clicks on a, button, input, select, and label elements
+    document.addEventListener('click', function(e) {
+        let el = e.target.closest('a, button, input, select, label, textarea');
+        if (!el) return;
+        
+        let text = '';
+        
+        // Handle different types of elements
+        if (el.tagName.toLowerCase() === 'input') {
+            if (el.type === 'radio' || el.type === 'checkbox') {
+                text = 'Toggle ' + el.type + (el.value ? ' [' + el.value + ']' : '');
+            } else if (el.type === 'submit' || el.type === 'button') {
+                text = el.value || 'Submit Button';
+            } else {
+                text = 'Input Field (' + el.type + ')';
+            }
+        } else if (el.tagName.toLowerCase() === 'select') {
+            text = 'Select Dropdown';
+        } else {
+            text = el.innerText ? el.innerText.trim().substring(0, 50) : '';
+        }
+
+        if (!text && el.title) text = el.title;
+        if (!text && el.name) text = el.name;
+        if (!text) text = 'Icon/Element';
+        
+        let identity = el.tagName.toLowerCase();
+        if (el.id) identity += '#' + el.id;
+        else if (el.className && typeof el.className === 'string') identity += '.' + el.className.split(' ').join('.');
+        if (el.name) identity += '[name=' + el.name + ']';
+        
+        let targetElement = text + ' (' + identity + ')';
+        targetElement = targetElement.substring(0, 500);
+
+        sendLog('click', { target_element: targetElement });
+    }, { capture: true }); // Use capture to ensure we get it even if stopped propagation
+
+    // Track dwell time
+    window.addEventListener('beforeunload', function() {
+        const duration = Date.now() - startTime;
+        sendLog('visit', { duration_ms: duration });
+    });
+});
+</script>
+@endif
+@endauth
+
 </body>
 </html>
 

@@ -75,10 +75,10 @@
 
     // Pembelian
     $hasPurchasingDashboard  = $router->has('purchasing.dashboard');
-    $hasPoIndex   = $router->has('purchasing.purchase_orders.index');
-    $hasPoCreate  = $router->has('purchasing.purchase_orders.create');
-    $hasGrnIndex  = $router->has('purchasing.purchase_receipts.index');
-    $hasGrnCreate = $router->has('purchasing.purchase_receipts.create');
+    $hasPoIndex   = !$isAdmin && $router->has('purchasing.purchase_orders.index');
+    $hasPoCreate  = !$isAdmin && $router->has('purchasing.purchase_orders.create');
+    $hasGrnIndex  = !$isAdmin && $router->has('purchasing.purchase_receipts.index');
+    $hasGrnCreate = !$isAdmin && $router->has('purchasing.purchase_receipts.create');
     $hasPurchaseReturnIndex    = $router->has('purchasing.purchase_returns.index');
     $hasSupplierInvoiceIndex   = $router->has('purchasing.supplier_invoices.index');
     $hasPurchasePaymentsIndex  = $router->has('purchasing.purchase_payments.index');
@@ -108,11 +108,11 @@
     $hasMarketplaceShow = $router->has('marketplace.orders.show');
 
     // Toko Online Laporan
-    $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
+    $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
     $hasMarketplaceSalesExport = $router->has('marketplace.reports.sales.export');
 
     // Toko Online Reconcile
-    $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
+    $hasMarketplaceReconcileQueue = !$isAdmin && $router->has('marketplace.reconcile.queue');
     $hasMarketplaceReconcileQueueBulk = $router->has('marketplace.reconcile.queue.bulk'); // POST (guard only)
     $hasMarketplaceReconcilePreview = $router->has('marketplace.reconcile.preview'); // POST
     $hasMarketplaceReconcileCommit = $router->has('marketplace.reconcile.commit'); // POST
@@ -120,7 +120,7 @@
     $hasMarketplaceReconciliationsResolve = $router->has('marketplace.reconciliations.resolve'); // POST
     $hasMarketplaceReconciliationsDiff = $router->has('marketplace.reconciliations.diff'); // GET
 
-    $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items'); // GET
+    $hasMarketplaceReconcileItemsIndex = !$isAdmin && $router->has('marketplace.reconcile.items'); // GET
     $hasMarketplaceReconcileItemsApply = $router->has('marketplace.reconcile.items.apply'); // POST
     $hasMarketplaceReconcileItemsPackets = $router->has('marketplace.reconcile.items.packets'); // GET
 
@@ -571,12 +571,12 @@
         display: flex;
         align-items: center;
         gap: .55rem;
-        padding: .6rem .9rem;
-        border-radius: 14px;
+        padding: .48rem .85rem;
+        border-radius: 12px;
         color: var(--text);
         text-decoration: none;
         font-size: .93rem;
-        transition: background .18s ease, box-shadow .18s ease, transform .12s ease, color .18s ease;
+        transition: background .1s ease-out, box-shadow .1s ease-out, transform .1s ease-out, color .1s ease-out;
         position: relative;
     }
 
@@ -596,7 +596,7 @@
     }
 
     .sidebar-toggle { cursor: pointer; border: 0; width: 100%; background: transparent; text-align: left; }
-    .sidebar-toggle .chevron { margin-left: auto; font-size: .8rem; opacity: .8; transition: transform .18s ease; }
+    .sidebar-toggle .chevron { margin-left: auto; font-size: .8rem; opacity: .8; transition: transform .12s ease-out; }
     .sidebar-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
     .sidebar-toggle.is-open { background: transparent; box-shadow: none; color: var(--accent); font-weight: 700; }
     .sidebar-toggle.is-open .icon { color: var(--accent); }
@@ -604,15 +604,15 @@
     .sidebar-link-sub {
         position: relative;
         font-size: .86rem;
-        padding: .42rem .9rem .42rem 2.3rem;
+        padding: .38rem .85rem .38rem 2.15rem;
         opacity: .95;
-        border-radius: 10px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         gap: .55rem;
         color: var(--text);
         text-decoration: none;
-        transition: background .18s ease, box-shadow .18s ease, transform .12s ease, color .18s ease;
+        transition: background .1s ease-out, box-shadow .1s ease-out, transform .1s ease-out, color .1s ease-out;
     }
 
     .sidebar-link-sub .icon { width: 18px; font-size: .9rem; text-align: center; }
@@ -660,6 +660,13 @@
         border-radius:999px;
         opacity:.8;
     }
+    body[data-theme="dark"] .sidebar-divider{
+        background: color-mix(in srgb, rgba(255,255,255,.05) 90%, transparent 10%);
+    }
+
+    .sidebar-modern .collapsing {
+        transition: height .15s ease-out !important;
+    }
 </style>
 
 <aside class="sidebar-modern flex-column">
@@ -683,6 +690,13 @@
                 <li>
                     <x-sidebar.simple-link href="{{ route('owner.access-control.index') }}" icon="bi bi-shield-lock" :active="request()->routeIs('owner.access-control.*')">
                         Akses Login
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
+            @if ($isOwner && $router->has('owner.activity-logs.index'))
+                <li>
+                    <x-sidebar.simple-link href="{{ route('owner.activity-logs.index') }}" icon="bi bi-activity" :active="request()->routeIs('owner.activity-logs.*')">
+                        Log Aktivitas
                     </x-sidebar.simple-link>
                 </li>
             @endif
@@ -742,7 +756,7 @@
                     <div class="collapse {{ $openCrm ? 'show' : '' }}" id="navCrm">
                         <x-sidebar.sub-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
                             :active="request()->routeIs('admin.crm.dashboard')">
-                            Dashboard
+                            Beranda
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
                             :active="request()->routeIs('admin.crm.visitors*')">
@@ -750,7 +764,7 @@
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
                             :active="request()->routeIs('admin.crm.orders*')">
-                            Orders
+                            Pesanan
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
                             :active="request()->routeIs('admin.crm.prospects*')">
@@ -758,7 +772,7 @@
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
                             :active="request()->routeIs('admin.crm.customers*')">
-                            Customers
+                            Pelanggan
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
                             :active="request()->routeIs('admin.crm.segments*')">
@@ -779,12 +793,12 @@
                 ADMIN / OPERATING (simple, non-collapsible)
             ========================================================= --}}
 
-            <x-sidebar.label text="Operations" />
+            <x-sidebar.label :text="$isAdmin ? 'Persediaan' : 'Operasional'" />
             <li class="simple-group">
                 @if ($hasInvIntelligence)
                     <x-sidebar.simple-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
                         :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
-                        Analisa Persediaan
+                        Analisa Stok
                     </x-sidebar.simple-link>
                 @endif
 
@@ -854,7 +868,7 @@
                     @if ($hasMarketplaceIndex)
                         <x-sidebar.simple-link href="{{ route('marketplace.orders') }}" icon="bi bi-cart3"
                             :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
-                            Orders
+                            Pesanan
                         </x-sidebar.simple-link>
                     @endif
 
@@ -865,7 +879,7 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($router->has('marketplace.boost'))
+                    @if (!$isAdmin && $router->has('marketplace.boost'))
                         <x-sidebar.simple-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
                             :active="request()->routeIs('marketplace.boost')">
                             Naikkan Produk
@@ -882,28 +896,28 @@
                     @if ($hasMarketplaceSalesReport)
                         <x-sidebar.simple-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                             :active="request()->routeIs('marketplace.reports.sales')">
-                            Sales Summary
+                            Laporan Penjualan
                         </x-sidebar.simple-link>
                     @endif
 
                     @if ($hasMarketplaceReconcileQueue)
                         <x-sidebar.simple-link href="{{ route('marketplace.reconcile.queue') }}" icon="bi bi-puzzle"
                             :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
-                            Reconcile Queue
+                            Antrean Rekonsiliasi
                         </x-sidebar.simple-link>
                     @endif
 
                     @if ($hasMarketplaceReconcileItemsIndex)
                         <x-sidebar.simple-link href="{{ route('marketplace.reconcile.items') }}" icon="bi bi-receipt"
                             :active="request()->routeIs('marketplace.reconcile.items*')">
-                            Reconcile Items
+                            Rekonsiliasi Barang
                         </x-sidebar.simple-link>
                     @endif
                 </li>
             @endif
 
             {{-- CRM Storefront --}}
-            @if ($isAdmin || $isOwner)
+            @if ($isOwner)
                 <x-sidebar.label text="CRM Storefront" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openCrm ? 'is-open' : '' }}" type="button"
@@ -916,7 +930,7 @@
                     <div class="collapse {{ $openCrm ? 'show' : '' }}" id="navCrmAdmin">
                         <x-sidebar.sub-link href="{{ route('admin.crm.dashboard') }}" icon="bi bi-bar-chart-line"
                             :active="request()->routeIs('admin.crm.dashboard')">
-                            Dashboard
+                            Beranda
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.visitors') }}" icon="bi bi-person-video3"
                             :active="request()->routeIs('admin.crm.visitors*')">
@@ -924,7 +938,7 @@
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.orders') }}" icon="bi bi-bag-check"
                             :active="request()->routeIs('admin.crm.orders*')">
-                            Orders
+                            Pesanan
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.prospects') }}" icon="bi bi-person-lines-fill"
                             :active="request()->routeIs('admin.crm.prospects*')">
@@ -932,7 +946,7 @@
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.customers') }}" icon="bi bi-people"
                             :active="request()->routeIs('admin.crm.customers*')">
-                            Customers
+                            Pelanggan
                         </x-sidebar.sub-link>
                         <x-sidebar.sub-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
                             :active="request()->routeIs('admin.crm.segments*')">
@@ -956,7 +970,7 @@
                     @if ($hasImportMarketplaceIndex)
                         <x-sidebar.simple-link href="{{ route('imports.marketplace.index') }}" icon="bi bi-upload"
                             :active="request()->routeIs('imports.marketplace.*')">
-                            Import Toko Online Pengiriman
+                            Impor Pengiriman
                         </x-sidebar.simple-link>
                     @endif
 
@@ -997,7 +1011,7 @@
                     @if ($hasSalesShipmentReturnsIndex)
                         <x-sidebar.simple-link href="{{ route('sales.shipment_returns.index') }}" icon="bi bi-arrow-repeat"
                             :active="request()->routeIs('sales.shipment_returns.*')">
-                            Retur Shipment
+                            Retur Pengiriman
                         </x-sidebar.simple-link>
                     @endif
                 </li>
@@ -1044,38 +1058,25 @@
                 </li>
             @endif
 
+
             {{-- Pembelian (admin only) --}}
             @php
-                $adminHasPoIndex  = $isAdmin && $router->has('purchasing.purchase_orders.index');
                 $adminHasPoCreate = $isAdmin && $router->has('purchasing.purchase_orders.create');
-                $adminHasGrnIndex  = $isAdmin && $hasGrnIndex;
-                $adminHasGrnCreate = $isAdmin && $hasGrnCreate;
+                $adminHasGrnCreate = $isAdmin && $router->has('purchasing.purchase_receipts.create');
             @endphp
-            @if ($adminHasPoIndex || $adminHasPoCreate || $adminHasGrnIndex || $adminHasGrnCreate)
+            @if ($adminHasPoCreate || $adminHasGrnCreate)
                 <x-sidebar.label text="Pengadaan" />
                 <li class="simple-group">
-                    @if ($adminHasPoIndex)
-                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-receipt"
-                            :active="request()->routeIs('purchasing.purchase_orders.index')">
-                            Daftar PO
-                        </x-sidebar.simple-link>
-                    @endif
                     @if ($adminHasPoCreate)
                         <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
                             :active="request()->routeIs('purchasing.purchase_orders.create')">
-                            PO Baru
-                        </x-sidebar.simple-link>
-                    @endif
-                    @if ($adminHasGrnIndex)
-                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list"
-                            :active="request()->routeIs('purchasing.purchase_receipts.index')">
-                            Daftar GRN
+                            Buat PO
                         </x-sidebar.simple-link>
                     @endif
                     @if ($adminHasGrnCreate)
                         <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-box-seam"
                             :active="request()->routeIs('purchasing.purchase_receipts.create')">
-                            GRN Baru
+                            Buat Penerimaan
                         </x-sidebar.simple-link>
                     @endif
                 </li>
@@ -1106,7 +1107,7 @@
                     @if ($hasProdCuttingJobsIndex)
                         <x-sidebar.simple-link href="{{ route('production.cutting_jobs.index') }}" icon="bi bi-scissors"
                             :active="request()->routeIs('production.cutting_jobs.*')">
-                            Pekerjaan Potong
+                            Potong
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1169,7 +1170,7 @@
                     @if ($hasProdWipCleanup)
                         <x-sidebar.simple-link href="{{ route('production.wip_cleanup.index') }}" icon="bi bi-eraser"
                             :active="request()->routeIs('production.wip_cleanup.*')">
-                            WIP Cleanup
+                            Bersihkan WIP
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1197,7 +1198,7 @@
                     @if ($hasProdReconcile && auth()->user()?->hasRole('owner'))
                         <x-sidebar.simple-link href="{{ route('production.reconcile.index') }}" icon="bi bi-search"
                             :active="request()->routeIs('production.reconcile.*')">
-                            Rekonsiliasi Gap Cost
+                            Rekon Biaya
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1268,7 +1269,7 @@
                     @if ($hasOpeningBalancesBatchIndex)
                         <x-sidebar.simple-link href="{{ route('accounting.opening-balances-batch.index') }}" icon="bi bi-basket"
                             :active="request()->routeIs('accounting.opening-balances-batch.*')">
-                            Saldo Awal Batch
+                            Batch Saldo Awal
                         </x-sidebar.simple-link>
                     @endif
                 </li>
@@ -1278,155 +1279,6 @@
             {{-- =========================================================
                 OWNER (collapsible, grouped)
             ========================================================= --}}
-
-            {{-- MASTER DATA --}}
-            <x-sidebar.label text="Data Master" />
-            <li class="mb-1">
-                <button class="sidebar-link sidebar-toggle {{ $openMaster ? 'is-open' : '' }}" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#navMaster"
-                    aria-expanded="{{ $openMaster ? 'true' : 'false' }}" aria-controls="navMaster">
-                    <span class="icon"><i class="bi bi-folder2-open"></i></span>
-                    <span>Data Master</span>
-                    <span class="chevron">▸</span>
-                </button>
-
-                <div class="collapse {{ $openMaster ? 'show' : '' }}" id="navMaster">
-                    @if ($hasMasterItemsIndex)
-                        <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="bi bi-box-seam"
-                            :active="request()->routeIs('master.items.*')">
-                            Items
-                        </x-sidebar.sub-link>
-                    @endif
-
-                    @if ($hasMasterItemCategoriesIndex)
-                        <x-sidebar.sub-link href="{{ route('master.item_categories.index') }}" icon="bi bi-folder2-open"
-                            :active="request()->routeIs('master.item_categories.*')">
-                            Kategori Item
-                        </x-sidebar.sub-link>
-                    @endif
-
-                    @if ($hasMasterItemBomsIndex)
-                        <x-sidebar.sub-link href="{{ route('master.item_boms.index') }}" icon="bi bi-receipt"
-                            :active="request()->routeIs('master.item_boms.*')">
-                            BOM SKU
-                        </x-sidebar.sub-link>
-                    @endif
-
-                    @if ($hasMasterSuppliersIndex)
-                        <x-sidebar.sub-link href="{{ route('master.suppliers.index') }}" icon="bi bi-tag"
-                            :active="request()->routeIs('master.suppliers.*')">
-                            Suppliers
-                        </x-sidebar.sub-link>
-                    @endif
-
-                    @if ($hasMasterCustomersIndex)
-                        <x-sidebar.sub-link href="{{ route('master.customers.index') }}" icon="bi bi-person"
-                            :active="request()->routeIs('master.customers.*')">
-                            Customers
-                        </x-sidebar.sub-link>
-                    @endif
-
-                    @if ($hasMasterEmployeesIndex)
-                        <x-sidebar.sub-link href="{{ route('master.employees.index') }}" icon="bi bi-person-fill-gear"
-                            :active="request()->routeIs('master.employees.*')">
-                            Karyawan
-                        </x-sidebar.sub-link>
-                    @endif
-                </div>
-            </li>
-
-            {{-- PURCHASING --}}
-            @if ($canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate, $hasPurchaseReturnIndex, $hasPrIndex, $hasMaterialShortageIndex, $hasSupplierItemsIndex))
-                <x-sidebar.label text="Pengadaan" />
-                <li class="mb-1">
-                    <button class="sidebar-link sidebar-toggle {{ $openPembelian ? 'is-open' : '' }}" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#navPembelian"
-                        aria-expanded="{{ $openPembelian ? 'true' : 'false' }}" aria-controls="navPembelian">
-                        <span class="icon"><i class="bi bi-receipt"></i></span>
-                        <span>Pembelian</span>
-                        <span class="chevron">▸</span>
-                    </button>
-
-                    <div class="collapse {{ $openPembelian ? 'show' : '' }}" id="navPembelian">
-                        @if ($hasPurchasingDashboard && ($isOwner || in_array($role ?? '', ['admin', 'accounting'], true)))
-                            <x-sidebar.sub-link href="{{ route('purchasing.dashboard') }}" icon="bi bi-bar-chart"
-                                :active="request()->routeIs('purchasing.dashboard')">
-                                Dashboard
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @php $subhead('Permintaan Pembelian'); @endphp
-                        @if ($hasMaterialShortageIndex)
-                            <x-sidebar.sub-link href="{{ route('purchasing.material_shortages.index') }}" icon="bi bi-exclamation-triangle"
-                                :active="request()->routeIs('purchasing.material_shortages.*')">
-                                Kekurangan Material
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasPrIndex)
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_requests.index') }}" icon="bi bi-list-ul"
-                                :active="request()->routeIs('purchasing.purchase_requests.*')">
-                                Purchase Request
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasSupplierItemsIndex)
-                            <x-sidebar.sub-link href="{{ route('purchasing.supplier_items.index') }}" icon="bi bi-list"
-                                :active="request()->routeIs('purchasing.supplier_items.*')">
-                                Pemasok Barang
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @php $subhead('Purchase Order'); @endphp
-                        @if ($hasPoIndex)
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list"
-                                :active="request()->routeIs('purchasing.purchase_orders.index')">
-                                Daftar PO
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasPoCreate)
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
-                                :active="request()->routeIs('purchasing.purchase_orders.create')">
-                                PO Baru
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @php $subhead('Penerimaan Barang (GRN)'); @endphp
-                        @if ($hasGrnIndex)
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list"
-                                :active="request()->routeIs('purchasing.purchase_receipts.index')">
-                                Daftar GRN
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasGrnCreate)
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-plus-circle"
-                                :active="request()->routeIs('purchasing.purchase_receipts.create')">
-                                GRN Baru
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasPurchaseReturnIndex)
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_returns.index') }}" icon="bi bi-arrow-return-left"
-                                :active="request()->routeIs('purchasing.purchase_returns.*')">
-                                Retur Pembelian
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasSupplierInvoiceIndex && ($isOwner || in_array($role ?? '', ['accounting', 'developer'])))
-                            @php $subhead('Faktur Supplier'); @endphp
-                            <x-sidebar.sub-link href="{{ route('purchasing.supplier_invoices.index') }}" icon="bi bi-receipt"
-                                :active="request()->routeIs('purchasing.supplier_invoices.*')">
-                                Faktur Supplier
-                            </x-sidebar.sub-link>
-                        @endif
-
-                        @if ($hasPurchasePaymentsIndex && $isOwner)
-                            @php $subhead('Pembayaran Supplier'); @endphp
-                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_payments.index') }}" icon="bi bi-cash"
-                                :active="request()->routeIs('purchasing.purchase_payments.*')">
-                                Bayar Supplier
-                            </x-sidebar.sub-link>
-                        @endif
-                    </div>
-                </li>
-            @endif
 
             {{-- MARKETPLACE --}}
             @if ($canShow(
@@ -1472,13 +1324,13 @@
 
                             <x-sidebar.sub-link href="{{ route('marketplace.settings') }}" icon="bi bi-gear"
                                 :active="request()->routeIs('marketplace.settings')">
-                                Pengaturan Global
+                                Pengaturan Umum
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceOrders)
                             <x-sidebar.sub-link href="{{ route('marketplace.orders') }}" icon="bi bi-list-ul"
                                 :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
-                                Order Lokal
+                                Pesanan Lokal
                             </x-sidebar.sub-link>
                         @endif
                         @if ($router->has('marketplace.products'))
@@ -1502,13 +1354,13 @@
                         @if ($hasMarketplacePemenuhan)
                             <x-sidebar.sub-link href="{{ route('marketplace.fulfillment') }}" icon="bi bi-truck"
                                 :active="request()->routeIs('marketplace.fulfillment') || request()->routeIs('marketplace.fulfillment.*')">
-                                Pemenuhan
+                                Fulfillment
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplacePickingBarang)
                             <x-sidebar.sub-link href="{{ route('marketplace.picking') }}" icon="bi bi-basket"
                                 :active="request()->routeIs('marketplace.picking')">
-                                Picking Barang
+                                Pengambilan
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1516,19 +1368,19 @@
                         @if ($hasMarketplaceSkuMapping)
                             <x-sidebar.sub-link href="{{ route('marketplace.sku-mapping') }}" icon="bi bi-link-45deg"
                                 :active="request()->routeIs('marketplace.sku-mapping')">
-                                Mapping SKU
+                                Pemetaan SKU
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceSync)
                             <x-sidebar.sub-link href="{{ route('marketplace.sync') }}" icon="bi bi-arrow-down-circle"
                                 :active="request()->routeIs('marketplace.sync')">
-                                Sinkron Order
+                                Sinkron Pesanan
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceIssues)
                             <x-sidebar.sub-link href="{{ route('marketplace.issues') }}" icon="bi bi-exclamation-triangle"
                                 :active="request()->routeIs('marketplace.issues')">
-                                Data Perlu Diperbaiki
+                                Perbaikan Data
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1542,7 +1394,7 @@
                         @if ($hasMarketplaceProfit)
                             <x-sidebar.sub-link href="{{ route('marketplace.profit') }}" icon="bi bi-graph-up"
                                 :active="request()->routeIs('marketplace.profit')">
-                                Laba Order
+                                Laba Pesanan
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceAds)
@@ -1588,13 +1440,13 @@
                         @if ($hasSalesInvoicesIndex)
                             <x-sidebar.sub-link href="{{ route('sales.invoices.index') }}" icon="bi bi-list"
                                 :active="request()->routeIs('sales.invoices.index')">
-                                Daftar Invoice
+                                Daftar Tagihan
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasSalesInvoicesCreate)
                             <x-sidebar.sub-link href="{{ route('sales.invoices.create') }}" icon="bi bi-plus-circle"
                                 :active="request()->routeIs('sales.invoices.create')">
-                                Invoice Baru
+                                Tagihan Baru
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1608,7 +1460,7 @@
                         @if ($hasSalesShipmentsCreate)
                             <x-sidebar.sub-link href="{{ route('sales.shipments.create') }}" icon="bi bi-plus-circle"
                                 :active="request()->routeIs('sales.shipments.create')">
-                                Pengiriman Baru
+                                Kirim Baru
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1624,7 +1476,7 @@
                         @if ($hasSalesReportPerformance)
                             <x-sidebar.sub-link href="{{ route('sales.reports.sales_performance.index') }}" icon="bi bi-graph-up"
                                 :active="request()->routeIs('sales.reports.sales_performance.*')">
-                                Performa Penjualan
+                                Kinerja Penjualan
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasSalesShipmentsReport)
@@ -1636,13 +1488,13 @@
                         @if ($hasSalesReportItemProfit)
                             <x-sidebar.sub-link href="{{ route('sales.reports.item_profit') }}" icon="bi bi-coin"
                                 :active="request()->routeIs('sales.reports.item_profit')">
-                                Profit per Item
+                                Laba per Barang
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasSalesReportChannelProfit)
                             <x-sidebar.sub-link href="{{ route('sales.reports.channel_profit') }}" icon="bi bi-tag"
                                 :active="request()->routeIs('sales.reports.channel_profit')">
-                                Profit per Channel
+                                Laba per Kanal
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasSalesReportShipmentAnalytics)
@@ -1685,7 +1537,7 @@
                             @php $subhead('Intelligence'); @endphp
                             <x-sidebar.sub-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
                                 :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
-                                Analisa Persediaan
+                                Analisa Stok
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1811,6 +1663,99 @@
                 </li>
             @endif
 
+            {{-- PURCHASING --}}
+            @if ($canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate, $hasPurchaseReturnIndex, $hasPrIndex, $hasMaterialShortageIndex, $hasSupplierItemsIndex))
+                <x-sidebar.label text="Pengadaan" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openPembelian ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navPembelian"
+                        aria-expanded="{{ $openPembelian ? 'true' : 'false' }}" aria-controls="navPembelian">
+                        <span class="icon"><i class="bi bi-receipt"></i></span>
+                        <span>Pembelian</span>
+                        <span class="chevron">▸</span>
+                    </button>
+
+                    <div class="collapse {{ $openPembelian ? 'show' : '' }}" id="navPembelian">
+                        @if ($hasPurchasingDashboard && ($isOwner || in_array($role ?? '', ['admin', 'accounting'], true)))
+                            <x-sidebar.sub-link href="{{ route('purchasing.dashboard') }}" icon="bi bi-bar-chart"
+                                :active="request()->routeIs('purchasing.dashboard')">
+                                Beranda
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Permintaan Pembelian'); @endphp
+                        @if ($hasMaterialShortageIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.material_shortages.index') }}" icon="bi bi-exclamation-triangle"
+                                :active="request()->routeIs('purchasing.material_shortages.*')">
+                                Kekurangan Bahan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasPrIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_requests.index') }}" icon="bi bi-list-ul"
+                                :active="request()->routeIs('purchasing.purchase_requests.*')">
+                                Permintaan Beli
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasSupplierItemsIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.supplier_items.index') }}" icon="bi bi-list"
+                                :active="request()->routeIs('purchasing.supplier_items.*')">
+                                Daftar Pemasok
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Purchase Order'); @endphp
+                        @if ($hasPoIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list"
+                                :active="request()->routeIs('purchasing.purchase_orders.index')">
+                                Daftar PO
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasPoCreate)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
+                                :active="request()->routeIs('purchasing.purchase_orders.create')">
+                                Buat PO
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @php $subhead('Penerimaan Barang (GRN)'); @endphp
+                        @if ($hasGrnIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list"
+                                :active="request()->routeIs('purchasing.purchase_receipts.index')">
+                                Daftar Penerimaan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasGrnCreate)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-plus-circle"
+                                :active="request()->routeIs('purchasing.purchase_receipts.create')">
+                                Buat Penerimaan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasPurchaseReturnIndex)
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_returns.index') }}" icon="bi bi-arrow-return-left"
+                                :active="request()->routeIs('purchasing.purchase_returns.*')">
+                                Retur Pembelian
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasSupplierInvoiceIndex && ($isOwner || in_array($role ?? '', ['accounting', 'developer'])))
+                            @php $subhead('Faktur Supplier'); @endphp
+                            <x-sidebar.sub-link href="{{ route('purchasing.supplier_invoices.index') }}" icon="bi bi-receipt"
+                                :active="request()->routeIs('purchasing.supplier_invoices.*')">
+                                Tagihan Pemasok
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasPurchasePaymentsIndex && $isOwner)
+                            @php $subhead('Pembayaran Supplier'); @endphp
+                            <x-sidebar.sub-link href="{{ route('purchasing.purchase_payments.index') }}" icon="bi bi-cash"
+                                :active="request()->routeIs('purchasing.purchase_payments.*')">
+                                Bayar Pemasok
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
+                </li>
+            @endif
+
             {{-- PRODUCTION --}}
             @if ($canShow(
                 $hasProdCuttingJobsIndex,
@@ -1865,7 +1810,7 @@
                         @if ($hasProdReconcile)
                             <x-sidebar.sub-link href="{{ route('production.reconcile.index') }}" icon="bi bi-search"
                                 :active="request()->routeIs('production.reconcile.*')">
-                                Rekonsiliasi Gap Cost
+                                Rekon Biaya
                             </x-sidebar.sub-link>
                         @endif
 
@@ -1873,7 +1818,7 @@
                         @if ($hasProdCuttingJobsIndex)
                             <x-sidebar.sub-link href="{{ route('production.cutting_jobs.index') }}" icon="bi bi-scissors"
                                 :active="request()->routeIs('production.cutting_jobs.*')">
-                                Pekerjaan Potong
+                                Potong
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdSewPickupsIndex)
@@ -1903,7 +1848,7 @@
                         @if ($hasProdFinishingJobsIndex)
                             <x-sidebar.sub-link href="{{ route('production.finishing_jobs.index') }}" icon="bi bi-patch-check"
                                 :active="request()->routeIs('production.finishing_jobs.*')">
-                                Pekerjaan Finishing
+                                Finishing
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdFinishingRepairsIndex)
@@ -1931,7 +1876,7 @@
                         @if ($hasProdWipCleanup)
                             <x-sidebar.sub-link href="{{ route('production.wip_cleanup.index') }}" icon="bi bi-eraser"
                                 :active="request()->routeIs('production.wip_cleanup.*')">
-                                WIP Cleanup
+                                Bersihkan WIP
                             </x-sidebar.sub-link>
                         @endif
                     </div>
@@ -1968,7 +1913,7 @@
                         @if ($hasOpeningBalancesBatchIndex)
                             <x-sidebar.sub-link href="{{ route('accounting.opening-balances-batch.index') }}" icon="bi bi-basket"
                                 :active="request()->routeIs('accounting.opening-balances-batch.*')">
-                                Saldo Awal Batch
+                                Batch Saldo Awal
                             </x-sidebar.sub-link>
                         @endif
 
@@ -2038,7 +1983,37 @@
                 </li>
             @endif
 
-            {{-- PAYROLL --}}
+            {{-- COSTING --}}
+            @if ($canShow($hasHppIndex, $hasProdCostPeriodsIndex))
+                <x-sidebar.label text="Biaya Produksi" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openCosting ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navCosting"
+                        aria-expanded="{{ $openCosting ? 'true' : 'false' }}" aria-controls="navCosting">
+                        <span class="icon"><i class="bi bi-graph-down"></i></span>
+                        <span>Biaya Produksi &amp; HPP</span>
+                        <span class="chevron">▸</span>
+                    </button>
+
+                    <div class="collapse {{ $openCosting ? 'show' : '' }}" id="navCosting">
+                        @if ($hasHppIndex)
+                            <x-sidebar.sub-link href="{{ route('costing.hpp.index') }}" icon="bi bi-gear"
+                                :active="request()->routeIs('costing.hpp.*')">
+                                HPP Barang Jadi
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasProdCostPeriodsIndex)
+                            <x-sidebar.sub-link href="{{ route('costing.production_cost_periods.index') }}" icon="bi bi-calendar3"
+                                :active="request()->routeIs('costing.production_cost_periods.*')">
+                                Periode Produksi
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
+                </li>
+            @endif
+
+{{-- PAYROLL --}}
             @if ($canShow($hasPayrollDashboard, $hasPieceworkIndex, $hasPieceRatesIndex, $hasPayrollReportsOperators))
                 <x-sidebar.label text="Penggajian" />
                 <li class="mb-1">
@@ -2087,36 +2062,62 @@
                 </li>
             @endif
 
-            {{-- COSTING --}}
-            @if ($canShow($hasHppIndex, $hasProdCostPeriodsIndex))
-                <x-sidebar.label text="Biaya Produksi" />
-                <li class="mb-1">
-                    <button class="sidebar-link sidebar-toggle {{ $openCosting ? 'is-open' : '' }}" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#navCosting"
-                        aria-expanded="{{ $openCosting ? 'true' : 'false' }}" aria-controls="navCosting">
-                        <span class="icon"><i class="bi bi-graph-down"></i></span>
-                        <span>Biaya Produksi &amp; HPP</span>
-                        <span class="chevron">▸</span>
-                    </button>
+            {{-- MASTER DATA --}}
+            <x-sidebar.label text="Data Induk" />
+            <li class="mb-1">
+                <button class="sidebar-link sidebar-toggle {{ $openMaster ? 'is-open' : '' }}" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#navMaster"
+                    aria-expanded="{{ $openMaster ? 'true' : 'false' }}" aria-controls="navMaster">
+                    <span class="icon"><i class="bi bi-folder2-open"></i></span>
+                    <span>Data Master</span>
+                    <span class="chevron">▸</span>
+                </button>
 
-                    <div class="collapse {{ $openCosting ? 'show' : '' }}" id="navCosting">
-                        @if ($hasHppIndex)
-                            <x-sidebar.sub-link href="{{ route('costing.hpp.index') }}" icon="bi bi-gear"
-                                :active="request()->routeIs('costing.hpp.*')">
-                                HPP Barang Jadi
-                            </x-sidebar.sub-link>
-                        @endif
+                <div class="collapse {{ $openMaster ? 'show' : '' }}" id="navMaster">
+                    @if ($hasMasterItemsIndex)
+                        <x-sidebar.sub-link href="{{ route('master.items.index') }}" icon="bi bi-box-seam"
+                            :active="request()->routeIs('master.items.*')">
+                            Barang
+                        </x-sidebar.sub-link>
+                    @endif
 
-                        @if ($hasProdCostPeriodsIndex)
-                            <x-sidebar.sub-link href="{{ route('costing.production_cost_periods.index') }}" icon="bi bi-calendar3"
-                                :active="request()->routeIs('costing.production_cost_periods.*')">
-                                Periode Biaya Produksi
-                            </x-sidebar.sub-link>
-                        @endif
-                    </div>
-                </li>
-            @endif
+                    @if ($hasMasterItemCategoriesIndex)
+                        <x-sidebar.sub-link href="{{ route('master.item_categories.index') }}" icon="bi bi-folder2-open"
+                            :active="request()->routeIs('master.item_categories.*')">
+                            Kategori Barang
+                        </x-sidebar.sub-link>
+                    @endif
 
-        @endif
+                    @if ($hasMasterItemBomsIndex)
+                        <x-sidebar.sub-link href="{{ route('master.item_boms.index') }}" icon="bi bi-receipt"
+                            :active="request()->routeIs('master.item_boms.*')">
+                            BOM / Resep
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasMasterSuppliersIndex)
+                        <x-sidebar.sub-link href="{{ route('master.suppliers.index') }}" icon="bi bi-tag"
+                            :active="request()->routeIs('master.suppliers.*')">
+                            Pemasok
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasMasterCustomersIndex)
+                        <x-sidebar.sub-link href="{{ route('master.customers.index') }}" icon="bi bi-person"
+                            :active="request()->routeIs('master.customers.*')">
+                            Pelanggan
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasMasterEmployeesIndex)
+                        <x-sidebar.sub-link href="{{ route('master.employees.index') }}" icon="bi bi-person-fill-gear"
+                            :active="request()->routeIs('master.employees.*')">
+                            Karyawan
+                        </x-sidebar.sub-link>
+                    @endif
+                </div>
+            </li>
+
+                    @endif
     </ul>
 </aside>
