@@ -1039,11 +1039,12 @@
                                 $shortBundleCode = preg_replace('/^BND-\d{8}-/', '', $b->bundle_code);
                             @endphp
 
-                            <tr class="bundle-row bundle-card-row row-empty {{ $isUnQCed ? 'opacity-50' : '' }}" data-row-index="{{ $idx }}"
+                            <tr class="bundle-row bundle-card-row row-empty {{ $isUnQCed ? 'opacity-50 is-unqced cursor-pointer' : '' }}" data-row-index="{{ $idx }}"
                                 data-qty-ready="{{ $qtyRemain }}" data-bundle-code="{{ $b->bundle_code }}"
                                 data-finished-item-id="{{ $b->finished_item_id }}"
                                 data-item-code="{{ $b->finishedItem?->code }}"
-                                data-item-name="{{ $b->finishedItem?->name }}" data-lot-code="{{ $lotCode }}">
+                                data-item-name="{{ $b->finishedItem?->name }}" data-lot-code="{{ $lotCode }}"
+                                data-detail-url="{{ route('production.cutting_jobs.show', $b->cutting_job_id) }}">
 
                                 <td class="d-none">
                                     <input type="hidden" name="lines[{{ $idx }}][bundle_id]"
@@ -1144,18 +1145,24 @@
                                             </div>
 
                                             <div class="mobile-row-footer-left mt-1">
-                                                <div class="pickup-label">
-                                                    Pickup (maks {{ number_format($qtyRemain, 2, ',', '.') }})
-                                                </div>
-                                                <input type="number" step="0.01" min="0"
-                                                    inputmode="decimal"
-                                                    class="form-control form-control-sm qty-input @error($oldQtyName) is-invalid @enderror"
-                                                    value="{{ old($oldQtyName, $defaultQtyPickup) }}"
-                                                    placeholder="Isi pickup" {{ $isUnQCed ? 'disabled' : '' }}>
-                                                @error($oldQtyName)
-                                                    <div class="invalid-feedback">
-                                                        {{ $message }}</div>
-                                                @enderror
+                                                @if($isUnQCed)
+                                                    <div class="mt-2 text-primary small fw-semibold">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i> Buka Detail Cutting
+                                                    </div>
+                                                @else
+                                                    <div class="pickup-label">
+                                                        Pickup (maks {{ number_format($qtyRemain, 2, ',', '.') }})
+                                                    </div>
+                                                    <input type="number" step="0.01" min="0"
+                                                        inputmode="decimal"
+                                                        class="form-control form-control-sm qty-input @error($oldQtyName) is-invalid @enderror"
+                                                        value="{{ old($oldQtyName, $defaultQtyPickup) }}"
+                                                        placeholder="Isi pickup">
+                                                    @error($oldQtyName)
+                                                        <div class="invalid-feedback">
+                                                            {{ $message }}</div>
+                                                    @enderror
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -1728,6 +1735,12 @@
 
                 row.addEventListener('click', function(e) {
                     if (e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.tagName === 'A' || e.target.closest('a')) return;
+                    
+                    if (row.classList.contains('is-unqced')) {
+                        window.open(row.dataset.detailUrl, '_blank');
+                        return;
+                    }
+
                     togglePicked();
                 });
 
