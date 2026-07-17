@@ -869,7 +869,7 @@
             $b->computed_qty_ready = (float) $b->qty_ready_for_sewing;
             return $b;
         })
-        ->filter(fn($b) => $b->computed_qty_ready > 0)
+        ->filter(fn($b) => $b->computed_qty_ready > 0 || $b->status === 'cut')
         ->values();
 
     $totalBundlesReady = $displayBundles->count();
@@ -997,7 +997,7 @@
                     <thead>
                         <tr>
                             <th style="width: 40px;" class="text-center">#</th>
-                            <th style="width: 130px;">Bundle</th>
+                            <th style="width: 130px;">Tgl Cutting</th>
                             <th style="width: 160px;">Item Jadi</th>
                             <th style="width: 140px;">Lot</th>
                             <th style="width: 110px;" class="text-end">Cutting</th>
@@ -1018,7 +1018,9 @@
                                 // sekarang ambil dari accessor / computed
                                 $qtyRemain = (float) ($b->computed_qty_ready ?? $b->qty_ready_for_sewing);
 
-                                if ($qtyRemain <= 0) {
+                                $isUnQCed = $b->status === 'cut';
+
+                                if ($qtyRemain <= 0 && !$isUnQCed) {
                                     continue;
                                 }
 
@@ -1034,9 +1036,10 @@
                                 $cutDateLabel = $cutDateObj ? $cutDateObj->format('d/m') : '-';
 
                                 $lotCode = $b->cuttingJob?->lot?->code;
+                                $shortBundleCode = preg_replace('/^BND-\d{8}-/', '', $b->bundle_code);
                             @endphp
 
-                            <tr class="bundle-row bundle-card-row row-empty" data-row-index="{{ $idx }}"
+                            <tr class="bundle-row bundle-card-row row-empty {{ $isUnQCed ? 'opacity-50' : '' }}" data-row-index="{{ $idx }}"
                                 data-qty-ready="{{ $qtyRemain }}" data-bundle-code="{{ $b->bundle_code }}"
                                 data-finished-item-id="{{ $b->finished_item_id }}"
                                 data-item-code="{{ $b->finishedItem?->code }}"
@@ -1050,14 +1053,21 @@
                                 {{-- DESKTOP --}}
                                 <td class="d-none d-md-table-cell td-desktop-only text-center">
                                     <div class="d-inline-flex align-items-center gap-1">
-                                        <input type="checkbox" class="form-check-input row-check"
-                                            data-row-index="{{ $idx }}">
+                                        @if ($isUnQCed)
+                                            <input type="checkbox" class="form-check-input row-check" disabled title="Belum di QC">
+                                        @else
+                                            <input type="checkbox" class="form-check-input row-check"
+                                                data-row-index="{{ $idx }}">
+                                        @endif
                                         <span class="small text-muted">{{ $loop->iteration }}</span>
                                     </div>
                                 </td>
 
                                 <td class="d-none d-md-table-cell td-desktop-only">
-                                    <span class="fw-semibold">{{ $b->bundle_code }}</span>
+                                    <a href="{{ route('production.cutting_jobs.show', $b->cutting_job_id) }}" target="_blank" class="text-decoration-none text-body">
+                                        <span class="fw-semibold">{{ $cutDateLabel }}</span>
+                                        <div><span class="badge-soft bg-light border text-muted px-2 py-0 mt-1" style="font-size: 0.65rem; font-family: var(--bs-font-monospace);">#{{ $shortBundleCode }}</span></div>
+                                    </a>
                                 </td>
 
                                 <td class="d-none d-md-table-cell td-desktop-only">
@@ -1083,16 +1093,21 @@
                                 </td>
 
                                 <td class="d-none d-md-table-cell td-desktop-only text-end">
-                                    <span class="qty-ready-pill">
-                                        {{ number_format($qtyRemain, 2, ',', '.') }}
-                                    </span>
+                                    @if($isUnQCed)
+                                        <span class="badge bg-danger">Belum QC</span>
+                                    @else
+                                        <span class="qty-ready-pill">
+                                            {{ number_format($qtyRemain, 2, ',', '.') }}
+                                        </span>
+                                    @endif
                                 </td>
 
                                 <td class="d-none d-md-table-cell td-desktop-only text-end">
                                     <input type="number" step="0.01" min="0" inputmode="decimal"
                                         name="lines[{{ $idx }}][qty_bundle]"
                                         class="form-control form-control-sm text-end qty-input @error($oldQtyName) is-invalid @enderror"
-                                        value="{{ old($oldQtyName, $defaultQtyPickup) }}">
+                                        value="{{ old($oldQtyName, $defaultQtyPickup) }}"
+                                        {{ $isUnQCed ? 'disabled' : '' }}>
                                     @error($oldQtyName)
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -1100,7 +1115,7 @@
 
                                 <td class="d-none d-md-table-cell td-desktop-only text-end">
                                     <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 btn-pick"
-                                        data-row-index="{{ $idx }}">
+                                        data-row-index="{{ $idx }}" {{ $isUnQCed ? 'disabled' : '' }}>
                                         Max
                                     </button>
                                 </td>
@@ -1119,9 +1134,13 @@
                                         <div class="mobile-row-header-right">
                                             <div class="qty-ready-label">Qty Ready</div>
                                             <div class="qty-ready-value">
-                                                <span class="qty-ready-pill">
-                                                    {{ number_format($qtyRemain, 2, ',', '.') }}
-                                                </span>
+                                                @if($isUnQCed)
+                                                    <span class="badge bg-danger">Belum QC</span>
+                                                @else
+                                                    <span class="qty-ready-pill">
+                                                        {{ number_format($qtyRemain, 2, ',', '.') }}
+                                                    </span>
+                                                @endif
                                             </div>
 
                                             <div class="mobile-row-footer-left mt-1">
@@ -1132,7 +1151,7 @@
                                                     inputmode="decimal"
                                                     class="form-control form-control-sm qty-input @error($oldQtyName) is-invalid @enderror"
                                                     value="{{ old($oldQtyName, $defaultQtyPickup) }}"
-                                                    placeholder="Isi pickup">
+                                                    placeholder="Isi pickup" {{ $isUnQCed ? 'disabled' : '' }}>
                                                 @error($oldQtyName)
                                                     <div class="invalid-feedback">
                                                         {{ $message }}</div>
@@ -1146,7 +1165,9 @@
                                         <div class="mobile-row-meta-left">
                                             <div class="mobile-row-meta-label">Tanggal</div>
                                             <div class="mobile-row-meta-value">
-                                                {{ $cutDateLabel }}
+                                                <a href="{{ route('production.cutting_jobs.show', $b->cutting_job_id) }}" target="_blank" class="text-decoration-none text-body">
+                                                    {{ $cutDateLabel }} <span class="badge-soft bg-light border text-muted px-1 py-0 ms-1" style="font-size: 0.6rem; font-family: var(--bs-font-monospace);">#{{ $shortBundleCode }}</span>
+                                                </a>
                                             </div>
                                         </div>
                                         <div class="mobile-row-meta-left text-end">
@@ -1706,7 +1727,7 @@
                 }
 
                 row.addEventListener('click', function(e) {
-                    if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+                    if (e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.tagName === 'A' || e.target.closest('a')) return;
                     togglePicked();
                 });
 

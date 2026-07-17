@@ -211,7 +211,10 @@ class SewingPickupController extends Controller
 
         $bundles = CuttingJobBundle::with(['finishedItem', 'cuttingJob.lot.item', 'qcResults'])
             ->withLedgerBalances(['WIP-CUT'])
-            ->readyForSewing($wipCutId)
+            ->where(function ($q) use ($wipCutId) {
+                $q->readyForSewing($wipCutId)
+                  ->orWhere('status', 'cut');
+            })
             ->get();
 
         $bomSuppliesByItem = $this->buildSewingSupplyChecklist($bundles);
