@@ -403,6 +403,13 @@
         } catch (e) {
           console.warn('Echo init failed:', e);
         }
+
+        // Cleanly disconnect Pusher on page unload to prevent "WebSocket is closed before connection is established" console error
+        window.addEventListener('beforeunload', function () {
+            if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+                window.Echo.connector.pusher.disconnect();
+            }
+        });
       })();
     </script>
   @endif
