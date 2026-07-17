@@ -69,6 +69,8 @@
     } else {
         $linesData = [];
     }
+
+    $receivedByLineId = $order && $order->exists ? app(\App\Services\Purchasing\PurchaseOrderService::class)->receivedQtyByLineId($order) : [];
 @endphp
 
 @push('head')
@@ -889,9 +891,17 @@
                                 @php
                                     $selectedAcc = collect($expenseAccounts)->firstWhere('id', $expAcc);
                                     $accLabel = $selectedAcc ? ($selectedAcc->code . ' - ' . $selectedAcc->name) : '';
+                                    
+                                    $lineId = $line['id'] ?? null;
+                                    $lineRcv = (float) ($receivedByLineId[$lineId] ?? 0);
+                                    $isReceived = $lineRcv > 0.0001;
                                 @endphp
                                 <span class="text-muted" style="font-size: .68rem;">Biaya: <span class="expacc-label-text fw-semibold">{{ $accLabel }}</span>
-                                    <a href="javascript:void(0)" class="btn-edit-expacc ms-1 text-decoration-none" title="Ubah Akun Biaya"><i class="bi bi-pencil-fill"></i></a>
+                                    @if($isReceived)
+                                        <span class="ms-1 text-warning" style="font-size: .65rem; font-style: italic;">(Ubah via GRN)</span>
+                                    @else
+                                        <a href="javascript:void(0)" class="btn-edit-expacc ms-1 text-decoration-none" title="Ubah Akun Biaya"><i class="bi bi-pencil-fill"></i></a>
+                                    @endif
                                 </span>
                             </div>
                             <div class="line-expacc-wrapper mt-2" style="{{ ($alloc === 'expense' && !$expAcc) ? '' : 'display:none;' }}">
