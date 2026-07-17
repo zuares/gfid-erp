@@ -138,10 +138,10 @@ class ActivityLogController extends Controller
             UserActivityLog::create([
                 'user_id' => $user->id,
                 'role' => $user->role,
-                'url' => $validated['url'],
-                'action' => $validated['action'],
-                'target_element' => $validated['target_element'],
-                'duration_ms' => $validated['duration_ms'],
+                'url' => $validated['url'] ?? '',
+                'action' => $validated['action'] ?? '',
+                'target_element' => $validated['target_element'] ?? null,
+                'duration_ms' => $validated['duration_ms'] ?? null,
             ]);
         });
 
