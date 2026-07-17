@@ -3500,7 +3500,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         for (const o of readyOrders) {
             if (!shippingParamCache.has(o.channel_order_id)) {
                 try {
-                    const res = await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/shipping-parameter`);
+                    const endpoint = o.is_kilat
+                        ? `/api/marketplace/stores/${o.store_id}/bookings/${o.channel_order_id}/shipping-parameter`
+                        : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/shipping-parameter`;
+                    
+                    const res = await api(endpoint);
                     if (res && !res.error) shippingParamCache.set(o.channel_order_id, res);
                 } catch(e) {}
                 // Jeda 500ms agar tidak spam API server/Shopee
