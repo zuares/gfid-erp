@@ -991,12 +991,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
 // Trigger DOMContentLoaded manually after HTMX swaps content so existing scripts re-initialize
-document.body.addEventListener('htmx:afterSettle', function(evt) {
-    window.document.dispatchEvent(new Event("DOMContentLoaded", {
-      bubbles: true,
-      cancelable: true
-    }));
-});
+if (!window.htmxSettleListenerAdded) {
+    document.addEventListener('htmx:afterSettle', function(evt) {
+        window.document.dispatchEvent(new Event("DOMContentLoaded", {
+          bubbles: true,
+          cancelable: true
+        }));
+    });
+    window.htmxSettleListenerAdded = true;
+}
 </script>
 
 </body>
