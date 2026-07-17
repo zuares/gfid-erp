@@ -61,7 +61,12 @@ class RevertPostedSewingReturnsToPendingQc extends Command
                 // 1. Rollback inventory_mutations
                 $mutations = DB::table('inventory_mutations')
                     ->where('source_id', $return->id)
-                    ->where('source_type', 'sewing_reject_rework_ok')
+                    ->whereIn('source_type', [
+                        'sewing_reject_rework_ok',
+                        'sewing_qc_out',
+                        'sewing_qc_in',
+                        'sewing_qc_reject',
+                    ])
                     ->get();
 
                 foreach ($mutations as $m) {
@@ -79,6 +84,16 @@ class RevertPostedSewingReturnsToPendingQc extends Command
                 }
 
                 $this->info("Reverted {$mutations->count()} mutations for Return #{$return->id}.");
+
+                // 2. Rollback QC Results
+                $qcDeleted = DB::table('qc_results')
+                    ->where('stage', 'sewing')
+                    ->where('sewing_job_id', $return->id)
+                    ->delete();
+                    
+                if ($qcDeleted > 0) {
+                    $this->info("Deleted {$qcDeleted} QC results for Return #{$return->id}.");
+                }
 
                 // 2. Delete Journals
                 $journals = Journal::where('source_id', $return->id)
