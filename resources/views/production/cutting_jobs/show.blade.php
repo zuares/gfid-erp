@@ -142,6 +142,23 @@
         }
 
         @media (max-width: 767.98px) {
+            .bq-table th.sticky-col-right, 
+            .bq-table td.sticky-col-right {
+                position: sticky;
+                right: 0;
+                background-color: var(--card, #fff);
+                z-index: 2;
+                box-shadow: -3px 0 6px rgba(0,0,0,0.03);
+            }
+            .row-no-qc td.sticky-col-right {
+                background-color: #f8fafc;
+            }
+            .row-has-reject td.sticky-col-right {
+                background-color: #fef2f2;
+            }
+        }
+
+        @media (max-width: 767.98px) {
             .table-wrap { overflow-x: auto }
             .bq-table { font-size: .8rem; white-space: nowrap }
             .bq-table th, .bq-table td { padding: .35rem .4rem }
@@ -720,7 +737,7 @@
                             <th class="d-none d-md-table-cell" style="width:160px;">Alasan</th>
                             <th class="d-none d-md-table-cell" style="width:160px;">WIP / Sewing</th>
                             <th style="width:90px;">Status</th>
-                            <th class="text-end" style="width:100px;">Aksi</th>
+                            <th class="text-end sticky-col-right" style="width:100px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -864,7 +881,7 @@
                             </td>
 
                             {{-- Aksi --}}
-                            <td class="text-end">
+                            <td class="text-end sticky-col-right">
                                 <div class="d-flex gap-1 justify-content-end align-items-center">
                                     @if ($canInputThis)
                                         <button type="button"
