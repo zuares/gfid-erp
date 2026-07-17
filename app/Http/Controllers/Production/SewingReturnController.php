@@ -1222,7 +1222,7 @@ class SewingReturnController extends Controller
                 'created_by_user_id' => auth()->id(),
                 'notes' => null,
                 'status' => (new SewingReturn())->isFillable('status')
-                    ? ($sewingQcFlowActive && $normalRows->isNotEmpty() ? 'pending_qc' : 'posted')
+                    ? ($sewingQcFlowActive ? 'pending_qc' : 'posted')
                     : null,
             ]);
 
@@ -1266,8 +1266,8 @@ class SewingReturnController extends Controller
                 $sourceRejectLineId = (int) ($r['source_reject_return_line_id'] ?? 0);
                 $sourceFinishingLineId = (int) ($r['source_finishing_job_line_id'] ?? 0);
 
-                // Normal sewing return menunggu QC. Stok tetap di WIP-SEW sampai QC approve.
-                if ($sewingQcFlowActive && $sourceRejectLineId <= 0 && $sourceFinishingLineId <= 0) {
+                // Semua return menunggu QC. Stok tetap di gudang asal sampai QC approve.
+                if ($sewingQcFlowActive) {
                     continue;
                 }
 

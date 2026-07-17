@@ -448,10 +448,16 @@
                                value="{{ (float) $line->qty_reject }}">
                       </td>
                       @if ($canSeeMoney)
+                        @php
+                            $currentPrice = $line->unit_price;
+                            if ((float)$currentPrice == 0 && $line->purchaseOrderLine) {
+                                $currentPrice = $line->purchaseOrderLine->unit_price;
+                            }
+                        @endphp
                         <td>
                           <input type="text" name="unit_price[]"
                                  class="form-control form-control-sm text-end mono js-price"
-                                 value="{{ $line->unit_price }}">
+                                 value="{{ $currentPrice }}">
                         </td>
                       @endif
                       <td>

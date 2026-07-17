@@ -690,15 +690,18 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
                                                step="1"
                                                inputmode="numeric"
                                                pattern="[0-9]*"
-                                               onfocus="this.select()">
+                                               onfocus="this.select()"
+                                               oninput="syncOk(this, {{ $i }}, {{ $row['qty_max'] }})">
                                     </td>
                                     <td>
-                                        <input type="text"
-                                               name="results[{{ $i }}][reject_reason]"
-                                               class="qcs-reason-input"
-                                               value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}"
-                                               placeholder="opsional"
-                                               maxlength="100">
+                                        <select name="results[{{ $i }}][reject_reason]" class="qcs-reason-input">
+                                            <option value="">- Pilih Alasan -</option>
+                                            <option value="Reject Jahit" {{ old("results.{$i}.reject_reason", $row['reject_reason']) == 'Reject Jahit' ? 'selected' : '' }}>Reject Jahit</option>
+                                            <option value="Reject Bahan" {{ old("results.{$i}.reject_reason", $row['reject_reason']) == 'Reject Bahan' ? 'selected' : '' }}>Reject Bahan</option>
+                                            @if(old("results.{$i}.reject_reason", $row['reject_reason']) && !in_array(old("results.{$i}.reject_reason", $row['reject_reason']), ['Reject Jahit', 'Reject Bahan']))
+                                                <option value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}" selected>{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}</option>
+                                            @endif
+                                        </select>
                                     </td>
                                 </tr>
                             @endforeach
@@ -738,6 +741,8 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
                                         <input type="number"
                                                class="qcs-mobile-input qcs-mono is-reject qty-reject"
                                                id="m_reject_{{ $i }}"
+                                               data-idx="{{ $i }}"
+                                               data-max="{{ $row['qty_max'] }}"
                                                data-target="results[{{ $i }}][qty_reject]"
                                                value="{{ old("results.{$i}.qty_reject", $row['qty_reject']) }}"
                                                min="0"
@@ -745,17 +750,20 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
                                                step="1"
                                                inputmode="numeric"
                                                pattern="[0-9]*"
-                                               onfocus="this.select()">
+                                               onfocus="this.select()"
+                                               oninput="syncMobileReject(this)">
                                     </div>
                                 </div>
                                 <div class="qcs-mobile-reason {{ (float) old("results.{$i}.qty_reject", $row['qty_reject']) > 0 ? 'is-visible' : '' }}">
                                     <span class="qcs-mobile-small-label">Alasan Reject</span>
-                                    <input type="text"
-                                           class="qcs-mobile-reason-input"
-                                           data-target="results[{{ $i }}][reject_reason]"
-                                           value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}"
-                                           placeholder="opsional"
-                                           maxlength="100">
+                                    <select class="qcs-mobile-reason-input" data-target="results[{{ $i }}][reject_reason]">
+                                        <option value="">- Pilih Alasan -</option>
+                                        <option value="Reject Jahit" {{ old("results.{$i}.reject_reason", $row['reject_reason']) == 'Reject Jahit' ? 'selected' : '' }}>Reject Jahit</option>
+                                        <option value="Reject Bahan" {{ old("results.{$i}.reject_reason", $row['reject_reason']) == 'Reject Bahan' ? 'selected' : '' }}>Reject Bahan</option>
+                                        @if(old("results.{$i}.reject_reason", $row['reject_reason']) && !in_array(old("results.{$i}.reject_reason", $row['reject_reason']), ['Reject Jahit', 'Reject Bahan']))
+                                            <option value="{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}" selected>{{ old("results.{$i}.reject_reason", $row['reject_reason']) }}</option>
+                                        @endif
+                                    </select>
                                 </div>
                             </div>
                         @endforeach
@@ -799,11 +807,25 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
         const rejectField = document.getElementById('reject_' + idx);
         const suggestedReject = Math.max(0, max - ok);
 
-        if (rejectField && rejectField.dataset.manual !== '1') {
+        if (rejectField) {
             rejectField.value = suggestedReject;
         }
 
         syncToMobile(idx, ok, suggestedReject);
+        updateSummary();
+    }
+
+    function syncOk(rejectInput, idx, max) {
+        const reject = numberValue(rejectInput);
+        const okInputs = document.querySelectorAll('.qcs-table .qcs-qty-input.is-ok');
+        const okField = okInputs[idx];
+        const suggestedOk = Math.max(0, max - reject);
+
+        if (okField) {
+            okField.value = suggestedOk;
+        }
+
+        syncToMobile(idx, suggestedOk, reject);
         updateSummary();
     }
 
@@ -814,11 +836,27 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
         const rejectField = document.getElementById('m_reject_' + idx);
         const suggestedReject = Math.max(0, max - ok);
 
-        if (rejectField && rejectField.dataset.manual !== '1') {
+        if (rejectField) {
             rejectField.value = suggestedReject;
         }
 
         syncToDesktop(idx, ok, suggestedReject);
+        toggleMobileReason(idx);
+        updateSummary();
+    }
+
+    function syncMobileReject(rejectInput) {
+        const idx = rejectInput.dataset.idx;
+        const max = parseFloat(rejectInput.dataset.max) || 0;
+        const reject = numberValue(rejectInput);
+        const mobileOk = document.querySelector('.qcs-mobile-input.is-ok[data-idx="' + idx + '"]');
+        const suggestedOk = Math.max(0, max - reject);
+
+        if (mobileOk) {
+            mobileOk.value = suggestedOk;
+        }
+
+        syncToDesktop(idx, suggestedOk, reject);
         toggleMobileReason(idx);
         updateSummary();
     }
@@ -828,7 +866,7 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
         const mobileReject = document.getElementById('m_reject_' + idx);
 
         if (mobileOk) mobileOk.value = ok;
-        if (mobileReject && mobileReject.dataset.manual !== '1') mobileReject.value = reject;
+        if (mobileReject) mobileReject.value = reject;
 
         toggleMobileReason(idx);
     }
@@ -838,7 +876,7 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
         const desktopReject = document.getElementById('reject_' + idx);
 
         if (desktopOk[idx]) desktopOk[idx].value = ok;
-        if (desktopReject && desktopReject.dataset.manual !== '1') desktopReject.value = reject;
+        if (desktopReject) desktopReject.value = reject;
     }
 
     function toggleMobileReason(idx) {
@@ -872,14 +910,6 @@ body[data-theme="dark"] .qcs-table tbody td { border-top-color: rgba(51,65,85,.6
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.qty-reject').forEach((el) => {
-            el.addEventListener('input', () => {
-                el.dataset.manual = '1';
-                const idx = el.id?.replace('m_reject_', '').replace('reject_', '');
-                if (idx !== undefined) toggleMobileReason(idx);
-                updateSummary();
-            });
-        });
 
         document.querySelectorAll('[id^="m_reject_"]').forEach((el) => {
             toggleMobileReason(el.id.replace('m_reject_', ''));

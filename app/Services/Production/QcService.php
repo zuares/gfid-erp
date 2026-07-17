@@ -305,14 +305,14 @@ class QcService
             // - IN : WIP-FIN (OK) pakai cost yang sama
             // - IN : REJ-SEW (Reject) pakai cost yang sama
 
-            // siapkan map unit_cost di WIP-SEW per item
+            // siapkan map unit_cost di WIP-SEW (atau REJ-SEW) per item
             $unitCostWipSewPerItem = [];
             foreach (array_keys($totalProcessedByItem) as $itemId) {
-                $unit = $this->inventory->getItemIncomingUnitCost($wipSewWarehouseId, $itemId);
+                $unit = $this->inventory->getItemIncomingUnitCost($sewingReturn->warehouse_id, $itemId);
                 $unitCostWipSewPerItem[$itemId] = $unit > 0 ? $unit : null;
             }
 
-            // 2.a OUT dari WIP-SEW (per bundle agar mutasi ber-tag)
+            // 2.a OUT dari WIP-SEW/REJ-SEW (per bundle agar mutasi ber-tag)
             foreach ($processedByBundleItem as $bundleId => $byItem) {
                 foreach ($byItem as $itemId => $qtyProcessed) {
                     if ($qtyProcessed <= 0) {
@@ -320,13 +320,13 @@ class QcService
                     }
 
                     $this->inventory->stockOut(
-                        warehouseId: $wipSewWarehouseId,
+                        warehouseId: $sewingReturn->warehouse_id,
                         itemId: $itemId,
                         qty: $qtyProcessed,
                         date: $qcDate,
                         sourceType: 'sewing_qc_out',
                         sourceId: $sewingReturn->id,
-                        notes: "QC Sewing OUT {$qtyProcessed} pcs dari WIP-SEW untuk return {$sewingReturn->code} (bundle #{$bundleId})",
+                        notes: "QC Sewing OUT {$qtyProcessed} pcs dari warehouse untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         allowNegative: false,
                         lotId: null,
                         unitCostOverride: $unitCostWipSewPerItem[$itemId] ?? null,

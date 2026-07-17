@@ -304,7 +304,7 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Replacement GRN tidak dapat diedit secara manual. Jika salah, batalkan/hapus GRN ini dan ulangi proses terima pengganti dari dokumen Retur.');
         }
 
-        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'order']);
+        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'lines.purchaseOrderLine', 'order']);
 
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
