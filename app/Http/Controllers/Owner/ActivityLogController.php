@@ -134,14 +134,16 @@ class ActivityLogController extends Controller
             'duration_ms' => 'nullable|integer',
         ]);
 
-        UserActivityLog::create([
-            'user_id' => $user->id,
-            'role' => $user->role,
-            'url' => $validated['url'],
-            'action' => $validated['action'],
-            'target_element' => $validated['target_element'],
-            'duration_ms' => $validated['duration_ms'],
-        ]);
+        defer(function () use ($user, $validated) {
+            UserActivityLog::create([
+                'user_id' => $user->id,
+                'role' => $user->role,
+                'url' => $validated['url'],
+                'action' => $validated['action'],
+                'target_element' => $validated['target_element'],
+                'duration_ms' => $validated['duration_ms'],
+            ]);
+        });
 
         return response()->json(['message' => 'Logged successfully']);
     }
