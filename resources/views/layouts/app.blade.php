@@ -19,11 +19,6 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
   {{-- =========================
-    ✅ HTMX (For SPA-like Sidebar)
-  ========================= --}}
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-
-  {{-- =========================
     ✅ FLATPICKR GLOBAL (CDN)
   ========================= --}}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -988,19 +983,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 @endif
 @endauth
-
-<script>
-// Trigger DOMContentLoaded manually after HTMX swaps content so existing scripts re-initialize
-if (!window.htmxSettleListenerAdded) {
-    document.addEventListener('htmx:afterSettle', function(evt) {
-        window.document.dispatchEvent(new Event("DOMContentLoaded", {
-          bubbles: true,
-          cancelable: true
-        }));
-    });
-    window.htmxSettleListenerAdded = true;
-}
-</script>
 
 </body>
 </html>
