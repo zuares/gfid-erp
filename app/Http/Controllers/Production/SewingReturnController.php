@@ -1611,14 +1611,8 @@ class SewingReturnController extends Controller
                 throw ValidationException::withMessages(['reason' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
-            // Tujuan Sewing Return adalah WH-PRD. Data lama tetap memakai destination_warehouse_id bila ada.
-            $destWarehouse = null;
-            if (!empty($return->destination_warehouse_id)) {
-                $destWarehouse = Warehouse::query()->whereKey((int) $return->destination_warehouse_id)->first();
-            }
-            if (!$destWarehouse) {
-                $destWarehouse = Warehouse::query()->where('code', 'WH-PRD')->first();
-            }
+            // Tujuan Sewing Return adalah WH-PRD. Abaikan WIP-FIN dari data lama.
+            $destWarehouse = Warehouse::query()->where('code', 'WH-PRD')->first();
             if (!$destWarehouse) {
                 throw ValidationException::withMessages(['reason' => 'Gudang tujuan SR tidak ditemukan (WH-PRD).']);
             }

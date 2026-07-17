@@ -37,11 +37,13 @@ class RevertPostedSewingReturnsToPendingQc extends Command
             return;
         }
 
-        $query = SewingReturn::query()
-            ->where('status', 'posted')
-            ->whereHas('lines', function($q) {
+        $query = SewingReturn::query()->where('status', 'posted');
+
+        if ($all) {
+            $query->whereHas('lines', function($q) {
                 $q->whereNotNull('source_reject_return_line_id');
             });
+        }
 
         if ($id) {
             $query->where('id', $id);
