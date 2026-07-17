@@ -128,6 +128,7 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
 
             Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])->name('show');
             Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])->name('approve');
+            Route::post('/{inventoryAdjustment}/void', [InventoryAdjustmentController::class, 'void'])->name('void');
         });
 
         // ================== WIP ADJUSTMENTS ==================

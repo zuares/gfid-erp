@@ -350,18 +350,11 @@
         }
 
         $canApprove = $isOwnerAdmin && method_exists($adjustment, 'canApprove') && $adjustment->canApprove();
+        $canVoid = $isOwnerAdmin && in_array($adjustment->status, [InventoryAdjustment::STATUS_DRAFT, InventoryAdjustment::STATUS_PENDING], true);
 
         // Overproduction flow: draft -> POST/VOID
         $canPostOverproduction =
             $isOwnerAdmin && $isOverproduction && $adjustment->status === InventoryAdjustment::STATUS_DRAFT;
-        $canVoidOverproduction =
-            $isOwnerAdmin &&
-            $isOverproduction &&
-            in_array(
-                $adjustment->status,
-                [InventoryAdjustment::STATUS_DRAFT, InventoryAdjustment::STATUS_PENDING],
-                true,
-            );
 
         $summary = $summary ?? [
             'total_in_qty' => 0,
@@ -463,11 +456,11 @@
                             </form>
                         @endif
 
-                        @if ($canVoidOverproduction)
-                            <form action="{{ route('production.cutting_overproduction.void', $adjustment) }}" method="POST"
-                                onsubmit="return confirm('VOID dokumen ini? Dokumen akan dibatalkan.');">
+                        @if ($canVoid)
+                            <form action="{{ $isOverproduction ? route('production.cutting_overproduction.void', $adjustment) : route('inventory.adjustments.void', $adjustment) }}" method="POST"
+                                onsubmit="return confirm('Batalkan dokumen ini?');">
                                 @csrf
-                                <button class="btn btn-sm btn-outline-danger btn-pill">VOID</button>
+                                <button class="btn btn-sm btn-outline-danger btn-pill">Batalkan</button>
                             </form>
                         @endif
 

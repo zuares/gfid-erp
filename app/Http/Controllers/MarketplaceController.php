@@ -889,17 +889,43 @@ class MarketplaceController extends Controller
                 ->get()
                 ->reject(fn ($b) => $b->order_sn && $knownSns->has($b->order_sn));
 
-            $bookingRows = $pureBookings->map(function ($b) {
-                $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) {
+            $allSkus = [];
+            foreach ($pureBookings as $b) {
+                if (is_array($b->items)) {
+                    foreach ($b->items as $i) {
+                        if ($sku = ($i['model_sku'] ?? $i['item_sku'] ?? null)) {
+                            $allSkus[] = $sku;
+                        }
+                    }
+                }
+            }
+            $mappedItems = \App\Models\Item::whereIn('code', array_unique($allSkus))
+                ->select('id', 'code', 'item_category_id', 'name')
+                ->with('category:id,code,name')
+                ->get()
+                ->keyBy('code');
+
+            $bookingRows = $pureBookings->map(function ($b) use ($mappedItems) {
+                $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) use ($mappedItems) {
                     // Tampilkan SKU marketplace (bukan judul produk); judul hanya fallback.
                     $sku = $i['model_sku'] ?? $i['item_sku'] ?? null;
                     $title = trim(($i['item_name'] ?? '') . (! empty($i['model_name']) ? ' - ' . $i['model_name'] : '')) ?: null;
+                    $mapped = $sku ? $mappedItems->get($sku) : null;
                     return [
                         'qty'           => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
                         'variant_name'  => $sku ?: $title,
                         'model_sku'     => $sku,
                         'item_sku'      => $i['item_sku'] ?? null,
-                        'internal_item' => null,
+                        'internal_item' => $mapped ? [
+                            'id'   => $mapped->id,
+                            'code' => $mapped->code,
+                            'name' => $mapped->name,
+                            'category' => $mapped->category ? [
+                                'id'   => $mapped->category->id,
+                                'code' => $mapped->category->code,
+                                'name' => $mapped->category->name,
+                            ] : null,
+                        ] : null,
                     ];
                 })->values()->all();
 

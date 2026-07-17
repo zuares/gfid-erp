@@ -666,6 +666,37 @@ class InventoryAdjustmentController extends Controller
     }
 
     /**
+     * VOID dokumen Adjustment (khusus Owner/Admin)
+     */
+    public function void(Request $request, InventoryAdjustment $inventoryAdjustment): RedirectResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(403, 'Harus login untuk membatalkan adjustment.');
+        }
+
+        $role = $user->role ?? null;
+        if (!in_array($role, ['owner', 'admin'])) {
+            abort(403, 'Hanya Owner atau Admin yang boleh membatalkan adjustment.');
+        }
+
+        if (!$inventoryAdjustment->isPending() && !$inventoryAdjustment->isDraft()) {
+            return redirect()
+                ->route('inventory.adjustments.show', $inventoryAdjustment)
+                ->with('status', 'error')
+                ->with('message', 'Hanya adjustment berstatus pending atau draft yang bisa dibatalkan.');
+        }
+
+        $inventoryAdjustment->status = InventoryAdjustment::STATUS_VOID;
+        $inventoryAdjustment->save();
+
+        return redirect()
+            ->route('inventory.adjustments.show', $inventoryAdjustment)
+            ->with('status', 'success')
+            ->with('message', 'Adjustment berhasil dibatalkan (VOID).');
+    }
+
+    /**
      * APPROVE untuk Adjustment Manual (source_type NULL).
      * ✅ Update qty_before / qty_after + eksekusi mutasi dengan unit_cost (biar total_cost ada).
      */
@@ -957,12 +988,12 @@ class InventoryAdjustmentController extends Controller
         $itemId = $request->integer('item_id');
 
         if ($itemId) {
-            $item = Item::with('itemRole')->find($itemId);
+            $item = Item::with('role')->find($itemId);
             if (!$item) {
                 return response()->json([], 404);
             }
 
-            if (($item->itemRole->code ?? '') === 'RM') {
+            if ($item->role_code === 'RM') {
                 $lots = $this->getLotStockRowsForItems([$item->id], $warehouseId);
                 if (!empty($lots)) {
                     return response()->json($lots);
@@ -987,7 +1018,7 @@ class InventoryAdjustmentController extends Controller
 
         if ($q === '') {
             $stocks = InventoryStock::query()
-                ->with(['item.itemRole'])
+                ->with(['item.role'])
                 ->where('warehouse_id', $warehouseId)
                 ->where('qty', '!=', 0)
                 ->orderBy('item_id')
@@ -998,7 +1029,7 @@ class InventoryAdjustmentController extends Controller
             $rmItemIds = [];
             
             foreach ($stocks as $stock) {
-                if (($stock->item?->itemRole->code ?? '') === 'RM') {
+                if (($stock->item?->role_code ?? '') === 'RM') {
                     $rmItemIds[] = $stock->item_id;
                 } else {
                     $results[] = [
@@ -1022,7 +1053,7 @@ class InventoryAdjustmentController extends Controller
         }
 
         $items = Item::query()
-            ->with('itemRole')
+            ->with('role')
             ->where(function ($sub) use ($q) {
                 $sub->where('code', 'like', '%' . $q . '%')
                     ->orWhere('name', 'like', '%' . $q . '%');
@@ -1045,7 +1076,7 @@ class InventoryAdjustmentController extends Controller
         $rmItemIds = [];
 
         foreach ($items as $item) {
-            if (($item->itemRole->code ?? '') === 'RM') {
+            if ($item->role_code === 'RM') {
                 $rmItemIds[] = $item->id;
             } else {
                 $results[] = [

@@ -312,7 +312,7 @@ class SyncMarketplaceBookings implements ShouldQueue
                     };
 
                     try {
-                        MarketplaceOrder::create([
+                        $newOrder = MarketplaceOrder::create([
                             'store_id'         => $this->store->id,
                             'channel_order_id' => $bSn,
                             'external_order_id'=> $bSn,
@@ -326,6 +326,27 @@ class SyncMarketplaceBookings implements ShouldQueue
                             'synced_at'        => now(),
                             'currency'         => 'IDR',
                         ]);
+
+                        if (!empty($bk->items) && is_array($bk->items)) {
+                            foreach ($bk->items as $idx => $item) {
+                                \App\Models\MarketplaceOrderItem::create([
+                                    'marketplace_order_id' => $newOrder->id,
+                                    'order_id'             => $newOrder->id,
+                                    'external_item_id'     => $item['item_id'] ?? null,
+                                    'external_model_id'    => $item['model_id'] ?? null,
+                                    'line_no'              => $idx + 1,
+                                    'item_name'            => $item['item_name'] ?? '-',
+                                    'item_sku'             => $item['item_sku']  ?? null,
+                                    'model_sku'            => $item['model_sku'] ?? null,
+                                    'variant_name'         => $item['model_name'] ?? null,
+                                    'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
+                                    'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
+                                    'image_url'            => data_get($item, 'image_info.image_url'),
+                                    'raw_json'             => $item,
+                                ]);
+                            }
+                        }
+
                         $newCount++;
                     } catch (\Throwable $e) {
                         Log::warning("SyncMarketplaceBookings stub [{$this->store->id}] {$bSn}: " . $e->getMessage());

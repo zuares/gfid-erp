@@ -665,7 +665,7 @@
                         <div class="ord-item-body">
                             <div class="ord-item-name">${(it.item_name || it.name || '—')}</div>
                             ${it.model_name ? `<div class="ord-item-variant">${it.model_name}</div>` : ''}
-                            ${(it.item_sku || it.sku) ? `<div class="ord-item-variant" style="color:#94a3b8; font-family:monospace">SKU: ${it.item_sku || it.sku}</div>` : ''}
+                            ${(it.model_sku || it.item_sku || it.sku) ? `<div class="ord-item-variant" style="color:#94a3b8; font-family:monospace">SKU: ${it.model_sku || it.item_sku || it.sku}</div>` : ''}
                         </div>
                     </div>
                 `).join('');
@@ -835,7 +835,7 @@
                     tr.innerHTML = `
                         <td>
                             <div style="font-weight:600; color:#0f172a; margin-bottom:2px;">${item.item_name || item.name || '—'}</div>
-                            <div style="font-size:0.7rem; color:#64748b;">${item.model_name || item.variation_name || ''} <span style="margin-left:5px; font-family:monospace; color:#94a3b8">${item.item_sku || item.sku || ''}</span></div>
+                            <div style="font-size:0.7rem; color:#64748b;">${item.model_name || item.variation_name || ''} <span style="margin-left:5px; font-family:monospace; color:#94a3b8">${item.model_sku || item.item_sku || item.sku || ''}</span></div>
                         </td>
                         <td style="text-align:center; font-weight:700;">${item.model_quantity_purchased || 1}</td>
                         <td style="text-align:right; font-weight:600; color:#1e293b;">Rp ${parseInt(price).toLocaleString('id-ID')}</td>
