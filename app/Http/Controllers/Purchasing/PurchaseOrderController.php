@@ -1174,11 +1174,8 @@ class PurchaseOrderController extends Controller
         }
 
         $rcvStatus = $order->received_status ?? 'not_received';
-        if ($rcvStatus !== 'fully_received') {
-            $blockers[] = match ($rcvStatus) {
-                'partial' => 'Barang baru sebagian diterima',
-                default   => 'Barang belum diterima',
-            };
+        if ($rcvStatus === 'not_received') {
+            $blockers[] = 'Barang belum diterima sama sekali';
         }
 
         $payStatus = $order->payment_status ?? 'unpaid';

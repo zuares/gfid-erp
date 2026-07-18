@@ -254,11 +254,32 @@
                     </form>
                 </li>
             @endif
+            @if ($status === 'approved' && $user && $user->isOwner())
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{{ route('purchasing.purchase_orders.close', $order->id) }}" method="POST"
+                          onsubmit="return confirm('Tutup Paksa (Short Close) PO ini? Pastikan semua tagihan telah lunas.');">
+                        @csrf
+                        <button type="submit" class="dropdown-item py-2 text-dark fw-semibold">
+                            <i class="bi bi-check2-all me-2"></i> Tutup Paksa PO
+                        </button>
+                    </form>
+                </li>
+            @endif
         </ul>
     </div>
 </div>
 
 <div class="po-wrap">
+    @if ($status === 'approved' && ($order->received_status ?? 'not_received') === 'partial' && ($order->payment_status ?? 'unpaid') === 'paid')
+        <div class="alert alert-warning d-flex align-items-center mb-3 mt-2" style="font-size: .85rem;">
+            <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+            <div>
+                <strong>Informasi Penerimaan Sebagian:</strong> Terdapat barang yang tidak lengkap/di-reject pada PO ini, namun tagihan untuk barang yang diterima sudah lunas. Jika tidak ada penerimaan lanjutan dari Supplier, Anda dapat menutup transaksi ini dengan memilih <b>Opsi Lainnya > Tutup Paksa PO</b>.
+            </div>
+        </div>
+    @endif
+    
     <div class="po-grid mt-2">
         <div class="po-card po-kpi">
             <div class="po-label">Item Batch</div>

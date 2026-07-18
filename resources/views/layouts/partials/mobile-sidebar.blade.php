@@ -477,12 +477,9 @@
         $hasAdminCrmProspects = false;
         $hasAdminCrmCustomers = false;
         $hasAdminCrmSegments = false;
-        
-        $hasPoIndex = false;
-        $hasGrnIndex = false;
 
         $hasProdSewRejectReturnsIndex = false;
-        
+
         $hasInvAdjustmentsIndex = $router->has('inventory.adjustments.index');
     }
 
@@ -817,6 +814,24 @@
                         </li>
                     @endif
 
+                    @if ($isAdmin && $hasInvTransfersIndex)
+                        <li>
+                            <a href="{{ route('inventory.transfers.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('inventory.transfers.index') ? 'active' : '' }}">
+                                <span class="icon"><i class="bi bi-arrow-repeat"></i></span><span>Daftar Transfer</span>
+                            </a>
+                        </li>
+                    @endif
+
+                    @if ($isAdmin && $hasInvTransfersCreate)
+                        <li>
+                            <a href="{{ route('inventory.transfers.create') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('inventory.transfers.create') ? 'active' : '' }}">
+                                <span class="icon"><i class="bi bi-plus-circle"></i></span><span>Buat Transfer</span>
+                            </a>
+                        </li>
+                    @endif
+
                     @if ($hasInvAdjustmentsIndex)
                         <li>
                             <a href="{{ route('inventory.adjustments.index') }}"
@@ -876,7 +891,7 @@
                             </li>
                         @endif
 
-                        @if ($hasPoIndex || $hasPoCreate)
+                        @if ($hasPoIndex || $hasPoCreate || $hasGrnIndex || $hasGrnCreate)
                             <div class="mobile-sidebar-section-label">Pengadaan</div>
 
                             @if ($hasPoIndex)
@@ -893,6 +908,24 @@
                                     <a href="{{ route('purchasing.purchase_orders.create') }}"
                                        class="mobile-sidebar-link {{ request()->routeIs('purchasing.purchase_orders.create') ? 'active' : '' }}">
                                         <span class="icon">＋</span><span>PO Baru</span>
+                                    </a>
+                                </li>
+                            @endif
+                            
+                            @if ($hasGrnIndex)
+                                <li>
+                                    <a href="{{ route('purchasing.purchase_receipts.index') }}"
+                                       class="mobile-sidebar-link {{ request()->routeIs('purchasing.purchase_receipts.index') ? 'active' : '' }}">
+                                        <span class="icon">🧾</span><span>Daftar Penerimaan</span>
+                                    </a>
+                                </li>
+                            @endif
+                            
+                            @if ($hasGrnCreate)
+                                <li>
+                                    <a href="{{ route('purchasing.purchase_receipts.create') }}"
+                                       class="mobile-sidebar-link {{ request()->routeIs('purchasing.purchase_receipts.create') ? 'active' : '' }}">
+                                        <span class="icon">＋</span><span>Penerimaan Baru</span>
                                     </a>
                                 </li>
                             @endif

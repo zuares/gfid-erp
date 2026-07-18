@@ -75,10 +75,10 @@
 
     // Pembelian
     $hasPurchasingDashboard  = $router->has('purchasing.dashboard');
-    $hasPoIndex   = !$isAdmin && $router->has('purchasing.purchase_orders.index');
-    $hasPoCreate  = !$isAdmin && $router->has('purchasing.purchase_orders.create');
-    $hasGrnIndex  = !$isAdmin && $router->has('purchasing.purchase_receipts.index');
-    $hasGrnCreate = !$isAdmin && $router->has('purchasing.purchase_receipts.create');
+    $hasPoIndex   = $router->has('purchasing.purchase_orders.index');
+    $hasPoCreate  = $router->has('purchasing.purchase_orders.create');
+    $hasGrnIndex  = $router->has('purchasing.purchase_receipts.index');
+    $hasGrnCreate = $router->has('purchasing.purchase_receipts.create');
     $hasPurchaseReturnIndex    = $router->has('purchasing.purchase_returns.index');
     $hasSupplierInvoiceIndex   = $router->has('purchasing.supplier_invoices.index');
     $hasPurchasePaymentsIndex  = $router->has('purchasing.purchase_payments.index');
@@ -830,6 +830,20 @@
                     </x-sidebar.simple-link>
                 @endif
 
+                @if ($isAdmin && $hasInvTransfersIndex)
+                    <x-sidebar.simple-link href="{{ route('inventory.transfers.index') }}" icon="bi bi-arrow-repeat"
+                        :active="request()->routeIs('inventory.transfers.index')">
+                        Daftar Transfer
+                    </x-sidebar.simple-link>
+                @endif
+
+                @if ($isAdmin && $hasInvTransfersCreate)
+                    <x-sidebar.simple-link href="{{ route('inventory.transfers.create') }}" icon="bi bi-plus-circle"
+                        :active="request()->routeIs('inventory.transfers.create')">
+                        Buat Transfer
+                    </x-sidebar.simple-link>
+                @endif
+
                 @if (!$isAdmin && $hasInvWipAdjIndex)
                     <x-sidebar.simple-link href="{{ route('inventory.wip_adjustments.index') }}" icon="bi bi-receipt"
                         :active="request()->routeIs('inventory.wip_adjustments.*')">
@@ -1060,20 +1074,28 @@
 
 
             {{-- Pembelian (admin only) --}}
-            @php
-                $adminHasPoCreate = $isAdmin && $router->has('purchasing.purchase_orders.create');
-                $adminHasGrnCreate = $isAdmin && $router->has('purchasing.purchase_receipts.create');
-            @endphp
-            @if ($adminHasPoCreate || $adminHasGrnCreate)
+            @if ($isAdmin && $canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate))
                 <x-sidebar.label text="Pengadaan" />
                 <li class="simple-group">
-                    @if ($adminHasPoCreate)
+                    @if ($hasPoIndex)
+                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
+                            :active="request()->routeIs('purchasing.purchase_orders.index')">
+                            Daftar PO
+                        </x-sidebar.simple-link>
+                    @endif
+                    @if ($hasPoCreate)
                         <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
                             :active="request()->routeIs('purchasing.purchase_orders.create')">
                             Buat PO
                         </x-sidebar.simple-link>
                     @endif
-                    @if ($adminHasGrnCreate)
+                    @if ($hasGrnIndex)
+                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list-ul"
+                            :active="request()->routeIs('purchasing.purchase_receipts.index')">
+                            Daftar Penerimaan
+                        </x-sidebar.simple-link>
+                    @endif
+                    @if ($hasGrnCreate)
                         <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-box-seam"
                             :active="request()->routeIs('purchasing.purchase_receipts.create')">
                             Buat Penerimaan
