@@ -136,7 +136,7 @@
             </div>
         @endif
 
-        <form action="{{ route('inventory.transfers.store') }}" method="POST">
+        <form action="{{ route('inventory.transfers.store') }}" method="POST" id="form-transfer">
             @csrf
 
             @php
@@ -280,11 +280,44 @@
                 <a href="{{ route('inventory.transfers.index') }}" class="btn-shp-outline" style="padding: .42rem 1.35rem;">
                     Batal
                 </a>
-                <button type="submit" class="btn-shp-submit">
+                <button type="button" id="btn-show-confirm" class="btn-shp-submit">
                     Simpan & Jalankan Transfer
                 </button>
             </div>
         </form>
+    </div>
+
+    {{-- MODAL KONFIRMASI --}}
+    <div class="modal fade" id="confirmTransferModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold" style="color: var(--shp-accent-2);">Konfirmasi Transfer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3" style="font-size: .9rem;">Anda akan mentransfer barang ke <strong id="confirm-to-warehouse" class="text-dark"></strong>. Berikut adalah rinciannya:</p>
+                    
+                    <div class="table-responsive border rounded-3" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0" style="font-size: .85rem;">
+                            <thead style="background: #f8fafc; position: sticky; top: 0;">
+                                <tr>
+                                    <th class="py-2 px-3 text-muted text-uppercase" style="font-size: .7rem;">Item</th>
+                                    <th class="py-2 px-3 text-muted text-uppercase text-end" style="font-size: .7rem; width: 80px;">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confirm-items-body">
+                                {{-- Diisi via JS --}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn-shp-outline" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn-shp-submit" id="btn-confirm-submit">Ya, Jalankan Transfer</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     @push('scripts')
@@ -349,6 +382,66 @@
                             if (hiddenId) hiddenId.value = '';
                         }
                     }
+                });
+
+                // KONFIRMASI TRANSFER
+                const form = document.getElementById('form-transfer');
+                const btnShowConfirm = document.getElementById('btn-show-confirm');
+                const btnConfirmSubmit = document.getElementById('btn-confirm-submit');
+                
+                btnShowConfirm?.addEventListener('click', function() {
+                    // Validasi HTML5 dasar
+                    if (!form.checkValidity()) {
+                        form.reportValidity();
+                        return;
+                    }
+
+                    // Ambil Gudang Tujuan
+                    const toSelect = document.querySelector('select[name="to_warehouse_id"]');
+                    const toText = toSelect.options[toSelect.selectedIndex]?.text || '-';
+                    document.getElementById('confirm-to-warehouse').textContent = toText;
+
+                    // Kumpulkan Item & Qty
+                    const confirmBody = document.getElementById('confirm-items-body');
+                    confirmBody.innerHTML = '';
+                    
+                    const rows = body.querySelectorAll('tr');
+                    let hasItem = false;
+
+                    rows.forEach(row => {
+                        const itemInput = row.querySelector('.js-item-suggest-input');
+                        const qtyInput = row.querySelector('.js-number-input');
+                        
+                        if (itemInput && qtyInput) {
+                            const itemName = itemInput.value.trim();
+                            const qty = parseFloat(qtyInput.value.replace(/,/g, '.') || 0);
+
+                            if (itemName && qty > 0) {
+                                hasItem = true;
+                                const tr = document.createElement('tr');
+                                tr.innerHTML = `
+                                    <td class="py-2 px-3 align-middle fw-medium">${itemName}</td>
+                                    <td class="py-2 px-3 align-middle text-end fw-bold" style="color: var(--shp-accent);">${qtyInput.value}</td>
+                                `;
+                                confirmBody.appendChild(tr);
+                            }
+                        }
+                    });
+
+                    if (!hasItem) {
+                        alert('Silakan masukkan minimal 1 item dengan Qty > 0 terlebih dahulu.');
+                        return;
+                    }
+
+                    // Tampilkan Modal
+                    const confirmModal = new bootstrap.Modal(document.getElementById('confirmTransferModal'));
+                    confirmModal.show();
+                });
+
+                btnConfirmSubmit?.addEventListener('click', function() {
+                    btnConfirmSubmit.disabled = true;
+                    btnConfirmSubmit.innerHTML = 'Memproses...';
+                    form.submit();
                 });
             });
         </script>

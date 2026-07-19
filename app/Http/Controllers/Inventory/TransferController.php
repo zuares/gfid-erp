@@ -101,7 +101,7 @@ class TransferController extends Controller
                 continue;
             }
 
-            $qtyFloat = $this->inventory->num($qty ?? 0); // kalau num protected, kita salin helpernya ke controller; kalau tidak, pakai (float)$qty
+            $qtyFloat = (float) ($qty ?? 0);
 
             if ($qtyFloat <= 0) {
                 continue;
@@ -186,9 +186,19 @@ class TransferController extends Controller
             'date' => ['required', 'date'],
             'from_warehouse_id' => ['required', 'exists:warehouses,id'],
             'to_warehouse_id' => ['required', 'exists:warehouses,id'],
-            'item_id' => ['required', 'exists:items,id'],
-            'qty' => ['required', 'numeric', 'gt:0'],
+            'item_id' => ['required', 'array'],
+            'item_id.*' => ['required', 'exists:items,id'],
+            'qty' => ['required', 'array'],
+            'qty.*' => ['required', 'numeric', 'gt:0'],
+            'line_notes' => ['nullable', 'array'],
+            'line_notes.*' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+        ], [
+            'item_id.*.required' => 'The item field is required.',
+            'item_id.*.exists' => 'The selected item is invalid.',
+            'qty.*.required' => 'The qty field is required.',
+            'qty.*.numeric' => 'The qty field must be a number.',
+            'qty.*.gt' => 'The qty field must be greater than 0.',
         ]);
     }
 }
