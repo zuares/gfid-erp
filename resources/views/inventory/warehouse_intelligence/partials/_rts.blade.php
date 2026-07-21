@@ -55,6 +55,7 @@
                         <tr class="rts-row" 
                             data-kritis="{{ $isKritis ? '1' : '0' }}" 
                             data-prd="{{ $r->wh_prd > 0 ? '1' : '0' }}" 
+                            data-minta="{{ $r->minta_prd }}"
                             data-buy="{{ $r->production_source === 'buy' ? '1' : '0' }}">
                             <td style="padding-left: 1rem;">
                                 <span class="fw-semibold">{{ $r->sku }}</span>
@@ -165,11 +166,12 @@
                     const isKritis = row.dataset.kritis === "1";
                     const hasPrd = row.dataset.prd === "1";
                     const isBuy = row.dataset.buy === "1";
+                    const mintaPrd = parseFloat(row.dataset.minta || 0);
                     
                     let show = false;
                     if(filter === 'all') show = true;
                     else if(filter === 'kritis' && isKritis) show = true;
-                    else if(filter === 'tarik_prd' && hasPrd && isKritis) show = true;
+                    else if(filter === 'tarik_prd' && hasPrd && mintaPrd > 0) show = true;
                     else if(filter === 'beli_jadi' && !hasPrd && isBuy && isKritis) show = true;
 
                     row.style.display = show ? '' : 'none';
