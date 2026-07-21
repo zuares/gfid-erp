@@ -64,6 +64,10 @@
 {{-- ================= AKSI CEPAT ================= --}}
 <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Aksi Cepat</div>
 <div class="dash-actions">
+    @if($u = $r('inventory.warehouse_intelligence.index'))
+        <a class="act" href="{{ $u }}"><span class="ico indigo" style="color: #4f46e5; background: #e0e7ff;"><i class="bi bi-cpu"></i></span><span class="t">Kebutuhan WH-RTS<small>Rekomendasi stok RTS</small></span></a>
+    @endif
+
     @if($u = $r('marketplace.orders'))
         <a class="act" href="{{ $u }}"><span class="ico blue"><i class="bi bi-card-list"></i></span><span class="t">Order Marketplace<small>Kelola semua pesanan</small></span></a>
     @endif

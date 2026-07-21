@@ -56,6 +56,10 @@
 {{-- ================= AKSI CEPAT ================= --}}
 <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Aksi Cepat</div>
 <div class="dash-actions">
+    @if($u = $r('inventory.warehouse_intelligence.index'))
+        <a class="act" href="{{ $u }}"><span class="ico indigo" style="color: #4f46e5; background: #e0e7ff;"><i class="bi bi-cpu"></i></span><span class="t">Prioritas WH-PRD<small>Prioritas packing & jahit</small></span></a>
+    @endif
+
     @if($u = $r('production.dashboard'))
         <a class="act" href="{{ $u }}"><span class="ico violet"><i class="bi bi-columns-gap"></i></span><span class="t">Dashboard Produksi<small>Prioritas & alur kerja</small></span></a>
     @endif
