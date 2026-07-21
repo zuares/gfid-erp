@@ -1587,5 +1587,32 @@
             setTimeout(focusScan, 60);
 
         })();
+    // Prevent double submission
+    document.getElementById('rtsCreateForm')?.addEventListener('submit', function(e) {
+        if (this.hasAttribute('data-submitted')) {
+            e.preventDefault();
+            return;
+        }
+        this.setAttribute('data-submitted', 'true');
+
+        const btn = e.submitter || this.querySelector('button[type="submit"]');
+        let origText = '';
+        if (btn) {
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.7';
+            origText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="margin-right: 5px;"></span> Menyimpan...';
+        }
+        
+        // Re-enable after 8s in case of silent validation failure (e.g., from server or another script)
+        setTimeout(() => {
+            this.removeAttribute('data-submitted');
+            if (btn) {
+                btn.style.pointerEvents = 'auto';
+                btn.style.opacity = '1';
+                btn.innerHTML = origText;
+            }
+        }, 8000);
+    });
     </script>
 @endsection

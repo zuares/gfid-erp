@@ -421,3 +421,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 @endpush
+
+@push('head')
+<style>
+    .sd-btn, .sd-pill{ display:inline-flex; align-items:center; justify-content:center; gap:.35rem; border-radius:7px; border:1px solid rgba(148,163,184,.3); background:transparent; color:#111827; text-decoration:none; font-size:.76rem; padding:.28rem .6rem; min-height:34px; font-weight:800; cursor:pointer; }
+    .sd-btn:hover{ background:rgba(148,163,184,.09); color:#111827; text-decoration:none; }
+    .sd-primary{ background:#334155!important; border-color:#334155!important; color:#fff!important; }
+    .nav-pills .nav-link { color: #64748b; font-weight: 700; }
+    .nav-pills .nav-link:hover { color: #334155; }
+    .nav-pills .nav-link.active { background-color: var(--shp-accent) !important; color: #fff !important; }
+</style>
+@endpush

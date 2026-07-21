@@ -4,25 +4,21 @@
         <div>Semua stok di WH-RTS dalam kondisi aman! Tidak ada item mendesak.</div>
     </div>
 @else
-    <div style="font-size: .75rem; color: #94a3b8; margin-bottom: 1rem; line-height: 1.4;">
-        <i class="bi bi-info-circle me-1"></i>
-        Daftar seluruh item yang memiliki laju penjualan aktif. Item yang <strong>Mendesak</strong> (stok di bawah Min Display) dan tersedia di PRD akan diurutkan teratas. Klik ikon pensil untuk mengatur batas Min/Max Display.
-    </div>
 
     <div class="card-main mb-3 p-3">
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="text-muted-ii fw-semibold me-2" style="font-size: .8rem;">Filter Operasional:</span>
-            <button class="btn btn-sm btn-outline-primary active btn-filter-rts" data-filter="all" style="border-radius: 20px; font-size: .75rem; padding: .25rem .75rem;">Semua Item</button>
-            <button class="btn btn-sm btn-outline-danger btn-filter-rts" data-filter="kritis" style="border-radius: 20px; font-size: .75rem; padding: .25rem .75rem;">Stok Kritis</button>
-            <button class="btn btn-sm btn-outline-success btn-filter-rts" data-filter="tarik_prd" style="border-radius: 20px; font-size: .75rem; padding: .25rem .75rem;">Bisa Tarik PRD</button>
-            <button class="btn btn-sm btn-outline-warning btn-filter-rts" data-filter="beli_jadi" style="border-radius: 20px; font-size: .75rem; padding: .25rem .75rem;">Perlu Beli (PR)</button>
+            <span style="font-size: .82rem; font-weight: 800; color: #111827; margin-right: .25rem;">Filter Operasional:</span>
+            <button class="btn-filter-rts active sd-btn sd-primary" data-filter="all">Semua Item</button>
+            <button class="btn-filter-rts sd-btn" data-filter="kritis">Stok Kritis</button>
+            <button class="btn-filter-rts sd-btn" data-filter="tarik_prd">Bisa Tarik PRD</button>
+            <button class="btn-filter-rts sd-btn" data-filter="beli_jadi">Perlu Beli (PR)</button>
             
             <div class="ms-auto d-flex gap-2" id="bulk-action-container" style="display: none;">
-                <button class="btn btn-sm" id="btn-bulk-minta" style="background: #10b981; color: #fff; border: none; font-weight: 600; font-size: .75rem; border-radius: 20px; padding: .25rem .75rem; display: none; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">
+                <button class="sd-btn sd-primary" id="btn-bulk-minta" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
                     Minta Stok Masal (<span id="bulk-count">0</span>)
                 </button>
-                <button class="btn btn-sm" id="btn-bulk-pr" style="background: #f59e0b; color: #fff; border: none; font-weight: 600; font-size: .75rem; border-radius: 20px; padding: .25rem .75rem; display: none; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);">
+                <button class="sd-btn sd-primary" id="btn-bulk-pr" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                     Buat PR Masal (<span id="bulk-pr-count">0</span>)
                 </button>
@@ -157,19 +153,9 @@
             btn.addEventListener('click', function() {
                 // Update active class
                 document.querySelectorAll('.btn-filter-rts').forEach(b => {
-                    b.classList.remove('active');
-                    // Reset to outline
-                    if(b.classList.contains('btn-primary')) { b.classList.replace('btn-primary', 'btn-outline-primary'); }
-                    if(b.classList.contains('btn-danger')) { b.classList.replace('btn-danger', 'btn-outline-danger'); }
-                    if(b.classList.contains('btn-success')) { b.classList.replace('btn-success', 'btn-outline-success'); }
-                    if(b.classList.contains('btn-warning')) { b.classList.replace('btn-warning', 'btn-outline-warning'); }
+                    b.classList.remove('active', 'sd-primary');
                 });
-                
-                this.classList.add('active');
-                if(this.classList.contains('btn-outline-primary')) { this.classList.replace('btn-outline-primary', 'btn-primary'); }
-                if(this.classList.contains('btn-outline-danger')) { this.classList.replace('btn-outline-danger', 'btn-danger'); }
-                if(this.classList.contains('btn-outline-success')) { this.classList.replace('btn-outline-success', 'btn-success'); }
-                if(this.classList.contains('btn-outline-warning')) { this.classList.replace('btn-outline-warning', 'btn-warning'); }
+                this.classList.add('active', 'sd-primary');
 
                 const filter = this.dataset.filter;
                 let bulkCount = 0;
@@ -354,7 +340,12 @@
                     buttonsToUpdate.forEach(b => b.outerHTML = newHtml);
                     
                     if (typeof Toast !== 'undefined') Toast.fire({ icon: 'success', title: 'Berhasil request ' + lines.length + ' item!' });
-                    document.getElementById('bulk-action-container').style.display = 'none';
+                    
+                    // Update the bulk button to be a link to the draft
+                    this.outerHTML = '<a href="'+showUrl+'" class="sd-btn sd-primary" style="background:#10b981!important;border-color:#10b981!important;color:#fff!important;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Detail</a>';
+                    
+                    const btnPr = document.getElementById('btn-bulk-pr');
+                    if(btnPr) btnPr.style.display = 'none';
                 } else {
                     alert(data.message || 'Terjadi kesalahan.');
                 }
@@ -404,7 +395,12 @@
                     buttonsToUpdate.forEach(b => b.outerHTML = newHtml);
                     
                     if (typeof Toast !== 'undefined') Toast.fire({ icon: 'success', title: 'Berhasil buat PR untuk ' + lines.length + ' item!' });
-                    document.getElementById('bulk-action-container').style.display = 'none';
+                    
+                    // Update the bulk button to be a link to the draft
+                    this.outerHTML = '<a href="'+showUrl+'" class="sd-btn sd-primary" style="background:#f59e0b!important;border-color:#f59e0b!important;color:#fff!important;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Detail</a>';
+                    
+                    const btnMinta = document.getElementById('btn-bulk-minta');
+                    if(btnMinta) btnMinta.style.display = 'none';
                 } else {
                     alert(data.message || 'Terjadi kesalahan.');
                 }

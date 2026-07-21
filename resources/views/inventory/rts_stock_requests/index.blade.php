@@ -3,7 +3,7 @@
 @section('title', 'RTS • Permintaan')
 
 @push('head')
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
 <style>
     .page-wrap {
         max-width: 960px;
@@ -208,14 +208,14 @@
     }
 
     .badge {
-        display: inline-flex; padding: .11rem .40rem;
-        border-radius: 999px; font-size: .68rem; font-weight: 800;
-        border: 1px solid rgba(148,163,184,.28);
-        background: rgba(148,163,184,.10); white-space: nowrap;
+        display: inline-flex; padding: .15rem .50rem;
+        border-radius: 999px; font-size: .70rem; font-weight: 800;
+        border: 1px solid rgba(148,163,184,.35);
+        background: rgba(148,163,184,.12); color: #475569; white-space: nowrap;
     }
-    .badge.ok     { border-color: rgba(16,185,129,.35);  background: rgba(16,185,129,.11); }
-    .badge.warn   { border-color: rgba(245,158,11,.38);  background: rgba(245,158,11,.10); }
-    .badge.danger { border-color: rgba(239,68,68,.35);   background: rgba(239,68,68,.08);  }
+    .badge.ok     { border-color: rgba(16,185,129,.40);  background: rgba(16,185,129,.12); color: #059669; }
+    .badge.warn   { border-color: rgba(245,158,11,.40);  background: rgba(245,158,11,.12); color: #d97706; }
+    .badge.danger { border-color: rgba(239,68,68,.40);   background: rgba(239,68,68,.12);  color: #dc2626; }
 
     .empty-row td { text-align: center; padding: 2.5rem; opacity: .45; font-size: .86rem; }
 
@@ -717,7 +717,7 @@
 
     .f-input:focus,
     .f-select:focus,
-    #inp-date:focus{
+    .rts-date-picker.flatpickr-input:focus{
         border-color:rgba(100,116,139,.55)!important;
         box-shadow:0 0 0 2px rgba(100,116,139,.10)!important;
     }
@@ -1032,7 +1032,7 @@
 
 
     /* === Fix RTS date picker double input === */
-    #inp-date.rts-date-picker{
+    .rts-date-picker.flatpickr-input{
         width:150px!important;
         min-width:150px!important;
         height:32px!important;
@@ -1045,12 +1045,10 @@
         cursor:pointer!important;
     }
 
-    .date-section .flatpickr-input:not(#inp-date){
-        display:none!important;
-    }
+
 
     @media(max-width:767.98px){
-        #inp-date.rts-date-picker{
+        .rts-date-picker.flatpickr-input{
             width:100%!important;
             min-width:0!important;
         }
@@ -1147,10 +1145,9 @@
         overflow:hidden!important;
     }
 
-    #inp-date.rts-date-picker{
-        display:block!important;
-        width:145px!important;
-        min-width:145px!important;
+    .rts-date-picker.flatpickr-input{
+        width: 170px !important; flex: 1;
+        min-width: 170px !important; flex: 1;
         height:32px!important;
         border:0!important;
         background:transparent!important;
@@ -1160,15 +1157,6 @@
         cursor:pointer!important;
     }
 
-    .date-section .flatpickr-input:not(#inp-date){
-        display:none!important;
-        width:0!important;
-        height:0!important;
-        padding:0!important;
-        border:0!important;
-        opacity:0!important;
-        pointer-events:none!important;
-    }
 
     .f-input,
     .f-select{
@@ -1295,8 +1283,8 @@
 
     {{-- Filter bar --}}
     <form method="GET" action="{{ route('rts.stock-requests.index') }}" id="filterForm">
-        <input type="hidden" name="date_from" id="hid-from" value="{{ $dateFromNow }}">
-        <input type="hidden" name="date_to" id="hid-to" value="{{ $dateToNow }}">
+        <input type="hidden" name="date_from" id="hid-from" value="{{ $dateFromNow }}" data-gf-date="off">
+        <input type="hidden" name="date_to" id="hid-to" value="{{ $dateToNow }}" data-gf-date="off">
         <input type="hidden" name="period"     id="hid-period" value="{{ $periodNow }}">
 
         <div class="filter-bar">
@@ -1316,7 +1304,10 @@
                         data-period="month">Bulan ini</button>
                 </div>
                 <div class="ds-divider"></div>
-                <input type="text" id="inp-date" class="f-input rts-date-picker" placeholder="Pilih tanggal…" readonly autocomplete="off">
+                <div style="display: flex; align-items: center; padding-left: .65rem; color: #94a3b8;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                </div>
+                <input type="text" id="inp-date" class="f-input rts-date-picker" placeholder="Pilih tanggal…" readonly autocomplete="off" data-gf-date="off">
                 @if($dateFromNow || $dateToNow || $periodNow !== 'all')
                     <button type="button" class="ds-clear" id="btn-clear-date" title="Hapus filter tanggal">✕</button>
                 @endif
@@ -1405,8 +1396,7 @@
     <div style="margin-top:1rem">{{ $stockRequests->links() }}</div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script>
 const hidFrom   = document.getElementById('hid-from');
@@ -1424,18 +1414,16 @@ function submitDate({ from='', to='', period='all' } = {}) {
 // ── Flatpickr (range + single) ────────────────────────────
 const fp = flatpickr('#inp-date', {
     mode: 'range',
-    dateFormat: 'Y-m-d',
+    dateFormat: 'j M Y',
     locale: 'id',
     altInput: false,
-    altFormat: 'j M Y',
     defaultDate: [hidFrom.value, hidTo.value].filter(Boolean),
-    onChange(dates) {
+    onClose(dates) {
         if (dates.length === 1) {
             // single date → same from & to
             const d = flatpickr.formatDate(dates[0], 'Y-m-d');
             submitDate({ from: d, to: d });
-        }
-        if (dates.length === 2) {
+        } else if (dates.length === 2) {
             submitDate({
                 from: flatpickr.formatDate(dates[0], 'Y-m-d'),
                 to:   flatpickr.formatDate(dates[1], 'Y-m-d'),

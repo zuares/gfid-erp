@@ -220,7 +220,7 @@ class WarehouseIntelligenceController extends Controller
             ->latest('id')
             ->first();
 
-        DB::transaction(function () use ($draft, $request, $prdWarehouse, $rtsWarehouse) {
+        DB::transaction(function () use (&$draft, $request, $prdWarehouse, $rtsWarehouse) {
             if (!$draft) {
                 $date = now()->toDateString();
                 $prefix = 'RTS-' . now()->format('Ymd') . '-';
