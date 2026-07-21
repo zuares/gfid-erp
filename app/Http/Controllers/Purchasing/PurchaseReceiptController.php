@@ -30,11 +30,22 @@ class PurchaseReceiptController extends Controller
         // ✅ biar tahu ada return (tanpa N+1)
             ->withCount(['returns as return_count'])
             ->withSum('returns as return_total_sum', 'total') // ✅ kolomnya total (bukan amount)
+            ->withSum('lines as total_qty', 'qty_received') // ✅ untuk total qty per row
+            ->withSum('lines as total_reject', 'qty_reject') // ✅ untuk total reject per row
             ->orderByDesc('date')
             ->orderByDesc('id');
 
         if ($request->filled('supplier_id')) {
             $q->where('supplier_id', (int) $request->supplier_id);
+        }
+
+        if ($request->filled('q')) {
+            $searchTerm = '%' . $request->q . '%';
+            $q->where(function($query) use ($searchTerm) {
+                $query->where('code', 'like', $searchTerm)
+                      ->orWhere('surat_jalan_no', 'like', $searchTerm)
+                      ->orWhere('notes', 'like', $searchTerm);
+            });
         }
 
         if ($request->filled('supplier_search')) {
@@ -45,15 +56,9 @@ class PurchaseReceiptController extends Controller
             $q->where('warehouse_id', (int) $request->warehouse_id);
         }
 
-        // default: posted (kalau param status tidak dikirim sama sekali)
         $status = $request->input('status');
-        if ($request->has('status')) {
-            if ($status !== null && $status !== '') {
-                $q->where('status', (string) $status);
-            }
-        } else {
-            $q->where('status', 'posted');
-            $status = 'posted';
+        if ($status !== null && $status !== '') {
+            $q->where('status', (string) $status);
         }
 
         if ($request->filled('from_date')) {
@@ -63,17 +68,34 @@ class PurchaseReceiptController extends Controller
             $q->whereDate('date', '<=', $request->to_date);
         }
 
+        // Clone query sebelum pagination agar limit/offset tidak terbawa ke aggregate query
+        $summaryQuery = clone $q;
+        
         $receipts = $q->paginate(15)->withQueryString();
 
         // Summary (clone query biar aman)
-        $summary = (clone $q)
+        $summary = $summaryQuery
             ->reorder()
             ->selectRaw('COUNT(*) as total_receipts')
             ->selectRaw("SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count")
             ->selectRaw("SUM(CASE WHEN status = 'posted' THEN 1 ELSE 0 END) as posted_count")
             ->selectRaw("SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_count")
             ->selectRaw('MAX(date) as last_date')
+            ->selectRaw('SUM(grand_total) as grand_total_sum')
             ->first();
+
+        // Calculate total qty across all filtered receipts
+        if ($summary) {
+            $summary->total_qty_sum = \App\Models\PurchaseReceiptLine::whereIn(
+                'purchase_receipt_id',
+                (clone $summaryQuery)->select('purchase_receipts.id')
+            )->sum('qty_received');
+            
+            $summary->total_reject_sum = \App\Models\PurchaseReceiptLine::whereIn(
+                'purchase_receipt_id',
+                (clone $summaryQuery)->select('purchase_receipts.id')
+            )->sum('qty_reject');
+        }
 
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
@@ -234,6 +256,63 @@ class PurchaseReceiptController extends Controller
         $this->validateOptionalPurchaseOrderRelation($data);
 
         $data['lines'] = $lines;
+
+        // ==========================================
+        // IDEMPOTENCY CHECK
+        // ==========================================
+        if (!$request->input('ignore_duplicate')) {
+            $inputLines = collect($data['lines'])->map(fn($l) => [
+                'item_id' => (int) ($l['item_id'] ?? 0),
+                'qty_received' => (float) ($l['qty_received'] ?? 0),
+                'qty_reject' => (float) ($l['qty_reject'] ?? 0),
+            ])->sortBy('item_id')->values()->toArray();
+
+            $idempotencyHash = md5(json_encode([
+                'supplier_id' => $data['supplier_id'],
+                'warehouse_id' => $data['warehouse_id'] ?? 0,
+                'purchase_order_id' => $data['purchase_order_id'] ?? 0,
+                'lines' => $inputLines,
+            ]));
+
+            $lockKey = 'grn_store_' . $request->user()->id . '_' . $idempotencyHash;
+            $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 10);
+
+            if (!$lock->get()) {
+                return back()->with('error', 'Sistem sedang memproses data GRN yang sama. Harap tunggu sebentar lalu coba lagi (double-click terdeteksi).');
+            }
+
+            $recentGRNs = \App\Models\PurchaseReceipt::with('lines')
+                ->where('created_by', $request->user()->id)
+                ->where('supplier_id', $data['supplier_id'])
+                ->where('created_at', '>=', now()->subMinutes(15))
+                ->get();
+            
+            $inputLines = collect($data['lines'])->map(fn($l) => [
+                'item_id' => (int) ($l['item_id'] ?? 0),
+                'qty_received' => (float) ($l['qty_received'] ?? 0),
+                'qty_reject' => (float) ($l['qty_reject'] ?? 0),
+            ])->sortBy('item_id')->values()->toArray();
+
+            $isDuplicate = $recentGRNs->contains(function ($grn) use ($inputLines, $data) {
+                if ((int)$grn->warehouse_id !== (int)($data['warehouse_id'] ?? 0)) return false;
+                if ((int)$grn->purchase_order_id !== (int)($data['purchase_order_id'] ?? 0)) return false;
+
+                $grnLines = $grn->lines->map(fn($l) => [
+                    'item_id' => (int) $l->item_id,
+                    'qty_received' => (float) $l->qty_received,
+                    'qty_reject' => (float) $l->qty_reject,
+                ])->sortBy('item_id')->values()->toArray();
+
+                return $grnLines == $inputLines;
+            });
+
+            if ($isDuplicate) {
+                return back()
+                    ->withInput()
+                    ->with('duplicate_warning', 'Anda baru saja membuat Goods Receipt yang sama persis (supplier, gudang, item, qty terima/reject) dalam 15 menit terakhir. Lanjutkan simpan data ganda?');
+            }
+        }
+
         $data['created_by'] = (int) $request->user()->id;
 
         $receipt = $this->service->create($data);

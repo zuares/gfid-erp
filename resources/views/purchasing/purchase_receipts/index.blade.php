@@ -29,16 +29,30 @@
     .sub{ color:var(--shp-muted); font-size:.78rem; }
     body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.4rem; }
-    .kpi{
-        display:inline-flex; align-items:baseline; gap:.45rem;
-        border-radius:7px; padding:.2rem .48rem;
-        border:1px solid rgba(148,163,184,.28); background:transparent; font-size:.72rem;
+    .kpi-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .65rem; margin-bottom: .85rem; }
+    .kpi-card {
+        background: var(--card, #fff); border: 1px solid rgba(148,163,184,.22);
+        border-radius: 8px; padding: .85rem 1rem; display: flex; flex-direction: column; justify-content: center;
     }
-    body[data-theme="dark"] .kpi{ background:rgba(15,23,42,.96); border-color:rgba(51,65,85,.85); }
-    .kpi .lbl{ font-size:.66rem; color:#94a3b8; }
-    .kpi .val{ font-weight:650; color:var(--shp-accent); }
-    body[data-theme="dark"] .kpi .val{ color:#cbd5e1; }
+    body[data-theme="dark"] .kpi-card { background: rgba(15,23,42,.98); }
+    .kpi-card .k-lbl { font-size: .68rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: .25rem; }
+    .kpi-card .k-val { font-size: 1.1rem; font-weight: 700; color: var(--shp-accent); }
+    body[data-theme="dark"] .kpi-card .k-val { color: #e2e8f0; }
+
+    .kpi-card.kpi-blue { border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.03); }
+    .kpi-card.kpi-blue .k-lbl { color: #3b82f6; }
+    .kpi-card.kpi-blue .k-val { color: #2563eb; }
+    body[data-theme="dark"] .kpi-card.kpi-blue .k-val { color: #60a5fa; }
+
+    .kpi-card.kpi-green { border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.03); }
+    .kpi-card.kpi-green .k-lbl { color: #22c55e; }
+    .kpi-card.kpi-green .k-val { color: #16a34a; }
+    body[data-theme="dark"] .kpi-card.kpi-green .k-val { color: #4ade80; }
+
+    .kpi-card.kpi-red { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.03); }
+    .kpi-card.kpi-red .k-lbl { color: #ef4444; }
+    .kpi-card.kpi-red .k-val { color: #dc2626; }
+    body[data-theme="dark"] .kpi-card.kpi-red .k-val { color: #f87171; }
 
     .btn-pill{ border-radius:7px; padding-inline:.85rem; box-shadow:none!important; font-weight:600; }
     .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
@@ -48,15 +62,28 @@
 
     /* Filter bar */
     .filter-bar{
-        background:var(--card); border:1px solid var(--shp-border);
-        border-radius:8px; padding:.6rem .7rem; margin-bottom:.65rem;
+        background:var(--card, #fff); border:1px solid rgba(148,163,184,.15);
+        border-radius:10px; padding:.75rem .85rem; margin-bottom:1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
     }
-    .filter-bar .form-control, .filter-bar .form-select{ border-radius:7px; font-size:.82rem; }
+    body[data-theme="dark"] .filter-bar{ background:rgba(15,23,42,.98); border-color:rgba(51,65,85,.6); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .filter-bar .form-control, .filter-bar .form-select{ border-radius:8px; font-size:.84rem; border-color: rgba(148,163,184,.3); }
+    .filter-bar .form-control:focus, .filter-bar .form-select:focus { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
     .filter-summary{ font-size:.74rem; color:var(--shp-muted); }
     .filter-summary strong{ color:var(--shp-accent); }
     body[data-theme="dark"] .filter-summary strong{ color:#cbd5e1; }
 
     /* Table (selaras shipment) */
+    .table-responsive {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: calc(100vh - 210px);
+    }
+    .table-responsive::-webkit-scrollbar { width: 6px; height: 6px; }
+    .table-responsive::-webkit-scrollbar-track { background: transparent; }
+    .table-responsive::-webkit-scrollbar-thumb { background: rgba(148,163,184,.3); border-radius: 4px; }
+    .table-responsive::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.5); }
+
     .table-list{ margin-bottom:0; }
     .table-list thead th{
         border-bottom-width:1px; font-size:.68rem; text-transform:none; letter-spacing:0;
@@ -129,14 +156,7 @@
             <div class="title">Goods Receipt</div>
             <div class="sub">Penerimaan barang dari supplier ke gudang.</div>
             @if (isset($summary))
-                <div class="kpis">
-                    <span class="kpi"><span class="lbl">Total</span><span class="val mono">{{ $summary->total_receipts ?? 0 }}</span></span>
-                    <span class="kpi"><span class="lbl">Draft</span><span class="val mono">{{ $summary->draft_count ?? 0 }}</span></span>
-                    <span class="kpi"><span class="lbl">Posted</span><span class="val mono">{{ $summary->posted_count ?? 0 }}</span></span>
-                    @if (($summary->closed_count ?? 0) > 0)
-                        <span class="kpi"><span class="lbl">Closed</span><span class="val mono">{{ $summary->closed_count }}</span></span>
-                    @endif
-                </div>
+                <!-- Summary is displayed in banner below -->
             @endif
         </div>
 
@@ -144,6 +164,31 @@
             <i class="bi bi-plus-lg me-1"></i> GRN Baru
         </a>
     </div>
+
+    @if (isset($summary))
+        <div class="kpi-banner">
+            <div class="kpi-card">
+                <span class="k-lbl">Total Penerimaan</span>
+                <span class="k-val mono">{{ rtrim(rtrim(number_format($summary->total_qty_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span>
+            </div>
+            <div class="kpi-card kpi-red">
+                <span class="k-lbl">Total Reject</span>
+                <span class="k-val mono">{{ rtrim(rtrim(number_format($summary->total_reject_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span>
+            </div>
+            <div class="kpi-card kpi-green">
+                <span class="k-lbl">Total Nilai</span>
+                <span class="k-val mono">Rp {{ number_format($summary->grand_total_sum ?? 0, 0, ',', '.') }}</span>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <span class="k-lbl">Dokumen (Total / Draft / Posted)</span>
+                <span class="k-val mono" style="font-size:1rem; font-weight:600;">
+                    {{ $summary->total_receipts ?? 0 }} <span style="color:#94a3b8; font-weight:400;">/</span>
+                    {{ $summary->draft_count ?? 0 }} <span style="color:#94a3b8; font-weight:400;">/</span>
+                    {{ $summary->posted_count ?? 0 }}
+                </span>
+            </div>
+        </div>
+    @endif
 
     {{-- FLASH --}}
     @if (session('success'))
@@ -160,9 +205,13 @@
             <input type="hidden" name="to_date"   id="grn-to-date"   value="{{ request('to_date') }}">
 
             <div class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="text" name="q" id="grn-search"
+                    value="{{ request('q') }}" placeholder="Cari GRN / Surat Jalan..."
+                    class="form-control form-control-sm search-input" style="max-width:200px;" autocomplete="off" />
+                
                 <input type="text" name="supplier_search" id="grn-supplier-search"
                     value="{{ request('supplier_search') }}" placeholder="Cari supplier…"
-                    class="form-control form-control-sm" style="max-width:200px;" autocomplete="off" />
+                    class="form-control form-control-sm search-input" style="max-width:160px;" autocomplete="off" />
 
                 <select name="warehouse_id" class="form-select form-select-sm grn-filter-auto" style="max-width:160px;">
                     <option value="">Semua Gudang</option>
@@ -198,34 +247,35 @@
                     autocomplete="off" data-gf-date="off" class="form-control form-control-sm"
                     style="max-width:200px;cursor:pointer;" readonly />
 
-                @if (request()->filled('supplier_search') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date'))
+                @if (request()->filled('q') || request()->filled('supplier_search') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date'))
                     <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
                         <i class="bi bi-x me-1"></i>Reset
                     </a>
                 @endif
             </div>
         </form>
-
-        @if (isset($summary) && !empty($summary->last_date))
-            <div class="filter-summary mt-2">
-                Terakhir diterima: <strong class="mono">{{ id_date($summary->last_date) }}</strong>
-            </div>
-        @endif
     </div>
+
+    @if (isset($summary) && !empty($summary->last_date))
+        <div class="filter-summary mb-2 px-1">
+            Terakhir diterima: <strong class="mono">{{ id_date($summary->last_date) }}</strong>
+        </div>
+    @endif
 
     {{-- TABLE (satu tabel responsif; mobile → kartu) --}}
     <div class="card card-main">
         <div class="card-body p-0">
-            <div class="table-responsive" style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 210px);">
-                <table class="table table-hover align-middle table-list">
+            <div class="table-responsive" style="overflow-x: auto; overflow-y: auto; max-height: 60vh;">
+                <table class="table table-hover align-middle table-list mb-0">
                     <thead>
                         <tr>
-                            <th style="width:46px; position: sticky; top: 0; z-index: 10;">#</th>
-                            <th style="width:120px; position: sticky; top: 0; z-index: 10;">Tanggal</th>
-                            <th style="width:210px; position: sticky; top: 0; z-index: 10;">GRN</th>
-                            <th style="position: sticky; top: 0; z-index: 10;">Supplier / Gudang</th>
-                            <th style="width:120px; position: sticky; top: 0; z-index: 10;">Status</th>
-                            <th style="width:100px; position: sticky; top: 0; z-index: 10;"></th>
+                            <th style="width:46px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">#</th>
+                            <th style="width:230px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Dokumen & Tanggal</th>
+                            <th style="position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Supplier / Gudang</th>
+                            <th style="width:150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Total (Qty & Rp)</th>
+                            <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Reject</th>
+                            <th style="width:120px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status</th>
+                            <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
                         </tr>
                     </thead>
                     <tbody id="grn-table-body">
@@ -253,18 +303,34 @@ document.addEventListener('DOMContentLoaded', function () {
         el.addEventListener('change', function () { form.submit(); });
     });
 
-    const supplierInput = document.getElementById('grn-supplier-search');
-    if (supplierInput) {
-        let timer;
-        supplierInput.addEventListener('input', function () {
-            clearTimeout(timer);
-            timer = setTimeout(function () { form.submit(); }, 500);
+    let searchTimer;
+    form.querySelectorAll('.search-input').forEach(function (input) {
+        input.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () { form.submit(); }, 500);
         });
-        setTimeout(function () {
-            supplierInput.focus();
-            const len = supplierInput.value.length;
-            supplierInput.setSelectionRange(len, len);
-        }, 100);
+    });
+    
+    // Focus the first search input if it was just typed in
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has('q')) {
+        const qInput = document.getElementById('grn-search');
+        if (qInput) {
+            setTimeout(function () {
+                qInput.focus();
+                const len = qInput.value.length;
+                qInput.setSelectionRange(len, len);
+            }, 100);
+        }
+    } else if (searchParams.has('supplier_search')) {
+        const supplierInput = document.getElementById('grn-supplier-search');
+        if (supplierInput) {
+            setTimeout(function () {
+                supplierInput.focus();
+                const len = supplierInput.value.length;
+                supplierInput.setSelectionRange(len, len);
+            }, 100);
+        }
     }
 
     const rangeInput = document.getElementById('grn-date-range');
