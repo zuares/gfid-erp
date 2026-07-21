@@ -8,15 +8,15 @@
     <div class="card-main mb-3 p-3">
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <span style="font-size: .82rem; font-weight: 800; color: #111827; margin-right: .25rem;">Filter Operasional:</span>
-            <button class="btn-filter-rts active sd-btn sd-primary" data-filter="all">Semua Item</button>
-            <button class="btn-filter-rts sd-btn" data-filter="kritis">Stok Kritis</button>
-            <button class="btn-filter-rts sd-btn" data-filter="tarik_prd">Bisa Tarik PRD</button>
-            <button class="btn-filter-rts sd-btn" data-filter="beli_jadi">Perlu Beli (PR)</button>
+            <button class="btn-filter-rts active sd-btn sd-primary" data-filter="all"><i class="bi bi-grid"></i> Semua Item</button>
+            <button class="btn-filter-rts sd-btn" data-filter="kritis" style="color: #d97706;"><i class="bi bi-exclamation-triangle"></i> Stok Kritis</button>
+            <button class="btn-filter-rts sd-btn" data-filter="tarik_prd" style="color: #059669;"><i class="bi bi-box-seam"></i> Tersedia di PRD</button>
+            <button class="btn-filter-rts sd-btn" data-filter="beli_jadi" style="color: #dc2626;"><i class="bi bi-cart-plus"></i> Perlu Beli (PR)</button>
             
             <div class="ms-auto d-flex gap-2" id="bulk-action-container" style="display: none;">
                 <button class="sd-btn sd-primary" id="btn-bulk-minta" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
-                    Minta Stok Masal (<span id="bulk-count">0</span>)
+                    Tarik PRD Masal (<span id="bulk-count">0</span>)
                 </button>
                 <button class="sd-btn sd-primary" id="btn-bulk-pr" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
@@ -125,9 +125,9 @@
                                         Lihat Draft
                                     </a>
                                 @elseif($r->wh_prd > 0 && $r->minta_prd > 0)
-                                    <button type="button" class="btn btn-sm btn-minta-stok" data-item="{{ $r->item_id }}" data-qty="{{ $r->minta_prd }}" style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Buat Request RTS">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
-                                        Minta Stok ({{ $fmt($r->minta_prd) }})
+                                    <button type="button" class="btn btn-sm btn-minta-stok" data-item="{{ $r->item_id }}" data-qty="{{ $r->minta_prd }}" style="background: #10b981; color: #fff; border: 1px solid #059669; font-weight: 600; font-size: .75rem; border-radius: 7px; padding: .25rem .6rem; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(16,185,129,0.2);" title="Tarik Stok dari PRD">
+                                        <i class="bi bi-box-seam"></i>
+                                        Tarik PRD ({{ $fmt($r->minta_prd) }})
                                     </button>
                                 @elseif($r->pr_draft_id)
                                     <a href="{{ route('purchasing.purchase_requests.edit', $r->pr_draft_id) }}" class="btn btn-sm" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat PR Draft">

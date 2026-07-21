@@ -22,9 +22,19 @@ class WarehouseIntelligenceController extends Controller
 
     public function index(Request $request)
     {
-        $tab = $request->query('tab', 'rts');
-        if (!in_array($tab, self::TABS)) {
-            $tab = 'rts';
+        $role = strtolower((string)(auth()->user()?->role ?? 'owner'));
+        
+        // Define allowed tabs per role
+        $allowedTabs = self::TABS;
+        if ($role === 'admin') {
+            $allowedTabs = ['rts'];
+        } elseif ($role === 'operating') {
+            $allowedTabs = ['prd'];
+        }
+
+        $tab = $request->query('tab');
+        if (!$tab || !in_array($tab, $allowedTabs)) {
+            $tab = $allowedTabs[0] ?? 'rts';
         }
 
         // We need all items for the basic filter placeholders
@@ -36,7 +46,19 @@ class WarehouseIntelligenceController extends Controller
 
     public function tabData(Request $request)
     {
-        $tab = $request->input('tab', 'rts');
+        $role = strtolower((string)(auth()->user()?->role ?? 'owner'));
+        
+        $allowedTabs = self::TABS;
+        if ($role === 'admin') {
+            $allowedTabs = ['rts'];
+        } elseif ($role === 'operating') {
+            $allowedTabs = ['prd'];
+        }
+
+        $tab = $request->input('tab');
+        if (!$tab || !in_array($tab, $allowedTabs)) {
+            $tab = $allowedTabs[0] ?? 'rts';
+        }
         $filters = $request->only(['item_id', 'category_id']);
 
         // Base rows from Intelligence Service (No controller-level cache to ensure limits update instantly)

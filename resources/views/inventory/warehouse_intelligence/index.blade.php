@@ -3,14 +3,29 @@
 @section('title', 'Warehouse Intelligence • Transfer & Produksi')
 
 @php
-    $tabs = [
+    $role = strtolower((string)(auth()->user()?->role ?? 'owner'));
+    $allTabs = [
         'rts' => 'Kebutuhan WH-RTS',
         'prd' => 'Prioritas WH-PRD',
     ];
-    $tabDesc = [
+    $allTabDesc = [
         'rts' => 'Daftar item yang stoknya menipis di area display/packing (WH-RTS).',
         'prd' => 'Daftar prioritas packing/transfer & jahit dari sudut pandang Gudang Produksi.',
     ];
+
+    $tabs = [];
+    $tabDesc = [];
+
+    if ($role === 'admin') {
+        $tabs['rts'] = $allTabs['rts'];
+        $tabDesc['rts'] = $allTabDesc['rts'];
+    } elseif ($role === 'operating') {
+        $tabs['prd'] = $allTabs['prd'];
+        $tabDesc['prd'] = $allTabDesc['prd'];
+    } else {
+        $tabs = $allTabs;
+        $tabDesc = $allTabDesc;
+    }
 @endphp
 
 @push('head')
