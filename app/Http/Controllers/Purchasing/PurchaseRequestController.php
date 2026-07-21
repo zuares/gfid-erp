@@ -319,9 +319,26 @@ class PurchaseRequestController extends Controller
             ])
             ->groupBy('item_category_id')
             ->map(fn ($rows) => $rows->first());
+            
+        $lastPurchasedSuppliers = DB::table('purchase_order_lines')
+            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_lines.purchase_order_id')
+            ->join('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
+            ->whereIn('purchase_order_lines.item_id', $purchase_request->lines->pluck('item_id'))
+            ->whereIn('purchase_orders.status', ['approved', 'done', 'open', 'processing', 'closed'])
+            ->where('suppliers.active', true)
+            ->orderByDesc('purchase_orders.date')
+            ->orderByDesc('purchase_orders.id')
+            ->get([
+                'purchase_order_lines.item_id',
+                'purchase_orders.supplier_id',
+            ])
+            ->groupBy('item_id')
+            ->map(fn ($rows) => $rows->first());
+
         $recommendedSuppliers = $purchase_request->lines->mapWithKeys(function ($line) use (
             $itemRecommendations,
-            $categoryRecommendations
+            $categoryRecommendations,
+            $lastPurchasedSuppliers
         ) {
             if ($itemRecommendation = $itemRecommendations->get($line->item_id)) {
                 $itemRecommendation->source = 'item';
@@ -331,6 +348,12 @@ class PurchaseRequestController extends Controller
             if ($categoryRecommendation = $categoryRecommendations->get($line->item?->item_category_id)) {
                 $categoryRecommendation->source = 'category';
                 return [$line->item_id => $categoryRecommendation];
+            }
+            
+            if ($lastPurchased = $lastPurchasedSuppliers->get($line->item_id)) {
+                $lastPurchased->source = 'history';
+                $lastPurchased->is_primary = 0;
+                return [$line->item_id => $lastPurchased];
             }
 
             return [];
@@ -388,9 +411,26 @@ class PurchaseRequestController extends Controller
             }
 
             $orders = collect();
-            $grouped = $lines->groupBy(fn ($line) => (int) $data['suppliers'][$line->id]);
+            
+            $lastPrices = DB::table('purchase_order_lines')
+                ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_lines.purchase_order_id')
+                ->whereIn('purchase_order_lines.item_id', $lines->pluck('item_id'))
+                ->whereIn('purchase_orders.status', ['approved', 'done', 'open', 'processing', 'closed'])
+                ->orderByDesc('purchase_orders.date')
+                ->orderByDesc('purchase_orders.id')
+                ->get(['purchase_order_lines.item_id', 'purchase_order_lines.unit_price'])
+                ->groupBy('item_id')
+                ->map(fn ($rows) => $rows->first()->unit_price);
+            
+            $grouped = $lines->groupBy(function ($line) use ($data) {
+                $supplierId = (int) $data['suppliers'][$line->id];
+                $itemType = $line->item->type;
+                return $supplierId . '|' . $itemType;
+            });
 
-            foreach ($grouped as $supplierId => $supplierLines) {
+            foreach ($grouped as $key => $supplierLines) {
+                [$supplierId, $orderType] = explode('|', $key);
+                
                 $order = $purchaseOrderService->create([
                     'date' => now()->toDateString(),
                     'supplier_id' => (int) $supplierId,
@@ -400,15 +440,23 @@ class PurchaseRequestController extends Controller
                     'notes' => "Dibuat dari {$purchase_request->code}. Harga dilengkapi owner sebelum approval.",
                     'created_by' => (int) $request->user()->id,
                     'status' => 'draft',
-                    'order_type' => 'material',
+                    'order_type' => $orderType,
                     'purchase_request_id' => $purchase_request->id,
-                    'lines' => $supplierLines->map(fn ($line) => [
-                        'item_id' => $line->item_id,
-                        'qty' => $line->qty,
-                        'unit_price' => $line->unit_price ?? 0,
-                        'discount' => 0,
-                        'notes' => $line->notes,
-                    ])->all(),
+                    'lines' => $supplierLines->map(function ($line) use ($lastPrices) {
+                        $historyPrice = $lastPrices->get($line->item_id);
+                        $itemPrice = $line->item->last_purchase_price;
+                        $prPrice = $line->unit_price;
+                        
+                        $finalPrice = $historyPrice ?: ($itemPrice ?: ($prPrice ?: 0));
+                        
+                        return [
+                            'item_id' => $line->item_id,
+                            'qty' => $line->qty,
+                            'unit_price' => $finalPrice,
+                            'discount' => 0,
+                            'notes' => $line->notes,
+                        ];
+                    })->all(),
                 ]);
 
                 $purchase_request->lines()

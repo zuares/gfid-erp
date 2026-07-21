@@ -304,7 +304,7 @@ class PurchaseOrderService
      * Total qty yang sudah "terpakai" per purchase_order_line_id, dari SEMUA GRN
      * (draft + posted) yang merujuk line tsb. Dipakai sebagai batas bawah qty PO.
      */
-    protected function receivedQtyByLineId(PurchaseOrder $order): array
+    public function receivedQtyByLineId(PurchaseOrder $order): array
     {
         return DB::table('purchase_receipt_lines')
             ->join('purchase_receipts', 'purchase_receipts.id', '=', 'purchase_receipt_lines.purchase_receipt_id')

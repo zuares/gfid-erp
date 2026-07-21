@@ -106,7 +106,7 @@ class PurchaseOrderController extends Controller
             'last_date' => optional((clone $summaryQuery)->orderByDesc('date')->first())->date,
         ];
 
-        $orders = $q->paginate(20)->withQueryString();
+        $orders = $q->paginate(15)->withQueryString();
 
 
 
@@ -237,6 +237,64 @@ class PurchaseOrderController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateData($request);
+
+        // ==========================================
+        // IDEMPOTENCY CHECK
+        // ==========================================
+        if (!$request->input('ignore_duplicate')) {
+            $inputLines = collect($data['lines'] ?? [])->map(fn($l) => [
+                'item_id' => (int) ($l['item_id'] ?? 0),
+                'qty' => (float) ($l['qty'] ?? 0),
+                'unit_price' => (float) ($l['unit_price'] ?? 0),
+            ])->sortBy('item_id')->values()->toArray();
+
+            $idempotencyHash = md5(json_encode([
+                'supplier_id' => $data['supplier_id'],
+                'discount' => (float)($data['discount'] ?? 0),
+                'tax_percent' => (float)($data['tax_percent'] ?? 0),
+                'shipping_cost' => (float)($data['shipping_cost'] ?? 0),
+                'lines' => $inputLines,
+            ]));
+
+            $lockKey = 'po_store_' . $request->user()->id . '_' . $idempotencyHash;
+            $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 10);
+
+            if (!$lock->get()) {
+                return back()->with('error', 'Sistem sedang memproses data PO yang sama. Harap tunggu sebentar lalu coba lagi (double-click terdeteksi).');
+            }
+
+            $recentPOs = \App\Models\PurchaseOrder::with('lines')
+                ->where('created_by', $request->user()->id)
+                ->where('supplier_id', $data['supplier_id'])
+                ->where('created_at', '>=', now()->subMinutes(15))
+                ->get();
+            
+            $inputLines = collect($data['lines'] ?? [])->map(fn($l) => [
+                'item_id' => (int) ($l['item_id'] ?? 0),
+                'qty' => (float) ($l['qty'] ?? 0),
+                'unit_price' => (float) ($l['unit_price'] ?? 0),
+            ])->sortBy('item_id')->values()->toArray();
+
+            $isDuplicate = $recentPOs->contains(function ($po) use ($inputLines, $data) {
+                if ((float)$po->discount !== (float)($data['discount'] ?? 0)) return false;
+                if ((float)$po->tax_percent !== (float)($data['tax_percent'] ?? 0)) return false;
+                if ((float)$po->shipping_cost !== (float)($data['shipping_cost'] ?? 0)) return false;
+
+                $poLines = $po->lines->map(fn($l) => [
+                    'item_id' => (int) $l->item_id,
+                    'qty' => (float) $l->qty,
+                    'unit_price' => (float) $l->unit_price,
+                ])->sortBy('item_id')->values()->toArray();
+
+                return $poLines == $inputLines;
+            });
+
+            if ($isDuplicate) {
+                return back()
+                    ->withInput()
+                    ->with('duplicate_warning', 'Anda baru saja membuat Purchase Order yang sama persis (supplier, item, qty, harga) dalam 15 menit terakhir. Lanjutkan simpan data ganda?');
+            }
+        }
 
         $data['created_by'] = (int) $request->user()->id;
         $data['status'] = 'draft';

@@ -29,30 +29,18 @@
     .sub{ color:var(--shp-muted); font-size:.78rem; }
     body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .kpi-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .65rem; margin-bottom: .85rem; }
-    .kpi-card {
-        background: var(--card, #fff); border: 1px solid rgba(148,163,184,.22);
-        border-radius: 8px; padding: .85rem 1rem; display: flex; flex-direction: column; justify-content: center;
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+    .kpi{
+        display:inline-flex; align-items:baseline; gap:.45rem;
+        border-radius:7px; padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28);
+        background: transparent;
+        font-size:.72rem;
     }
-    body[data-theme="dark"] .kpi-card { background: rgba(15,23,42,.98); }
-    .kpi-card .k-lbl { font-size: .68rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: .25rem; }
-    .kpi-card .k-val { font-size: 1.1rem; font-weight: 700; color: var(--shp-accent); }
-    body[data-theme="dark"] .kpi-card .k-val { color: #e2e8f0; }
-
-    .kpi-card.kpi-blue { border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.03); }
-    .kpi-card.kpi-blue .k-lbl { color: #3b82f6; }
-    .kpi-card.kpi-blue .k-val { color: #2563eb; }
-    body[data-theme="dark"] .kpi-card.kpi-blue .k-val { color: #60a5fa; }
-
-    .kpi-card.kpi-green { border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.03); }
-    .kpi-card.kpi-green .k-lbl { color: #22c55e; }
-    .kpi-card.kpi-green .k-val { color: #16a34a; }
-    body[data-theme="dark"] .kpi-card.kpi-green .k-val { color: #4ade80; }
-
-    .kpi-card.kpi-red { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.03); }
-    .kpi-card.kpi-red .k-lbl { color: #ef4444; }
-    .kpi-card.kpi-red .k-val { color: #dc2626; }
-    body[data-theme="dark"] .kpi-card.kpi-red .k-val { color: #f87171; }
+    body[data-theme="dark"] .kpi{ background: rgba(15, 23, 42, 0.96); border-color: rgba(51, 65, 85, 0.85); }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
+    body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
+    .kpi .val{ font-weight:650; color:var(--shp-accent); }
 
     .btn-pill{ border-radius:7px; padding-inline:.85rem; box-shadow:none!important; font-weight:600; }
     .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
@@ -156,7 +144,18 @@
             <div class="title">Goods Receipt</div>
             <div class="sub">Penerimaan barang dari supplier ke gudang.</div>
             @if (isset($summary))
-                <!-- Summary is displayed in banner below -->
+                <div class="kpis">
+                    <span class="kpi"><span class="lbl">Total</span><span class="val mono">{{ $summary->total_receipts ?? 0 }}</span></span>
+                    <span class="kpi"><span class="lbl">Draft</span><span class="val mono">{{ $summary->draft_count ?? 0 }}</span></span>
+                    <span class="kpi"><span class="lbl">Posted</span><span class="val mono">{{ $summary->posted_count ?? 0 }}</span></span>
+                    @if (($summary->closed_count ?? 0) > 0)
+                        <span class="kpi"><span class="lbl">Closed</span><span class="val mono">{{ $summary->closed_count }}</span></span>
+                    @endif
+                    <span class="kpi"><span class="lbl">Penerimaan</span><span class="val mono">{{ rtrim(rtrim(number_format($summary->total_qty_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span></span>
+                    <span class="kpi"><span class="lbl" style="color:#ef4444;">Reject</span><span class="val mono" style="color:#dc2626;">{{ rtrim(rtrim(number_format($summary->total_reject_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span></span>
+                    <span class="kpi"><span class="lbl" style="color:#ef4444;">Reject Rp</span><span class="val mono" style="color:#dc2626;">Rp {{ number_format($summary->total_reject_rp_sum ?? 0, 0, ',', '.') }}</span></span>
+                    <span class="kpi"><span class="lbl">Nilai</span><span class="val mono">Rp {{ number_format($summary->grand_total_sum ?? 0, 0, ',', '.') }}</span></span>
+                </div>
             @endif
         </div>
 
@@ -164,31 +163,6 @@
             <i class="bi bi-plus-lg me-1"></i> GRN Baru
         </a>
     </div>
-
-    @if (isset($summary))
-        <div class="kpi-banner">
-            <div class="kpi-card">
-                <span class="k-lbl">Total Penerimaan</span>
-                <span class="k-val mono">{{ rtrim(rtrim(number_format($summary->total_qty_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span>
-            </div>
-            <div class="kpi-card kpi-red">
-                <span class="k-lbl">Total Reject</span>
-                <span class="k-val mono">{{ rtrim(rtrim(number_format($summary->total_reject_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span>
-            </div>
-            <div class="kpi-card kpi-green">
-                <span class="k-lbl">Total Nilai</span>
-                <span class="k-val mono">Rp {{ number_format($summary->grand_total_sum ?? 0, 0, ',', '.') }}</span>
-            </div>
-            <div class="kpi-card kpi-blue">
-                <span class="k-lbl">Dokumen (Total / Draft / Posted)</span>
-                <span class="k-val mono" style="font-size:1rem; font-weight:600;">
-                    {{ $summary->total_receipts ?? 0 }} <span style="color:#94a3b8; font-weight:400;">/</span>
-                    {{ $summary->draft_count ?? 0 }} <span style="color:#94a3b8; font-weight:400;">/</span>
-                    {{ $summary->posted_count ?? 0 }}
-                </span>
-            </div>
-        </div>
-    @endif
 
     {{-- FLASH --}}
     @if (session('success'))
@@ -273,8 +247,9 @@
                             <th style="width:230px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Dokumen & Tanggal</th>
                             <th style="position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Supplier / Gudang</th>
                             <th style="width:150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Total (Qty & Rp)</th>
-                            <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Reject</th>
-                            <th style="width:120px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status</th>
+                            <th style="width:140px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Reject</th>
+                            <th style="width:140px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status Pembayaran</th>
+                            <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status</th>
                             <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
                         </tr>
                     </thead>

@@ -534,8 +534,22 @@
                 <a href="{{ route('rts.stock-requests.barcode', $stockRequest->id) }}" target="_blank" class="btn btn-outline">
                     <i class="bi bi-upc-scan"></i> Cetak Barcode
                 </a>
+                @if ($stockRequest->status === 'draft')
+                    <a href="{{ route('rts.stock-requests.edit', $stockRequest) }}" class="btn btn-outline">
+                        <i class="bi bi-pencil"></i> Edit Draft
+                    </a>
+                @endif
                 @if ($canManage && $canReceive)
                     <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="btn btn-primary">Terima Jadi</a>
+                @endif
+                @if ($canManage && $stockRequest->status !== 'cancelled')
+                    <form action="{{ route('rts.stock-requests.destroy', $stockRequest) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan Stock Request ini?\n\nJika stok sudah dipindahkan, stok akan dikembalikan secara otomatis.');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+                            <i class="bi bi-x-circle"></i> Batalkan
+                        </button>
+                    </form>
                 @endif
             </div>
         </div>
@@ -544,15 +558,15 @@
             <div class="stats">
                 <div class="stat">
                     <div class="k">Req</div>
-                    <div class="v mono">{{ rtrim(rtrim(number_format($reqTotal, 2, '.', ''), '0'), '.') }}</div>
+                    <div class="v mono">{{ number_format($reqTotal, 0, ',', '.') }}</div>
                 </div>
                 <div class="stat">
                     <div class="k">Terima Jadi</div>
-                    <div class="v mono">{{ rtrim(rtrim(number_format($recvTotal, 2, '.', ''), '0'), '.') }}</div>
+                    <div class="v mono">{{ number_format($recvTotal, 0, ',', '.') }}</div>
                 </div>
                 <div class="stat">
                     <div class="k">Sisa</div>
-                    <div class="v mono">{{ rtrim(rtrim(number_format($outTotal, 2, '.', ''), '0'), '.') }}</div>
+                    <div class="v mono">{{ number_format($outTotal, 0, ',', '.') }}</div>
                 </div>
             </div>
 
@@ -595,11 +609,11 @@
                                     <div class="item-code mono">{{ $line->item->code }}</div>
                                     <div class="item-name">{{ $line->item->name }}</div>
                                 </td>
-                                <td class="td-right mono">{{ rtrim(rtrim(number_format($req, 2, '.', ''), '0'), '.') }}
+                                <td class="td-right mono">{{ number_format($req, 0, ',', '.') }}
                                 </td>
-                                <td class="td-right mono">{{ rtrim(rtrim(number_format($recv, 2, '.', ''), '0'), '.') }}
+                                <td class="td-right mono">{{ number_format($recv, 0, ',', '.') }}
                                 </td>
-                                <td class="td-right mono">{{ rtrim(rtrim(number_format($out, 2, '.', ''), '0'), '.') }}
+                                <td class="td-right mono">{{ number_format($out, 0, ',', '.') }}
                                 </td>
                             </tr>
                         @endforeach

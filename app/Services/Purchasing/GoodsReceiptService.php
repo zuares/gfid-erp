@@ -672,7 +672,7 @@ class GoodsReceiptService
             }
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
-        });
+        }, 3);
     }
 
     /**
@@ -758,7 +758,7 @@ class GoodsReceiptService
             }
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
-        });
+        }, 3);
     }
 
     public function recalculate(PurchaseReceipt $grn): PurchaseReceipt

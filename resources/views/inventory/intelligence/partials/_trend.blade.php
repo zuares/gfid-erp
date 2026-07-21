@@ -23,8 +23,35 @@
     ];
 @endphp
 
-<x-gf.panel title="Tren Permintaan per SKU"
-    subtitle="Penjualan harian 30 hari. Arah = qty 7 hari terakhir vs 7 hari sebelumnya. Klik SKU untuk lihat grafiknya.">
+<div class="filter-bar mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
+        <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
+        <input type="search" class="form-control form-control-sm ii-search" data-ii-search
+            placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
+
+        <select class="form-select form-select-sm" data-ii-status aria-label="Status" style="max-width:140px;">
+            <option value="">Semua Status</option>
+            <option value="stockout">Stockout</option>
+            <option value="kritis">Kritis</option>
+            <option value="menipis">Menipis</option>
+            <option value="sehat">Sehat</option>
+            <option value="no_demand">Tanpa demand</option>
+        </select>
+
+        <select class="form-select form-select-sm" data-ii-sort aria-label="Urutkan" style="max-width:180px;">
+            <option value="trend-desc">Paling naik</option>
+            <option value="trend-asc">Paling turun</option>
+            <option value="score-desc">Skor evaluasi tertinggi</option>
+            <option value="ads-desc">Jual/hari tertinggi</option>
+            <option value="sku-asc">SKU A–Z</option>
+        </select>
+
+        <span class="ii-count ms-auto" data-ii-count>{{ $fmt($skuCount) }} SKU</span>
+    </div>
+</div>
+
+<div class="card-main">
     @if ($rows->isEmpty())
         <div class="ii-empty">Tidak ada data penjualan untuk filter ini.</div>
     @else
@@ -39,42 +66,17 @@
         </div>
         <script type="application/json" data-ii-trend-data>@json($payload)</script>
 
-        <div class="ii-toolbar">
-            <input type="search" class="form-control ii-search" data-ii-search
-                placeholder="Cari SKU / produk / kategori…" autocomplete="off">
-
-            <select class="form-select" data-ii-status aria-label="Status">
-                <option value="">Semua Status</option>
-                <option value="stockout">Stockout</option>
-                <option value="kritis">Kritis</option>
-                <option value="menipis">Menipis</option>
-                <option value="sehat">Sehat</option>
-                <option value="no_demand">Tanpa demand</option>
-            </select>
-
-            <select class="form-select" data-ii-sort aria-label="Urutkan">
-                <option value="trend-desc">Paling naik</option>
-                <option value="trend-asc">Paling turun</option>
-                <option value="score-desc">Skor evaluasi tertinggi</option>
-                <option value="ads-desc">Jual/hari tertinggi</option>
-                <option value="sku-asc">SKU A–Z</option>
-            </select>
-
-            <span class="ii-count" data-ii-count>{{ $fmt($skuCount) }} SKU</span>
-        </div>
-
-        <div class="gf-table-scroll gf-table-scroll-sticky">
-            <table class="table table-hover align-middle mb-0 gf-clean-table gf-sticky-table" data-ii-table>
-                <thead>
+        <div class="table-responsive" style="max-height: 50vh;">
+            <table class="table table-hover align-middle table-list" data-ii-table>
+                <thead style="background: rgba(241, 245, 249, 0.5); position: sticky; top: 0; z-index: 10;">
                     <tr>
-                        <th>SKU</th>
-                        <th class="gf-hide-mobile">Kategori</th>
+                        <th style="padding-left: 1.25rem;">SKU & Produk</th>
                         <th>Arah (7hr)</th>
-                        <th class="gf-num gf-hide-mobile">ADS 7</th>
-                        <th class="gf-num gf-hide-mobile">ADS 14</th>
-                        <th class="gf-num">ADS 30</th>
-                        <th class="gf-num gf-hide-mobile">Skor</th>
-                        <th class="gf-hide-mobile">Status</th>
+                        <th class="text-end gf-hide-mobile">ADS 7</th>
+                        <th class="text-end gf-hide-mobile">ADS 14</th>
+                        <th class="text-end">ADS 30</th>
+                        <th class="text-end gf-hide-mobile">Skor</th>
+                        <th class="gf-hide-mobile" style="padding-right: 1.25rem;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -87,8 +89,13 @@
                             data-ads="{{ $r->ads }}"
                             data-score="{{ $r->eval_score }}"
                             data-delta="{{ $r->direction === 'new' ? 999999 : ($r->delta_pct ?? 0) }}">
-                            <td><span class="gf-chip" title="{{ $r->product }}"><b>{{ $r->sku }}</b></span></td>
-                            <td class="text-muted gf-hide-mobile">{{ $r->category }}</td>
+                            
+                            <td style="padding-left: 1.25rem;">
+                                <span class="fw-semibold">{{ $r->sku }}</span>
+                                <div class="text-muted-ii" style="font-size: .7rem;">{{ $r->product }}</div>
+                                <div class="text-muted-ii mt-1" style="font-size: .65rem;">{{ $r->category }}</div>
+                            </td>
+                            
                             <td>
                                 <span class="ii-dir {{ $dm[1] }}">{{ $dm[0] }}
                                     @if ($r->direction === 'new')
@@ -100,16 +107,16 @@
                                     @endif
                                 </span>
                             </td>
-                            <td class="gf-num gf-hide-mobile">{{ $fmt($r->ads7, 1) }}</td>
-                            <td class="gf-num gf-hide-mobile">{{ $fmt($r->ads14, 1) }}</td>
-                            <td class="gf-num">{{ $fmt($r->ads30, 1) }}</td>
-                            <td class="gf-num gf-hide-mobile">
+                            <td class="text-end gf-hide-mobile text-muted">{{ $fmt($r->ads7, 1) }}</td>
+                            <td class="text-end gf-hide-mobile text-muted">{{ $fmt($r->ads14, 1) }}</td>
+                            <td class="text-end fw-semibold">{{ $fmt($r->ads30, 1) }}</td>
+                            <td class="text-end gf-hide-mobile">
                                 @php $sc = $r->eval_score; $scb = $sc >= 70 ? 'ii-score-high' : ($sc >= 40 ? 'ii-score-mid' : 'ii-score-low'); @endphp
                                 <span class="ii-score {{ $scb }}">{{ $sc }}</span>
                             </td>
-                            <td class="gf-hide-mobile">
-                                <span class="ii-status ii-status-{{ $r->status }}">
-                                    <span class="ii-status-dot"></span>{{ $statusLabel[$r->status] ?? $r->status }}
+                            <td class="gf-hide-mobile" style="padding-right: 1.25rem;">
+                                <span class="badge-status st-{{ $r->status }}">
+                                    {{ $statusLabel[$r->status] ?? $r->status }}
                                 </span>
                             </td>
                         </tr>
@@ -119,4 +126,4 @@
         </div>
         <div class="ii-empty" data-ii-empty hidden>Tidak ada SKU yang cocok dengan filter.</div>
     @endif
-</x-gf.panel>
+</div>

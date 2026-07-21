@@ -28,6 +28,8 @@ class Item extends Model
         'base_unit_cost',
 
         'active',
+        'rts_min_display',
+        'rts_max_display',
         'affects_hpp',
         'default_allocation', // hpp / expense
         'default_expense_account_id',

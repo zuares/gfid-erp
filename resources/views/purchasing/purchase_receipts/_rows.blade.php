@@ -31,6 +31,18 @@
         $actionLabel = $canEdit ? 'Lanjutkan' : 'Detail';
         $showRoute = route('purchasing.purchase_receipts.show', $receipt->id);
         $dateLabel = $receipt->date ? id_date($receipt->date) . ' ' . $receipt->created_at->format('H:i') : '—';
+        
+        $ps = (string) ($receipt->order->payment_status ?? 'unpaid');
+        $payLabel = match($ps) {
+            'paid' => 'Lunas',
+            'partial' => 'Sebagian',
+            default => 'Belum',
+        };
+        $payBadgeClass = match($ps) {
+            'paid' => 'text-success bg-success bg-opacity-10',
+            'partial' => 'text-warning bg-warning bg-opacity-10',
+            default => 'text-muted bg-secondary bg-opacity-10',
+        };
     @endphp
 
     <tr class="grn-row" data-href="{{ $showRoute }}">
@@ -70,10 +82,15 @@
 
         <td class="text-end mobile-hide">
             @if(($receipt->total_reject ?? 0) > 0)
-                <span class="mono fw-semibold" style="color:#dc2626;">{{ rtrim(rtrim(number_format($receipt->total_reject, 2, ',', '.'), '0'), ',') }}</span>
+                <div class="mono fw-semibold" style="color:#dc2626;">{{ rtrim(rtrim(number_format($receipt->total_reject, 2, ',', '.'), '0'), ',') }}</div>
+                <div class="muted mono mt-1" style="color:#ef4444;">Rp {{ number_format($receipt->total_reject_rp ?? 0, 0, ',', '.') }}</div>
             @else
                 <span class="text-muted">-</span>
             @endif
+        </td>
+
+        <td class="mobile-hide">
+            <span class="badge py-1 px-2 {{ $payBadgeClass }}" style="font-weight: 600; font-size: .72rem; border-radius: 6px;">{{ $payLabel }}</span>
         </td>
 
         <td class="mobile-hide">

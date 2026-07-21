@@ -325,34 +325,35 @@
                         
                         <div class="accordion-item" style="border: none; border-bottom: 1px solid rgba(148,163,184,.15); background: transparent;">
                             <h2 class="accordion-header" id="heading-{{ $accIndex }}">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $accIndex }}" aria-expanded="false" aria-controls="collapse-{{ $accIndex }}" style="background: rgba(248, 250, 252, 0.8); padding: 0.75rem 1.25rem; font-weight: 700; color: var(--shp-text); box-shadow: none; border-radius: 8px 8px 0 0;">
-                                    <div style="display: flex; flex-direction: column;">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-calendar-event me-2 text-primary"></i> {{ $dateLabel }}
-                                            <span class="badge bg-secondary ms-2 rounded-pill" title="Total Pcs">{{ number_format((float)$totalPcs, 0, ',', '.') }} Pcs</span>
-                                            <span class="badge bg-info ms-1 rounded-pill" title="Total Iket" style="color: #fff; background-color: #0ea5e9 !important;">{{ number_format($totalIket, 0, ',', '.') }} Iket</span>
+                                <button class="accordion-button {{ $loop->first ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ $accIndex }}" aria-expanded="{{ $loop->first ? 'true' : 'false' }}" aria-controls="collapse-{{ $accIndex }}" style="background: rgba(248, 250, 252, 0.8); padding: 0.75rem 1.25rem; font-weight: 700; color: var(--shp-text); box-shadow: none; border-radius: 8px 8px 0 0;">
+                                    <div style="display: flex; flex-direction: column; width: 100%;">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <i class="bi bi-calendar-event me-2 text-primary"></i> {{ $dateLabel }}
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.8rem; font-weight: 500;">
+                                                {{ number_format((float)$totalPcs, 0, ',', '.') }} pcs &bull; {{ number_format($totalIket, 0, ',', '.') }} iket
+                                            </div>
                                         </div>
                                         @if($fabrics)
-                                        <div style="font-size: 0.75rem; font-weight: normal; color: #64748b; margin-top: 0.25rem; margin-left: 1.5rem;">
+                                        <div class="text-muted" style="font-size: 0.72rem; font-weight: normal; margin-top: 0.25rem;">
                                             <i class="bi bi-box-seam me-1"></i>{{ str($fabrics)->limit(60) }}
                                         </div>
                                         @endif
                                     </div>
                                 </button>
                             </h2>
-                            <div id="collapse-{{ $accIndex }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ $accIndex }}" data-bs-parent="#accordionCuttingJobs">
+                            <div id="collapse-{{ $accIndex }}" class="accordion-collapse collapse {{ $loop->first ? 'show' : '' }}" aria-labelledby="heading-{{ $accIndex }}">
                                 <div class="accordion-body p-0 pb-2">
                                     <div class="table-responsive table-scroll" style="border: none;">
                                         <table class="table table-hover align-middle table-list mb-0">
                                             <thead>
                                                 <tr>
                                                     <th style="width:46px;">#</th>
-                                                    <th style="width:120px;" class="mobile-hide">Tanggal</th>
-                                                    <th style="width:200px;">Cutting</th>
-                                                    <th class="mobile-hide">Item Kain</th>
-                                                    <th style="width:150px;" class="mobile-hide">Operator</th>
-                                                    <th class="text-end mobile-hide" style="width:80px;">Iket</th>
-                                                    <th class="text-end mobile-hide" style="width:100px;">Qty (pcs)</th>
+                                                    <th style="width:250px;">Item & Cutting Job</th>
+                                                    <th class="mobile-hide">Bahan Baku</th>
+                                                    <th style="width:130px;" class="mobile-hide">Operator</th>
+                                                    <th class="text-end mobile-hide" style="width:120px;">Kuantitas</th>
                                                     <th style="width:130px;" class="mobile-hide">Status</th>
                                                     <th style="width:110px;"></th>
                                                 </tr>
@@ -384,8 +385,6 @@
                                         {{ ($jobs->currentPage() - 1) * $jobs->perPage() + $loop->iteration }}
                                     </td>
 
-                                    <td class="small mobile-hide">{{ $job->date?->format('d M Y') ?? '-' }}</td>
-
                                     <td>
                                         <div class="cj-row-main">
                                             <div style="flex: 1; min-width: 0;">
@@ -396,16 +395,30 @@
                                                     $fabricCode = $job->fabricItem?->code ?? $job->lot?->item?->code ?? '-';
                                                 @endphp
                                                 
-                                                <!-- Desktop: Job Code is Title -->
-                                                <a class="code-link d-none d-md-inline" href="{{ $detailUrl }}">{{ $job->code }}</a>
+                                                <!-- Desktop Layout -->
+                                                <div class="d-none d-md-block">
+                                                    <!-- Item Code & Qty (Focal) -->
+                                                    <a href="{{ $detailUrl }}" style="text-decoration: none; display: block; margin-bottom: 0.35rem;">
+                                                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                                            @foreach($itemSummary as $code => $qty)
+                                                                <span class="split-badge" style="font-size: 0.85rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border-color: rgba(148,163,184,0.35);">
+                                                                    <span class="sb-left" style="color: var(--shp-text); font-weight: 700;">{{ $code }}</span>
+                                                                    <span class="sb-right fw-bold">{{ (float)$qty }} pcs</span>
+                                                                </span>
+                                                            @endforeach
+                                                        </div>
+                                                    </a>
+                                                    
+                                                    <!-- Job Code (Muted) -->
+                                                    <div class="text-muted" style="font-size: 0.75rem;">
+                                                        <i class="bi bi-tag me-1"></i>{{ $job->code }}
+                                                    </div>
+                                                </div>
                                                 
                                                 <!-- Mobile Layout -->
                                                 <div class="d-md-none">
-                                                    <!-- Date & Status -->
-                                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                                                        <span style="color: #2563eb; font-weight: 700; background: rgba(37, 99, 235, 0.1); padding: 0.15rem 0.4rem; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.2); font-size: 0.75rem;">
-                                                            <i class="bi bi-calendar3 me-1"></i>{{ $job->date?->format('d M Y') ?? '-' }}
-                                                        </span>
+                                                    <!-- Status -->
+                                                    <div style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 0.5rem;">
                                                         <span class="badge-status {{ $cfg['class'] }}">{{ $cfg['label'] }}</span>
                                                     </div>
 
@@ -438,34 +451,38 @@
                                                     </div>
                                                 </div>
 
-                                                <!-- Desktop: Item Summary Badges -->
-                                                <div class="mt-2 d-none d-md-flex" style="flex-wrap: wrap; gap: 0.35rem;">
-                                                    @foreach($itemSummary as $code => $qty)
-                                                        <span class="split-badge" style="font-size: 0.72rem;">
-                                                            <span class="sb-left">{{ $code }}</span>
-                                                            <span class="sb-right">{{ (float)$qty }}</span>
-                                                        </span>
-                                                    @endforeach
-                                                </div>
+
                                             </div>
                                         </div>
                                     </td>
 
                                     <td class="mobile-hide">
-                                        <div class="text-muted" style="font-size: 0.72rem; margin-bottom: 0.35rem;">
-                                            <span class="mono fw-semibold">{{ $fabricCode }}</span>
-                                            @if($dipotong > 0)
-                                                &bull; <span>{{ (float)$dipotong }} kg</span>
-                                            @endif
+                                        <div class="d-flex align-items-center" style="gap: 0.4rem;">
+                                            <i class="bi bi-box-seam text-muted" style="font-size: 1rem;"></i>
+                                            <div>
+                                                <div style="font-size: 0.82rem; font-weight: 600; color: var(--shp-text);">{{ $fabricCode }}</div>
+                                                @if($dipotong > 0)
+                                                    <div class="text-muted" style="font-size: 0.72rem;">{{ (float)$dipotong }} kg</div>
+                                                @endif
+                                            </div>
                                         </div>
                                     </td>
 
-                                    <td class="mobile-hide">{{ $job->operator?->name ?? '-' }}</td>
-
-                                    <td class="text-end mobile-hide"><span class="num">{{ number_format($bundleCount, 0, ',', '.') }}</span></td>
+                                    <td class="mobile-hide text-muted" style="font-size: 0.85rem;">
+                                        @if($job->operator)
+                                            <i class="bi bi-person me-1"></i>{{ $job->operator->name }}
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
 
                                     <td class="text-end mobile-hide">
-                                        <span class="num">{{ $qtyPcs > 0 ? number_format($qtyPcs, 0, ',', '.') : '-' }}</span>
+                                        <div style="font-weight: 600; font-size: 0.85rem; color: var(--shp-text);">
+                                            {{ $qtyPcs > 0 ? number_format($qtyPcs, 0, ',', '.') : '-' }} pcs
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.72rem;">
+                                            {{ number_format($bundleCount, 0, ',', '.') }} iket
+                                        </div>
                                     </td>
 
                                     <td class="mobile-hide">

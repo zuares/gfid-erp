@@ -154,11 +154,27 @@ document.querySelectorAll('.type-card').forEach(card => {
     
     <form id="po-create-form" action="{{ route('purchasing.purchase_orders.store') }}" method="POST">
         @csrf
+        <input type="hidden" name="ignore_duplicate" id="ignore_duplicate" value="0">
         
         <div class="shp-topbar mb-3">
             <div class="shp-topbar-code">Buat PO Baru</div>
         </div>
         <div class="shp-wrap pt-2">
+            @if(session('duplicate_warning'))
+                <div class="alert alert-warning py-3 d-flex align-items-start mb-3" style="border-radius:10px;">
+                    <i class="bi bi-exclamation-triangle-fill me-3 fs-4 mt-1"></i>
+                    <div>
+                        <strong>Peringatan Duplikasi!</strong><br>
+                        {{ session('duplicate_warning') }}
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-warning btn-sm" onclick="document.getElementById('ignore_duplicate').value='1'; document.getElementById('po-create-form').submit();">
+                                <i class="bi bi-check2-all me-1"></i> Ya, Lanjutkan Simpan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if(request('from_pr'))
                 <input type="hidden" name="from_pr" value="{{ request('from_pr') }}">
                 <div class="alert alert-info py-2 d-flex align-items-center mb-3">

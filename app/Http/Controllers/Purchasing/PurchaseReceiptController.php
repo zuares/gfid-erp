@@ -25,13 +25,17 @@ class PurchaseReceiptController extends Controller
      */
     public function index(Request $request)
     {
-        $q = PurchaseReceipt::query()
-            ->with(['supplier', 'warehouse'])
+        $q = PurchaseReceipt::query()->select('purchase_receipts.*')
+            ->with(['supplier', 'warehouse', 'order'])
         // ✅ biar tahu ada return (tanpa N+1)
             ->withCount(['returns as return_count'])
             ->withSum('returns as return_total_sum', 'total') // ✅ kolomnya total (bukan amount)
             ->withSum('lines as total_qty', 'qty_received') // ✅ untuk total qty per row
             ->withSum('lines as total_reject', 'qty_reject') // ✅ untuk total reject per row
+            ->addSelect([
+                'total_reject_rp' => \App\Models\PurchaseReceiptLine::selectRaw('SUM(qty_reject * unit_price)')
+                    ->whereColumn('purchase_receipt_id', 'purchase_receipts.id')
+            ])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -95,6 +99,11 @@ class PurchaseReceiptController extends Controller
                 'purchase_receipt_id',
                 (clone $summaryQuery)->select('purchase_receipts.id')
             )->sum('qty_reject');
+            
+            $summary->total_reject_rp_sum = \App\Models\PurchaseReceiptLine::whereIn(
+                'purchase_receipt_id',
+                (clone $summaryQuery)->select('purchase_receipts.id')
+            )->selectRaw('SUM(qty_reject * unit_price) as sum')->value('sum');
         }
 
         $suppliers = Supplier::orderBy('name')->get();

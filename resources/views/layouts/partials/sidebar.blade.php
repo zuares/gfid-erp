@@ -45,6 +45,7 @@
     $hasInvWipCutReconcile = $router->has('inventory.wip_cut_reconcile.index');
 
     $hasInvIntelligence = $router->has('inventory.intelligence');
+    $hasWhIntelligence = $router->has('inventory.warehouse_intelligence');
 
     // RTS
     $hasRtsStockReqIndex = $router->has('rts.stock-requests.index');
@@ -203,7 +204,7 @@
         $hasInvTransfersIndex = $hasInvTransfersCreate = $hasInvAdjustmentsIndex = false;
         $hasInvOpnamesIndex = $hasInvOpnamesCreate = false;
         $hasInvExternalIndex = $hasInvExternalCreate = false;
-        $hasInvWipAdjIndex = $hasInvWipCutReconcile = $hasInvIntelligence = false;
+        $hasInvWipAdjIndex = $hasInvWipCutReconcile = $hasInvIntelligence = $hasWhIntelligence = false;
         $hasRtsStockReqIndex = $hasRtsDirectReceiveIndex = false;
     }
 
@@ -317,6 +318,8 @@
     $openPersediaan =
         $open('inventory.intelligence') ||
         $open('inventory.intelligence.*') ||
+        $open('inventory.warehouse_intelligence') ||
+        $open('inventory.warehouse_intelligence.*') ||
         $open('inventory.stocks.*') ||
         $open('inventory.stock_opnames.*') ||
         $open('inventory.stock_card.*') ||
@@ -798,7 +801,14 @@
                 @if ($hasInvIntelligence)
                     <x-sidebar.simple-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
                         :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
-                        Analisa Stok
+                        Ringkasan Stok
+                    </x-sidebar.simple-link>
+                @endif
+                
+                @if ($hasWhIntelligence)
+                    <x-sidebar.simple-link href="{{ route('inventory.warehouse_intelligence') }}" icon="bi bi-box-seam"
+                        :active="request()->routeIs('inventory.warehouse_intelligence') || request()->routeIs('inventory.warehouse_intelligence.*')">
+                        Stok Gudang
                     </x-sidebar.simple-link>
                 @endif
 
@@ -1532,6 +1542,7 @@
             {{-- INVENTORY --}}
             @if ($canShow(
                 $hasInvIntelligence,
+                $hasWhIntelligence,
                 $hasInvStocksItems,
                 $hasInvStocksLots,
                 $hasInvStockCard,
@@ -1539,6 +1550,7 @@
                 $hasInvTransfersCreate,
                 $hasInvAdjustmentsIndex,
                 $hasInvWipAdjIndex,
+                $hasInvWipCutReconcile,
                 $hasInvOpnamesIndex,
                 $hasInvOpnamesCreate,
                 $hasInvExternalIndex,
@@ -1555,12 +1567,20 @@
                     </button>
 
                     <div class="collapse {{ $openPersediaan ? 'show' : '' }}" id="navPersediaan">
-                        @if ($hasInvIntelligence)
+                        @if ($hasInvIntelligence || $hasWhIntelligence)
                             @php $subhead('Intelligence'); @endphp
-                            <x-sidebar.sub-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
-                                :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
-                                Analisa Stok
-                            </x-sidebar.sub-link>
+                            @if ($hasInvIntelligence)
+                                <x-sidebar.sub-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
+                                    :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
+                                    Ringkasan Stok
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasWhIntelligence)
+                                <x-sidebar.sub-link href="{{ route('inventory.warehouse_intelligence') }}" icon="bi bi-box-seam"
+                                    :active="request()->routeIs('inventory.warehouse_intelligence') || request()->routeIs('inventory.warehouse_intelligence.*')">
+                                    Stok Gudang
+                                </x-sidebar.sub-link>
+                            @endif
                         @endif
 
                         @php $subhead('Stok'); @endphp

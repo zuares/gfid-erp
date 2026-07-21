@@ -694,8 +694,8 @@
             ->values()
             ->toArray();
 
-        // ✅ create selalu baru: ambil old('lines') saja
-        $oldLinesForJs = old('lines', []);
+        // ✅ create selalu baru: ambil old('lines') saja, atau gunakan data dari query parameters (prefillLines)
+        $oldLinesForJs = old('lines', $prefillLines ?? []);
 
         // Render item-suggest component template
         $itemSuggestHtml = view('components.item-suggest', [
@@ -745,9 +745,12 @@
                 </div>
             </div>
         @else
-            <form id="rtsCreateForm" method="POST" action="{{ route('rts.stock-requests.store') }}"
+            <form id="rtsCreateForm" method="POST" action="{{ isset($stockRequest) ? route('rts.stock-requests.update', $stockRequest) : route('rts.stock-requests.store') }}"
                 style="margin-top:.9rem">
                 @csrf
+                @if(isset($stockRequest))
+                    @method('PUT')
+                @endif
 
                 <div class="card">
                     <div class="row">
@@ -849,7 +852,8 @@
                     <div class="muted small">Klik Terima Barang untuk konfirmasi perpindahan stok.</div>
                     <div class="btns">
                         <a class="btn" href="{{ route('rts.stock-requests.index') }}">Batal</a>
-                        <button type="submit" class="btn btn-primary">Terima Barang</button>
+                        <button type="submit" name="action" value="draft" class="btn btn-outline" id="btn-draft">Simpan Draft</button>
+                        <button type="submit" name="action" value="complete" class="btn btn-primary" id="btn-complete">Terima Barang</button>
                     </div>
                 </div>
             </form>
@@ -1361,6 +1365,11 @@
                 if (rows.length < 1) {
                     e.preventDefault();
                     alert('Minimal isi 1 item dengan qty > 0.');
+                    return;
+                }
+
+                if (e.submitter && e.submitter.value === 'draft') {
+                    // Jika draft, izinkan submit langsung (tanpa confirm modal)
                     return;
                 }
 

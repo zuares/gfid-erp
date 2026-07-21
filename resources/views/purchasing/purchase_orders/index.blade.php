@@ -51,12 +51,16 @@
 
     /* Filter bar */
     .filter-bar{
-        background:var(--card, #fff); border:1px solid var(--shp-border);
-        border-radius:8px; padding:.6rem .7rem; margin-bottom:.65rem;
+        background:var(--card, #fff); border:1px solid rgba(148,163,184,.15);
+        border-radius:10px; padding:.75rem .85rem; margin-bottom:1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
     }
-    .filter-bar .form-control, .filter-bar .form-select{ border-radius:7px; font-size:.82rem; }
+    body[data-theme="dark"] .filter-bar{ background:rgba(15,23,42,.98); border-color:rgba(51,65,85,.6); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .filter-bar .form-control, .filter-bar .form-select{ border-radius:8px; font-size:.84rem; border-color: rgba(148,163,184,.3); }
+    .filter-bar .form-control:focus, .filter-bar .form-select:focus { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
     .filter-summary{ font-size:.74rem; color:var(--shp-muted); }
     .filter-summary strong{ color:var(--shp-accent); }
+    body[data-theme="dark"] .filter-summary strong{ color:#cbd5e1; }
 
 
     .btn-pill { border-radius: 7px; padding-inline: .78rem; box-shadow: none !important; font-weight: 600; text-decoration: none; }
@@ -289,13 +293,13 @@
                 @endif
             </div>
         </form>
-
-        @if (isset($summary) && !empty($summary->last_date))
-            <div class="filter-summary mt-2">
-                PO terakhir dibuat: <strong class="mono">{{ id_date($summary->last_date) }}</strong>
-            </div>
-        @endif
     </div>
+
+    @if (isset($summary) && !empty($summary->last_date))
+        <div class="filter-summary mb-2 px-1">
+            PO terakhir dibuat: <strong class="mono">{{ id_date($summary->last_date) }}</strong>
+        </div>
+    @endif
 
     <div class="card card-main">
         <div class="card-body p-0">
@@ -307,12 +311,11 @@
                     <thead>
                     <tr>
                         <th style="width: 46px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">#</th>
-                        <th style="width: 100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
+                        <th style="width: 230px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                             <a href="{{ $sortUrl('date') }}" class="th-sort {{ $sortCol === 'date' ? 'active' : '' }}">
-                                Tanggal {{ $sortIcon('date') }}
+                                Dokumen & Tanggal {{ $sortIcon('date') }}
                             </a>
                         </th>
-                        <th style="width: 160px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">PO</th>
                         <th style="position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                             <a href="{{ $sortUrl('supplier_id') }}" class="th-sort {{ $sortCol === 'supplier_id' ? 'active' : '' }}">
                                 Supplier {{ $sortIcon('supplier_id') }}
@@ -371,18 +374,20 @@
                         @endphp
 
                         <tr class="po-row" data-href="{{ $actionRoute }}" style="cursor: pointer;">
-                            <td class="text-muted small mobile-hide">
+                            <td class="text-muted small mobile-hide mono">
                                 {{ ($orders->currentPage() - 1) * $orders->perPage() + $loop->iteration }}
                             </td>
 
-                            <td class="small mobile-hide mono" style="white-space: nowrap;">{{ id_date($order->date) }}</td>
-
                             <td>
                                 <div class="ship-row-main">
-                                    <div>
-                                        <a class="code-link mono" href="{{ $actionRoute }}">
+                                    <div style="min-width:0;">
+                                        <a class="code-link mono text-muted d-block" style="font-size: 0.72rem; text-decoration: none;" href="{{ $actionRoute }}">
                                             {{ $order->code }}
                                         </a>
+                                        
+                                        <div class="small mono text-nowrap mt-1" style="color:var(--shp-text); font-weight: 500;">
+                                            {{ id_date($order->date) }}
+                                        </div>
 
                                         <div class="muted mt-1" style="font-size: .74rem;">
                                             @php
@@ -463,10 +468,9 @@
                 </tbody>
             </table>
         </div>
-        <div class="divider"></div>
-        <div class="p-3">
-            {{ $orders->links() }}
-        </div>
+        @if (method_exists($orders, 'links'))
+            <div class="px-3 py-2 border-top">{{ $orders->links() }}</div>
+        @endif
         @endif
     </div>
 </div>

@@ -315,6 +315,7 @@
                     // hidden id
                     if (hiddenId) {
                         hiddenId.value = item.id;
+                        hiddenId.dispatchEvent(new Event('change', { bubbles: true }));
                     }
 
                     // hidden category id
@@ -398,7 +399,10 @@
                     const q = this.value.trim();
 
                     if (q.length === 0) {
-                        if (hiddenId) hiddenId.value = '';
+                        if (hiddenId) {
+                            hiddenId.value = '';
+                            hiddenId.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
                         if (hiddenCategory) hiddenCategory.value = '';
                         hideDropdown();
                         return;

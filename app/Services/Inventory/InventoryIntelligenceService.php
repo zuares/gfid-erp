@@ -53,31 +53,42 @@ class InventoryIntelligenceService
         return $items->map(function ($item) use ($snapshot, $series) {
             $s = $snapshot->get($item->id);
 
-            $ready = (float) $s->ready_stock;
-            $wip = (float) $s->wip_stock;
-            $ads = (float) $s->ads;
-            $cover = $s->cover_days;          // null bila ads 0
-            $pipeCover = $s->pipe_cover_days; // null bila ads 0
+            $readyRts = (float) ($s->ready_stock ?? 0);
+            $readyAllocated = (float) ($s->ready_allocated ?? 0);
+            $whPrd = (float) ($s->wh_prd ?? 0);
+            $readyTotal = $readyRts + $whPrd;
+            $wip = (float) ($s->wip_stock ?? 0);
+            $ads = (float) ($s->ads ?? 0);
+            $cover = $s->cover_days ?? null;
+            $pipeCover = $s->pipe_cover_days ?? null;
 
             $forecast = round($ads * self::FORECAST_HORIZON, 1);
             $suggested = $ads > 0
-                ? max(0.0, round(self::COVER_TARGET * $ads - $ready - $wip, 0))
+                ? max(0.0, round(self::COVER_TARGET * $ads - $readyTotal - $wip, 0))
                 : 0.0;
 
             $vals = $series->get($item->id, array_fill(0, self::FORECAST_HORIZON, 0.0));
             $wads = $this->weightedAds($vals);
-            $status = $this->healthStatus($ready, $ads, $cover);
+            $status = $this->healthStatus($readyTotal, $ads, $cover);
 
             return (object) [
                 'item_id' => $item->id,
                 'sku' => $item->code,
                 'product' => $item->name,
                 'category' => $item->category?->name ?? '-',
-                'ready' => $ready,
+                'production_source' => $item->production_source,
+                'production_source_label' => $item->production_source_label,
+                'production_source_key' => $item->is_made_in_house ? 'own' : 'external',
+                'rts_min_display' => $item->rts_min_display,
+                'rts_max_display' => $item->rts_max_display,
+                'ready' => $readyRts,
+                'ready_allocated' => $readyAllocated,
+                'wh_prd' => $whPrd,
+                'ready_total' => $readyTotal,
                 'wip' => $wip,
-                's7' => (float) $s->s7,
-                's14' => (float) $s->s14,
-                's30' => (float) $s->s30,
+                's7' => (float) ($s->s7 ?? 0),
+                's14' => (float) ($s->s14 ?? 0),
+                's30' => (float) ($s->s30 ?? 0),
                 'ads' => round($ads, 2),
                 'wads' => $wads,
                 'ads_lift' => round($wads - $ads, 2),
@@ -287,7 +298,7 @@ class InventoryIntelligenceService
             'menipis' => $rows->where('status', 'menipis')->count(),
             'sehat' => $rows->where('status', 'sehat')->count(),
             'below_target' => $rows->whereIn('status', ['stockout', 'kritis', 'menipis'])->count(),
-            'total_ready' => (float) $rows->sum('ready'),
+            'total_ready' => (float) $rows->sum('ready_total'),
             'total_wip' => (float) $rows->sum('wip'),
             'total_suggested' => (float) $rows->sum('suggested_qty'),
             'tightest_cover' => $rows->whereNotNull('cover_days')->min('cover_days'),

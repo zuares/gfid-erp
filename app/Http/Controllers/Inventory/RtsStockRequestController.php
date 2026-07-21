@@ -164,6 +164,13 @@ class RtsStockRequestController extends Controller
         // ✅ selalu dokumen baru
         $prefillDate = $date;
         $prefillLines = [];
+        
+        if ($request->has('item_id') && $request->has('qty')) {
+            $prefillLines[] = [
+                'item_id' => $request->item_id,
+                'qty_request' => (float) $request->qty,
+            ];
+        }
 
         return view('inventory.rts_stock_requests.create', compact(
             'prdWarehouse',
@@ -236,10 +243,13 @@ class RtsStockRequestController extends Controller
             }
         }
 
+        $action = $request->input('action', 'complete');
+        $isDraft = $action === 'draft';
+
         $srCode = '';
         $srModel = null;
 
-        $result = DB::transaction(function () use ($data, $shortageItems, &$srCode, &$srModel) {
+        $result = DB::transaction(function () use ($data, $shortageItems, $isDraft, &$srCode, &$srModel) {
             $date = Carbon::parse($data['date'])->toDateString();
 
             $code = $this->generateRtsCode($date);
@@ -249,11 +259,19 @@ class RtsStockRequestController extends Controller
             $sr->code = $code;
             $sr->date = $date;
             $sr->purpose = 'rts_replenish';
-            $sr->status = 'completed';
+            $sr->status = $isDraft ? 'draft' : 'completed';
             $sr->source_warehouse_id = (int) $data['source_warehouse_id'];
             $sr->destination_warehouse_id = (int) $data['destination_warehouse_id'];
-            $sr->received_by_user_id = Auth::id();
-            $sr->received_at = now();
+            
+            if (!$isDraft) {
+                $sr->received_by_user_id = Auth::id();
+                $sr->received_at = now();
+            } else {
+                // Untuk draft, biasanya requested_by yang diisi
+                if (property_exists($sr, 'requested_by_user_id')) {
+                    $sr->requested_by_user_id = Auth::id();
+                }
+            }
 
             // sesuaikan kolom creator kamu:
             if (property_exists($sr, 'created_by')) {
@@ -271,20 +289,22 @@ class RtsStockRequestController extends Controller
                 $qty = (float) $row['qty_request'];
                 $itemId = (int) $row['item_id'];
 
-                try {
-                    $this->inventory->move(
-                        itemId: $itemId,
-                        fromWarehouseId: (int) $data['source_warehouse_id'],
-                        toWarehouseId: (int) $data['destination_warehouse_id'],
-                        qty: $qty,
-                        referenceType: 'stock_request',
-                        referenceId: $sr->id,
-                        notes: 'RTS direct receive (PRD → RTS)',
-                        date: $date,
-                        allowNegative: true,
-                    );
-                } catch (\RuntimeException $e) {
-                    throw ValidationException::withMessages(['stock' => $e->getMessage()]);
+                if (!$isDraft) {
+                    try {
+                        $this->inventory->move(
+                            itemId: $itemId,
+                            fromWarehouseId: (int) $data['source_warehouse_id'],
+                            toWarehouseId: (int) $data['destination_warehouse_id'],
+                            qty: $qty,
+                            referenceType: 'stock_request',
+                            referenceId: $sr->id,
+                            notes: 'RTS direct receive (PRD → RTS)',
+                            date: $date,
+                            allowNegative: true,
+                        );
+                    } catch (\RuntimeException $e) {
+                        throw ValidationException::withMessages(['stock' => $e->getMessage()]);
+                    }
                 }
 
                 StockRequestLine::create([
@@ -293,17 +313,21 @@ class RtsStockRequestController extends Controller
                     'item_id' => $itemId,
                     'qty_request' => $qty,
                     'qty_dispatched' => 0,
-                    'qty_received' => $qty,
+                    'qty_received' => $isDraft ? 0 : $qty,
                 ]);
             }
 
+            $msg = $isDraft 
+                ? 'Draft Permintaan RTS berhasil disimpan.'
+                : 'Terima Barang berhasil. Stok WH-PRD langsung berpindah ke WH-RTS.';
+            
             return redirect()
                 ->route('rts.stock-requests.show', $sr)
-                ->with('success', 'Terima Barang berhasil. Stok WH-PRD langsung berpindah ke WH-RTS.');
+                ->with('success', $msg);
         });
 
         // 🔔 Kirim notifikasi WA ke role operating jika ada stok minus
-        if (!empty($shortageItems)) {
+        if (!$isDraft && !empty($shortageItems)) {
             $msg = "⚠️ *INFO STOK MINUS DI WH-PRD* ⚠️\n\n"
                  . "Ada pengambilan RTS (*{$srCode}*) yang membuat stok PRD menjadi minus.\n\n"
                  . "*Rincian barang kurang:*\n"
@@ -318,6 +342,227 @@ class RtsStockRequestController extends Controller
         }
 
         return $result;
+    }
+
+    public function edit(StockRequest $stockRequest): View
+    {
+        $role = strtolower((string) (auth()->user()?->role ?? ''));
+        if (!in_array($role, ['owner', 'admin'], true)) {
+            abort(403);
+        }
+
+        if ($stockRequest->status !== 'draft') {
+            abort(403, 'Hanya draft yang dapat diedit.');
+        }
+
+        $prdWarehouse = Warehouse::where('code', 'WH-PRD')->firstOrFail();
+        $rtsWarehouse = Warehouse::where('code', 'WH-RTS')->firstOrFail();
+
+        $finishedGoodsItems = Item::query()
+            ->select('id', 'code', 'name')
+            ->where('type', 'finished_good')
+            ->orderBy('code')
+            ->get();
+
+        $prdStockByItem = DB::table('inventory_stocks')
+            ->where('warehouse_id', $prdWarehouse->id)
+            ->whereIn('item_id', $finishedGoodsItems->pluck('id'))
+            ->pluck('qty', 'item_id');
+
+        $prefillDate = $stockRequest->date->toDateString();
+        $prefillLines = $stockRequest->lines->map(fn($line) => [
+            'item_id' => $line->item_id,
+            'qty_request' => (float) $line->qty_request,
+        ])->toArray();
+
+        return view('inventory.rts_stock_requests.create', compact(
+            'prdWarehouse',
+            'rtsWarehouse',
+            'finishedGoodsItems',
+            'prdStockByItem',
+            'prefillDate',
+            'prefillLines',
+            'stockRequest'
+        ));
+    }
+
+    public function update(Request $request, StockRequest $stockRequest): RedirectResponse
+    {
+        $role = strtolower((string) (auth()->user()?->role ?? ''));
+        if (!in_array($role, ['owner', 'admin'], true)) {
+            abort(403);
+        }
+
+        if ($stockRequest->status !== 'draft') {
+            abort(403, 'Hanya draft yang dapat diedit.');
+        }
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'source_warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+            'destination_warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+
+            'lines' => ['required', 'array', 'min:1'],
+            'lines.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'lines.*.qty_request' => ['required', 'numeric', 'gt:0'],
+        ], [
+            'lines.required' => 'Minimal 1 baris item.',
+            'lines.*.qty_request.gt' => 'Qty harus > 0.',
+        ]);
+
+        $itemIds = array_map(fn($r) => (int) $r['item_id'], $data['lines'] ?? []);
+        if (count($itemIds) !== count(array_unique($itemIds))) {
+            throw ValidationException::withMessages([
+                'lines' => 'Item tidak boleh duplikat. Hapus salah satu baris yang sama.',
+            ]);
+        }
+
+        if ((int) $data['source_warehouse_id'] === (int) $data['destination_warehouse_id']) {
+            throw ValidationException::withMessages([
+                'destination_warehouse_id' => 'Gudang tujuan harus berbeda dari gudang sumber.',
+            ]);
+        }
+
+        $srcWhId = (int) $data['source_warehouse_id'];
+        $prdStocks = DB::table('inventory_stocks')
+            ->where('warehouse_id', $srcWhId)
+            ->whereIn('item_id', $itemIds)
+            ->pluck('qty', 'item_id');
+
+        $shortageItems = [];
+        foreach ($data['lines'] as $row) {
+            $iid = (int) $row['item_id'];
+            $qtyReq = (float) $row['qty_request'];
+            $stock = (float) ($prdStocks[$iid] ?? 0);
+            
+            if ($qtyReq > $stock) {
+                $item = DB::table('items')->where('id', $iid)->first();
+                $itemStr = $item ? ($item->code) : "Item #{$iid}";
+                $shortageItems[] = "• {$itemStr}: diambil " . ($qtyReq + 0) . ", stok sistem " . ($stock + 0);
+            }
+        }
+
+        $action = $request->input('action', 'complete');
+        $isDraft = $action === 'draft';
+        $srCode = $stockRequest->code;
+
+        $result = DB::transaction(function () use ($data, $stockRequest, $isDraft, &$srCode) {
+            $date = Carbon::parse($data['date'])->toDateString();
+
+            $stockRequest->date = $date;
+            $stockRequest->status = $isDraft ? 'draft' : 'completed';
+            $stockRequest->source_warehouse_id = (int) $data['source_warehouse_id'];
+            $stockRequest->destination_warehouse_id = (int) $data['destination_warehouse_id'];
+            
+            if (!$isDraft) {
+                $stockRequest->received_by_user_id = Auth::id();
+                $stockRequest->received_at = now();
+            }
+
+            $stockRequest->save();
+
+            // Clear old lines
+            $stockRequest->lines()->delete();
+
+            $lineNo = 1;
+            foreach ($data['lines'] as $row) {
+                $qty = (float) $row['qty_request'];
+                $itemId = (int) $row['item_id'];
+
+                if (!$isDraft) {
+                    try {
+                        $this->inventory->move(
+                            itemId: $itemId,
+                            fromWarehouseId: (int) $data['source_warehouse_id'],
+                            toWarehouseId: (int) $data['destination_warehouse_id'],
+                            qty: $qty,
+                            referenceType: 'stock_request',
+                            referenceId: $stockRequest->id,
+                            notes: 'RTS direct receive (PRD → RTS)',
+                            date: $date,
+                            allowNegative: true,
+                        );
+                    } catch (\RuntimeException $e) {
+                        throw ValidationException::withMessages(['stock' => $e->getMessage()]);
+                    }
+                }
+
+                StockRequestLine::create([
+                    'stock_request_id' => $stockRequest->id,
+                    'line_no' => $lineNo++,
+                    'item_id' => $itemId,
+                    'qty_request' => $qty,
+                    'qty_dispatched' => 0,
+                    'qty_received' => $isDraft ? 0 : $qty,
+                ]);
+            }
+
+            $msg = $isDraft 
+                ? 'Draft Permintaan RTS berhasil diperbarui.'
+                : 'Terima Barang berhasil. Stok WH-PRD langsung berpindah ke WH-RTS.';
+            
+            return redirect()
+                ->route('rts.stock-requests.show', $stockRequest)
+                ->with('success', $msg);
+        });
+
+        if (!$isDraft && !empty($shortageItems)) {
+            $msg = "⚠️ *INFO STOK MINUS DI WH-PRD* ⚠️\n\n"
+                 . "Ada pengambilan RTS (*{$srCode}*) yang membuat stok PRD menjadi minus.\n\n"
+                 . "*Rincian barang kurang:*\n"
+                 . implode("\n", $shortageItems) . "\n\n"
+                 . "Tolong tim Operating segera cek fisik barang di area PRD ya agar stok sistem dan fisik sinkron kembali. Semangat! 💪";
+                 
+            try {
+                app(\App\Services\WaNotificationService::class)->sendToOperatingRole($msg);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Gagal kirim notif WA stok minus: ' . $e->getMessage());
+            }
+        }
+
+        return $result;
+    }
+
+    public function destroy(StockRequest $stockRequest): RedirectResponse
+    {
+        $role = strtolower((string) (auth()->user()?->role ?? ''));
+        if (!in_array($role, ['owner', 'admin'], true)) {
+            abort(403);
+        }
+
+        if ($stockRequest->purpose !== 'rts_replenish') {
+            abort(404);
+        }
+
+        if ($stockRequest->status === 'cancelled') {
+            return back()->with('warning', 'Permintaan ini sudah dibatalkan sebelumnya.');
+        }
+
+        DB::transaction(function () use ($stockRequest) {
+            if ($stockRequest->status === 'draft') {
+                $stockRequest->lines()->delete();
+                $stockRequest->delete();
+            } else {
+                // Reverse inventory
+                app(InventoryService::class)->reverseBySource(
+                    originalSourceTypes: ['stock_request'],
+                    originalSourceId: $stockRequest->id,
+                    voidSourceType: 'stock_request_void',
+                    voidSourceId: $stockRequest->id,
+                    notesPrefix: 'Pembatalan RTS',
+                    date: now(),
+                );
+                
+                $stockRequest->status = 'cancelled';
+                $stockRequest->save();
+            }
+        });
+
+        if ($stockRequest->status === 'draft' || !$stockRequest->exists) {
+            return redirect()->route('inventory.warehouse_intelligence')->with('success', 'Draft RTS berhasil dihapus.');
+        }
+
+        return redirect()->route('rts.stock-requests.show', $stockRequest)->with('success', 'Stock Request RTS berhasil dibatalkan dan stok dikembalikan.');
     }
 
 /**

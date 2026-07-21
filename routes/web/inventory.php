@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\StockApiController;
 use App\Http\Controllers\Inventory\ExternalTransferController;
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Inventory\InventoryIntelligenceController;
+use App\Http\Controllers\Inventory\WarehouseIntelligenceController;
 use App\Http\Controllers\Inventory\InventoryStockController;
 use App\Http\Controllers\Inventory\RtsDirectReceiveController;
 use App\Http\Controllers\Inventory\RtsStockRequestController;
@@ -44,6 +45,18 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
             ->name('intelligence.slip');
         Route::get('intelligence/export', [InventoryIntelligenceController::class, 'export'])
             ->name('intelligence.export');
+
+        // ================== WAREHOUSE INTELLIGENCE ==================
+        Route::get('warehouse-intelligence', [WarehouseIntelligenceController::class, 'index'])
+            ->name('warehouse_intelligence');
+        Route::get('warehouse-intelligence/data', [WarehouseIntelligenceController::class, 'tabData'])
+            ->name('warehouse_intelligence.data');
+        Route::post('warehouse-intelligence/limits', [WarehouseIntelligenceController::class, 'updateLimits'])
+            ->name('warehouse_intelligence.limits');
+        Route::post('warehouse-intelligence/request-draft', [WarehouseIntelligenceController::class, 'requestDraft'])
+            ->name('warehouse_intelligence.request_draft');
+        Route::post('warehouse-intelligence/request-pr-draft', [WarehouseIntelligenceController::class, 'requestPrDraft'])
+            ->name('warehouse_intelligence.request_pr_draft');
 
         // ================== STOCK CARD ==================
         Route::get('stock-card', [StockCardController::class, 'index'])->name('stock_card.index');
@@ -158,6 +171,9 @@ Route::middleware(['web', 'auth', 'access:inventory', 'role:owner,admin'])->grou
 
         Route::get('/create', [RtsStockRequestController::class, 'create'])->name('create');
         Route::post('/', [RtsStockRequestController::class, 'store'])->name('store');
+        Route::get('/{stockRequest}/edit', [RtsStockRequestController::class, 'edit'])->name('edit');
+        Route::put('/{stockRequest}', [RtsStockRequestController::class, 'update'])->name('update');
+        Route::delete('/{stockRequest}', [RtsStockRequestController::class, 'destroy'])->name('destroy');
 
         Route::get('/{stockRequest}/confirm', [RtsStockRequestController::class, 'confirmReceive'])
             ->whereNumber('stockRequest')

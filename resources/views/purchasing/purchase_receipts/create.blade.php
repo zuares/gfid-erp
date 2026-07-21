@@ -413,6 +413,23 @@
     {{-- ── FORM ── --}}
     <form id="grnForm" method="POST" action="{{ route('purchasing.purchase_receipts.store') }}">
         @csrf
+        <input type="hidden" name="ignore_duplicate" id="ignore_duplicate" value="0">
+        
+        @if(session('duplicate_warning'))
+            <div class="alert alert-warning py-3 d-flex align-items-start mb-3" style="border-radius:10px;">
+                <i class="bi bi-exclamation-triangle-fill me-3 fs-4 mt-1"></i>
+                <div>
+                    <strong>Peringatan Duplikasi!</strong><br>
+                    {{ session('duplicate_warning') }}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-warning btn-sm" onclick="document.getElementById('ignore_duplicate').value='1'; document.getElementById('btnConfirm').click(); document.getElementById('grnForm').submit();">
+                            <i class="bi bi-check2-all me-1"></i> Ya, Lanjutkan Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+        
         <input type="hidden" id="purchase_order_id" name="purchase_order_id"
                value="{{ $hasOrder ? $order->id : '' }}">
         <input type="hidden" name="order_type"  value="{{ $selectedOrderType }}">

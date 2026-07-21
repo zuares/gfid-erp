@@ -25,7 +25,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class InventoryIntelligenceController extends Controller
 {
-    private const TABS = ['summary', 'health', 'forecast', 'trend'];
+    private const TABS = ['summary', 'health', 'forecast', 'procurement', 'trend'];
 
     private const TREND_RANGES = [30, 60, 90];
 
@@ -43,13 +43,15 @@ class InventoryIntelligenceController extends Controller
 
         $filters = $this->resolveFilters($request);
 
+        $selectedItem = $filters['item_id'] ? Item::find($filters['item_id']) : null;
+
         return view('inventory.intelligence.index', array_merge(
             [
                 'filters' => $filters,
                 'initialTab' => $initialTab,
                 'initialPartial' => $this->partialFor($initialTab),
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
-                'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
+                'selectedItemLabel' => $selectedItem ? $selectedItem->code . ' — ' . $selectedItem->name : '',
             ],
             $this->tabData($initialTab, $filters),
         ));
@@ -64,7 +66,19 @@ class InventoryIntelligenceController extends Controller
         }
 
         $filters = $this->resolveFilters($request);
-        $html = view($this->partialFor($tab), $this->tabData($tab, $filters))->render();
+        
+        $selectedItem = $filters['item_id'] ? Item::find($filters['item_id']) : null;
+        
+        $data = array_merge(
+            $this->tabData($tab, $filters),
+            [
+                'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
+                'filters' => $filters,
+                'selectedItemLabel' => $selectedItem ? $selectedItem->code . ' — ' . $selectedItem->name : '',
+            ]
+        );
+
+        $html = view($this->partialFor($tab), $data)->render();
 
         return response()->json([
             'tab' => $tab,
@@ -192,6 +206,7 @@ class InventoryIntelligenceController extends Controller
         return match ($tab) {
             'health' => ['rows' => $rows],
             'forecast' => ['rows' => $rows],
+            'procurement' => ['rows' => $rows],
             default => [
                 'summary' => $this->service->summary($rows),
                 'rows' => $rows,

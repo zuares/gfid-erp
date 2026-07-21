@@ -88,6 +88,8 @@
                                         <div class="small mt-1 {{ $recommendation->is_primary ? 'text-success' : 'text-muted' }}">
                                             @if (($recommendation->source ?? 'item') === 'category')
                                                 {{ $recommendation->is_primary ? 'Pemasok utama' : 'Pemasok alternatif' }} kategori {{ $recommendation->category_name }} terpilih otomatis.
+                                            @elseif (($recommendation->source ?? 'item') === 'history')
+                                                Pemasok pembelian terakhir terpilih otomatis.
                                             @else
                                                 {{ $recommendation->is_primary ? 'Pemasok utama barang terpilih otomatis.' : 'Pemasok alternatif barang terpilih otomatis.' }}
                                             @endif

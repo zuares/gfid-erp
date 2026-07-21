@@ -292,7 +292,7 @@
             </button>
           @else
             <form action="{{ route('purchasing.purchase_receipts.post', $receipt->id) }}" method="POST"
-                  onsubmit="return confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat');" class="d-inline">
+                  onsubmit="if(confirm('Post GRN ini?\n\n• Stok akan bertambah\n• Jurnal akan tercatat')){ this.querySelector('button[type=submit]').disabled = true; return true; } return false;" class="d-inline">
               @csrf
               <button type="submit" class="btn btn-success btn-pill btn-sm">
                 <i class="bi bi-check-lg me-1"></i>Post GRN
@@ -326,7 +326,7 @@
 
         @if ($canUnpostSafely)
           <form action="{{ route('purchasing.purchase_receipts.unpost', $receipt->id) }}" method="POST"
-                onsubmit="return confirm('UNPOST GRN ini? Stok akan dibalik dan jurnal di-void.');">
+                onsubmit="if(confirm('UNPOST GRN ini? Stok akan dibalik dan jurnal di-void.')){ this.querySelector('button[type=submit]').disabled = true; return true; } return false;">
             @csrf
             <button type="submit" class="btn btn-outline-danger btn-pill btn-sm">
               <i class="bi bi-x me-1"></i>Unpost

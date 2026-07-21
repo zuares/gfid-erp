@@ -156,6 +156,7 @@ class ProductionPriorityService
             $sa = $sales->get($id);
 
             $ready = (float) ($st->ready ?? 0);
+            $readyAllocated = (float) ($st->ready_allocated ?? 0);
             $siapJahit = (float) ($st->siap_jahit ?? 0);
             $sedangJahit = (float) ($st->sedang_jahit ?? 0);
             $whPrd = (float) ($st->wh_prd ?? 0);
@@ -170,6 +171,7 @@ class ProductionPriorityService
             return [$id => (object) [
                 'item_id' => $id,
                 'ready_stock' => $ready,
+                'ready_allocated' => $readyAllocated,
                 'siap_jahit' => $siapJahit,
                 'sedang_jahit' => $sedangJahit,
                 'wh_prd' => $whPrd,
@@ -241,6 +243,7 @@ class ProductionPriorityService
             ->selectRaw("
                 s.item_id,
                 COALESCE(SUM(CASE WHEN w.code='WH-RTS' THEN s.qty END),0) as ready,
+                COALESCE(SUM(CASE WHEN w.code='WH-RTS' THEN s.allocated_qty END),0) as ready_allocated,
                 COALESCE(SUM(CASE WHEN w.code='WIP-CUT' THEN s.qty END),0) as siap_jahit,
                 COALESCE(SUM(CASE WHEN w.code='WIP-SEW' THEN s.qty END),0) as sedang_jahit,
                 COALESCE(SUM(CASE WHEN w.code='WH-PRD' THEN s.qty END),0) as wh_prd,
