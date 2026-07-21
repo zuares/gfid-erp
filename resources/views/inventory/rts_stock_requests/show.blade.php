@@ -50,6 +50,10 @@
         .sd-table td{ border:0; padding:0; }
         .sd-table td.sd-r{ text-align:left; margin-top:.35rem; }
     }
+
+    .sd-btn-row { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-top: .9rem; align-items: center; padding-inline: .2rem; }
+    .sd-muted { color: #64748b; font-size: .8rem; }
+    .sd-actions-bottom { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
 </style>
 @endpush
 
@@ -93,20 +97,6 @@
                     <a href="{{ route('rts.stock-requests.edit', $stockRequest) }}" class="sd-btn">
                         <i class="bi bi-pencil"></i> Edit Draft
                     </a>
-                @endif
-                
-                @if ($canManage && $canReceive)
-                    <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="sd-btn sd-primary">Terima Jadi</a>
-                @endif
-                
-                @if ($canManage && $stockRequest->status !== 'cancelled')
-                    <form action="{{ route('rts.stock-requests.destroy', $stockRequest) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan Stock Request ini?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="sd-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
-                            <i class="bi bi-x-circle"></i> Batalkan
-                        </button>
-                    </form>
                 @endif
             </div>
         </div>
@@ -176,7 +166,28 @@
             </div>
         </div>
 
-    </div>
+    
+        <div class="sd-btn-row">
+            <div class="sd-muted">Pilih aksi untuk memproses permintaan ini.</div>
+            <div class="sd-actions-bottom">
+                @if ($canManage && $stockRequest->status !== 'cancelled')
+                    <form action="{{ route('rts.stock-requests.destroy', $stockRequest) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan Stock Request ini?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="sd-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+                            <i class="bi bi-x-circle"></i> Batalkan
+                        </button>
+                    </form>
+                @endif
+                
+                @if ($canManage && $canReceive)
+                    <a href="{{ route('rts.stock-requests.confirm', $stockRequest) }}" class="sd-btn sd-primary">
+                        Terima Barang
+                    </a>
+                @endif
+            </div>
+        </div>
+</div>
 @endsection
 
 @php
@@ -280,7 +291,11 @@ function printPickingList() {
             .qty, .sku-code { font-weight: 900 !important; }
             .category-row td { color: #fff !important; background: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
-    </style>
+    
+    .sd-btn-row { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-top: .9rem; align-items: center; padding-inline: .2rem; }
+    .sd-muted { color: #64748b; font-size: .8rem; }
+    .sd-actions-bottom { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+</style>
 </head>
 <body>
     <div id="toolbar">
