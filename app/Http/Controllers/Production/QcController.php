@@ -830,8 +830,8 @@ class QcController extends Controller
         }
 
         return redirect()
-            ->route('production.sewing.returns.show', $sewingReturn)
-            ->with('success', "QC Jahit berhasil disimpan. Stok {$sewingReturn->warehouse?->code} → {$sewingReturn->destinationWarehouse?->code} sudah diperbarui.");
+            ->route('production.qc.index', ['stage' => 'sewing'])
+            ->with('success', "QC Jahit berhasil disimpan. Stok {$sewingReturn->warehouse?->code} → WH-PRD & REJ-SEW sudah diperbarui.");
     }
 
     public function overproductionCuttingBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle)

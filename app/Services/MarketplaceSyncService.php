@@ -12,6 +12,7 @@ use App\Models\MarketplaceSyncLog;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Services\Channels\ChannelManager;
+use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -220,21 +221,78 @@ class MarketplaceSyncService
     }
 
     /**
-     * Sync settlement / escrow data per order dari marketplace.
-     * Tarik order-order yang belum punya settlement (atau dalam rentang waktu),
-     * fetch escrow detail satu per satu, simpan ke marketplace_order_settlements.
-     *
-     * @return array{synced: int, skipped: int, errors: int, message: string}
+     * Maksimal percobaan panggilan get_escrow_detail (1 percobaan awal + 2 retry).
      */
-    public function syncSettlements(Store $store, ?int $timeFrom = null, ?int $timeTo = null): array
-    {
+    private const ESCROW_MAX_ATTEMPTS = 3;
+
+    /**
+     * Maksimal detik menunggu antar-retry, dibatasi supaya Retry-After yang besar
+     * dari Shopee tidak menahan proses batch terlalu lama.
+     */
+    private const ESCROW_MAX_RETRY_SLEEP_SECONDS = 10;
+
+    /**
+     * Field settlement yang dianggap "material" untuk keperluan logging perubahan
+     * saat --resync (BUKAN untuk tabel histori — histori sengaja belum dibuat di Fase 1,
+     * lihat AUDIT_FASE1_RANCANGAN_FINAL.md Bagian 10).
+     */
+    private const MATERIAL_SETTLEMENT_FIELDS = [
+        'commission_fee', 'service_fee', 'transaction_fee', 'seller_voucher',
+        'shipping_fee_subsidy', 'escrow_tax', 'final_income', 'settlement_time',
+    ];
+
+    /**
+     * Sync settlement / escrow data per order dari marketplace.
+     *
+     * Alur: query order eligible → panggil finance API (dengan retry) → validasi
+     * response → mapping → updateOrCreate (per order, dalam transaction pendek) →
+     * logging → result summary. Detail retry/validasi/mapping/normalisasi nominal
+     * & timestamp SENGAJA dipisah ke method privat lain (lihat
+     * getEscrowDetailWithRetry(), validateEscrowIncome(), mapEscrowSettlement(),
+     * decimalValue(), normalizeShopeeTimestamp()) supaya method ini tetap fokus
+     * pada orkestrasi, bukan detail teknis tiap langkah.
+     *
+     * TIDAK membuat jurnal accounting apa pun (di luar scope Fase 1).
+     *
+     * @param  Store  $store
+     * @param  int|null  $timeFrom  Unix timestamp, filter ordered_at >= ini
+     * @param  int|null  $timeTo  Unix timestamp, filter ordered_at <= ini
+     * @param  string|null  $orderSn  Kalau diisi, batasi ke satu channel_order_id
+     * @param  bool  $resync  Kalau true, order yang SUDAH punya settlement tetap diproses ulang (updateOrCreate)
+     * @param  int  $limit  Maks order yang diambil dalam satu pemanggilan (satu batch)
+     * @param  int  $afterId  Cursor — hanya ambil order dengan id > afterId (untuk mode --all di command)
+     * @return array{found:int, processed:int, synced:int, skipped:int, errors:int, last_processed_id:int|null, failed_order_ids:array<int,string>, last_call_meta:array|null, message:string}
+     */
+    public function syncSettlements(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        ?string $orderSn = null,
+        bool $resync = false,
+        int $limit = 200,
+        int $afterId = 0,
+    ): array {
         $driver = $this->manager->driver($store);
 
-        // Ambil order yang perlu di-settle: COMPLETED atau SHIPPED, belum ada settlement
         $query = MarketplaceOrder::where('store_id', $store->id)
-            ->whereIn('order_status', ['COMPLETED', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])
-            ->whereDoesntHave('settlement');
+            ->where('id', '>', $afterId)
+            ->where('order_status', 'COMPLETED')
+            ->orderBy('id');
 
+        if (! $resync) {
+            $query->whereNotExists(function ($q) use ($store) {
+                $q->select(DB::raw(1))
+                  ->from('marketplace_order_settlements')
+                  ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                  ->where('marketplace_order_settlements.store_id', $store->id);
+            });
+        }
+        if ($orderSn) {
+            $query->where('channel_order_id', $orderSn);
+        } else {
+            // Abaikan order dengan permanent failure saat memproses batch
+            $query->whereNull('settlement_sync_error_code');
+        }
         if ($timeFrom) {
             $query->where('ordered_at', '>=', now()->setTimestamp($timeFrom));
         }
@@ -242,87 +300,514 @@ class MarketplaceSyncService
             $query->where('ordered_at', '<=', now()->setTimestamp($timeTo));
         }
 
-        $orders  = $query->limit(200)->get();
+        $orders  = $query->limit(max(1, $limit))->get();
+        $found   = $orders->count();
+        $processed = 0;
         $synced  = 0;
         $skipped = 0;
         $errors  = 0;
+        $lastProcessedId = null;
+        $failedOrderIds  = [];
+        // Metadata panggilan API TERAKHIR yang diproses (attempts/http_status/retry_after/
+        // duration) — dipakai command untuk --inspect. Untuk mode satu-order (--order),
+        // ini otomatis metadata satu-satunya order yang diproses. Untuk batch, ini hanya
+        // metadata order terakhir (bukan agregat) — cukup untuk kebutuhan --inspect yang
+        // memang dibatasi hanya valid bersama --order (satu order).
+        $lastCallMeta = null;
 
         foreach ($orders as $order) {
+            $processed++;
+            $lastProcessedId = $order->id;
+
             try {
-                $response = $driver->getEscrowDetail($store, $order->channel_order_id);
-
-                if (! empty($response['error']) || empty($response['response'])) {
-                    $errMsg = $response['message'] ?? ($response['error'] ?? 'Unknown error');
-                    // Tidak fatal — skip dan catat
-                    Log::warning("Escrow detail error order {$order->channel_order_id}: {$errMsg}");
-                    $errors++;
-                    continue;
-                }
-
-                $income = $response['response']['order_income'] ?? $response['response'] ?? [];
-
-                if (empty($income)) {
+                // Revalidasi status order tepat sebelum API dipanggil
+                $order->refresh();
+                if ($order->order_status !== 'COMPLETED') {
                     $skipped++;
+                    Log::info("[sync-settlements] Order {$order->channel_order_id} berubah status menjadi {$order->order_status} (bukan COMPLETED), API batal dipanggil.");
                     continue;
                 }
 
-                $settlementTime = ! empty($income['escrow_release_time'])
-                    ? now()->setTimestamp((int) $income['escrow_release_time'])
-                    : (! empty($income['settlement_time']) ? now()->setTimestamp((int) $income['settlement_time']) : null);
+                // 1) Panggil API dulu (di luar transaction — request jaringan tidak boleh
+                //    menahan transaction database, apalagi di SQLite yang rawan "database
+                //    is locked" kalau transaction dibiarkan terbuka lama).
+                $retryResult = $this->getEscrowDetailWithRetry($driver, $store, $order->channel_order_id);
+                $response = $retryResult['payload'];
+                $lastCallMeta = $retryResult['meta'];
 
-                MarketplaceOrderSettlement::updateOrCreate(
-                    ['channel_order_id' => $order->channel_order_id],
-                    [
-                        'store_id'   => $store->id,
-                        'order_id'   => $order->id,
+                // 2) Validasi response SEBELUM mapping — tidak langsung anggap sukses
+                //    hanya karena tidak ada exception.
+                $validation = $this->validateEscrowIncome($response);
 
-                        // Pembayaran customer
-                        'buyer_payment_amount'  => (float) ($income['buyer_payment_amount'] ?? $income['buyer_paid_amount'] ?? 0),
+                if ($validation['status'] === 'skipped') {
+                    // Kondisi bisnis (mis. response kosong / belum eligible di sisi Shopee)
+                    // — bukan error, dan TIDAK membuat settlement kosong/nol.
+                    $skipped++;
+                    Log::info("[sync-settlements] Order {$order->channel_order_id} dilewati: {$validation['message']}");
+                    continue;
+                }
 
-                        // Fee marketplace
-                        'commission_fee'        => (float) ($income['commission_fee'] ?? 0),
-                        'service_fee'           => (float) ($income['service_fee'] ?? $income['credit_card_promotion'] ?? 0),
-                        'transaction_fee'       => (float) ($income['transaction_fee'] ?? 0),
+                if ($validation['status'] === 'error') {
+                    $errors++;
+                    $failedOrderIds[] = $order->channel_order_id;
+                    Log::warning("[sync-settlements] Order {$order->channel_order_id} gagal validasi ({$validation['reason']}): {$validation['message']}");
+                    
+                    if ($validation['reason'] === 'order_not_found') {
+                        $order->update([
+                            'settlement_sync_error_code' => 'order_not_found',
+                            'settlement_sync_failed_at' => now(),
+                        ]);
+                    }
+                    continue;
+                }
 
-                        // Voucher & diskon
-                        'seller_voucher'        => (float) ($income['seller_voucher_rebate'] ?? $income['seller_voucher'] ?? 0),
-                        'seller_coin_cash_back' => (float) ($income['seller_absorbed_coin_discount'] ?? $income['seller_coin_cash_back'] ?? 0),
+                // 3) Mapping — terpusat, tidak menyebar fallback di banyak tempat.
+                $mapped = $this->mapEscrowSettlement($store, $order, $validation['node'], $response);
 
-                        // Ongkir
-                        'actual_shipping_fee'   => (float) ($income['actual_shipping_fee'] ?? $income['estimated_shipping_fee'] ?? 0),
-                        'shipping_fee_subsidy'  => (float) ($income['shopee_shipping_rebate'] ?? $income['shipping_fee_rebate'] ?? 0),
-                        'reverse_shipping_fee'  => (float) ($income['reverse_shipping_fee'] ?? 0),
+                // 3b) Field finansial yang tidak tersedia dari API dicatat (nama kolom lokal
+                //     saja, BUKAN payload mentah) — supaya "field hilang" bisa dibedakan dari
+                //     "field dikirim bernilai 0" tanpa perlu buka raw_json satu-satu.
+                if (! empty($mapped['missing_financial_fields'])) {
+                    Log::info("[sync-settlements] Order {$order->channel_order_id} field API hilang", [
+                        'store_id' => $store->id,
+                        'missing_financial_fields' => $mapped['missing_financial_fields'],
+                    ]);
+                }
 
-                        // Campaign & lainnya
-                        'activity_fee'          => (float) ($income['activity_fee'] ?? $income['ams_commission_fee'] ?? 0),
-                        'drc_adjustable_refund' => (float) ($income['drc_adjustable_refund'] ?? $income['seller_return_refund_amount'] ?? 0),
-                        'escrow_tax'            => (float) ($income['escrow_tax'] ?? 0),
+                // 4) Simpan — transaction PENDEK, hanya membungkus operasi database untuk
+                //    SATU order ini (bukan seluruh batch), sesuai prinsip: satu error tidak
+                //    boleh rollback order lain, dan transaction panjang berbahaya untuk SQLite.
+                DB::transaction(function () use ($order, $mapped, $resync) {
+                    $existing = $resync
+                        ? MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->first()
+                        : null;
 
-                        // Dana cair
-                        'final_income'          => (float) ($income['final_income'] ?? $income['escrow_amount'] ?? 0),
-                        'settlement_time'       => $settlementTime,
+                    MarketplaceOrderSettlement::updateOrCreate(
+                        ['channel_order_id' => $order->channel_order_id],
+                        $mapped['values']
+                    );
 
-                        'synced_at' => now(),
-                        'raw_json'  => $income,
-                    ]
-                );
+                    if ($existing) {
+                        $this->logMaterialChanges($order, $existing, $mapped['values']);
+                    }
+                    
+                    // Reset permanent failure jika akhirnya sukses
+                    if ($order->settlement_sync_error_code !== null) {
+                        $order->update([
+                            'settlement_sync_error_code' => null,
+                            'settlement_sync_failed_at' => null,
+                        ]);
+                    }
+                });
 
                 $synced++;
 
             } catch (\Throwable $e) {
-                Log::error("Gagal sync settlement order {$order->channel_order_id}: " . $e->getMessage());
+                Log::error("[sync-settlements] Exception order {$order->channel_order_id}: " . $e->getMessage());
                 $errors++;
+                $failedOrderIds[] = $order->channel_order_id;
             }
         }
 
-        $message = "Settlement synced: {$synced}, skipped: {$skipped}, errors: {$errors}.";
-        $this->log($store, 'sync_settlements', $errors > 0 && $synced === 0 ? 'failed' : 'success', $message, [
-            'synced'  => $synced,
-            'skipped' => $skipped,
-            'errors'  => $errors,
+        $message = "Settlement — found: {$found}, processed: {$processed}, synced: {$synced}, skipped: {$skipped}, errors: {$errors}.";
+
+        $logStatus = 'success';
+        if ($errors > 0) {
+            $logStatus = $synced > 0 ? 'partial_success' : 'failed';
+        }
+
+        $this->log($store, 'sync_settlements', $logStatus, $message, [
+            'found'              => $found,
+            'processed'          => $processed,
+            'synced'             => $synced,
+            'skipped'            => $skipped,
+            'errors'             => $errors,
+            'last_processed_id'  => $lastProcessedId,
+            // Dibatasi maksimal 20 supaya log tidak membengkak untuk batch ratusan order.
+            'failed_order_ids'   => array_slice($failedOrderIds, 0, 20),
         ]);
 
-        return compact('synced', 'skipped', 'errors', 'message');
+        return [
+            'found'              => $found,
+            'processed'          => $processed,
+            'synced'             => $synced,
+            'skipped'            => $skipped,
+            'errors'             => $errors,
+            'last_processed_id'  => $lastProcessedId,
+            'failed_order_ids'   => array_slice($failedOrderIds, 0, 20),
+            'last_call_meta'     => $lastCallMeta,
+            'message'            => $message,
+        ];
+    }
+
+    /**
+     * Panggil getEscrowDetail() dengan retry terbatas — HANYA untuk kegagalan
+     * transient (ConnectionException, HTTP 429, HTTP 5xx). Tidak retry untuk error
+     * 4xx lain (dianggap permanen: validasi/permission/order tidak valid).
+     *
+     * Membaca status HTTP dari `_meta.http_status` (lihat ShopeeChannel::withHttpMeta()),
+     * BUKAN dari pencocokan string bebas terhadap field 'message'/'error' Shopee.
+     *
+     * Tidak pernah mencetak/mencatat token atau credential — hanya menerima $orderSn
+     * (string) dan mengembalikan response API apa adanya (ditambah _meta).
+     */
+    /**
+     * @return array{payload:array, meta:array{attempts:int, http_status:mixed, retry_after:mixed, token_refreshed:null, duration_ms:float}}
+     */
+    private function getEscrowDetailWithRetry(MarketplaceChannel $driver, Store $store, string $orderSn): array
+    {
+        $attempt = 0;
+        $response = [];
+        $startedAt = hrtime(true);
+
+        while ($attempt < self::ESCROW_MAX_ATTEMPTS) {
+            $attempt++;
+
+            try {
+                $response = $driver->getEscrowDetail($store, $orderSn);
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                $response = [
+                    'error'   => 'connection_exception',
+                    'message' => $e->getMessage(),
+                    '_meta'   => ['http_status' => null, 'retry_after' => null],
+                ];
+            }
+
+            $httpStatus = $response['_meta']['http_status'] ?? null;
+            $isConnectionIssue = ($response['error'] ?? null) === 'connection_exception';
+            $isTransient = $isConnectionIssue || $httpStatus === 429 || ($httpStatus !== null && $httpStatus >= 500);
+
+            if (! $isTransient || $attempt >= self::ESCROW_MAX_ATTEMPTS) {
+                break;
+            }
+
+            $retryAfter = $response['_meta']['retry_after'] ?? null;
+            $sleepSeconds = is_numeric($retryAfter) ? (int) $retryAfter : (2 * $attempt);
+            $sleepSeconds = min($sleepSeconds, self::ESCROW_MAX_RETRY_SLEEP_SECONDS);
+
+            if ($sleepSeconds > 0) {
+                sleep($sleepSeconds);
+            }
+        }
+
+        $durationMs = (hrtime(true) - $startedAt) / 1_000_000;
+
+        return [
+            // Payload API asli (ShopeeChannel::withHttpMeta() masih menyisipkan _meta di
+            // sini) — TIDAK diubah, supaya validateEscrowIncome()/mapEscrowSettlement()
+            // yang sudah ada tidak perlu berubah. _meta di payload ini TIDAK PERNAH ikut
+            // ke raw_json (mapEscrowSettlement() hanya mengambil node order_income).
+            'payload' => $response,
+            'meta'    => [
+                'attempts'    => $attempt,
+                'http_status' => $response['_meta']['http_status'] ?? null,
+                'retry_after' => $response['_meta']['retry_after'] ?? null,
+                // SENGAJA null ("tidak diketahui"), BUKAN false. ShopeeChannel belum
+                // menyediakan sinyal aman untuk mendeteksi refresh token benar-benar
+                // terjadi (menebak dari perubahan token_expires_at berisiko salah, mis.
+                // race condition antar proses). Keputusan UAT 23 Juli 2026: jangan klaim
+                // false tanpa instrumentasi pasti — caller (command --inspect) menampilkan
+                // "unknown/not instrumented" untuk nilai null ini.
+                'token_refreshed' => null,
+                'duration_ms' => round($durationMs, 2),
+            ],
+        ];
+    }
+
+    /**
+     * Validasi response get_escrow_detail SEBELUM mapping. Tidak menentukan kondisi
+     * bisnis berdasarkan pencocokan string bebas — mengecek field 'error' resmi
+     * Shopee dan struktur node finansial secara eksplisit.
+     *
+     * @return array{status:'ok'|'skipped'|'error', node?:array, reason?:string, message?:string}
+     */
+    private function validateEscrowIncome(array $response): array
+    {
+        if (! empty($response['error'])) {
+            return [
+                'status'  => 'error',
+                'reason'  => (string) $response['error'],
+                'message' => (string) ($response['message'] ?? $response['error']),
+            ];
+        }
+
+        $node = $response['response']['order_income'] ?? $response['response'] ?? null;
+
+        if (! is_array($node)) {
+            return [
+                'status'  => 'error',
+                'reason'  => 'invalid_structure',
+                'message' => 'Struktur response finansial tidak ditemukan (response / response.order_income bukan array).',
+            ];
+        }
+
+        if (empty($node)) {
+            // Response kosong TANPA error eksplisit — bukan berarti settlement bernilai
+            // nol. Paling mungkin: order belum eligible di sisi Shopee walau status lokal
+            // sudah eligible. Dicatat sebagai skipped, BUKAN disimpan sebagai settlement 0.
+            return [
+                'status'  => 'skipped',
+                'reason'  => 'empty_income',
+                'message' => 'Response finansial kosong — order kemungkinan belum eligible di sisi Shopee, atau field order_income tidak dikembalikan.',
+            ];
+        }
+
+        $hasPrimarySignal = array_key_exists('final_income', $node)
+            || array_key_exists('escrow_amount', $node)
+            || array_key_exists('order_sn', $node);
+
+        if (! $hasPrimarySignal) {
+            return [
+                'status'  => 'error',
+                'reason'  => 'missing_primary_fields',
+                'message' => 'Tidak ada field final_income/escrow_amount/order_sn di response — struktur tidak dikenali (perlu verifikasi ulang ke dokumentasi resmi).',
+            ];
+        }
+
+        return ['status' => 'ok', 'node' => $node];
+    }
+
+    /**
+     * Mapping terpusat dari node finansial Shopee (`order_income`) ke kolom
+     * `marketplace_order_settlements`. SEMUA fallback field (a ?? b ?? c) ada di SATU
+     * tempat ini, bukan menyebar.
+     *
+     * KOREKSI MAPPING BERBASIS UAT NYATA (23 Juli 2026) — order `2607181DCXQSBW`,
+     * toko Greatfit.id (store_id=5), lewat `--inspect`. Fallback lama (asumsi, belum
+     * pernah diverifikasi) DIPERTAHANKAN sebagai compatibility guard untuk kemungkinan
+     * variasi response order/versi API lain — bukan dihapus, hanya diberi prioritas
+     * lebih rendah dari field yang sudah terbukti nyata. Ringkasan keputusan:
+     *  - buyer_payment_amount: `buyer_total_amount` TERVERIFIKASI ada (81912 di UAT).
+     *    `buyer_payment_amount`/`buyer_paid_amount` tidak pernah muncul di response.
+     *  - seller_voucher: `voucher_from_seller` TERVERIFIKASI ada (200 di UAT).
+     *  - transaction_fee: Kombinasi `seller_transaction_fee` (beban seller) dan 
+     *    `seller_order_processing_fee` (Biaya Penanganan Pesanan). SENGAJA TIDAK
+     *    memakai `buyer_transaction_fee` atau `credit_card_transaction_fee` (beban pembeli).
+     *    sebagai fallback — biaya pembeli tidak boleh masuk laporan biaya seller.
+     *  - activity_fee: HANYA mewakili AMS commission (`order_ams_commission_fee`).
+     *    `campaign_fee` SENGAJA TIDAK dipakai — dianggap konsep berbeda sampai terbukti
+     *    sebaliknya; tetap tersimpan apa adanya di raw_json, kandidat kolom terpisah di
+     *    fase berikutnya (TIDAK dibuat di koreksi ini).
+     *  - final_income: `escrow_amount` TERVERIFIKASI ada (68456 di UAT). `final_income`
+     *    tidak pernah muncul di response nyata — fallback ini pada dasarnya jadi primary.
+     *  - seller_coin_cash_back: `seller_coin_cash_back` sendiri TERVERIFIKASI ada di UAT
+     *    (field asli persis nama kolom lokal) — diprioritaskan di atas fallback lama.
+     *  - commission_fee, service_fee, actual_shipping_fee, shopee_shipping_rebate,
+     *    reverse_shipping_fee, drc_adjustable_refund, escrow_tax: TIDAK diubah — field
+     *    utamanya sudah terbukti tepat di UAT.
+     *  - settlement_time: TIDAK diubah (lihat docblock di bawah, sumbernya belum
+     *    terbukti dari UAT ini — order yang diuji belum ada timestamp pencairan).
+     *
+     * ad_cost (TECHNICAL DEBT): kolom ini ada di skema tapi SENGAJA TIDAK dipetakan dari
+     * field mana pun di sini. Belum ada field di get_escrow_detail yang terverifikasi
+     * sebagai sumbernya — JANGAN diisi pakai campaign_fee, AMS fee, atau biaya lain
+     * tanpa verifikasi konsep dulu. Kolom tetap default sesuai skema.
+     *
+     * `raw_json` HANYA berisi node finansial asli Shopee (`$income`) — TIDAK
+     * mengandung `_meta` (metadata HTTP internal).
+     *
+     * @return array{values: array, missing_financial_fields: array<int,string>}
+     */
+    private function mapEscrowSettlement(Store $store, MarketplaceOrder $order, array $income, array $rawResponse): array
+    {
+        $rootResponse = $rawResponse['response'] ?? [];
+
+        $settlementTime = $this->normalizeShopeeTimestamp($income['escrow_release_time'] ?? null)
+            ?? $this->normalizeShopeeTimestamp($rootResponse['escrow_release_time'] ?? null)
+            ?? $this->normalizeShopeeTimestamp($income['settlement_time'] ?? null);
+
+        // Fallback: Jika Shopee sama sekali tidak mengirimkan escrow_release_time di API escrow (sering terjadi 
+        // di versi API baru), kita gunakan update_time dari order detail saat statusnya sudah COMPLETED.
+        if (! $settlementTime && $order->order_status === 'COMPLETED' && !empty($order->raw_json['update_time'])) {
+            $settlementTime = $this->normalizeShopeeTimestamp($order->raw_json['update_time']);
+        }
+
+        // Melacak kolom mana yang nilainya "field tidak tersedia dari API" (BUKAN
+        // "field dikirim bernilai 0") — dipakai untuk observability (missing_financial_fields
+        // di sync log), supaya dua kondisi ini tidak tercampur padahal keduanya sama-sama
+        // tersimpan sebagai 0.00 di kolom NOT NULL (lihat docblock nn()).
+        $missingFields = [];
+        $val = function (string $localColumn, ?string $decimal) use (&$missingFields): string {
+            if ($decimal === null) {
+                $missingFields[] = $localColumn;
+            }
+            return $this->nn($decimal);
+        };
+
+        $values = [
+            'store_id'   => $store->id,
+            'order_id'   => $order->id,
+
+            // Pembayaran customer (Subtotal Pesanan / Harga Produk yg diakui seller sbg gross)
+            'buyer_payment_amount'  => $val('buyer_payment_amount', $this->decimalValue(
+                $income['cost_of_goods_sold'] ?? $income['order_selling_price'] ?? $income['buyer_total_amount'] ?? $income['buyer_payment_amount'] ?? null
+            )),
+
+            // Fee marketplace
+            'commission_fee'        => $val('commission_fee', $this->decimalValue($income['commission_fee'] ?? null)),
+            'service_fee'           => $val('service_fee', $this->decimalValue($income['service_fee'] ?? null)),
+            'transaction_fee'       => $val('transaction_fee', $this->decimalValue(
+                ($income['seller_transaction_fee'] ?? 0) + ($income['seller_order_processing_fee'] ?? 0) ?: ($income['transaction_fee'] ?? null)
+            )),
+
+            // Voucher & diskon
+            'seller_voucher'        => $val('seller_voucher', $this->decimalValue(
+                $income['voucher_from_seller'] ?? $income['seller_voucher_rebate'] ?? $income['seller_voucher'] ?? null
+            )),
+            'seller_coin_cash_back' => $val('seller_coin_cash_back', $this->decimalValue(
+                $income['seller_coin_cash_back'] ?? $income['seller_absorbed_coin_discount'] ?? null
+            )),
+
+            // Ongkir
+            'actual_shipping_fee'   => $val('actual_shipping_fee', $this->decimalValue($income['actual_shipping_fee'] ?? $income['estimated_shipping_fee'] ?? null)),
+            'shipping_fee_subsidy'  => $val('shipping_fee_subsidy', $this->decimalValue($income['shopee_shipping_rebate'] ?? $income['shipping_fee_rebate'] ?? null)),
+            'reverse_shipping_fee'  => $val('reverse_shipping_fee', $this->decimalValue($income['reverse_shipping_fee'] ?? null)),
+
+            // Campaign & lainnya — activity_fee = AMS commission SAJA (lihat docblock).
+            'activity_fee'          => $val('activity_fee', $this->decimalValue(
+                $income['order_ams_commission_fee'] ?? $income['ams_commission_fee'] ?? $income['activity_fee'] ?? null
+            )),
+            'drc_adjustable_refund' => $val('drc_adjustable_refund', $this->decimalValue($income['drc_adjustable_refund'] ?? $income['seller_return_refund_amount'] ?? null)),
+            'escrow_tax'            => $val('escrow_tax', $this->decimalValue($income['escrow_tax'] ?? null)),
+
+            // Dana cair
+            'final_income'          => $val('final_income', $this->decimalValue($income['final_income'] ?? $income['escrow_amount'] ?? null)),
+            'settlement_time'       => $settlementTime, // NULLABLE — null tetap null, TIDAK di-track sebagai missing_financial_fields (memang boleh null)
+
+            'synced_at' => now(),
+            'raw_json'  => $income, // murni payload Shopee, TANPA _meta
+        ];
+
+        return [
+            'values' => $values,
+            'missing_financial_fields' => $missingFields,
+        ];
+    }
+
+    /**
+     * "Not-null guard" — SEMUA 13 kolom fee/nominal di marketplace_order_settlements
+     * (buyer_payment_amount s/d final_income) adalah NOT NULL di skema saat ini
+     * (default '0', TANPA ->nullable() — lihat migration
+     * 2026_06_09_013006_create_marketplace_order_settlements_table.php). Insert NULL
+     * eksplisit ke kolom ini akan gagal dengan integrity error.
+     *
+     * decimalValue() SENGAJA tetap mengembalikan null murni untuk "field tidak
+     * tersedia dari API" (Koreksi 6) — itu perilaku yang benar & unit-testable
+     * secara independen. Guard di sini HANYA memaksa null -> '0.00' di titik
+     * PENYIMPANAN, semata-mata karena keterbatasan skema kolom NOT NULL yang
+     * sudah ada — BUKAN karena secara semantik "tidak tersedia" == "nol".
+     *
+     * TECHNICAL DEBT (dicatat, bukan diperbaiki di Fase 1 — di luar scope migration
+     * yang disetujui): kalau distingsi "field tidak tersedia" vs "fee memang 0"
+     * benar-benar dibutuhkan untuk rekonsiliasi, ke-13 kolom ini perlu migration
+     * terpisah untuk dijadikan nullable, disertai keputusan bisnis dulu.
+     */
+    private function nn(?string $value): string
+    {
+        return $value ?? '0.00';
+    }
+
+    /**
+     * Normalisasi nilai nominal finansial dari response API menjadi string decimal
+     * aman untuk disimpan (kolom di-cast 'decimal:2' oleh Eloquent).
+     *
+     * - null / '' → null (BUKAN otomatis 0 — "field tidak tersedia" beda makna
+     *   dengan "fee bernilai 0")
+     * - int/float/string numerik → string decimal 2 digit
+     * - string non-numerik → dianggap invalid, melempar exception (bukan disulap jadi 0)
+     *
+     * Pakai bcmath (fixed-point, tanpa presisi float) kalau tersedia; fallback ke
+     * sprintf kalau bcmath tidak terpasang (bukan dependency wajib project ini).
+     */
+    private function decimalValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return null;
+            }
+            if (! is_numeric($trimmed)) {
+                throw new \UnexpectedValueException("Nilai nominal bukan angka valid: \"{$value}\"");
+            }
+            $value = $trimmed;
+        } elseif (! is_int($value) && ! is_float($value)) {
+            throw new \UnexpectedValueException('Nilai nominal harus null, int, float, atau string numerik.');
+        }
+
+        if (function_exists('bcadd')) {
+            return bcadd((string) $value, '0', 2);
+        }
+
+        // Fallback tanpa bcmath — tetap dijalankan lewat string formatting, bukan
+        // dipakai untuk KALKULASI (hanya pembulatan tampilan/penyimpanan akhir).
+        return sprintf('%.2f', (float) $value);
+    }
+
+    /**
+     * Normalisasi timestamp dari Shopee (get_escrow_detail belum diverifikasi resmi
+     * apakah selalu epoch detik — lihat AUDIT_FASE1_RANCANGAN_FINAL.md Bagian 10).
+     *
+     * - null / '' / non-numeric → null
+     * - 0 → null (dianggap "tidak ada", bukan epoch 1970-01-01 yang valid secara bisnis)
+     * - epoch detik wajar (<=10 digit) → dipakai apa adanya
+     * - epoch lebih dari 10 digit → DIASUMSIKAN milidetik, dibagi 1000 (heuristik,
+     *   diberi komentar jelas karena belum terverifikasi ke response asli)
+     */
+    private function normalizeShopeeTimestamp(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $intValue = (int) $value;
+
+        if ($intValue === 0) {
+            return null;
+        }
+
+        if (abs($intValue) > 9_999_999_999) {
+            $intValue = intdiv($intValue, 1000);
+        }
+
+        try {
+            return Carbon::createFromTimestamp($intValue, config('app.timezone'));
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Log (bukan tabel histori permanen — sengaja ditunda, lihat scope Fase 1)
+     * perubahan pada field material saat --resync menimpa settlement yang sudah ada.
+     * Hanya field finansial numerik yang dicatat — TIDAK ADA data pembeli/token.
+     */
+    private function logMaterialChanges(MarketplaceOrder $order, MarketplaceOrderSettlement $existing, array $newValues): void
+    {
+        $changed = [];
+
+        foreach (self::MATERIAL_SETTLEMENT_FIELDS as $field) {
+            $oldVal = (string) $existing->{$field};
+            $newVal = (string) ($newValues[$field] ?? '');
+
+            if ($oldVal !== $newVal) {
+                $changed[$field] = ['old' => $oldVal, 'new' => $newVal];
+            }
+        }
+
+        if (! empty($changed)) {
+            Log::info("[sync-settlements] Resync mengubah nilai order {$order->channel_order_id}", [
+                'store_id' => $order->store_id,
+                'changed'  => $changed,
+            ]);
+        }
     }
 
     /**

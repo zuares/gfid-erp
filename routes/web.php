@@ -159,6 +159,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/unlist',      [\App\Http\Controllers\MarketplaceProductController::class, 'toggleUnlist'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/sku',         [\App\Http\Controllers\MarketplaceProductController::class, 'updateSku'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/model-sku',   [\App\Http\Controllers\MarketplaceProductController::class, 'updateModelSku'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
 
     // Naikkan Produk (boost)

@@ -998,7 +998,46 @@ class MarketplaceController extends Controller
             $query->where('store_id', $request->store_id);
         }
 
-        $settlements = $query->limit(200)->get()->map(fn ($s) => [
+        if ($request->filled('order_date_from')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->whereDate('ordered_at', '>=', $request->order_date_from);
+            });
+        }
+
+        if ($request->filled('order_date_to')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->whereDate('ordered_at', '<=', $request->order_date_to);
+            });
+        }
+
+        if ($request->filled('settlement_date_from')) {
+            $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
+        }
+
+        if ($request->filled('settlement_date_to')) {
+            $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
+        }
+
+        if ($request->filled('status')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->where('order_status', $request->status);
+            });
+        }
+
+        if ($request->filled('settlement_status')) {
+            if ($request->settlement_status === 'cair') {
+                $query->whereNotNull('settlement_time');
+            } elseif ($request->settlement_status === 'belum_cair') {
+                $query->whereNull('settlement_time');
+            }
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where('channel_order_id', 'like', "%{$search}%");
+        }
+
+        $paginator = $query->paginate($request->input('per_page', 50))->through(fn ($s) => [
             'id'                    => $s->id,
             'store'                 => $s->store,
             'order'                 => $s->order,
@@ -1015,12 +1054,34 @@ class MarketplaceController extends Controller
             'activity_fee'          => (float) $s->activity_fee,
             'drc_adjustable_refund' => (float) $s->drc_adjustable_refund,
             'escrow_tax'            => (float) $s->escrow_tax,
+            'ad_cost'               => (float) $s->ad_cost,
             'final_income'          => (float) $s->final_income,
             'settlement_time'       => $s->settlement_time?->toISOString(),
             'synced_at'             => $s->synced_at?->toISOString(),
+            'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
         ]);
 
-        return response()->json($settlements);
+        if ($request->input('page', 1) == 1) {
+            $aggr = (clone $query)->reorder()->selectRaw('
+                COUNT(*) as count,
+                SUM(buyer_payment_amount) as gross,
+                SUM(final_income) as net,
+                SUM(commission_fee + service_fee + transaction_fee + activity_fee + escrow_tax + ad_cost) as fees
+            ')->first();
+            $meta = [
+                'kpi_count' => (int) $aggr->count,
+                'kpi_gross' => (float) $aggr->gross,
+                'kpi_net'   => (float) $aggr->net,
+                'kpi_fees'  => (float) $aggr->fees,
+            ];
+        } else {
+            $meta = null; // Frontend can preserve previous KPI state on page change
+        }
+
+        return response()->json([
+            'paginator' => $paginator,
+            'meta'      => $meta
+        ]);
     }
 
     public function orderProfits(Request $request): JsonResponse
@@ -1036,7 +1097,53 @@ class MarketplaceController extends Controller
             $query->where('store_id', $request->store_id);
         }
 
-        $settlements = $query->limit(200)->get();
+        if ($request->filled('order_date_from')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->whereDate('ordered_at', '>=', $request->order_date_from);
+            });
+        }
+
+        if ($request->filled('order_date_to')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->whereDate('ordered_at', '<=', $request->order_date_to);
+            });
+        }
+
+        if ($request->filled('settlement_date_from')) {
+            $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
+        }
+
+        if ($request->filled('settlement_date_to')) {
+            $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
+        }
+
+        if ($request->filled('status')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->where('order_status', $request->status);
+            });
+        }
+
+        if ($request->filled('settlement_status')) {
+            if ($request->settlement_status === 'cair') {
+                $query->whereNotNull('settlement_time');
+            } elseif ($request->settlement_status === 'belum_cair') {
+                $query->whereNull('settlement_time');
+            }
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('channel_order_id', 'like', "%{$search}%")
+                  ->orWhereHas('order.items', function ($qi) use ($search) {
+                      $qi->where('item_name', 'like', "%{$search}%")
+                         ->orWhere('model_sku', 'like', "%{$search}%")
+                         ->orWhere('item_sku', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $settlements = $query->get();
 
         // Pre-load HPP: build map sku → hpp_unit
         // Collect all unique SKUs from all items
@@ -1111,6 +1218,7 @@ class MarketplaceController extends Controller
                     ? round($profitNet / (float) $s->buyer_payment_amount * 100, 1)
                     : null,
                 'settlement_time'       => $s->settlement_time?->toISOString(),
+                'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
                 // Detail potongan (untuk tooltip)
                 'commission_fee'        => (float) $s->commission_fee,
                 'service_fee'           => (float) $s->service_fee,
@@ -1122,7 +1230,90 @@ class MarketplaceController extends Controller
             ];
         });
 
-        return response()->json($rows);
+        // 1. Calculate Global KPIs
+        $kpiOmzet = 0;
+        $kpiHpp = 0;
+        $kpiNet = 0;
+        $kpiProfit = 0;
+        $kpiCount = $rows->count();
+        
+        foreach ($rows as $row) {
+            $omzetGross = $row['raw_json'] ? ($row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']) : $row['buyer_payment_amount'];
+            $kpiOmzet += (float) $omzetGross;
+            $kpiHpp += (float) $row['hpp_total'];
+            $kpiNet += (float) $row['final_income'];
+            $kpiProfit += (float) $row['profit_net'];
+        }
+        $kpiMargin = $kpiOmzet > 0 ? round(($kpiProfit / $kpiOmzet) * 100, 1) : null;
+        $avgProfit = $kpiCount > 0 ? round($kpiProfit / $kpiCount) : 0;
+        
+        // 2. Sort the Collection
+        if ($request->filled('sort')) {
+            $sort = $request->sort;
+            if ($sort === 'margin_asc') $rows = $rows->sortBy('margin_pct')->values();
+            elseif ($sort === 'margin_desc') $rows = $rows->sortByDesc('margin_pct')->values();
+            elseif ($sort === 'profit_asc') $rows = $rows->sortBy('profit_net')->values();
+            elseif ($sort === 'profit_desc') $rows = $rows->sortByDesc('profit_net')->values();
+            elseif ($sort === 'date_asc') $rows = $rows->sortBy('settlement_time')->values();
+            elseif ($sort === 'date_desc') $rows = $rows->sortByDesc('settlement_time')->values();
+        } else {
+            // Default sort: latest settlement time
+            $rows = $rows->sortByDesc('settlement_time')->values();
+        }
+        
+        // 3. Export to CSV if requested
+        if ($request->export === 'csv') {
+            $headers = [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="profit_export.csv"',
+            ];
+            
+            $callback = function() use ($rows) {
+                $file = fopen('php://output', 'w');
+                // CSV Header
+                fputcsv($file, ['Order SN', 'Toko', 'Status', 'Tgl Order', 'Tgl Cair', 'Harga Jual', 'Promosi Seller (Voucher)', 'Promosi Seller (Koin)', 'Dana Cair', 'HPP', 'Profit', 'Margin %']);
+                
+                foreach ($rows as $row) {
+                    $omzetGross = $row['raw_json'] ? ($row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']) : $row['buyer_payment_amount'];
+                    fputcsv($file, [
+                        $row['channel_order_id'],
+                        $row['store']['name'] ?? '',
+                        $row['order']['order_status'] ?? '',
+                        $row['order']['ordered_at'] ?? '',
+                        $row['settlement_time'] ?? 'Belum Cair',
+                        $omzetGross,
+                        $row['seller_voucher'],
+                        $row['seller_coin_cash_back'],
+                        $row['final_income'],
+                        $row['hpp_total'],
+                        $row['profit_net'],
+                        $row['margin_pct']
+                    ]);
+                }
+                fclose($file);
+            };
+            
+            return response()->stream($callback, 200, $headers);
+        }
+        
+        // 4. Manual Pagination
+        $perPage = (int) $request->input('per_page', 50);
+        $page = (int) $request->input('page', 1);
+        $pagedData = $rows->slice(($page - 1) * $perPage, $perPage)->values();
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator($pagedData, $kpiCount, $perPage, $page);
+
+        return response()->json([
+            'paginator' => $paginator,
+            'meta'      => [
+                'kpi_omzet'   => $kpiOmzet,
+                'kpi_hpp'     => $kpiHpp,
+                'kpi_net'     => $kpiNet,
+                'kpi_profit'  => $kpiProfit,
+                'kpi_margin'  => $kpiMargin,
+                'avg_profit'  => $avgProfit,
+                'kpi_count'   => $kpiCount
+            ]
+        ]);
     }
 
     public function updateSettlementAdCost(Request $request, MarketplaceOrderSettlement $settlement): JsonResponse

@@ -61,6 +61,8 @@
     .table-list thead th{
         border-bottom:1px solid var(--prd-border); font-size:.68rem; color:#64748b;
         background:var(--card,#fff); padding:.52rem .62rem; white-space:nowrap; text-align:left;
+        position: sticky; top: 0; z-index: 10;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
     body[data-theme="dark"] .table-list thead th{ background:rgba(15,23,42,.98); color:#9ca3af; }
     .table-list tbody td{
@@ -70,7 +72,10 @@
     body[data-theme="dark"] .table-list tbody td{ border-top-color:rgba(51,65,85,.85); }
 
     .prd-img{ width:42px; height:42px; border-radius:7px; object-fit:cover; background:#f1f5f9; }
-    .prd-name{ font-weight:700; color:inherit; max-width:300px; line-height:1.3; }
+    .prd-name{ 
+        font-weight:700; color:inherit; max-width:280px; line-height:1.3;
+        display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;
+    }
     .prd-sku{ font-size:.67rem; color:#94a3b8; }
     .muted{ font-size:.74rem; color:#6b7280; }
 
@@ -96,14 +101,22 @@
     .stock-low{ color:#b91c1c; font-weight:800; }
     .stock-zero{ color:#b91c1c; font-weight:800; background:rgba(239,68,68,.08); border-radius:6px; padding:1px 7px; }
 
-    .model-row td{ background:rgba(148,163,184,.05); font-size:.73rem; }
-    body[data-theme="dark"] .model-row td{ background:rgba(30,41,59,.5); }
+    .model-row td{ background:rgba(148,163,184,.04); font-size:.73rem; padding: .35rem .62rem; border-top: 1px solid transparent; }
+    body[data-theme="dark"] .model-row td{ background:rgba(30,41,59,.4); }
     .inp-mini{ width:88px; font-size:.72rem; padding:2px 6px; border:1px solid rgba(148,163,184,.35); border-radius:6px; background:transparent; color:inherit; }
     .btn-mini{ font-size:.65rem; padding:2px 8px; border-radius:6px; }
     .prd-caret{ cursor:pointer; user-select:none; color:#64748b; font-size:.8rem; }
     .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
 
     /* ── Tabs (Produk / Boost) ── */
+    .store-tab { 
+        background: transparent; border: none; padding: .4rem .8rem; font-size: .8rem; font-weight: 600; 
+        color: var(--prd-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: color 0.15s;
+    }
+    .store-tab:hover { color: var(--prd-accent); }
+    .store-tab.active { color: var(--prd-accent); border-bottom-color: var(--prd-accent); }
+    body[data-theme="dark"] .store-tab:hover, body[data-theme="dark"] .store-tab.active { color: #fff; border-bottom-color: #fff; }
+
     .pt-tabs{ display:flex; gap:.35rem; margin-bottom:.85rem; }
     .pt-tab{
         font-size:.82rem; font-weight:650; padding:.4rem .9rem; border-radius:8px;
@@ -190,47 +203,55 @@
 
     {{-- ══ TAB: Daftar Produk ══ --}}
     <div id="tabProduk" class="pt-pane active">
-    {{-- Filter bar --}}
-    <div class="filter-bar">
-        <input type="text" class="form-control form-control-sm filter-search" placeholder="🔍 Cari nama / SKU / item id…" id="fSearch">
-        <select class="form-select form-select-sm filter-select" id="fStore"><option value="">Semua Toko</option></select>
-        <select class="form-select form-select-sm filter-select" id="fStatus">
-            <option value="">Semua Status</option>
-            <option value="NORMAL">● Tampil</option>
-            <option value="UNLIST">● Disembunyikan</option>
-            <option value="BANNED">● Banned</option>
-        </select>
-        <select class="form-select form-select-sm filter-select" id="fMapping">
-            <option value="">Semua Mapping</option>
-            <option value="unmapped">❌ Belum di-mapping</option>
-            <option value="mapped">✓ Sudah di-mapping</option>
-            <option value="nosku">⚠ SKU kosong</option>
-        </select>
-        <select class="form-select form-select-sm filter-select" id="fStock">
-            <option value="">Semua Stok</option>
-            <option value="zero">Habis (0)</option>
-            <option value="low">Menipis (≤5)</option>
-            <option value="ok">Aman (>5)</option>
-        </select>
-        <select class="form-select form-select-sm filter-select" id="fSort">
-            <option value="synced">Terbaru sync</option>
-            <option value="sales">Terlaris</option>
-            <option value="stock_asc">Stok terendah</option>
-            <option value="stock_desc">Stok tertinggi</option>
-            <option value="price_asc">Harga terendah</option>
-            <option value="price_desc">Harga tertinggi</option>
-            <option value="name">Nama A–Z</option>
-        </select>
-        <span class="filter-reset" id="fReset" onclick="resetFilters()">✕ reset filter</span>
-        <span class="filter-count" id="prdCount"></span>
+    <div id="storeTabs" class="d-flex gap-2 mb-2" style="overflow-x:auto; border-bottom:1px solid var(--prd-border); padding-bottom:0px; scrollbar-width:none;"></div>
+    <div style="background:rgba(148,163,184,.03); padding:.55rem .75rem; border-radius:8px; border:1px solid var(--prd-border); margin-bottom:.65rem;">
+        <div class="filter-bar" style="flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; margin-bottom: 0;">
+            <div style="position:relative; flex-shrink:0;">
+                <input type="text" class="form-control form-control-sm filter-search w-100" style="padding-left:26px;" placeholder="Cari nama / SKU / item id…" id="fSearch">
+                <i class="bi bi-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+            </div>
+            <input type="hidden" id="fStore" value="">
+            <div style="position:relative; flex-shrink:0; min-width:125px;">
+                <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="fStatus">
+                    <option value="">Semua Status</option>
+                    <option value="NORMAL" selected>● Tampil</option>
+                    <option value="UNLIST">● Arsip</option>
+                    <option value="BANNED">● Banned</option>
+                </select>
+                <i class="bi bi-circle-half" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+            </div>
+            <div style="position:relative; flex-shrink:0; min-width:145px;">
+                <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="fMapping">
+                    <option value="">Semua Mapping</option>
+                    <option value="unmapped">❌ Belum di-mapping</option>
+                    <option value="mapped">✓ Sudah di-mapping</option>
+                    <option value="nosku">⚠ SKU kosong</option>
+                </select>
+                <i class="bi bi-link-45deg" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem"></i>
+            </div>
+            <div style="position:relative; flex-shrink:0; min-width:125px;">
+                <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="fSort">
+                    <option value="sales" selected>Terlaris (Total)</option>
+                    <option value="synced">Terbaru sync</option>
+                    <option value="stock_asc">Stok terendah</option>
+                    <option value="stock_desc">Stok tertinggi</option>
+                    <option value="price_asc">Harga terendah</option>
+                    <option value="price_desc">Harga tertinggi</option>
+                    <option value="name">Nama A–Z</option>
+                </select>
+                <i class="bi bi-sort-down" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.8rem"></i>
+            </div>
+            <span class="filter-reset ms-2" id="fReset" onclick="resetFilters()" style="flex-shrink:0;">✕ Reset filter</span>
+            <span class="filter-count ms-auto" id="prdCount" style="flex-shrink:0; white-space:nowrap;"></span>
+        </div>
     </div>
 
     {{-- Tabel --}}
-    <div class="card-main table-wrap">
-        <table class="table-list">
+    <div class="card-main table-wrap" style="max-height: calc(100vh - 210px); overflow-y: auto;">
+        <table class="table-list table-hover">
             <thead><tr>
-                <th style="width:26px"></th><th style="width:50px"></th><th>Produk</th><th>Toko</th>
-                <th>Status</th><th>Harga</th><th>Stok</th><th>Terjual</th><th>Mapping</th><th style="width:200px">Aksi</th>
+                <th style="width:26px"></th><th style="width:50px"></th><th>Produk</th>
+                <th>Status</th><th>Harga Setelah Diskon</th><th>Stok</th><th>Terjual</th><th>Statistik</th><th>Mapping</th><th style="width:230px">Aksi</th>
             </tr></thead>
             <tbody id="prdBody"><tr><td colspan="10" class="empty">Memuat…</td></tr></tbody>
         </table>
@@ -281,6 +302,55 @@
         </div>
     </div>{{-- /tabBoost --}}
 </div>
+
+<div class="modal fade" id="modalMapping" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-black">Hubungkan SKU ke Item Internal</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="mapSelectedInternalId">
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">MARKETPLACE SKU</label>
+                    <input type="text" class="form-control" id="mapSkuInput"
+                        placeholder="Marketplace SKU" style="border-radius:12px" autocomplete="off" readonly>
+                </div>
+
+                <div id="mapRecommendations" style="display:none;margin-bottom:1rem">
+                    <div class="fw-bold mb-1"
+                        style="font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em">
+                        REKOMENDASI ITEM INTERNAL
+                    </div>
+                    <div id="mapRecoList" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="mb-3 position-relative">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">CARI ITEM INTERNAL</label>
+                    <input type="text" class="form-control mb-1" id="mapItemSearch"
+                        placeholder="Ketik kode atau nama item…" style="border-radius:12px" autocomplete="off">
+                    <div id="mapItemResults" class="border shadow-sm"
+                        style="border-radius:12px;overflow:hidden;display:none;max-height:200px;overflow-y:auto;position:absolute;z-index:99;background:#fff;width:100%"></div>
+                    <div id="mapItemSelected" class="mt-2 fw-bold" style="font-size:.85rem;color:#166534"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size:.75rem;color:#64748b">CATATAN (Opsional)</label>
+                    <input type="text" class="form-control" id="mapNotes" style="border-radius:12px">
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-dark fw-bold" style="border-radius:999px" id="mapSaveBtn"
+                        onclick="submitMapping()">Simpan Mapping</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -311,12 +381,12 @@
     };
 
     window.syncProducts = async function () {
-        $('btnSync').disabled = true; $('btnSync').textContent = '⏳ Sync…';
+        $('btnSync').disabled = true; $('btnSync').textContent = '⏳ Memulai…';
         try {
             const res = await api(`${API}/sync`, { method: 'POST', body: '{}' });
-            toast(res.message, res.errors?.length ? 'warning' : 'success');
-            if (res.errors?.length) console.warn('Sync errors:', res.errors);
-            loadProducts();
+            toast(res.message, 'success');
+            // Do not call loadProducts immediately since it's backgrounded. 
+            // Just let user know it's running.
         } catch (e) { alert('Sync gagal: ' + e.message); }
         finally { $('btnSync').disabled = false; $('btnSync').textContent = '⟳ Sync Shopee'; }
     };
@@ -324,9 +394,20 @@
     function buildStoreOptions() {
         const sel = $('fStore'), cur = sel.value;
         const stores = [...new Map(products.filter(p => p.store).map(p => [p.store.id, p.store.name])).entries()];
-        sel.innerHTML = '<option value="">Semua Toko</option>' + stores.map(([id, name]) => `<option value="${id}">${esc(name)}</option>`).join('');
-        sel.value = cur;
+        
+        let html = `<button class="store-tab ${cur === '' ? 'active' : ''}" onclick="setStoreTab('')">Semua Produk</button>`;
+        html += `<button class="store-tab ${cur === 'bermasalah' ? 'active' : ''}" style="color:var(--bs-danger);" onclick="setStoreTab('bermasalah')">⚠ Bermasalah</button>`;
+        stores.forEach(([id, name]) => {
+            html += `<button class="store-tab ${cur === String(id) ? 'active' : ''}" onclick="setStoreTab('${id}')">${esc(name)}</button>`;
+        });
+        if ($('storeTabs')) $('storeTabs').innerHTML = html;
     }
+    
+    window.setStoreTab = function(id) {
+        $('fStore').value = id;
+        buildStoreOptions();
+        render();
+    };
 
     // ── Filter fungsional (instan, client-side) ─────────────────────────────
     function modelMapState(m) {
@@ -345,17 +426,20 @@
         const q = $('fSearch').value.trim().toLowerCase();
         const store = $('fStore').value;
         const status = $('fStatus').value;
-        const mapping = $('fMapping').value || (kpiFilter === 'unmapped' ? 'unmapped' : '');
-        const stock = $('fStock').value || (kpiFilter === 'zero' ? 'zero' : '');
+        const mapping = $('fMapping')?.value || (kpiFilter === 'unmapped' ? 'unmapped' : '');
+        const stock = kpiFilter === 'zero' ? 'zero' : '';
         const statusKpi = ['NORMAL','UNLIST'].includes(kpiFilter) ? kpiFilter : '';
 
         let rows = products.filter(p => {
-            if (store && String(p.store?.id) !== store) return false;
+            if (store === 'bermasalah') {
+                const isBermasalah = p.item_status === 'BANNED' || (p.stock_total ?? 0) === 0 || productMapState(p) === 'unmapped' || productMapState(p) === 'nosku';
+                if (!isBermasalah) return false;
+            } else if (store && String(p.store?.id) !== store) {
+                return false;
+            }
             if ((status || statusKpi) && p.item_status !== (status || statusKpi)) return false;
             if (mapping && productMapState(p) !== mapping) return false;
             if (stock === 'zero' && (p.stock_total ?? 0) !== 0) return false;
-            if (stock === 'low'  && ((p.stock_total ?? 0) === 0 || p.stock_total > 5)) return false;
-            if (stock === 'ok'   && (p.stock_total ?? 0) <= 5) return false;
             if (q) {
                 const hay = [p.item_name, p.item_sku, p.item_id, ...(p.models || []).map(m => m.model_sku), ...(p.models || []).map(m => m.model_name)]
                     .filter(Boolean).join(' ').toLowerCase();
@@ -381,14 +465,18 @@
     }
 
     window.resetFilters = function () {
-        ['fSearch','fStore','fStatus','fMapping','fStock'].forEach(id => $(id).value = '');
-        $('fSort').value = 'synced';
+        ['fSearch','fStore','fMapping'].forEach(id => {
+            if ($(id)) $(id).value = '';
+        });
+        if ($('fStatus')) $('fStatus').value = 'NORMAL';
+        if ($('fSort')) $('fSort').value = 'sales';
         kpiFilter = '';
+        buildStoreOptions();
         render();
     };
 
     function anyFilterActive() {
-        return kpiFilter || $('fSearch').value || $('fStore').value || $('fStatus').value || $('fMapping').value || $('fStock').value;
+        return kpiFilter || $('fSearch').value || $('fStore').value || ($('fStatus') && $('fStatus').value !== 'NORMAL') || $('fMapping').value;
     }
 
     // ── KPI (klik untuk quick-filter) ───────────────────────────────────────
@@ -413,9 +501,8 @@
     window.kpiClick = function (key) {
         kpiFilter = (kpiFilter === key) ? '' : key;
         // KPI mengambil alih dropdown terkait supaya tidak dobel
-        if (['NORMAL','UNLIST'].includes(key)) $('fStatus').value = '';
-        if (key === 'zero') $('fStock').value = '';
-        if (key === 'unmapped') $('fMapping').value = '';
+        if (['NORMAL','UNLIST'].includes(key) && $('fStatus')) $('fStatus').value = '';
+        if (key === 'unmapped' && $('fMapping')) $('fMapping').value = '';
         render();
     };
 
@@ -450,11 +537,25 @@
     }
 
     function inlineEditors(pid, m) {
-        return `<div class="d-flex gap-1 flex-wrap align-items-center">
-            <input class="inp-mini" type="number" min="0" value="${m.stock}" id="stk-${pid}-${m.model_id}" title="Stok">
-            <button class="btn btn-prd-outline btn-mini" onclick="saveStock(${pid}, '${m.model_id}')">Stok</button>
-            <input class="inp-mini" type="number" min="100" value="${m.price ?? ''}" id="prc-${pid}-${m.model_id}" title="Harga">
-            <button class="btn btn-prd-outline btn-mini" onclick="savePrice(${pid}, '${m.model_id}')">Harga</button>
+        let origPrc = m.price ?? '';
+        let discPrc = origPrc;
+        
+        try {
+            const raw = typeof m.raw_json === 'string' ? JSON.parse(m.raw_json) : (m.raw_json || {});
+            const pInfo = raw.price_info?.[0];
+            if (pInfo) {
+                origPrc = pInfo.original_price ?? origPrc;
+                discPrc = pInfo.current_price ?? origPrc;
+            }
+        } catch(e) {}
+
+        return `<div class="d-flex gap-1 flex-nowrap align-items-center">
+            <input type="hidden" id="prc-${pid}-${m.model_id}" value="${origPrc}">
+            <div class="input-group input-group-sm" style="width:115px;" title="Harga Setelah Diskon">
+                <span class="input-group-text text-success" style="padding:0 6px; font-size:.7rem">Rp</span>
+                <input class="form-control px-2" style="font-size:.75rem; padding: 2px 6px;" type="number" min="100" value="${discPrc}" id="disc-${pid}-${m.model_id}">
+            </div>
+            <button class="btn btn-outline-primary btn-mini" onclick="savePrice(${pid}, '${m.model_id}')" style="padding:1px 6px;" title="Simpan Harga">💾</button>
         </div>`;
     }
 
@@ -476,51 +577,112 @@
             const price = p.price_min != null
                 ? (p.price_min === p.price_max ? rp(p.price_min) : `${rp(p.price_min)} – ${rp(p.price_max)}`)
                 : '—';
+            const stats = `<div style="font-size:.7rem; line-height:1.4; white-space:nowrap;"><i class="bi bi-eye"></i> ${p.views || 0} &nbsp; <i class="bi bi-star"></i> ${p.rating_star || 0}</div>`;
 
+            const isBermasalahTab = $('fStore').value === 'bermasalah';
+
+            let aksiContent = '';
+            if (isBermasalahTab) {
+                let issues = [];
+                if (p.item_status === 'BANNED') {
+                    issues.push(`<a class="btn btn-sm btn-outline-danger w-100 mb-1 py-1" href="https://seller.shopee.co.id/portal/product/${p.item_id}" target="_blank" style="font-size:.7rem">Cek Pelanggaran di Shopee ↗</a>`);
+                }
+                if ((p.stock_total ?? 0) === 0) {
+                    if (multiModel) {
+                        issues.push(`<button class="btn btn-sm btn-outline-warning w-100 mb-1 py-1" onclick="toggleModels(${p.id}, document.querySelector('tr[data-pid=\\'${p.id}\\'] .prd-caret'))" style="font-size:.7rem">Buka Varian & Isi Stok</button>`);
+                    } else {
+                        issues.push(`<div class="input-group input-group-sm mb-1"><input type="number" class="form-control px-2" placeholder="Stok Baru" id="stk-${p.id}-0" style="font-size:.75rem"><button class="btn btn-warning" onclick="saveStock(${p.id}, '0')" style="font-size:.7rem; padding: 2px 6px;">Simpan</button></div>`);
+                    }
+                }
+                const mapState = productMapState(p);
+                if (mapState === 'nosku') {
+                    if (multiModel) {
+                        issues.push(`<button class="btn btn-sm btn-outline-danger w-100 py-1 mb-1" onclick="toggleModels(${p.id}, document.querySelector('tr[data-pid=\\'${p.id}\\'] .prd-caret'))" style="font-size:.7rem">⚠️ SKU Varian Kosong (Buka)</button>`);
+                    } else {
+                        issues.push(`<div class="mb-1 text-danger fw-bold" style="font-size:.7rem">⚠️ SKU Kosong (Isi di sebelah kiri)</div>`);
+                    }
+                } else if (mapState === 'unmapped') {
+                    if (multiModel) {
+                        issues.push(`<button class="btn btn-sm btn-outline-primary w-100 py-1" onclick="toggleModels(${p.id}, document.querySelector('tr[data-pid=\\'${p.id}\\'] .prd-caret'))" style="font-size:.7rem">Perbaiki Mapping Varian</button>`);
+                    } else {
+                        const sku = models.length ? models[0].model_sku : p.item_sku;
+                        issues.push(`<button class="btn btn-sm btn-outline-primary w-100 py-1" onclick="openMapModal('${esc(sku || '')}')" style="font-size:.7rem">Mapping ke GFID</button>`);
+                    }
+                }
+                
+                aksiContent = issues.join('');
+                if (!aksiContent) aksiContent = '<span class="text-muted" style="font-size:.75rem">Tidak ada masalah khusus</span>';
+            } else {
+                aksiContent = `
+                    <div class="dropdown mb-1">
+                        <button class="btn btn-prd-outline btn-mini dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 2px 8px; font-weight: 700; border-radius: 6px;">
+                            ⋮ Aksi
+                        </button>
+                        <ul class="dropdown-menu shadow-sm" style="font-size: .78rem; min-width: 140px; padding: .3rem 0; border-radius: 8px;">
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="showHistory(${p.id})">📈 Riwayat</a></li>
+                            ${st === 'NORMAL' ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="boostNow(${p.id}, this)">🚀 Naikkan (Boost)</a></li>` : ''}
+                            ${st === 'NORMAL' ? `<li><hr class="dropdown-divider" style="margin: .2rem 0"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="setUnlist(${p.id}, true)">🙈 Arsipkan Produk</a></li>` : (st === 'UNLIST' ? `<li><hr class="dropdown-divider" style="margin: .2rem 0"></li><li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="setUnlist(${p.id}, false)">👁 Aktifkan Produk</a></li>` : '')}
+                        </ul>
+                    </div>
+                    ${!multiModel && models.length ? `<div class="mt-1">${inlineEditors(p.id, models[0])}</div>` : ''}
+                `;
+            }
+
+            const isModelOpened = openedModels.has(p.id);
             const mainRow = `<tr data-pid="${p.id}">
-                <td>${multiModel ? `<span class="prd-caret" onclick="toggleModels(${p.id}, this)">▶</span>` : ''}</td>
+                <td>${multiModel ? `<span class="prd-caret" onclick="toggleModels(${p.id}, this)"><i class="bi bi-chevron-${isModelOpened ? 'down' : 'right'}"></i></span>` : ''}</td>
                 <td>${p.image_url ? `<img class="prd-img" src="${esc(p.image_url)}" loading="lazy">` : '<div class="prd-img"></div>'}</td>
-                <td><div class="prd-name">${esc(p.item_name || '—')}</div>
-                    <div class="prd-sku">SKU: ${esc(p.item_sku || '—')} · ${esc(p.item_id)}${multiModel ? ` · ${models.length} varian` : ''}</div></td>
-                <td class="muted">${esc(p.store?.name || '')}</td>
+                <td><div class="prd-name" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${esc(p.item_name || '')}">${esc(p.item_name || '—')}</div>
+                    <div class="prd-sku d-flex align-items-center gap-1 flex-wrap mt-1">
+                        <span class="text-muted">SKU:</span>
+                        <div class="input-group input-group-sm" style="max-width:180px;">
+                            <input type="text" class="form-control px-2 py-0" style="font-size:.72rem;height:24px" value="${esc(p.item_sku || '')}" id="isku-${p.id}" placeholder="Induk SKU">
+                            <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveIndukSkuInline(${p.id})" style="padding:1px 8px;height:24px" title="Simpan SKU">💾</button>
+                        </div>
+                        <span class="text-muted">· ${esc(p.item_id)}${multiModel ? ` · ${models.length} varian` : ''}</span>
+                    </div>
+                </td>
                 <td>${statusBadge(st)}</td>
                 <td>${price}</td>
                 <td>${stockCell(p.stock_total)}</td>
                 <td class="muted">${p.sales ?? '—'}</td>
+                <td>${stats}</td>
                 <td>${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
                 <td>
-                    <button class="btn btn-prd-outline btn-mini mb-1" onclick="showHistory(${p.id})" title="Riwayat harian: stok, harga, terjual">📈 Riwayat</button>
-                    ${st === 'NORMAL'
-                        ? `<button class="btn btn-prd-outline btn-mini mb-1" onclick="boostNow(${p.id}, this)" title="Naikkan produk ke urutan teratas (4 jam)">🚀 Naikkan</button>`
-                        : ''}
-                    ${!multiModel && models.length ? inlineEditors(p.id, models[0]) : ''}
-                    ${st === 'NORMAL'
-                        ? `<button class="btn btn-prd-outline btn-mini mt-1" onclick="setUnlist(${p.id}, true)">🙈 Sembunyikan</button>`
-                        : (st === 'UNLIST' ? `<button class="btn btn-outline-success btn-mini mt-1" onclick="setUnlist(${p.id}, false)">👁 Tampilkan</button>` : '')}
+                    ${aksiContent}
                 </td>
             </tr>`;
 
             const modelRows = multiModel ? models.map(m => `
-                <tr class="model-row mr-${p.id}" style="display:none">
+                <tr class="model-row mr-${p.id}" style="${isModelOpened ? '' : 'display:none'}">
                     <td></td><td></td>
-                    <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} <span class="prd-sku">SKU: ${esc(m.model_sku || '—')}</span></td>
-                    <td></td><td></td>
+                    <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} 
+                        <div class="input-group input-group-sm mt-1" style="max-width:180px;">
+                            <input type="text" class="form-control px-2" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" placeholder="Kode Variasi">
+                            <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveSkuInline(${p.id}, '${m.model_id}')" style="padding:1px 8px;" title="Simpan SKU">💾</button>
+                        </div>
+                    </td>
+                    <td></td>
                     <td>${rp(m.price)}</td>
                     <td>${stockCell(m.stock)}</td>
                     <td></td>
+                    <td></td>
                     <td>${mappingBadge(m)}</td>
-                    <td>${inlineEditors(p.id, m)}</td>
+                    <td><div class="d-flex align-items-center gap-1">${inlineEditors(p.id, m)}<button class="btn btn-outline-secondary btn-mini" onclick="showHistory(${p.id})" style="padding:1px 5px" title="Riwayat">📈</button></div></td>
                 </tr>`).join('') : '';
 
             return mainRow + modelRows;
         }).join('');
     }
 
+    let openedModels = new Set();
     window.toggleModels = function (pid, caret) {
         const rows = document.querySelectorAll('.mr-' + pid);
         const show = rows.length && rows[0].style.display === 'none';
         rows.forEach(r => r.style.display = show ? '' : 'none');
-        caret.textContent = show ? '▼' : '▶';
+        if (caret) caret.innerHTML = show ? '<i class="bi bi-chevron-down"></i>' : '<i class="bi bi-chevron-right"></i>';
+        if (show) openedModels.add(pid);
+        else openedModels.delete(pid);
     };
 
     // ── Aksi stok / harga / unlist ──────────────────────────────────────────
@@ -530,17 +692,52 @@
         try {
             await api(`${API}/${pid}/stock`, { method: 'POST', body: JSON.stringify({ stock_list: [{ model_id: modelId, stock: val }] }) });
             toast('Stok tersimpan ke Shopee ✔');
-            loadProducts();
+            
+            // Update local state instead of reloading table
+            const p = products.find(x => x.id === pid);
+            if (p) {
+                const m = p.models.find(x => String(x.model_id) === String(modelId));
+                if (m) {
+                    const diff = val - (m.stock || 0);
+                    m.stock = val;
+                    p.stock_total = (p.stock_total || 0) + diff;
+                }
+            }
         } catch (e) { alert('Gagal: ' + e.message); }
     };
 
     window.savePrice = async function (pid, modelId) {
-        const val = parseFloat($(`prc-${pid}-${modelId}`).value);
-        if (isNaN(val) || val < 100) return alert('Harga tidak valid (min 100)');
+        const origPrice = parseFloat($(`prc-${pid}-${modelId}`).value);
+        const discPrice = parseFloat($(`disc-${pid}-${modelId}`).value);
+        
+        if (isNaN(origPrice) || origPrice < 100) return alert('Harga asli tidak valid (min 100)');
+        if (isNaN(discPrice) || discPrice < 100) return alert('Harga jual tidak valid (min 100)');
+        if (discPrice > origPrice) return alert('Harga jual tidak boleh lebih tinggi dari Harga Asli');
+
         try {
-            await api(`${API}/${pid}/price`, { method: 'POST', body: JSON.stringify({ price_list: [{ model_id: modelId, original_price: val }] }) });
-            toast('Harga tersimpan ke Shopee ✔');
-            loadProducts();
+            await api(`${API}/${pid}/price`, { 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    price_list: [{ model_id: modelId, original_price: origPrice, discount_price: discPrice }] 
+                }) 
+            });
+            toast('Harga berhasil diupdate ke Shopee ✔');
+            
+            // Update local state instead of reloading table
+            const p = products.find(x => x.id === pid);
+            if (p) {
+                const m = p.models.find(x => String(x.model_id) === String(modelId));
+                if (m) {
+                    m.price = origPrice;
+                    // Try parsing promotion if exists
+                    const promo = m.promotion || p.promotion || null;
+                    if (promo && typeof promo === 'object') {
+                        if (promo.promotion_price_info && promo.promotion_price_info[0]) {
+                            promo.promotion_price_info[0].promotion_price = discPrice;
+                        }
+                    }
+                }
+            }
         } catch (e) { alert('Gagal: ' + e.message); }
     };
 
@@ -576,6 +773,64 @@
         if (window.Swal) Swal.fire({ toast:true, position:'top-end', icon, title, showConfirmButton:false, timer:2600 });
     }
 
+    window.saveSkuInline = async function (pid, modelId) {
+        const inp = document.getElementById(`vsku-${pid}-${modelId}`);
+        const newSku = inp.value;
+        const prod = products.find(p => p.id === pid);
+        if (!prod) return;
+        const m = prod.models.find(x => String(x.model_id) === String(modelId));
+        if (!m || m.model_sku === newSku) return;
+
+        inp.disabled = true;
+        try {
+            const res = await fetch(`/api/marketplace/products/${pid}/model-sku`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ model_id: modelId, new_sku: newSku })
+            });
+            const dat = await res.json();
+            if (!res.ok) throw new Error(dat.message || 'Gagal update SKU');
+            
+            m.model_sku = newSku;
+            toast('SKU varian berhasil disimpan ✔');
+        } catch (e) {
+            alert('Gagal simpan SKU: ' + e.message);
+            inp.value = m.model_sku || '';
+        } finally {
+            inp.disabled = false;
+        }
+    };
+
+    window.saveIndukSkuInline = async function (pid) {
+        const inp = document.getElementById(`isku-${pid}`);
+        const newSku = inp.value;
+        const prod = products.find(p => p.id === pid);
+        if (!prod || prod.item_sku === newSku) return;
+
+        inp.disabled = true;
+        try {
+            const res = await fetch(`/api/marketplace/products/${pid}/sku`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ new_sku: newSku })
+            });
+            const dat = await res.json();
+            if (!res.ok) throw new Error(dat.message || 'Gagal update SKU');
+            
+            prod.item_sku = newSku;
+            toast('Induk SKU berhasil disimpan ✔');
+            
+            if (!prod.has_model) {
+                render();
+            }
+        } catch (e) {
+            alert('Gagal simpan SKU: ' + e.message);
+            inp.value = prod.item_sku || '';
+        } finally {
+            inp.disabled = false;
+        }
+    };
+
     // ── Mapping SKU → item internal ─────────────────────────────────────────
     window.autoMap = async function () {
         $('btnAutoMap').disabled = true;
@@ -587,57 +842,104 @@
         finally { $('btnAutoMap').disabled = false; }
     };
 
-    window.openMapModal = async function (sku) {
-        const { value: itemId } = await Swal.fire({
-            title: `Mapping SKU: ${sku}`,
-            html: `
-                <input id="mapSearch" class="swal2-input" placeholder="Cari kode / nama item internal…" style="font-size:.85rem">
-                <div id="mapResults" style="max-height:240px;overflow-y:auto;text-align:left;font-size:.8rem"></div>`,
-            showCancelButton: true,
-            confirmButtonText: 'Simpan',
-            cancelButtonText: 'Batal',
-            didOpen: () => {
-                const inp = document.getElementById('mapSearch');
-                const box = document.getElementById('mapResults');
-                let t = null;
-                window._mapSelected = null;
+    let mapSearchTimer = null;
 
-                async function search(q) {
-                    const items = await fetch(`/api/sku-mappings/search-items?q=${encodeURIComponent(q)}`, { headers: { 'Accept': 'application/json' } }).then(r => r.json());
-                    box.innerHTML = items.length ? items.map(i => `
-                        <div class="map-opt" data-id="${i.id}" style="padding:6px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer;border-radius:6px">
-                            <b>${i.code}</b> — ${i.name}
-                        </div>`).join('') : '<div class="text-muted p-2">Tidak ditemukan.</div>';
-                    box.querySelectorAll('.map-opt').forEach(el => el.onclick = () => {
-                        box.querySelectorAll('.map-opt').forEach(x => x.style.background = '');
-                        el.style.background = '#eef2ff';
-                        window._mapSelected = parseInt(el.dataset.id);
-                    });
-                }
-                inp.oninput = () => { clearTimeout(t); t = setTimeout(() => search(inp.value), 300); };
-                search(sku);
-                inp.focus();
-            },
-            preConfirm: () => {
-                if (!window._mapSelected) { Swal.showValidationMessage('Pilih item internal dulu'); return false; }
-                return window._mapSelected;
-            }
+    window.selectMapItem = function (id, code, name) {
+        $('mapSelectedInternalId').value = id;
+        $('mapItemSearch').value = code || name;
+        $('mapItemSelected').textContent = '✓ Terpilih: ' + (code ? code + ' — ' : '') + name;
+        $('mapItemResults').style.display = 'none';
+        
+        document.querySelectorAll('#mapRecoList .btn-outline-primary').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.id == id) btn.classList.add('active');
         });
+    };
 
-        if (!itemId) return;
+    window.submitMapping = async function () {
+        const sku = $('mapSkuInput').value;
+        const itemId = $('mapSelectedInternalId').value;
+        const notes = $('mapNotes').value;
+
+        if (!itemId) return alert('Silakan cari dan pilih item internal terlebih dahulu.');
+
+        const btn = $('mapSaveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan...';
+
         try {
             await api('/api/sku-mappings', {
                 method: 'POST',
                 body: JSON.stringify({
                     marketplace_sku: sku,
                     channel_code: null,
-                    item_id: itemId,
-                    notes: 'mapping dari tab Produk'
+                    item_id: parseInt(itemId),
+                    notes: notes || 'mapping dari tab Produk'
                 })
             });
             toast(`SKU ${sku} berhasil di-mapping ✔`);
             loadProducts();
-        } catch (e) { alert('Gagal simpan mapping: ' + e.message); }
+            bootstrap.Modal.getInstance($('modalMapping')).hide();
+        } catch (e) { 
+            alert('Gagal simpan mapping: ' + e.message); 
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Simpan Mapping';
+        }
+    };
+
+    window.openMapModal = async function (sku) {
+        $('mapSelectedInternalId').value = '';
+        $('mapSkuInput').value = sku || '';
+        $('mapItemSearch').value = '';
+        $('mapItemSelected').textContent = '';
+        $('mapItemResults').style.display = 'none';
+        $('mapRecommendations').style.display = 'none';
+        $('mapRecoList').innerHTML = '';
+        $('mapNotes').value = '';
+
+        new bootstrap.Modal($('modalMapping')).show();
+
+        if (!$('mapItemSearch').dataset.inited) {
+            $('mapItemSearch').dataset.inited = '1';
+            $('mapItemSearch').addEventListener('input', function () {
+                clearTimeout(mapSearchTimer);
+                const q = this.value.trim();
+                if (q.length < 2) { $('mapItemResults').style.display = 'none'; return; }
+                mapSearchTimer = setTimeout(async () => {
+                    const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+                    const box = $('mapItemResults');
+                    if (!items.length) { box.style.display = 'none'; return; }
+                    box.style.display = 'block';
+                    box.innerHTML = items.map(i =>
+                        `<div class="p-2 border-bottom text-dark" style="cursor:pointer;font-size:.82rem;background:#fff"
+                            onmousedown="selectMapItem(${i.id},'${esc(i.code||'')}','${esc(i.name)}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fff'">
+                            <strong>${esc(i.code||'')}</strong>${i.code ? ' — ' : ''}${esc(i.name)}
+                        </div>`
+                    ).join('');
+                }, 250);
+            });
+        }
+
+        if (sku && sku.length >= 2) {
+            const queries = new Set([sku, sku.split('-')[0], sku.replace(/[-_]\d+$/, '')]);
+            let results = [];
+            for (const q of queries) {
+                if (!q || q.length < 2) continue;
+                const items = await api('/api/sku-mappings/search-items?q=' + encodeURIComponent(q)).catch(() => []);
+                items.forEach(i => { if (!results.find(r => r.id === i.id)) results.push(i); });
+                if (results.length >= 5) break;
+            }
+            if (results.length) {
+                $('mapRecommendations').style.display = 'block';
+                $('mapRecoList').innerHTML = results.slice(0, 5).map(i =>
+                    `<button type="button" class="btn btn-sm btn-outline-primary text-start" data-id="${i.id}" style="font-size:.7rem;border-radius:10px"
+                        onclick="selectMapItem(${i.id},'${esc(i.code||'')}','${esc(i.name)}')">
+                        <b>${esc(i.code||i.name)}</b><br><span style="font-size:.65rem">${esc(i.name)}</span>
+                    </button>`
+                ).join('');
+            }
+        }
     };
 
     // ── Mesin waktu: riwayat harian produk ──────────────────────────────────
@@ -674,9 +976,10 @@
     };
 
     // ── Event listeners filter (instan) ─────────────────────────────────────
-    let searchDeb = null;
-    $('fSearch').addEventListener('input', () => { clearTimeout(searchDeb); searchDeb = setTimeout(render, 250); });
-    ['fStore','fStatus','fMapping','fStock','fSort'].forEach(id => $(id).addEventListener('change', render));
+    $('fSearch').addEventListener('input', render);
+    ['fStatus','fMapping','fSort'].forEach(id => {
+        if ($(id)) $(id).addEventListener('change', render);
+    });
 
     // ══════════════════════════════════════════════════════════════════════
     // TAB: Naikkan Produk (Boost) — memakai ulang `products`, `api`, `esc`

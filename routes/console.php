@@ -76,6 +76,11 @@ Schedule::command('marketplace:sync-returns')
     ->withoutOverlapping()
     ->runInBackground();
 
+Schedule::command('marketplace:sync-settlements')
+    ->everyFourHours()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('marketplace:sync-chats')
     ->everyMinute()
     ->withoutOverlapping()

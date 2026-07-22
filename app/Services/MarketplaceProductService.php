@@ -51,6 +51,8 @@ class MarketplaceProductService
 
         // 2. Detail per chunk 50
         $synced = 0;
+        $now = now();
+
         foreach (array_chunk(array_keys($itemIds), 50) as $chunk) {
             $res = $driver->getItemBaseInfo($store, $chunk);
             if (! empty($res['error'])) {
@@ -58,21 +60,164 @@ class MarketplaceProductService
                 continue;
             }
 
-            // Extra info (sales/views/rating) — non-fatal jika gagal
+            // Extra info (sales/views/rating)
             $extraMap = [];
             $extra = $driver->getItemExtraInfo($store, $chunk);
             foreach (data_get($extra, 'response.item_list', []) as $e) {
                 $extraMap[(string) ($e['item_id'] ?? '')] = $e;
             }
 
-            foreach (data_get($res, 'response.item_list', []) as $item) {
-                try {
-                    $this->upsertProduct($store, $item, $extraMap[(string) ($item['item_id'] ?? '')] ?? []);
-                    $synced++;
-                } catch (\Throwable $e) {
-                    $errors[] = "item {$item['item_id']}: " . $e->getMessage();
-                    Log::warning('Product sync: gagal upsert item', ['item_id' => $item['item_id'] ?? null, 'err' => $e->getMessage()]);
+            $productBatch = [];
+            $itemList = data_get($res, 'response.item_list', []);
+
+            foreach ($itemList as $item) {
+                $itemId = (string) $item['item_id'];
+                $hasModel = (bool) ($item['has_model'] ?? false);
+                $extraData = $extraMap[$itemId] ?? [];
+
+                $productBatch[] = [
+                    'store_id'    => $store->id,
+                    'item_id'     => $itemId,
+                    'item_name'   => $item['item_name'] ?? null,
+                    'item_sku'    => $item['item_sku'] ?? null,
+                    'item_status' => $item['item_status'] ?? null,
+                    'category_id' => isset($item['category_id']) ? (string) $item['category_id'] : null,
+                    'image_url'   => data_get($item, 'image.image_url_list.0'),
+                    'has_model'   => $hasModel,
+                    'sales'       => $extraData['sale'] ?? $extraData['sales'] ?? null,
+                    'views'       => $extraData['views'] ?? null,
+                    'rating_star' => $extraData['rating_star'] ?? null,
+                    'raw_json'    => json_encode($item),
+                    'synced_at'   => $now,
+                    'created_at'  => $now,
+                    'updated_at'  => $now,
+                ];
+            }
+
+            if (empty($productBatch)) continue;
+
+            // 1. Bulk Upsert Products
+            MarketplaceProduct::upsert(
+                $productBatch,
+                ['store_id', 'item_id'],
+                ['item_name', 'item_sku', 'item_status', 'category_id', 'image_url', 'has_model', 'sales', 'views', 'rating_star', 'raw_json', 'synced_at', 'updated_at']
+            );
+            $synced += count($productBatch);
+
+            // 2. Ambil ID product yang baru di-upsert untuk foreign key models
+            $insertedProducts = MarketplaceProduct::where('store_id', $store->id)
+                ->whereIn('item_id', $chunk)
+                ->get()
+                ->keyBy('item_id');
+
+            // 3. Kumpulkan models
+            $modelBatch = [];
+            $productsToUpdateTotals = [];
+
+            foreach ($itemList as $item) {
+                $itemId = (string) $item['item_id'];
+                $product = $insertedProducts->get($itemId);
+                if (!$product) continue;
+
+                $hasModel = (bool) ($item['has_model'] ?? false);
+                
+                $priceInfo = data_get($item, 'price_info.0', []);
+                $itemPrice = $priceInfo['current_price'] ?? $priceInfo['original_price'] ?? null;
+                $stockInfo = data_get($item, 'stock_info_v2.seller_stock.0.stock')
+                    ?? data_get($item, 'stock_info_v2.summary_info.total_available_stock')
+                    ?? data_get($item, 'stock_info.0.current_stock');
+
+                $productModelsData = [];
+
+                if ($hasModel) {
+                    $modelRes = $driver->getProductModelList($store, $itemId);
+                    if (! empty($modelRes['error'])) {
+                        Log::warning("Product sync: gagal ambil model item {$itemId}: " . ($modelRes['message'] ?? $modelRes['error']));
+                        continue;
+                    }
+
+                    $tiers = data_get($modelRes, 'response.tier_variation', []);
+                    foreach (data_get($modelRes, 'response.model', []) as $m) {
+                        $modelId = (string) ($m['model_id'] ?? '');
+                        if ($modelId === '') continue;
+
+                        $name = $m['model_name'] ?? null;
+                        if (! $name && ! empty($m['tier_index']) && ! empty($tiers)) {
+                            $parts = [];
+                            foreach ($m['tier_index'] as $tierPos => $optIdx) {
+                                $opt = data_get($tiers, "{$tierPos}.option_list.{$optIdx}.option");
+                                if ($opt) $parts[] = $opt;
+                            }
+                            $name = implode(' / ', $parts) ?: null;
+                        }
+
+                        $mPriceInfo = data_get($m, 'price_info.0', []);
+                        $mStock = data_get($m, 'stock_info_v2.seller_stock.0.stock')
+                            ?? data_get($m, 'stock_info_v2.summary_info.total_available_stock')
+                            ?? data_get($m, 'stock_info.0.current_stock');
+
+                        $productModelsData[] = [
+                            'marketplace_product_id' => $product->id,
+                            'model_id'   => $modelId,
+                            'model_name' => $name,
+                            'model_sku'  => $m['model_sku'] ?? null,
+                            'price'      => $mPriceInfo['current_price'] ?? $mPriceInfo['original_price'] ?? null,
+                            'stock'      => (int) ($mStock ?? 0),
+                            'raw_json'   => json_encode($m),
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+                } else {
+                    $productModelsData[] = [
+                        'marketplace_product_id' => $product->id,
+                        'model_id'   => '0',
+                        'model_name' => null,
+                        'model_sku'  => $item['item_sku'] ?? null,
+                        'price'      => $itemPrice,
+                        'stock'      => (int) ($stockInfo ?? 0),
+                        'raw_json'   => json_encode(['price_info' => $item['price_info'] ?? null, 'stock_info_v2' => $item['stock_info_v2'] ?? null]),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
                 }
+
+                if (!empty($productModelsData)) {
+                    array_push($modelBatch, ...$productModelsData);
+                    $productsToUpdateTotals[$product->id] = $productModelsData;
+                }
+            }
+
+            // 4. Bulk Upsert Models
+            if (!empty($modelBatch)) {
+                MarketplaceProductModel::upsert(
+                    $modelBatch,
+                    ['marketplace_product_id', 'model_id'],
+                    ['model_name', 'model_sku', 'price', 'stock', 'raw_json', 'updated_at']
+                );
+            }
+
+            // 5. Update Total Stock & Price Min/Max efficiently
+            $updateProductTotals = [];
+            foreach ($productsToUpdateTotals as $pId => $models) {
+                $prices = array_filter(array_column($models, 'price'), fn($p) => $p !== null);
+                $updateProductTotals[] = [
+                    'id' => $pId,
+                    'price_min' => !empty($prices) ? min($prices) : null,
+                    'price_max' => !empty($prices) ? max($prices) : null,
+                    'stock_total' => array_sum(array_column($models, 'stock')),
+                ];
+            }
+
+            // Memanfaatkan batch update via query builder (karena MySql tidak support update batch langsung tanpa CASE WHEN, 
+            // kita loop ringan, atau biarkan loop query karena ini sudah tersaring hanya utk product yg terupdate).
+            // Berhubung ini sudah di level product_id, kita bisa loop karena sangat sedikit.
+            foreach ($updateProductTotals as $pTotal) {
+                MarketplaceProduct::where('id', $pTotal['id'])->update([
+                    'price_min' => $pTotal['price_min'],
+                    'price_max' => $pTotal['price_max'],
+                    'stock_total' => $pTotal['stock_total'],
+                ]);
             }
         }
 
@@ -126,22 +271,111 @@ class MarketplaceProductService
 
     /**
      * Update harga di Shopee + lokal.
-     * $priceList: [['model_id' => '0', 'original_price' => 125000], ...]
+     * $priceList: [['model_id' => '0', 'original_price' => 125000, 'discount_price' => 110000], ...]
      */
     public function updatePrice(MarketplaceProduct $product, array $priceList): array
     {
         $driver = $this->manager->driver($product->store);
-        $res = $driver->updateProductPrice($product->store, $product->item_id, $priceList);
+        
+        $originalPriceList = array_map(function($p) {
+            return [
+                'model_id' => $p['model_id'],
+                'original_price' => $p['original_price']
+            ];
+        }, $priceList);
+
+        $res = $driver->updateProductPrice($product->store, $product->item_id, $originalPriceList);
 
         if (! empty($res['error'])) {
             return $res;
         }
 
+        // 2. Handle Discount Price
+        $hasDiscount = false;
         foreach ($priceList as $p) {
-            MarketplaceProductModel::where('marketplace_product_id', $product->id)
-                ->where('model_id', (string) ($p['model_id'] ?? '0'))
-                ->update(['price' => (float) $p['original_price']]);
+            if (isset($p['discount_price']) && $p['discount_price'] < $p['original_price']) {
+                $hasDiscount = true;
+                break;
+            }
         }
+
+        if ($hasDiscount) {
+            // Find or create an ongoing discount campaign
+            $discounts = $driver->getDiscountList($product->store, 'ongoing');
+            $discountId = null;
+            if (empty($discounts['error'])) {
+                foreach (data_get($discounts, 'response.discount_list', []) as $d) {
+                    if (str_contains($d['discount_name'], 'GFID-Harga-Jual')) {
+                        $discountId = $d['discount_id'];
+                        break;
+                    }
+                }
+            }
+
+            // Jika tidak ada promo GFID-Harga-Jual yang ongoing, cari yang upcoming
+            if (!$discountId) {
+                $upcoming = $driver->getDiscountList($product->store, 'upcoming');
+                if (empty($upcoming['error'])) {
+                    foreach (data_get($upcoming, 'response.discount_list', []) as $d) {
+                        if (str_contains($d['discount_name'], 'GFID-Harga-Jual')) {
+                            $discountId = $d['discount_id'];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!$discountId) {
+                $newD = $driver->addDiscount($product->store, 'GFID-Harga-Jual-' . date('Ym'), time(), time() + (86400 * 180));
+                if (!empty($newD['error'])) {
+                    Log::error("Failed to create discount: " . ($newD['message'] ?? $newD['error']));
+                } else {
+                    $discountId = data_get($newD, 'response.discount_id');
+                }
+            }
+
+            if ($discountId) {
+                $itemList = [
+                    [
+                        'item_id' => (int)$product->item_id,
+                        'model_list' => array_map(function($p) {
+                            return [
+                                'model_id' => (int)$p['model_id'],
+                                'model_promotion_price' => (float)$p['discount_price']
+                            ];
+                        }, $priceList)
+                    ]
+                ];
+                
+                $addRes = $driver->addDiscountItem($product->store, $discountId, $itemList);
+                
+                // Jika gagal karena item sudah ada di dalam diskon ini, maka update item tersebut
+                if (!empty($addRes['error']) && str_contains(strtolower($addRes['message'] ?? ''), 'exists')) {
+                     $driver->updateDiscountItem($product->store, $discountId, $itemList);
+                }
+            }
+        }
+
+        foreach ($priceList as $p) {
+            $model = MarketplaceProductModel::where('marketplace_product_id', $product->id)
+                ->where('model_id', (string) ($p['model_id'] ?? '0'))
+                ->first();
+                
+            if ($model) {
+                $raw = is_string($model->raw_json) ? json_decode($model->raw_json, true) : ($model->raw_json ?? []);
+                if (!isset($raw['price_info'])) $raw['price_info'] = [[]];
+                $raw['price_info'][0]['original_price'] = (float) $p['original_price'];
+                if (isset($p['discount_price'])) {
+                    $raw['price_info'][0]['current_price'] = (float) $p['discount_price'];
+                }
+                
+                $model->update([
+                    'price' => (float) $p['original_price'],
+                    'raw_json' => $raw
+                ]);
+            }
+        }
+        
         $prices = $product->models()->pluck('price')->filter();
         $product->update([
             'price_min' => $prices->min(),
@@ -193,7 +427,7 @@ class MarketplaceProductService
 
         // Harga & stok level item (untuk item tanpa varian)
         $priceInfo = data_get($item, 'price_info.0', []);
-        $itemPrice = $priceInfo['original_price'] ?? $priceInfo['current_price'] ?? null;
+        $itemPrice = $priceInfo['current_price'] ?? $priceInfo['original_price'] ?? null;
 
         $stockInfo = data_get($item, 'stock_info_v2.seller_stock.0.stock')
             ?? data_get($item, 'stock_info_v2.summary_info.total_available_stock')
@@ -282,7 +516,7 @@ class MarketplaceProductService
                 [
                     'model_name' => $name,
                     'model_sku'  => $m['model_sku'] ?? null,
-                    'price'      => $priceInfo['original_price'] ?? $priceInfo['current_price'] ?? null,
+                    'price'      => $priceInfo['current_price'] ?? $priceInfo['original_price'] ?? null,
                     'stock'      => (int) ($stock ?? 0),
                     'raw_json'   => $m,
                 ]
@@ -294,5 +528,40 @@ class MarketplaceProductService
         if (! empty($keptIds)) {
             $product->models()->whereNotIn('id', $keptIds)->delete();
         }
+    }
+
+    public function updateSku(MarketplaceProduct $product, string $newSku): array
+    {
+        $driver = $this->manager->driver($product->store);
+        $res = $driver->updateItemBaseInfo($product->store, (int)$product->item_id, ['item_sku' => $newSku]);
+
+        if (!empty($res['error'])) {
+            throw new \Exception($res['message'] ?? $res['error']);
+        }
+
+        $product->update(['item_sku' => $newSku]);
+        return $res;
+    }
+
+    public function updateModelSku(MarketplaceProductModel $model, string $newSku): array
+    {
+        $product = $model->marketplaceProduct;
+        $driver = $this->manager->driver($product->store);
+        
+        $modelsParam = [
+            [
+                'model_id' => (int)$model->model_id,
+                'model_sku' => $newSku,
+            ]
+        ];
+
+        $res = $driver->updateModel($product->store, (int)$product->item_id, $modelsParam);
+
+        if (!empty($res['error'])) {
+            throw new \Exception($res['message'] ?? $res['error']);
+        }
+
+        $model->update(['model_sku' => $newSku]);
+        return $res;
     }
 }

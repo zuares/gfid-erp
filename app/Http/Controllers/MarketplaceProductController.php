@@ -107,17 +107,13 @@ class MarketplaceProductController extends Controller
             ->get();
 
         $total = 0;
-        $errors = [];
         foreach ($stores as $store) {
-            $res = $this->products->syncProducts($store);
-            $total += $res['synced'];
-            $errors = array_merge($errors, array_map(fn ($e) => "[{$store->name}] {$e}", $res['errors']));
+            \App\Jobs\Marketplace\SyncMarketplaceProductsJob::dispatch($store);
+            $total++;
         }
 
         return response()->json([
-            'synced'  => $total,
-            'errors'  => $errors,
-            'message' => "Berhasil sync {$total} produk." . ($errors ? ' Sebagian gagal — cek detail.' : ''),
+            'message' => "Proses sinkronisasi sedang berjalan di latar belakang (background) untuk {$total} toko. Silakan refresh halaman dalam beberapa menit.",
         ]);
     }
 
@@ -159,6 +155,34 @@ class MarketplaceProductController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function updateSku(MarketplaceProduct $product, Request $request)
+    {
+        $data = $request->validate([
+            'new_sku' => 'nullable|string|max:100',
+        ]);
+        try {
+            $this->products->updateSku($product, $data['new_sku'] ?? '');
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function updateModelSku(MarketplaceProduct $product, Request $request)
+    {
+        $data = $request->validate([
+            'model_id' => 'required|numeric',
+            'new_sku'  => 'nullable|string|max:100',
+        ]);
+        try {
+            $model = $product->models()->where('model_id', $data['model_id'])->firstOrFail();
+            $this->products->updateModelSku($model, $data['new_sku'] ?? '');
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /**

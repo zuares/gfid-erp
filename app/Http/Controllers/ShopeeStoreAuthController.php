@@ -161,6 +161,7 @@ class ShopeeStoreAuthController extends Controller
         // Jalankan sinkronisasi awal secara otomatis di background
         if (isset($storeModel) && $storeModel) {
             \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $storeModel->id]);
+            \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', ['--store' => $storeModel->id]);
             \App\Jobs\SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
         }
 

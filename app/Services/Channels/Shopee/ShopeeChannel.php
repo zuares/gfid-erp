@@ -99,11 +99,7 @@ class ShopeeChannel implements MarketplaceChannel
 
         $response = Http::timeout(30)->get($this->baseUrl($store) . $path, $query);
 
-        return $response->json() ?? [
-            'error'   => 'invalid_response',
-            'message' => $response->body(),
-            'status'  => $response->status(),
-        ];
+        return $this->withHttpMeta($response);
     }
 
     protected function doPost(Store $store, string $path, array $body = []): array
@@ -120,11 +116,48 @@ class ShopeeChannel implements MarketplaceChannel
 
         $response = Http::timeout(30)->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
 
-        return $response->json() ?? [
-            'error'   => 'invalid_response',
-            'message' => $response->body(),
-            'status'  => $response->status(),
-        ];
+        return $this->withHttpMeta($response);
+    }
+
+    /**
+     * Bungkus response HTTP mentah menjadi array payload Shopee, ditambah metadata
+     * HTTP internal aplikasi di key `_meta` (http_status, retry_after).
+     *
+     * PENTING: `_meta` BUKAN bagian dari response asli Shopee — ini murni metadata
+     * internal supaya lapisan retry (lihat MarketplaceSyncService::getEscrowDetailWithRetry())
+     * bisa membaca kode status HTTP asli. Sebelumnya status HTTP hilang setiap kali
+     * Shopee mengembalikan body JSON valid (kasus umum untuk error 429/5xx yang tetap
+     * berbentuk JSON) — hanya tersimpan saat body BUKAN JSON valid.
+     *
+     * Perubahan ini aditif murni: field 'error'/'message'/'response'/dll milik Shopee
+     * tidak diubah/dihapus, hanya ditambah satu key baru di root. Sudah diaudit: tidak
+     * ada caller lain di project yang mengiterasi seluruh root response atau menyimpan
+     * root response mentah-mentah ke kolom raw_json (semua pemanggil mengambil sub-key
+     * spesifik seperti 'response'/'order_income'). Caller yang menyimpan raw_json HARUS
+     * memisahkan `_meta` dulu sebelum menyimpan (lihat mapEscrowSettlement()) supaya
+     * raw_json tetap murni response asli Shopee.
+     */
+    protected function withHttpMeta(\Illuminate\Http\Client\Response $response): array
+    {
+        $payload = $response->json();
+
+        if (! is_array($payload)) {
+            $payload = [
+                'error'   => 'invalid_response',
+                'message' => $response->body(),
+                'status'  => $response->status(), // dipertahankan untuk backward-compat
+            ];
+        }
+
+        $payload['_meta'] = array_merge(
+            is_array($payload['_meta'] ?? null) ? $payload['_meta'] : [],
+            [
+                'http_status' => $response->status(),
+                'retry_after' => $response->header('Retry-After'),
+            ]
+        );
+
+        return $payload;
     }
 
     public function getShopInfo(Store $store): array
@@ -808,6 +841,72 @@ class ShopeeChannel implements MarketplaceChannel
                 'item_id' => (int) $i['item_id'],
                 'unlist'  => (bool) $i['unlist'],
             ], $items),
+        ]);
+    }
+
+    /**
+     * Endpoint: POST /api/v2/product/update_item_base_info
+     */
+    public function updateItemBaseInfo(Store $store, int $itemId, array $data): array
+    {
+        return $this->post($store, '/api/v2/product/update_item_base_info', array_merge([
+            'item_id' => $itemId,
+        ], $data));
+    }
+
+    /**
+     * Endpoint: POST /api/v2/product/update_model
+     */
+    public function updateModel(Store $store, int $itemId, array $models): array
+    {
+        return $this->post($store, '/api/v2/product/update_model', [
+            'item_id' => $itemId,
+            'model' => $models,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Discount APIs (Shopee v2.discount)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function getDiscountList(Store $store, string $status = 'ongoing', int $offset = 0, int $limit = 100): array
+    {
+        return $this->get($store, '/api/v2/discount/get_discount_list', [
+            'discount_status' => $status,
+            'pagination_offset' => $offset,
+            'pagination_entries_per_page' => $limit,
+        ]);
+    }
+
+    public function addDiscount(Store $store, string $discountName, int $startTime, int $endTime): array
+    {
+        return $this->post($store, '/api/v2/discount/add_discount', [
+            'discount_name' => $discountName,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+        ]);
+    }
+
+    public function addDiscountItem(Store $store, int $discountId, array $itemList): array
+    {
+        return $this->post($store, '/api/v2/discount/add_discount_item', [
+            'discount_id' => $discountId,
+            'item_list' => $itemList,
+        ]);
+    }
+
+    public function updateDiscountItem(Store $store, int $discountId, array $itemList): array
+    {
+        return $this->post($store, '/api/v2/discount/update_discount_item', [
+            'discount_id' => $discountId,
+            'item_list' => $itemList,
+        ]);
+    }
+
+    public function endDiscount(Store $store, int $discountId): array
+    {
+        return $this->post($store, '/api/v2/discount/end_discount', [
+            'discount_id' => $discountId,
         ]);
     }
 

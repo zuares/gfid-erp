@@ -24,6 +24,8 @@ class MarketplaceOrder extends Model
         'synced_at',
         'shipping_arranged_at',
         'raw_json',
+        'settlement_sync_error_code',
+        'settlement_sync_failed_at',
 
         // Legacy — digunakan modul marketplace lama
         'external_order_id',
@@ -60,6 +62,7 @@ class MarketplaceOrder extends Model
         'ordered_at'    => 'datetime',
         'synced_at'     => 'datetime',
         'shipping_arranged_at' => 'datetime',
+        'settlement_sync_failed_at' => 'datetime',
         'raw_json'      => 'array',
         'payment_date'  => 'datetime',
         'completed_at'  => 'datetime',

@@ -33,10 +33,10 @@
 
         {{-- Back --}}
         <div class="mb-3">
-            <a href="{{ route('marketplace.orders.index') }}" class="btn btn-sm btn-outline-secondary">
+            <a href="{{ route('marketplace.orders') }}" class="btn btn-sm btn-outline-secondary">
                 ← Kembali ke List
             </a>
-            <a href="{{ route('shipments.from_marketplace_order', $order) }}" class="btn btn-sm btn-outline-primary">
+            <a href="{{ route('sales.shipments.create', ['marketplace_order_id' => $order->id]) }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-box-arrow-up-right me-1"></i>
                 Buat Shipment dari Order
             </a>

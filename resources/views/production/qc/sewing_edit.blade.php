@@ -716,12 +716,37 @@
                 <div class="fab-wrap" id="fab-wrap">
                     <a href="{{ route('production.sewing.returns.show', $sewingReturn) }}"
                        class="btn btn-sm btn-outline-secondary fab-back">←</a>
-                    <button type="submit" class="btn btn-sm btn-success fab-save" id="btn-save-qc">
+                    <button type="button" class="btn btn-sm btn-success fab-save" id="btn-show-confirm">
                         Simpan QC
                     </button>
                 </div>
             </div>
         </form>
+    </div>
+
+    {{-- Modal Konfirmasi --}}
+    <div class="modal fade" id="confirmQcModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:14px; border:none; box-shadow:0 10px 25px rgba(0,0,0,.1);">
+                <div class="modal-header" style="border-bottom:1px solid rgba(148,163,184,.15); padding:1rem 1.25rem;">
+                    <h5 class="modal-title" style="font-weight:800; font-size:1.05rem;">Konfirmasi QC</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="padding:1.25rem;">
+                    <div style="background:rgba(59,130,246,.08); border:1px solid rgba(59,130,246,.2); border-radius:8px; padding:.75rem; margin-bottom:1rem; font-size:.8rem; color:#1e3a8a;">
+                        <strong style="display:block; margin-bottom:.3rem;">Informasi Perpindahan Stok:</strong>
+                        <div style="display:flex; align-items:center; gap:.4rem;"><span style="color:#16a34a; font-weight:800; min-width:48px;">● OK</span> ➔ Masuk ke gudang <b>WH-PRD</b></div>
+                        <div style="display:flex; align-items:center; gap:.4rem; margin-top:.15rem;"><span style="color:#dc2626; font-weight:800; min-width:48px;">● Reject</span> ➔ Masuk ke gudang <b>REJ-SEW</b></div>
+                    </div>
+                    <p class="text-muted" style="font-size:.85rem; margin-bottom:.75rem;">Ringkasan hasil QC yang akan disimpan:</p>
+                    <div id="confirmSummary" style="display:flex; flex-direction:column; gap:.5rem;"></div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid rgba(148,163,184,.15); padding:1rem 1.25rem; background:rgba(148,163,184,.03); border-bottom-left-radius:14px; border-bottom-right-radius:14px;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius:8px; font-weight:700;">Batal</button>
+                    <button type="button" class="btn btn-success" id="btn-confirm-submit" style="border-radius:8px; font-weight:700;">Ya, Simpan QC</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -814,5 +839,69 @@
             this.select();
         });
     });
+
+    // Confirmation Modal Logic
+    const btnShowConfirm = document.getElementById('btn-show-confirm');
+    const confirmQcModal = new bootstrap.Modal(document.getElementById('confirmQcModal'));
+    const confirmSummary = document.getElementById('confirmSummary');
+    const form = document.getElementById('sewing-qc-form');
+    
+    if (btnShowConfirm) {
+        btnShowConfirm.addEventListener('click', function() {
+            const itemsMap = {};
+            document.querySelectorAll('.fin-item').forEach(el => {
+                const itemName = el.querySelector('.code').textContent.trim();
+                const ok = numberValue(el.querySelector('.qty-ok'));
+                const rjJahit = numberValue(el.querySelector('.qty-reject-jahit'));
+                const rjBahan = numberValue(el.querySelector('.qty-reject-bahan'));
+                
+                if (!itemsMap[itemName]) itemsMap[itemName] = { ok: 0, rjJahit: 0, rjBahan: 0, bundles: 0 };
+                itemsMap[itemName].ok += ok;
+                itemsMap[itemName].rjJahit += rjJahit;
+                itemsMap[itemName].rjBahan += rjBahan;
+                itemsMap[itemName].bundles += 1;
+            });
+
+            let html = '';
+            for (const [name, data] of Object.entries(itemsMap)) {
+                const fmt = new Intl.NumberFormat('id-ID').format;
+                html += `
+                    <div style="border:1px solid rgba(148,163,184,.2); border-radius:10px; padding:.75rem; background:var(--card);">
+                        <div style="font-weight:800; font-size:.9rem; margin-bottom:.35rem;">${name} <span style="font-weight:600; font-size:.7rem; color:var(--muted);">(${data.bundles} bundle)</span></div>
+                        <div style="display:flex; gap:.6rem; font-size:.8rem; font-family:monospace; flex-wrap:wrap; margin-top:.45rem;">
+                            <div style="display:flex; flex-direction:column; gap:.15rem;">
+                                <span style="color:#16a34a; font-weight:700; background:rgba(22,163,74,.1); padding:.15rem .45rem; border-radius:6px; border:1px solid rgba(22,163,74,.2);">OK: ${fmt(data.ok)}</span>
+                                <span style="font-size:.65rem; color:var(--muted); text-align:center; font-family:var(--bs-body-font-family); letter-spacing:-.02em;">➔ WH-PRD</span>
+                            </div>
+                            ${data.rjJahit > 0 ? `<div style="display:flex; flex-direction:column; gap:.15rem;">
+                                <span style="color:#b91c1c; font-weight:700; background:rgba(185,28,28,.1); padding:.15rem .45rem; border-radius:6px; border:1px solid rgba(185,28,28,.2);">Rj Jahit: ${fmt(data.rjJahit)}</span>
+                                <span style="font-size:.65rem; color:var(--muted); text-align:center; font-family:var(--bs-body-font-family); letter-spacing:-.02em;">➔ REJ-SEW</span>
+                            </div>` : ''}
+                            ${data.rjBahan > 0 ? `<div style="display:flex; flex-direction:column; gap:.15rem;">
+                                <span style="color:#b91c1c; font-weight:700; background:rgba(185,28,28,.1); padding:.15rem .45rem; border-radius:6px; border:1px solid rgba(185,28,28,.2);">Rj Bahan: ${fmt(data.rjBahan)}</span>
+                                <span style="font-size:.65rem; color:var(--muted); text-align:center; font-family:var(--bs-body-font-family); letter-spacing:-.02em;">➔ REJ-SEW</span>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (Object.keys(itemsMap).length === 0) {
+                html = '<div class="text-center text-muted small py-3">Tidak ada data bundle</div>';
+            }
+            
+            confirmSummary.innerHTML = html;
+            confirmQcModal.show();
+        });
+    }
+
+    const btnConfirmSubmit = document.getElementById('btn-confirm-submit');
+    if (btnConfirmSubmit) {
+        btnConfirmSubmit.addEventListener('click', function() {
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Menyimpan...';
+            form.submit();
+        });
+    }
 </script>
 @endpush

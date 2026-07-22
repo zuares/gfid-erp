@@ -99,7 +99,7 @@ class MarketplaceOrderController extends Controller
 
     public function show(MarketplaceOrder $order)
     {
-        $order->load(['store.channel', 'items.item']);
+        $order->load(['store.channel', 'items.internalItem']);
 
         return view('marketplace.orders.show', compact('order'));
     }
