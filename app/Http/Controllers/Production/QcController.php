@@ -42,7 +42,7 @@ class QcController extends Controller
         $user = Auth::user();
         $userRole = $user->role ?? null;
 
-        // Admin: langsung ke QC Sewing dengan view khusus + sidebar
+        // Admin: langsung ke QC Sewing
         if ($userRole === 'admin') {
             if ($request->query('stage') !== QcResult::STAGE_SEWING) {
                 return redirect()->route('production.qc.index', ['stage' => QcResult::STAGE_SEWING]);
@@ -62,7 +62,7 @@ class QcController extends Controller
                 ->paginate(20)
                 ->withQueryString();
 
-            return view('production.qc.sewing_index', compact('records', 'userRole'));
+            return view('production.qc.index', compact('stage', 'records', 'userRole'));
         }
 
         $records = collect();
