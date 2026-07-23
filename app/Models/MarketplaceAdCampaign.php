@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MarketplaceAdCampaign extends Model
 {
@@ -12,12 +13,17 @@ class MarketplaceAdCampaign extends Model
     protected $fillable = [
         'store_id',
         'channel_campaign_id',
+        'channel_item_id',
+        'internal_item_id',
+        'ad_group_id',
+        'mapping_status',
+        'mapping_source',
         'campaign_name',
         'campaign_type',
         'status',
 
-        'report_date_from',
-        'report_date_to',
+        'last_synced_range_from',
+        'last_synced_range_to',
 
         'spend',
         'impressions',
@@ -38,8 +44,11 @@ class MarketplaceAdCampaign extends Model
     ];
 
     protected $casts = [
-        'report_date_from'  => 'date:Y-m-d',
-        'report_date_to'    => 'date:Y-m-d',
+        'channel_item_id'   => 'integer',
+        'internal_item_id'  => 'integer',
+        'ad_group_id'       => 'integer',
+        'last_synced_range_from' => 'date:Y-m-d',
+        'last_synced_range_to'   => 'date:Y-m-d',
         'spend'             => 'decimal:2',
         'impressions'       => 'integer',
         'clicks'            => 'integer',
@@ -62,6 +71,54 @@ class MarketplaceAdCampaign extends Model
         return $this->belongsTo(Store::class);
     }
 
+    public function dailies(): HasMany
+    {
+        return $this->hasMany(MarketplaceAdCampaignDaily::class, 'channel_campaign_id', 'channel_campaign_id')
+            ->where('store_id', $this->store_id);
+    }
+
+    public function internalItem(): BelongsTo
+    {
+        return $this->belongsTo(Item::class, 'internal_item_id');
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(MarketplaceAdGroup::class, 'ad_group_id');
+    }
+
+    /**
+     * Break-even ACOS efektif (0..1) = margin kotor. Prioritas:
+     * 1. Override manual di kolom break_even_acos.
+     * 2. Derivasi dari data: harga jual rata2 teramati (gmv / unit terjual)
+     *    dibanding HPP item internal → BE ACOS = (harga - hpp) / harga
+     *    = 1 - (hpp * unit) / gmv.
+     *
+     * Catatan: `items` tidak menyimpan harga jual, jadi harga diambil dari
+     * GMV iklan yang teramati. Butuh internal_item_id termapping + ada penjualan.
+     */
+    public function effectiveBreakEvenAcos(): ?float
+    {
+        if ($this->break_even_acos !== null) {
+            return (float) $this->break_even_acos;
+        }
+
+        $units = (int) ($this->items_sold ?: $this->orders);
+        $gmv   = (float) $this->gmv;
+        if ($units <= 0 || $gmv <= 0) return null;
+
+        $item = $this->relationLoaded('internalItem') ? $this->internalItem : $this->internalItem()->first();
+        if (! $item) return null;
+
+        $hpp = (float) ($item->hpp ?? $item->base_unit_cost ?? 0);
+        if ($hpp <= 0) return null;
+
+        $avgPrice = $gmv / $units;
+        if ($hpp >= $avgPrice) return null; // jual rugi/impas → BE tak berarti
+
+        return round(($avgPrice - $hpp) / $avgPrice, 6);
+    }
+
     /** ACOS sebagai persen (0–100). */
     public function acosPct(): ?float
     {
@@ -69,11 +126,10 @@ class MarketplaceAdCampaign extends Model
         return round((float) $this->spend / (float) $this->gmv * 100, 1);
     }
 
-    /** Break-even ACOS dalam persen. */
+    /** Break-even ACOS dalam persen (override manual atau derivasi HPP). */
     public function breakEvenAcosPct(): ?float
     {
-        return $this->break_even_acos !== null
-            ? round((float) $this->break_even_acos * 100, 1)
-            : null;
+        $be = $this->effectiveBreakEvenAcos();
+        return $be !== null ? round($be * 100, 1) : null;
     }
 }

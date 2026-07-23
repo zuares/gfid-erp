@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Channel;
 use App\Models\Item;
 use App\Models\MarketplaceAdCampaign;
+use App\Models\MarketplaceAdCampaignDaily;
+use App\Models\MarketplaceAdsBalanceLog;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
@@ -1000,7 +1002,8 @@ class MarketplaceSyncService
         // Response: response.campaign_list[].{campaign_id, ad_name, ad_type,
         //   campaign_placement, metrics_list[].{impression, clicks, expense,
         //   broad_gmv, broad_order, direct_gmv, direct_order, ctr, cr, cpc}}
-        $perfMap    = []; // campaign_id => {metrics + meta}
+        $perfMap    = []; // campaign_id => {metrics + meta} (rollup rentang)
+        $dailyRows  = []; // baris harian mentah untuk marketplace_ad_campaign_dailies
         $perfErrors = 0;
         foreach (array_chunk($campaignIds, 50) as $chunk) {
             $perfRes = $driver->getCampaignDailyPerformance($store, $chunk, $startDDMMYYYY, $endDDMMYYYY);
@@ -1036,11 +1039,95 @@ class MarketplaceSyncService
                     $perfMap[$cid]['direct_order'] += (int)   ($d['direct_order'] ?? 0);
                     $perfMap[$cid]['cpc_sum']      += (float) ($d['cpc'] ?? 0);
                     $perfMap[$cid]['days']++;
+
+                    // ── Simpan baris harian mentah (grain terkecil) ──────────
+                    $rawDate = $d['date'] ?? $d['report_date'] ?? null;
+                    $date    = $this->parseAdMetricDate($rawDate);
+                    if ($date === null) continue; // tanpa tanggal tak bisa disimpan per hari
+
+                    $key = $cid . '|' . $date;
+                    if (! isset($dailyRows[$key])) {
+                        $dailyRows[$key] = [
+                            'store_id'            => $store->id,
+                            'channel_campaign_id' => $cid,
+                            'date'                => $date,
+                            'ad_type'             => $row['ad_type'] ?? null,
+                            'impressions'         => 0, 'clicks' => 0, 'expense' => 0,
+                            'broad_order'         => 0, 'broad_gmv' => 0,
+                            'direct_order'        => 0, 'direct_gmv' => 0,
+                            'cpc'                 => null,
+                        ];
+                    }
+                    $dailyRows[$key]['impressions']  += (int)   ($d['impression'] ?? 0);
+                    $dailyRows[$key]['clicks']       += (int)   ($d['clicks'] ?? 0);
+                    $dailyRows[$key]['expense']      += (float) ($d['expense'] ?? 0);
+                    $dailyRows[$key]['broad_order']  += (int)   ($d['broad_order'] ?? 0);
+                    $dailyRows[$key]['broad_gmv']    += (float) ($d['broad_gmv'] ?? 0);
+                    $dailyRows[$key]['direct_order'] += (int)   ($d['direct_order'] ?? 0);
+                    $dailyRows[$key]['direct_gmv']   += (float) ($d['direct_gmv'] ?? 0);
+                    if (isset($d['cpc'])) $dailyRows[$key]['cpc'] = (float) $d['cpc'];
                 }
             }
         }
 
-        // ── 4. Upsert ke DB ───────────────────────────────────────────────────
+        // ── 3b. Ambil item_id produk per campaign (product ads) ───────────────
+        // Endpoint: get_product_level_campaign_setting_info. Untuk product ads,
+        // tiap campaign terikat 1 produk (item_id) → kunci mapping ke item internal.
+        $itemIdMap = []; // channel_campaign_id => item_id (int)
+        foreach (array_chunk($campaignIds, 50) as $chunk) {
+            try {
+                $setRes = $driver->getCampaignSettingInfo($store, $chunk);
+            } catch (\Throwable $e) {
+                Log::warning("getCampaignSettingInfo error store #{$store->id}: " . $e->getMessage());
+                continue;
+            }
+            if (! empty($setRes['error'])) {
+                Log::warning("getCampaignSettingInfo error store #{$store->id}: " .
+                    ($setRes['message'] ?? $setRes['error']));
+                continue;
+            }
+            foreach (data_get($setRes, 'response.campaign_list', []) as $c) {
+                $cid = (string) ($c['campaign_id'] ?? '');
+                if (! $cid) continue;
+                // item_id bisa muncul di beberapa bentuk tergantung tipe campaign
+                $itemId = data_get($c, 'item_id')
+                    ?? data_get($c, 'item_id_list.0')
+                    ?? data_get($c, 'manual_product_ads.0.item_id')
+                    ?? data_get($c, 'auto_product_ads.item_id')
+                    ?? data_get($c, 'product_list.0.item_id');
+                if ($itemId) $itemIdMap[$cid] = (int) $itemId;
+            }
+        }
+
+        // ── 3c. Simpan baris harian (idempoten, upsert per store+campaign+date) ─
+        if (! empty($dailyRows)) {
+            $now = now();
+            foreach (array_chunk(array_values($dailyRows), 200) as $chunk) {
+                foreach ($chunk as &$r) { $r['created_at'] = $now; $r['updated_at'] = $now; }
+                unset($r);
+                MarketplaceAdCampaignDaily::upsert(
+                    $chunk,
+                    ['store_id', 'channel_campaign_id', 'date'],
+                    ['ad_type', 'impressions', 'clicks', 'expense', 'broad_order',
+                     'broad_gmv', 'direct_order', 'direct_gmv', 'cpc', 'updated_at']
+                );
+            }
+        }
+
+        // ── 3d. Log saldo iklan (burn rate) ───────────────────────────────────
+        try {
+            $balRes = $driver->getAdsTotalBalance($store);
+            $bal    = data_get($balRes, 'response.total_balance', data_get($balRes, 'response.balance'));
+            if ($bal !== null) {
+                MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => (float) $bal]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("getAdsTotalBalance error store #{$store->id}: " . $e->getMessage());
+        }
+
+        $mapper = app(\App\Services\AdItemMapper::class);
+
+        // ── 4. Upsert master campaign (1 baris per campaign) + mapping ────────
         foreach ($campaignIds as $campaignId) {
             try {
                 $cid     = (string) $campaignId;
@@ -1060,37 +1147,44 @@ class MarketplaceSyncService
                 // placement: search|discovery → gunakan sebagai campaign_type
                 $placement = $metrics['campaign_placement'] ?? $metrics['ad_type'] ?? null;
 
-                MarketplaceAdCampaign::updateOrCreate(
-                    [
-                        'store_id'            => $store->id,
-                        'channel_campaign_id' => $cid,
-                        'report_date_from'    => Carbon::parse($dateFrom)->toDateString(),
-                        'report_date_to'      => Carbon::parse($dateTo)->toDateString(),
-                    ],
-                    [
-                        'campaign_name' => $metrics['ad_name'] ?? null,
-                        'campaign_type' => $placement,
-                        'status'        => 'ongoing', // aktif karena muncul di API
+                $campaign = MarketplaceAdCampaign::firstOrNew([
+                    'store_id'            => $store->id,
+                    'channel_campaign_id' => $cid,
+                ]);
 
-                        'spend'       => $spend,
-                        'impressions' => $impressions,
-                        'clicks'      => $clicks,
-                        'ctr'         => $ctr,
-                        'orders'      => $orders,
-                        'items_sold'  => (int) ($metrics['direct_order'] ?? 0),
-                        'gmv'         => $gmv,
-                        'direct_gmv'  => (float) ($metrics['direct_gmv'] ?? 0),
-                        'roas'        => $roas,
-                        'direct_roas' => $spend > 0 && ($metrics['direct_gmv'] ?? 0) > 0
-                            ? round((float) $metrics['direct_gmv'] / $spend, 4)
-                            : null,
-                        'cpc'         => $cpc,
-                        'cvr'         => $cvr,
+                $campaign->fill([
+                    'channel_item_id' => $itemIdMap[$cid] ?? $campaign->channel_item_id,
+                    'campaign_name'   => $metrics['ad_name'] ?? $campaign->campaign_name,
+                    'campaign_type'   => $placement,
+                    'status'          => 'ongoing', // aktif karena muncul di API
 
-                        'raw_json'  => $metrics,
-                        'synced_at' => now(),
-                    ]
-                );
+                    'spend'       => $spend,
+                    'impressions' => $impressions,
+                    'clicks'      => $clicks,
+                    'ctr'         => $ctr,
+                    'orders'      => $orders,
+                    'items_sold'  => (int) ($metrics['direct_order'] ?? 0),
+                    'gmv'         => $gmv,
+                    'direct_gmv'  => (float) ($metrics['direct_gmv'] ?? 0),
+                    'roas'        => $roas,
+                    'direct_roas' => $spend > 0 && ($metrics['direct_gmv'] ?? 0) > 0
+                        ? round((float) $metrics['direct_gmv'] / $spend, 4)
+                        : null,
+                    'cpc'         => $cpc,
+                    'cvr'         => $cvr,
+
+                    'last_synced_range_from' => Carbon::parse($dateFrom)->toDateString(),
+                    'last_synced_range_to'   => Carbon::parse($dateTo)->toDateString(),
+                    'raw_json'  => $metrics,
+                    'synced_at' => now(),
+                ]);
+
+                // Resolusi mapping ke item internal (hormati override manual).
+                if ($campaign->mapping_status !== 'manual') {
+                    $mapper->applyTo($campaign);
+                }
+
+                $campaign->save();
 
                 $synced++;
             } catch (\Throwable $e) {
@@ -1114,6 +1208,28 @@ class MarketplaceSyncService
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Parse tanggal metric harian dari Shopee Ads API ke 'Y-m-d'.
+     * Menerima 'DD-MM-YYYY', 'YYYY-MM-DD', atau unix timestamp. Null jika gagal.
+     */
+    private function parseAdMetricDate($raw): ?string
+    {
+        if (empty($raw)) return null;
+
+        if (is_numeric($raw)) {
+            try { return Carbon::createFromTimestamp((int) $raw)->toDateString(); }
+            catch (\Throwable $e) { return null; }
+        }
+
+        $raw = trim((string) $raw);
+        // DD-MM-YYYY (format request Shopee Ads)
+        if (preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $raw, $m)) {
+            return "{$m[3]}-{$m[2]}-{$m[1]}";
+        }
+        try { return Carbon::parse($raw)->toDateString(); }
+        catch (\Throwable $e) { return null; }
+    }
 
     private function upsertOrders(Store $store, array $details, bool $dryRun = false): array
     {

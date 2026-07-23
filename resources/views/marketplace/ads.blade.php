@@ -199,11 +199,25 @@
     </x-gf.panel>
 
     {{-- ── Tabel Campaign ───────────────────────────────────────────────────── --}}
-    <x-gf.panel title="Performa per Campaign" subtitle="Klik header kolom untuk sort. Klik ✎ di Break-Even ACOS untuk set margin.">
+    <x-gf.panel title="Performa Iklan" subtitle="Lihat per campaign, per item internal, atau per grup. Klik header kolom untuk sort.">
+
+        {{-- View toggle: Campaign / Item / Grup --}}
+        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem">
+            <div class="period-tabs">
+                <span style="font-size:.72rem;color:#94a3b8;font-weight:700;align-self:center">Lihat per:</span>
+                <button class="period-tab active" data-view="campaign" onclick="setView('campaign')">Campaign</button>
+                <button class="period-tab" data-view="item" onclick="setView('item')">Item Internal</button>
+                <button class="period-tab" data-view="group" onclick="setView('group')">Grup</button>
+            </div>
+            <span id="unmappedBadge" class="reco-badge reco-warn" style="display:none;cursor:pointer"
+                  onclick="toggleUnmappedFilter()" title="Klik untuk filter hanya yang belum di-mapping"></span>
+            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem;margin-left:auto"
+                    onclick="manageGroups()">🏷️ Kelola Grup</button>
+        </div>
 
         {{-- Filter bar --}}
         <div class="ads-filter-bar">
-            <input type="search" id="searchCampaign" placeholder="🔍  Cari nama campaign…" oninput="applyFilters()">
+            <input type="search" id="searchCampaign" placeholder="🔍  Cari nama / item…" oninput="applyFilters()">
             <select id="filterStatus" onchange="applyFilters()" style="min-width:130px">
                 <option value="">Semua Status</option>
                 <option value="ongoing">ongoing</option>
@@ -219,6 +233,10 @@
                 <option value="⚠️">⚠️ Set Break-Even</option>
                 <option value="⚪">⚪ Tidak Aktif</option>
             </select>
+            <label class="ads-toggle" id="unmappedFilterWrap" style="display:none">
+                <input type="checkbox" id="onlyUnmapped" onchange="applyFilters()">
+                Hanya belum di-mapping
+            </label>
             <label class="ads-toggle" style="margin-left:auto">
                 <input type="checkbox" id="hideInactive" checked onchange="applyFilters()">
                 Sembunyikan 0-spend
@@ -250,6 +268,8 @@
     let allRows  = [];
     let filtered = [];
     let stores   = [];
+    let groups   = [];
+    let view     = 'campaign'; // campaign | item | group
     let sortCol  = 'spend';
     let sortDir  = 'desc';
     let page     = 1;
@@ -489,12 +509,44 @@
         const from = $('dateFrom').value;
         const to   = $('dateTo').value;
         const sid  = $('adsStoreId').value;
-        const url  = `/api/marketplace/ads-analytics?date_from=${from}&date_to=${to}` + (sid ? `&store_id=${sid}` : '');
+        const url  = `/api/marketplace/ads-analytics?date_from=${from}&date_to=${to}&group_by=${view}` + (sid ? `&store_id=${sid}` : '');
 
-        const data = await api(url).catch(() => ({ rows: [], kpi: {} }));
+        const data = await api(url).catch(() => ({ rows: [], kpi: {}, groups: [] }));
         allRows = (data.rows || []).slice();
+        groups  = data.groups || [];
         renderKpi(data.kpi || {});
+        renderUnmapped(data.kpi || {});
         page = 1;
+        applyFilters();
+    };
+
+    // ── View toggle: Campaign / Item / Grup ────────────────────────────────────
+    window.setView = function (v) {
+        if (view === v) return;
+        view = v;
+        document.querySelectorAll('[data-view]').forEach(b =>
+            b.classList.toggle('active', b.dataset.view === v));
+        // filter "hanya belum di-mapping" hanya relevan di view campaign/item
+        $('unmappedFilterWrap').style.display = (v === 'campaign' || v === 'item') ? '' : 'none';
+        sortCol = 'spend'; sortDir = 'desc';
+        loadAds();
+    };
+
+    function renderUnmapped(kpi) {
+        const badge = $('unmappedBadge');
+        const n = kpi.unmapped || 0;
+        if (n > 0 && view !== 'group') {
+            badge.style.display = '';
+            badge.textContent = `⚠️ ${n} belum di-mapping`;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    window.toggleUnmappedFilter = function () {
+        const cb = $('onlyUnmapped');
+        cb.checked = !cb.checked;
+        $('unmappedFilterWrap').style.display = '';
         applyFilters();
     };
 
@@ -520,12 +572,18 @@
         const fReco    = $('filterReco').value;
         const hideZero = $('hideInactive').checked;
 
+        const onlyUnmapped = $('onlyUnmapped').checked;
+
         filtered = allRows.filter(r => {
             if (hideZero && Number(r.spend || 0) === 0) return false;
             if (q && !(r.campaign_name || '').toLowerCase().includes(q) &&
-                     !String(r.campaign_id).includes(q)) return false;
-            if (fStatus && r.status !== fStatus) return false;
+                     !(r.item_name || '').toLowerCase().includes(q) &&
+                     !(r.item_code || '').toLowerCase().includes(q) &&
+                     !String(r.campaign_id ?? '').includes(q)) return false;
+            // Status & reco filter hanya untuk baris campaign (bukan agregat)
+            if (fStatus && !r.is_group && r.status !== fStatus) return false;
             if (fReco   && (r.reco?.icon ?? '') !== fReco) return false;
+            if (onlyUnmapped && r.internal_item_id) return false;
             return true;
         });
 
@@ -578,17 +636,21 @@
             return `<th class="sortable ${cls} ${align === 'right' ? 'text-end' : ''}" onclick="sortBy('${col}')">${label}<span class="sort-icon"></span></th>`;
         }
 
+        const firstLabel = view === 'item' ? 'Item Internal' : view === 'group' ? 'Grup' : 'Campaign';
+        const showMapCol = view === 'campaign';
+
         body.innerHTML = `
         <div class="gf-table-scroll">
         <table class="gf-clean-table w-100">
             <thead><tr>
-                ${sortTh('campaign_name','Campaign','left')}
+                ${sortTh('campaign_name',firstLabel,'left')}
                 <th>Tipe</th>
+                ${showMapCol ? '<th>Item / Grup</th>' : ''}
                 ${sortTh('spend','Spend','right')}
                 ${sortTh('gmv','Sales','right')}
                 ${sortTh('roas','ROAS','right')}
                 ${sortTh('acos_pct','ACOS','right')}
-                <th class="text-end" title="Klik ✎ untuk set margin kotor">Break-Even ✎</th>
+                <th class="text-end" title="${showMapCol ? 'Klik ✎ untuk set margin kotor' : 'break-even tertimbang'}">Break-Even${showMapCol ? ' ✎' : ''}</th>
                 ${sortTh('profit_after_ads','Profit Stlh Iklan','right')}
                 ${sortTh('orders','Orders','right')}
                 ${sortTh('clicks','Klik','right')}
@@ -632,14 +694,42 @@
 
                 const isInactive = (r.spend || 0) === 0;
 
-                return `<tr class="${isInactive ? 'row-inactive' : ''}">
-                    <td style="max-width:220px">
+                // ── Sel pertama: berbeda per view ──────────────────────────
+                let firstCell;
+                if (r.is_group) {
+                    const dot = r.group_color ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${esc(r.group_color)};margin-right:5px"></span>` : '';
+                    const sub = r.item_code ? `<div style="font-size:.68rem;color:#94a3b8;font-family:monospace">${esc(r.item_code)}</div>` : '';
+                    firstCell = `<td style="max-width:240px">
+                        <div class="fw-bold" style="font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.campaign_name)}">${dot}${esc(r.campaign_name || '—')}</div>
+                        ${sub}
+                        <div style="font-size:.67rem;color:#94a3b8">${r.members} campaign digabung</div>
+                    </td>`;
+                } else {
+                    firstCell = `<td style="max-width:220px">
                         <div class="fw-bold" style="font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                             title="${esc(r.campaign_name || r.campaign_id)}">${esc(r.campaign_name || r.campaign_id || '—')}</div>
                         <div style="font-size:.68rem;color:#94a3b8;font-family:monospace">#${esc(String(r.campaign_id))}</div>
                         <div style="font-size:.67rem;font-weight:700;color:${statusColors[r.status]??'#94a3b8'}">${esc(r.status||'—')}</div>
-                    </td>
+                    </td>`;
+                }
+
+                // ── Sel mapping (hanya view campaign) ──────────────────────
+                let mapCell = '';
+                if (showMapCol) {
+                    const mapped = r.internal_item_id;
+                    const mapBadge = mapped
+                        ? `<span class="reco-badge reco-ok" style="cursor:pointer" onclick="mapItem(${r.id})" title="${esc((r.item_code||'')+' '+(r.item_name||''))}">🔗 ${esc(r.item_code || r.item_name || 'item')}</span>`
+                        : `<span class="reco-badge reco-warn" style="cursor:pointer" onclick="mapItem(${r.id})">＋ Map item</span>`;
+                    const grpChip = r.ad_group_id
+                        ? `<span class="type-pill" style="cursor:pointer;background:${r.group_color?esc(r.group_color)+'22':'#f1f5f9'}" onclick="assignGroup(${r.id})">${esc(r.group_name)}</span>`
+                        : `<span class="type-pill" style="cursor:pointer" onclick="assignGroup(${r.id})">＋ grup</span>`;
+                    mapCell = `<td style="max-width:170px"><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">${mapBadge}${grpChip}</div></td>`;
+                }
+
+                return `<tr class="${isInactive ? 'row-inactive' : ''}">
+                    ${firstCell}
                     <td><span class="type-pill">${esc(r.campaign_type || '—')}</span></td>
+                    ${mapCell}
                     <td class="text-end" style="font-size:.83rem;font-weight:700">${fmtRp(r.spend)}</td>
                     <td class="text-end" style="font-size:.83rem;font-weight:700;color:#0369a1">
                         ${fmtRp(r.gmv)}
@@ -653,10 +743,12 @@
                         ${barHtml}
                     </td>
                     <td class="text-end" style="font-size:.82rem">
-                        <span style="cursor:pointer;text-decoration:underline dotted;color:#0369a1;font-weight:800"
-                            onclick="editBreakEven(${r.id})" title="Klik untuk set break-even ACOS">
-                            ${bePct != null ? bePct + '%' : '<span style="color:#94a3b8">Set ✎</span>'}
-                        </span>
+                        ${r.is_group
+                            ? `<span style="font-weight:800;color:#475569">${bePct != null ? bePct + '%' : '—'}</span>`
+                            : `<span style="cursor:pointer;text-decoration:underline dotted;color:#0369a1;font-weight:800"
+                                onclick="editBreakEven(${r.id})" title="Klik untuk set break-even ACOS">
+                                ${bePct != null ? bePct + '%' : '<span style="color:#94a3b8">Set ✎</span>'}
+                               </span>`}
                     </td>
                     <td class="text-end" style="font-size:.83rem;font-weight:900;color:${profit===null?'#94a3b8':profit>=0?'#16a34a':'#b91c1c'}">
                         ${profit != null ? fmtRp(profit) : '<span style="color:#94a3b8;font-weight:400">—</span>'}
@@ -734,6 +826,120 @@
             method: 'PATCH',
             body: JSON.stringify({ break_even_acos: pct / 100 }),
         }).then(() => loadAds()).catch(e => alert('Gagal simpan: ' + e.message));
+    };
+
+    // ── Mapping campaign → item internal ───────────────────────────────────────
+    window.mapItem = function (rowId) {
+        const r = allRows.find(x => x.id === rowId);
+        if (!r) return;
+        let timer = null;
+
+        Swal.fire({
+            title: 'Mapping ke Item Internal',
+            html: `
+                <div style="text-align:left;font-size:.82rem">
+                    <div style="color:#64748b;margin-bottom:.4rem">Campaign: <b>${esc(r.campaign_name || r.campaign_id)}</b>
+                    ${r.channel_item_id ? `<br><span style="font-family:monospace;font-size:.72rem;color:#94a3b8">Shopee item_id: ${esc(String(r.channel_item_id))}</span>` : ''}</div>
+                    <input id="mapSearch" class="form-control" placeholder="Cari nama / kode item…" autocomplete="off" style="font-size:.85rem;border-radius:10px">
+                    <div id="mapResults" style="max-height:240px;overflow-y:auto;margin-top:.5rem"></div>
+                    ${r.internal_item_id ? `<button id="mapClear" class="btn btn-sm btn-light border w-100 mt-2" style="font-size:.78rem;border-radius:999px">✕ Hapus mapping (kembali ke otomatis)</button>` : ''}
+                </div>`,
+            showConfirmButton: false, showCloseButton: true, width: 460,
+            didOpen: () => {
+                const input = document.getElementById('mapSearch');
+                const box   = document.getElementById('mapResults');
+                const doSave = (itemId) => {
+                    api(`/api/marketplace/ad-campaigns/${rowId}/map-item`, {
+                        method: 'PATCH', body: JSON.stringify({ internal_item_id: itemId }),
+                    }).then(() => { Swal.close(); loadAds(); })
+                      .catch(e => alert('Gagal: ' + e.message));
+                };
+                const render = (items) => {
+                    box.innerHTML = items.length ? items.map(it => `
+                        <div class="map-opt" data-id="${it.id}" style="padding:.45rem .5rem;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;cursor:pointer">
+                            <div style="font-weight:700;font-size:.82rem">${esc(it.name || '—')}</div>
+                            <div style="font-size:.7rem;color:#94a3b8;font-family:monospace">${esc(it.code || '')} · HPP ${fmtRp(it.hpp || 0)}</div>
+                        </div>`).join('') : '<div style="color:#94a3b8;padding:.5rem">Tidak ada hasil.</div>';
+                    box.querySelectorAll('.map-opt').forEach(el =>
+                        el.onclick = () => doSave(parseInt(el.dataset.id)));
+                };
+                const search = (q) => api(`/api/marketplace/items/search?q=${encodeURIComponent(q)}`)
+                    .then(render).catch(() => box.innerHTML = '<div style="color:#dc2626;padding:.5rem">Gagal cari.</div>');
+                input.oninput = () => { clearTimeout(timer); timer = setTimeout(() => search(input.value.trim()), 250); };
+                search('');
+                input.focus();
+                const clr = document.getElementById('mapClear');
+                if (clr) clr.onclick = () => doSave(null);
+            },
+        });
+    };
+
+    // ── Assign campaign ke grup ────────────────────────────────────────────────
+    window.assignGroup = function (rowId) {
+        const r = allRows.find(x => x.id === rowId);
+        if (!r) return;
+        const opts = groups.map(g =>
+            `<option value="${g.id}" ${g.id === r.ad_group_id ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+        Swal.fire({
+            title: 'Assign ke Grup',
+            html: `<div style="text-align:left;font-size:.82rem">
+                <div style="color:#64748b;margin-bottom:.4rem">${esc(r.campaign_name || r.campaign_id)}</div>
+                <select id="grpSel" class="form-select" style="font-size:.85rem;border-radius:10px">
+                    <option value="">— tanpa grup —</option>${opts}
+                </select>
+                <button id="grpNew" class="btn btn-sm btn-light border mt-2" style="font-size:.76rem;border-radius:999px">＋ Grup baru</button>
+            </div>`,
+            showCancelButton: true, confirmButtonText: 'Simpan', cancelButtonText: 'Batal',
+            didOpen: () => {
+                document.getElementById('grpNew').onclick = async () => {
+                    const name = prompt('Nama grup baru:');
+                    if (!name) return;
+                    try {
+                        const d = await api('/api/marketplace/ad-groups', { method: 'POST', body: JSON.stringify({ name }) });
+                        groups.push(d.group);
+                        const sel = document.getElementById('grpSel');
+                        const o = document.createElement('option');
+                        o.value = d.group.id; o.textContent = d.group.name; o.selected = true;
+                        sel.appendChild(o);
+                    } catch (e) { alert('Gagal: ' + e.message); }
+                };
+            },
+            preConfirm: () => document.getElementById('grpSel').value,
+        }).then(res => {
+            if (!res.isConfirmed) return;
+            api(`/api/marketplace/ad-campaigns/${rowId}/group`, {
+                method: 'PATCH', body: JSON.stringify({ ad_group_id: res.value ? parseInt(res.value) : null }),
+            }).then(() => loadAds()).catch(e => alert('Gagal: ' + e.message));
+        });
+    };
+
+    // ── Kelola grup ────────────────────────────────────────────────────────────
+    window.manageGroups = function () {
+        const list = groups.length ? groups.map(g => `
+            <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px">
+                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${g.color || '#cbd5e1'}"></span>
+                <b style="font-size:.82rem">${esc(g.name)}</b>
+                <span style="font-size:.7rem;color:#94a3b8">${g.campaigns_count} campaign</span>
+            </div>`).join('') : '<div style="color:#94a3b8;padding:.5rem">Belum ada grup.</div>';
+        Swal.fire({
+            title: '🏷️ Kelola Grup',
+            html: `<div style="text-align:left">${list}
+                <button id="mgNew" class="btn btn-sm btn-dark w-100 mt-2" style="font-size:.8rem;border-radius:999px">＋ Buat Grup Baru</button>
+                <div style="font-size:.72rem;color:#94a3b8;margin-top:.5rem">Assign campaign ke grup lewat kolom "Item / Grup" di tabel (view Campaign).</div>
+            </div>`,
+            showConfirmButton: false, showCloseButton: true, width: 440,
+            didOpen: () => {
+                document.getElementById('mgNew').onclick = async () => {
+                    const name = prompt('Nama grup:');
+                    if (!name) return;
+                    const color = prompt('Warna (hex, opsional, mis. #2563eb):', '#2563eb') || null;
+                    try {
+                        await api('/api/marketplace/ad-groups', { method: 'POST', body: JSON.stringify({ name, color }) });
+                        Swal.close(); loadAds();
+                    } catch (e) { alert('Gagal: ' + e.message); }
+                };
+            },
+        });
     };
 
     init();

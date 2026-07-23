@@ -255,6 +255,8 @@
         $subsidiShopee = (float)($inc['shopee_discount'] ?? 0);
         $voucherToko = (float)($settlement->seller_voucher ?? $inc['seller_discount'] ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0);
         
+        $isEstimasi = false;
+        
         if ($settlement) {
             $biayaAdmin = abs((float)($settlement->commission_fee ?? 0)) + abs((float)($settlement->transaction_fee ?? 0));
             $biayaLayananSeller = abs((float)($settlement->service_fee ?? 0));
@@ -280,10 +282,12 @@
             if ($penghasilan <= 0) {
                 // Estimasi (saat data settlement/escrow belum ada)
                 if ($biayaLayanan == 0 && $biayaLainnya == 0) {
-                    $biayaLayanan = round((float)$subtotal * ((float)$estimatedFeeRatio ?? 0.15));
+                    $ratio = in_array($statusText, ['ready_to_ship', 'processed', 'shipped']) ? 0.24 : ((float)($estimatedFeeRatio ?? 0.15));
+                    $biayaLayanan = round((float)$subtotal * $ratio);
                     $biayaAdmin = $biayaLayanan; // For display
                 }
                 $penghasilan = (float)$subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
+                $isEstimasi = true;
             }
         }
         
@@ -312,7 +316,7 @@
     <div class="od-grid-2">
         <div class="od-card">
             <div class="od-head">
-                <div class="od-title">Penghasilan Akhir</div>
+                <div style="font-weight:500; color:#64748b; font-size:.85rem; margin-bottom:2px">{{ $isEstimasi ? 'Estimasi ' : '' }}Penghasilan Akhir</div>
                 <div style="font-weight:900; color:#166534; font-size:1.1rem">Rp{{ number_format($penghasilan, 0, ',', '.') }}</div>
             </div>
             <div class="od-body od-list" style="border-top:1px solid rgba(148,163,184,.12)">
@@ -378,11 +382,6 @@
                 </div>
                 @endif
                 
-                <div style="display:flex; justify-content:space-between; margin-top:.8rem; padding-top:.5rem; border-top:1px dashed rgba(148,163,184,.3)">
-                    <span style="font-weight:800; color:#111827">Total Penghasilan</span>
-                    <span class="od-code-cell" style="font-size:1rem; color:#166534">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
-                </div>
-
                 <div style="margin-top:1.5rem">
                     <div style="font-weight:700; color:#334155; margin-bottom:.5rem">Penyesuaian Pesanan</div>
                     <table style="width:100%; border-collapse:collapse; font-size:.85rem; text-align:left">
@@ -402,7 +401,7 @@
                 </div>
 
                 <div style="display:flex; justify-content:space-between; margin-top:1.5rem; padding-top:.5rem; border-top:1px solid rgba(148,163,184,.3)">
-                    <span style="font-weight:800; color:#111827; font-size:1.1rem">Penghasilan Akhir</span>
+                    <span style="font-weight:800; color:#111827; font-size:1.1rem">{{ $isEstimasi ? 'Estimasi ' : '' }}Penghasilan Akhir</span>
                     <span class="od-code-cell" style="font-size:1.1rem; font-weight:900; color:#166534">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
                 </div>
             </div>

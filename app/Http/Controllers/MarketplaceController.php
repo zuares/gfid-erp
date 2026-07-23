@@ -6,6 +6,8 @@ use App\Http\Requests\SyncOrdersRequest;
 use App\Models\Channel;
 use App\Models\ItemCostSnapshot;
 use App\Models\MarketplaceAdCampaign;
+use App\Models\MarketplaceAdGroup;
+use App\Models\MarketplaceAdItemMap;
 use App\Models\MarketplaceOrder;
 use App\Models\Item;
 use App\Models\MarketplaceOrderItem;
@@ -1907,92 +1909,218 @@ class MarketplaceController extends Controller
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
         $dateTo   = $request->input('date_to',   now()->toDateString());
         $storeId  = $request->input('store_id');
+        $groupBy  = $request->input('group_by', 'campaign'); // campaign | item | group
 
-        // ── 1. Ambil campaign dari tabel API-synced ──────────────────────────
-        $query = MarketplaceAdCampaign::with('store:id,name')
-            ->where('report_date_from', '>=', $dateFrom)
-            ->where('report_date_to',   '<=', $dateTo)
-            ->orderByDesc('spend');
+        // ── 1. Agregasi metrik harian per campaign dalam rentang tanggal ──────
+        //    Grain data ada di marketplace_ad_campaign_dailies → dijumlahkan
+        //    supaya rentang tanggal apapun akurat (bukan bergantung range sync).
+        $agg = \DB::table('marketplace_ad_campaign_dailies')
+            ->select(
+                'store_id',
+                'channel_campaign_id',
+                \DB::raw('SUM(expense) as spend'),
+                \DB::raw('SUM(broad_gmv) as gmv'),
+                \DB::raw('SUM(direct_gmv) as direct_gmv'),
+                \DB::raw('SUM(impressions) as impressions'),
+                \DB::raw('SUM(clicks) as clicks'),
+                \DB::raw('SUM(broad_order) as orders'),
+                \DB::raw('SUM(direct_order) as items_sold'),
+            )
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->groupBy('store_id', 'channel_campaign_id')
+            ->get()
+            ->keyBy(fn ($r) => $r->store_id . '|' . $r->channel_campaign_id);
 
-        if ($storeId) {
-            $query->where('store_id', $storeId);
-        }
-
-        $campaigns = $query->limit(200)->get();
-
-        if ($campaigns->isEmpty()) {
+        if ($agg->isEmpty()) {
             return response()->json([
-                'rows' => [],
-                'kpi'  => ['spend' => 0, 'gmv' => 0, 'roas' => null, 'acos' => null,
-                           'orders' => 0, 'clicks' => 0, 'profit_after_ads' => null],
+                'rows'   => [],
+                'groups' => $this->adGroupsPayload(),
+                'view'   => $groupBy,
+                'kpi'    => ['spend' => 0, 'gmv' => 0, 'roas' => null, 'acos' => null,
+                             'orders' => 0, 'clicks' => 0, 'profit_after_ads' => null],
             ]);
         }
 
-        // ── 2. Build rows dengan break-even ACOS + rekomendasi ───────────────
-        // Break-even ACOS untuk campaign-level: pakai nilai manual dari DB jika ada,
-        // atau biarkan null (user bisa set via endpoint update).
-        $rows = $campaigns->map(function (MarketplaceAdCampaign $c) {
-            $spend     = (float) $c->spend;
-            $gmv       = (float) $c->gmv;
-            $orders    = (int) $c->orders;
+        // ── 2. Master campaign (identitas + mapping + grup + break-even) ──────
+        $masters = MarketplaceAdCampaign::with(['store:id,name', 'internalItem:id,code,name', 'group:id,name,color'])
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->whereIn('channel_campaign_id', $agg->pluck('channel_campaign_id')->unique()->all())
+            ->get()
+            ->keyBy(fn ($c) => $c->store_id . '|' . $c->channel_campaign_id);
 
-            // ACOS (0..1) — hitung dari data mentah agar akurat
+        // ── 3. Build baris campaign-level ─────────────────────────────────────
+        $campaignRows = collect();
+        foreach ($agg as $key => $a) {
+            $c = $masters->get($key);
+            if (! $c) continue;
+
+            $spend  = (float) $a->spend;
+            $gmv    = (float) $a->gmv;
+            $orders = (int) $a->orders;
+            $clicks = (int) $a->clicks;
+            $units  = (int) $a->items_sold;
+
             $acos = $gmv > 0 && $spend > 0 ? round($spend / $gmv, 4) : null;
-
-            // ROAS
             $roas = $spend > 0 ? round($gmv / $spend, 2) : null;
+            $cpc  = $clicks > 0 ? round($spend / $clicks, 2) : null;
 
-            // Break-even ACOS dari kolom manual (user bisa di-set)
-            $beAcos  = $c->break_even_acos !== null ? (float) $c->break_even_acos : null;
-            $bePct   = $beAcos !== null ? round($beAcos * 100, 1) : null;
+            // Break-even ACOS efektif (override manual atau derivasi HPP item)
+            $beAcos = $c->break_even_acos !== null
+                ? (float) $c->break_even_acos
+                : $this->deriveBreakEvenAcos($c->internalItem, $gmv, $units);
+            $bePct  = $beAcos !== null ? round($beAcos * 100, 1) : null;
 
-            // Profit setelah iklan: hanya bisa dihitung jika break-even ACOS diset
-            // gross_margin = beAcos × gmv → profit_after_ads = gmv×beAcos - spend
             $profitAfterAds = ($beAcos !== null) ? round($gmv * $beAcos - $spend, 2) : null;
-
             $reco = $this->adsRecommendation($spend, $acos, $beAcos, $orders);
 
-            return [
+            $campaignRows->push([
                 'id'              => $c->id,
+                'store_id'        => $c->store_id,
                 'store_name'      => $c->store?->name,
                 'campaign_id'     => $c->channel_campaign_id,
                 'campaign_name'   => $c->campaign_name,
                 'campaign_type'   => $c->campaign_type,
                 'status'          => $c->status,
+                'channel_item_id' => $c->channel_item_id,
+                'internal_item_id'=> $c->internal_item_id,
+                'item_code'       => $c->internalItem?->code,
+                'item_name'       => $c->internalItem?->name,
+                'mapping_status'  => $c->mapping_status,
+                'ad_group_id'     => $c->ad_group_id,
+                'group_name'      => $c->group?->name,
+                'group_color'     => $c->group?->color,
                 'spend'           => $spend,
                 'gmv'             => $gmv,
-                'direct_gmv'      => (float) $c->direct_gmv,
-                'impressions'     => (int) $c->impressions,
-                'clicks'          => (int) $c->clicks,
+                'direct_gmv'      => (float) $a->direct_gmv,
+                'impressions'     => (int) $a->impressions,
+                'clicks'          => $clicks,
                 'orders'          => $orders,
-                'items_sold'      => (int) $c->items_sold,
+                'items_sold'      => $units,
                 'roas'            => $roas,
-                'direct_roas'     => $c->direct_roas !== null ? (float) $c->direct_roas : null,
-                'cpc'             => $c->cpc !== null ? (float) $c->cpc : null,
+                'cpc'             => $cpc,
                 'acos'            => $acos,
                 'acos_pct'        => $acos !== null ? round($acos * 100, 1) : null,
                 'break_even_acos'     => $beAcos,
                 'break_even_acos_pct' => $bePct,
                 'profit_after_ads'    => $profitAfterAds,
                 'reco'            => $reco,
-            ];
-        });
+            ]);
+        }
 
-        // ── 3. Overall KPI ────────────────────────────────────────────────────
-        $totSpend  = $rows->sum('spend');
-        $totGmv    = $rows->sum('gmv');
+        // ── 4. Regroup jika perlu (per item internal / per grup) ──────────────
+        $rows = match ($groupBy) {
+            'item'  => $this->aggregateAdRows($campaignRows, 'internal_item_id',
+                fn ($r) => $r['item_name'] ?? ($r['internal_item_id'] ? 'Item #' . $r['internal_item_id'] : '⚠ Belum di-mapping'),
+                fn ($r) => ['item_code' => $r['item_code'], 'internal_item_id' => $r['internal_item_id']]),
+            'group' => $this->aggregateAdRows($campaignRows, 'ad_group_id',
+                fn ($r) => $r['group_name'] ?? '— Tanpa Grup —',
+                fn ($r) => ['ad_group_id' => $r['ad_group_id'], 'group_color' => $r['group_color']]),
+            default => $campaignRows->sortByDesc('spend')->values(),
+        };
 
+        // ── 5. Overall KPI (selalu level campaign) ────────────────────────────
+        $totSpend = $campaignRows->sum('spend');
+        $totGmv   = $campaignRows->sum('gmv');
         $kpi = [
-            'spend'           => $totSpend,
-            'gmv'             => $totGmv,
-            'roas'            => $totSpend > 0 ? round($totGmv / $totSpend, 2) : null,
-            'acos'            => $totGmv  > 0 ? round($totSpend / $totGmv * 100, 1) : null,
-            'orders'          => $rows->sum('orders'),
-            'clicks'          => $rows->sum('clicks'),
-            'profit_after_ads' => $rows->filter(fn ($r) => $r['profit_after_ads'] !== null)->sum('profit_after_ads') ?: null,
+            'spend'            => $totSpend,
+            'gmv'              => $totGmv,
+            'roas'             => $totSpend > 0 ? round($totGmv / $totSpend, 2) : null,
+            'acos'             => $totGmv  > 0 ? round($totSpend / $totGmv * 100, 1) : null,
+            'orders'           => $campaignRows->sum('orders'),
+            'clicks'           => $campaignRows->sum('clicks'),
+            'profit_after_ads' => $campaignRows->filter(fn ($r) => $r['profit_after_ads'] !== null)->sum('profit_after_ads') ?: null,
+            'unmapped'         => $campaignRows->where('internal_item_id', null)->count(),
         ];
 
-        return response()->json(compact('rows', 'kpi'));
+        return response()->json([
+            'rows'   => $rows->values(),
+            'groups' => $this->adGroupsPayload(),
+            'view'   => $groupBy,
+            'kpi'    => $kpi,
+        ]);
+    }
+
+    /**
+     * Break-even ACOS (0..1) diturunkan dari harga jual teramati (gmv/unit)
+     * vs HPP item internal. Null jika data tak cukup.
+     */
+    private function deriveBreakEvenAcos(?Item $item, float $gmv, int $units): ?float
+    {
+        if (! $item || $units <= 0 || $gmv <= 0) return null;
+        $hpp = (float) ($item->hpp ?? $item->base_unit_cost ?? 0);
+        if ($hpp <= 0) return null;
+        $avgPrice = $gmv / $units;
+        if ($hpp >= $avgPrice) return null;
+        return round(($avgPrice - $hpp) / $avgPrice, 6);
+    }
+
+    /**
+     * Agregasi baris campaign menjadi baris grup (per item / per grup).
+     * Rasio dihitung ulang; profit dijumlahkan; break-even = rata-rata tertimbang gmv.
+     */
+    private function aggregateAdRows($campaignRows, string $keyField, callable $labelFn, callable $metaFn)
+    {
+        return $campaignRows
+            ->groupBy(fn ($r) => $r[$keyField] ?? '∅')
+            ->map(function ($group) use ($keyField, $labelFn, $metaFn) {
+                $first  = $group->first();
+                $spend  = $group->sum('spend');
+                $gmv    = $group->sum('gmv');
+                $orders = $group->sum('orders');
+                $clicks = $group->sum('clicks');
+
+                $acos = $gmv > 0 && $spend > 0 ? round($spend / $gmv, 4) : null;
+                $roas = $spend > 0 ? round($gmv / $spend, 2) : null;
+
+                $beWeighted = $group->filter(fn ($r) => $r['break_even_acos'] !== null && $r['gmv'] > 0);
+                $beAcos = $beWeighted->isNotEmpty() && $beWeighted->sum('gmv') > 0
+                    ? round($beWeighted->sum(fn ($r) => $r['break_even_acos'] * $r['gmv']) / $beWeighted->sum('gmv'), 4)
+                    : null;
+                $bePct  = $beAcos !== null ? round($beAcos * 100, 1) : null;
+
+                $profit = $group->filter(fn ($r) => $r['profit_after_ads'] !== null)->sum('profit_after_ads') ?: null;
+                $reco   = $this->adsRecommendation($spend, $acos, $beAcos, $orders);
+
+                return array_merge([
+                    'id'              => $keyField . ':' . ($first[$keyField] ?? 'none'),
+                    'is_group'        => true,
+                    'campaign_id'     => null,
+                    'campaign_name'   => $labelFn($first),
+                    'campaign_type'   => $group->count() . ' campaign',
+                    'status'          => null,
+                    'members'         => $group->count(),
+                    'spend'           => $spend,
+                    'gmv'             => $gmv,
+                    'direct_gmv'      => $group->sum('direct_gmv'),
+                    'impressions'     => $group->sum('impressions'),
+                    'clicks'          => $clicks,
+                    'orders'          => $orders,
+                    'items_sold'      => $group->sum('items_sold'),
+                    'roas'            => $roas,
+                    'cpc'             => $clicks > 0 ? round($spend / $clicks, 2) : null,
+                    'acos'            => $acos,
+                    'acos_pct'        => $acos !== null ? round($acos * 100, 1) : null,
+                    'break_even_acos'     => $beAcos,
+                    'break_even_acos_pct' => $bePct,
+                    'profit_after_ads'    => $profit,
+                    'reco'            => $reco,
+                ], $metaFn($first));
+            })
+            ->sortByDesc('spend')
+            ->values();
+    }
+
+    /** Daftar semua grup iklan untuk UI (dengan jumlah campaign). */
+    private function adGroupsPayload()
+    {
+        return MarketplaceAdGroup::withCount('campaigns')
+            ->orderBy('name')
+            ->get(['id', 'name', 'color', 'notes'])
+            ->map(fn ($g) => [
+                'id' => $g->id, 'name' => $g->name, 'color' => $g->color,
+                'notes' => $g->notes, 'campaigns_count' => $g->campaigns_count,
+            ]);
     }
 
     public function updateCampaignBreakEven(Request $request, MarketplaceAdCampaign $campaign): JsonResponse
@@ -2006,6 +2134,106 @@ class MarketplaceController extends Controller
         return response()->json([
             'message'         => 'Break-even ACOS diperbarui.',
             'break_even_acos' => (float) $campaign->break_even_acos,
+        ]);
+    }
+
+    /**
+     * Mapping manual campaign iklan → item internal.
+     * Menyimpan override di marketplace_ad_item_maps (agar bertahan saat re-sync)
+     * dan langsung meng-update campaign.
+     */
+    public function mapCampaignItem(Request $request, MarketplaceAdCampaign $campaign): JsonResponse
+    {
+        $data = $request->validate([
+            'internal_item_id' => ['nullable', 'integer', 'exists:items,id'],
+        ]);
+
+        if (empty($data['internal_item_id'])) {
+            // Batalkan override → kembalikan ke resolusi otomatis
+            MarketplaceAdItemMap::query()
+                ->where('channel_code', 'shopee')
+                ->where(function ($q) use ($campaign) {
+                    if ($campaign->channel_item_id) $q->orWhere('channel_item_id', $campaign->channel_item_id);
+                    $q->orWhere('channel_campaign_id', $campaign->channel_campaign_id);
+                })->delete();
+
+            app(\App\Services\AdItemMapper::class)->applyTo($campaign);
+            $campaign->save();
+
+            return response()->json([
+                'message'          => 'Override mapping dihapus, kembali ke otomatis.',
+                'internal_item_id' => $campaign->internal_item_id,
+                'mapping_status'   => $campaign->mapping_status,
+            ]);
+        }
+
+        MarketplaceAdItemMap::updateOrCreate(
+            $campaign->channel_item_id
+                ? ['channel_code' => 'shopee', 'channel_item_id' => $campaign->channel_item_id]
+                : ['channel_code' => 'shopee', 'channel_campaign_id' => $campaign->channel_campaign_id],
+            [
+                'store_id'            => $campaign->store_id,
+                'channel_campaign_id' => $campaign->channel_campaign_id,
+                'internal_item_id'    => $data['internal_item_id'],
+                'created_by'          => $request->user()?->id,
+            ]
+        );
+
+        $campaign->update([
+            'internal_item_id' => $data['internal_item_id'],
+            'mapping_status'   => 'manual',
+            'mapping_source'   => 'manual',
+        ]);
+
+        return response()->json([
+            'message'          => 'Item internal berhasil di-mapping.',
+            'internal_item_id' => $campaign->internal_item_id,
+            'item'             => optional(Item::find($data['internal_item_id']))->only(['id', 'code', 'name']),
+            'mapping_status'   => 'manual',
+        ]);
+    }
+
+    /** Buat grup iklan. */
+    public function storeAdGroup(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name'  => ['required', 'string', 'max:120'],
+            'color' => ['nullable', 'string', 'max:20'],
+            'notes' => ['nullable', 'string'],
+        ]);
+        $data['created_by'] = $request->user()?->id;
+
+        $group = MarketplaceAdGroup::create($data);
+
+        return response()->json(['message' => 'Grup dibuat.', 'group' => $group], 201);
+    }
+
+    /** Update grup iklan. */
+    public function updateAdGroup(Request $request, MarketplaceAdGroup $group): JsonResponse
+    {
+        $data = $request->validate([
+            'name'  => ['sometimes', 'string', 'max:120'],
+            'color' => ['nullable', 'string', 'max:20'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $group->update($data);
+
+        return response()->json(['message' => 'Grup diperbarui.', 'group' => $group]);
+    }
+
+    /** Assign / lepas campaign dari grup. */
+    public function assignCampaignGroup(Request $request, MarketplaceAdCampaign $campaign): JsonResponse
+    {
+        $data = $request->validate([
+            'ad_group_id' => ['nullable', 'integer', 'exists:marketplace_ad_groups,id'],
+        ]);
+
+        $campaign->update(['ad_group_id' => $data['ad_group_id'] ?? null]);
+
+        return response()->json([
+            'message'     => $data['ad_group_id'] ? 'Campaign dimasukkan ke grup.' : 'Campaign dikeluarkan dari grup.',
+            'ad_group_id' => $campaign->ad_group_id,
         ]);
     }
 
