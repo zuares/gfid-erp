@@ -9,14 +9,14 @@
     <div class="ship-topbar">
         <div>
             <h1 class="title">Profit per Order</h1>
-            <div class="sub">Harga jual dikurangi HPP, fee marketplace, voucher, dan promosi — profit bersih per order.</div>
+            <div class="sub">Harga jual dikurangi COGS, fee marketplace, voucher, dan promosi — profit bersih per order.</div>
             <div class="sub" id="lastSyncLabel" style="margin-top:4px; font-size:0.75rem; color:#64748b; font-weight: 500;">
                 Terakhir Sync: <span id="lastSyncTime">—</span>
             </div>
         </div>
         <div class="controls">
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="syncFinance()">Sync Manual</button>
-            <button class="btn btn-sm btn-dark btn-pill" onclick="syncHpp()" style="border-radius:999px;font-weight:600">Sync HPP</button>
+            <button class="btn btn-sm btn-dark btn-pill" onclick="syncHpp()" style="border-radius:999px;font-weight:600">Sync COGS</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="exportCsv()">Export CSV</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="loadProfits()">Refresh</button>
@@ -24,7 +24,7 @@
     </div>
 
     <div id="profitHppWarning" class="alert alert-warning d-none mb-3" style="border-radius:8px;font-size:.85rem">
-        ⚠️ Beberapa order tidak memiliki mapping SKU → Item, sehingga HPP-nya <strong>0</strong>. Lengkapi <a href="{{ route('marketplace.sku-mapping') }}">SKU Mapping</a> dan pastikan sudah ada <em>HPP Snapshot</em> aktif.
+        ⚠️ Beberapa order tidak memiliki mapping SKU → Item, sehingga COGS-nya <strong>0</strong>. Lengkapi <a href="{{ route('marketplace.sku-mapping') }}">SKU Mapping</a> dan pastikan sudah ada <em>COGS Snapshot</em> aktif.
     </div>
 
     <style>
@@ -97,7 +97,7 @@
             
             <div class="filter-item">
                 <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterHppStatus" onchange="loadProfits()">
-                    <option value="">HPP</option>
+                    <option value="">COGS</option>
                     <option value="empty">Kosong</option>
                     <option value="mapped">Terisi</option>
                 </select>
@@ -144,7 +144,7 @@
             <div class="oc-kpi-value" id="kpiOmzet" style="font-size: 1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
         </div>
         <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-            <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total HPP">Total HPP</div>
+            <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total COGS">Total COGS</div>
             <div class="oc-kpi-value" id="kpiHpp" style="font-size: 1.05rem; color:#b45309; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
         </div>
         <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
@@ -288,7 +288,7 @@
     }
 
     async function syncFinance() {
-        if (!confirm('Jalankan proses sync data finance (order, settlement, hpp, ads)? Proses ini akan berjalan di latar belakang.')) return;
+        if (!confirm('Jalankan proses sync data finance (order, settlement, cogs, ads)? Proses ini akan berjalan di latar belakang.')) return;
         try {
             const btn = document.querySelector('button[onclick="syncFinance()"]');
             const oldText = btn.innerHTML;
@@ -343,7 +343,7 @@
     };
 
     window.syncHpp = async function() {
-        if (!confirm('Tarik HPP terbaru dari master produk untuk semua order yang sudah ter-mapping?')) return;
+        if (!confirm('Tarik COGS terbaru dari master produk untuk semua order yang sudah ter-mapping?')) return;
         
         // Find the button and show loading state
         const btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
@@ -506,7 +506,7 @@
                     <th class="text-end" style="min-width:90px">Harga Jual</th>
                     <th class="text-end" style="min-width:110px">Promosi Seller</th>
                     <th class="text-end" style="min-width:100px">Dana Cair</th>
-                    <th class="text-end" title="HPP dari snapshot aktif">HPP</th>
+                    <th class="text-end" title="COGS dari snapshot aktif">COGS</th>
                     <th class="text-end" style="color:#16a34a;font-weight:900">Profit</th>
                     <th class="text-end">Margin</th>
                 </tr>
@@ -537,7 +537,7 @@
                         <div style="margin-top:6px; border-top:1px dashed var(--shp-border); padding-top:4px;">
                             ${r.items.map(i => `
                                 <div style="display:flex; align-items:center; gap:4px; font-size:.68rem; margin-bottom:2px;" title="${esc(i.sku)} (Qty: ${i.qty})">
-                                    ${i.mapped ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#b91c1c;font-weight:bold" title="Belum di-mapping atau HPP kosong">!</span>'}
+                                    ${i.mapped ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#b91c1c;font-weight:bold" title="Belum di-mapping atau COGS kosong">!</span>'}
                                     <span style="color:var(--shp-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; flex:1;">${esc(i.sku)}</span>
                                     <span style="color:#94a3b8">x${i.qty}</span>
                                 </div>
@@ -575,7 +575,7 @@
                     </td>
 
                     <td class="text-end" style="font-size:.78rem;color:#b45309">${hppLabel}
-                        ${r.hpp_total > 0 ? `<div style="font-size:.66rem;color:#94a3b8">HPP unit tersimpan</div>` : ''}
+                        ${r.hpp_total > 0 ? `<div style="font-size:.66rem;color:#94a3b8">COGS unit tersimpan</div>` : ''}
                     </td>
 
                     <td class="text-end fw-black" style="font-size:.88rem;color:${profitColor}">${fmtRp(r.profit_net)}</td>
