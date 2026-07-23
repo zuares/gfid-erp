@@ -124,7 +124,7 @@ class MarketplaceOrderController extends Controller
                     if (!empty($resEscrow['response']['order_income'])) {
                         $liveData['income_details'] = $resEscrow['response']['order_income'];
                     }
-                    $order->raw_json = json_encode($liveData);
+                    $order->raw_json = $liveData;
                     $order->save();
                 }
             } catch (\Exception $e) {

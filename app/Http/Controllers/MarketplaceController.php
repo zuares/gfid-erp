@@ -1378,48 +1378,57 @@ class MarketplaceController extends Controller
 
     public function orderProfits(Request $request): JsonResponse
     {
-        $query = MarketplaceOrderSettlement::with([
+        $query = MarketplaceOrder::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'order:id,channel_order_id,order_status,ordered_at',
-            'order.items:id,marketplace_order_id,model_sku,item_sku,qty,price,mapping_status,internal_item_id,hpp_snapshot',
-        ])->latest('settlement_time');
+            'settlement',
+            'items:id,marketplace_order_id,model_sku,item_sku,qty,price,mapping_status,internal_item_id,hpp_snapshot',
+        ])
+        ->where(function($q) {
+            $q->whereNotIn('order_status', ['UNPAID', 'CANCELLED'])
+              ->orWhereHas('settlement');
+        });
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->store_id);
         }
 
         if ($request->filled('order_date_from')) {
-            $query->whereHas('order', function ($q) use ($request) {
-                $q->whereDate('ordered_at', '>=', $request->order_date_from);
-            });
+            $query->whereDate('ordered_at', '>=', $request->order_date_from);
         }
 
         if ($request->filled('order_date_to')) {
-            $query->whereHas('order', function ($q) use ($request) {
-                $q->whereDate('ordered_at', '<=', $request->order_date_to);
-            });
+            $query->whereDate('ordered_at', '<=', $request->order_date_to);
         }
 
         if ($request->filled('settlement_date_from')) {
-            $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
+            $query->whereHas('settlement', function ($q) use ($request) {
+                $q->whereDate('settlement_time', '>=', $request->settlement_date_from);
+            });
         }
 
         if ($request->filled('settlement_date_to')) {
-            $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
+            $query->whereHas('settlement', function ($q) use ($request) {
+                $q->whereDate('settlement_time', '<=', $request->settlement_date_to);
+            });
         }
 
         if ($request->filled('status')) {
-            $query->whereHas('order', function ($q) use ($request) {
-                $q->where('order_status', $request->status);
-            });
+            $query->where('order_status', $request->status);
         }
 
         if ($request->filled('settlement_status')) {
             if ($request->settlement_status === 'cair') {
-                $query->whereNotNull('settlement_time');
+                $query->whereHas('settlement', function($q) {
+                    $q->whereNotNull('settlement_time');
+                });
             } elseif ($request->settlement_status === 'belum_cair') {
-                $query->whereNull('settlement_time');
+                $query->where(function($q) {
+                    $q->doesntHave('settlement')
+                      ->orWhereHas('settlement', function($q2) {
+                          $q2->whereNull('settlement_time');
+                      });
+                });
             }
         }
 
@@ -1427,7 +1436,7 @@ class MarketplaceController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('channel_order_id', 'like', "%{$search}%")
-                  ->orWhereHas('order.items', function ($qi) use ($search) {
+                  ->orWhereHas('items', function ($qi) use ($search) {
                       $qi->where('item_name', 'like', "%{$search}%")
                          ->orWhere('model_sku', 'like', "%{$search}%")
                          ->orWhere('item_sku', 'like', "%{$search}%");
@@ -1435,17 +1444,17 @@ class MarketplaceController extends Controller
             });
         }
 
-        $settlements = $query->get();
+        $orders = $query->get();
 
         // Pre-load HPP: build map sku → hpp_unit
         // Collect all unique SKUs from all items
-        $allSkus = $settlements->flatMap(fn ($s) => $s->order?->items ?? collect())
+        $allSkus = $orders->flatMap(fn ($o) => $o->items ?? collect())
             ->map(fn ($item) => $item->model_sku ?: $item->item_sku)
             ->filter()
             ->unique()
             ->values();
 
-        $channelCode = $settlements->first()?->store?->channel?->code;
+        $channelCode = $orders->first()?->store?->channel?->code;
 
         // Build sku → item_id map via SkuMapping
         $skuMappings = SkuMapping::whereIn('marketplace_sku', $allSkus)
@@ -1473,8 +1482,9 @@ class MarketplaceController extends Controller
             $skuToHpp[$sku] = $costSnapshots[$itemId] ?? null;
         }
 
-        $rows = $settlements->map(function ($s) use ($skuToHpp) {
-            $items    = $s->order?->items ?? collect();
+        $rows = $orders->map(function ($order) use ($skuToHpp) {
+            $s = $order->settlement;
+            $items    = $order->items ?? collect();
             $hppTotal = 0.0;
             $hppMapped = true;
 
@@ -1502,40 +1512,61 @@ class MarketplaceController extends Controller
                 ];
             }
 
-            $finalIncome = (float) $s->final_income;
-            $adCost      = (float) $s->ad_cost;
+            $rawJson = $s && $s->raw_json ? $s->raw_json : $order->raw_json;
+            if (is_string($rawJson)) {
+                $rawJson = json_decode($rawJson, true);
+            }
+
+            $baseAmount = (float) ($order->total_paid_customer > 0 ? $order->total_paid_customer : $order->total_amount);
+            $inc = $rawJson['income_details'] ?? [];
+            $escrowAmount = (float)($inc['escrow_amount'] ?? $rawJson['payment_info']['net_revenue'] ?? 0);
+            $isCompleted = in_array(strtoupper($order->order_status ?: $order->status), ['COMPLETED', 'SELESAI']);
+
+            if ($s && $s->final_income !== null && (float)$s->final_income > 0) {
+                $finalIncome = (float) $s->final_income;
+            } else if ($isCompleted && $escrowAmount > 0) {
+                $finalIncome = $escrowAmount;
+            } else if ($isCompleted && $order->net_payout_estimated > 0) {
+                $finalIncome = (float) $order->net_payout_estimated;
+            } else {
+                // Estimasi potong admin fee 24% (Hanya untuk belum selesai / belum ada data)
+                $finalIncome = $baseAmount * 0.76;
+            }
+
+            $adCost      = $s ? (float) $s->ad_cost : 0.0;
             $profitNet   = $finalIncome - $hppTotal - $adCost;
+            $buyerPayment = $s ? (float) $s->buyer_payment_amount : ($isCompleted && !empty($inc['buyer_total_amount']) ? (float)$inc['buyer_total_amount'] : $baseAmount);
 
             return [
-                'id'                    => $s->id,
-                'channel_order_id'      => $s->channel_order_id,
-                'store'                 => $s->store ? ['id' => $s->store->id, 'name' => $s->store->name] : null,
-                'order'                 => $s->order ? [
-                    'id'           => $s->order->id,
-                    'order_status' => $s->order->order_status,
-                    'ordered_at'   => $s->order->ordered_at?->toISOString(),
-                ] : null,
+                'id'                    => $s ? $s->id : null,
+                'channel_order_id'      => $order->channel_order_id,
+                'store'                 => $order->store ? ['id' => $order->store->id, 'name' => $order->store->name] : null,
+                'order'                 => [
+                    'id'           => $order->id,
+                    'order_status' => $order->order_status,
+                    'ordered_at'   => $order->ordered_at?->toISOString(),
+                ],
                 'items'                 => $itemDetails,
-                'buyer_payment_amount'  => (float) $s->buyer_payment_amount,
+                'buyer_payment_amount'  => $buyerPayment,
                 'final_income'          => $finalIncome,
                 'hpp_total'             => $hppTotal,
                 'hpp_mapped'            => $hppMapped,
                 'ad_cost'               => $adCost,
                 'profit_gross'          => $finalIncome - $hppTotal,  // before ad cost
                 'profit_net'            => $profitNet,
-                'margin_pct'            => $s->buyer_payment_amount > 0
-                    ? round($profitNet / (float) $s->buyer_payment_amount * 100, 1)
+                'margin_pct'            => $buyerPayment > 0
+                    ? round($profitNet / $buyerPayment * 100, 1)
                     : null,
-                'settlement_time'       => $s->settlement_time?->toISOString(),
-                'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
+                'settlement_time'       => $s ? $s->settlement_time?->toISOString() : null,
+                'raw_json'              => $rawJson,
                 // Detail potongan (untuk tooltip)
-                'commission_fee'        => (float) $s->commission_fee,
-                'service_fee'           => (float) $s->service_fee,
-                'transaction_fee'       => (float) $s->transaction_fee,
-                'activity_fee'          => (float) $s->activity_fee,
-                'seller_voucher'        => (float) $s->seller_voucher,
-                'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
-                'shipping_fee_subsidy'  => (float) $s->shipping_fee_subsidy,
+                'commission_fee'        => $s ? (float) $s->commission_fee : 0.0,
+                'service_fee'           => $s ? (float) $s->service_fee : 0.0,
+                'transaction_fee'       => $s ? (float) $s->transaction_fee : 0.0,
+                'activity_fee'          => $s ? (float) $s->activity_fee : 0.0,
+                'seller_voucher'        => $s ? (float) $s->seller_voucher : 0.0,
+                'seller_coin_cash_back' => $s ? (float) $s->seller_coin_cash_back : 0.0,
+                'shipping_fee_subsidy'  => $s ? (float) $s->shipping_fee_subsidy : 0.0,
             ];
         });
 
@@ -1571,11 +1602,11 @@ class MarketplaceController extends Controller
             elseif ($sort === 'margin_desc') $rows = $rows->sortByDesc('margin_pct')->values();
             elseif ($sort === 'profit_asc') $rows = $rows->sortBy('profit_net')->values();
             elseif ($sort === 'profit_desc') $rows = $rows->sortByDesc('profit_net')->values();
-            elseif ($sort === 'date_asc') $rows = $rows->sortBy('settlement_time')->values();
-            elseif ($sort === 'date_desc') $rows = $rows->sortByDesc('settlement_time')->values();
+            elseif ($sort === 'date_asc') $rows = $rows->sortBy(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
+            elseif ($sort === 'date_desc') $rows = $rows->sortByDesc(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
         } else {
-            // Default sort: latest settlement time
-            $rows = $rows->sortByDesc('settlement_time')->values();
+            // Default sort: latest settlement time or ordered at
+            $rows = $rows->sortByDesc(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
         }
         
         // 3. Export to CSV if requested

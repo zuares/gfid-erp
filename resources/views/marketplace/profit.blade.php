@@ -459,6 +459,10 @@
     // ── Edit Ad Cost (inline) ─────────────────────────────────────────────────
     window.editAdCost = function (idx) {
         const r   = rows[idx];
+        if (!r.id) {
+            alert('Order belum cair, belum ada catatan settlement untuk menyimpan biaya iklan.');
+            return;
+        }
         const cur = r.ad_cost || 0;
         const val = prompt(`Biaya iklan untuk order ${r.channel_order_id}:`, cur);
         if (val === null) return;

@@ -58,6 +58,9 @@
 
 @php
     $raw = $order->raw_json ?? [];
+    if (is_string($raw)) {
+        $raw = json_decode($raw, true) ?? [];
+    }
     $liveData = $raw['order_list'][0] ?? $raw['response']['order_list'][0] ?? (isset($raw['order_sn']) ? $raw : []);
     $pkg = $liveData['package_list'][0] ?? [];
     
@@ -68,7 +71,7 @@
     $zipcode = $liveData['recipient_address']['zipcode'] ?? $order->shipping_postal_code ?? '';
     
     $carrier = $liveData['shipping_carrier'] ?? $pkg['shipping_carrier'] ?? $order->shipping_carrier ?? $order->shipping_courier_code ?? '—';
-    $awb = $pkg['package_number'] ?? $pkg['tracking_number'] ?? $order->shipping_awb_no ?? '';
+    $awb = $pkg['package_number'] ?? $pkg['tracking_number'] ?? $liveData['tracking_no'] ?? ($liveData['shipping_document_info']['tracking_number'] ?? $order->shipping_awb_no ?? '');
     
     $payMethod = $liveData['payment_method'] ?? $order->payment_method ?? '—';
     $statusText = strtolower($order->order_status ?: $order->status);
@@ -155,21 +158,31 @@
                 <div class="od-title">Waktu Transaksi</div>
             </div>
             <div class="od-body od-list">
+                @php
+                    // Helper untuk ambil tanggal dari liveData (timestamp)
+                    $getTs = function($key) use ($liveData) {
+                        return !empty($liveData[$key]) ? \Carbon\Carbon::createFromTimestamp($liveData[$key]) : null;
+                    };
+                    $createTime = $order->ordered_at ?? $order->order_date ?? $getTs('create_time');
+                    $payTime = $order->payment_date ?? $getTs('pay_time');
+                    $shipTime = $order->shipping_arranged_at ?? $getTs('ship_time') ?? $getTs('arrange_ship_time');
+                    $completeTime = $order->completed_at ?? ($order->cancelled_at ?: $getTs('cancel_time'));
+                @endphp
                 <div style="display:flex; justify-content:space-between">
                     <span class="od-muted">Dipesan</span>
-                    <span class="od-code-cell" style="font-size:.85rem">{{ $order->ordered_at ? id_datetime($order->ordered_at) : ($order->order_date ? id_datetime($order->order_date) : '—') }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem">{{ $createTime ? id_datetime($createTime) : '—' }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between">
                     <span class="od-muted">Dibayar</span>
-                    <span class="od-code-cell" style="font-size:.85rem">{{ $order->payment_date ? id_datetime($order->payment_date) : '—' }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem">{{ $payTime ? id_datetime($payTime) : '—' }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between">
                     <span class="od-muted">Dikirim</span>
-                    <span class="od-code-cell" style="font-size:.85rem">{{ $order->shipping_arranged_at ? id_datetime($order->shipping_arranged_at) : '—' }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem">{{ $shipTime ? id_datetime($shipTime) : '—' }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between">
                     <span class="od-muted">Selesai / Batal</span>
-                    <span class="od-code-cell" style="font-size:.85rem">{{ $order->completed_at ? id_datetime($order->completed_at) : ($order->cancelled_at ? id_datetime($order->cancelled_at) : '—') }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem">{{ $completeTime ? id_datetime($completeTime) : '—' }}</span>
                 </div>
             </div>
         </div>
@@ -218,15 +231,23 @@
                         @endforeach
                     @elseif($fallbackItems && $fallbackItems->count() > 0)
                         @foreach($fallbackItems as $line)
-                        @php $subtotalItems += $line->line_gross_amount; @endphp
+                        @php 
+                            $price = $line->price ?? $line->price_original ?? 0;
+                            $qty = (int) $line->qty;
+                            $subtotal = $price * $qty;
+                            $subtotalItems += $line->line_gross_amount > 0 ? $line->line_gross_amount : $subtotal;
+                        @endphp
                         <tr>
-                            <td class="od-code-cell">{{ $line->external_sku ?: '-' }}</td>
+                            <td class="od-code-cell">{{ $line->model_sku ?? $line->item_sku ?? $line->external_sku ?? '-' }}</td>
                             <td>
-                                <div style="font-weight:700; color:#111827">{{ $line->item_name_snapshot ?: '-' }}</div>
+                                <div style="font-weight:700; color:#111827">{{ $line->item_name ?? $line->item_name_snapshot ?? '-' }}</div>
+                                @if($line->variant_name || $line->variant_snapshot)
+                                <div class="od-name">Var: {{ $line->variant_name ?? $line->variant_snapshot }}</div>
+                                @endif
                             </td>
-                            <td class="od-c">{{ number_format($line->price_original, 0, ',', '.') }}</td>
-                            <td class="od-c od-code-cell">{{ (int) $line->qty }}</td>
-                            <td class="od-r od-code-cell">{{ number_format($line->line_gross_amount, 0, ',', '.') }}</td>
+                            <td class="od-c">{{ number_format($price, 0, ',', '.') }}</td>
+                            <td class="od-c od-code-cell">{{ $qty }}</td>
+                            <td class="od-r od-code-cell">{{ number_format($line->line_gross_amount > 0 ? $line->line_gross_amount : $subtotal, 0, ',', '.') }}</td>
                         </tr>
                         @endforeach
                     @else
@@ -245,15 +266,22 @@
         
         // Seller Income Data
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
-        $subtotal = $subtotalItems > 0 ? $subtotalItems : ($order->subtotal_items ?? ($inc['original_price'] ?? 0));
+        $subtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? ($subtotalItems > 0 ? $subtotalItems : 0));
         
+        $estimasiOngkir = (float)($liveData['estimated_shipping_fee'] ?? $inc['estimated_shipping_fee'] ?? 0);
+        $ongkirRebate = (float)($inc['shopee_shipping_rebate'] ?? 0);
         $ongkirDibayarPembeli = (float)($inc['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
+        
+        // Terkadang Shopee mengisi 0 pada buyer_paid_shipping_fee meski pembeli bayar ongkir. Kita hitung manual selisihnya jika begitu.
+        if ($ongkirDibayarPembeli == 0 && $estimasiOngkir > $ongkirRebate) {
+            $ongkirDibayarPembeli = $estimasiOngkir - $ongkirRebate;
+        }
         
         $ongkosJasaKirim = (float)($settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0))));
         $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
         
         $subsidiShopee = (float)($inc['shopee_discount'] ?? 0);
-        $voucherToko = (float)($settlement->seller_voucher ?? $inc['seller_discount'] ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0);
+        $voucherToko = (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0);
         
         $isEstimasi = false;
         
@@ -281,13 +309,18 @@
                 
             if ($penghasilan <= 0) {
                 // Estimasi (saat data settlement/escrow belum ada)
-                if ($biayaLayanan == 0 && $biayaLainnya == 0) {
-                    $ratio = in_array($statusText, ['ready_to_ship', 'processed', 'shipped']) ? 0.24 : ((float)($estimatedFeeRatio ?? 0.15));
-                    $biayaLayanan = round((float)$subtotal * $ratio);
+                $isCompleted = in_array(strtoupper($statusText), ['COMPLETED', 'SELESAI']);
+                if (!$isCompleted && $biayaLayanan == 0 && $biayaLainnya == 0) {
+                    $baseAmountForEstimasi = (float)($liveData['total_amount'] ?? $order->total_paid_customer ?? $order->total_amount ?? 0);
+                    $biayaLayanan = round($baseAmountForEstimasi * 0.24);
                     $biayaAdmin = $biayaLayanan; // For display
+                    $penghasilan = $baseAmountForEstimasi - $biayaLayanan;
+                } else if (!$isCompleted) {
+                    $penghasilan = (float)$subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
+                } else {
+                    $penghasilan = (float)($order->total_paid_customer > 0 ? $order->total_paid_customer : ($liveData['total_amount'] ?? $order->total_amount ?? 0));
                 }
-                $penghasilan = (float)$subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
-                $isEstimasi = true;
+                $isEstimasi = !$isCompleted;
             }
         }
         
@@ -301,16 +334,24 @@
 
         // Buyer Payment Data
         $voucherShopee = (float)($inc['voucher_from_shopee'] ?? $order->other_discount ?? 0);
-        $koinShopee = (float)($settlement->seller_coin_cash_back ?? $inc['seller_coin_cash_back'] ?? 0);
-        $biayaLayananPembeli = (float)($inc['buyer_transaction_fee'] ?? 2000);
+        $koinShopee = (float)($inc['coin'] ?? 0); // Koin yang ditukarkan pembeli
         
-        if (empty($inc) && !$settlement && (float)($liveData['total_amount'] ?? 0) > 0) {
-            $biayaLayananPembeli = 2000; 
-        }
-
         $totalPembeli = (float)($settlement->buyer_payment_amount ?? $inc['buyer_total_amount'] ?? ($order->total_paid_customer > 0
             ? $order->total_paid_customer
-            : ($liveData['total_amount'] ?? ($subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko + $biayaLayananPembeli))));
+            : ($liveData['total_amount'] ?? 0)));
+            
+        if ($totalPembeli > 0) {
+            // Hitung mundur biaya layanan pembeli agar totalnya pas (balancing)
+            $biayaLayananPembeli = $totalPembeli - ($subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko - $koinShopee);
+            if ($biayaLayananPembeli < 0) {
+                // Jika negatif, mungkin subtotal tidak klop, pakai dari API
+                $biayaLayananPembeli = (float)($inc['buyer_transaction_fee'] ?? 0);
+            }
+        } else {
+            $biayaLayananPembeli = (float)($inc['buyer_transaction_fee'] ?? 2000);
+            if (empty($inc) && !$settlement) $biayaLayananPembeli = 2000;
+            $totalPembeli = $subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko - $koinShopee + $biayaLayananPembeli;
+        }
     @endphp
 
     <div class="od-grid-2">
@@ -429,15 +470,11 @@
                     <span class="od-code-cell" style="font-size:.85rem; color:{{ $voucherToko > 0 ? '#991b1b' : 'inherit' }}">{{ $voucherToko > 0 ? '-' : '' }}Rp{{ number_format($voucherToko, 0, ',', '.') }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Dapatkan Koin Shopee 
-                        @if($koinShopee > 0) 
-                        <span style="font-size:0.75rem; color:#64748b">( {{ number_format($koinShopee, 0, ',', '.') }} Koin )</span> 
-                        @endif
-                    </span>
+                    <span class="od-muted">Koin Shopee Ditukarkan</span>
                     <span class="od-code-cell" style="font-size:.85rem; color:{{ $koinShopee > 0 ? '#991b1b' : 'inherit' }}">{{ $koinShopee > 0 ? '-' : '' }}Rp{{ number_format($koinShopee, 0, ',', '.') }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Biaya Layanan</span>
+                    <span class="od-muted">Biaya Layanan & Penanganan</span>
                     <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($biayaLayananPembeli, 0, ',', '.') }}</span>
                 </div>
                 
