@@ -102,7 +102,7 @@ class MarketplaceOrderController extends Controller
         $order->load(['store.channel', 'items.internalItem']);
 
         // Coba tarik data terbaru dari API agar halaman terupdate otomatis
-        if ($order->store && $order->store->channel->code === 'shopee') {
+        if ($order->store && $order->store->channel?->code === 'shopee') {
             try {
                 $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
                 

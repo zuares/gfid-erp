@@ -296,18 +296,17 @@
         $voucherCodeStr = !empty($voucherCodes) ? (is_array($voucherCodes) ? implode(', ', $voucherCodes) : $voucherCodes) : '';
 
         // Buyer Payment Data
-        $voucherShopee = $inc['voucher_from_shopee'] ?? $order->other_discount ?? 0;
-        $koinShopee = $settlement->seller_coin_cash_back ?? $inc['seller_coin_cash_back'] ?? 0;
-        $biayaLayananPembeli = $inc['buyer_transaction_fee'] ?? 2000;
+        $voucherShopee = (float)($inc['voucher_from_shopee'] ?? $order->other_discount ?? 0);
+        $koinShopee = (float)($settlement->seller_coin_cash_back ?? $inc['seller_coin_cash_back'] ?? 0);
+        $biayaLayananPembeli = (float)($inc['buyer_transaction_fee'] ?? 2000);
         
-        // Asumsi Biaya Layanan Pembeli = 2000 jika total amount beda dengan subtotal
-        if (empty($inc) && !$settlement && $liveData['total_amount'] > 0) {
+        if (empty($inc) && !$settlement && (float)($liveData['total_amount'] ?? 0) > 0) {
             $biayaLayananPembeli = 2000; 
         }
 
-        $totalPembeli = $settlement->buyer_payment_amount ?? $inc['buyer_total_amount'] ?? ($order->total_paid_customer > 0
+        $totalPembeli = (float)($settlement->buyer_payment_amount ?? $inc['buyer_total_amount'] ?? ($order->total_paid_customer > 0
             ? $order->total_paid_customer
-            : ($liveData['total_amount'] ?? ($subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko + $biayaLayananPembeli)));
+            : ($liveData['total_amount'] ?? ($subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko + $biayaLayananPembeli))));
     @endphp
 
     <div class="od-grid-2">

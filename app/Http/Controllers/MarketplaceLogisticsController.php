@@ -685,7 +685,7 @@ class MarketplaceLogisticsController extends Controller
             foreach ($regularChunks as $chunk) {
                 try {
                     $driver->createShippingDocument($store, $chunk);
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error("FPDI Error: " . $e->getMessage()); }
             }
             
             // Create booking shipping document in bulk
@@ -697,7 +697,7 @@ class MarketplaceLogisticsController extends Controller
                         $cleanedChunk = array_map(fn($c) => ['booking_sn' => $c['booking_sn'] ?? '', 'tracking_number' => $c['tracking_number'] ?? ''], $chunk);
                         $driver->createBookingShippingDocument($store, $cleanedChunk);
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error("FPDI Error: " . $e->getMessage()); }
             }
 
             // Sleep a bit to allow Shopee to generate documents
@@ -821,18 +821,6 @@ class MarketplaceLogisticsController extends Controller
             $currentStoreId = null;
             
             foreach ($pdfContents as $item) {
-                // Jika berpindah toko, sisipkan halaman pemisah (Kertas Thermal A6)
-                if ($currentStoreId !== null && $currentStoreId !== $item['store_id']) {
-                    $pdf->AddPage('P', [100, 150]);
-                    $pdf->SetFont('Arial', 'B', 16);
-                    $storeName = \App\Models\Store::find($item['store_id'])->name ?? 'Toko Lainnya';
-                    $pdf->Cell(0, 40, '', 0, 1); // Spacer atas
-                    $pdf->Cell(0, 10, '--- BATAS TOKO ---', 0, 1, 'C');
-                    $pdf->SetFont('Arial', 'B', 14);
-                    $pdf->Cell(0, 10, strtoupper($storeName), 0, 1, 'C');
-                    $pdf->SetFont('Arial', '', 10);
-                    $pdf->Cell(0, 15, 'Pisahkan tumpukan paket setelah kertas ini', 0, 1, 'C');
-                }
                 $currentStoreId = $item['store_id'];
 
                 $tmpPath = storage_path('app/temp_pdf_' . uniqid() . '.pdf');
@@ -848,7 +836,7 @@ class MarketplaceLogisticsController extends Controller
                         $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
                         $pdf->useTemplate($templateId);
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error("FPDI Error: " . $e->getMessage()); }
             }
             
             foreach ($tempFiles as $f) {
@@ -929,7 +917,7 @@ class MarketplaceLogisticsController extends Controller
                         $pdf->setSourceFile($greetingImageFull);
                         $gTplId = $pdf->importPage(1);
                         $pdf->useTemplate($gTplId, 0, 0, $width, $height);
-                    } catch (\Exception $e) {}
+                    } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error("FPDI Error: " . $e->getMessage()); }
                 } else {
                     // Add 4mm safe margin
                     $m = 4;
