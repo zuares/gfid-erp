@@ -743,9 +743,11 @@
 
     window.setUnlist = async function (pid, unlist) {
         try {
-            await api(`${API}/${pid}/unlist`, { method: 'POST', body: JSON.stringify({ unlist }) });
+            const res = await api(`${API}/${pid}/unlist`, { method: 'POST', body: JSON.stringify({ unlist }) });
+            const p = products.find(x => x.id === pid);
+            if (p) p.item_status = res.item_status || (unlist ? 'UNLIST' : 'NORMAL');
             toast(unlist ? 'Produk disembunyikan' : 'Produk ditampilkan');
-            loadProducts();
+            render();
         } catch (e) { alert('Gagal: ' + e.message); }
     };
 
@@ -792,11 +794,12 @@
             if (!res.ok) throw new Error(dat.message || 'Gagal update SKU');
             
             m.model_sku = newSku;
+            m.mapping = null; // SKU berubah → mapping lama tak berlaku lagi
             toast('SKU varian berhasil disimpan ✔');
+            render(); // tampilkan tombol Map langsung tanpa reload/pindah tab
         } catch (e) {
             alert('Gagal simpan SKU: ' + e.message);
             inp.value = m.model_sku || '';
-        } finally {
             inp.disabled = false;
         }
     };
@@ -843,8 +846,10 @@
     };
 
     let mapSearchTimer = null;
+    let mapSelectedItem = null; // { id, code, name } item internal yang dipilih
 
     window.selectMapItem = function (id, code, name) {
+        mapSelectedItem = { id, code: code || '', name: name || '' };
         $('mapSelectedInternalId').value = id;
         $('mapItemSearch').value = code || name;
         $('mapItemSelected').textContent = '✓ Terpilih: ' + (code ? code + ' — ' : '') + name;
@@ -868,7 +873,7 @@
         btn.textContent = 'Menyimpan...';
 
         try {
-            await api('/api/sku-mappings', {
+            const dat = await api('/api/sku-mappings', {
                 method: 'POST',
                 body: JSON.stringify({
                     marketplace_sku: sku,
@@ -877,10 +882,22 @@
                     notes: notes || 'mapping dari tab Produk'
                 })
             });
+
+            // Update state lokal → tabel langsung ter-update tanpa reload
+            const map = {
+                id:        dat.id,
+                item_id:   dat.item_id ?? (dat.item && dat.item.id) ?? parseInt(itemId),
+                item_code: (dat.item && dat.item.code) ?? mapSelectedItem?.code ?? '',
+                item_name: (dat.item && dat.item.name) ?? mapSelectedItem?.name ?? '',
+            };
+            products.forEach(p => (p.models || []).forEach(m => {
+                if (m.model_sku === sku) m.mapping = map;
+            }));
+
             toast(`SKU ${sku} berhasil di-mapping ✔`);
-            loadProducts();
+            render();
             bootstrap.Modal.getInstance($('modalMapping')).hide();
-        } catch (e) { 
+        } catch (e) {
             alert('Gagal simpan mapping: ' + e.message); 
         } finally {
             btn.disabled = false;

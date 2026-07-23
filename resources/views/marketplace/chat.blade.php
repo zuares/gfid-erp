@@ -169,6 +169,7 @@
         </div>
         <div class="chat-msgs" id="chatMsgs" style="display:none" onscroll="handleChatScroll()"></div>
         <button id="btnScrollDown" class="btn-scroll-down" onclick="scrollToBottom()">⬇</button>
+        <div id="chatReplyBlock" style="display:none;padding:10px 14px;background:#fff7ed;border-top:1px solid #fed7aa;color:#9a3412;font-size:.75rem;line-height:1.4"></div>
         <div class="chat-input" id="chatInput" style="display:none">
             <textarea id="msgText" placeholder="Tulis pesan… (Enter untuk kirim)" onkeydown="onMsgKey(event)" oninput="autoGrow(this)"></textarea>
             <button class="btn btn-primary btn-sm px-3" onclick="sendMessage()" id="btnSend">Kirim</button>
@@ -285,13 +286,18 @@
         try {
             const data = await api(`${API}/conversations/${id}/messages${syncFirst ? '?sync=1' : ''}`);
             renderMessages(data.messages);
-            
-            // Otomatis focus ke input setelah pesan dimuat
-            setTimeout(() => {
-                const input = $('msgText');
-                input.focus();
-                if (input.value.length > 0) input.select();
-            }, 100);
+
+            // Guard jendela balasan Shopee (7 hari chat / 30 hari pesanan)
+            applyReplyGuard(data.can_reply !== false, data.reply_reason);
+
+            // Otomatis focus ke input setelah pesan dimuat (hanya bila boleh balas)
+            if (data.can_reply !== false) {
+                setTimeout(() => {
+                    const input = $('msgText');
+                    input.focus();
+                    if (input.value.length > 0) input.select();
+                }, 100);
+            }
             
             // Tandai terbaca (non-blocking)
             api(`${API}/conversations/${id}/read`, { method: 'POST' }).then(() => {
@@ -306,6 +312,30 @@
             $('chatMsgs').innerHTML = `<div class="text-center text-danger" style="font-size:.75rem">${esc(e.message)}</div>`;
         }
     };
+
+    // Aktif/nonaktifkan kotak balas sesuai aturan Shopee.
+    // canReply=false → kotak dikunci + banner penjelasan ditampilkan.
+    function applyReplyGuard(canReply, reason) {
+        const input = $('msgText');
+        const btn = $('btnSend');
+        const block = $('chatReplyBlock');
+        if (!input || !btn) return;
+        if (canReply) {
+            input.disabled = false;
+            btn.disabled = false;
+            input.placeholder = 'Tulis pesan… (Enter untuk kirim)';
+            if (block) block.style.display = 'none';
+        } else {
+            input.disabled = true;
+            btn.disabled = true;
+            input.placeholder = 'Balasan tidak tersedia untuk percakapan ini';
+            if (block) {
+                block.textContent = '🔒 ' + (reason || 'Shopee tidak mengizinkan balasan pada percakapan ini (jendela 7 hari chat / 30 hari pesanan sudah lewat).');
+                block.style.display = '';
+            }
+        }
+    }
+    window.applyReplyGuard = applyReplyGuard;
 
     window.closeConversation = function () {
         document.querySelector('.chat-wrap').classList.remove('show-chat');
@@ -467,7 +497,10 @@
         $('chatMsgs').innerHTML =
             '<div class="text-center text-muted" style="font-size:.75rem;padding:20px">' +
             'Belum ada percakapan dengan pembeli ini.<br>Kirim pesan pertama untuk memulai chat. 👇</div>';
-            
+
+        // Compose selalu dari deep-link order (ada pesanan) → kotak balas dibuka.
+        applyReplyGuard(true);
+
         setTimeout(() => {
             const input = $('msgText');
             input.focus();

@@ -15,7 +15,7 @@ class SyncOrdersCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'marketplace:sync-orders {--store= : ID toko spesifik yang ingin diproses} {--dry-run : Hanya simulasi, tidak panggil API atau ubah DB}';
+    protected $signature = 'marketplace:sync-orders {--store= : ID toko spesifik yang ingin diproses} {--days=3 : Rentang hari ke belakang yang ditarik (1-60)} {--dry-run : Hanya simulasi, tidak panggil API atau ubah DB}';
 
     /**
      * The console command description.
@@ -60,9 +60,15 @@ class SyncOrdersCommand extends Command
         $skippedCount = 0;
         $failedCount = 0;
 
+        $days = max(1, min(60, (int) $this->option('days'))); // clamp 1-60 hari
         $timeTo = now()->timestamp;
-        $timeFrom = now()->subDays(3)->timestamp; // default seperti controller
+        $timeFrom = now()->subDays($days)->timestamp;
         $isDryRun = $this->option('dry-run');
+
+        if ($days > 3) {
+            $this->line("Rentang: {$days} hari terakhir");
+            $this->line('');
+        }
 
         foreach ($stores as $index => $store) {
             $orderNum = $index + 1;

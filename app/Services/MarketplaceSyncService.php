@@ -47,6 +47,30 @@ class MarketplaceSyncService
     }
 
     /**
+     * Pecah rentang waktu menjadi jendela <= 14 hari.
+     * Shopee get_order_list membatasi rentang maksimal 15 hari per panggilan API,
+     * jadi rentang panjang (30/60 hari) harus dipecah lalu digabung hasilnya.
+     *
+     * @return array<int, array{0:int,1:int}>
+     */
+    private function splitTimeWindows(int $timeFrom, int $timeTo, int $maxSpan = 1209600): array
+    {
+        if ($timeTo <= $timeFrom) {
+            return [[$timeFrom, $timeTo]];
+        }
+
+        $windows = [];
+        $start = $timeFrom;
+        while ($start < $timeTo) {
+            $end = min($start + $maxSpan, $timeTo);
+            $windows[] = [$start, $end];
+            $start = $end; // sedikit tumpang-tindih di batas aman — order_sn tetap di-dedup
+        }
+
+        return $windows;
+    }
+
+    /**
      * Sync orders dari marketplace ke DB lokal.
      * Mengembalikan array: found, synced, order_sn_list, message.
      * Melempar \RuntimeException jika API error.
@@ -63,13 +87,16 @@ class MarketplaceSyncService
             ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'IN_CANCEL', 'CANCELLED']
             : ['']; // Channel lain panggil tanpa filter status
 
+        // Rentang panjang (mis. 30/60 hari) dipecah menjadi jendela <=14 hari
+        // agar tidak ditolak oleh batas 15 hari Shopee get_order_list.
+        foreach ($this->splitTimeWindows($timeFrom, $timeTo) as [$windowFrom, $windowTo]) {
         foreach ($statuses as $status) {
             $cursor = '';
             $hasMore = true;
 
             // 1. Ambil daftar order per status
             while ($hasMore) {
-                $listResponse = $driver->getOrders($store, $timeFrom, $timeTo, $pageSize, $cursor, $status);
+                $listResponse = $driver->getOrders($store, $windowFrom, $windowTo, $pageSize, $cursor, $status);
 
                 if (! empty($listResponse['error'])) {
                     $this->log($store, 'sync_orders', 'failed', $listResponse['message'] ?? $listResponse['error'], $listResponse);
@@ -100,6 +127,7 @@ class MarketplaceSyncService
                 }
             }
         }
+        } // tutup loop jendela waktu
 
         $orderSnList = array_unique($orderSnList);
 

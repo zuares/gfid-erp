@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Events\ChatMessageReceived;
 use App\Models\MarketplaceChatMessage;
 use App\Models\MarketplaceConversation;
+use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
@@ -79,6 +80,52 @@ class MarketplaceChatService
         }
 
         return $new;
+    }
+
+    /**
+     * Cek apakah seller masih boleh mengirim chat ke percakapan ini menurut
+     * aturan Shopee: (1) pembeli mengirim chat dalam 7 hari terakhir, ATAU
+     * (2) ada pesanan dari pembeli itu dalam 30 hari terakhir. Kalau tidak,
+     * Shopee akan menolak send_message.
+     *
+     * @return array{can_reply:bool, reason:?string}
+     */
+    public function canReply(MarketplaceConversation $conversation): array
+    {
+        // (1) Jendela chat 7 hari sejak pesan TERAKHIR dari buyer.
+        $lastBuyer = $conversation->messages()
+            ->where('from_role', 'buyer')
+            ->orderByDesc('sent_at')
+            ->first();
+
+        if ($lastBuyer && $lastBuyer->sent_at && $lastBuyer->sent_at->gt(now()->subDays(7))) {
+            return ['can_reply' => true, 'reason' => null];
+        }
+
+        // (2) Jendela pesanan 30 hari — cocokkan buyer_username lintas toko
+        // milik shop yang sama (external_shop_id).
+        $store    = $conversation->store;
+        $username = $conversation->buyer_username;
+
+        if ($store && filled($username)) {
+            $storeIds = filled($store->external_shop_id)
+                ? Store::where('external_shop_id', $store->external_shop_id)->pluck('id')
+                : collect([$store->id]);
+
+            $hasRecentOrder = MarketplaceOrder::whereIn('store_id', $storeIds)
+                ->where('buyer_username', $username)
+                ->where('order_date', '>=', now()->subDays(30))
+                ->exists();
+
+            if ($hasRecentOrder) {
+                return ['can_reply' => true, 'reason' => null];
+            }
+        }
+
+        return [
+            'can_reply' => false,
+            'reason'    => 'Jendela balasan Shopee sudah lewat. Pembeli terakhir chat lebih dari 7 hari lalu dan tidak ada pesanan dalam 30 hari terakhir, jadi Shopee tidak mengizinkan seller mengirim chat di percakapan ini.',
+        ];
     }
 
     /**

@@ -120,7 +120,9 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/shop-info',    [MarketplaceController::class, 'shopInfo']);
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    
+    Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
     Route::post('/stores/{store}/sync-historical', [MarketplaceController::class, 'syncHistorical']);
     Route::post('/stores/{store}/force-sync-background', [MarketplaceController::class, 'forceSyncBackground']);
 

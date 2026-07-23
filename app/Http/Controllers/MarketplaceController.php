@@ -557,10 +557,33 @@ class MarketplaceController extends Controller
         ]);
     }
 
+    /**
+     * Sync pesanan rentang panjang (mis. 30/60 hari) di latar belakang via queue.
+     * Menghindari timeout browser untuk penarikan data berat.
+     */
+    public function syncOrdersBackground(Request $request, Store $store): JsonResponse
+    {
+        $days = max(1, min(60, (int) $request->input('days', 30)));
+
+        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', [
+            '--store' => $store->id,
+            '--days'  => $days,
+        ]);
+
+        $store->update(['last_synced_at' => now()]);
+
+        return response()->json([
+            'message' => "Sync pesanan {$days} hari untuk toko ini dikirim ke latar belakang. Data akan masuk bertahap.",
+            'status'  => 'queued',
+            'days'    => $days,
+        ]);
+    }
+
     public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
     {
-        // Beri waktu 3 menit untuk penarikan data berat (misal: opsi 14 hari)
-        set_time_limit(180);
+        // Beri waktu lebih untuk penarikan data berat (opsi 30/60 hari dipecah
+        // menjadi beberapa jendela 14 hari, jadi butuh waktu lebih panjang).
+        set_time_limit(300);
 
         $lock = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
 

@@ -720,6 +720,21 @@ body[data-theme="dark"] .ord-table tbody tr td {
             {{-- Sync --}}
             <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; margin-right: 0.4rem; font-weight: 500;" class="mobile-hide"></span>
             <button class="btn-ship-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onclick="openQuickSync()">🔄 <span class="mobile-hide">Sync Pesanan</span></button>
+
+            {{-- Sync Latar Belakang / Backfill Histori — dispatch ke queue (Artisan::queue),
+                 TIDAK blocking, mengikuti endpoint yang SUDAH ADA & dipakai di /marketplace/toko
+                 (force-sync-background, sync-historical). Tidak mengubah openQuickSync()
+                 atau alur Sync Pesanan yang sudah berjalan — murni tambahan. --}}
+            <div style="position:relative" class="mobile-hide">
+                <button class="btn-ship-outline" id="btnBgSync" onclick="toggleDropdown('ddBgSync', event)" title="Sync di latar belakang / tarik histori masa lalu — untuk backlog besar" style="border:none; background:#f1f5f9; color:#475569; font-weight:600; padding: 0.35rem 0.6rem; border-radius: 6px; box-shadow:none;">
+                    <span style="opacity:0.7;">⏱</span> <span class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">Latar Belakang</span>
+                </button>
+                <div class="hdr-dropdown" id="ddBgSync" style="right:0;left:auto;min-width:260px">
+                    <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">SYNC LATAR BELAKANG / BACKFILL HISTORI (PER TOKO)</div>
+                    <div id="bgSyncDropdownItems" style="padding:.2rem 0"></div>
+                </div>
+            </div>
+
             <button class="btn-ship-outline" onclick="loadOrders()" title="Segarkan Data" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border-color:#e2e8f0; border-radius: 6px; color:#475569; background:#fff; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">🔃</button>
         </div>
     </div>
@@ -945,13 +960,19 @@ body[data-theme="dark"] .ord-table tbody tr td {
                     {{-- Rentang Waktu --}}
                     <div class="mb-3">
                         <label class="form-label" style="font-size:.7rem;font-weight:700;color:#64748b;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.4rem">Rentang Waktu</label>
-                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem">
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem">
                             <button class="qs-range-btn" data-days="1" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">1 Hari</button>
                             <button class="qs-range-btn active" data-days="3" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #0f172a;border-radius:10px;background:#0f172a;color:#fff;cursor:pointer;transition:all .2s">3 Hari</button>
                             <button class="qs-range-btn" data-days="7" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">7 Hari</button>
                             <button class="qs-range-btn" data-days="14" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">14 Hari</button>
+                            <button class="qs-range-btn" data-days="30" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">30 Hari</button>
+                            <button class="qs-range-btn" data-days="60" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">60 Hari</button>
                         </div>
                         <input type="hidden" id="qsSyncRangeDays" value="3">
+                        <div id="qsRangeHint" style="display:none;margin-top:.5rem;padding:.5rem .6rem;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.68rem;color:#92400e;line-height:1.4">
+                            ⏳ Rentang panjang butuh waktu lebih lama & ditarik bertahap (jendela 14 hari).
+                            Disarankan pakai <b>Sync di Latar Belakang</b> agar tidak menunggu di layar.
+                        </div>
                     </div>
 
                     {{-- Tipe Sync --}}
@@ -1032,9 +1053,12 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
 
             {{-- Footer --}}
-            <div class="modal-footer border-0" style="padding:.75rem 1.5rem 1.25rem;gap:.5rem">
-                <button id="qsCancelBtn" class="btn btn-light border fw-bold flex-fill" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">Tutup</button>
-                <button id="qsRunBtn" class="btn btn-dark fw-bold flex-fill" style="border-radius:999px;font-size:.8rem" onclick="runQuickSync()">🔄 Sync Sekarang</button>
+            <div class="modal-footer border-0 flex-column" style="padding:.75rem 1.5rem 1.25rem;gap:.5rem">
+                <div class="d-flex w-100" style="gap:.5rem">
+                    <button id="qsCancelBtn" class="btn btn-light border fw-bold flex-fill" style="border-radius:999px;font-size:.8rem" data-bs-dismiss="modal">Tutup</button>
+                    <button id="qsRunBtn" class="btn btn-dark fw-bold flex-fill" style="border-radius:999px;font-size:.8rem" onclick="runQuickSync()">🔄 Sync Sekarang</button>
+                </div>
+                <button id="qsBgBtn" class="btn btn-outline-dark fw-bold w-100" style="border-radius:999px;font-size:.78rem" onclick="runBackgroundSync()">🌙 Sync di Latar Belakang</button>
             </div>
         </div>
     </div>
@@ -1270,6 +1294,76 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         el.innerHTML = `<div class="hdr-dropdown-item ${!activeStore?'selected':''}" onclick="selectStore('')">🏪 Semua Toko</div>` +
             names.map(n => `<div class="hdr-dropdown-item ${activeStore===n?'selected':''}" onclick="selectStore('${esc(n)}')">${esc(n)}</div>`).join('');
     }
+
+    // ── Sync Latar Belakang / Backfill Histori (dropdown "⏱ Latar Belakang") ──
+    // Endpoint yang dipanggil (force-sync-background, sync-historical) SUDAH ADA dan
+    // sudah dipakai di /marketplace/toko — di sini murni menambahkan akses dari halaman
+    // Orders, TIDAK membuat endpoint/job baru, TIDAK mengubah openQuickSync()/runQuickSync().
+    let bgSyncStoresCache = null;
+
+    async function populateBgSyncDropdown() {
+        const el = $('bgSyncDropdownItems');
+        el.innerHTML = '<div style="padding:.4rem;font-size:.72rem;color:#94a3b8">Memuat toko…</div>';
+        try {
+            if (!bgSyncStoresCache) {
+                bgSyncStoresCache = await api('/api/marketplace/stores');
+            }
+            const activeStores = bgSyncStoresCache.filter(s => s.is_active);
+            if (!activeStores.length) {
+                el.innerHTML = '<div style="padding:.4rem;font-size:.72rem;color:#94a3b8">Tidak ada toko aktif.</div>';
+                return;
+            }
+            el.innerHTML = activeStores.map(s => {
+                const disconnected = s.connection_status !== 'CONNECTED';
+                return `
+                <div style="padding:.35rem .6rem;border-top:1px solid #f1f5f9">
+                    <div style="font-size:.78rem;font-weight:600;color:#0f172a">${esc(s.name)}
+                        ${disconnected ? '<span style="font-size:.62rem;color:#b91c1c;font-weight:700"> · koneksi tidak aktif</span>' : ''}
+                    </div>
+                    <div style="display:flex;gap:.4rem;margin-top:.25rem">
+                        <button class="btn-ship-outline" style="font-size:.68rem;padding:.15rem .5rem;border-radius:5px" onclick="runOrderBackgroundSync(${s.id}, '${esc(s.name)}')">▶ Sync Latar Belakang</button>
+                        <button class="btn-ship-outline" style="font-size:.68rem;padding:.15rem .5rem;border-radius:5px" onclick="runOrderHistoricalBackfill(${s.id}, '${esc(s.name)}')">🕰 Backfill Histori</button>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            el.innerHTML = '<div style="padding:.4rem;font-size:.72rem;color:#b91c1c">Gagal memuat daftar toko: ' + esc(e.message) + '</div>';
+        }
+    }
+
+    // Isi dropdown sekali saat pertama dibuka (bukan tiap render tabel, supaya hemat panggilan API)
+    const _origToggleDropdownForBg = true; // penanda: populate dipicu manual di bawah, bukan override toggleDropdown()
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = $('btnBgSync');
+        if (btn) btn.addEventListener('click', () => { if (!$('ddBgSync').classList.contains('open')) populateBgSyncDropdown(); }, { capture: true });
+    });
+
+    window.runOrderBackgroundSync = async function (storeId, storeName) {
+        if (!confirm(`Tarik pesanan & retur TERBARU untuk ${storeName} di latar belakang?\n\nProses berjalan di server (butuh queue worker aktif), Anda bisa langsung pindah/tutup halaman.`)) return;
+        try {
+            const res = await api(`/api/marketplace/stores/${storeId}/force-sync-background`, { method: 'POST' });
+            alert(res.message || 'Sinkronisasi dikirim ke latar belakang.');
+        } catch (e) {
+            alert('Gagal mengirim ke latar belakang: ' + e.message);
+        }
+        $('ddBgSync').classList.remove('open');
+    };
+
+    window.runOrderHistoricalBackfill = async function (storeId, storeName) {
+        const year = prompt(`Backfill histori pesanan & retur untuk ${storeName}.\nMasukkan tahun target (contoh: 2022):`, String(new Date().getFullYear() - 1));
+        if (!year) return;
+        if (!confirm(`Tarik SELURUH histori order & retur tahun ${year} untuk ${storeName} di latar belakang?\n\nBisa berjalan lama (tergantung volume). Anda tetap bisa menutup halaman ini.`)) return;
+        try {
+            const res = await api(`/api/marketplace/stores/${storeId}/sync-historical`, {
+                method: 'POST',
+                body: JSON.stringify({ year: year }),
+            });
+            alert(res.message || `Backfill histori tahun ${year} dikirim ke latar belakang.`);
+        } catch (e) {
+            alert('Gagal mengirim backfill histori: ' + e.message);
+        }
+        $('ddBgSync').classList.remove('open');
+    };
 
     window.selectStore = function (name) {
         activeStore = name;
@@ -3206,9 +3300,64 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 this.style.background = '#0f172a'; this.style.color = '#fff';
                 this.style.borderColor = '#0f172a';
                 document.getElementById('qsSyncRangeDays').value = this.dataset.days;
+
+                // Tampilkan peringatan durasi untuk rentang panjang (>=30 hari)
+                const hint = document.getElementById('qsRangeHint');
+                if (hint) hint.style.display = parseInt(this.dataset.days) >= 30 ? '' : 'none';
             });
         });
     });
+
+    // ── Quick Sync — Background (queue) untuk rentang panjang ─────────────
+    window.runBackgroundSync = async function () {
+        const days = parseInt(document.getElementById('qsSyncRangeDays').value) || 3;
+        const bgBtn = document.getElementById('qsBgBtn');
+        const runBtn = document.getElementById('qsRunBtn');
+        bgBtn.disabled = true; runBtn.disabled = true;
+        bgBtn.innerHTML = '⏳ Mengirim ke antrean…';
+        document.getElementById('qsAlert').className = 'alert d-none';
+
+        try {
+            const stores = await api('/api/marketplace/stores');
+            const active = stores.filter(s => s.connection_status === 'CONNECTED');
+
+            if (!active.length) {
+                document.getElementById('qsAlert').className = 'alert alert-warning';
+                document.getElementById('qsAlert').textContent = 'Tidak ada toko aktif. Hubungkan minimal satu toko Shopee dulu.';
+                bgBtn.disabled = false; runBtn.disabled = false;
+                bgBtn.innerHTML = '🌙 Sync di Latar Belakang';
+                return;
+            }
+
+            let queued = 0;
+            for (const s of active) {
+                try {
+                    await api('/api/marketplace/stores/' + s.id + '/sync-orders-background', {
+                        method: 'POST',
+                        body: JSON.stringify({ days }),
+                    });
+                    queued++;
+                } catch (e) { /* lanjut toko berikutnya */ }
+            }
+
+            document.getElementById('qsConfigPanel').style.display = 'none';
+            document.getElementById('qsProgressPanel').style.display = 'none';
+            document.getElementById('qsResultPanel').style.display = '';
+            document.getElementById('qsResultIcon').textContent = '🌙';
+            document.getElementById('qsResultTitle').textContent = 'Dikirim ke Latar Belakang';
+            document.getElementById('qsResultSub').textContent =
+                `Sync ${days} hari untuk ${queued} toko sedang diproses di latar belakang. Data masuk bertahap — tutup jendela ini dan segarkan daftar beberapa saat lagi.`;
+            runBtn.innerHTML = '🔄 Sync Lagi';
+            runBtn.disabled = false;
+            runBtn.onclick = openQuickSync;
+        } catch (e) {
+            document.getElementById('qsAlert').className = 'alert alert-danger';
+            document.getElementById('qsAlert').textContent = 'Gagal mengirim ke latar belakang. Coba lagi.';
+        } finally {
+            bgBtn.disabled = false;
+            bgBtn.innerHTML = '🌙 Sync di Latar Belakang';
+        }
+    };
 
     // ── Quick Sync — Open ────────────────────────────────────────────────
     window.openQuickSync = function () {
@@ -3217,6 +3366,18 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         document.getElementById('qsProgressPanel').style.display = 'none';
         document.getElementById('qsResultPanel').style.display = 'none';
         document.getElementById('qsAlert').className = 'alert d-none';
+        // Reset pilihan rentang ke default 3 hari + sembunyikan hint
+        document.querySelectorAll('.qs-range-btn').forEach(b => {
+            const isDefault = b.dataset.days === '3';
+            b.style.background = isDefault ? '#0f172a' : '#fff';
+            b.style.color = isDefault ? '#fff' : '#475569';
+            b.style.borderColor = isDefault ? '#0f172a' : '#e2e8f0';
+        });
+        document.getElementById('qsSyncRangeDays').value = '3';
+        const hint = document.getElementById('qsRangeHint');
+        if (hint) hint.style.display = 'none';
+        const bgBtn = document.getElementById('qsBgBtn');
+        if (bgBtn) { bgBtn.disabled = false; bgBtn.innerHTML = '🌙 Sync di Latar Belakang'; }
         const runBtn = document.getElementById('qsRunBtn');
         const cancelBtn = document.getElementById('qsCancelBtn');
         runBtn.disabled = false;

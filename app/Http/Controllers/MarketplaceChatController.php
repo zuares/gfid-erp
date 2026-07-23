@@ -67,9 +67,13 @@ class MarketplaceChatController extends Controller
             ->limit(200)
             ->get();
 
+        $reply = $this->chat->canReply($conversation);
+
         return response()->json([
             'conversation' => $conversation->fresh('store:id,name'),
             'messages'     => $messages,
+            'can_reply'    => $reply['can_reply'],
+            'reply_reason' => $reply['reason'],
         ]);
     }
 
@@ -112,13 +116,14 @@ class MarketplaceChatController extends Controller
 
     /**
      * Total pesan belum dibaca (untuk badge sidebar).
+     * Hanya menghitung pesan yang BELUM DIBACA (unread_count), tidak lagi
+     * mencampur status "belum dibalas" (is_answered).
      */
     public function unreadCount()
     {
         return response()->json([
             'unread' => (int) MarketplaceConversation::where('unread_count', '>', 0)
-                            ->orWhere('is_answered', false)
-                            ->count(),
+                            ->sum('unread_count'),
         ]);
     }
 
