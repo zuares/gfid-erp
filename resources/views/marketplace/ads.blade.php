@@ -520,7 +520,7 @@
                         const _m = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
                         const fmtDt = (d) => { if (!d) return '—'; const p = d.split('-'); return p.length===3 ? `${p[2]} ${_m[parseInt(p[1])-1]} ${p[0]}` : d; };
                         return `<tr style="border-top:1px solid #f1f5f9">
-                            <td style="padding:4px">${fmtDt(r.date)}</td>`
+                            <td style="padding:4px">${fmtDt(r.date)}</td>
                             <td style="text-align:right;font-weight:700">${fmtRp(r.balance)}</td>
                             <td style="text-align:right;color:${delta > 0 ? '#166534' : (delta < 0 ? '#dc2626' : '#94a3b8')}">${delta != null ? (delta > 0 ? '+' : '') + fmtRp(delta) : '—'}</td>
                         </tr>`;
