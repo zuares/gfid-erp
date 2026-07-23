@@ -118,52 +118,79 @@ class MarketplaceSyncFinanceCommand extends Command
 
             if ($dryRun) {
                 $this->info("   [DRY-RUN] Simulasi sinkronisasi settlement dilewati.");
-                continue;
-            }
+            } else {
+                $afterId = 0;
+                $batchCount = 1;
+                $storeSettlementSynced = 0;
 
-            $afterId = 0;
-            $batchCount = 1;
-            $storeSettlementSynced = 0;
+                while (true) {
+                    $this->line(" Menarik batch settlement ke-{$batchCount}...");
 
-            while (true) {
-                $this->line(" Menarik batch settlement ke-{$batchCount}...");
+                    try {
+                        // Hanya tarik settlement untuk order dalam rentang N bulan
+                        $res = $syncService->syncSettlements(
+                            store: $store,
+                            timeFrom: $targetDate,
+                            timeTo: time(),
+                            orderSn: null,
+                            resync: true, // Paksa resync untuk mengecek settlement terbaru
+                            limit: 200,
+                            afterId: $afterId
+                        );
 
-                try {
-                    // Hanya tarik settlement untuk order dalam rentang N bulan
-                    $res = $syncService->syncSettlements(
-                        store: $store,
-                        timeFrom: $targetDate,
-                        timeTo: time(),
-                        orderSn: null,
-                        resync: true, // Paksa resync untuk mengecek settlement terbaru
-                        limit: 200,
-                        afterId: $afterId
-                    );
+                        $synced = $res['synced'] ?? 0;
+                        $skipped = $res['skipped'] ?? 0;
+                        $errors = $res['errors'] ?? 0;
+                        $storeSettlementSynced += $synced;
 
-                    $synced = $res['synced'] ?? 0;
-                    $skipped = $res['skipped'] ?? 0;
-                    $errors = $res['errors'] ?? 0;
-                    $storeSettlementSynced += $synced;
+                        $this->info("   ✓ Batch {$batchCount}: {$synced} settlement tersinkron (Skipped: {$skipped}, Errors: {$errors}).");
 
-                    $this->info("   ✓ Batch {$batchCount}: {$synced} settlement tersinkron (Skipped: {$skipped}, Errors: {$errors}).");
+                        $afterId = $res['last_processed_id'] ?? null;
 
-                    $afterId = $res['last_processed_id'] ?? null;
+                        // Stop if no more records processed or afterId is null
+                        if (!$afterId || ($res['processed'] ?? 0) < 200) {
+                            break;
+                        }
 
-                    // Stop if no more records processed or afterId is null
-                    if (!$afterId || ($res['processed'] ?? 0) < 200) {
+                        $batchCount++;
+                        sleep(1); // Mencegah rate limit
+
+                    } catch (\Exception $e) {
+                        $this->error("   Gagal pull settlement batch {$batchCount}: " . $e->getMessage());
                         break;
                     }
-
-                    $batchCount++;
-                    sleep(1); // Mencegah rate limit
-
-                } catch (\Exception $e) {
-                    $this->error("   Gagal pull settlement batch {$batchCount}: " . $e->getMessage());
-                    break;
                 }
+                
+                $totalSyncedToFinance += $storeSettlementSynced;
             }
 
-            $totalSyncedToFinance += $storeSettlementSynced;
+            // 3. PULL DATA RETUR / REFUND
+            $this->info("Mulai menarik data RETUR / REFUND dari API untuk {$months} bulan terakhir...");
+            $currentEndDateRetur = time();
+            
+            while ($currentEndDateRetur > $targetDate) {
+                $currentStartDateRetur = max($targetDate, $currentEndDateRetur - (14 * 86400));
+                
+                $startFmt = date('Y-m-d', $currentStartDateRetur);
+                $endFmt = date('Y-m-d', $currentEndDateRetur);
+                
+                $this->line(" Menarik data retur rentang: {$startFmt} sampai {$endFmt}...");
+                
+                if (!$dryRun) {
+                    try {
+                        dispatch_sync(new \App\Jobs\SyncMarketplaceReturns($store, $currentStartDateRetur, $currentEndDateRetur));
+                        $this->info("   ✓ API Success: Data retur berhasil diproses.");
+                    } catch (\Exception $e) {
+                        $this->error("   Gagal pull retur rentang {$startFmt} - {$endFmt}: " . $e->getMessage());
+                    }
+                } else {
+                    $this->info("   [DRY-RUN] Melewati proses API pull retur.");
+                }
+                
+                $currentEndDateRetur = $currentStartDateRetur - 1;
+                sleep(1);
+            }
+
             $this->info("--------------------------------------------------");
         }
 
