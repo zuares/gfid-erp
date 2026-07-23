@@ -135,21 +135,41 @@ class SyncOrdersCommand extends Command
                 continue;
             }
 
+            $progressKey = "marketplace:sync_progress:{$store->id}";
+
             try {
                 $start = microtime(true);
+
+                Cache::put($progressKey, [
+                    'percent' => 2, 'label' => 'Memulai…', 'status' => 'running',
+                    'store' => $store->name, 'ts' => now()->timestamp,
+                ], 1800);
 
                 $result = $syncService->syncOrders(
                     $store,
                     $timeFrom,
                     $timeTo,
                     50,
-                    $isDryRun
+                    $isDryRun,
+                    function (int $percent, string $label) use ($progressKey, $store) {
+                        Cache::put($progressKey, [
+                            'percent' => $percent, 'label' => $label, 'status' => 'running',
+                            'store' => $store->name, 'ts' => now()->timestamp,
+                        ], 1800);
+                    }
                 );
 
                 $duration = round((microtime(true) - $start) * 1000);
-                
+
                 $new = $result['new'] ?? 0;
                 $updated = $result['updated'] ?? 0;
+
+                Cache::put($progressKey, [
+                    'percent' => 100,
+                    'label'   => "Selesai · {$new} baru, {$updated} update",
+                    'status'  => 'done', 'store' => $store->name,
+                    'new' => $new, 'updated' => $updated, 'ts' => now()->timestamp,
+                ], 300);
 
                 $this->info("Hasil: {$new} order baru, {$updated} diperbarui, 0 gagal");
 
@@ -174,6 +194,11 @@ class SyncOrdersCommand extends Command
                     'error'      => $e->getMessage(),
                     'result'     => 'failed'
                 ]);
+
+                Cache::put($progressKey, [
+                    'percent' => 100, 'label' => 'Gagal: ' . $e->getMessage(),
+                    'status' => 'error', 'store' => $store->name, 'ts' => now()->timestamp,
+                ], 300);
 
                 $this->error("Hasil: Gagal ({$e->getMessage()})");
                 $failedCount++;

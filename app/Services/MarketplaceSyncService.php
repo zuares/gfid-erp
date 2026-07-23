@@ -75,8 +75,17 @@ class MarketplaceSyncService
      * Mengembalikan array: found, synced, order_sn_list, message.
      * Melempar \RuntimeException jika API error.
      */
-    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false): array
+    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false, ?callable $onProgress = null): array
     {
+        // Pelaporan progres bersifat opsional — dipakai untuk sync latar belakang
+        // agar UI bisa menampilkan persentase. Aman jika callback null / melempar.
+        $report = function (int $percent, string $label) use ($onProgress) {
+            if ($onProgress) {
+                try { $onProgress(max(0, min(100, $percent)), $label); } catch (\Throwable $e) { /* abaikan */ }
+            }
+        };
+        $report(3, 'Menyiapkan sinkronisasi…');
+
         $driver = $this->manager->driver($store);
 
         $orderSnList = [];
@@ -89,7 +98,9 @@ class MarketplaceSyncService
 
         // Rentang panjang (mis. 30/60 hari) dipecah menjadi jendela <=14 hari
         // agar tidak ditolak oleh batas 15 hari Shopee get_order_list.
-        foreach ($this->splitTimeWindows($timeFrom, $timeTo) as [$windowFrom, $windowTo]) {
+        $windows = $this->splitTimeWindows($timeFrom, $timeTo);
+        $totalWindows = max(1, count($windows));
+        foreach ($windows as $wIdx => [$windowFrom, $windowTo]) {
         foreach ($statuses as $status) {
             $cursor = '';
             $hasMore = true;
@@ -127,6 +138,9 @@ class MarketplaceSyncService
                 }
             }
         }
+        // Fase 1 (tarik daftar order): 5% → 55% seiring jendela waktu selesai
+        $report((int) round(5 + (($wIdx + 1) / $totalWindows) * 50),
+            'Menarik daftar pesanan… (' . ($wIdx + 1) . '/' . $totalWindows . ' periode)');
         } // tutup loop jendela waktu
 
         $orderSnList = array_unique($orderSnList);
@@ -137,9 +151,15 @@ class MarketplaceSyncService
         }
 
         // 2. Ambil detail order per chunk
+        $report(57, 'Mengambil detail pesanan…');
         $details = [];
         $failedChunks = 0;
-        foreach (array_chunk($orderSnList, 50) as $chunk) {
+        $detailChunks = array_chunk($orderSnList, 50);
+        $totalChunks = max(1, count($detailChunks));
+        foreach ($detailChunks as $ci => $chunk) {
+            // Fase 2 (detail order): 57% → 90% seiring chunk selesai
+            $report((int) round(57 + (($ci + 1) / $totalChunks) * 33),
+                'Mengambil detail pesanan… (' . ($ci + 1) . '/' . $totalChunks . ')');
             try {
                 $detailResponse = $driver->getOrderDetail($store, $chunk);
                 if (! empty($detailResponse['error'])) {
@@ -161,6 +181,7 @@ class MarketplaceSyncService
         }
 
         // 3. Simpan ke DB
+        $report(92, 'Menyimpan pesanan ke database…');
         $stats  = $this->upsertOrders($store, $details, $dryRun);
 
         // 4. Auto-buat fulfillment draft untuk READY_TO_SHIP yang belum punya fulfillment

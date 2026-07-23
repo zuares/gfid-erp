@@ -744,7 +744,15 @@
             showSyncResult(d, syncStoreName);
             loadAll();
         } catch (e) {
-            alertEl.className = 'alert alert-danger'; alertEl.textContent = 'Error: ' + e.message;
+            alertEl.className = 'alert alert-danger';
+            // Token/koneksi bermasalah — tawarkan link login ulang, selaras dengan pola
+            // yang sudah dipakai di settlement.blade.php & orders.blade.php Quick Sync.
+            if (e.data && e.data.action && e.data.action.type === 'redirect') {
+                alertEl.innerHTML = `Error: ${esc(e.data.message || e.message)} ` +
+                    `<a href="${esc(e.data.action.url)}" class="alert-link">${esc(e.data.action.label)}</a>`;
+            } else {
+                alertEl.textContent = 'Error: ' + e.message;
+            }
             btn.disabled = false; btn.textContent = 'Coba Lagi';
         }
     };
@@ -1016,12 +1024,15 @@
     window.disconnectStore = async function (storeId, name) {
         if (!confirm('Apakah Anda yakin ingin memutuskan koneksi API untuk toko "' + name + '"?')) return;
         try {
-            await api('/stores/' + storeId + '/disconnect', {
+            // BUG (ditemukan saat audit): sebelumnya URL ini tanpa prefix /api/marketplace
+            // sehingga selalu 404 di production — tombol "Putuskan Koneksi" tidak pernah
+            // benar-benar berfungsi. Diperbaiki agar sama seperti endpoint lain di file ini.
+            await api('/api/marketplace/stores/' + storeId + '/disconnect', {
                 method: 'POST',
             });
             loadAll();
         } catch (e) {
-            alert(e.message || 'Gagal memutuskan koneksi toko');
+            notifyBgSyncError(e, 'Gagal memutuskan koneksi toko');
         }
     };
 
@@ -1046,45 +1057,85 @@
         }
     };
 
-    window.forceSyncStore = async function (storeId, storeName) {
-        if (!confirm(`Tarik seluruh pesanan (15 hari) dan retur untuk toko ${storeName} sekarang? Proses akan berjalan di latar belakang.`)) return;
+    // ── Notifikasi sync latar belakang (selaras dgn pola settlement.blade.php &
+    // orders.blade.php Quick Sync): kalau server menolak karena koneksi bermasalah
+    // (401/422 dengan e.data.action.type === 'redirect'), tawarkan link login ulang
+    // yang bisa langsung diklik, bukan sekadar pesan error generik.
+    const bgSyncInFlight = new Set();
 
+    function notifyBgSyncError(e, fallbackMsg) {
+        if (e.data && e.data.action && e.data.action.type === 'redirect' && window.Swal) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Koneksi Bermasalah',
+                html: esc(e.data.message || e.message) + '<br><br>Silakan login ulang agar sinkronisasi dapat berjalan.',
+                showCancelButton: true,
+                confirmButtonText: e.data.action.label || 'Login Ulang',
+                cancelButtonText: 'Nanti',
+                confirmButtonColor: '#1e293b',
+            }).then(r => { if (r.isConfirmed) window.location.href = e.data.action.url; });
+            return;
+        }
+        const msg = (e.data && e.data.message) || e.message || fallbackMsg;
+        if (window.Swal) {
+            Swal.fire({ icon: 'error', title: 'Gagal', text: msg, confirmButtonColor: '#1e293b' });
+        } else {
+            alert(msg);
+        }
+    }
+
+    function notifyBgSyncSuccess(title, message) {
+        if (window.Swal) {
+            Swal.fire({ icon: 'success', title, text: message, confirmButtonColor: '#1e293b', timer: 5000, timerProgressBar: true });
+        } else {
+            alert(message);
+        }
+    }
+
+    window.forceSyncStore = async function (storeId, storeName) {
+        if (bgSyncInFlight.has('force-' + storeId)) return; // cegah double-klik selagi masih diproses
+        if (!confirm(`Tarik pesanan (3 hari terakhir, default) dan retur untuk toko ${storeName} sekarang?\n\nProses berjalan di latar belakang (butuh queue worker aktif di server). Anda bisa langsung pindah/tutup halaman.`)) return;
+
+        bgSyncInFlight.add('force-' + storeId);
         try {
-            const res = await api(`/stores/${storeId}/force-sync-background`, {
+            // BUG (ditemukan saat audit): sebelumnya URL ini tanpa prefix /api/marketplace
+            // sehingga selalu 404 di production — tombol ini tidak pernah benar-benar
+            // mengirim job ke queue. Diperbaiki agar sama seperti endpoint lain di file ini.
+            const res = await api(`/api/marketplace/stores/${storeId}/force-sync-background`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
-            alert(res.message || 'Sinkronisasi berhasil dijadwalkan.');
+            notifyBgSyncSuccess('Dikirim ke Latar Belakang', res.message || 'Sinkronisasi berhasil dijadwalkan.');
         } catch (e) {
-            alert('Gagal menjadwalkan sinkronisasi: ' + e.message);
+            notifyBgSyncError(e, 'Gagal menjadwalkan sinkronisasi.');
+        } finally {
+            bgSyncInFlight.delete('force-' + storeId);
         }
     };
 
     window.triggerHistoricalBackfill = async function (storeId, storeName) {
+        if (bgSyncInFlight.has('hist-' + storeId)) return;
         const year = prompt(`Tarik Histori (Mesin Waktu) untuk toko ${storeName}.\nMasukkan tahun target mundur (contoh: 2022):`, "2022");
         if (!year) return;
-        
+
         if (!confirm(`Peringatan: Menarik seluruh histori order dan retur dari tahun ${year} akan berjalan lama di latar belakang.\nAnda tetap bisa menutup halaman ini. Lanjutkan?`)) return;
 
+        bgSyncInFlight.add('hist-' + storeId);
         try {
-            const res = await fetch(`/api/marketplace/stores/${storeId}/sync-historical`, {
+            // Sebelumnya pakai fetch() manual + header X-CSRF-TOKEN sendiri. Disamakan dengan
+            // api() helper bersama (mpHelpers) yang dipakai endpoint lain di halaman ini —
+            // route sync-historical sudah di-exempt dari CSRF (routes/web.php), konsisten
+            // dengan pola semua route POST API marketplace lain.
+            const res = await api(`/api/marketplace/stores/${storeId}/sync-historical`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ year: year })
+                body: JSON.stringify({ year: year }),
             });
-            const data = await res.json();
-            if (data.status === 'success') {
-                alert("Berhasil! Proses tarik histori sedang berjalan di latar belakang server.");
-            } else {
-                alert("Gagal: " + (data.message || 'Unknown error'));
-            }
+            notifyBgSyncSuccess('Dikirim ke Latar Belakang', res.message || `Backfill histori tahun ${year} dikirim ke latar belakang.`);
         } catch (e) {
-            alert("Gagal memanggil API: " + e.message);
+            notifyBgSyncError(e, 'Gagal mengirim backfill histori.');
+        } finally {
+            bgSyncInFlight.delete('hist-' + storeId);
         }
     };
 

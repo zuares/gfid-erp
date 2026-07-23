@@ -1334,6 +1334,47 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     // TIDAK membuat endpoint/job baru, TIDAK mengubah openQuickSync()/runQuickSync().
     let bgSyncStoresCache = null;
 
+    // ── Progres sync latar belakang (per toko) ───────────────────────────
+    // State disimpan di memori agar bar tetap muncul saat dropdown ditutup lalu
+    // dibuka lagi. Polling ke endpoint /sync-progress (dibaca dari Cache server).
+    const bgSyncState = {};    // { [storeId]: {percent,label,status,...} }
+    const bgSyncPollers = {};  // { [storeId]: intervalId }
+
+    function renderBgProgress(storeId, p) {
+        const box = document.getElementById('bgprog-' + storeId);
+        if (!box) return; // dropdown sedang tertutup — state tetap tersimpan
+        if (!p || p.status === 'idle') { box.style.display = 'none'; return; }
+        box.style.display = '';
+        const bar = document.getElementById('bgprog-bar-' + storeId);
+        const label = document.getElementById('bgprog-label-' + storeId);
+        const pct = (p.percent == null) ? 0 : p.percent;
+        bar.style.width = pct + '%';
+        bar.style.background = p.status === 'error' ? '#dc2626'
+            : (p.status === 'done' ? '#16a34a' : '#0f172a');
+        const icon = p.status === 'queued' ? '⏳' : p.status === 'done' ? '✅'
+            : p.status === 'error' ? '⚠️' : '🔄';
+        label.textContent = `${icon} ${pct}% · ${p.label || ''}`;
+    }
+
+    async function pollBgProgress(storeId) {
+        try {
+            const p = await api(`/api/marketplace/stores/${storeId}/sync-progress`);
+            bgSyncState[storeId] = p;
+            renderBgProgress(storeId, p);
+            if (['done', 'error', 'idle'].includes(p.status)) {
+                clearInterval(bgSyncPollers[storeId]);
+                delete bgSyncPollers[storeId];
+                if (p.status === 'idle') delete bgSyncState[storeId];
+            }
+        } catch (e) { /* abaikan error sesaat, coba lagi di tick berikutnya */ }
+    }
+
+    function startBgPoll(storeId) {
+        if (bgSyncPollers[storeId]) return;
+        pollBgProgress(storeId); // langsung sekali
+        bgSyncPollers[storeId] = setInterval(() => pollBgProgress(storeId), 2500);
+    }
+
     async function populateBgSyncDropdown() {
         const el = $('bgSyncDropdownItems');
         el.innerHTML = '<div style="padding:.4rem;font-size:.72rem;color:#94a3b8">Memuat toko…</div>';
@@ -1354,11 +1395,25 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                         ${disconnected ? '<span style="font-size:.62rem;color:#b91c1c;font-weight:700"> · koneksi tidak aktif</span>' : ''}
                     </div>
                     <div style="display:flex;gap:.4rem;margin-top:.25rem">
-                        <button class="btn-ship-outline" style="font-size:.68rem;padding:.15rem .5rem;border-radius:5px" onclick="runOrderBackgroundSync(${s.id}, '${esc(s.name)}')">▶ Sync Latar Belakang</button>
-                        <button class="btn-ship-outline" style="font-size:.68rem;padding:.15rem .5rem;border-radius:5px" onclick="runOrderHistoricalBackfill(${s.id}, '${esc(s.name)}')">🕰 Backfill Histori</button>
+                        <button class="btn-ship-outline" style="font-size:.68rem;padding:.15rem .5rem;border-radius:5px" onclick="event.stopPropagation(); runOrderBackgroundSync(${s.id}, '${esc(s.name)}')">▶ Sync Latar Belakang</button>
+                        <button class="btn-ship-outline" style="font-size:.68rem;padding:.15rem .5rem;border-radius:5px" onclick="event.stopPropagation(); runOrderHistoricalBackfill(${s.id}, '${esc(s.name)}')">🕰 Backfill Histori</button>
+                    </div>
+                    <div id="bgprog-${s.id}" style="display:none;margin-top:.4rem">
+                        <div style="height:6px;background:#f1f5f9;border-radius:99px;overflow:hidden">
+                            <div id="bgprog-bar-${s.id}" style="height:100%;width:0%;background:#0f172a;border-radius:99px;transition:width .4s"></div>
+                        </div>
+                        <div id="bgprog-label-${s.id}" style="font-size:.62rem;color:#64748b;margin-top:.2rem"></div>
                     </div>
                 </div>`;
             }).join('');
+
+            // Pulihkan tampilan progres untuk toko yang sedang/baru sync + pastikan polling jalan
+            activeStores.forEach(s => {
+                if (bgSyncState[s.id]) {
+                    renderBgProgress(s.id, bgSyncState[s.id]);
+                    if (['queued', 'running'].includes(bgSyncState[s.id].status)) startBgPoll(s.id);
+                }
+            });
         } catch (e) {
             el.innerHTML = '<div style="padding:.4rem;font-size:.72rem;color:#b91c1c">Gagal memuat daftar toko: ' + esc(e.message) + '</div>';
         }
@@ -1372,17 +1427,20 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     });
 
     window.runOrderBackgroundSync = async function (storeId, storeName) {
-        if (!confirm(`Tarik pesanan 60 hari terakhir untuk ${storeName} di latar belakang?\n\nProses berjalan di server (butuh queue worker aktif), Anda bisa langsung pindah/tutup halaman.`)) return;
+        if (!confirm(`Tarik pesanan 60 hari terakhir untuk ${storeName} di latar belakang?\n\nProses berjalan di server (butuh queue worker aktif). Anda bisa memantau progresnya di sini, atau tutup halaman — proses tetap jalan.`)) return;
+        // Tampilkan progres awal langsung, lalu mulai polling. Dropdown TIDAK ditutup.
+        bgSyncState[storeId] = { percent: 0, label: 'Mengirim ke antrean…', status: 'queued', store: storeName };
+        renderBgProgress(storeId, bgSyncState[storeId]);
         try {
-            const res = await api(`/api/marketplace/stores/${storeId}/sync-orders-background`, {
+            await api(`/api/marketplace/stores/${storeId}/sync-orders-background`, {
                 method: 'POST',
                 body: JSON.stringify({ days: 60 }),
             });
-            alert(res.message || 'Sinkronisasi dikirim ke latar belakang.');
+            startBgPoll(storeId);
         } catch (e) {
-            alert('Gagal mengirim ke latar belakang: ' + e.message);
+            bgSyncState[storeId] = { percent: 100, label: 'Gagal mengirim: ' + e.message, status: 'error', store: storeName };
+            renderBgProgress(storeId, bgSyncState[storeId]);
         }
-        $('ddBgSync').classList.remove('open');
     };
 
     window.runOrderHistoricalBackfill = async function (storeId, storeName) {

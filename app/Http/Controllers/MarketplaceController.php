@@ -522,8 +522,80 @@ class MarketplaceController extends Controller
         );
     }
 
+    /**
+     * Cek connection_status toko SEBELUM meng-queue job latar belakang (force-sync-background,
+     * sync-orders-background, sync-historical) — supaya tidak diam-diam gagal di worker tanpa
+     * pernah memberi tahu user (job latar belakang tidak punya jalur feedback real-time ke UI).
+     * Pola & pesan disalin persis dari pre-check yang sudah dipakai & terverifikasi di
+     * syncOrders() (baris ~594-649) dan syncSettlementsBackground(). Return null kalau toko
+     * siap disync, atau JsonResponse redirect (422/401) kalau tidak.
+     */
+    private function ensureStoreReadyForBackgroundSync(Store $store): ?JsonResponse
+    {
+        $status = $store->connection_status;
+
+        if ($status === 'TOKEN_EXPIRED') {
+            try {
+                if ($store->channel->code === 'shopee') {
+                    /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
+                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                    $shopee->refreshToken($store);
+                    $store->refresh();
+                    $status = $store->connection_status;
+                } elseif ($store->channel->code === 'tiktok') {
+                    /** @var \App\Services\Channels\TikTokShop\TikTokShopChannel $tiktok */
+                    $tiktok = app(\App\Services\Channels\TikTokShop\TikTokShopChannel::class);
+                    $tiktok->refreshToken($store);
+                    $store->refresh();
+                    $status = $store->connection_status;
+                }
+            } catch (\Throwable $e) {
+                $status = 'AUTH_REQUIRED';
+                \Illuminate\Support\Facades\Log::warning('Token refresh failed before queueing background sync', [
+                    'store_id'   => $store->id,
+                    'store_name' => $store->name,
+                    'error'      => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($status === 'NOT_CONNECTED') {
+            $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
+            return response()->json([
+                'success' => false,
+                'code'    => 'STORE_NOT_CONNECTED',
+                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Hubungkan ' . $store->channel->name,
+                    'url'   => url('/marketplace/' . $urlSegment . '/connect'),
+                ],
+            ], 422);
+        }
+
+        if ($status !== 'CONNECTED') {
+            $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
+            return response()->json([
+                'success' => false,
+                'code'    => 'SHOPEE_AUTH_REQUIRED',
+                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum sinkronisasi bisa berjalan.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Login Ulang ' . $store->channel->name,
+                    'url'   => url('/marketplace/' . $urlSegment . '/connect'),
+                ],
+            ], 401);
+        }
+
+        return null;
+    }
+
     public function syncHistorical(Request $request, Store $store): JsonResponse
     {
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+            return $resp;
+        }
+
         $year = $request->input('year', 2022);
 
         // Lempar pekerjaan berat ini ke antrean (Queue) di latar belakang
@@ -531,28 +603,32 @@ class MarketplaceController extends Controller
             'year' => $year,
             '--store' => $store->id
         ]);
-        
+
         \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-returns', [
             'year' => $year,
             '--store' => $store->id
         ]);
 
         return response()->json([
-            'status' => 'success', 
+            'status' => 'success',
             'message' => "Proses 'Mesin Waktu' menuju tahun {$year} untuk toko {$store->name} sedang berjalan di latar belakang!"
         ]);
     }
 
     public function forceSyncBackground(Request $request, Store $store): JsonResponse
     {
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+            return $resp;
+        }
+
         // Jalankan sinkronisasi secara asinkron di queue
         \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $store->id]);
         \App\Jobs\SyncMarketplaceReturns::dispatch($store, null, null, true);
-        
+
         $store->update(['last_synced_at' => now()]);
 
         return response()->json([
-            'message' => 'Perintah tarik data pesanan dan retur terbaru telah dikirim ke latar belakang.',
+            'message' => 'Perintah tarik data pesanan (3 hari terakhir, default command) dan retur terbaru telah dikirim ke latar belakang.',
             'status' => 'queued'
         ]);
     }
@@ -563,7 +639,20 @@ class MarketplaceController extends Controller
      */
     public function syncOrdersBackground(Request $request, Store $store): JsonResponse
     {
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+            return $resp;
+        }
+
         $days = max(1, min(60, (int) $request->input('days', 30)));
+
+        // Set state awal supaya UI langsung menampilkan progres "antre" sebelum worker jalan.
+        \Illuminate\Support\Facades\Cache::put("marketplace:sync_progress:{$store->id}", [
+            'percent' => 0,
+            'label'   => 'Menunggu antrean worker…',
+            'status'  => 'queued',
+            'store'   => $store->name,
+            'ts'      => now()->timestamp,
+        ], 1800);
 
         \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', [
             '--store' => $store->id,
@@ -577,6 +666,21 @@ class MarketplaceController extends Controller
             'status'  => 'queued',
             'days'    => $days,
         ]);
+    }
+
+    /**
+     * Progres sinkronisasi latar belakang untuk satu toko (dibaca dari Cache).
+     * Dipakai UI untuk menampilkan persentase pada dropdown "Latar Belakang".
+     */
+    public function syncOrdersProgress(Store $store): JsonResponse
+    {
+        $progress = \Illuminate\Support\Facades\Cache::get("marketplace:sync_progress:{$store->id}");
+
+        if (! $progress) {
+            return response()->json(['status' => 'idle', 'percent' => null]);
+        }
+
+        return response()->json($progress);
     }
 
     public function syncOrders(SyncOrdersRequest $request, Store $store): JsonResponse
