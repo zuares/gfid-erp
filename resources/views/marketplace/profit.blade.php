@@ -229,13 +229,13 @@
             btn.disabled = true;
         }
         
-        const params = new URLSearchParams();
-        if ($('profitStoreId').value) params.append('store_id', $('profitStoreId').value);
+        const storeId = $('profitStoreId').value;
+        const payload = storeId ? { store_id: storeId } : {};
         
         try {
-            const res = await api('/marketplace/sync-hpp', {
+            const res = await api('/api/marketplace/sync-hpp', {
                 method: 'POST',
-                body: params
+                body: JSON.stringify(payload)
             });
             alert(res.message + ' (' + res.updated + ' diperbarui)');
             loadProfits();
