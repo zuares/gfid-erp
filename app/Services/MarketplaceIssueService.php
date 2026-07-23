@@ -555,6 +555,51 @@ class MarketplaceIssueService
         return ['updated' => $updated, 'errors' => $errors];
     }
 
+    public function syncHpp(?int $storeId = null): array
+    {
+        $query = MarketplaceOrderItem::query()
+            ->where('mapping_status', self::MAPPING_MAPPED)
+            ->when($storeId, fn ($q) => $q->whereHas(
+                'order', fn ($q2) => $q2->where('store_id', $storeId)
+            ))
+            ->with('internalItem');
+
+        $updated = 0;
+        $errors  = 0;
+
+        $query->chunkById(200, function ($items) use (&$updated, &$errors) {
+            foreach ($items as $item) {
+                try {
+                    if (!$item->internalItem) continue;
+
+                    $hpp = (float) $item->internalItem->effective_unit_cost;
+                    
+                    if ($hpp > 0) {
+                        $item->update([
+                            'hpp_snapshot' => $hpp,
+                            'cost_status'  => self::COST_COMPLETE,
+                            'profit_status'=> self::PROFIT_COMPLETE,
+                            'data_status'  => self::DATA_VALID,
+                            'issue_reason' => null
+                        ]);
+                    } else {
+                        $item->update([
+                            'cost_status'  => self::COST_MISSING_HPP,
+                            'profit_status'=> self::PROFIT_INCOMPLETE,
+                            'data_status'  => self::DATA_INCOMPLETE,
+                            'issue_reason' => self::COST_MISSING_HPP
+                        ]);
+                    }
+                    $updated++;
+                } catch (\Throwable) {
+                    $errors++;
+                }
+            }
+        });
+
+        return ['updated' => $updated, 'errors' => $errors];
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Pesanan Kilat (booking) — item yang belum ter-mapping ikut masuk Issues
     // ─────────────────────────────────────────────────────────────────────────

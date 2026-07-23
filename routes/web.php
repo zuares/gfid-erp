@@ -246,6 +246,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/issue-summary',  [MarketplaceController::class, 'issueSummary']);
     Route::post('/remap-items',   [MarketplaceController::class, 'remapOrderItems'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/sync-hpp',      [MarketplaceController::class, 'syncHpp'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/auto-map-by-code', [MarketplaceController::class, 'autoMapByCode'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores-summary',  [MarketplaceController::class, 'storesSummary']);

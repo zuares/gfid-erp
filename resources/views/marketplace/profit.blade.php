@@ -12,6 +12,7 @@
             <div class="sub">Harga jual dikurangi HPP, fee marketplace, voucher, dan promosi — profit bersih per order.</div>
         </div>
         <div class="controls">
+            <button class="btn btn-sm btn-dark btn-pill" onclick="syncHpp()" style="border-radius:999px;font-weight:600">Sync HPP</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="exportCsv()">Export CSV</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="loadProfits()">Refresh</button>
@@ -214,6 +215,38 @@
     window.goToPage = function(page) {
         currentPage = page;
         loadProfits();
+    };
+
+    window.syncHpp = async function() {
+        if (!confirm('Tarik HPP terbaru dari master produk untuk semua order yang sudah ter-mapping?')) return;
+        
+        // Find the button and show loading state
+        const btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
+        let oldText = '';
+        if (btn) {
+            oldText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing...';
+            btn.disabled = true;
+        }
+        
+        const params = new URLSearchParams();
+        if ($('profitStoreId').value) params.append('store_id', $('profitStoreId').value);
+        
+        try {
+            const res = await api('/marketplace/sync-hpp', {
+                method: 'POST',
+                body: params
+            });
+            alert(res.message + ' (' + res.updated + ' diperbarui)');
+            loadProfits();
+        } catch (e) {
+            alert('Gagal: ' + e.message);
+        } finally {
+            if (btn) {
+                btn.innerHTML = oldText;
+                btn.disabled = false;
+            }
+        }
     };
 
     // ── Load ──────────────────────────────────────────────────────────────────

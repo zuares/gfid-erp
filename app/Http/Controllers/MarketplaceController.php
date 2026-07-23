@@ -2803,6 +2803,18 @@ class MarketplaceController extends Controller
         ]);
     }
 
+    public function syncHpp(Request $request): JsonResponse
+    {
+        set_time_limit(300);
+        $storeId = $request->input('store_id');
+        $result  = $this->issueService->syncHpp($storeId ? (int) $storeId : null);
+        return response()->json([
+            'message' => 'HPP berhasil disinkronisasi.',
+            'updated' => $result['updated'],
+            'errors'  => $result['errors'],
+        ]);
+    }
+
     public function autoMapByCode(Request $request): JsonResponse
     {
         set_time_limit(300);
