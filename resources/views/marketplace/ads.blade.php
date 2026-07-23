@@ -854,6 +854,7 @@
                     </td>
                     <td class="text-end">
                         <span class="roas-chip ${roasClass}">${r.roas != null ? r.roas.toFixed(2) + 'x' : '—'}</span>
+                        ${showMapCol ? targetBadge(r.target_status) : ''}
                     </td>
                     <td class="text-end" style="font-size:.82rem">
                         <div style="font-weight:800;color:${acosColor}">${acosPct != null ? acosPct + '%' : '—'}</div>
@@ -1057,6 +1058,78 @@
                 };
             },
         });
+    };
+
+    // ── GMV Max helpers (label read-only; tidak mengubah DB) ───────────────────
+    function fmtRoas(v) { return (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + 'x'; }
+    function statusLabel(s) { return ({ ongoing:'Aktif', closed:'Selesai', paused:'Dijeda', scheduled:'Terjadwal' })[s] || (s || '—'); }
+    function campStatusColor(s) { return ({ ongoing:'#16a34a', closed:'#94a3b8', paused:'#b45309', scheduled:'#2563eb' })[s] || '#94a3b8'; }
+    function biddingLabel(m) {
+        if (m === 'auto') return `<span class="type-pill" title="API tidak memberi label literal GMV Max. Identifikasi berdasarkan bidding method (auto) & struktur auto_bidding." style="background:#ecfdf5;color:#047857">Auto / GMV Max</span>`;
+        if (m === 'manual') return `<span class="type-pill">Manual</span>`;
+        return '<span style="color:#cbd5e1">—</span>';
+    }
+    function targetBadge(st) {
+        const m = ({ above:['Di atas','#15803d'], below:['Di bawah','#b91c1c'], maximize:['Maks GMV','#475569'] })[st];
+        return m ? `<div style="font-size:.6rem;font-weight:700;margin-top:2px;color:${m[1]}">${m[0]}</div>` : '';
+    }
+
+    // ── Detail campaign (READ-ONLY modal) ──────────────────────────────────────
+    window.openCampaignDetail = async function (id) {
+        Swal.fire({ title: 'Memuat detail…', didOpen: () => Swal.showLoading(), showConfirmButton: false });
+        try {
+            const from = $('dateFrom').value, to = $('dateTo').value;
+            const d = await api(`/api/marketplace/ad-campaigns/${id}/detail?date_from=${from}&date_to=${to}`);
+            const s = d.setting || {}, p = d.performance || {};
+            const roasFmt = v => v != null ? v.toFixed(2) + 'x' : '—';
+            const rp  = v => v != null ? fmtRp(v) : '—';
+            const pct = v => v != null ? v.toFixed(2) + '%' : '—';
+            const num = v => v != null ? Number(v).toLocaleString('id') : '—';
+            const targetTxt = (s.target_roas != null && s.target_roas > 0) ? fmtRoas(s.target_roas)
+                : (s.bidding_method === 'auto' && s.target_roas === 0) ? 'Maksimalkan GMV' : '—';
+            const daily = d.daily || [];
+            const dailyRows = daily.length ? daily.map(row => `<tr>
+                <td>${esc(row.date)}</td><td class="text-end">${rp(row.expense)}</td>
+                <td class="text-end">${num(row.impressions)}</td><td class="text-end">${num(row.clicks)}</td>
+                <td class="text-end">${rp(row.broad_gmv)}</td><td class="text-end">${num(row.broad_order)}</td>
+            </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8">Belum ada data harian di rentang ini.</td></tr>';
+            let rawBlock = '';
+            if (d.raw_setting_payload) {
+                rawBlock = `<details style="margin-top:.6rem"><summary style="cursor:pointer;font-size:.72rem;color:#64748b">Raw setting payload (debug, owner)</summary>
+                  <pre style="max-height:200px;overflow:auto;font-size:.65rem;background:#0f172a;color:#e2e8f0;padding:.5rem;border-radius:6px">${esc(JSON.stringify(d.raw_setting_payload, null, 2))}</pre></details>`;
+            }
+            Swal.fire({
+                title: esc(s.item_name || ('Campaign #' + s.campaign_id)),
+                width: 640, showCloseButton: true, showConfirmButton: false,
+                html: `<div style="text-align:left;font-size:.8rem">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem .8rem;margin-bottom:.5rem">
+                    <div><b>Campaign ID</b><br>${esc(String(s.campaign_id || '—'))}</div>
+                    <div><b>Item ID</b><br>${esc(String(s.item_id || '—'))} ${s.item_code ? ('· ' + esc(s.item_code)) : ''}</div>
+                    <div><b>Ad type</b><br>${esc(s.ad_type || '—')}</div>
+                    <div><b>Bidding</b><br>${esc(s.bidding_method || '—')}</div>
+                    <div><b>Target ROAS</b><br>${targetTxt}</div>
+                    <div><b>Budget</b><br>${rp(s.campaign_budget)}</div>
+                    <div><b>Placement</b><br>${esc(s.campaign_placement || '—')}</div>
+                    <div><b>Status</b><br>${esc(s.campaign_status || '—')}</div>
+                    <div><b>Setting synced</b><br>${esc(s.setting_synced_at || '—')}</div>
+                  </div><hr>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem .6rem;font-size:.75rem">
+                    <div><b>Spend</b><br>${rp(p.spend)}</div>
+                    <div><b>Broad GMV</b><br>${rp(p.broad_gmv)}</div>
+                    <div><b>Direct GMV</b><br>${rp(p.direct_gmv)}</div>
+                    <div><b>Broad ROAS</b><br>${roasFmt(p.broad_roas)}</div>
+                    <div><b>Direct ROAS</b><br>${roasFmt(p.direct_roas)}</div>
+                    <div><b>CTR</b><br>${pct(p.ctr)}</div>
+                    <div><b>CPC</b><br>${rp(p.cpc)}</div>
+                    <div><b>Broad order</b><br>${num(p.broad_order)}</div>
+                    <div><b>Broad CVR</b><br>${pct(p.broad_cvr)}</div>
+                  </div>
+                  <details style="margin-top:.6rem"><summary style="cursor:pointer;font-size:.72rem;color:#64748b">Tren harian (${daily.length} hari)</summary>
+                    <table style="width:100%;font-size:.68rem;margin-top:.3rem"><thead><tr style="color:#64748b"><th style="text-align:left">Tgl</th><th class="text-end">Spend</th><th class="text-end">Impr</th><th class="text-end">Klik</th><th class="text-end">GMV</th><th class="text-end">Order</th></tr></thead><tbody>${dailyRows}</tbody></table>
+                  </details>${rawBlock}
+                </div>`,
+            });
+        } catch (e) { Swal.fire('Gagal', esc(e.message || 'Tidak dapat memuat detail'), 'error'); }
     };
 
     init();

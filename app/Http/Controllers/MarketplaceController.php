@@ -1481,7 +1481,7 @@ class MarketplaceController extends Controller
             $itemDetails = [];
             foreach ($items as $item) {
                 $sku = $item->model_sku ?: $item->item_sku;
-                $isMapped = $item->mapping_status === \App\Models\MarketplaceOrderItem::MAPPING_MAPPED || !empty($item->internal_item_id);
+                $isMapped = $item->mapping_status === \App\Services\MarketplaceIssueService::MAPPING_MAPPED || !empty($item->internal_item_id);
                 
                 $hpp = (float) $item->hpp_snapshot;
                 // Fallback to active snapshot if hpp_snapshot is 0
