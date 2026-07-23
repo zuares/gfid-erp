@@ -784,9 +784,9 @@ class MarketplaceIssueService
             ));
 
         return [
-            'sku_empty'         => (clone $base)->where('mapping_status', self::MAPPING_SKU_EMPTY)->count(),
-            'mapping_not_found' => (clone $base)->where('mapping_status', self::MAPPING_NOT_FOUND)->count(),
-            'missing_hpp'       => (clone $base)->where('cost_status', self::COST_MISSING_HPP)->count(),
+            'sku_empty'         => (clone $base)->skuEmpty()->count(),
+            'mapping_not_found' => (clone $base)->mappingNotFound()->count(),
+            'missing_hpp'       => (clone $base)->missingHpp()->count(),
             'profit_incomplete' => (clone $base)->where('profit_status', self::PROFIT_INCOMPLETE)->count(),
             'data_incomplete'   => (clone $base)->where('data_status', self::DATA_INCOMPLETE)->count(),
             'data_valid'        => (clone $base)->where('data_status', self::DATA_VALID)->count(),

@@ -280,14 +280,51 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
-     * Ambil info pengaturan campaign (nama, tipe, status, budget).
+     * Ambil info pengaturan campaign (nama, tipe, status, budget, target ROAS).
      * Endpoint: GET /api/v2/ads/get_product_level_campaign_setting_info
+     *
+     * PENTING (terverifikasi dari API nyata): Shopee MEWAJIBKAN `info_type_list`
+     * dan HARUS berupa comma-separated string ("1,2,3,4"). Format PHP array
+     * (yang di-encode Guzzle jadi info_type_list[0]=..) DITOLAK (error_param).
+     * Info type: 1=common_info, 2=manual_bidding_info, 3=auto_bidding_info,
+     * 4=auto_product_ads_info.
+     *
+     * Backward compatible: pemanggil 2-argumen lama tetap jalan (default 1..4).
      */
-    public function getCampaignSettingInfo(Store $store, array $campaignIds): array
-    {
+    public function getCampaignSettingInfo(
+        Store $store,
+        array $campaignIds,
+        array|string $infoTypeList = [1, 2, 3, 4]
+    ): array {
         return $this->get($store, '/api/v2/ads/get_product_level_campaign_setting_info', [
             'campaign_id_list' => implode(',', $campaignIds),
+            'info_type_list'   => self::normalizeInfoTypeList($infoTypeList),
         ]);
+    }
+
+    /**
+     * Normalisasi info_type_list → comma-separated string dari int positif unik.
+     * Aturan: buang kosong, cast int (untuk array), hilangkan duplikat, hanya
+     * positif; jika hasil kosong → default "1,2,3,4". Tidak pernah kirim array
+     * mentah ke Guzzle. Dibuat public+static agar mudah diuji unit.
+     */
+    public static function normalizeInfoTypeList(array|string $infoTypeList): string
+    {
+        $raw = is_string($infoTypeList)
+            ? array_map('trim', explode(',', $infoTypeList))
+            : $infoTypeList;
+
+        $types = [];
+        foreach ($raw as $v) {
+            if ($v === '' || $v === null) continue;
+            $n = (int) $v;
+            if ($n > 0) $types[$n] = true; // key = dedup otomatis
+        }
+
+        $types = array_keys($types);
+        if (empty($types)) $types = [1, 2, 3, 4];
+
+        return implode(',', $types);
     }
 
     /**

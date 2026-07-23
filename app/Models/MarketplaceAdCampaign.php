@@ -22,6 +22,18 @@ class MarketplaceAdCampaign extends Model
         'campaign_type',
         'status',
 
+        // ── Setting campaign (Fase 2, dari setting_info) ──
+        'ad_type',
+        'bidding_method',
+        'target_roas',
+        'campaign_budget',
+        'campaign_status',
+        'campaign_placement',
+        'started_at',
+        'ended_at',
+        'raw_setting_payload',
+        'setting_synced_at',
+
         'last_synced_range_from',
         'last_synced_range_to',
 
@@ -47,6 +59,12 @@ class MarketplaceAdCampaign extends Model
         'channel_item_id'   => 'integer',
         'internal_item_id'  => 'integer',
         'ad_group_id'       => 'integer',
+        'target_roas'         => 'decimal:4',
+        'campaign_budget'     => 'decimal:2',
+        'started_at'          => 'datetime',
+        'ended_at'            => 'datetime',
+        'setting_synced_at'   => 'datetime',
+        'raw_setting_payload' => 'array',
         'last_synced_range_from' => 'date:Y-m-d',
         'last_synced_range_to'   => 'date:Y-m-d',
         'spend'             => 'decimal:2',

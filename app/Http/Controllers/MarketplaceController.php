@@ -2524,6 +2524,15 @@ class MarketplaceController extends Controller
                 }
             }
 
+            $sku = $i->marketplace_sku ?? $i->model_sku ?? $i->item_sku ?? $i->external_sku;
+            $mappingStatus = $i->mapping_status;
+            $issueReason = $i->issue_reason;
+
+            if ($mappingStatus === 'marketplace_sku_empty' && !empty($sku)) {
+                $mappingStatus = 'mapping_not_found';
+                $issueReason = 'mapping_not_found';
+            }
+
             return [
                 'id'                  => $i->id,
                 'order_id'            => $i->order?->id,
@@ -2533,13 +2542,13 @@ class MarketplaceController extends Controller
                 'channel_code'        => $i->order?->store?->channel?->code,
                 'item_name'           => $i->item_name ?? $i->item_name_snapshot,
                 'variant_name'        => $i->variant_name ?? $i->variant_snapshot,
-                'marketplace_sku'     => $i->marketplace_sku ?? $i->model_sku ?? $i->item_sku ?? $i->external_sku,
+                'marketplace_sku'     => $sku,
                 'qty'                 => $i->qty,
-                'mapping_status'      => $i->mapping_status,
+                'mapping_status'      => $mappingStatus,
                 'cost_status'         => $i->cost_status,
                 'profit_status'       => $i->profit_status,
                 'data_status'         => $i->data_status,
-                'issue_reason'        => $i->issue_reason,
+                'issue_reason'        => $issueReason,
                 'internal_item_id'    => $i->internal_item_id,
                 'internal_item_name'  => $i->internalItem?->name,
                 'internal_item_code'  => $i->internalItem?->code,

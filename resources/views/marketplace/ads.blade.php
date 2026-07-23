@@ -4,251 +4,282 @@
 @include('marketplace._shared')
 
 @push('head')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
 <style>
-/* ── Badge rekomendasi ─────────────────────────────────────────── */
-.reco-badge {
-    display: inline-flex; align-items: center; gap: .3rem;
-    font-size: .72rem; font-weight: 800; padding: .2rem .65rem;
-    border-radius: 999px; white-space: nowrap;
-}
-.reco-scale  { background: rgba(22,163,74,.12); color: #15803d; }
-.reco-ok     { background: rgba(37,99,235,.1);  color: #1d4ed8; }
-.reco-warn   { background: rgba(217,119,6,.12); color: #b45309; }
-.reco-stop   { background: rgba(185,28,28,.1);  color: #b91c1c; }
-.reco-nodata { background: rgba(148,163,184,.12); color: #64748b; }
+    /* ── Shipments UI Match ─────────────────────────────────────────── */
+    :root{
+        --shp-accent:#334155;
+        --shp-accent-2:#1f2937;
+        --shp-border:rgba(148,163,184,.18);
+        --shp-border-strong:rgba(148,163,184,.30);
+        --shp-muted:#64748b;
+    }
+    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
 
-/* ── ACOS bar ──────────────────────────────────────────────────── */
-.acos-bar-wrap { position:relative; height:5px; border-radius:999px; background:#f1f5f9; overflow:visible; margin-top:3px; min-width:60px; }
-.acos-bar-fill { position:absolute; left:0; top:0; height:100%; border-radius:999px; transition:width .3s; }
-.acos-bar-be   { position:absolute; top:-2px; width:2px; height:9px; background:#0f172a; border-radius:1px; }
+    .card-main{
+        background: var(--card); border-radius: 8px; border: 1px solid var(--shp-border);
+        box-shadow: none; overflow:hidden; margin-bottom: 1rem;
+    }
+    body[data-theme="dark"] .card-main{ border-color: rgba(51,65,85,.85); box-shadow: none; background:var(--card,#0f172a); }
 
-/* ── Period tabs ───────────────────────────────────────────────── */
-.period-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
-.period-tab {
-    font-size:.75rem; font-weight:700; padding:.28rem .7rem; border-radius:999px;
-    border:1px solid #e2e8f0; background:#f8fafc; color:#475569; cursor:pointer; transition:all .15s;
-}
-.period-tab.active, .period-tab:hover { background:#0f172a; color:#fff; border-color:#0f172a; }
+    .ship-topbar{
+        position:sticky; top:0; z-index:300; display:flex; justify-content:space-between; align-items:center; gap:.6rem; flex-wrap:wrap;
+        padding:.45rem .75rem; margin-inline:-.75rem; margin-bottom:.65rem; background:var(--card,#fff); border-bottom:1px solid var(--shp-border);
+    }
+    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
+    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    .sub{ color:var(--shp-muted); font-size:.78rem; }
+    body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-/* ── Filter bar ────────────────────────────────────────────────── */
-.ads-filter-bar {
-    display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;
-    padding: .6rem .8rem; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;
-    margin-bottom:.75rem;
-}
-.ads-filter-bar input[type=search], .ads-filter-bar select {
-    font-size:.8rem; padding:.3rem .65rem; border-radius:8px; border:1px solid #e2e8f0;
-    background:#fff; color:#0f172a; outline:none;
-}
-.ads-filter-bar input[type=search] { min-width:200px; }
-.ads-filter-bar input[type=search]:focus,
-.ads-filter-bar select:focus { border-color:#0f172a; box-shadow:0 0 0 2px rgba(15,23,42,.08); }
+    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
+    .kpi{
+        display:inline-flex; align-items:baseline; gap:.45rem; border-radius:7px; padding:.2rem .48rem;
+        border:1px solid rgba(148,163,184,.28); background: transparent; font-size:.72rem;
+    }
+    body[data-theme="dark"] .kpi{ background: rgba(15, 23, 42, 0.96); border-color: rgba(51, 65, 85, 0.85); }
+    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
+    body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
+    .kpi .val{ font-weight:650; color:var(--shp-accent); }
+    body[data-theme="dark"] .kpi .val{ color:#e2e8f0; }
 
-/* ── Tabel sortable ────────────────────────────────────────────── */
-.gf-clean-table th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
-.gf-clean-table th.sortable:hover { color:#0f172a; }
-.gf-clean-table th .sort-icon { margin-left:.25rem; opacity:.35; font-size:.7rem; }
-.gf-clean-table th.sort-asc .sort-icon::after  { content:'↑'; opacity:1; }
-.gf-clean-table th.sort-desc .sort-icon::after { content:'↓'; opacity:1; }
-.gf-clean-table th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content:'⇅'; }
+    .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .filter-label{ font-size:.8rem; color:#6b7280; }
+    body[data-theme="dark"] .filter-label{ color:#9ca3af; }
+    .filter-select, .filter-input { 
+        border-radius:7px; font-size:.82rem; border: 1px solid var(--shp-border); 
+        padding:.3rem .6rem; background:var(--card,#fff); color:inherit; outline:none;
+    }
+    body[data-theme="dark"] .filter-select, body[data-theme="dark"] .filter-input { background: rgba(15, 23, 42, 0.98); }
+    .filter-select:focus, .filter-input:focus { border-color:var(--shp-accent); }
+    
+    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+    .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
+    .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
+    .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
+    .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+    body[data-theme="dark"] .btn-ship-outline{ color:#9ca3af!important; }
+    body[data-theme="dark"] .btn-ship-outline:hover{ color:#e2e8f0!important; background:rgba(148,163,184,.15)!important; }
 
-/* ── KPI mini ──────────────────────────────────────────────────── */
-.kpi-mini { font-size:.72rem; color:#64748b; margin-top:2px; }
+    .table-list{ margin-bottom:0; width:100%; border-collapse: collapse; }
+    .table-list thead th{
+        border-bottom:1px solid var(--shp-border); font-size:.68rem; text-transform:none; letter-spacing:0;
+        color:#64748b; background: var(--card,#fff); padding:.52rem .62rem; white-space:nowrap;
+    }
+    body[data-theme="dark"] .table-list thead th{ background: rgba(15, 23, 42, 0.98); color:#9ca3af; }
+    .table-list tbody td{ vertical-align:middle; border-top: 1px solid rgba(148, 163, 184, 0.16); padding:.52rem .62rem; }
+    body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
+    .table-list tbody tr:hover td { background:rgba(148,163,184,.05); }
 
-/* ── Toggle switch ─────────────────────────────────────────────── */
-.ads-toggle { display:flex; align-items:center; gap:.4rem; font-size:.78rem; color:#475569; font-weight:600; cursor:pointer; }
-.ads-toggle input { width:32px; height:18px; accent-color:#0f172a; cursor:pointer; }
+    .table-list th.sortable { cursor:pointer; user-select:none; }
+    .table-list th.sortable:hover { color:#0f172a; }
+    body[data-theme="dark"] .table-list th.sortable:hover { color:#e2e8f0; }
+    .table-list th .sort-icon { margin-left:.25rem; opacity:.35; font-size:.7rem; }
+    .table-list th.sort-asc .sort-icon::after  { content:'↑'; opacity:1; }
+    .table-list th.sort-desc .sort-icon::after { content:'↓'; opacity:1; }
+    .table-list th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content:'⇅'; }
 
-/* ── Campaign type pill ────────────────────────────────────────── */
-.type-pill {
-    display:inline-block; font-size:.65rem; font-weight:700; padding:.1rem .45rem;
-    border-radius:4px; background:#f1f5f9; color:#64748b; text-transform:uppercase; letter-spacing:.03em;
-}
+    .reco-badge {
+        display: inline-flex; align-items: center; gap: .3rem;
+        font-size: .72rem; font-weight: 800; padding: .2rem .65rem;
+        border-radius: 999px; white-space: nowrap;
+    }
+    .reco-scale  { background: rgba(22,163,74,.12); color: #15803d; }
+    .reco-ok     { background: rgba(37,99,235,.1);  color: #1d4ed8; }
+    .reco-warn   { background: rgba(217,119,6,.12); color: #b45309; }
+    .reco-stop   { background: rgba(185,28,28,.1);  color: #b91c1c; }
+    .reco-nodata { background: rgba(148,163,184,.12); color: #64748b; }
 
-/* ── Row inactive ──────────────────────────────────────────────── */
-.gf-clean-table tbody tr:hover td { background:#fafafa; }
-.gf-clean-table tbody tr.row-inactive td { opacity:.4; }
+    .acos-bar-wrap { position:relative; height:5px; border-radius:999px; background:#f1f5f9; overflow:visible; margin-top:3px; min-width:60px; }
+    body[data-theme="dark"] .acos-bar-wrap { background:#334155; }
+    .acos-bar-fill { position:absolute; left:0; top:0; height:100%; border-radius:999px; transition:width .3s; }
+    .acos-bar-be   { position:absolute; top:-2px; width:2px; height:9px; background:#0f172a; border-radius:1px; }
+    body[data-theme="dark"] .acos-bar-be { background:#e2e8f0; }
 
-/* ── ROAS chip ─────────────────────────────────────────────────── */
-.roas-chip { display:inline-block; font-weight:900; font-size:.88rem; padding:.05rem .4rem; border-radius:6px; }
-.roas-good { background:#dcfce7; color:#15803d; }
-.roas-ok   { background:#e0f2fe; color:#0369a1; }
-.roas-bad  { background:#fee2e2; color:#b91c1c; }
-.roas-none { color:#94a3b8; }
+    .period-tabs { display:flex; gap:.2rem; }
+    .period-tab {
+        font-size:.75rem; font-weight:700; padding:.28rem .7rem; border-radius:999px;
+        border:1px solid transparent; background:transparent; color:var(--shp-muted); cursor:pointer; transition:all .15s;
+    }
+    .period-tab.active, .period-tab:hover { background:rgba(148,163,184,.1); color:var(--shp-accent); border-color:var(--shp-border); }
+    body[data-theme="dark"] .period-tab.active, body[data-theme="dark"] .period-tab:hover { color:#e2e8f0; }
 
-/* ── Pagination ────────────────────────────────────────────────── */
-.ads-pager { display:flex; align-items:center; gap:.4rem; justify-content:flex-end; margin-top:.6rem; flex-wrap:wrap; }
-.ads-pager-btn {
-    font-size:.75rem; font-weight:700; padding:.25rem .65rem; border-radius:8px;
-    border:1px solid #e2e8f0; background:#f8fafc; cursor:pointer; color:#475569; transition:all .12s;
-}
-.ads-pager-btn:hover:not(:disabled) { background:#0f172a; color:#fff; border-color:#0f172a; }
-.ads-pager-btn:disabled { opacity:.4; cursor:default; }
-.ads-pager-btn.active { background:#0f172a; color:#fff; border-color:#0f172a; }
-.ads-pager-info { font-size:.75rem; color:#64748b; }
+    .toggle-switch { display:flex; align-items:center; gap:.4rem; font-size:.78rem; color:#475569; font-weight:600; cursor:pointer; }
+    body[data-theme="dark"] .toggle-switch { color:#9ca3af; }
+    .toggle-switch input { width:32px; height:18px; accent-color:#0f172a; cursor:pointer; }
+
+    .type-pill {
+        display:inline-block; font-size:.65rem; font-weight:700; padding:.1rem .45rem;
+        border-radius:4px; background:#f1f5f9; color:#64748b; text-transform:uppercase; letter-spacing:.03em;
+    }
+    body[data-theme="dark"] .type-pill { background:#1e293b; color:#94a3b8; }
+
+    .roas-chip { display:inline-block; font-weight:900; font-size:.88rem; padding:.05rem .4rem; border-radius:6px; }
+    .roas-good { background:#dcfce7; color:#15803d; }
+    .roas-ok   { background:#e0f2fe; color:#0369a1; }
+    .roas-bad  { background:#fee2e2; color:#b91c1c; }
+    .roas-none { color:#94a3b8; }
+    body[data-theme="dark"] .roas-good { background:rgba(22,163,74,.2); color:#4ade80; }
+    body[data-theme="dark"] .roas-ok { background:rgba(37,99,235,.2); color:#60a5fa; }
+    body[data-theme="dark"] .roas-bad { background:rgba(220,38,38,.2); color:#f87171; }
+
+    .row-inactive td { opacity:.4; }
+    
+    .ads-pager { display:flex; align-items:center; gap:.4rem; justify-content:flex-end; padding:.6rem; flex-wrap:wrap; }
+    .ads-pager-btn {
+        font-size:.75rem; font-weight:700; padding:.25rem .65rem; border-radius:8px;
+        border:1px solid var(--shp-border); background:var(--card,#fff); cursor:pointer; color:#475569; transition:all .12s;
+    }
+    body[data-theme="dark"] .ads-pager-btn { background:rgba(15,23,42,0.98); color:#9ca3af; }
+    .ads-pager-btn:hover:not(:disabled) { background:var(--shp-accent); color:#fff; border-color:var(--shp-accent); }
+    .ads-pager-btn:disabled { opacity:.4; cursor:default; }
+    .ads-pager-btn.active { background:var(--shp-accent); color:#fff; border-color:var(--shp-accent); }
+    .ads-pager-info { font-size:.75rem; color:#64748b; }
 </style>
 @endpush
 
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="Analisa Iklan"
-    description="Performa campaign Shopee Ads — spend, ROAS, ACOS, break-even & rekomendasi scale / stop.">
+<div class="page-wrap">
+    <div class="ship-topbar" style="margin-bottom: .8rem; border-bottom: none; background: transparent;">
+        <div>
+            <div class="title">Analisa Iklan</div>
+            <div class="sub">Performa campaign Ads</div>
 
-    {{-- ── KPI ─────────────────────────────────────────────────────────────── --}}
-    <div class="oc-kpi-grid" style="grid-template-columns:repeat(7,minmax(0,1fr))">
-        <div class="oc-kpi-card" style="border:1px solid rgba(34,197,94,.35)">
-            <div class="oc-kpi-label">💰 Saldo Iklan</div>
-            <div class="oc-kpi-value" id="kpiBalance" style="font-size:.88rem">—</div>
-            <div class="kpi-mini" id="kpiBalanceSub">pilih toko untuk cek</div>
-        </div>
-        <div class="oc-kpi-card">
-            <div class="oc-kpi-label">Total Spend</div>
-            <div class="oc-kpi-value" id="kpiSpend" style="font-size:.88rem">—</div>
-            <div class="kpi-mini">biaya iklan</div>
-        </div>
-        <div class="oc-kpi-card">
-            <div class="oc-kpi-label">Sales Iklan</div>
-            <div class="oc-kpi-value" id="kpiGmv" style="font-size:.88rem">—</div>
-            <div class="kpi-mini">GMV attributed</div>
-        </div>
-        <div class="oc-kpi-card">
-            <div class="oc-kpi-label">ROAS</div>
-            <div class="oc-kpi-value" id="kpiRoas">—</div>
-            <div class="kpi-mini">sales / spend</div>
-        </div>
-        <div class="oc-kpi-card">
-            <div class="oc-kpi-label">ACOS</div>
-            <div class="oc-kpi-value" id="kpiAcos">—</div>
-            <div class="kpi-mini">spend / sales ×100</div>
-        </div>
-        <div class="oc-kpi-card">
-            <div class="oc-kpi-label">Orders</div>
-            <div class="oc-kpi-value" id="kpiOrders">—</div>
-            <div class="kpi-mini" id="kpiOrdersSub">dari iklan</div>
-        </div>
-        <div class="oc-kpi-card">
-            <div class="oc-kpi-label">Profit Setelah Iklan</div>
-            <div class="oc-kpi-value" id="kpiProfit" style="font-size:.88rem">—</div>
-            <div class="kpi-mini">gross profit − spend</div>
+            <div class="kpis">
+                <span class="kpi" title="Sisa kredit iklan"><span class="lbl">Saldo</span><span class="val" id="kpiBalance">—</span></span>
+                <span class="kpi"><span class="lbl">Spend</span><span class="val" id="kpiSpend">—</span></span>
+                <span class="kpi"><span class="lbl">Sales</span><span class="val" id="kpiGmv">—</span></span>
+                <span class="kpi"><span class="lbl">ROAS</span><span class="val" id="kpiRoas">—</span></span>
+                <span class="kpi"><span class="lbl">ACOS</span><span class="val" id="kpiAcos">—</span></span>
+                <span class="kpi"><span class="lbl">Orders</span><span class="val" id="kpiOrders">—</span></span>
+                <span class="kpi" title="Gross profit - spend"><span class="lbl">Profit</span><span class="val" id="kpiProfit">—</span></span>
+            </div>
         </div>
     </div>
 
-    {{-- ── Sync & Filter ────────────────────────────────────────────────────── --}}
-    <x-gf.panel title="Sync & Filter">
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
-            <div style="flex:1;min-width:180px">
-                <label class="form-label fw-bold" style="font-size:.72rem;color:#64748b;text-transform:uppercase">TOKO</label>
-                <select class="form-select" id="adsStoreId" style="border-radius:12px;font-size:.83rem"></select>
-            </div>
-            <div>
-                <label class="form-label fw-bold" style="font-size:.72rem;color:#64748b;text-transform:uppercase">DARI</label>
-                <input type="date" class="form-control" id="dateFrom" style="border-radius:12px;font-size:.83rem;width:150px">
-            </div>
-            <div>
-                <label class="form-label fw-bold" style="font-size:.72rem;color:#64748b;text-transform:uppercase">SAMPAI</label>
-                <input type="date" class="form-control" id="dateTo" style="border-radius:12px;font-size:.83rem;width:150px">
-            </div>
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-                <button class="btn btn-dark fw-bold" id="syncBtn" style="border-radius:999px;min-width:150px" onclick="runSync()">
-                    ↓ Sync dari API
-                </button>
-                <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" onclick="loadAds()">
-                    ↻ Refresh
-                </button>
+    <!-- Filter Bar Separated -->
+    <div class="card card-main mb-3" style="border-radius: 8px;">
+        <div class="card-body p-2" style="overflow-x:auto;">
+            <div class="d-flex align-items-center justify-content-between gap-3 flex-nowrap" style="min-width: max-content;">
+                <div class="d-flex align-items-center gap-2 flex-nowrap">
+                    <select class="filter-select" id="adsStoreId"></select>
+                    <div style="position:relative; display:flex; align-items:center;">
+                        <i class="bi bi-calendar3" style="position:absolute; left: .65rem; color:#64748b; font-size:.75rem; pointer-events:none;"></i>
+                        <input type="text" id="dateRangePicker" class="filter-input text-nowrap" style="padding-left:1.9rem; width:180px; cursor:pointer; text-align:center; font-size:.78rem;" placeholder="Pilih Tanggal..." readonly>
+                    </div>
+                    <input type="hidden" id="dateFrom">
+                    <input type="hidden" id="dateTo">
+                </div>
+                
+                <div class="d-flex align-items-center gap-2 flex-nowrap">
+                    <button class="btn btn-sm btn-ship-primary btn-pill text-nowrap" id="syncBtn" onclick="runSync()">Sync API</button>
+                    <button class="btn btn-sm btn-ship-outline btn-pill text-nowrap" onclick="loadAds()">Refresh</button>
+                </div>
             </div>
         </div>
+    </div>
+    
+    <div id="adsSyncAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
 
-        <div style="margin-top:.75rem">
-            <div class="period-tabs" id="periodTabs">
-                <span style="font-size:.72rem;color:#94a3b8;font-weight:700;align-self:center">Cepat:</span>
-                <button class="period-tab" data-days="7">7 hari</button>
-                <button class="period-tab active" data-days="30">30 hari</button>
-                <button class="period-tab" data-days="90">90 hari</button>
+    <div class="card card-main">
+        <div class="card-body p-2" style="border-bottom:1px solid var(--shp-border); overflow-x:auto;">
+            <div class="d-flex justify-content-between align-items-center gap-4 flex-nowrap" style="min-width:max-content;">
+                <div class="d-flex align-items-center gap-2 flex-nowrap">
+                    <span class="filter-label text-nowrap" style="font-size:.7rem;font-weight:700;text-transform:uppercase">Harian</span>
+                    <div class="period-tabs flex-nowrap" id="periodTabs">
+                        <button class="period-tab text-nowrap" data-days="7">7 Hari</button>
+                        <button class="period-tab active text-nowrap" data-days="30">30 Hari</button>
+                        <button class="period-tab text-nowrap" data-days="90">90 Hari</button>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center gap-2 flex-nowrap">
+                    <button class="btn btn-sm btn-ship-outline btn-pill text-nowrap" id="btnSyncShopPerf" onclick="syncShopPerf()">Sync DB</button>
+                    <button class="btn btn-sm btn-ship-outline btn-pill text-nowrap" id="btnShopPerf" onclick="loadShopPerf()">Muat DB</button>
+                    <button class="btn btn-sm btn-ship-outline btn-pill text-nowrap" id="btnBackfill" onclick="backfillAds()">Tarik 6 Bln</button>
+                    <button class="btn btn-sm btn-ship-outline btn-pill text-nowrap" onclick="showBalanceHistory()">Riwayat Saldo</button>
+                </div>
             </div>
         </div>
-
-        <div id="adsSyncAlert" class="alert d-none mt-3" style="border-radius:12px;font-size:.85rem"></div>
-    </x-gf.panel>
-
-    {{-- ── Performa Harian Toko (live dari API) ─────────────────────────────── --}}
-    <x-gf.panel title="Performa Harian Toko" subtitle="Tersimpan di database untuk analisa historis — mendukung agregat SEMUA toko. Scheduler otomatis menyimpan tiap malam 23:30.">
-        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-            <button class="btn btn-dark fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnSyncShopPerf" onclick="syncShopPerf()">↓ Sync ke DB</button>
-            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnShopPerf" onclick="loadShopPerf()">📊 Muat dari DB</button>
-            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" id="btnBackfill" onclick="backfillAds()" title="Tarik data 6 bulan ke belakang, per bulan">⏳ Tarik Riwayat 6 Bln</button>
-            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem" onclick="showBalanceHistory()">💰 Riwayat Saldo</button>
-            <span class="text-muted" style="font-size:.72rem" id="shopPerfInfo"></span>
-        </div>
-        <div id="perStoreWrap" class="mb-2" style="display:none">
+        
+        <div id="perStoreWrap" class="p-2" style="display:none; border-bottom:1px solid var(--shp-border)">
             <div style="font-size:.7rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:4px">Perbandingan per Toko</div>
             <div id="perStoreChips" style="display:flex;gap:.4rem;flex-wrap:wrap"></div>
         </div>
-        <div style="overflow-x:auto">
-            <table class="table table-sm" style="font-size:.75rem" id="shopPerfTable">
+        
+        <div class="table-responsive">
+            <table class="table-list" id="shopPerfTable">
                 <thead>
-                    <tr style="color:#64748b;font-size:.68rem;text-transform:uppercase">
-                        <th>Tanggal</th><th class="text-end">Impresi</th><th class="text-end">Klik</th>
-                        <th class="text-end">CTR</th><th class="text-end">Spend</th>
-                        <th class="text-end">Order</th><th class="text-end">GMV</th><th class="text-end">ROAS</th>
+                    <tr>
+                        <th>Tanggal</th>
+                        <th class="text-end">Impresi</th>
+                        <th class="text-end">Klik</th>
+                        <th class="text-end">CTR</th>
+                        <th class="text-end">Spend</th>
+                        <th class="text-end">Order</th>
+                        <th class="text-end">GMV</th>
+                        <th class="text-end">ROAS</th>
                     </tr>
                 </thead>
                 <tbody id="shopPerfBody">
-                    <tr><td colspan="8" class="text-center text-muted py-3">Belum dimuat.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-3" style="font-size:.8rem">Belum dimuat.</td></tr>
                 </tbody>
             </table>
+            <div id="shopPerfInfo" class="px-3 pb-2 text-muted" style="font-size:.7rem;text-align:right"></div>
         </div>
-    </x-gf.panel>
+    </div>
 
-    {{-- ── Tabel Campaign ───────────────────────────────────────────────────── --}}
-    <x-gf.panel title="Performa Iklan" subtitle="Lihat per campaign, per item internal, atau per grup. Klik header kolom untuk sort.">
+    <div class="card card-main">
+        <div class="card-body p-2" style="border-bottom:1px solid var(--shp-border); overflow-x:auto;">
+            <div class="d-flex align-items-center gap-3 flex-nowrap" style="min-width:max-content;">
+                
+                <div class="period-tabs flex-nowrap" style="border-right:1px solid var(--shp-border); padding-right:.75rem;">
+                    <button class="period-tab active text-nowrap" data-view="campaign" onclick="setView('campaign')">Campaign</button>
+                    <button class="period-tab text-nowrap" data-view="item" onclick="setView('item')">Item</button>
+                    <button class="period-tab text-nowrap" data-view="group" onclick="setView('group')">Grup</button>
+                </div>
+                
+                <div class="d-flex gap-2 align-items-center flex-nowrap" style="border-right:1px solid var(--shp-border); padding-right:.75rem;">
+                    <span id="unmappedBadge" class="reco-badge reco-warn" style="display:none;cursor:pointer;white-space:nowrap" onclick="toggleUnmappedFilter()"></span>
+                    <input type="search" id="searchCampaign" class="filter-input" placeholder="Cari..." oninput="applyFilters()" style="width:130px">
+                    <select id="filterStatus" class="filter-select" onchange="applyFilters()" style="width:auto;">
+                        <option value="">Status (Semua)</option>
+                        <option value="ongoing">Ongoing</option>
+                        <option value="suspended">Suspended</option>
+                        <option value="ended">Ended</option>
+                    </select>
+                    <select id="filterReco" class="filter-select" onchange="applyFilters()" style="width:auto;">
+                        <option value="">Rekomendasi (Semua)</option>
+                        <option value="🚀">Scale</option>
+                        <option value="✅">Pertahankan</option>
+                        <option value="⚡">Perhatikan</option>
+                        <option value="🔴">Stop</option>
+                    </select>
+                </div>
 
-        {{-- View toggle: Campaign / Item / Grup --}}
-        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem">
-            <div class="period-tabs">
-                <span style="font-size:.72rem;color:#94a3b8;font-weight:700;align-self:center">Lihat per:</span>
-                <button class="period-tab active" data-view="campaign" onclick="setView('campaign')">Campaign</button>
-                <button class="period-tab" data-view="item" onclick="setView('item')">Item Internal</button>
-                <button class="period-tab" data-view="group" onclick="setView('group')">Grup</button>
+                <div class="d-flex gap-3 align-items-center flex-nowrap">
+                    <label class="toggle-switch mb-0" id="unmappedFilterWrap" style="display:none; white-space:nowrap;">
+                        <input type="checkbox" id="onlyUnmapped" onchange="applyFilters()">
+                        Hanya Unmapped
+                    </label>
+                    <label class="toggle-switch mb-0" style="white-space:nowrap;">
+                        <input type="checkbox" id="hideInactive" checked onchange="applyFilters()">
+                        Sembunyikan 0
+                    </label>
+                    <button class="btn btn-sm btn-ship-outline btn-pill text-nowrap" onclick="manageGroups()">Kelola Grup</button>
+                </div>
+                
             </div>
-            <span id="unmappedBadge" class="reco-badge reco-warn" style="display:none;cursor:pointer"
-                  onclick="toggleUnmappedFilter()" title="Klik untuk filter hanya yang belum di-mapping"></span>
-            <button class="btn btn-light border fw-bold btn-sm" style="border-radius:999px;font-size:.78rem;margin-left:auto"
-                    onclick="manageGroups()">🏷️ Kelola Grup</button>
         </div>
-
-        {{-- Filter bar --}}
-        <div class="ads-filter-bar">
-            <input type="search" id="searchCampaign" placeholder="🔍  Cari nama / item…" oninput="applyFilters()">
-            <select id="filterStatus" onchange="applyFilters()" style="min-width:130px">
-                <option value="">Semua Status</option>
-                <option value="ongoing">ongoing</option>
-                <option value="suspended">suspended</option>
-                <option value="ended">ended</option>
-            </select>
-            <select id="filterReco" onchange="applyFilters()" style="min-width:160px">
-                <option value="">Semua Rekomendasi</option>
-                <option value="🚀">🚀 Scale</option>
-                <option value="✅">✅ Pertahankan</option>
-                <option value="⚡">⚡ Perhatikan</option>
-                <option value="🔴">🔴 Stop</option>
-                <option value="⚠️">⚠️ Set Break-Even</option>
-                <option value="⚪">⚪ Tidak Aktif</option>
-            </select>
-            <label class="ads-toggle" id="unmappedFilterWrap" style="display:none">
-                <input type="checkbox" id="onlyUnmapped" onchange="applyFilters()">
-                Hanya belum di-mapping
-            </label>
-            <label class="ads-toggle" style="margin-left:auto">
-                <input type="checkbox" id="hideInactive" checked onchange="applyFilters()">
-                Sembunyikan 0-spend
-            </label>
+        
+        <div class="table-responsive" style="overflow-y:hidden">
+            <div id="adsBody">
+                <div class="text-center text-muted py-4" style="font-size:.8rem">Memuat...</div>
+            </div>
+            <div id="adsPager" class="ads-pager" style="display:none"></div>
         </div>
-
-        <div id="adsBody">
-            <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
-        </div>
-        <div class="ads-pager" id="adsPager" style="display:none"></div>
-    </x-gf.panel>
-
+    </div>
+    
     {{-- Legend --}}
     <div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:#64748b;margin-top:-.2rem;padding:0 .1rem">
         <span>🚀 <strong>Scale</strong> — ACOS &lt; 60% break-even</span>
@@ -257,12 +288,13 @@
         <span>🔴 <strong>Stop/Kurangi Bid</strong> — ACOS &gt; break-even</span>
         <span style="margin-left:auto;color:#94a3b8">⚠️ Set break-even ACOS agar rekomendasi akurat</span>
     </div>
-
-</x-gf.page>
+</div>
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+
 (function () {
     const { api, fmtRp, esc } = window.mpHelpers;
     let allRows  = [];
@@ -283,11 +315,14 @@
         from.setDate(from.getDate() - (days - 1));
         $('dateFrom').value = toDateStr(from);
         $('dateTo').value   = toDateStr(to);
+        if (window._adsDatePicker) {
+            window._adsDatePicker.setDate([from, to]);
+        }
     }
 
-    document.querySelectorAll('.period-tab').forEach(btn => {
+    document.querySelectorAll('.period-tab[data-days]').forEach(btn => {
         btn.addEventListener('click', function () {
-            document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.period-tab[data-days]').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             setDateRange(parseInt(this.dataset.days));
             loadAds();
@@ -296,6 +331,26 @@
 
     // ── Init ──────────────────────────────────────────────────────────────────
     async function init() {
+        if (window.flatpickr) {
+            window._adsDatePicker = flatpickr('#dateRangePicker', {
+                mode: 'range',
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd M Y',
+                onChange: function(selectedDates, dateStr, instance) {
+                    if (selectedDates.length === 2) {
+                        $('dateFrom').value = instance.formatDate(selectedDates[0], 'Y-m-d');
+                        $('dateTo').value = instance.formatDate(selectedDates[1], 'Y-m-d');
+                        // Optional: auto-refresh on select
+                        // loadAds();
+                        
+                        // Hapus status active dari period-tabs karena pakai custom date
+                        document.querySelectorAll('.period-tab[data-days]').forEach(b => b.classList.remove('active'));
+                    }
+                }
+            });
+        }
+        
         stores = await api('/api/marketplace/stores').catch(() => []);
         const sel = $('adsStoreId');
         sel.innerHTML = '<option value="">— semua toko —</option>';
@@ -372,11 +427,14 @@
                 $('shopPerfBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Belum ada data di rentang ini — klik "↓ Sync ke DB" dulu.</td></tr>';
             } else {
                 const tot = { imp:0, clk:0, spend:0, ord:0, gmv:0 };
+                const _months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+                const _fmtD = (d) => { if (!d) return '—'; const p = d.split('-'); return p.length===3 ? `${p[2]} ${_months[parseInt(p[1])-1]} ${p[0]}` : d; };
+                
                 $('shopPerfBody').innerHTML = days.map(r => {
                     tot.imp += +r.impressions || 0; tot.clk += +r.clicks || 0;
                     tot.spend += +r.spend || 0; tot.ord += +r.orders || 0; tot.gmv += +r.gmv || 0;
                     return `<tr>
-                        <td>${r.date || '—'}</td>
+                        <td>${_fmtD(r.date)}</td>
                         <td class="text-end">${(+r.impressions || 0).toLocaleString('id-ID')}</td>
                         <td class="text-end">${(+r.clicks || 0).toLocaleString('id-ID')}</td>
                         <td class="text-end">${r.ctr != null ? (+r.ctr).toFixed(2) + '%' : '—'}</td>
@@ -444,13 +502,15 @@
                     <tbody>${days.map((r, idx) => {
                         const prev = days[idx + 1];
                         const delta = prev ? r.balance - prev.balance : null;
+                        const _m = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+                        const fmtDt = (d) => { if (!d) return '—'; const p = d.split('-'); return p.length===3 ? `${p[2]} ${_m[parseInt(p[1])-1]} ${p[0]}` : d; };
                         return `<tr style="border-top:1px solid #f1f5f9">
-                            <td style="padding:4px">${r.date}</td>
+                            <td style="padding:4px">${fmtDt(r.date)}</td>`
                             <td style="text-align:right;font-weight:700">${fmtRp(r.balance)}</td>
                             <td style="text-align:right;color:${delta > 0 ? '#166534' : (delta < 0 ? '#dc2626' : '#94a3b8')}">${delta != null ? (delta > 0 ? '+' : '') + fmtRp(delta) : '—'}</td>
                         </tr>`;
                     }).join('')}</tbody>
-                </table></div>`
+                </table>`
                 : '<div class="text-muted p-3">Belum ada riwayat — snapshot saldo tercatat otomatis tiap sync & tiap malam 23:30.</div>';
             Swal.fire({ title: '💰 Riwayat Saldo Iklan', html: body, width: 480, showConfirmButton: false, showCloseButton: true });
         } catch (e) { alert('Gagal: ' + e.message); }
@@ -504,7 +564,7 @@
 
     // ── Load ──────────────────────────────────────────────────────────────────
     window.loadAds = async function () {
-        $('adsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
+        $('adsBody').innerHTML = '<div class="text-center text-muted py-4"> Memuat…</div>';
         $('adsPager').style.display = 'none';
         const from = $('dateFrom').value;
         const to   = $('dateTo').value;
@@ -640,8 +700,8 @@
         const showMapCol = view === 'campaign';
 
         body.innerHTML = `
-        <div class="gf-table-scroll">
-        <table class="gf-clean-table w-100">
+        <div class="">
+        <table class="table-list w-100">
             <thead><tr>
                 ${sortTh('campaign_name',firstLabel,'left')}
                 <th>Tipe</th>
@@ -762,7 +822,7 @@
                 </tr>`;
             }).join('')}
             </tbody>
-        </table></div>`;
+        </table>`;
 
         // Footer / pager
         const hiddenNote = hiddenCount > 0
@@ -775,9 +835,9 @@
         } else {
             pager.style.display = 'none';
             const foot = document.createElement('div');
-            foot.className = 'gf-table-foot';
-            foot.innerHTML = `<span class="gf-table-foot-hint">${info}</span>`;
-            body.querySelector('.gf-table-scroll').after(foot);
+            foot.className = 'p-2';
+            foot.innerHTML = `<span class="text-muted small">${info}</span>`;
+            body.querySelector('.').after(foot);
         }
     }
 
@@ -944,5 +1004,6 @@
 
     init();
 })();
+
 </script>
 @endpush

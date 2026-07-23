@@ -1071,12 +1071,13 @@ class MarketplaceSyncService
         }
 
         // ── 3b. Ambil item_id produk per campaign (product ads) ───────────────
-        // Endpoint: get_product_level_campaign_setting_info. Untuk product ads,
-        // tiap campaign terikat 1 produk (item_id) → kunci mapping ke item internal.
-        $itemIdMap = []; // channel_campaign_id => item_id (int)
+        // Endpoint: get_product_level_campaign_setting_info dengan info_type_list=1,2,3,4.
+        // Path setting terverifikasi dari API nyata (lihat parseCampaignSetting()).
+        // Kegagalan setting TIDAK menggagalkan sync performa (partial-failure aman).
+        $settingMap = []; // channel_campaign_id => parsed setting
         foreach (array_chunk($campaignIds, 50) as $chunk) {
             try {
-                $setRes = $driver->getCampaignSettingInfo($store, $chunk);
+                $setRes = $driver->getCampaignSettingInfo($store, $chunk, [1, 2, 3, 4]);
             } catch (\Throwable $e) {
                 Log::warning("getCampaignSettingInfo error store #{$store->id}: " . $e->getMessage());
                 continue;
@@ -1089,13 +1090,7 @@ class MarketplaceSyncService
             foreach (data_get($setRes, 'response.campaign_list', []) as $c) {
                 $cid = (string) ($c['campaign_id'] ?? '');
                 if (! $cid) continue;
-                // item_id bisa muncul di beberapa bentuk tergantung tipe campaign
-                $itemId = data_get($c, 'item_id')
-                    ?? data_get($c, 'item_id_list.0')
-                    ?? data_get($c, 'manual_product_ads.0.item_id')
-                    ?? data_get($c, 'auto_product_ads.item_id')
-                    ?? data_get($c, 'product_list.0.item_id');
-                if ($itemId) $itemIdMap[$cid] = (int) $itemId;
+                $settingMap[$cid] = self::parseCampaignSetting($c);
             }
         }
 
@@ -1153,7 +1148,6 @@ class MarketplaceSyncService
                 ]);
 
                 $campaign->fill([
-                    'channel_item_id' => $itemIdMap[$cid] ?? $campaign->channel_item_id,
                     'campaign_name'   => $metrics['ad_name'] ?? $campaign->campaign_name,
                     'campaign_type'   => $placement,
                     'status'          => 'ongoing', // aktif karena muncul di API
@@ -1178,6 +1172,29 @@ class MarketplaceSyncService
                     'raw_json'  => $metrics,
                     'synced_at' => now(),
                 ]);
+
+                // Setting campaign: HANYA di-set bila setting berhasil dibaca.
+                // Bila gagal (tak ada di $settingMap), kolom setting lama TIDAK
+                // ditimpa null (partial-failure aman).
+                if (isset($settingMap[$cid])) {
+                    $s = $settingMap[$cid];
+                    $campaign->fill([
+                        'channel_item_id'    => $s['channel_item_id'] ?? $campaign->channel_item_id,
+                        'ad_type'            => $s['ad_type'] ?? $campaign->ad_type,
+                        'bidding_method'     => $s['bidding_method'] ?? $campaign->bidding_method,
+                        'campaign_status'    => $s['campaign_status'] ?? $campaign->campaign_status,
+                        'campaign_placement' => $s['campaign_placement'] ?? $campaign->campaign_placement,
+                        'campaign_budget'    => $s['campaign_budget'] ?? $campaign->campaign_budget,
+                        'target_roas'        => $s['target_roas'],   // 0 valid; null bila tak ada auto_bidding_info
+                        'started_at'         => $s['started_at'] ?? $campaign->started_at,
+                        'ended_at'           => $s['ended_at'],      // null legit (end_time=0)
+                        'raw_setting_payload'=> $s['raw_setting_payload'],
+                        'setting_synced_at'  => now(),
+                    ]);
+                    if (! empty($s['ad_name'])) {
+                        $campaign->campaign_name = $s['ad_name']; // nama dari setting lebih akurat
+                    }
+                }
 
                 // Resolusi mapping ke item internal (hormati override manual).
                 if ($campaign->mapping_status !== 'manual') {
@@ -1208,6 +1225,65 @@ class MarketplaceSyncService
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Parse satu node campaign dari get_product_level_campaign_setting_info
+     * (info_type_list=1,2,3,4) menjadi field ternormalisasi.
+     *
+     * Path terverifikasi dari API nyata (campaign 477707399):
+     *   common_info.item_id_list.0  ← path item_id yang BENAR (prioritas 1)
+     *   common_info.{ad_type,ad_name,bidding_method,campaign_status,
+     *                campaign_placement,campaign_budget,campaign_duration.*}
+     *   auto_bidding_info.roas_target
+     *
+     * Static + tanpa side-effect agar mudah diuji unit.
+     */
+    public static function parseCampaignSetting(array $node): array
+    {
+        $common = data_get($node, 'common_info') ?? [];
+        $auto   = data_get($node, 'auto_bidding_info'); // null bila bukan auto bidding
+
+        // Path NYATA diprioritaskan; fallback untuk struktur lain/lama.
+        $itemId = data_get($node, 'common_info.item_id_list.0')
+            ?? data_get($node, 'item_id')
+            ?? data_get($node, 'item_id_list.0');
+
+        $tz    = config('app.timezone', 'Asia/Jakarta');
+        $start = (int) data_get($common, 'campaign_duration.start_time', 0);
+        $end   = (int) data_get($common, 'campaign_duration.end_time', 0);
+
+        return [
+            'channel_item_id'     => $itemId !== null ? (int) $itemId : null,
+            'ad_type'             => data_get($common, 'ad_type'),
+            'ad_name'             => data_get($common, 'ad_name'),
+            'bidding_method'      => data_get($common, 'bidding_method'),
+            'campaign_status'     => data_get($common, 'campaign_status'),
+            'campaign_placement'  => data_get($common, 'campaign_placement'),
+            'campaign_budget'     => data_get($common, 'campaign_budget'),
+            'target_roas'         => $auto ? data_get($auto, 'roas_target') : null,
+            'started_at'          => $start > 0 ? Carbon::createFromTimestamp($start, $tz) : null,
+            'ended_at'            => $end   > 0 ? Carbon::createFromTimestamp($end, $tz)   : null, // end_time=0 → null
+            'raw_setting_payload' => self::stripSensitive($node),
+        ];
+    }
+
+    /**
+     * Buang key sensitif (defensif) sebelum menyimpan raw payload.
+     * Setting node normalnya tidak memuat credential, tapi ini jaminan aman.
+     */
+    public static function stripSensitive($data)
+    {
+        static $blocked = ['access_token', 'refresh_token', 'partner_key', 'partner_key_v2', 'sign', 'credentials'];
+
+        if (! is_array($data)) return $data;
+
+        $out = [];
+        foreach ($data as $k => $v) {
+            if (is_string($k) && in_array($k, $blocked, true)) continue;
+            $out[$k] = self::stripSensitive($v);
+        }
+        return $out;
+    }
 
     /**
      * Parse tanggal metric harian dari Shopee Ads API ke 'Y-m-d'.

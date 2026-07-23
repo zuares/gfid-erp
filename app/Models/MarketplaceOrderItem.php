@@ -93,13 +93,36 @@ class MarketplaceOrderItem extends Model
     /** marketplace_sku kosong. */
     public function scopeSkuEmpty(Builder $query): Builder
     {
-        return $query->where('mapping_status', 'marketplace_sku_empty');
+        return $query->where('mapping_status', 'marketplace_sku_empty')
+            ->where(function (Builder $q) {
+                $q->whereNull('marketplace_sku')->orWhere('marketplace_sku', '');
+            })
+            ->where(function (Builder $q) {
+                $q->whereNull('model_sku')->orWhere('model_sku', '');
+            })
+            ->where(function (Builder $q) {
+                $q->whereNull('item_sku')->orWhere('item_sku', '');
+            })
+            ->where(function (Builder $q) {
+                $q->whereNull('external_sku')->orWhere('external_sku', '');
+            });
     }
 
     /** SKU ada tapi belum ada mapping ke item internal. */
     public function scopeMappingNotFound(Builder $query): Builder
     {
-        return $query->where('mapping_status', 'mapping_not_found');
+        return $query->where(function (Builder $q) {
+            $q->where('mapping_status', 'mapping_not_found')
+              ->orWhere(function (Builder $q2) {
+                  $q2->where('mapping_status', 'marketplace_sku_empty')
+                     ->where(function (Builder $q3) {
+                         $q3->where(function ($q4) { $q4->whereNotNull('marketplace_sku')->where('marketplace_sku', '!=', ''); })
+                            ->orWhere(function ($q4) { $q4->whereNotNull('model_sku')->where('model_sku', '!=', ''); })
+                            ->orWhere(function ($q4) { $q4->whereNotNull('item_sku')->where('item_sku', '!=', ''); })
+                            ->orWhere(function ($q4) { $q4->whereNotNull('external_sku')->where('external_sku', '!=', ''); });
+                     });
+              });
+        });
     }
 
     /** Mapping OK tapi HPP belum diisi. */
