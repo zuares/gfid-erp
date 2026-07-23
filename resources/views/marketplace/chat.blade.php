@@ -252,7 +252,6 @@
                 <div class="conv-time">
                     ${timeAgo(c.last_message_at)}
                     ${c.unread_count > 0 ? `<br><span class="conv-unread">${c.unread_count}</span>` : ''}
-                    ${(c.unread_count === 0 && c.is_answered === 0) ? `<br><span style="color:#ef4444;font-size:0.6rem;font-weight:700">Belum dibalas</span>` : ''}
                 </div>
                 </div>
             </div>`).join('');

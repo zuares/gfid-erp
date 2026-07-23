@@ -70,6 +70,24 @@ class MarketplaceSyncFinanceCommand extends Command
             $this->info("Memproses Toko: {$store->name} (Channel: {$store->channel->name})");
             $this->info("--------------------------------------------------");
 
+            if ($store->connection_status === 'TOKEN_EXPIRED') {
+                if (!$dryRun) {
+                    try {
+                        $manager = app(\App\Services\Channels\ChannelManager::class);
+                        $driver = $manager->driver($store);
+                        if (method_exists($driver, 'refreshToken')) {
+                            $driver->refreshToken($store);
+                            $store->refresh();
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('Token refresh failed in sync-finance', [
+                            'store_id' => $store->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+
             if ($store->connection_status !== 'CONNECTED') {
                 $this->warn("Toko {$store->name} perlu login ulang / tidak terhubung. Dilewati.");
                 continue;
