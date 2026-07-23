@@ -123,8 +123,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
-    Route::post('/stores/{store}/sync-historical', [MarketplaceController::class, 'syncHistorical']);
-    Route::post('/stores/{store}/force-sync-background', [MarketplaceController::class, 'forceSyncBackground']);
+    Route::post('/stores/{store}/sync-historical', [MarketplaceController::class, 'syncHistorical'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/stores/{store}/force-sync-background', [MarketplaceController::class, 'forceSyncBackground'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     // Logistics Endpoints
     Route::get('/stores/{store}/orders/{orderSn}/shipping-parameter', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getShippingParameter']);

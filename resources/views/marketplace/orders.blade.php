@@ -1223,16 +1223,43 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     };
 
     // ── Dropdown toggle ───────────────────────────────────────────────────
+    // Header (.ship-topbar) memakai overflow-x:auto di desktop, yang IKUT memotong
+    // dropdown secara vertikal. Supaya tidak tertutup, saat dibuka dropdown
+    // dipromosikan ke position:fixed dan diposisikan tepat di bawah tombolnya.
+    function closeAllDropdowns() {
+        document.querySelectorAll('.hdr-dropdown.open').forEach(d => {
+            d.classList.remove('open');
+            d.style.position = ''; d.style.top = ''; d.style.left = ''; d.style.right = '';
+        });
+    }
+    function positionDropdown(dd, btn) {
+        const r = btn.getBoundingClientRect();
+        dd.style.position = 'fixed';
+        dd.style.top = (r.bottom + 8) + 'px';
+        // Rata kanan dengan tombol, tapi jangan sampai keluar layar
+        const w = dd.offsetWidth;
+        let left = r.right - w;
+        const maxLeft = window.innerWidth - w - 8;
+        if (left > maxLeft) left = maxLeft;
+        if (left < 8) left = 8;
+        dd.style.left = left + 'px';
+        dd.style.right = 'auto';
+    }
     window.toggleDropdown = function (id, e) {
         e.stopPropagation();
         const dd = $(id);
+        const btn = e.currentTarget;
         const isOpen = dd.classList.contains('open');
-        document.querySelectorAll('.hdr-dropdown.open').forEach(d => d.classList.remove('open'));
-        if (!isOpen) dd.classList.add('open');
+        closeAllDropdowns();
+        if (!isOpen) {
+            dd.classList.add('open');       // tampilkan dulu agar offsetWidth terukur
+            positionDropdown(dd, btn);
+        }
     };
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.hdr-dropdown.open').forEach(d => d.classList.remove('open'));
-    });
+    document.addEventListener('click', closeAllDropdowns);
+    // Tutup saat scroll/resize agar posisi fixed tidak "menggantung"
+    window.addEventListener('scroll', closeAllDropdowns, true);
+    window.addEventListener('resize', closeAllDropdowns);
 
     // ── Date presets ──────────────────────────────────────────────────────
     const PRESET_LABELS = { 1: 'Hari ini', 7: '7 hari', 30: '30 hari', 90: '90 hari' };
@@ -1296,9 +1323,15 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     // ── Sync Latar Belakang / Backfill Histori (dropdown "⏱ Latar Belakang") ──
-    // Endpoint yang dipanggil (force-sync-background, sync-historical) SUDAH ADA dan
-    // sudah dipakai di /marketplace/toko — di sini murni menambahkan akses dari halaman
-    // Orders, TIDAK membuat endpoint/job baru, TIDAK mengubah openQuickSync()/runQuickSync().
+    // Endpoint yang dipanggil SUDAH ADA sebelumnya di MarketplaceController & routes/web.php:
+    //   - sync-orders-background (syncOrdersBackground): sync pesanan N hari terakhir via queue,
+    //     dipakai untuk "Sync Latar Belakang" (default 60 hari, batas maksimum command ini).
+    //   - sync-historical (syncHistorical): backfill histori order+retur per tahun via queue,
+    //     dipakai untuk "Backfill Histori". Route ini sebelumnya belum di-exempt dari CSRF
+    //     (beda dengan sibling route lain seperti sync-orders/sync-orders-background), sudah
+    //     disamakan di routes/web.php agar konsisten dengan pola CSRF-exempt untuk semua POST
+    //     API marketplace yang dipanggil via window.mpHelpers.api() (fetch tanpa token CSRF).
+    // TIDAK membuat endpoint/job baru, TIDAK mengubah openQuickSync()/runQuickSync().
     let bgSyncStoresCache = null;
 
     async function populateBgSyncDropdown() {
@@ -1339,9 +1372,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     });
 
     window.runOrderBackgroundSync = async function (storeId, storeName) {
-        if (!confirm(`Tarik pesanan & retur TERBARU untuk ${storeName} di latar belakang?\n\nProses berjalan di server (butuh queue worker aktif), Anda bisa langsung pindah/tutup halaman.`)) return;
+        if (!confirm(`Tarik pesanan 60 hari terakhir untuk ${storeName} di latar belakang?\n\nProses berjalan di server (butuh queue worker aktif), Anda bisa langsung pindah/tutup halaman.`)) return;
         try {
-            const res = await api(`/api/marketplace/stores/${storeId}/force-sync-background`, { method: 'POST' });
+            const res = await api(`/api/marketplace/stores/${storeId}/sync-orders-background`, {
+                method: 'POST',
+                body: JSON.stringify({ days: 60 }),
+            });
             alert(res.message || 'Sinkronisasi dikirim ke latar belakang.');
         } catch (e) {
             alert('Gagal mengirim ke latar belakang: ' + e.message);
