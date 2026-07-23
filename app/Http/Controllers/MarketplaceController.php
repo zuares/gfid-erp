@@ -1571,11 +1571,6 @@ class MarketplaceController extends Controller
                 'shipping_fee_subsidy'  => $s ? (float) $s->shipping_fee_subsidy : 0.0,
             ];
             
-            $rawJson = is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json;
-            if (is_string($rawJson)) {
-                $rawJson = json_decode($rawJson, true); // double decode just in case
-            }
-            
             $itemsDiscount = 0;
             if (isset($rawJson['items']) && is_array($rawJson['items'])) {
                 foreach ($rawJson['items'] as $it) {
@@ -1677,6 +1672,10 @@ class MarketplaceController extends Controller
         $pagedData = $rows->slice(($page - 1) * $perPage, $perPage)->values();
         $paginator = new \Illuminate\Pagination\LengthAwarePaginator($pagedData, $kpiCount, $perPage, $page);
 
+        $lastSync = \App\Models\MarketplaceSyncLog::whereIn('action', ['sync_finance', 'sync_settlements'])
+            ->latest()
+            ->value('created_at');
+
         return response()->json([
             'paginator' => $paginator,
             'meta'      => [
@@ -1686,7 +1685,8 @@ class MarketplaceController extends Controller
                 'kpi_profit'  => $kpiProfit,
                 'kpi_margin'  => $kpiMargin,
                 'avg_profit'  => $avgProfit,
-                'kpi_count'   => $kpiCount
+                'kpi_count'   => $kpiCount,
+                'last_sync'   => $lastSync ? $lastSync->toISOString() : null
             ]
         ]);
     }

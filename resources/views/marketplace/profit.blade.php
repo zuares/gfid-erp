@@ -10,8 +10,12 @@
         <div>
             <h1 class="title">Profit per Order</h1>
             <div class="sub">Harga jual dikurangi HPP, fee marketplace, voucher, dan promosi — profit bersih per order.</div>
+            <div class="sub" id="lastSyncLabel" style="margin-top:4px; font-size:0.75rem; color:#64748b; font-weight: 500;">
+                Terakhir Sync: <span id="lastSyncTime">—</span>
+            </div>
         </div>
         <div class="controls">
+            <button class="btn btn-sm btn-ship-outline btn-pill" onclick="syncFinance()">Sync Manual</button>
             <button class="btn btn-sm btn-dark btn-pill" onclick="syncHpp()" style="border-radius:999px;font-weight:600">Sync HPP</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="exportCsv()">Export CSV</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
@@ -282,6 +286,36 @@
 
         loadProfits();
     }
+
+    async function syncFinance() {
+        if (!confirm('Jalankan proses sync data finance (order, settlement, hpp, ads)? Proses ini akan berjalan di latar belakang.')) return;
+        try {
+            const btn = document.querySelector('button[onclick="syncFinance()"]');
+            const oldText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Menyiapkan...';
+            btn.disabled = true;
+
+            const res = await fetch('/api/marketplace/sync-finance-all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            });
+            const data = await res.json();
+            
+            alert(data.message || 'Sync finance berhasil dijadwalkan.');
+            setTimeout(() => loadProfits(), 2000);
+        } catch (err) {
+            alert('Gagal trigger sync finance: ' + err.message);
+        } finally {
+            const btn = document.querySelector('button[onclick="syncFinance()"]');
+            if (btn) {
+                btn.innerHTML = 'Sync Manual';
+                btn.disabled = false;
+            }
+        }
+    }
     
     window.resetFilters = function() {
         sessionStorage.removeItem('mpProfitFilters');
@@ -419,9 +453,25 @@
         window.location.href = '/api/marketplace/order-profits?' + params.toString();
     };
 
+    let isSyncing = false;
+    let hasUnmapped = false;
+
+    const fmtDateTime = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        const pad = n => n.toString().padStart(2, '0');
+        const day = pad(d.getDate());
+        const month = d.toLocaleString('id-ID', { month: 'short' });
+        const year = d.getFullYear();
+        const hrs = pad(d.getHours());
+        const min = pad(d.getMinutes());
+        return `${day} ${month} ${year} ${hrs}:${min}`;
+    };
+
     function renderKpi(meta) {
         if (!meta) return;
-        const hasUnmapped = rows.some(r => !r.hpp_mapped);
+        hasUnmapped = rows.some(r => !r.hpp_mapped);
 
         $('kpiOmzet').textContent  = fmtRp(meta.kpi_omzet);
         $('kpiIncome').textContent = fmtRp(meta.kpi_net);
@@ -429,6 +479,12 @@
         $('kpiProfit').textContent = fmtRp(meta.kpi_profit);
         $('kpiAvgProfit').textContent = fmtRp(meta.avg_profit);
         $('kpiMargin').textContent = meta.kpi_margin !== null ? meta.kpi_margin + '%' : '—';
+
+        if (meta.last_sync) {
+            $('lastSyncTime').textContent = fmtDateTime(meta.last_sync);
+        } else {
+            $('lastSyncTime').textContent = '—';
+        }
 
         $('profitHppWarning').className = 'alert alert-warning mt-3' + (hasUnmapped ? '' : ' d-none');
     }
@@ -439,19 +495,6 @@
             body.innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Tidak ada data margin untuk filter ini.</div>';
             return;
         }
-
-        const fmtDateTime = (iso) => {
-            if (!iso) return '';
-            const d = new Date(iso);
-            if (isNaN(d.getTime())) return iso;
-            const pad = n => n.toString().padStart(2, '0');
-            const day = pad(d.getDate());
-            const month = d.toLocaleString('id-ID', { month: 'short' });
-            const year = d.getFullYear();
-            const hrs = pad(d.getHours());
-            const min = pad(d.getMinutes());
-            return `${day} ${month} ${year} ${hrs}:${min}`;
-        };
 
         let html = `
         <div class="table-responsive" style="margin:0; border:none; max-height:65vh; overflow-y:auto;">
