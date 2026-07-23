@@ -101,6 +101,37 @@ class MarketplaceOrderController extends Controller
     {
         $order->load(['store.channel', 'items.internalItem']);
 
+        // Coba tarik data terbaru dari API agar halaman terupdate otomatis
+        if ($order->store && $order->store->channel->code === 'shopee') {
+            try {
+                $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                
+                // 1. Tarik Order Detail
+                $resDetail = $shopee->getOrderDetail($order->store, [$order->channel_order_id]);
+                $liveData = $resDetail['response']['order_list'][0] ?? null;
+
+                // 2. Tarik Escrow Detail (Income)
+                // Shopee kadang mengembalikan escrow_detail meski status masih READY_TO_SHIP (estimasi)
+                $resEscrow = [];
+                try {
+                    $reflection = new \ReflectionClass($shopee);
+                    $method = $reflection->getMethod('get');
+                    $method->setAccessible(true);
+                    $resEscrow = $method->invoke($shopee, $order->store, '/api/v2/payment/get_escrow_detail', ['order_sn' => $order->channel_order_id]);
+                } catch (\Exception $e) {}
+
+                if ($liveData) {
+                    if (!empty($resEscrow['response']['order_income'])) {
+                        $liveData['income_details'] = $resEscrow['response']['order_income'];
+                    }
+                    $order->raw_json = json_encode($liveData);
+                    $order->save();
+                }
+            } catch (\Exception $e) {
+                // Abaikan error koneksi/token agar halaman tetap terbuka
+            }
+        }
+
         return view('marketplace.orders.show', compact('order'));
     }
 

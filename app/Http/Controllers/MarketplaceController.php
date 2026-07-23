@@ -1475,13 +1475,22 @@ class MarketplaceController extends Controller
             $hppTotal = 0.0;
             $hppMapped = true;
 
+            $itemDetails = [];
             foreach ($items as $item) {
                 $sku = $item->model_sku ?: $item->item_sku;
-                if ($sku && isset($skuToHpp[$sku])) {
+                $isMapped = $sku && isset($skuToHpp[$sku]);
+                
+                if ($isMapped) {
                     $hppTotal += $skuToHpp[$sku] * (int) $item->qty;
                 } else {
                     $hppMapped = false;
                 }
+                
+                $itemDetails[] = [
+                    'sku' => $sku ?: 'No SKU',
+                    'qty' => (int) $item->qty,
+                    'mapped' => $isMapped
+                ];
             }
 
             $finalIncome = (float) $s->final_income;
@@ -1493,9 +1502,11 @@ class MarketplaceController extends Controller
                 'channel_order_id'      => $s->channel_order_id,
                 'store'                 => $s->store ? ['id' => $s->store->id, 'name' => $s->store->name] : null,
                 'order'                 => $s->order ? [
+                    'id'           => $s->order->id,
                     'order_status' => $s->order->order_status,
                     'ordered_at'   => $s->order->ordered_at?->toISOString(),
                 ] : null,
+                'items'                 => $itemDetails,
                 'buyer_payment_amount'  => (float) $s->buyer_payment_amount,
                 'final_income'          => $finalIncome,
                 'hpp_total'             => $hppTotal,
@@ -1518,6 +1529,14 @@ class MarketplaceController extends Controller
                 'shipping_fee_subsidy'  => (float) $s->shipping_fee_subsidy,
             ];
         });
+
+        if ($request->filled('hpp_status')) {
+            if ($request->hpp_status === 'empty') {
+                $rows = $rows->where('hpp_mapped', false)->values();
+            } elseif ($request->hpp_status === 'mapped') {
+                $rows = $rows->where('hpp_mapped', true)->values();
+            }
+        }
 
         // 1. Calculate Global KPIs
         $kpiOmzet = 0;

@@ -114,13 +114,12 @@ body[data-theme="dark"] .ord-search-bar input::placeholder { color: #64748b; }
 
 /* ── Tabs ── */
 .ord-tabs {
-    display: flex; gap: .5rem; flex-wrap: wrap;
-    background: #ffffff;
-    padding: .7rem;
+    display: flex; gap: .25rem; flex-wrap: wrap;
+    background: #f1f5f9;
+    padding: .35rem;
     border-radius: 12px;
     margin-bottom: 1.25rem;
     border: 1px solid #e2e8f0;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
     position: sticky; top: 60px; z-index: 30;
 }
 body[data-theme="dark"] .ord-tabs {
@@ -128,39 +127,37 @@ body[data-theme="dark"] .ord-tabs {
     border-color: rgba(255,255,255,0.1);
 }
 .ord-tab {
-    display: flex; align-items: center; gap: .45rem;
-    background: #f8fafc; border: 1px solid #f1f5f9; padding: .45rem .85rem;
-    font-size: .8rem; font-weight: 600; color: #475569;
-    border-radius: 8px; cursor: pointer; transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative; white-space: nowrap; flex-shrink: 0;
+    appearance: none; display: inline-flex; align-items: center; gap: .4rem;
+    border: none; background: transparent; color: #64748b;
+    font-weight: 800; font-size: .78rem; padding: .5rem .8rem;
+    cursor: pointer; border-radius: 8px;
+    white-space: nowrap; flex-shrink: 0; transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.ord-tab:hover:not(.active) { background: #f1f5f9; color: #1e293b; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-body[data-theme="dark"] .ord-tab:hover:not(.active) { background: rgba(255,255,255,0.05); color: #fff; }
+.ord-tab:hover:not(.active) { color: #334155; background: rgba(255,255,255,0.5); }
+body[data-theme="dark"] .ord-tab:hover:not(.active) { color: #f1f5f9; background: rgba(255,255,255,0.05); }
 .ord-tab.active { 
-    color: #fff; 
-    background: linear-gradient(135deg, #2563eb, #1d4ed8); 
-    border-color: #1e40af; 
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    color: #0f172a; 
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.025);
 }
 
 .ord-subtab {
-    border: 1px solid transparent; background: transparent; padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: #64748b; transition: all 0.2s;
+    border: 1px solid rgba(148,163,184,.25); background: transparent; padding: 4px 12px; border-radius: 7px; font-size: 0.72rem; font-weight: 700; cursor: pointer; color: #475569; transition: all 0.15s;
     display: inline-flex; align-items: center; gap: 6px;
 }
 .ord-subtab .ord-badge {
-    background: #e2e8f0 !important;
-    color: #0f172a !important;
+    background: rgba(148,163,184,.16) !important;
+    color: #475569 !important;
 }
 .ord-subtab.active { 
-    background: #eff6ff; 
-    color: #1d4ed8; 
-    border-color: #bfdbfe;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+    background: #334155; 
+    color: #ffffff; 
+    border-color: #334155;
 }
 .ord-subtab.active .ord-badge { 
-    background: #2563eb !important; 
+    background: rgba(255,255,255,.2) !important; 
     color: #ffffff !important; 
-    box-shadow: 0 2px 4px rgba(37,99,235,0.25);
+    box-shadow: none;
 }
 body[data-theme="dark"] .ord-subtab.active { background: rgba(51, 65, 85, 1); }
 .ord-subtab:hover:not(.active) { background: rgba(0,0,0,0.05); }
@@ -279,10 +276,10 @@ body[data-theme="dark"] .ord-card { border-color: rgba(51,65,85,.85); }
 /* ── Table overrides ── */
 .ord-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .ord-table thead tr th {
-    font-size: .68rem; font-weight: 600; letter-spacing: 0;
-    color: var(--shp-muted); text-transform: none; padding: .52rem .62rem;
+    font-size: .68rem; font-weight: 700; letter-spacing: 0;
+    color: var(--shp-muted); text-transform: none; padding: .55rem .65rem;
     border-bottom: 1px solid var(--shp-border); background: var(--card,#fff); white-space: nowrap;
-    position: sticky; top: 0; z-index: 10;
+    position: sticky; top: 0; z-index: 10; text-align: left;
 }
 body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98); color: #9ca3af; }
 .ord-table colgroup .col-order   { width: 13%; }
@@ -294,11 +291,11 @@ body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98)
 .ord-table colgroup .col-store   { width: 17%; }
 .ord-table colgroup .col-store-sm { width: 16%; }
 .ord-table colgroup .col-total   { width: 13%; }
-.ord-table tbody tr { transition: all .2s ease; }
-.ord-table tbody tr:hover td { background: #f8fafc; box-shadow: inset 0 2px 4px -2px rgba(0,0,0,0.03); }
+.ord-table tbody tr { transition: all .15s ease; }
+.ord-table tbody tr:hover td { background: #f8fafc; }
 .ord-table tbody tr td {
-    padding: .7rem .75rem; border-bottom: 1px solid #f4f6f9;
-    vertical-align: top; font-size: .8rem;
+    padding: .65rem .65rem; border-bottom: 1px solid rgba(148,163,184,.12);
+    vertical-align: middle; font-size: .8rem;
 }
 
 /* ── Order ID cell ── */
@@ -310,18 +307,17 @@ body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98)
 .ord-date { font-size: .68rem; color: #94a3b8; margin-top: .15rem; }
 
 /* ── Item cards (focal point) ── */
-.ord-items-cell { display: flex; flex-direction: column; gap: .4rem; }
+.ord-items-cell { display: flex; flex-direction: column; gap: .3rem; }
 .ord-item-card {
     display: flex; align-items: flex-start; gap: .55rem;
-    background: #f1f5f9; border: 1px solid transparent;
-    border-radius: 8px; padding: .5rem .65rem;
-    transition: all .2s ease;
+    background: #f8fafc; border: 1px solid rgba(148,163,184,.15);
+    border-radius: 7px; padding: .4rem .55rem;
 }
-.ord-table tbody tr:hover .ord-item-card { background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.02); }
+.ord-table tbody tr:hover .ord-item-card { background: #fff; border-color: rgba(148,163,184,.25); }
 .ord-item-qty {
-    font-size: .7rem; font-weight: 800; background: #e2e8f0; color: #475569;
-    border-radius: 5px; padding: .1rem .35rem; flex-shrink: 0; margin-top: .1rem;
-    min-width: 24px; text-align: center; line-height: 1.4;
+    font-size: .72rem; font-weight: 800; background: #e2e8f0; color: #475569;
+    border-radius: 5px; padding: .1rem .4rem; flex-shrink: 0; margin-top: .05rem;
+    min-width: 26px; text-align: center; line-height: 1.4;
 }
 .ord-item-qty.urgent { background: #fef3c7; color: #92400e; }
 .ord-item-body { flex: 1; min-width: 0; }
@@ -383,10 +379,10 @@ body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98)
 /* ── Process toolbar ── */
 .process-toolbar {
     display: none; align-items: center; justify-content: space-between;
-    padding: .6rem .75rem; background: #f8fafc; border-radius: 10px;
-    border: 1.5px solid #f1f5f9; margin-bottom: 1rem; gap: .5rem;
-    position: sticky; top: 135px; z-index: 25;
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    padding: .6rem .85rem; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px);
+    border-radius: 8px; border: 1px solid rgba(148,163,184,.25); margin-bottom: 1rem; gap: .5rem;
+    position: sticky; top: 110px; z-index: 25;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
 }
 .process-toolbar.visible { display: flex; }
 .process-toolbar-info { font-size: .75rem; color: #64748b; font-weight: 600; }
@@ -490,7 +486,7 @@ body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); 
     border: 1px solid #bbf7d0; border-radius: 999px; padding: .08rem .45rem;
 }
 .pk-pack-info {
-    font-size: .72rem; font-weight: 700; color: #2563eb;
+    font-size: .72rem; font-weight: 700; color: var(--shp-accent);
 }
 .pk-pack-info.short { color: #d97706; }
 .btn-review {
@@ -663,31 +659,32 @@ body[data-theme="dark"] .ord-table tbody tr td {
     @endif
 
     {{-- ── TOPBAR ── --}}
-    <div class="ship-topbar" style="border-bottom: 1px solid var(--shp-border); padding: .75rem 1rem; margin-inline: -1rem; margin-bottom: 1.5rem; background: var(--card);">
-        <div style="display:flex; align-items:center; gap:1rem;">
-            <h1 class="title" style="display:flex;align-items:center;gap:.5rem; font-size:1.15rem; font-weight:800; color:var(--shp-accent);">
+    <div class="ship-topbar">
+        <div>
+            <h1 class="title">
                 📦 Order Lokal
-                <span id="syncIndicator" style="display:none;font-size:.7rem;color:var(--shp-muted);font-weight:normal;background:#f1f5f9;padding:2px 8px;border-radius:12px;">
+                <span id="syncIndicator" style="display:none;font-size:.7rem;color:var(--shp-muted);font-weight:normal;background:#f1f5f9;padding:2px 8px;border-radius:12px;margin-left:8px;">
                     <span class="prod-tab-spinner" style="width:10px;height:10px;border-width:1.5px;margin-right:.2rem;"></span>
                     Menyinkronkan...
                 </span>
             </h1>
+            <div class="sub">Manajemen pesanan dari semua toko dan channel marketplace</div>
         </div>
-        <div class="controls" style="flex:1; justify-content:flex-end">
+        <div class="controls">
             {{-- Hidden date inputs --}}
             <input type="hidden" id="mpDateFrom" value="{{ $filters['date_from'] }}">
             <input type="hidden" id="mpDateTo"   value="{{ $filters['date_to'] }}">
 
             {{-- Search bar --}}
-            <div class="ord-search-bar" style="background:#f8fafc; border-color:#e2e8f0;">
+            <div class="ord-search-bar" style="background:var(--card); border:1px solid rgba(148,163,184,.35);">
                 <span class="search-icon" style="opacity:0.5; font-size:0.9em;">🔍</span>
-                <input type="text" id="filterSearch" placeholder="Cari order/resi/SKU…" oninput="onSearchInput(this)" autocomplete="off" style="border:none;background:transparent;outline:none;width:100%;font-size:0.8rem;">
-                <button class="ord-search-clear" id="searchClearBtn" onclick="clearSearch()" style="background:transparent;border:none;cursor:pointer;color:#94a3b8;display:none;">✕</button>
+                <input type="text" id="filterSearch" placeholder="Cari order/resi/SKU…" oninput="onSearchInput(this)" autocomplete="off">
+                <button class="ord-search-clear" id="searchClearBtn" onclick="clearSearch()">✕</button>
             </div>
 
             {{-- Store filter --}}
             <div style="position:relative" class="mobile-hide">
-                <button class="btn-ship-outline" id="btnStore" onclick="toggleDropdown('ddStore', event)" style="border:none; background:#f1f5f9; color:#475569; font-weight:600; padding: 0.35rem 0.6rem; border-radius: 6px; box-shadow:none;">
+                <button class="btn-ship-outline" id="btnStore" onclick="toggleDropdown('ddStore', event)">
                     <span style="opacity:0.7;">🏪</span> <span id="btnStoreLabel" class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">Semua Toko</span>
                 </button>
                 <div class="hdr-dropdown" id="ddStore">
@@ -698,7 +695,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
 
             {{-- Date filter --}}
             <div style="position:relative" class="mobile-hide">
-                <button class="btn-ship-outline" id="btnDate" onclick="toggleDropdown('ddDate', event)" style="border:none; background:#f1f5f9; color:#475569; font-weight:600; padding: 0.35rem 0.6rem; border-radius: 6px; box-shadow:none;">
+                <button class="btn-ship-outline" id="btnDate" onclick="toggleDropdown('ddDate', event)">
                     <span style="opacity:0.7;">📅</span> <span id="btnDateLabel" class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">30 hari terakhir</span>
                 </button>
                 <div class="hdr-dropdown" id="ddDate" style="right:0;left:auto;min-width:210px">
@@ -718,15 +715,15 @@ body[data-theme="dark"] .ord-table tbody tr td {
             </div>
 
             {{-- Sync --}}
-            <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; margin-right: 0.4rem; font-weight: 500;" class="mobile-hide"></span>
-            <button class="btn-ship-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onclick="openQuickSync()">🔄 <span class="mobile-hide">Sync Pesanan</span></button>
+            <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;" class="mobile-hide"></span>
+            <button class="btn-ship-primary" onclick="openQuickSync()">🔄 <span class="mobile-hide">Sync Pesanan</span></button>
 
             {{-- Sync Latar Belakang / Backfill Histori — dispatch ke queue (Artisan::queue),
                  TIDAK blocking, mengikuti endpoint yang SUDAH ADA & dipakai di /marketplace/toko
                  (force-sync-background, sync-historical). Tidak mengubah openQuickSync()
                  atau alur Sync Pesanan yang sudah berjalan — murni tambahan. --}}
             <div style="position:relative" class="mobile-hide">
-                <button class="btn-ship-outline" id="btnBgSync" onclick="toggleDropdown('ddBgSync', event)" title="Sync di latar belakang / tarik histori masa lalu — untuk backlog besar" style="border:none; background:#f1f5f9; color:#475569; font-weight:600; padding: 0.35rem 0.6rem; border-radius: 6px; box-shadow:none;">
+                <button class="btn-ship-outline" id="btnBgSync" onclick="toggleDropdown('ddBgSync', event)" title="Sync di latar belakang / tarik histori masa lalu — untuk backlog besar">
                     <span style="opacity:0.7;">⏱</span> <span class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">Latar Belakang</span>
                 </button>
                 <div class="hdr-dropdown" id="ddBgSync" style="right:0;left:auto;min-width:260px">
@@ -735,7 +732,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
                 </div>
             </div>
 
-            <button class="btn-ship-outline" onclick="loadOrders()" title="Segarkan Data" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border-color:#e2e8f0; border-radius: 6px; color:#475569; background:#fff; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">🔃</button>
+            <button class="btn-ship-outline" onclick="loadOrders()" title="Segarkan Data">🔃</button>
         </div>
     </div>
 
@@ -752,7 +749,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
             <button class="btn-fresh" id="btnFreshOrders" onclick="devFreshOrders()" title="Hapus SEMUA orders + fulfillments">🗑 Fresh All</button>
             <button class="btn-ship-outline" id="btnRemapItems" onclick="devRemapItems()" style="color:#6d28d9!important; border-color:#c4b5fd!important;" title="Re-resolve semua mapping_status + cost_status item berdasarkan SKU Mapping">🔁 Remap Items</button>
             <div style="width:1px;height:20px;background:#e2e8f0;margin:0 .15rem"></div>
-            <a href="/sales/shipments" class="btn-ship-outline" style="color:#2563eb!important; border-color:#bfdbfe!important; text-decoration:none;">📋 Buka Shipment →</a>
+            <a href="/sales/shipments" class="btn-ship-outline" style="color:var(--shp-accent)!important; border-color:var(--shp-border)!important; text-decoration:none;">📋 Buka Shipment →</a>
         </div>
     </div>
     @endif
@@ -779,19 +776,19 @@ body[data-theme="dark"] .ord-table tbody tr td {
             Perlu Dikirim <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
         <button class="ord-tab" data-tab="processed" onclick="switchTab('processed',this)">
-            Sedang Dikemas <span class="ord-badge" id="badge-processed" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
+            Dikemas <span class="ord-badge" id="badge-processed" style="background:rgba(148,163,184,.15);color:#334155;border-color:rgba(148,163,184,.25)">—</span>
         </button>
         <button class="ord-tab" data-tab="processed_instant" onclick="switchTab('processed_instant',this)">
             ⚡ Instan <span class="ord-badge" id="badge-processed_instant" style="background:#fef08a;color:#854d0e;border-color:#fde047">—</span>
         </button>
         <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped',this)">
-            Sedang Dikirim <span class="ord-badge" id="badge-shipped">—</span>
+            Dikirim <span class="ord-badge" id="badge-shipped">—</span>
         </button>
         <button class="ord-tab" data-tab="completed" onclick="switchTab('completed',this)">
             Selesai <span class="ord-badge" id="badge-completed">—</span>
         </button>
         <button class="ord-tab" data-tab="rrc" onclick="switchTab('rrc',this)">
-            🔁 Retur/Refund/Batal <span class="ord-badge" id="badge-rrc" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">—</span>
+            🔁 Retur & Batal <span class="ord-badge" id="badge-rrc" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">—</span>
         </button>
     </div>
     {{-- Toolbar: Actions & Sub-Tabs --}}
@@ -802,19 +799,19 @@ body[data-theme="dark"] .ord-table tbody tr td {
             
             <div id="subTabProcessedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabProcessed('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-all">—</span></button>
-                <button class="ord-subtab active" data-sub="packing" onclick="switchSubTabProcessed('packing', this)">Belum Dipacking <span class="ord-badge bg-secondary urgent" id="badge-sub-packing">—</span></button>
+                <button class="ord-subtab active" data-sub="packing" onclick="switchSubTabProcessed('packing', this)">Belum Packing <span class="ord-badge bg-secondary urgent" id="badge-sub-packing">—</span></button>
                 <button class="ord-subtab" data-sub="ready" onclick="switchSubTabProcessed('ready', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-ready">—</span></button>
             </div>
             <div id="subTabReadyContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
-                <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Diproses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
-                <button class="ord-subtab" data-sub="kilat" onclick="switchSubTabReady('kilat', this)">⚡ Pengiriman Kilat <span class="ord-badge bg-secondary" id="badge-sub-ready-kilat">—</span></button>
+                <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Proses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
+                <button class="ord-subtab" data-sub="kilat" onclick="switchSubTabReady('kilat', this)">⚡ Kilat <span class="ord-badge bg-secondary" id="badge-sub-ready-kilat">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
             </div>
             <div id="subTabShippedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabShipped('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-shipped-all">—</span></button>
                 <button class="ord-subtab active" data-sub="shipped" onclick="switchSubTabShipped('shipped', this)">Dikirim <span class="ord-badge bg-secondary" id="badge-sub-shipped-shipped">—</span></button>
-                <button class="ord-subtab" data-sub="confirm" onclick="switchSubTabShipped('confirm', this)">Menunggu Konfirmasi <span class="ord-badge bg-secondary" id="badge-sub-shipped-confirm">—</span></button>
+                <button class="ord-subtab" data-sub="confirm" onclick="switchSubTabShipped('confirm', this)">Menunggu <span class="ord-badge bg-secondary" id="badge-sub-shipped-confirm">—</span></button>
             </div>
             <div id="subTabRrcContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab active" data-sub="return" onclick="switchSubTabRrc('return', this)">↩️ Retur <span class="ord-badge bg-secondary" id="badge-sub-rrc-return">—</span></button>
@@ -1031,7 +1028,7 @@ body[data-theme="dark"] .ord-table tbody tr td {
                             <div style="font-size:.62rem;color:#15803d;font-weight:600">Order Baru</div>
                         </div>
                         <div style="text-align:center;padding:.5rem;background:#eff6ff;border-radius:10px">
-                            <div id="qsStatUpdated" style="font-size:1.15rem;font-weight:800;color:#2563eb">0</div>
+                            <div id="qsStatUpdated" style="font-size:1.15rem;font-weight:800;color:var(--shp-accent)">0</div>
                             <div style="font-size:.62rem;color:#1d4ed8;font-weight:600">Diperbarui</div>
                         </div>
                         <div style="text-align:center;padding:.5rem;background:#fff7ed;border-radius:10px">
@@ -2533,14 +2530,14 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     actionBtn = `
                     <div style="display:flex; flex-direction:column; align-items:center; width:100%">
                         ${ofgLabel}
-                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>
+                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:var(--shp-accent); color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>
                     </div>`;
                 }
             } else if (activeTab === 'processed') {
                 if (isFulfilled) {
                     actionBtn = `<div class="btn-fulfillment done" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; font-weight:700">✓ Selesai</div>`;
                 } else if (isInPacking) {
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; font-weight:700" onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; background:#f8fafc; color:var(--shp-accent); border:1px solid rgba(148,163,184,.25); font-weight:700" onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
                 } else {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; font-weight:700; border:1px solid #cbd5e1" onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
                 }
@@ -2553,7 +2550,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
                     actionBtn = `
                     <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
-                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
+                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:var(--shp-accent); color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
                         <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
                     </div>`;
                 }
@@ -2561,7 +2558,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (o.order_status === 'UNPAID') {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:#2563eb; color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(37,99,235,0.2)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:var(--shp-accent); color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
                     const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>`;
@@ -2828,7 +2825,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (isFulfilled) {
                 actionBtn = `<div class="btn-review" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0;cursor:default">✓ Selesai</div>`;
             } else if (isInPacking) {
-                actionBtn = `<button class="btn-review" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe"
+                actionBtn = `<button class="btn-review" style="background:#f8fafc;color:var(--shp-accent);border-color:rgba(148,163,184,.25)"
                     title="Buat atau lanjutkan Draft Shipment Marketplace, lalu scan resi/order ini."
                     onclick="window.location='/sales/shipments'">Lanjut ke Shipment →</button>`;
             } else {
@@ -3234,9 +3231,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (o.order_status === 'UNPAID') {
                     logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                    logisticsBtn = `<button class="btn-ship-primary" style="font-size:0.7rem;padding:0.2rem 0.5rem;width:100%;border-radius:5px" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>`;
+                    logisticsBtn = `<button class="btn-ship-outline" style="font-size:0.7rem;padding:0.2rem 0.5rem;width:100%;border-radius:5px" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>`;
                 }
             }
 
@@ -3772,105 +3769,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     setInterval(prefetchShippingParams, 15000);
 
     // ── Order Details ────────────────────────────────────────────────────
-    window.showOrderDetail = async function(orderId) {
-        const o = orders.find(x => x.id === orderId);
-        if(!o) return;
-        
-        let modalEl = document.getElementById('orderDetailModal');
-        let modal = bootstrap.Modal.getInstance(modalEl);
-        if (!modal) {
-            modal = new bootstrap.Modal(modalEl);
-        }
-        
-        document.getElementById('detailModalTitle').innerText = 'Mengambil data...';
-        document.getElementById('detailModalBody').innerHTML = '<div style="text-align:center; padding:30px; color:#64748b"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><br>Mengambil data live dari Shopee...</div>';
-        modal.show();
-
-        try {
-            // Booking murni (belum MATCHED) tidak punya order → pakai endpoint booking detail.
-            const detailUrl = o.is_kilat
-                ? `/api/marketplace/stores/${o.store_id}/bookings/${o.channel_order_id}/detail`
-                : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/raw-detail`;
-            const res = await api(detailUrl);
-
-            if (res.error) {
-                document.getElementById('detailModalBody').innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px">❌ Gagal mengambil data: ${esc(res.message || res.error)}</div>`;
-                return;
-            }
-
-            const liveData = res.response?.order_list?.[0] || res.order_list?.[0] || {};
-            
-            let itemsHtml = (liveData.item_list || []).map(item => `
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px;">
-                    <div>
-                        <div style="font-weight:600; font-size:0.85rem; color:#334155">${esc(item.item_name)}</div>
-                        <div style="font-size:0.75rem; color:#64748b">Var: ${esc(item.model_name || '-')} | SKU: ${esc(item.item_sku || item.model_sku || '-')}</div>
-                    </div>
-                    <div style="text-align:right">
-                        <div style="font-weight:700; font-size:0.85rem; color:#0f172a">${item.model_quantity_purchased}x</div>
-                        <div style="font-size:0.75rem; color:#64748b">${fmtRp(item.model_discounted_price || item.model_original_price)}</div>
-                    </div>
-                </div>
-            `).join('');
-
-            const r = liveData.recipient_address || {};
-            const buyerHtml = `
-                <div style="margin-bottom:15px; padding:12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px;">
-                    <h6 style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px">Informasi Penerima (Live)</h6>
-                    <div style="font-weight:700; font-size:0.9rem; color:#0f172a">${esc(r.name || liveData.buyer_username || '—')}</div>
-                    <div style="font-size:0.8rem; color:#475569; margin-top:2px">📞 ${esc(r.phone || '—')}</div>
-                    <div style="font-size:0.8rem; color:#475569; margin-top:6px; line-height:1.4">
-                        ${esc(r.full_address || '')}
-                    </div>
-                </div>
-            `;
-
-            let pkg = (liveData.package_list && liveData.package_list[0]) || {};
-            const paymentHtml = `
-                <div style="margin-bottom:15px; padding:12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px;">
-                    <h6 style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px">Pembayaran & Pengiriman</h6>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.8rem">
-                        <span style="color:#475569">Metode Bayar</span>
-                        <strong style="color:#0f172a">${esc(liveData.payment_method || '—')}</strong>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.8rem">
-                        <span style="color:#475569">Kurir</span>
-                        <strong style="color:#0f172a">${esc(liveData.shipping_carrier || pkg.shipping_carrier || '—')}</strong>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.8rem">
-                        <span style="color:#475569">No Resi</span>
-                        <div style="text-align: right;">
-                            <strong style="color:#059669; display:block; margin-bottom:4px;">${esc(pkg.package_number || pkg.tracking_number || o.shipping_awb_no || '—')}</strong>
-                            ${(o.order_status === 'SHIPPED' || o.order_status === 'PROCESSED' || o.order_status === 'COMPLETED') ? 
-                            `<button class="btn btn-sm btn-outline-info" style="font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:4px;" onclick="trackOrder(${o.store_id}, '${o.channel_order_id}', event)"><i class="bi bi-truck me-1"></i>Lacak</button>` : ''}
-                        </div>
-                    </div>
-                    <hr style="margin:8px 0; border-color:#e2e8f0">
-                    <div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-top:6px; padding-top:6px;">
-                        <span style="color:#0f172a; font-weight:700">Total Akhir</span>
-                        <strong style="color:#ea580c; font-size:1rem">${fmtRp(liveData.total_amount || 0)}</strong>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('detailModalTitle').innerText = 'Pesanan ' + (liveData.order_sn || o.channel_order_id);
-            document.getElementById('detailModalBody').innerHTML = `
-                <div class="row">
-                    <div class="col-md-7">
-                        <h6 style="font-size:0.85rem; font-weight:700; color:#334155; margin-bottom:10px">Daftar Produk (${liveData.item_list?.length || 0})</h6>
-                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; max-height:350px; overflow-y:auto">
-                            ${itemsHtml || '<div style="color:#94a3b8; font-size:0.8rem; text-align:center">Tidak ada item</div>'}
-                        </div>
-                    </div>
-                    <div class="col-md-5 mt-3 mt-md-0">
-                        ${buyerHtml}
-                        ${paymentHtml}
-                    </div>
-                </div>
-            `;
-        } catch (err) {
-            document.getElementById('detailModalBody').innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px">❌ Gagal menghubungi server: ${err.message}</div>`;
-        }
+    window.showOrderDetail = function(orderId) {
+        window.location.href = `/marketplace/orders/${orderId}`;
     };
 
     // ── Logistics ────────────────────────────────────────────────────────
@@ -4207,7 +4107,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                         <button onclick="executePrintBulk('unprinted_only')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:none;background:${unprinted === 0 ? '#e2e8f0' : '#10b981'};color:${unprinted === 0 ? '#94a3b8' : 'white'};cursor:${unprinted === 0 ? 'not-allowed' : 'pointer'};box-shadow:${unprinted === 0 ? 'none' : '0 2px 4px rgba(16,185,129,0.2)'};" ${unprinted === 0 ? 'disabled' : ''}>
                             Cetak Resi Belum Pernah Dicetak (${unprinted})
                         </button>
-                        <button onclick="executePrintBulk('selected')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;cursor:pointer;">
+                        <button onclick="executePrintBulk('selected')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid rgba(148,163,184,.25);background:#f8fafc;color:var(--shp-accent);cursor:pointer;">
                             ${hasSelection ? `Cetak Resi Terpilih (${total})` : `Cetak Semua Resi (${total})`}
                         </button>
                         <button onclick="executePrintBulk('reprint')" style="width:100%;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;cursor:pointer;">
@@ -4381,7 +4281,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     ${failedListHtml}
                     <div style="display:flex;gap:12px;margin-top:24px;">
                         ${data.success_count > 0 ? `
-                        <button onclick="window.open('${data.download_url}', '_blank'); document.getElementById('printResultModal').remove();" style="flex:1;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:none;background:#2563eb;color:white;cursor:pointer;box-shadow:0 2px 4px rgba(37,99,235,0.2);">
+                        <button onclick="window.open('${data.download_url}', '_blank'); document.getElementById('printResultModal').remove();" style="flex:1;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:none;background:var(--shp-accent);color:white;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
                             ⬇️ Unduh PDF Berhasil
                         </button>` : ''}
                         <button onclick="document.getElementById('printResultModal').remove()" style="flex:1;padding:12px;border-radius:8px;font-weight:600;font-size:0.9rem;border:1px solid #cbd5e1;background:white;color:#334155;cursor:pointer;">

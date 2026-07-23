@@ -199,6 +199,9 @@ class ShopeeChannel implements MarketplaceChannel
                 'payment_method',
                 'total_amount',
                 'checkout_shipping_carrier',
+                'estimated_shipping_fee',
+                'cancel_reason',
+                'cancel_by'
             ]),
         ]);
     }

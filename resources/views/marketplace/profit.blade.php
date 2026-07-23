@@ -53,6 +53,15 @@
                 </div>
                 
                 <div style="position:relative; min-width:125px; width:125px;">
+                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterHppStatus" onchange="loadProfits()">
+                        <option value="">Semua HPP</option>
+                        <option value="empty">HPP Kosong</option>
+                        <option value="mapped">HPP Terisi</option>
+                    </select>
+                    <i class="bi bi-tags" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                </div>
+                
+                <div style="position:relative; min-width:125px; width:125px;">
                     <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSort" onchange="loadProfits()">
                         <option value="">Waktu Cair</option>
                         <option value="margin_asc">Margin ↑</option>
@@ -215,6 +224,7 @@
         if ($('profitStoreId').value) params.append('store_id', $('profitStoreId').value);
         if ($('filterStatus').value) params.append('status', $('filterStatus').value);
         if ($('filterSettlementStatus').value) params.append('settlement_status', $('filterSettlementStatus').value);
+        if ($('filterHppStatus').value) params.append('hpp_status', $('filterHppStatus').value);
         if ($('filterSort').value) params.append('sort', $('filterSort').value);
         if ($('filterSearch').value) params.append('search', $('filterSearch').value);
         params.append('page', currentPage);
@@ -251,6 +261,7 @@
         if ($('profitStoreId').value) params.append('store_id', $('profitStoreId').value);
         if ($('filterStatus').value) params.append('status', $('filterStatus').value);
         if ($('filterSettlementStatus').value) params.append('settlement_status', $('filterSettlementStatus').value);
+        if ($('filterHppStatus').value) params.append('hpp_status', $('filterHppStatus').value);
         if ($('filterSort').value) params.append('sort', $('filterSort').value);
         if ($('filterSearch').value) params.append('search', $('filterSearch').value);
         if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length === 2) {
@@ -320,6 +331,17 @@
                         <a href="/marketplace/orders/${r.order?.id || ''}" class="code-link">${esc(r.channel_order_id)}</a>
                         <div style="margin-top:3px">${r.order?.order_status ? `<span class="oc-badge oc-badge-muted" style="font-size:.65rem">${esc(r.order.order_status)}</span>` : ''}</div>
                         <div style="font-size:.75rem; font-weight:600; margin-top:4px; color:var(--shp-muted);">${esc(r.store?.name || '—')}</div>
+                        ${r.items && r.items.length ? `
+                        <div style="margin-top:6px; border-top:1px dashed var(--shp-border); padding-top:4px;">
+                            ${r.items.map(i => `
+                                <div style="display:flex; align-items:center; gap:4px; font-size:.68rem; margin-bottom:2px;" title="${esc(i.sku)} (Qty: ${i.qty})">
+                                    ${i.mapped ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#b91c1c;font-weight:bold" title="Belum di-mapping atau HPP kosong">!</span>'}
+                                    <span style="color:var(--shp-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; flex:1;">${esc(i.sku)}</span>
+                                    <span style="color:#94a3b8">x${i.qty}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
                     </td>
                     
                     <td style="font-size:.78rem;">
