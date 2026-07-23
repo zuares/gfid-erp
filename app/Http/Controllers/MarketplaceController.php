@@ -18,6 +18,7 @@ use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Channels\ChannelManager;
+use App\Support\GmvMaxAnalytics;
 use App\Services\MarketplaceIssueService;
 use App\Services\MarketplaceSyncService;
 use App\Services\OrderFulfillmentService;
@@ -1381,7 +1382,7 @@ class MarketplaceController extends Controller
             'store:id,name,channel_id',
             'store.channel:id,code,name',
             'order:id,channel_order_id,order_status,ordered_at',
-            'order.items:id,marketplace_order_id,model_sku,item_sku,qty,price',
+            'order.items:id,marketplace_order_id,model_sku,item_sku,qty,price,mapping_status,internal_item_id,hpp_snapshot',
         ])->latest('settlement_time');
 
         if ($request->filled('store_id')) {
@@ -1480,10 +1481,16 @@ class MarketplaceController extends Controller
             $itemDetails = [];
             foreach ($items as $item) {
                 $sku = $item->model_sku ?: $item->item_sku;
-                $isMapped = $sku && isset($skuToHpp[$sku]);
+                $isMapped = $item->mapping_status === \App\Models\MarketplaceOrderItem::MAPPING_MAPPED || !empty($item->internal_item_id);
                 
-                if ($isMapped) {
-                    $hppTotal += $skuToHpp[$sku] * (int) $item->qty;
+                $hpp = (float) $item->hpp_snapshot;
+                // Fallback to active snapshot if hpp_snapshot is 0
+                if ($hpp <= 0 && $sku && isset($skuToHpp[$sku])) {
+                    $hpp = (float) $skuToHpp[$sku];
+                }
+
+                if ($isMapped && $hpp > 0) {
+                    $hppTotal += $hpp * (int) $item->qty;
                 } else {
                     $hppMapped = false;
                 }
@@ -1491,7 +1498,7 @@ class MarketplaceController extends Controller
                 $itemDetails[] = [
                     'sku' => $sku ?: 'No SKU',
                     'qty' => (int) $item->qty,
-                    'mapped' => $isMapped
+                    'mapped' => $isMapped && $hpp > 0
                 ];
             }
 
@@ -1962,8 +1969,13 @@ class MarketplaceController extends Controller
             $units  = (int) $a->items_sold;
 
             $acos = $gmv > 0 && $spend > 0 ? round($spend / $gmv, 4) : null;
-            $roas = $spend > 0 ? round($gmv / $spend, 2) : null;
+            $roas = GmvMaxAnalytics::roas($gmv, $spend);            // broad actual ROAS
+            $directRoas = GmvMaxAnalytics::roas((float) $a->direct_gmv, $spend);
             $cpc  = $clicks > 0 ? round($spend / $clicks, 2) : null;
+
+            // ── Setting GMV Max (Fase 2 kolom; sudah ter-load di $c, tanpa N+1) ──
+            $targetRoas   = $c->target_roas !== null ? (float) $c->target_roas : null;
+            $targetStatus = GmvMaxAnalytics::targetStatus($targetRoas, $roas, $c->bidding_method);
 
             // Break-even ACOS efektif (override manual atau derivasi HPP item)
             $beAcos = $c->break_even_acos !== null
@@ -1990,9 +2002,22 @@ class MarketplaceController extends Controller
                 'ad_group_id'     => $c->ad_group_id,
                 'group_name'      => $c->group?->name,
                 'group_color'     => $c->group?->color,
+                // ── Setting GMV Max ──
+                'ad_type'            => $c->ad_type,
+                'bidding_method'     => $c->bidding_method,
+                'target_roas'        => $targetRoas,
+                'target_status'      => $targetStatus,
+                'campaign_budget'    => $c->campaign_budget !== null ? (float) $c->campaign_budget : null,
+                'campaign_status'    => $c->campaign_status,
+                'campaign_placement' => $c->campaign_placement,
+                'started_at'         => optional($c->started_at)->toDateTimeString(),
+                'ended_at'           => optional($c->ended_at)->toDateTimeString(),
+                'setting_synced_at'  => optional($c->setting_synced_at)->toDateTimeString(),
+
                 'spend'           => $spend,
                 'gmv'             => $gmv,
                 'direct_gmv'      => (float) $a->direct_gmv,
+                'direct_roas'     => $directRoas,
                 'impressions'     => (int) $a->impressions,
                 'clicks'          => $clicks,
                 'orders'          => $orders,
@@ -2008,6 +2033,19 @@ class MarketplaceController extends Controller
             ]);
         }
 
+        // ── 3b. Filter server-side khusus GMV Max (opsional) ──────────────────
+        $fBidding      = $request->input('bidding_method');
+        $fCampStatus   = $request->input('campaign_status');
+        $fTargetStatus = $request->input('target_status');
+        if ($fBidding || $fCampStatus || $fTargetStatus) {
+            $campaignRows = $campaignRows->filter(function ($r) use ($fBidding, $fCampStatus, $fTargetStatus) {
+                if ($fBidding && ($r['bidding_method'] ?? null) !== $fBidding) return false;
+                if ($fCampStatus && ($r['campaign_status'] ?? null) !== $fCampStatus) return false;
+                if ($fTargetStatus && ($r['target_status'] ?? null) !== $fTargetStatus) return false;
+                return true;
+            })->values();
+        }
+
         // ── 4. Regroup jika perlu (per item internal / per grup) ──────────────
         $rows = match ($groupBy) {
             'item'  => $this->aggregateAdRows($campaignRows, 'internal_item_id',
@@ -2019,18 +2057,28 @@ class MarketplaceController extends Controller
             default => $campaignRows->sortByDesc('spend')->values(),
         };
 
-        // ── 5. Overall KPI (selalu level campaign) ────────────────────────────
-        $totSpend = $campaignRows->sum('spend');
-        $totGmv   = $campaignRows->sum('gmv');
+        // ── 5. Overall KPI (selalu level campaign; broad = attributed utama) ──
+        $totSpend    = $campaignRows->sum('spend');
+        $totGmv      = $campaignRows->sum('gmv');       // broad — JANGAN jumlahkan dgn direct
+        $totDirect   = $campaignRows->sum('direct_gmv');
+        // Last sync = setting/perf tersinkron terbaru dari campaign yang tampil
+        $lastSync = $masters->flatMap(fn ($c) => [$c->setting_synced_at, $c->synced_at])
+            ->filter()->max();
         $kpi = [
             'spend'            => $totSpend,
             'gmv'              => $totGmv,
-            'roas'             => $totSpend > 0 ? round($totGmv / $totSpend, 2) : null,
+            'direct_gmv'       => $totDirect,
+            'roas'             => GmvMaxAnalytics::roas($totGmv, $totSpend),
+            'direct_roas'      => GmvMaxAnalytics::roas($totDirect, $totSpend),
+            'weighted_target_roas' => GmvMaxAnalytics::weightedTargetRoas($campaignRows),
             'acos'             => $totGmv  > 0 ? round($totSpend / $totGmv * 100, 1) : null,
             'orders'           => $campaignRows->sum('orders'),
             'clicks'           => $campaignRows->sum('clicks'),
+            'active_campaigns' => $campaignRows->where('campaign_status', 'ongoing')->count(),
+            'below_target'     => $campaignRows->where('target_status', 'below')->count(),
             'profit_after_ads' => $campaignRows->filter(fn ($r) => $r['profit_after_ads'] !== null)->sum('profit_after_ads') ?: null,
             'unmapped'         => $campaignRows->where('internal_item_id', null)->count(),
+            'last_sync'        => $lastSync ? $lastSync->toDateTimeString() : null,
         ];
 
         return response()->json([
@@ -2234,6 +2282,81 @@ class MarketplaceController extends Controller
         return response()->json([
             'message'     => $data['ad_group_id'] ? 'Campaign dimasukkan ke grup.' : 'Campaign dikeluarkan dari grup.',
             'ad_group_id' => $campaign->ad_group_id,
+        ]);
+    }
+
+    /**
+     * Detail campaign GMV Max (READ-ONLY): setting + performa agregat periode +
+     * daily trend. Raw setting payload hanya untuk owner (sudah tersanitasi).
+     * Broad = attributed utama; direct = pembanding (tidak dijumlahkan).
+     */
+    public function campaignDetail(Request $request, MarketplaceAdCampaign $campaign): JsonResponse
+    {
+        $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
+        $dateTo   = $request->input('date_to',   now()->toDateString());
+
+        $campaign->loadMissing('internalItem:id,code,name', 'store:id,name');
+
+        $daily = \DB::table('marketplace_ad_campaign_dailies')
+            ->where('store_id', $campaign->store_id)
+            ->where('channel_campaign_id', $campaign->channel_campaign_id)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->orderBy('date')
+            ->get(['date', 'expense', 'impressions', 'clicks', 'broad_order', 'direct_order', 'broad_gmv', 'direct_gmv']);
+
+        $spend  = (float) $daily->sum('expense');
+        $gmv    = (float) $daily->sum('broad_gmv');
+        $dGmv   = (float) $daily->sum('direct_gmv');
+        $impr   = (int) $daily->sum('impressions');
+        $clicks = (int) $daily->sum('clicks');
+        $bOrd   = (int) $daily->sum('broad_order');
+        $dOrd   = (int) $daily->sum('direct_order');
+
+        $performance = [
+            'spend'       => $spend,
+            'broad_gmv'   => $gmv,
+            'direct_gmv'  => $dGmv,
+            'impressions' => $impr,
+            'clicks'      => $clicks,
+            'broad_order' => $bOrd,
+            'direct_order'=> $dOrd,
+            'ctr'         => GmvMaxAnalytics::safeDiv($clicks * 100, $impr, 2),
+            'cpc'         => GmvMaxAnalytics::safeDiv($spend, $clicks, 2),
+            'broad_cvr'   => GmvMaxAnalytics::safeDiv($bOrd * 100, $clicks, 2),
+            'direct_cvr'  => GmvMaxAnalytics::safeDiv($dOrd * 100, $clicks, 2),
+            'broad_roas'  => GmvMaxAnalytics::roas($gmv, $spend),
+            'direct_roas' => GmvMaxAnalytics::roas($dGmv, $spend),
+            'broad_cpa'   => GmvMaxAnalytics::safeDiv($spend, $bOrd, 2),
+            'direct_cpa'  => GmvMaxAnalytics::safeDiv($spend, $dOrd, 2),
+        ];
+
+        $setting = [
+            'campaign_id'        => $campaign->channel_campaign_id,
+            'item_id'            => $campaign->channel_item_id,
+            'item_code'          => $campaign->internalItem?->code,
+            'item_name'          => $campaign->internalItem?->name,
+            'ad_type'            => $campaign->ad_type,
+            'bidding_method'     => $campaign->bidding_method,
+            'target_roas'        => $campaign->target_roas !== null ? (float) $campaign->target_roas : null,
+            'campaign_budget'    => $campaign->campaign_budget !== null ? (float) $campaign->campaign_budget : null,
+            'campaign_placement' => $campaign->campaign_placement,
+            'campaign_status'    => $campaign->campaign_status,
+            'started_at'         => optional($campaign->started_at)->toDateTimeString(),
+            'ended_at'           => optional($campaign->ended_at)->toDateTimeString(),
+            'setting_synced_at'  => optional($campaign->setting_synced_at)->toDateTimeString(),
+        ];
+
+        // Raw payload: owner-only, sanitasi ganda (defensif) walau sudah bersih saat simpan.
+        $raw = null;
+        if ($request->user()?->isOwner()) {
+            $raw = \App\Services\MarketplaceSyncService::stripSensitive($campaign->raw_setting_payload ?? []);
+        }
+
+        return response()->json([
+            'setting'             => $setting,
+            'performance'         => $performance,
+            'daily'               => $daily,
+            'raw_setting_payload' => $raw,
         ]);
     }
 

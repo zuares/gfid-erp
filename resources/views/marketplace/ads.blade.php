@@ -153,6 +153,9 @@
                 <span class="kpi"><span class="lbl">ACOS</span><span class="val" id="kpiAcos">—</span></span>
                 <span class="kpi"><span class="lbl">Orders</span><span class="val" id="kpiOrders">—</span></span>
                 <span class="kpi" title="Gross profit - spend"><span class="lbl">Profit</span><span class="val" id="kpiProfit">—</span></span>
+                <span class="kpi" title="Target ROAS rata-rata tertimbang spend (campaign Custom ROAS)"><span class="lbl">Target ROAS</span><span class="val" id="kpiTargetRoas">—</span></span>
+                <span class="kpi" title="Campaign aktif dgn actual ROAS di bawah target"><span class="lbl">Di bawah target</span><span class="val" id="kpiBelowTarget">—</span></span>
+                <span class="kpi" title="Sinkronisasi terakhir (setting/performa)"><span class="lbl">Last Sync</span><span class="val" id="kpiLastSync">—</span></span>
             </div>
         </div>
     </div>
@@ -254,6 +257,18 @@
                         <option value="✅">Pertahankan</option>
                         <option value="⚡">Perhatikan</option>
                         <option value="🔴">Stop</option>
+                    </select>
+                    <select id="filterBidding" class="filter-select" onchange="applyFilters()" style="width:auto;" title="Bidding method">
+                        <option value="">Bidding (Semua)</option>
+                        <option value="auto">Auto / GMV Max</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                    <select id="filterTarget" class="filter-select" onchange="applyFilters()" style="width:auto;" title="Status pencapaian target ROAS">
+                        <option value="">Target (Semua)</option>
+                        <option value="above">Di atas target</option>
+                        <option value="below">Di bawah target</option>
+                        <option value="maximize">Maksimalkan GMV</option>
+                        <option value="no_data">Belum ada data</option>
                     </select>
                 </div>
 
@@ -623,6 +638,22 @@
         const p  = kpi.profit_after_ads;
         el.textContent = p != null ? fmtRp(p) : '—';
         el.style.color = p != null ? (p >= 0 ? '#16a34a' : '#b91c1c') : '';
+
+        // ── GMV Max KPI (null-safe: elemen mungkin tak ada di layout tertentu) ──
+        const setTxt = (id, v) => { const n = $(id); if (n) n.textContent = v; };
+        setTxt('kpiTargetRoas', kpi.weighted_target_roas != null ? kpi.weighted_target_roas.toFixed(2) + 'x' : '—');
+        setTxt('kpiBelowTarget', kpi.below_target != null ? String(kpi.below_target) : '—');
+        setTxt('kpiLastSync', kpi.last_sync ? fmtSyncTime(kpi.last_sync) : '—');
+    }
+
+    // Format "YYYY-MM-DD HH:MM:SS" → "24 Jul 10:30" (Asia/Jakarta apa adanya dari server)
+    function fmtSyncTime(s) {
+        try {
+            const [d, t] = String(s).split(' ');
+            const [y, m, day] = d.split('-');
+            const bulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+            return `${parseInt(day)} ${bulan[parseInt(m)-1]} ${(t||'').slice(0,5)}`;
+        } catch (e) { return s; }
     }
 
     // ── Filter + Sort ─────────────────────────────────────────────────────────
@@ -633,6 +664,8 @@
         const hideZero = $('hideInactive').checked;
 
         const onlyUnmapped = $('onlyUnmapped').checked;
+        const fBidding = $('filterBidding') ? $('filterBidding').value : '';
+        const fTarget  = $('filterTarget')  ? $('filterTarget').value  : '';
 
         filtered = allRows.filter(r => {
             if (hideZero && Number(r.spend || 0) === 0) return false;
@@ -644,6 +677,9 @@
             if (fStatus && !r.is_group && r.status !== fStatus) return false;
             if (fReco   && (r.reco?.icon ?? '') !== fReco) return false;
             if (onlyUnmapped && r.internal_item_id) return false;
+            // GMV Max: bidding & target status (hanya baris campaign)
+            if (fBidding && !r.is_group && (r.bidding_method ?? '') !== fBidding) return false;
+            if (fTarget  && !r.is_group && (r.target_status ?? '') !== fTarget) return false;
             return true;
         });
 
@@ -706,6 +742,9 @@
                 ${sortTh('campaign_name',firstLabel,'left')}
                 <th>Tipe</th>
                 ${showMapCol ? '<th>Item / Grup</th>' : ''}
+                ${showMapCol ? '<th>Bidding</th>' : ''}
+                ${showMapCol ? sortTh('target_roas','Target','right') : ''}
+                ${showMapCol ? sortTh('campaign_budget','Budget','right') : ''}
                 ${sortTh('spend','Spend','right')}
                 ${sortTh('gmv','Sales','right')}
                 ${sortTh('roas','ROAS','right')}
@@ -765,11 +804,14 @@
                         <div style="font-size:.67rem;color:#94a3b8">${r.members} campaign digabung</div>
                     </td>`;
                 } else {
+                    const cs = r.campaign_status
+                        ? ` · <span style="font-weight:700;color:${campStatusColor(r.campaign_status)}">${statusLabel(r.campaign_status)}</span>` : '';
                     firstCell = `<td style="max-width:220px">
                         <div class="fw-bold" style="font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                             title="${esc(r.campaign_name || r.campaign_id)}">${esc(r.campaign_name || r.campaign_id || '—')}</div>
-                        <div style="font-size:.68rem;color:#94a3b8;font-family:monospace">#${esc(String(r.campaign_id))}</div>
-                        <div style="font-size:.67rem;font-weight:700;color:${statusColors[r.status]??'#94a3b8'}">${esc(r.status||'—')}</div>
+                        <div style="font-size:.67rem;color:#94a3b8">
+                            <span style="cursor:pointer;text-decoration:underline dotted;font-family:monospace" onclick="openCampaignDetail(${r.id})" title="Lihat detail (read-only)">#${esc(String(r.campaign_id))} · Detail</span>${cs}
+                        </div>
                     </td>`;
                 }
 
@@ -786,10 +828,25 @@
                     mapCell = `<td style="max-width:170px"><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">${mapBadge}${grpChip}</div></td>`;
                 }
 
+                // ── Sel GMV Max (hanya view campaign) ──────────────────────
+                let biddingCell = '', targetCell = '', budgetCell = '';
+                if (showMapCol) {
+                    biddingCell = `<td>${biddingLabel(r.bidding_method)}</td>`;
+                    const tRoas = r.target_roas;
+                    const targetText = (tRoas != null && tRoas > 0) ? fmtRoas(tRoas)
+                        : (r.bidding_method === 'auto' && tRoas === 0) ? '<span style="font-size:.68rem;color:#0369a1">Maks. GMV</span>'
+                        : '<span style="color:#cbd5e1">—</span>';
+                    targetCell = `<td class="text-end" style="font-size:.78rem">${targetText}</td>`;
+                    budgetCell = `<td class="text-end" style="font-size:.78rem">${r.campaign_budget != null ? fmtRp(r.campaign_budget) : '<span style="color:#cbd5e1">—</span>'}</td>`;
+                }
+
                 return `<tr class="${isInactive ? 'row-inactive' : ''}">
                     ${firstCell}
                     <td><span class="type-pill">${esc(r.campaign_type || '—')}</span></td>
                     ${mapCell}
+                    ${biddingCell}
+                    ${targetCell}
+                    ${budgetCell}
                     <td class="text-end" style="font-size:.83rem;font-weight:700">${fmtRp(r.spend)}</td>
                     <td class="text-end" style="font-size:.83rem;font-weight:700;color:#0369a1">
                         ${fmtRp(r.gmv)}

@@ -269,6 +269,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     // ── Analisa Iklan: mapping item internal & grouping ───────────────────────
+    Route::get('/ad-campaigns/{campaign}/detail', [MarketplaceController::class, 'campaignDetail']); // read-only GMV Max detail
     Route::patch('/ad-campaigns/{campaign}/map-item', [MarketplaceController::class, 'mapCampaignItem'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::patch('/ad-campaigns/{campaign}/group',    [MarketplaceController::class, 'assignCampaignGroup'])
