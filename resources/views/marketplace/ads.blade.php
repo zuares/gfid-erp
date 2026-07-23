@@ -903,7 +903,7 @@
             const foot = document.createElement('div');
             foot.className = 'p-2';
             foot.innerHTML = `<span class="text-muted small">${info}</span>`;
-            body.querySelector('.').after(foot);
+            body.querySelector('.table-list').after(foot);
         }
     }
 
