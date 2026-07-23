@@ -1718,10 +1718,8 @@ class MarketplaceController extends Controller
             }
         }
 
-        // Production: dispatch ke background supaya tidak timeout 504
-        dispatch(function () use ($store, $dateFrom, $dateTo) {
-            app(\App\Services\MarketplaceSyncService::class)->syncAdCampaigns($store, $dateFrom, $dateTo);
-        });
+        // Production: dispatch ke background menggunakan Job khusus (dengan timeout besar)
+        \App\Jobs\SyncAdCampaignsJob::dispatch($store, $dateFrom, $dateTo);
 
         return response()->json([
             'status' => 'success', 

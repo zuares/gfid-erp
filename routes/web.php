@@ -375,11 +375,8 @@ Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::
 Route::post('/api/marketplace/sync-finance-all', function () {
     if (app()->environment('local') && function_exists('exec') && false === stripos(ini_get('disable_functions'), 'exec')) {
         $artisan = base_path('artisan');
-        exec("php {$artisan} marketplace:sync-finance > /dev/null 2>&1 &");
-    } else {
-        dispatch(function () {
-            \Illuminate\Support\Facades\Artisan::call('marketplace:sync-finance');
-        });
+    // Production: bypass batasan disable_functions exec dengan dispatch ke queue worker (menggunakan Job khusus agar tidak timeout)
+        \App\Jobs\SyncFinanceJob::dispatch();
     }
     return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
