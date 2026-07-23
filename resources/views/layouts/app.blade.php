@@ -533,7 +533,7 @@
           monthSelectorType: 'static',
           nextArrow: '&rsaquo;',
           prevArrow: '&lsaquo;',
-          locale: 'id',
+          locale: (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.id) ? 'id' : 'default',
           onReady: function(selectedDates, dateStr, instance){
             instance.input.classList.add('gf-date-input');
             instance.calendarContainer.classList.add('gf-date-calendar');

@@ -349,6 +349,7 @@
         if (window.flatpickr) {
             window._adsDatePicker = flatpickr('#dateRangePicker', {
                 mode: 'range',
+                locale: (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.id) ? 'id' : 'default',
                 dateFormat: 'Y-m-d',
                 altInput: true,
                 altFormat: 'd M Y',
@@ -631,20 +632,23 @@
 
     // ── KPI ───────────────────────────────────────────────────────────────────
     function renderKpi(kpi) {
-        $('kpiSpend').textContent  = fmtRp(kpi.spend || 0);
-        $('kpiGmv').textContent    = fmtRp(kpi.gmv   || 0);
-        $('kpiRoas').textContent   = kpi.roas != null ? kpi.roas.toFixed(2) + 'x' : '—';
-        $('kpiAcos').textContent   = kpi.acos != null ? kpi.acos.toFixed(1) + '%' : '—';
-        $('kpiOrders').textContent = kpi.orders != null ? kpi.orders.toLocaleString('id') : '—';
-        $('kpiOrdersSub').textContent = kpi.clicks ? kpi.clicks.toLocaleString('id') + ' klik' : 'dari iklan';
+        const setTxt = (id, v) => { const n = $(id); if (n) n.textContent = v; };
+        
+        setTxt('kpiSpend', fmtRp(kpi.spend || 0));
+        setTxt('kpiGmv', fmtRp(kpi.gmv || 0));
+        setTxt('kpiRoas', kpi.roas != null ? kpi.roas.toFixed(2) + 'x' : '—');
+        setTxt('kpiAcos', kpi.acos != null ? kpi.acos.toFixed(1) + '%' : '—');
+        setTxt('kpiOrders', kpi.orders != null ? kpi.orders.toLocaleString('id') : '—');
+        setTxt('kpiOrdersSub', kpi.clicks ? kpi.clicks.toLocaleString('id') + ' klik' : 'dari iklan');
 
         const el = $('kpiProfit');
-        const p  = kpi.profit_after_ads;
-        el.textContent = p != null ? fmtRp(p) : '—';
-        el.style.color = p != null ? (p >= 0 ? '#16a34a' : '#b91c1c') : '';
+        if (el) {
+            const p  = kpi.profit_after_ads;
+            el.textContent = p != null ? fmtRp(p) : '—';
+            el.style.color = p != null ? (p >= 0 ? '#16a34a' : '#b91c1c') : '';
+        }
 
         // ── GMV Max KPI (null-safe: elemen mungkin tak ada di layout tertentu) ──
-        const setTxt = (id, v) => { const n = $(id); if (n) n.textContent = v; };
         setTxt('kpiTargetRoas', kpi.weighted_target_roas != null ? kpi.weighted_target_roas.toFixed(2) + 'x' : '—');
         setTxt('kpiBelowTarget', kpi.below_target != null ? String(kpi.below_target) : '—');
         setTxt('kpiLastSync', kpi.last_sync ? fmtSyncTime(kpi.last_sync) : '—');
