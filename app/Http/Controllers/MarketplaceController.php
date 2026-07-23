@@ -1506,7 +1506,7 @@ class MarketplaceController extends Controller
             $adCost      = (float) $s->ad_cost;
             $profitNet   = $finalIncome - $hppTotal - $adCost;
 
-            return [
+            $data = [
                 'id'                    => $s->id,
                 'channel_order_id'      => $s->channel_order_id,
                 'store'                 => $s->store ? ['id' => $s->store->id, 'name' => $s->store->name] : null,
@@ -1527,7 +1527,6 @@ class MarketplaceController extends Controller
                     ? round($profitNet / (float) $s->buyer_payment_amount * 100, 1)
                     : null,
                 'settlement_time'       => $s->settlement_time?->toISOString(),
-                'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
                 // Detail potongan (untuk tooltip)
                 'commission_fee'        => (float) $s->commission_fee,
                 'service_fee'           => (float) $s->service_fee,
@@ -1537,6 +1536,27 @@ class MarketplaceController extends Controller
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
                 'shipping_fee_subsidy'  => (float) $s->shipping_fee_subsidy,
             ];
+            
+            $rawJson = is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json;
+            if (is_string($rawJson)) {
+                $rawJson = json_decode($rawJson, true); // double decode just in case
+            }
+            
+            $itemsDiscount = 0;
+            if (isset($rawJson['items']) && is_array($rawJson['items'])) {
+                foreach ($rawJson['items'] as $it) {
+                    $sellPrice = (float)($it['selling_price'] ?? 0);
+                    $discPrice = (float)($it['discounted_price'] ?? 0);
+                    if ($sellPrice > $discPrice) {
+                        $itemsDiscount += ($sellPrice - $discPrice);
+                    }
+                }
+            }
+            
+            $data['raw_json'] = $rawJson;
+            $data['seller_discount'] = $itemsDiscount;
+            
+            return $data;
         });
 
         if ($request->filled('hpp_status')) {

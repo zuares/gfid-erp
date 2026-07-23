@@ -23,72 +23,114 @@
         ⚠️ Beberapa order tidak memiliki mapping SKU → Item, sehingga HPP-nya <strong>0</strong>. Lengkapi <a href="{{ route('marketplace.sku-mapping') }}">SKU Mapping</a> dan pastikan sudah ada <em>HPP Snapshot</em> aktif.
     </div>
 
-    <div class="card-main mb-3">
-        <div style="padding:.75rem; background:rgba(148,163,184,.03);">
-            <div class="controls" style="flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: .4rem;">
-                
-                <div style="position:relative; min-width:125px; width:125px;">
-                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="profitStoreId" onchange="loadProfits()">
-                        <option value="">Semua Toko</option>
-                    </select>
-                    <i class="bi bi-shop" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:125px; width:125px;">
-                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterStatus" onchange="loadProfits()">
-                        <option value="">Semua Status</option>
-                        <option value="COMPLETED">Selesai</option>
-                        <option value="SHIPPED">Dikirim</option>
-                        <option value="CANCELLED">Batal</option>
-                    </select>
-                    <i class="bi bi-box-seam" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:125px; width:125px;">
-                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSettlementStatus" onchange="loadProfits()">
-                        <option value="">Semua Dana</option>
-                        <option value="cair">Sudah Cair</option>
-                        <option value="belum_cair">Belum Cair</option>
-                    </select>
-                    <i class="bi bi-wallet2" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:125px; width:125px;">
-                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterHppStatus" onchange="loadProfits()">
-                        <option value="">Semua HPP</option>
-                        <option value="empty">HPP Kosong</option>
-                        <option value="mapped">HPP Terisi</option>
-                    </select>
-                    <i class="bi bi-tags" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:125px; width:125px;">
-                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSort" onchange="loadProfits()">
-                        <option value="">Waktu Cair</option>
-                        <option value="margin_asc">Margin ↑</option>
-                        <option value="margin_desc">Margin ↓</option>
-                        <option value="profit_asc">Profit ↑</option>
-                        <option value="profit_desc">Profit ↓</option>
-                    </select>
-                    <i class="bi bi-sort-down" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:135px; width:135px;">
-                    <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterOrderDate" placeholder="Tgl Order...">
-                    <i class="bi bi-calendar3" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:135px; width:135px;">
-                    <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterSettlementDate" placeholder="Tgl Cair...">
-                    <i class="bi bi-calendar3" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
-                <div style="position:relative; min-width:145px; width:145px;">
-                    <input type="text" class="form-control form-control-sm filter-select w-100" style="padding-left:26px" id="filterSearch" placeholder="Cari Order..." onkeyup="if(event.key==='Enter')loadProfits()">
-                    <i class="bi bi-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                </div>
-                
+    <style>
+        .profit-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            align-items: center;
+        }
+        .profit-filters .filter-item {
+            flex: 1 1 130px;
+            position: relative;
+            min-width: 130px;
+        }
+        .profit-filters .filter-item.search-item {
+            flex: 2 1 200px;
+        }
+        .profit-filters select.form-select, 
+        .profit-filters input.form-control {
+            padding-left: 28px;
+            font-size: 0.8rem;
+            height: 32px;
+            border-color: rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            box-shadow: none;
+        }
+        .profit-filters select.form-select:focus,
+        .profit-filters input.form-control:focus {
+            border-color: var(--shp-primary);
+        }
+        .profit-filters .filter-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+    </style>
+
+    <div class="card-main mb-3" style="padding:1rem;">
+        <div class="profit-filters">
+            
+            <div class="filter-item">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="profitStoreId" onchange="loadProfits()">
+                    <option value="">Toko</option>
+                </select>
+                <i class="bi bi-shop filter-icon"></i>
             </div>
+            
+            <div class="filter-item">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterStatus" onchange="loadProfits()">
+                    <option value="">Status</option>
+                    <option value="COMPLETED">Selesai</option>
+                    <option value="SHIPPED">Dikirim</option>
+                    <option value="CANCELLED">Batal</option>
+                </select>
+                <i class="bi bi-box-seam filter-icon"></i>
+            </div>
+            
+            <div class="filter-item">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterSettlementStatus" onchange="loadProfits()">
+                    <option value="">Dana</option>
+                    <option value="cair">Cair</option>
+                    <option value="belum_cair">Belum Cair</option>
+                </select>
+                <i class="bi bi-wallet2 filter-icon"></i>
+            </div>
+            
+            <div class="filter-item">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterHppStatus" onchange="loadProfits()">
+                    <option value="">HPP</option>
+                    <option value="empty">Kosong</option>
+                    <option value="mapped">Terisi</option>
+                </select>
+                <i class="bi bi-tags filter-icon"></i>
+            </div>
+            
+            <div class="filter-item">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterSort" onchange="loadProfits()">
+                    <option value="">Waktu Cair</option>
+                    <option value="margin_asc">Margin ↑</option>
+                    <option value="margin_desc" selected>Margin ↓</option>
+                    <option value="profit_asc">Profit ↑</option>
+                    <option value="profit_desc">Profit ↓</option>
+                </select>
+                <i class="bi bi-sort-down filter-icon"></i>
+            </div>
+            
+            <div class="filter-item">
+                <input type="text" class="form-control filter-select w-100" style="background:#fff;cursor:pointer;" id="filterOrderDate" placeholder="Tgl Order">
+                <i class="bi bi-calendar3 filter-icon"></i>
+            </div>
+            
+            <div class="filter-item">
+                <input type="text" class="form-control filter-select w-100" style="background:#fff;cursor:pointer;" id="filterSettlementDate" placeholder="Tgl Cair">
+                <i class="bi bi-calendar3 filter-icon"></i>
+            </div>
+            
+            <div class="filter-item search-item" style="display:flex; gap:0.5rem;">
+                <div style="position:relative; flex-grow:1;">
+                    <input type="text" class="form-control filter-select w-100" id="filterSearch" placeholder="Cari..." onkeyup="if(event.key==='Enter')loadProfits()">
+                    <i class="bi bi-search filter-icon"></i>
+                </div>
+                <button class="btn btn-light border" style="height:32px; padding:0 0.75rem; font-size:0.8rem; display:flex; align-items:center; gap:0.4rem; color:var(--shp-muted); border-radius:6px;" onclick="resetFilters()" title="Reset Filter">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+            </div>
+            
         </div>
     </div>
     
@@ -179,16 +221,55 @@
             sel.appendChild(opt);
         });
 
+        // 1. Prepare default dates
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        let defaultOrderDate = [firstDay, lastDay];
+        let defaultSettlementDate = [firstDay, lastDay];
+
+        // 2. Read saved state
+        const savedRaw = sessionStorage.getItem('mpProfitFilters');
+        let saved = null;
+        if (savedRaw) {
+            try { saved = JSON.parse(savedRaw); } catch(e){}
+        }
+
+        if (saved) {
+            if (saved.filterOrderDate) defaultOrderDate = saved.filterOrderDate;
+            if (saved.filterSettlementDate) defaultSettlementDate = saved.filterSettlementDate;
+        }
+
+        // 3. Init Flatpickr
         if (window.GFID && window.GFID.initDateRange) {
             const onDateClose = function(selectedDates) {
                 if (selectedDates.length === 2 || selectedDates.length === 0) {
                     currentPage = 1; loadProfits();
                 }
             };
-            fpOrderDate = window.GFID.initDateRange('#filterOrderDate', { onClose: onDateClose });
-            fpSettlementDate = window.GFID.initDateRange('#filterSettlementDate', { onClose: onDateClose });
+            fpOrderDate = window.GFID.initDateRange('#filterOrderDate', { 
+                onClose: onDateClose,
+                defaultDate: defaultOrderDate
+            });
+            fpSettlementDate = window.GFID.initDateRange('#filterSettlementDate', { 
+                onClose: onDateClose,
+                defaultDate: defaultSettlementDate
+            });
         }
         
+        // 4. Restore other filters or apply defaults
+        if (saved) {
+            ['profitStoreId', 'filterStatus', 'filterSettlementStatus', 'filterHppStatus', 'filterSort', 'filterSearch'].forEach(id => {
+                if (saved[id] !== undefined && $(id)) $(id).value = saved[id];
+            });
+        } else {
+            ['filterStatus', 'filterSettlementStatus', 'filterHppStatus', 'filterSearch'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            $('filterSort').value = 'margin_desc';
+        }
+
         document.querySelectorAll('.filter-select').forEach(el => {
             if (el.tagName === 'SELECT' || el.id === 'filterSearch') {
                 el.addEventListener('change', () => { 
@@ -198,16 +279,26 @@
                 });
             }
         });
-        // Reset fields to empty just in case browser cached them on F5
-        document.querySelectorAll('.filter-select').forEach(el => el.value = '');
 
         loadProfits();
     }
     
     window.resetFilters = function() {
-        document.querySelectorAll('.filter-select').forEach(el => el.value = '');
-        if (fpOrderDate) fpOrderDate.clear();
-        if (fpSettlementDate) fpSettlementDate.clear();
+        sessionStorage.removeItem('mpProfitFilters');
+        $('profitStoreId').value = '';
+        ['filterStatus', 'filterSettlementStatus', 'filterHppStatus', 'filterSearch'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        $('filterSort').value = 'margin_desc';
+        
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+        if (fpOrderDate) fpOrderDate.setDate([firstDay, lastDay]);
+        if (fpSettlementDate) fpSettlementDate.setDate([firstDay, lastDay]);
+        
         currentPage = 1;
         loadProfits();
     };
@@ -263,15 +354,33 @@
         params.append('page', currentPage);
         params.append('per_page', 50);
 
+        let savedOrderDate = null;
         if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length === 2) {
+            savedOrderDate = fpOrderDate.selectedDates;
             params.append('order_date_from', fpOrderDate.formatDate(fpOrderDate.selectedDates[0], 'Y-m-d'));
             params.append('order_date_to', fpOrderDate.formatDate(fpOrderDate.selectedDates[1], 'Y-m-d'));
         }
         
+        let savedSettlementDate = null;
         if (fpSettlementDate && fpSettlementDate.selectedDates && fpSettlementDate.selectedDates.length === 2) {
+            savedSettlementDate = fpSettlementDate.selectedDates;
             params.append('settlement_date_from', fpSettlementDate.formatDate(fpSettlementDate.selectedDates[0], 'Y-m-d'));
             params.append('settlement_date_to', fpSettlementDate.formatDate(fpSettlementDate.selectedDates[1], 'Y-m-d'));
         }
+
+        // Save state to sessionStorage
+        try {
+            sessionStorage.setItem('mpProfitFilters', JSON.stringify({
+                profitStoreId: $('profitStoreId').value,
+                filterStatus: $('filterStatus').value,
+                filterSettlementStatus: $('filterSettlementStatus').value,
+                filterHppStatus: $('filterHppStatus').value,
+                filterSort: $('filterSort').value,
+                filterSearch: $('filterSearch').value,
+                filterOrderDate: savedOrderDate,
+                filterSettlementDate: savedSettlementDate
+            }));
+        } catch(e) {}
 
         try {
             const res = await api('/api/marketplace/order-profits?' + params.toString());
@@ -326,10 +435,23 @@
 
     function renderTable() {
         const body = $('profitBody');
-        if (!rows.length) {
-            body.innerHTML = '<div class="oc-empty">Belum ada data profit. Pastikan sudah ada settlement dan HPP aktif.</div>';
+        if (!rows || rows.length === 0) {
+            $('tableContainer').innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Tidak ada data margin untuk filter ini.</div>';
             return;
         }
+
+        const fmtDateTime = (iso) => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return iso;
+            const pad = n => n.toString().padStart(2, '0');
+            const day = pad(d.getDate());
+            const month = d.toLocaleString('id-ID', { month: 'short' });
+            const year = d.getFullYear();
+            const hrs = pad(d.getHours());
+            const min = pad(d.getMinutes());
+            return `${day} ${month} ${year} ${hrs}:${min}`;
+        };
 
         let html = `
         <div class="table-responsive" style="margin:0; border:none; max-height:65vh; overflow-y:auto;">
@@ -378,9 +500,9 @@
                     </td>
                     
                     <td style="font-size:.78rem;">
-                        <div style="color:var(--shp-text)">${r.order?.ordered_at ? fmtDate(r.order.ordered_at) : '<span style="color:#94a3b8">—</span>'}</div>
+                        <div style="color:var(--shp-text)">${r.order?.ordered_at ? fmtDateTime(r.order.ordered_at) : '<span style="color:#94a3b8">—</span>'}</div>
                         <div style="font-size:.72rem;color:var(--shp-muted);margin-top:2px;">
-                            ${r.settlement_time ? fmtDate(r.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem;padding:.1rem .3rem">Belum Cair</span>'}
+                            ${r.settlement_time ? fmtDateTime(r.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem;padding:.1rem .3rem">Belum Cair</span>'}
                         </div>
                     </td>
                     
@@ -394,6 +516,9 @@
                         </div>
                         <div style="font-size:.75rem; color:var(--shp-muted); margin-top:2px;">
                             Koin: <span style="font-weight:600;color:${r.seller_coin_cash_back ? '#b91c1c' : '#94a3b8'}">${r.seller_coin_cash_back ? '−'+fmtRp(r.seller_coin_cash_back) : '0'}</span>
+                        </div>
+                        <div style="font-size:.75rem; color:var(--shp-muted); margin-top:2px;">
+                            Pkt Diskon: <span style="font-weight:600;color:${r.seller_discount ? '#b91c1c' : '#94a3b8'}">${r.seller_discount ? '−'+fmtRp(r.seller_discount) : '0'}</span>
                         </div>
                     </td>
 
