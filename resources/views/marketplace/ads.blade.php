@@ -384,7 +384,11 @@
     // ── Saldo Iklan (v2.ads.get_total_balance) ────────────────────────────────
     async function loadBalance() {
         const sid = $('adsStoreId').value;
-        $('kpiBalance').textContent = '⏳';
+        const setTxt = (id, v) => { const n = $(id); if (n) n.textContent = v; };
+        const setCol = (id, c) => { const n = $(id); if (n) n.style.color = c; };
+        const setTit = (id, t) => { const n = $(id); if (n) n.title = t; };
+
+        setTxt('kpiBalance', '⏳');
         try {
             let balance, sub;
             if (sid) {
@@ -397,19 +401,19 @@
                 balance = d.total;
                 const ok = (d.stores || []).filter(s => s.balance != null).length;
                 sub = `total ${ok}/${(d.stores || []).length} toko`;
-                $('kpiBalance').title = (d.stores || []).map(s => `${s.store}: ${s.balance != null ? fmtRp(s.balance) : (s.error || '—')}`).join('\n');
+                setTit('kpiBalance', (d.stores || []).map(s => `${s.store}: ${s.balance != null ? fmtRp(s.balance) : (s.error || '—')}`).join('\n'));
             }
-            $('kpiBalance').textContent = balance != null ? fmtRp(balance) : '—';
-            $('kpiBalanceSub').textContent = sub;
+            setTxt('kpiBalance', balance != null ? fmtRp(balance) : '—');
+            setTxt('kpiBalanceSub', sub);
             if (balance != null && balance < 100000) {
-                $('kpiBalance').style.color = '#dc2626';
-                $('kpiBalanceSub').textContent = '⚠ saldo menipis — top up!';
+                setCol('kpiBalance', '#dc2626');
+                setTxt('kpiBalanceSub', '⚠ saldo menipis — top up!');
             } else {
-                $('kpiBalance').style.color = '';
+                setCol('kpiBalance', '');
             }
         } catch (e) {
-            $('kpiBalance').textContent = '—';
-            $('kpiBalanceSub').textContent = e.message.length > 40 ? 'gagal cek saldo' : e.message;
+            setTxt('kpiBalance', '—');
+            setTxt('kpiBalanceSub', e.message.length > 40 ? 'gagal cek saldo' : e.message);
         }
     }
 
