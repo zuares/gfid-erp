@@ -217,14 +217,18 @@ class MarketplaceLogisticsController extends Controller
             
             // Shopee hanya mengizinkan SATU metode pengiriman (pickup ATAU dropoff).
             // Jika frontend tidak mengirim apapun (misal 'auto'), kirim salah satu sebagai pancingan.
-            if (empty($params['pickup']) && empty($params['dropoff']) && empty($params['non_integrated'])) {
+            $hasPickup = isset($params['pickup']);
+            $hasDropoff = isset($params['dropoff']);
+            $hasNonIntegrated = isset($params['non_integrated']);
+
+            if (!$hasPickup && !$hasDropoff && !$hasNonIntegrated) {
                 $params['pickup'] = new \stdClass();
             } else {
                 // Jika dikirim tapi berupa array kosong, ubah jadi object {}
-                if (isset($params['dropoff']) && is_array($params['dropoff']) && empty($params['dropoff'])) {
+                if ($hasDropoff && is_array($params['dropoff']) && empty($params['dropoff'])) {
                     $params['dropoff'] = new \stdClass();
                 }
-                if (isset($params['pickup']) && is_array($params['pickup']) && empty($params['pickup'])) {
+                if ($hasPickup && is_array($params['pickup']) && empty($params['pickup'])) {
                     $params['pickup'] = new \stdClass();
                 }
             }
