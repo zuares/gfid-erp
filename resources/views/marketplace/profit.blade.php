@@ -436,7 +436,7 @@
     function renderTable() {
         const body = $('profitBody');
         if (!rows || rows.length === 0) {
-            $('tableContainer').innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Tidak ada data margin untuk filter ini.</div>';
+            body.innerHTML = '<div style="padding:40px; text-align:center; color:#94a3b8;"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Tidak ada data margin untuk filter ini.</div>';
             return;
         }
 
