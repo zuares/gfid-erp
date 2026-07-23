@@ -377,7 +377,9 @@ Route::post('/api/marketplace/sync-finance-all', function () {
         $artisan = base_path('artisan');
         exec("php {$artisan} marketplace:sync-finance > /dev/null 2>&1 &");
     } else {
-        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-finance');
+        dispatch(function () {
+            \Illuminate\Support\Facades\Artisan::call('marketplace:sync-finance');
+        });
     }
     return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
