@@ -261,10 +261,6 @@
         $penghasilan = $inc['escrow_amount'] 
             ?? $liveData['payment_info']['net_revenue'] 
             ?? $order->net_payout_estimated;
-            
-        if ($penghasilan <= 0) {
-            $penghasilan = $subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
-        }
 
         // Buyer Payment Data
         $voucherShopee = $inc['voucher_from_shopee'] ?? $order->other_discount ?? 0;

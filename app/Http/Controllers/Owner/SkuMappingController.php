@@ -76,21 +76,20 @@ class SkuMappingController extends Controller
     /** SKU dari marketplace_order_items yang belum punya mapping. */
     public function unmappedSkus(): JsonResponse
     {
-        $mapped = SkuMapping::pluck('marketplace_sku')->unique();
-
-        $unmapped = MarketplaceOrderItem::query()
-            ->selectRaw('COALESCE(model_sku, item_sku) as sku, item_name, COUNT(*) as order_count')
-            ->whereRaw('COALESCE(model_sku, item_sku) IS NOT NULL')
-            ->groupByRaw('COALESCE(model_sku, item_sku), item_name')
-            ->get()
-            ->filter(fn ($row) => $row->sku && ! $mapped->contains($row->sku))
-            ->map(fn ($row) => [
-                'sku'         => $row->sku,
-                'item_name'   => $row->item_name,
-                'order_count' => (int) $row->order_count,
-            ])
-            ->unique('sku')
-            ->values();
+        $unmapped = DB::table('marketplace_order_items as moi')
+            ->join('marketplace_orders as mo', 'mo.id', '=', 'moi.marketplace_order_id')
+            ->join('stores as s', 's.id', '=', 'mo.store_id')
+            ->join('channels as c', 'c.id', '=', 's.channel_id')
+            ->leftJoin('sku_mappings as sm', function ($join) {
+                $join->on('sm.marketplace_sku', '=', DB::raw('COALESCE(moi.model_sku, moi.item_sku)'))
+                     ->whereRaw('(sm.channel_code = c.code OR sm.channel_code IS NULL)');
+            })
+            ->selectRaw('COALESCE(moi.model_sku, moi.item_sku) as sku, MAX(moi.item_name) as item_name, c.code as channel_code, COUNT(moi.id) as order_count')
+            ->whereRaw('COALESCE(moi.model_sku, moi.item_sku) IS NOT NULL')
+            ->whereNull('sm.id')
+            ->groupByRaw('COALESCE(moi.model_sku, moi.item_sku), c.code')
+            ->orderByDesc('order_count')
+            ->get();
 
         return response()->json($unmapped);
     }

@@ -57,6 +57,16 @@
             api('/api/sku-mappings/unmapped-skus'),
             api('/api/sku-mappings'),
         ]);
+
+        if (um.status === 'rejected') {
+            console.error('Failed to load unmapped SKUs:', um.reason);
+            $('unmappedBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat SKU belum dipetakan.</div>';
+        }
+        if (mp.status === 'rejected') {
+            console.error('Failed to load mappings:', mp.reason);
+            $('mappingsBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat daftar mapping.</div>';
+        }
+
         unmappedList = um.value || [];
         mappingsList  = mp.value || [];
 
@@ -91,7 +101,10 @@
             </tr></thead>
             <tbody>
             ${unmappedList.map(u => `<tr>
-                <td><code style="font-size:.8rem;font-weight:700">${esc(u.sku)}</code></td>
+                <td>
+                    <code style="font-size:.8rem;font-weight:700">${esc(u.sku)}</code>
+                    ${u.channel_code ? `<br><span class="oc-badge oc-badge-muted" style="font-size:.65rem">${channelPill({code: u.channel_code, name: u.channel_code})}</span>` : ''}
+                </td>
                 <td style="font-size:.82rem;color:#475569">${esc(u.item_name || '—')}</td>
                 <td class="text-end" style="font-size:.8rem;font-weight:700">${u.order_count}</td>
                 <td class="text-end">
