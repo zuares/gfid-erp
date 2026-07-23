@@ -14,13 +14,27 @@ use Illuminate\Support\Facades\Log;
 /**
  * Fase 1 — sinkronisasi settlement/escrow Shopee.
  *
- * TIDAK dijadwalkan otomatis di paket ini (lihat AUDIT_FASE1_RANCANGAN_FINAL.md
- * Koreksi 1) — hanya dijalankan manual sampai backfill + UAT selesai. TIDAK membuat
- * jurnal accounting apa pun.
+ * SUDAH DIJADWALKAN otomatis lewat scheduler (lihat routes/console.php,
+ * `Schedule::command('marketplace:sync-settlements')->everyFourHours()`) sejak
+ * commit 80dae05 (23 Juli 2026) — dijalankan TANPA opsi (semua toko aktif Shopee,
+ * satu batch @200 order/toko per run). TIDAK membuat jurnal accounting apa pun.
+ *
+ * Command ini tetap bisa dijalankan manual kapan saja untuk backfill/`--resync`/
+ * `--order` spesifik/`--all` (loop banyak batch) — lock per toko (lihat
+ * LOCK_TTL_SECONDS) memastikan eksekusi manual dan scheduler untuk toko yang sama
+ * tidak tumpang tindih. Kunci ini SAMA dengan yang dipakai
+ * `MarketplaceController::syncSettlements()` (tombol "Tarik Settlement Baru" di
+ * /marketplace/settlement) — ketiga jalur (scheduler, CLI manual, tombol UI)
+ * saling eksklusif per toko.
+ *
+ * PENTING untuk production: scheduler HANYA benar-benar berjalan kalau cron
+ * `* * * * * php artisan schedule:run` (atau `php artisan schedule:work`) aktif
+ * di server. Cek dengan `php artisan schedule:list`.
  *
  * CATATAN OPERASIONAL — "The MAC is invalid" saat kredensial toko gagal didekripsi
  * (ditemukan saat UAT 23 Juli 2026): biasanya disebabkan config cache BASI (mis.
- * APP_KEY ter-cache dari nilai .env lama). Sebelum menjalankan UAT lokal yang memakai
+ * APP_KEY ter-cache dari nilai .env lama, atau APP_KEY production beda dari saat
+ * kredensial toko dienkripsi). Sebelum menjalankan UAT lokal yang memakai
  * encrypted credentials, jalankan dulu:
  *   php artisan config:clear
  * JANGAN menjalankan config:clear otomatis dari command ini (berisiko di production,

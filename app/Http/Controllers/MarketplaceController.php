@@ -976,6 +976,69 @@ class MarketplaceController extends Controller
 
     public function syncSettlements(Request $request, Store $store): JsonResponse
     {
+        // Beri waktu lebih untuk batch settlement (retry + panggilan per-order ke Shopee).
+        set_time_limit(180);
+
+        // Kunci yang SAMA dengan yang dipakai `marketplace:sync-settlements` (lihat
+        // SyncSettlementsCommand::LOCK_TTL_SECONDS) supaya sync manual dari tombol UI dan
+        // sync dari scheduler/CLI untuk toko yang sama tidak bisa tumpang tindih.
+        $lock = \Illuminate\Support\Facades\Cache::lock("sync_settlements_store_{$store->id}", 900);
+
+        if (! $lock->get()) {
+            return response()->json([
+                'message' => "Sync settlement sedang berjalan untuk toko {$store->name} (dari proses lain atau scheduler). Mohon tunggu beberapa saat lalu coba lagi.",
+            ], 429);
+        }
+
+        $status = $store->connection_status;
+
+        if ($status === 'TOKEN_EXPIRED') {
+            try {
+                if ($store->channel->code === 'shopee') {
+                    /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
+                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                    $shopee->refreshToken($store);
+                    $store->refresh();
+                    $status = $store->connection_status;
+                }
+            } catch (\Throwable $e) {
+                $status = 'AUTH_REQUIRED';
+                \Illuminate\Support\Facades\Log::warning('Token refresh failed during settlement sync', [
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($status === 'NOT_CONNECTED') {
+            $lock->release();
+            return response()->json([
+                'success' => false,
+                'code'    => 'STORE_NOT_CONNECTED',
+                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Hubungkan ' . $store->channel->name,
+                    'url'   => url('/marketplace/shopee/connect'),
+                ],
+            ], 422);
+        }
+
+        if ($status !== 'CONNECTED') {
+            $lock->release();
+            return response()->json([
+                'success' => false,
+                'code'    => 'SHOPEE_AUTH_REQUIRED',
+                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum settlement bisa ditarik.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Login Ulang ' . $store->channel->name,
+                    'url'   => url('/marketplace/shopee/connect'),
+                ],
+            ], 401);
+        }
+
         try {
             $result = $this->sync->syncSettlements(
                 $store,
@@ -983,7 +1046,23 @@ class MarketplaceController extends Controller
                 $request->input('time_to')   ? (int) $request->input('time_to')   : null,
             );
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            // Detail exception (bisa memuat pesan driver HTTP, query, dsb) HANYA masuk log —
+            // TIDAK dikirim ke client. Response ke UI selalu pesan generik yang ramah,
+            // konsisten dengan pola catch(\Throwable) di syncOrders() (baris ~665-677).
+            \Illuminate\Support\Facades\Log::error('Settlement sync gagal total', [
+                'store_id'   => $store->id,
+                'store_name' => $store->name,
+                'error'      => $e->getMessage(),
+                'exception'  => get_class($e),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'code'    => 'SETTLEMENT_SYNC_ERROR',
+                'message' => "Sinkronisasi settlement untuk toko {$store->name} belum berhasil. Detail teknis sudah dicatat di log server — hubungi admin bila berulang.",
+            ], 502);
+        } finally {
+            $lock->release();
         }
 
         return response()->json($result);

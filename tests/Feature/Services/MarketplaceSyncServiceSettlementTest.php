@@ -232,6 +232,115 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertDatabaseHas('marketplace_order_settlements', ['final_income' => '10000.00']);
     }
 
+    // ── 6b. Breakdown new vs updated pada response (ditulis 23 Juli 2026, saat
+    //        menambah kebutuhan tombol UI "diterima/baru/diperbarui/dilewati/gagal")
+    //        — BELUM DIJALANKAN, lihat catatan status test di laporan sesi ini.
+    public function test_settlement_baru_dihitung_sebagai_new_bukan_updated()
+    {
+        $order = $this->createOrder();
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse(['final_income' => 45000, 'order_sn' => $order->channel_order_id]));
+        });
+
+        $service = app(MarketplaceSyncService::class);
+        $result = $service->syncSettlements($this->store);
+
+        $this->assertSame(1, $result['synced']);
+        $this->assertSame(1, $result['new']);
+        $this->assertSame(0, $result['updated']);
+    }
+
+    // ── 6c. Settlement PENDING (settlement_time NULL) yang sudah lewat cooldown
+    //        direfresh otomatis TANPA --resync, dan dihitung sebagai 'updated'.
+    public function test_settlement_pending_direfresh_otomatis_setelah_cooldown_dan_dihitung_updated()
+    {
+        $order = $this->createOrder();
+        MarketplaceOrderSettlement::create([
+            'store_id'         => $this->store->id,
+            'order_id'         => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income'     => 10000,
+            'settlement_time'  => null, // belum final
+            'synced_at'        => now()->subMinutes(90), // lewat cooldown 60 menit
+        ]);
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse([
+                    'final_income'          => 12000,
+                    'order_sn'              => $order->channel_order_id,
+                    'escrow_release_time'   => now()->subMinute()->timestamp, // sekarang final
+                ]));
+        });
+
+        $service = app(MarketplaceSyncService::class);
+        $result = $service->syncSettlements($this->store, resync: false);
+
+        $this->assertSame(1, $result['found']);
+        $this->assertSame(1, $result['synced']);
+        $this->assertSame(0, $result['new']);
+        $this->assertSame(1, $result['updated']);
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'channel_order_id' => $order->channel_order_id,
+            'final_income'     => '12000.00',
+        ]);
+        $this->assertSame(1, MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->count());
+    }
+
+    // ── 6d. Settlement PENDING yang BELUM lewat cooldown TIDAK di-refresh
+    //        (mencegah request API berlebihan ke Shopee untuk order yang sama).
+    public function test_settlement_pending_belum_lewat_cooldown_tidak_direfresh()
+    {
+        $order = $this->createOrder();
+        MarketplaceOrderSettlement::create([
+            'store_id'         => $this->store->id,
+            'order_id'         => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income'     => 10000,
+            'settlement_time'  => null,
+            'synced_at'        => now()->subMinutes(10), // belum 60 menit
+        ]);
+
+        $this->mockDriver(function (MockInterface $mock) {
+            $mock->shouldNotReceive('getEscrowDetail');
+        });
+
+        $service = app(MarketplaceSyncService::class);
+        $result = $service->syncSettlements($this->store, resync: false);
+
+        $this->assertSame(0, $result['found']);
+    }
+
+    // ── 6e. Settlement yang SUDAH FINAL (settlement_time terisi) TIDAK PERNAH
+    //        di-refresh otomatis tanpa --resync, walau synced_at sudah lama —
+    //        ini invarian keamanan paling penting dari fitur pending-refresh:
+    //        jangan sampai data yang sudah final diminta ulang terus-menerus.
+    public function test_settlement_final_tidak_pernah_direfresh_otomatis()
+    {
+        $order = $this->createOrder();
+        MarketplaceOrderSettlement::create([
+            'store_id'         => $this->store->id,
+            'order_id'         => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income'     => 10000,
+            'settlement_time'  => now()->subDays(10),
+            'synced_at'        => now()->subDays(10),
+        ]);
+
+        $this->mockDriver(function (MockInterface $mock) {
+            $mock->shouldNotReceive('getEscrowDetail');
+        });
+
+        $service = app(MarketplaceSyncService::class);
+        $result = $service->syncSettlements($this->store, resync: false);
+
+        $this->assertSame(0, $result['found']);
+    }
+
     // ── 10. Error satu order tidak menghentikan batch ──────────────────────────
     public function test_error_satu_order_tidak_menghentikan_batch()
     {

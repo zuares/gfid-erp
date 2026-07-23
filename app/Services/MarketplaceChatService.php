@@ -82,6 +82,46 @@ class MarketplaceChatService
     }
 
     /**
+     * Rekonsiliasi status percakapan yang tampak "belum dibalas / belum dibaca"
+     * padahal sudah ditangani di aplikasi Shopee. Untuk tiap percakapan yang
+     * ditandai (is_answered = false ATAU unread_count > 0), tarik pesan aslinya
+     * dari Shopee — ini mengimpor balasan yang dikirim seller LANGSUNG dari
+     * aplikasi Shopee (di luar aplikasi ini) — lalu hitung ulang is_answered
+     * dari peran pengirim pesan terakhir. Sumber paling otoritatif.
+     *
+     * @return array{scanned:int, fixed:int}
+     */
+    public function reconcileAnswered(Store $store, int $limit = 100): array
+    {
+        if (! $store->is_active || blank($store->credential('access_token'))) {
+            return ['scanned' => 0, 'fixed' => 0];
+        }
+
+        $convs = MarketplaceConversation::where('store_id', $store->id)
+            ->where(fn ($q) => $q->where('is_answered', false)->orWhere('unread_count', '>', 0))
+            ->orderByDesc('last_message_at')
+            ->limit($limit)
+            ->get();
+
+        $fixed = 0;
+
+        foreach ($convs as $conv) {
+            $this->syncMessages($conv);
+
+            $last = $conv->messages()->orderByDesc('sent_at')->first();
+            if ($last) {
+                $answered = $last->from_role === 'seller';
+                if ((bool) $conv->is_answered !== $answered) {
+                    $conv->update(['is_answered' => $answered]);
+                    $fixed++;
+                }
+            }
+        }
+
+        return ['scanned' => $convs->count(), 'fixed' => $fixed];
+    }
+
+    /**
      * Kirim pesan teks. Jika $conversation null, kirim cold-start ke $toId
      * (percakapan baru akan dibuat via sync setelahnya).
      */
@@ -338,16 +378,29 @@ class MarketplaceChatService
         $lastText = data_get($c, 'latest_message_content.text')
             ?? (is_string(data_get($c, 'latest_message_content')) ? data_get($c, 'latest_message_content') : null);
 
+        // "Sudah dibalas" bila pesan TERAKHIR bukan berasal dari buyer.
+        // Shopee mengirim id user pengirim pesan terakhir; to_id adalah buyer.
+        // Ini menangkap balasan yang dikirim seller LANGSUNG dari aplikasi Shopee
+        // (di luar aplikasi ini) — yang sebelumnya tak pernah menyetel is_answered.
+        $buyerId    = data_get($c, 'to_id') !== null ? (string) data_get($c, 'to_id') : null;
+        $lastFromId = (string) (data_get($c, 'last_message_from_id')
+            ?? data_get($c, 'latest_message_from_id')
+            ?? '');
+        $isAnswered = ($lastFromId !== '' && $buyerId !== null && $buyerId !== '')
+            ? ($lastFromId !== $buyerId)   // pengirim terakhir bukan buyer → sudah dibalas
+            : null;                         // tak bisa ditentukan → jangan ubah nilai lama
+
         $conv = MarketplaceConversation::updateOrCreate(
             ['store_id' => $store->id, 'conversation_id' => $extConvId],
             array_filter([
-                'buyer_user_id'     => data_get($c, 'to_id') !== null ? (string) data_get($c, 'to_id') : null,
+                'buyer_user_id'     => $buyerId,
                 'buyer_username'    => data_get($c, 'to_name'),
                 'buyer_avatar'      => data_get($c, 'to_avatar'),
                 'last_message_type' => data_get($c, 'latest_message_type'),
                 'last_message_text' => $lastText,
                 'last_message_at'   => $lastAt,
                 'unread_count'      => data_get($c, 'unread_count'),
+                'is_answered'       => $isAnswered,
                 'meta'              => $c,
             ], fn ($v) => $v !== null)
         );

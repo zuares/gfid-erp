@@ -232,6 +232,16 @@ class MarketplaceSyncService
     private const ESCROW_MAX_RETRY_SLEEP_SECONDS = 10;
 
     /**
+     * Cooldown minimum (menit) sebelum settlement yang BELUM final
+     * (settlement_time NULL) di-refresh ulang otomatis oleh batch reguler (bukan
+     * --resync). Mencegah order yang sama diminta ulang ke API Shopee di setiap
+     * batch/scheduler tick (tiap 4 jam) selagi memang belum ada perubahan status di
+     * sisi Shopee. TIDAK berlaku untuk settlement yang sudah final
+     * (settlement_time terisi) — itu hanya bisa di-refresh lewat --resync eksplisit.
+     */
+    private const PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES = 60;
+
+    /**
      * Field settlement yang dianggap "material" untuk keperluan logging perubahan
      * saat --resync (BUKAN untuk tabel histori — histori sengaja belum dibuat di Fase 1,
      * lihat AUDIT_FASE1_RANCANGAN_FINAL.md Bagian 10).
@@ -258,10 +268,15 @@ class MarketplaceSyncService
      * @param  int|null  $timeFrom  Unix timestamp, filter ordered_at >= ini
      * @param  int|null  $timeTo  Unix timestamp, filter ordered_at <= ini
      * @param  string|null  $orderSn  Kalau diisi, batasi ke satu channel_order_id
-     * @param  bool  $resync  Kalau true, order yang SUDAH punya settlement tetap diproses ulang (updateOrCreate)
+     * @param  bool  $resync  Kalau true, SEMUA order (termasuk yang settlement-nya sudah
+     *                        final) diproses ulang (updateOrCreate). Kalau false (default),
+     *                        order tetap eligible bila: belum ada settlement sama sekali,
+     *                        ATAU settlement ada tapi belum final (settlement_time NULL)
+     *                        dan sudah lewat cooldown — lihat
+     *                        PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES.
      * @param  int  $limit  Maks order yang diambil dalam satu pemanggilan (satu batch)
      * @param  int  $afterId  Cursor — hanya ambil order dengan id > afterId (untuk mode --all di command)
-     * @return array{found:int, processed:int, synced:int, skipped:int, errors:int, last_processed_id:int|null, failed_order_ids:array<int,string>, last_call_meta:array|null, message:string}
+     * @return array{found:int, processed:int, synced:int, new:int, updated:int, skipped:int, errors:int, last_processed_id:int|null, failed_order_ids:array<int,string>, last_call_meta:array|null, message:string}
      */
     public function syncSettlements(
         Store $store,
@@ -280,11 +295,29 @@ class MarketplaceSyncService
             ->orderBy('id');
 
         if (! $resync) {
-            $query->whereNotExists(function ($q) use ($store) {
-                $q->select(DB::raw(1))
-                  ->from('marketplace_order_settlements')
-                  ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
-                  ->where('marketplace_order_settlements.store_id', $store->id);
+            // Eligible untuk batch REGULER (bukan --resync) kalau salah satu:
+            // (a) belum pernah ada settlement sama sekali — perilaku asli, TIDAK diubah; atau
+            // (b) SUDAH ada settlement tapi BELUM FINAL (settlement_time NULL) dan sudah
+            //     melewati cooldown (lihat PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES) —
+            //     supaya order yang duitnya belum cair saat sync pertama kali TIDAK
+            //     terlewat selamanya, tanpa membanjiri API Shopee dengan re-check di
+            //     setiap batch/scheduler tick untuk order yang sama.
+            // Settlement yang SUDAH final (settlement_time terisi) TIDAK PERNAH masuk
+            // cabang (b) — hanya bisa diperbarui lagi lewat --resync eksplisit.
+            $query->where(function ($eligible) use ($store) {
+                $eligible->whereNotExists(function ($q) use ($store) {
+                    $q->select(DB::raw(1))
+                      ->from('marketplace_order_settlements')
+                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                      ->where('marketplace_order_settlements.store_id', $store->id);
+                })->orWhereExists(function ($q) use ($store) {
+                    $q->select(DB::raw(1))
+                      ->from('marketplace_order_settlements')
+                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                      ->where('marketplace_order_settlements.store_id', $store->id)
+                      ->whereNull('marketplace_order_settlements.settlement_time')
+                      ->where('marketplace_order_settlements.synced_at', '<=', now()->subMinutes(self::PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES));
+                });
             });
         }
         if ($orderSn) {
@@ -304,6 +337,8 @@ class MarketplaceSyncService
         $found   = $orders->count();
         $processed = 0;
         $synced  = 0;
+        $new     = 0;
+        $updated = 0;
         $skipped = 0;
         $errors  = 0;
         $lastProcessedId = null;
@@ -377,20 +412,28 @@ class MarketplaceSyncService
                 // 4) Simpan — transaction PENDEK, hanya membungkus operasi database untuk
                 //    SATU order ini (bukan seluruh batch), sesuai prinsip: satu error tidak
                 //    boleh rollback order lain, dan transaction panjang berbahaya untuk SQLite.
-                DB::transaction(function () use ($order, $mapped, $resync) {
-                    $existing = $resync
-                        ? MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->first()
-                        : null;
+                $wasNew = true;
+
+                DB::transaction(function () use ($order, $mapped, $resync, &$wasNew) {
+                    // Dicek terlepas dari $resync — dipakai untuk breakdown baru vs
+                    // diperbarui di response (kebutuhan UI tombol Sync Settlement),
+                    // TIDAK mengubah perilaku upsert/histori yang sudah ada.
+                    $existing = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->first();
+                    $wasNew   = $existing === null;
 
                     MarketplaceOrderSettlement::updateOrCreate(
                         ['channel_order_id' => $order->channel_order_id],
                         $mapped['values']
                     );
 
+                    // Log perubahan material baik saat --resync eksplisit MAUPUN saat
+                    // refresh otomatis settlement pending (existing tapi settlement_time
+                    // sebelumnya NULL) — keduanya adalah "update terhadap row yang sudah
+                    // ada" dan sama-sama layak diaudit datanya berubah dari apa ke apa.
                     if ($existing) {
                         $this->logMaterialChanges($order, $existing, $mapped['values']);
                     }
-                    
+
                     // Reset permanent failure jika akhirnya sukses
                     if ($order->settlement_sync_error_code !== null) {
                         $order->update([
@@ -401,6 +444,11 @@ class MarketplaceSyncService
                 });
 
                 $synced++;
+                if ($wasNew) {
+                    $new++;
+                } else {
+                    $updated++;
+                }
 
             } catch (\Throwable $e) {
                 Log::error("[sync-settlements] Exception order {$order->channel_order_id}: " . $e->getMessage());
@@ -409,7 +457,7 @@ class MarketplaceSyncService
             }
         }
 
-        $message = "Settlement — found: {$found}, processed: {$processed}, synced: {$synced}, skipped: {$skipped}, errors: {$errors}.";
+        $message = "Settlement — found: {$found}, processed: {$processed}, synced: {$synced} (new: {$new}, updated: {$updated}), skipped: {$skipped}, errors: {$errors}.";
 
         $logStatus = 'success';
         if ($errors > 0) {
@@ -420,6 +468,8 @@ class MarketplaceSyncService
             'found'              => $found,
             'processed'          => $processed,
             'synced'             => $synced,
+            'new'                => $new,
+            'updated'            => $updated,
             'skipped'            => $skipped,
             'errors'             => $errors,
             'last_processed_id'  => $lastProcessedId,
@@ -431,6 +481,8 @@ class MarketplaceSyncService
             'found'              => $found,
             'processed'          => $processed,
             'synced'             => $synced,
+            'new'                => $new,
+            'updated'            => $updated,
             'skipped'            => $skipped,
             'errors'             => $errors,
             'last_processed_id'  => $lastProcessedId,
@@ -803,7 +855,10 @@ class MarketplaceSyncService
         }
 
         if (! empty($changed)) {
-            Log::info("[sync-settlements] Resync mengubah nilai order {$order->channel_order_id}", [
+            // Bisa dipicu oleh --resync eksplisit ATAU refresh otomatis settlement yang
+            // sebelumnya belum final (settlement_time NULL) — keduanya sama-sama "update
+            // terhadap row existing", jadi pesan log tidak mengasumsikan salah satu saja.
+            Log::info("[sync-settlements] Nilai settlement order {$order->channel_order_id} berubah (update terhadap row existing)", [
                 'store_id' => $order->store_id,
                 'changed'  => $changed,
             ]);

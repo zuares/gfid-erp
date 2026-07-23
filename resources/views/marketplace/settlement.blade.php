@@ -342,27 +342,40 @@
 
     window.runSettlementSync = async function () {
         const storeId = $('filterStore').value;
-        if (!storeId) { alert('Pilih toko dulu sebelum sync settlement.'); return; }
+        if (!storeId) { alert('Pilih toko dulu sebelum sync settlement (dropdown "Semua Toko" di filter).'); return; }
 
         const btn     = $('runSettlementBtn');
         const alertEl = $('settlementSyncAlert');
+        if (btn.disabled) return; // cegah double-klik selagi masih syncing
         btn.disabled  = true;
-        btn.textContent = 'Syncing…';
+        btn.textContent = '⏳ Syncing…';
         alertEl.className = 'alert d-none mb-3';
 
         try {
             const d = await api('/api/marketplace/stores/' + storeId + '/sync-settlements', { method: 'POST' });
             alertEl.className = 'alert alert-success mb-3';
             alertEl.innerHTML = `<strong>✓ Settlement sync selesai.</strong><br>
-                <small>Synced: <strong>${d.synced}</strong> &nbsp;·&nbsp;
-                Skipped: ${d.skipped} &nbsp;·&nbsp;
-                Errors: ${d.errors}</small>`;
+                <small>
+                    Diterima: <strong>${d.found ?? 0}</strong> &nbsp;·&nbsp;
+                    Baru: <strong>${d.new ?? 0}</strong> &nbsp;·&nbsp;
+                    Diperbarui: <strong>${d.updated ?? 0}</strong> &nbsp;·&nbsp;
+                    Dilewati: ${d.skipped ?? 0} &nbsp;·&nbsp;
+                    Gagal: ${d.errors ?? 0}
+                </small>`;
             btn.textContent = '✓ Selesai';
             loadSettlements();
             setTimeout(() => { btn.disabled = false; btn.textContent = '↓ Tarik Settlement Baru'; }, 3000);
         } catch (e) {
             alertEl.className = 'alert alert-danger mb-3';
-            alertEl.textContent = '✗ ' + e.message;
+
+            // Token/koneksi Shopee bermasalah — tawarkan link login ulang, jangan cuma pesan generik.
+            if (e.data && e.data.action && e.data.action.type === 'redirect') {
+                alertEl.innerHTML = `✗ ${esc(e.data.message || e.message)} ` +
+                    `<a href="${esc(e.data.action.url)}" class="alert-link">${esc(e.data.action.label)}</a>`;
+            } else {
+                alertEl.textContent = '✗ ' + (e.message || 'Sync settlement gagal. Coba lagi beberapa saat lagi.');
+            }
+
             btn.disabled = false;
             btn.textContent = '↓ Tarik Settlement Baru';
         }

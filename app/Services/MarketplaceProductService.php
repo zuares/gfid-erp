@@ -545,7 +545,7 @@ class MarketplaceProductService
 
     public function updateModelSku(MarketplaceProductModel $model, string $newSku): array
     {
-        $product = $model->marketplaceProduct;
+        $product = $model->product;
         $driver = $this->manager->driver($product->store);
         
         $modelsParam = [
