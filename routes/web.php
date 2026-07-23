@@ -373,6 +373,7 @@ if (app()->environment(['local', 'testing'])) {
 // API endpoint for tracking
 Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'store'])->name('activity-logs.store')->middleware('auth')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::post('/api/marketplace/sync-finance-all', function () {
-    \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-finance');
+    $artisan = base_path('artisan');
+    exec("php {$artisan} marketplace:sync-finance > /dev/null 2>&1 &");
     return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
 });
