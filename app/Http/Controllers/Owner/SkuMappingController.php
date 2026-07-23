@@ -18,13 +18,26 @@ use Illuminate\Validation\Rule;
 
 class SkuMappingController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $mappings = SkuMapping::with('item:id,code,name')
-            ->orderBy('marketplace_sku')
-            ->get();
+        $query = SkuMapping::with('item:id,code,name');
 
-        $itemIds = $mappings->pluck('item_id')->filter()->unique();
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('marketplace_sku', 'like', "%{$search}%")
+                  ->orWhereHas('item', function ($qi) use ($search) {
+                      $qi->where('code', 'like', "%{$search}%")
+                         ->orWhere('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $mappings = $query->orderBy('marketplace_sku')
+            ->paginate($request->input('per_page', 50));
+
+        $itemIds = collect($mappings->items())->pluck('item_id')->filter()->unique();
+        
         $stocks = DB::table('inventory_stocks')
             ->whereIn('item_id', $itemIds)
             ->selectRaw('item_id, SUM(qty) as total_qty, SUM(allocated_qty) as allocated_qty')
@@ -32,14 +45,14 @@ class SkuMappingController extends Controller
             ->get()
             ->keyBy('item_id');
 
-        $mappings->each(function ($mapping) use ($stocks) {
+        foreach ($mappings->items() as $mapping) {
             if ($mapping->item) {
                 $stock = $stocks->get($mapping->item_id);
                 $mapping->item->stock_physical = (float) ($stock->total_qty ?? 0);
                 $mapping->item->stock_packing = (float) ($stock->allocated_qty ?? 0);
                 $mapping->item->stock_available = $mapping->item->stock_physical - $mapping->item->stock_packing;
             }
-        });
+        }
 
         return response()->json($mappings);
     }

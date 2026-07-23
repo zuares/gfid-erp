@@ -240,33 +240,74 @@
     </div>
 
     @php
+        $settlement = $order->settlement;
         $inc = $liveData['income_details'] ?? [];
         
         // Seller Income Data
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
         $subtotal = $subtotalItems > 0 ? $subtotalItems : ($order->subtotal_items ?? ($inc['original_price'] ?? 0));
+        
         $ongkirDibayarPembeli = $inc['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0;
         
-        $ongkosJasaKirim = $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0)));
-        $potonganOngkir = $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0;
+        $ongkosJasaKirim = $settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0)));
+        $potonganOngkir = $settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0;
         
         $subsidiShopee = $inc['shopee_discount'] ?? 0;
-        $voucherToko = $inc['seller_discount'] ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0;
+        $voucherToko = $settlement->seller_voucher ?? $inc['seller_discount'] ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0;
         
-        $biayaLayanan = abs($inc['commission_fee'] ?? 0) + abs($inc['service_fee'] ?? 0) + abs($inc['seller_transaction_fee'] ?? 0);
-        if ($biayaLayanan == 0) $biayaLayanan = abs($order->platform_fee_total ?? 0);
+        if ($settlement) {
+            $biayaAdmin = abs($settlement->commission_fee ?? 0) + abs($settlement->transaction_fee ?? 0);
+            $biayaLayananSeller = abs($settlement->service_fee ?? 0);
+            $biayaLainnyaLuar = abs($settlement->activity_fee ?? 0) + abs($settlement->escrow_tax ?? 0) + abs($settlement->drc_adjustable_refund ?? 0) + abs($settlement->ad_cost ?? 0);
+            
+            $biayaLayanan = $biayaAdmin + $biayaLayananSeller;
+            $biayaLainnya = $biayaLainnyaLuar;
+            $penghasilan = $settlement->final_income;
+        } else {
+            $biayaAdmin = abs($inc['commission_fee'] ?? 0) + abs($inc['seller_transaction_fee'] ?? 0);
+            $biayaLayananSeller = abs($inc['service_fee'] ?? 0);
+            $biayaLainnyaLuar = abs($inc['payment_promotion'] ?? 0) + abs($inc['cross_border_tax'] ?? 0) + abs($inc['escrow_tax'] ?? 0);
+            
+            $biayaLayanan = $biayaAdmin + $biayaLayananSeller;
+            if ($biayaLayanan == 0) $biayaLayanan = abs($order->platform_fee_total ?? 0);
 
-        $biayaLainnya = abs($inc['payment_promotion'] ?? 0) + abs($inc['cross_border_tax'] ?? 0) + abs($inc['escrow_tax'] ?? 0);
+            $biayaLainnya = $biayaLainnyaLuar;
 
-        $penghasilan = $inc['escrow_amount'] 
-            ?? $liveData['payment_info']['net_revenue'] 
-            ?? $order->net_payout_estimated;
+            $penghasilan = $inc['escrow_amount'] 
+                ?? $liveData['payment_info']['net_revenue'] 
+                ?? $order->net_payout_estimated;
+                
+            if ($penghasilan <= 0) {
+                // Estimasi (saat data settlement/escrow belum ada)
+                if ($biayaLayanan == 0 && $biayaLainnya == 0) {
+                    $biayaLayanan = round($subtotal * ($estimatedFeeRatio ?? 0.15));
+                    $biayaAdmin = $biayaLayanan; // For display
+                }
+                $penghasilan = $subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
+            }
+        }
+        
+        $totalBiayaLainnya = $biayaLayanan + $biayaLainnya;
+        $totalVoucherSubsidi = $voucherToko - $subsidiShopee; // - if seller voucher is higher
+        $subtotalOngkir = $ongkirDibayarPembeli - $ongkosJasaKirim + $potonganOngkir;
+        
+        // Coba ambil kode voucher toko
+        $voucherCodes = $inc['seller_voucher_code'] ?? [];
+        $voucherCodeStr = !empty($voucherCodes) ? (is_array($voucherCodes) ? implode(', ', $voucherCodes) : $voucherCodes) : '';
 
         // Buyer Payment Data
         $voucherShopee = $inc['voucher_from_shopee'] ?? $order->other_discount ?? 0;
-        $totalPembeli = $inc['buyer_total_amount'] ?? ($order->total_paid_customer > 0
+        $koinShopee = $settlement->seller_coin_cash_back ?? $inc['seller_coin_cash_back'] ?? 0;
+        $biayaLayananPembeli = $inc['buyer_transaction_fee'] ?? 2000;
+        
+        // Asumsi Biaya Layanan Pembeli = 2000 jika total amount beda dengan subtotal
+        if (empty($inc) && !$settlement && $liveData['total_amount'] > 0) {
+            $biayaLayananPembeli = 2000; 
+        }
+
+        $totalPembeli = $settlement->buyer_payment_amount ?? $inc['buyer_total_amount'] ?? ($order->total_paid_customer > 0
             ? $order->total_paid_customer
-            : ($liveData['total_amount'] ?? ($subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko + $biayaLayanan)));
+            : ($liveData['total_amount'] ?? ($subtotal + $ongkirDibayarPembeli - $voucherShopee - $voucherToko + $biayaLayananPembeli)));
     @endphp
 
     <div class="od-grid-2">
@@ -281,35 +322,89 @@
                     <span class="od-muted">Harga Produk</span>
                     <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($subtotal, 0, ',', '.') }}</span>
                 </div>
-                <div style="font-weight:700; color:#334155; margin-top:.5rem; margin-bottom:.1rem">Estimasi Subtotal Ongkos Kirim <span style="float:right">Rp{{ number_format($ongkosJasaKirim, 0, ',', '.') }}</span></div>
+                <div style="font-weight:700; color:#334155; margin-top:.5rem; margin-bottom:.1rem">Subtotal Ongkos Kirim <span style="float:right">Rp{{ number_format($subtotalOngkir, 0, ',', '.') }}</span></div>
                 <div style="display:flex; justify-content:space-between; margin-left:.5rem">
                     <span class="od-muted">Ongkir Dibayar Pembeli</span>
                     <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($ongkirDibayarPembeli, 0, ',', '.') }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; margin-left:.5rem">
-                    <span class="od-muted">Estimasi Ongkos Kirim yang Dibayarkan ke Jasa Kirim</span>
+                    <span class="od-muted">Ongkos Kirim yang Dibayarkan ke Jasa Kirim</span>
                     <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($ongkosJasaKirim, 0, ',', '.') }}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; margin-left:.5rem">
-                    <span class="od-muted">Estimasi Potongan Ongkos Kirim dari Shopee</span>
+                    <span class="od-muted">Potongan Ongkos Kirim dari Shopee</span>
                     <span class="od-code-cell" style="font-size:.85rem; color:#15803d">Rp{{ number_format($potonganOngkir, 0, ',', '.') }}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:.5rem">
-                    <span class="od-muted" style="font-weight:600">Voucher & Subsidi Shopee</span>
+
+                @if($totalVoucherSubsidi > 0 || $subsidiShopee > 0)
+                <div style="font-weight:700; color:#334155; margin-top:.6rem; margin-bottom:.1rem">
+                    Voucher & Subsidi Shopee 
+                    <span style="float:right; color:{{ $totalVoucherSubsidi > 0 ? '#b91c1c' : '#15803d' }}">
+                        {{ $totalVoucherSubsidi > 0 ? '-' : '' }}Rp{{ number_format(abs($totalVoucherSubsidi), 0, ',', '.') }}
+                    </span>
+                </div>
+                @if($voucherToko > 0)
+                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
+                    <span class="od-muted">Voucher Toko yang ditanggung Penjual {{ $voucherCodeStr ? '- '.$voucherCodeStr : '' }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($voucherToko, 0, ',', '.') }}</span>
+                </div>
+                @endif
+                @if($subsidiShopee > 0)
+                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
+                    <span class="od-muted">Subsidi Shopee</span>
                     <span class="od-code-cell" style="font-size:.85rem; color:#15803d">Rp{{ number_format($subsidiShopee, 0, ',', '.') }}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:.6rem">
-                    <span class="od-muted">Biaya Lainnya (Layanan & Admin)</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($biayaLayanan, 0, ',', '.') }}</span>
+                @endif
+                @endif
+
+                <div style="font-weight:700; color:#334155; margin-top:{{ ($totalVoucherSubsidi > 0 || $subsidiShopee > 0) ? '.6rem' : '.6rem' }}; margin-bottom:.1rem">
+                    Biaya Lainnya <span style="float:right; color:#b91c1c">-Rp{{ number_format($totalBiayaLainnya, 0, ',', '.') }}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:.5rem">
-                    <span class="od-muted">Biaya Lainnya (Pajak, dll)</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($biayaLainnya, 0, ',', '.') }}</span>
+                @if($biayaAdmin > 0)
+                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
+                    <span class="od-muted">Biaya Administrasi</span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($biayaAdmin, 0, ',', '.') }}</span>
                 </div>
+                @endif
+                @if($biayaLayananSeller > 0)
+                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
+                    <span class="od-muted">Biaya Layanan</span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($biayaLayananSeller, 0, ',', '.') }}</span>
+                </div>
+                @endif
+                @if($biayaLainnyaLuar > 0)
+                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
+                    <span class="od-muted">Pajak / Biaya Lainnya</span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($biayaLainnyaLuar, 0, ',', '.') }}</span>
+                </div>
+                @endif
                 
                 <div style="display:flex; justify-content:space-between; margin-top:.8rem; padding-top:.5rem; border-top:1px dashed rgba(148,163,184,.3)">
-                    <span style="font-weight:800; color:#111827">Estimasi Total Penghasilan</span>
+                    <span style="font-weight:800; color:#111827">Total Penghasilan</span>
                     <span class="od-code-cell" style="font-size:1rem; color:#166534">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
+                </div>
+
+                <div style="margin-top:1.5rem">
+                    <div style="font-weight:700; color:#334155; margin-bottom:.5rem">Penyesuaian Pesanan</div>
+                    <table style="width:100%; border-collapse:collapse; font-size:.85rem; text-align:left">
+                        <thead style="background:rgba(241,245,249,.5)">
+                            <tr>
+                                <th style="padding:.5rem; border-bottom:1px solid rgba(148,163,184,.2); font-weight:600; color:#64748b">Tanggal Penyesuaian Dibuat</th>
+                                <th style="padding:.5rem; border-bottom:1px solid rgba(148,163,184,.2); font-weight:600; color:#64748b">Alasan Penyesuaian</th>
+                                <th style="padding:.5rem; border-bottom:1px solid rgba(148,163,184,.2); font-weight:600; color:#64748b; text-align:right">Penyesuaian</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="3" style="padding:1rem; text-align:center; color:#94a3b8">Belum ada biaya penyesuaian untuk pesanan ini</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:1.5rem; padding-top:.5rem; border-top:1px solid rgba(148,163,184,.3)">
+                    <span style="font-weight:800; color:#111827; font-size:1.1rem">Penghasilan Akhir</span>
+                    <span class="od-code-cell" style="font-size:1.1rem; font-weight:900; color:#166534">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>
@@ -327,26 +422,28 @@
                     <span class="od-muted">Ongkos Kirim</span>
                     <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($ongkirDibayarPembeli, 0, ',', '.') }}</span>
                 </div>
-                @if($voucherShopee > 0)
                 <div style="display:flex; justify-content:space-between">
                     <span class="od-muted">Voucher Shopee</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($voucherShopee, 0, ',', '.') }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:{{ $voucherShopee > 0 ? '#991b1b' : 'inherit' }}">{{ $voucherShopee > 0 ? '-' : '' }}Rp{{ number_format($voucherShopee, 0, ',', '.') }}</span>
                 </div>
-                @endif
-                @if($voucherToko > 0)
                 <div style="display:flex; justify-content:space-between">
                     <span class="od-muted">Voucher Toko</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($voucherToko, 0, ',', '.') }}</span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:{{ $voucherToko > 0 ? '#991b1b' : 'inherit' }}">{{ $voucherToko > 0 ? '-' : '' }}Rp{{ number_format($voucherToko, 0, ',', '.') }}</span>
                 </div>
-                @endif
-                @if($biayaLayanan > 0)
                 <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Biaya Layanan (Estimasi)</span>
-                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($biayaLayanan, 0, ',', '.') }}</span>
+                    <span class="od-muted">Dapatkan Koin Shopee 
+                        @if($koinShopee > 0) 
+                        <span style="font-size:0.75rem; color:#64748b">( {{ number_format($koinShopee, 0, ',', '.') }} Koin )</span> 
+                        @endif
+                    </span>
+                    <span class="od-code-cell" style="font-size:.85rem; color:{{ $koinShopee > 0 ? '#991b1b' : 'inherit' }}">{{ $koinShopee > 0 ? '-' : '' }}Rp{{ number_format($koinShopee, 0, ',', '.') }}</span>
                 </div>
-                @endif
+                <div style="display:flex; justify-content:space-between">
+                    <span class="od-muted">Biaya Layanan</span>
+                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($biayaLayananPembeli, 0, ',', '.') }}</span>
+                </div>
                 
-                <div style="display:flex; justify-content:space-between; margin-top:2.2rem; padding-top:.5rem; border-top:1px solid rgba(148,163,184,.18)">
+                <div style="display:flex; justify-content:space-between; margin-top:.8rem; padding-top:.5rem; border-top:1px dashed rgba(148,163,184,.3)">
                     <span style="font-weight:800; color:#111827">Total Pembayaran Pembeli</span>
                     <span class="od-code-cell" style="font-size:1.1rem; color:#111827">Rp{{ number_format($totalPembeli, 0, ',', '.') }}</span>
                 </div>

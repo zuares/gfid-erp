@@ -45,39 +45,63 @@
 <script>
 (function () {
     const { api, esc, channelPill } = window.mpHelpers;
-    let unmappedList = [], mappingsList = [];
+    let unmappedList = [];
+    let mappingsPaginator = null;
+    let currentPage = 1;
+    let currentSearch = '';
 
     const $ = id => document.getElementById(id);
 
-    async function loadMappings() {
+    async function loadData() {
         $('unmappedBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
 
+        const params = new URLSearchParams({ page: currentPage, per_page: 50 });
+        if (currentSearch) params.append('search', currentSearch);
+
         const [um, mp] = await Promise.allSettled([
             api('/api/sku-mappings/unmapped-skus'),
-            api('/api/sku-mappings'),
+            api('/api/sku-mappings?' + params.toString()),
         ]);
 
         if (um.status === 'rejected') {
             console.error('Failed to load unmapped SKUs:', um.reason);
             $('unmappedBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat SKU belum dipetakan.</div>';
+        } else {
+            unmappedList = um.value || [];
+            renderUnmapped();
         }
+
         if (mp.status === 'rejected') {
             console.error('Failed to load mappings:', mp.reason);
             $('mappingsBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat daftar mapping.</div>';
+        } else {
+            mappingsPaginator = mp.value || null;
+            renderMappings();
         }
 
-        unmappedList = um.value || [];
-        mappingsList  = mp.value || [];
-
         renderKpi();
-        renderUnmapped();
-        renderMappings('');
+    }
+    
+    async function reloadMappingsOnly() {
+        $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
+        
+        const params = new URLSearchParams({ page: currentPage, per_page: 50 });
+        if (currentSearch) params.append('search', currentSearch);
+        
+        try {
+            mappingsPaginator = await api('/api/sku-mappings?' + params.toString());
+            renderMappings();
+            renderKpi();
+        } catch (e) {
+            console.error(e);
+            $('mappingsBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat daftar mapping.</div>';
+        }
     }
 
     function renderKpi() {
         const unmapped = unmappedList.length;
-        const mapped   = mappingsList.length;
+        const mapped   = mappingsPaginator ? (mappingsPaginator.total || 0) : 0;
         const total    = unmapped + mapped;
         const pct      = total > 0 ? Math.round((mapped / total) * 100) : 0;
         $('kpiUnmapped').textContent  = unmapped;
@@ -109,7 +133,7 @@
                 <td class="text-end" style="font-size:.8rem;font-weight:700">${u.order_count}</td>
                 <td class="text-end">
                     <button class="btn btn-dark btn-sm fw-bold" style="border-radius:999px;font-size:.72rem"
-                        onclick="mpMapping.open('${esc(u.sku)}', loadMappings)">+ Map</button>
+                        onclick="mpMapping.open('${esc(u.sku)}', window.loadData)">+ Map</button>
                 </td>
             </tr>`).join('')}
             </tbody>
@@ -117,23 +141,18 @@
         <div class="gf-table-foot"><span class="gf-table-foot-hint">${unmappedList.length} SKU belum dipetakan</span></div>`;
     }
 
-    function renderMappings(q) {
+    function renderMappings() {
         const body = $('mappingsBody');
-        const rows = q
-            ? mappingsList.filter(m =>
-                (m.marketplace_sku||'').toLowerCase().includes(q.toLowerCase()) ||
-                (m.item?.code||'').toLowerCase().includes(q.toLowerCase()) ||
-                (m.item?.name||'').toLowerCase().includes(q.toLowerCase()))
-            : mappingsList;
+        const rows = mappingsPaginator && mappingsPaginator.data ? mappingsPaginator.data : [];
 
         if (!rows.length) {
-            body.innerHTML = q
+            body.innerHTML = currentSearch
                 ? '<div class="oc-empty">Tidak ada mapping yang cocok.</div>'
                 : '<div class="oc-empty">Belum ada mapping terdaftar.</div>';
             return;
         }
 
-        body.innerHTML = `
+        let html = `
         <div class="gf-table-scroll">
         <table class="gf-clean-table w-100">
             <thead><tr>
@@ -164,21 +183,75 @@
                 </td>
             </tr>`).join('')}
             </tbody>
-        </table></div>
-        <div class="gf-table-foot"><span class="gf-table-foot-hint">${rows.length} mapping ditampilkan</span></div>`;
+        </table></div>`;
+
+        // Pagination UI
+        let linksHtml = '';
+        if (mappingsPaginator && mappingsPaginator.last_page > 1) {
+            linksHtml += '<div class="btn-group">';
+            
+            if (mappingsPaginator.current_page > 1) {
+                linksHtml += `<button class="btn btn-sm btn-light border" onclick="goToPage(${mappingsPaginator.current_page - 1})">Prev</button>`;
+            } else {
+                linksHtml += `<button class="btn btn-sm btn-light border" disabled>Prev</button>`;
+            }
+
+            let start = Math.max(1, mappingsPaginator.current_page - 2);
+            let end = Math.min(mappingsPaginator.last_page, mappingsPaginator.current_page + 2);
+            
+            for(let p = start; p <= end; p++) {
+                if (p === mappingsPaginator.current_page) {
+                    linksHtml += `<button class="btn btn-sm btn-primary active">${p}</button>`;
+                } else {
+                    linksHtml += `<button class="btn btn-sm btn-light border" onclick="goToPage(${p})">${p}</button>`;
+                }
+            }
+
+            if (mappingsPaginator.current_page < mappingsPaginator.last_page) {
+                linksHtml += `<button class="btn btn-sm btn-light border" onclick="goToPage(${mappingsPaginator.current_page + 1})">Next</button>`;
+            } else {
+                linksHtml += `<button class="btn btn-sm btn-light border" disabled>Next</button>`;
+            }
+            linksHtml += '</div>';
+        }
+
+        html += `
+        <div style="padding:.5rem .75rem; border-top:1px solid var(--shp-border); display:flex; justify-content:space-between; align-items:center; font-size:.75rem; color:var(--shp-muted);">
+            <div>Menampilkan baris ${mappingsPaginator.from || 0} - ${mappingsPaginator.to || 0} dari total ${mappingsPaginator.total || 0}</div>
+            <div>${linksHtml}</div>
+        </div>`;
+
+        body.innerHTML = html;
     }
+
+    window.goToPage = function(page) {
+        currentPage = page;
+        reloadMappingsOnly();
+    };
 
     window.deleteMapping = async function (id) {
         if (!confirm('Hapus mapping ini?')) return;
         try {
             await api('/api/sku-mappings/' + id, { method: 'DELETE' });
-            loadMappings();
+            loadData();
         } catch (e) { alert(e.message); }
     };
 
-    window.filterMappings = function (q) { renderMappings(q); };
-    window.loadMappings   = loadMappings;
-    loadMappings();
+    let searchTimeout;
+    window.filterMappings = function (q) {
+        clearTimeout(searchTimeout);
+        currentSearch = q;
+        currentPage = 1;
+        searchTimeout = setTimeout(() => {
+            reloadMappingsOnly();
+        }, 400);
+    };
+    
+    // Setup initial window globals
+    window.loadMappings = loadData; // Alias for backward compatibility if used in modals
+    window.loadData = loadData;
+    
+    loadData();
 })();
 </script>
 @endpush
