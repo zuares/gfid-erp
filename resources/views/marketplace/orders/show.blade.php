@@ -247,43 +247,43 @@
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
         $subtotal = $subtotalItems > 0 ? $subtotalItems : ($order->subtotal_items ?? ($inc['original_price'] ?? 0));
         
-        $ongkirDibayarPembeli = $inc['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0;
+        $ongkirDibayarPembeli = (float)($inc['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
         
-        $ongkosJasaKirim = $settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0)));
-        $potonganOngkir = $settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0;
+        $ongkosJasaKirim = (float)($settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0))));
+        $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
         
-        $subsidiShopee = $inc['shopee_discount'] ?? 0;
-        $voucherToko = $settlement->seller_voucher ?? $inc['seller_discount'] ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0;
+        $subsidiShopee = (float)($inc['shopee_discount'] ?? 0);
+        $voucherToko = (float)($settlement->seller_voucher ?? $inc['seller_discount'] ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0);
         
         if ($settlement) {
-            $biayaAdmin = abs($settlement->commission_fee ?? 0) + abs($settlement->transaction_fee ?? 0);
-            $biayaLayananSeller = abs($settlement->service_fee ?? 0);
-            $biayaLainnyaLuar = abs($settlement->activity_fee ?? 0) + abs($settlement->escrow_tax ?? 0) + abs($settlement->drc_adjustable_refund ?? 0) + abs($settlement->ad_cost ?? 0);
+            $biayaAdmin = abs((float)($settlement->commission_fee ?? 0)) + abs((float)($settlement->transaction_fee ?? 0));
+            $biayaLayananSeller = abs((float)($settlement->service_fee ?? 0));
+            $biayaLainnyaLuar = abs((float)($settlement->activity_fee ?? 0)) + abs((float)($settlement->escrow_tax ?? 0)) + abs((float)($settlement->drc_adjustable_refund ?? 0)) + abs((float)($settlement->ad_cost ?? 0));
             
             $biayaLayanan = $biayaAdmin + $biayaLayananSeller;
             $biayaLainnya = $biayaLainnyaLuar;
-            $penghasilan = $settlement->final_income;
+            $penghasilan = (float)$settlement->final_income;
         } else {
-            $biayaAdmin = abs($inc['commission_fee'] ?? 0) + abs($inc['seller_transaction_fee'] ?? 0);
-            $biayaLayananSeller = abs($inc['service_fee'] ?? 0);
-            $biayaLainnyaLuar = abs($inc['payment_promotion'] ?? 0) + abs($inc['cross_border_tax'] ?? 0) + abs($inc['escrow_tax'] ?? 0);
+            $biayaAdmin = abs((float)($inc['commission_fee'] ?? 0)) + abs((float)($inc['seller_transaction_fee'] ?? 0));
+            $biayaLayananSeller = abs((float)($inc['service_fee'] ?? 0));
+            $biayaLainnyaLuar = abs((float)($inc['payment_promotion'] ?? 0)) + abs((float)($inc['cross_border_tax'] ?? 0)) + abs((float)($inc['escrow_tax'] ?? 0));
             
             $biayaLayanan = $biayaAdmin + $biayaLayananSeller;
-            if ($biayaLayanan == 0) $biayaLayanan = abs($order->platform_fee_total ?? 0);
+            if ($biayaLayanan == 0) $biayaLayanan = abs((float)($order->platform_fee_total ?? 0));
 
             $biayaLainnya = $biayaLainnyaLuar;
 
-            $penghasilan = $inc['escrow_amount'] 
+            $penghasilan = (float)($inc['escrow_amount'] 
                 ?? $liveData['payment_info']['net_revenue'] 
-                ?? $order->net_payout_estimated;
+                ?? $order->net_payout_estimated ?? 0);
                 
             if ($penghasilan <= 0) {
                 // Estimasi (saat data settlement/escrow belum ada)
                 if ($biayaLayanan == 0 && $biayaLainnya == 0) {
-                    $biayaLayanan = round($subtotal * ($estimatedFeeRatio ?? 0.15));
+                    $biayaLayanan = round((float)$subtotal * ((float)$estimatedFeeRatio ?? 0.15));
                     $biayaAdmin = $biayaLayanan; // For display
                 }
-                $penghasilan = $subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
+                $penghasilan = (float)$subtotal - $voucherToko - $biayaLayanan - $biayaLainnya;
             }
         }
         

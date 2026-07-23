@@ -135,19 +135,24 @@ class MarketplaceOrderController extends Controller
         // Hitung estimasi rata-rata persentase potongan admin dari settlement historis toko ini
         $estimatedFeeRatio = 0.15; // default 15%
         if ($order->store_id) {
-            $avgFees = \Illuminate\Support\Facades\DB::table('marketplace_order_settlements')
-                ->join('marketplace_orders', 'marketplace_order_settlements.order_id', '=', 'marketplace_orders.id')
-                ->where('marketplace_order_settlements.store_id', $order->store_id)
-                ->where('marketplace_orders.subtotal_items', '>', 0)
-                ->selectRaw('SUM(commission_fee + service_fee + transaction_fee + activity_fee) as total_fees, SUM(marketplace_orders.subtotal_items) as total_subtotal')
-                ->first();
-                
-            if ($avgFees && $avgFees->total_subtotal > 0) {
-                $ratio = $avgFees->total_fees / $avgFees->total_subtotal;
-                // Batasi rasio wajar agar tidak anomali (antara 1% s/d 25%)
-                if ($ratio > 0.01 && $ratio < 0.25) {
-                    $estimatedFeeRatio = $ratio;
+            try {
+                $avgFees = \Illuminate\Support\Facades\DB::table('marketplace_order_settlements')
+                    ->join('marketplace_orders', 'marketplace_order_settlements.order_id', '=', 'marketplace_orders.id')
+                    ->where('marketplace_order_settlements.store_id', $order->store_id)
+                    ->where('marketplace_orders.subtotal_items', '>', 0)
+                    ->selectRaw('SUM(commission_fee + service_fee + transaction_fee + activity_fee) as total_fees, SUM(marketplace_orders.subtotal_items) as total_subtotal')
+                    ->first();
+                    
+                if ($avgFees && $avgFees->total_subtotal > 0) {
+                    $ratio = $avgFees->total_fees / $avgFees->total_subtotal;
+                    // Batasi rasio wajar agar tidak anomali (antara 1% s/d 25%)
+                    if ($ratio > 0.01 && $ratio < 0.25) {
+                        $estimatedFeeRatio = $ratio;
+                    }
                 }
+            } catch (\Exception $e) {
+                // Abaikan error (misal karena kolom DB di prod berbeda) dan gunakan fallback 15%
+                \Illuminate\Support\Facades\Log::warning('Gagal mengambil rata-rata fee: ' . $e->getMessage());
             }
         }
 
