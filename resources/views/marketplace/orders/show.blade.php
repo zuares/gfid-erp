@@ -281,7 +281,18 @@
         $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
         
         $subsidiShopee = (float)($inc['shopee_discount'] ?? 0);
-        $voucherToko = (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0);
+        
+        $paketDiskon = 0;
+        if (isset($inc['items']) && is_array($inc['items'])) {
+            foreach ($inc['items'] as $it) {
+                $sellP = (float)($it['selling_price'] ?? 0);
+                $discP = (float)($it['discounted_price'] ?? 0);
+                if ($sellP > $discP) {
+                    $paketDiskon += ($sellP - $discP);
+                }
+            }
+        }
+        $voucherToko = (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $order->voucher_discount ?? 0) + $paketDiskon;
         
         $isEstimasi = false;
         

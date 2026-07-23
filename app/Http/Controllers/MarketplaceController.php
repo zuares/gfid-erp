@@ -1539,7 +1539,7 @@ class MarketplaceController extends Controller
             
             $omzetGross = (float) ($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $rawJson['cost_of_goods_sold'] ?? $rawJson['order_selling_price'] ?? $buyerPayment);
 
-            return [
+            $data = [
                 'id'                    => $s ? $s->id : null,
                 'channel_order_id'      => $order->channel_order_id,
                 'store'                 => $order->store ? ['id' => $order->store->id, 'name' => $order->store->name] : null,
@@ -1570,6 +1570,27 @@ class MarketplaceController extends Controller
                 'seller_coin_cash_back' => $s ? (float) $s->seller_coin_cash_back : 0.0,
                 'shipping_fee_subsidy'  => $s ? (float) $s->shipping_fee_subsidy : 0.0,
             ];
+            
+            $rawJson = is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json;
+            if (is_string($rawJson)) {
+                $rawJson = json_decode($rawJson, true); // double decode just in case
+            }
+            
+            $itemsDiscount = 0;
+            if (isset($rawJson['items']) && is_array($rawJson['items'])) {
+                foreach ($rawJson['items'] as $it) {
+                    $sellPrice = (float)($it['selling_price'] ?? 0);
+                    $discPrice = (float)($it['discounted_price'] ?? 0);
+                    if ($sellPrice > $discPrice) {
+                        $itemsDiscount += ($sellPrice - $discPrice);
+                    }
+                }
+            }
+            
+            $data['raw_json'] = $rawJson;
+            $data['seller_discount'] = $itemsDiscount;
+            
+            return $data;
         });
 
         if ($request->filled('hpp_status')) {
