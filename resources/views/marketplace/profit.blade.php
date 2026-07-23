@@ -357,7 +357,11 @@
                     ? fmtRp(r.hpp_total)
                     : `<span style="color:#b91c1c" title="SKU belum ter-mapping">${fmtRp(r.hpp_total)} ⚠</span>`;
                 
-                const omzetGross = r.raw_json ? (r.raw_json.cost_of_goods_sold || r.raw_json.order_selling_price || r.buyer_payment_amount) : r.buyer_payment_amount;
+                let omzetGross = r.buyer_payment_amount;
+                if (r.raw_json) {
+                    const inc = r.raw_json.income_details || {};
+                    omzetGross = inc.cost_of_goods_sold || inc.order_selling_price || r.raw_json.cost_of_goods_sold || r.raw_json.order_selling_price || r.buyer_payment_amount;
+                }
 
                 return `<tr>
                     <td>

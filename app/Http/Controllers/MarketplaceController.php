@@ -1536,6 +1536,8 @@ class MarketplaceController extends Controller
             $adCost      = $s ? (float) $s->ad_cost : 0.0;
             $profitNet   = $finalIncome - $hppTotal - $adCost;
             $buyerPayment = $s ? (float) $s->buyer_payment_amount : ($isCompleted && !empty($inc['buyer_total_amount']) ? (float)$inc['buyer_total_amount'] : $baseAmount);
+            
+            $omzetGross = (float) ($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $rawJson['cost_of_goods_sold'] ?? $rawJson['order_selling_price'] ?? $buyerPayment);
 
             return [
                 'id'                    => $s ? $s->id : null,
@@ -1554,8 +1556,8 @@ class MarketplaceController extends Controller
                 'ad_cost'               => $adCost,
                 'profit_gross'          => $finalIncome - $hppTotal,  // before ad cost
                 'profit_net'            => $profitNet,
-                'margin_pct'            => $buyerPayment > 0
-                    ? round($profitNet / $buyerPayment * 100, 1)
+                'margin_pct'            => $omzetGross > 0
+                    ? round($profitNet / $omzetGross * 100, 1)
                     : null,
                 'settlement_time'       => $s ? $s->settlement_time?->toISOString() : null,
                 'raw_json'              => $rawJson,
@@ -1586,8 +1588,10 @@ class MarketplaceController extends Controller
         $kpiCount = $rows->count();
         
         foreach ($rows as $row) {
-            $omzetGross = $row['raw_json'] ? ($row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']) : $row['buyer_payment_amount'];
-            $kpiOmzet += (float) $omzetGross;
+            $inc = $row['raw_json']['income_details'] ?? [];
+            $omzetGross = (float)($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
+            
+            $kpiOmzet += $omzetGross;
             $kpiHpp += (float) $row['hpp_total'];
             $kpiNet += (float) $row['final_income'];
             $kpiProfit += (float) $row['profit_net'];
@@ -1622,7 +1626,9 @@ class MarketplaceController extends Controller
                 fputcsv($file, ['Order SN', 'Toko', 'Status', 'Tgl Order', 'Tgl Cair', 'Harga Jual', 'Promosi Seller (Voucher)', 'Promosi Seller (Koin)', 'Dana Cair', 'HPP', 'Profit', 'Margin %']);
                 
                 foreach ($rows as $row) {
-                    $omzetGross = $row['raw_json'] ? ($row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']) : $row['buyer_payment_amount'];
+                    $inc = $row['raw_json']['income_details'] ?? [];
+                    $omzetGross = (float)($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
+                    
                     fputcsv($file, [
                         $row['channel_order_id'],
                         $row['store']['name'] ?? '',
