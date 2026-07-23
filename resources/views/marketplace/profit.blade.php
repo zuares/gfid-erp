@@ -287,7 +287,7 @@
         loadProfits();
     }
 
-    async function syncFinance() {
+    window.syncFinance = async function() {
         if (!confirm('Jalankan proses sync data finance (order, settlement, cogs, ads)? Proses ini akan berjalan di latar belakang.')) return;
         try {
             const btn = document.querySelector('button[onclick="syncFinance()"]');
