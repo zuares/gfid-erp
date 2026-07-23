@@ -196,6 +196,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
     Route::post('/stores/{store}/sync-settlements',  [MarketplaceController::class, 'syncSettlements'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/order-profits',                     [MarketplaceController::class, 'orderProfits']);
     
     // Returns Module

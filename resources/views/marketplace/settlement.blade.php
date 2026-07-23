@@ -18,6 +18,9 @@
             <button class="btn btn-sm btn-ship-primary btn-pill" id="runSettlementBtn" onclick="runSettlementSync()">
                 Tarik Settlement Baru
             </button>
+            <button class="btn btn-sm btn-ship-outline btn-pill" id="runSettlementBgBtn" onclick="runSettlementSyncBackground()" title="Untuk backlog besar (ratusan/ribuan order) — berjalan di latar belakang, butuh queue worker aktif di server">
+                Sync Latar Belakang (Semua Order)
+            </button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="loadSettlements()">Refresh</button>
         </div>
@@ -378,6 +381,44 @@
 
             btn.disabled = false;
             btn.textContent = '↓ Tarik Settlement Baru';
+        }
+    };
+
+    // Untuk backlog besar (ratusan/ribuan order) yang tidak mungkin selesai dalam satu
+    // request HTTP tanpa timeout — dikirim ke queue (bukan sinkron), tidak ada progress
+    // real-time, cukup refresh halaman beberapa saat lagi. Butuh queue worker aktif di
+    // server (php artisan queue:work) — kalau tidak, job akan menumpuk di antrian.
+    window.runSettlementSyncBackground = async function () {
+        const storeId = $('filterStore').value;
+        if (!storeId) { alert('Pilih toko dulu sebelum sync latar belakang.'); return; }
+
+        const storeName = $('filterStore').selectedOptions[0]?.textContent || 'toko ini';
+        if (!confirm(`Tarik SEMUA settlement yang belum tersinkron untuk ${storeName} di latar belakang?\n\nProses ini bisa berjalan beberapa menit dan TIDAK bisa dibatalkan dari sini. Anda tetap bisa menutup/pindah halaman.`)) {
+            return;
+        }
+
+        const btn = $('runSettlementBgBtn');
+        const alertEl = $('settlementSyncAlert');
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = 'Mengirim ke antrian…';
+        alertEl.className = 'alert d-none mb-3';
+
+        try {
+            const d = await api('/api/marketplace/stores/' + storeId + '/sync-settlements-background', { method: 'POST' });
+            alertEl.className = 'alert alert-info mb-3';
+            alertEl.textContent = 'ℹ ' + (d.message || 'Sinkronisasi dikirim ke latar belakang.');
+        } catch (e) {
+            alertEl.className = 'alert alert-danger mb-3';
+            if (e.data && e.data.action && e.data.action.type === 'redirect') {
+                alertEl.innerHTML = `✗ ${esc(e.data.message || e.message)} ` +
+                    `<a href="${esc(e.data.action.url)}" class="alert-link">${esc(e.data.action.label)}</a>`;
+            } else {
+                alertEl.textContent = '✗ ' + (e.message || 'Gagal mengirim sinkronisasi ke latar belakang.');
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Sync Latar Belakang (Semua Order)';
         }
     };
 

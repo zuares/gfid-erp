@@ -1068,6 +1068,89 @@ class MarketplaceController extends Controller
         return response()->json($result);
     }
 
+    /**
+     * Versi latar belakang dari syncSettlements() — untuk backfill jumlah besar (ratusan/
+     * ribuan order) yang TIDAK mungkin selesai dalam satu siklus request HTTP tanpa
+     * timeout. Mengikuti pola persis forceSyncBackground() (baris 546) yang sudah dipakai
+     * untuk orders: dispatch command lewat Artisan::queue(), TIDAK dieksekusi langsung di
+     * request ini. Butuh queue worker aktif di server (lihat catatan di response).
+     *
+     * Beda dengan syncSettlements() (tombol "Tarik Settlement Baru", satu batch @200 order,
+     * sinkron/blocking): endpoint ini memicu `marketplace:sync-settlements --store=X --all`
+     * yang mengulang batch sampai habis atau kena batas pengaman command (20 batch/12 menit
+     * per eksekusi, lihat SyncSettlementsCommand::ALL_MAX_BATCHES/ALL_MAX_RUNTIME_SECONDS) —
+     * cukup untuk backlog saat ini, dan aman diulang (idempotent, lock per toko) kalau
+     * belum habis dalam satu run.
+     */
+    public function syncSettlementsBackground(Request $request, Store $store): JsonResponse
+    {
+        // Cek connection_status DULU (sama seperti syncSettlements()) — supaya tidak
+        // meng-queue job yang sudah pasti gagal tanpa memberi tahu user sama sekali
+        // (job latar belakang tidak punya jalur feedback real-time ke UI).
+        $status = $store->connection_status;
+
+        if ($status === 'TOKEN_EXPIRED') {
+            try {
+                if ($store->channel->code === 'shopee') {
+                    /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
+                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                    $shopee->refreshToken($store);
+                    $store->refresh();
+                    $status = $store->connection_status;
+                }
+            } catch (\Throwable $e) {
+                $status = 'AUTH_REQUIRED';
+                \Illuminate\Support\Facades\Log::warning('Token refresh failed before queueing background settlement sync', [
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($status === 'NOT_CONNECTED') {
+            return response()->json([
+                'success' => false,
+                'code'    => 'STORE_NOT_CONNECTED',
+                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Hubungkan ' . $store->channel->name,
+                    'url'   => url('/marketplace/shopee/connect'),
+                ],
+            ], 422);
+        }
+
+        if ($status !== 'CONNECTED') {
+            return response()->json([
+                'success' => false,
+                'code'    => 'SHOPEE_AUTH_REQUIRED',
+                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum settlement bisa ditarik.",
+                'action'  => [
+                    'type'  => 'redirect',
+                    'label' => 'Login Ulang ' . $store->channel->name,
+                    'url'   => url('/marketplace/shopee/connect'),
+                ],
+            ], 401);
+        }
+
+        // Dispatch ke queue — TIDAK dieksekusi sekarang. Lock per toko
+        // (sync_settlements_store_{id}) tetap ditegakkan di DALAM command saat job ini
+        // benar-benar dijalankan worker, jadi aman kalau di-klik berkali-kali atau
+        // bertabrakan dengan scheduler/CLI manual — yang belakangan cuma akan dilewati
+        // (bukan dobel proses), bukan gagal.
+        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', [
+            '--store' => $store->id,
+            '--all'   => true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'status'  => 'queued',
+            'message' => "Sinkronisasi settlement toko {$store->name} telah dikirim ke latar belakang. Proses berjalan bertahap (per batch 200 order) — refresh halaman beberapa saat lagi untuk lihat progresnya. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi.",
+        ]);
+    }
+
     public function settlements(Request $request): JsonResponse
     {
         $query = MarketplaceOrderSettlement::with(['store:id,name', 'order:id,channel_order_id,order_status,ordered_at'])
