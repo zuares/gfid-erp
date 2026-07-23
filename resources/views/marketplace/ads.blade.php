@@ -563,9 +563,13 @@
                 { method: 'POST' }
             );
             alertEl.className = 'alert alert-success';
-            alertEl.innerHTML = `<strong>✓ Sync selesai.</strong>
-                <small> Synced: <strong>${d.synced}</strong> &nbsp;·&nbsp;
-                Skipped: ${d.skipped} &nbsp;·&nbsp; Errors: ${d.errors}</small>`;
+            if (d.message && !d.synced) {
+                alertEl.innerHTML = `<strong>✓ Sinkronisasi dimulai.</strong><small> ${d.message}</small>`;
+            } else {
+                alertEl.innerHTML = `<strong>✓ Sync selesai.</strong>
+                    <small> Synced: <strong>${d.synced}</strong> &nbsp;·&nbsp;
+                    Skipped: ${d.skipped} &nbsp;·&nbsp; Errors: ${d.errors}</small>`;
+            }
             btn.textContent = '✓ Selesai';
             loadAds();
             setTimeout(() => { btn.disabled = false; btn.textContent = '↓ Sync dari API'; }, 3000);
@@ -976,7 +980,7 @@
                     box.innerHTML = items.length ? items.map(it => `
                         <div class="map-opt" data-id="${it.id}" style="padding:.45rem .5rem;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;cursor:pointer">
                             <div style="font-weight:700;font-size:.82rem">${esc(it.name || '—')}</div>
-                            <div style="font-size:.7rem;color:#94a3b8;font-family:monospace">${esc(it.code || '')} · HPP ${fmtRp(it.hpp || 0)}</div>
+                            <div style="font-size:.7rem;color:#94a3b8;font-family:monospace">${esc(it.code || '')} · COGS ${fmtRp(it.hpp || 0)}</div>
                         </div>`).join('') : '<div style="color:#94a3b8;padding:.5rem">Tidak ada hasil.</div>';
                     box.querySelectorAll('.map-opt').forEach(el =>
                         el.onclick = () => doSave(parseInt(el.dataset.id)));

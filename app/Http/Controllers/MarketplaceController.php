@@ -1709,13 +1709,24 @@ class MarketplaceController extends Controller
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
         $dateTo   = $request->input('date_to',   now()->toDateString());
 
-        try {
-            $result = $this->sync->syncAdCampaigns($store, $dateFrom, $dateTo);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+        if (app()->environment('local') && function_exists('exec') && false === stripos(ini_get('disable_functions'), 'exec')) {
+            try {
+                $result = $this->sync->syncAdCampaigns($store, $dateFrom, $dateTo);
+                return response()->json($result);
+            } catch (\Throwable $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
         }
 
-        return response()->json($result);
+        // Production: dispatch ke background supaya tidak timeout 504
+        dispatch(function () use ($store, $dateFrom, $dateTo) {
+            app(\App\Services\MarketplaceSyncService::class)->syncAdCampaigns($store, $dateFrom, $dateTo);
+        });
+
+        return response()->json([
+            'status' => 'success', 
+            'message' => 'Proses sinkronisasi campaign berjalan di background.'
+        ]);
     }
 
     /**
