@@ -33,6 +33,11 @@ class Kernel extends ConsoleKernel
         $schedule->command('marketplace:sync-bookings')
                  ->hourly()
                  ->withoutOverlapping();
+
+        // Cron Job: Sinkronisasi data keuangan (Order, Settlement, HPP, Ads) setiap 4 jam
+        $schedule->command('marketplace:sync-finance')
+                 ->everyFourHours()
+                 ->withoutOverlapping();
     }
 
     protected function commands(): void
