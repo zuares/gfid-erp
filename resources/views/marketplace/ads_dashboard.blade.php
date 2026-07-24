@@ -154,11 +154,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const ctxHist = document.getElementById('historicalChart');
     if (ctxHist && rawHistorical && rawHistorical.length > 0) {
         
-        // Find max days across periods
+        // Calculate maxDays strictly from the selected date range
         let maxDays = 0;
-        rawHistorical.forEach(period => {
-            if (period.data.length > maxDays) maxDays = period.data.length;
-        });
+        const dStart = fromEl && fromEl.value ? new Date(fromEl.value) : new Date();
+        const dEnd = toEl && toEl.value ? new Date(toEl.value) : new Date();
+        if (dStart && dEnd) {
+            maxDays = Math.round((dEnd - dStart) / (1000 * 60 * 60 * 24)) + 1;
+        }
+        if (maxDays < 1) maxDays = 1;
         
         // Generate X-Axis: "Hari 1", "Hari 2", etc.
         let histLabels = [];
@@ -196,13 +199,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const renderHistChart = (metric) => {
             let datasets = rawHistorical.map((period, idx) => {
-                let dataPoints = [];
-                for (let i = 0; i < maxDays; i++) {
-                    if (i < period.data.length) {
-                        dataPoints.push(getMetricValue(period.data[i], metric));
-                    } else {
-                        dataPoints.push(null);
-                    }
+                let dataPoints = new Array(maxDays).fill(null);
+                
+                // Align data to specific day offset
+                if (period.start) {
+                    const pStart = new Date(period.start);
+                    period.data.forEach(d => {
+                        if (d.date) {
+                            const pDate = new Date(d.date);
+                            const dayOffset = Math.round((pDate - pStart) / (1000 * 60 * 60 * 24));
+                            if (dayOffset >= 0 && dayOffset < maxDays) {
+                                dataPoints[dayOffset] = getMetricValue(d, metric);
+                            }
+                        }
+                    });
                 }
                 
                 let label = idx === 0 ? 'Rentang Saat Ini' : `${idx} Rentang Lalu`;
@@ -217,7 +227,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     tension: 0.3,
                     pointRadius: 0,
                     pointHoverRadius: 4,
-                    fill: false
+                    fill: false,
+                    spanGaps: true
                 };
             });
 
