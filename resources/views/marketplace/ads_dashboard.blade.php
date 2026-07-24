@@ -607,27 +607,32 @@ document.addEventListener("DOMContentLoaded", function() {
     const ctxHourly = document.getElementById("hourlyChart");
     if(ctxHourly) {
         new Chart(ctxHourly.getContext('2d'), {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: hourlyData.map(d => d.performance_hour + ':00'),
                 datasets: [
                     {
                         label: 'Klik',
-                        type: 'bar',
                         data: hourlyData.map(d => parseInt(d.clicks || 0)),
-                        backgroundColor: 'rgba(139, 92, 246, 0.8)',
-                        borderRadius: 4,
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: hourlyData.length <= 1 ? 5 : 0,
+                        pointHoverRadius: 5,
                         yAxisID: 'y'
                     },
                     {
                         label: 'Konversi (Pesanan)',
-                        type: 'line',
                         data: hourlyData.map(d => parseInt(d.orders || 0)),
-                        borderColor: 'rgba(16, 185, 129, 1)',
-                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         borderWidth: 2,
-                        tension: 0.3,
-                        pointRadius: hourlyData.length <= 1 ? 5 : 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: hourlyData.length <= 1 ? 5 : 0,
+                        pointHoverRadius: 5,
                         yAxisID: 'y1'
                     }
                 ]
