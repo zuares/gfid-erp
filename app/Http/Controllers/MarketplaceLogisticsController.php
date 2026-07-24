@@ -28,22 +28,33 @@ class MarketplaceLogisticsController extends Controller
                 })
                 ->first();
 
+            $booking = null;
             if (!$order) {
-                return response()->json(['error' => 'Order not found'], 404);
+                // Coba cari di tabel booking jika tidak ada di tabel orders (kasus pesanan kilat murni yang belum ada order_sn-nya)
+                $booking = \App\Models\MarketplaceBooking::where('store_id', $store->id)
+                    ->where('booking_sn', $orderSn)
+                    ->first();
+                
+                if (!$booking) {
+                    return response()->json(['error' => 'Order or Booking not found'], 404);
+                }
             }
 
             $awb = null;
-            if (!empty($order->booking_sn) && method_exists($driver, 'getBookingTrackingNumber')) {
+            if ($order && !empty($order->booking_sn) && method_exists($driver, 'getBookingTrackingNumber')) {
                 $trackingResp = $driver->getBookingTrackingNumber($store, $order->booking_sn);
                 $awb = $trackingResp['response']['tracking_number'] ?? null;
-            } elseif (method_exists($driver, 'getTrackingNumber')) {
+            } elseif ($booking && method_exists($driver, 'getBookingTrackingNumber')) {
+                $trackingResp = $driver->getBookingTrackingNumber($store, $booking->booking_sn);
+                $awb = $trackingResp['response']['tracking_number'] ?? null;
+            } elseif ($order && method_exists($driver, 'getTrackingNumber')) {
                 $trackingResp = $driver->getTrackingNumber($store, $order->channel_order_id);
                 $awb = $trackingResp['response']['tracking_number'] ?? null;
             }
             if (!$awb && method_exists($driver, 'getOrderDetail')) {
                 // Ensure we use the actual order_sn for getOrderDetail, as booking_sn will cause an error
-                $actualOrderSn = $order->channel_order_id;
-                if (!empty($actualOrderSn) && $actualOrderSn !== $order->booking_sn) {
+                $actualOrderSn = $order ? $order->channel_order_id : ($booking ? $booking->order_sn : null);
+                if (!empty($actualOrderSn) && (!$order || $actualOrderSn !== $order->booking_sn)) {
                     $details = $driver->getOrderDetail($store, [$actualOrderSn]);
                     $list = $details['response']['order_list'] ?? [];
                     if (count($list) > 0) {
@@ -55,12 +66,18 @@ class MarketplaceLogisticsController extends Controller
                 }
             }
 
-            if ($awb && $order->shipping_awb_no !== $awb) {
-                $order->update(['shipping_awb_no' => $awb]);
+            if ($awb) {
+                if ($order && $order->shipping_awb_no !== $awb) {
+                    $order->update(['shipping_awb_no' => $awb]);
+                }
+                if ($booking && $booking->tracking_number !== $awb) {
+                    $booking->update(['tracking_number' => $awb]);
+                }
                 return response()->json(['success' => true, 'awb' => $awb]);
             }
 
-            return response()->json(['success' => false, 'message' => 'AWB not found or unchanged', 'awb' => $order->shipping_awb_no]);
+            $currentAwb = $order ? $order->shipping_awb_no : ($booking ? $booking->tracking_number : null);
+            return response()->json(['success' => false, 'message' => 'AWB not found or unchanged', 'awb' => $currentAwb]);
 
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('syncAwb Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString(), 'orderSn' => $orderSn]);
