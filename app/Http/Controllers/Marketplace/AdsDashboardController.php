@@ -44,21 +44,32 @@ class AdsDashboardController extends Controller
             ->orderBy('date')
             ->get();
             
+        $dStart = \Carbon\Carbon::parse($dateFrom);
+        $dEnd = \Carbon\Carbon::parse($dateTo);
+        $diffDays = $dStart->diffInDays($dEnd);
+        
+        $prevDateFrom = $dStart->copy()->subDays($diffDays + 1)->toDateString();
+        $prevDateTo = $dStart->copy()->subDay()->toDateString();
+        
         // Fetch Campaigns (Dynamic aggregation from dailies based on date filter)
         $campaigns = MarketplaceAdCampaign::where('store_id', $storeId)
             ->withSum(['dailies as sum_expense' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'expense')
             ->withSum(['dailies as sum_gmv' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_gmv')
             ->withSum(['dailies as sum_clicks' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'clicks')
             ->withSum(['dailies as sum_orders' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_order')
+            ->withSum(['dailies as sum_prev_expense' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'expense')
+            ->withSum(['dailies as sum_prev_gmv' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'broad_gmv')
             ->get()
             ->map(function ($camp) {
                 $camp->spend = $camp->sum_expense ?? 0;
                 $camp->gmv = $camp->sum_gmv ?? 0;
                 $camp->clicks = $camp->sum_clicks ?? 0;
                 $camp->orders = $camp->sum_orders ?? 0;
+                $camp->prev_spend = $camp->sum_prev_expense ?? 0;
+                $camp->prev_gmv = $camp->sum_prev_gmv ?? 0;
                 return $camp;
             })
-            ->filter(fn($camp) => $camp->spend > 0)
+            ->filter(fn($camp) => $camp->spend > 0 || $camp->prev_spend > 0)
             ->sortByDesc('spend')
             ->values();
             

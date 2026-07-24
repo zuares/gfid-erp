@@ -478,7 +478,11 @@ document.addEventListener('DOMContentLoaded', function () {
                             @forelse($campaigns as $camp)
                                 @php
                                     $c_roas = $camp->spend > 0 ? $camp->gmv / $camp->spend : 0;
+                                    $c_prev_roas = $camp->prev_spend > 0 ? $camp->prev_gmv / $camp->prev_spend : 0;
                                     $c_cvr = $camp->clicks > 0 ? ($camp->orders / $camp->clicks) * 100 : 0;
+                                    
+                                    $gmv_growth = $camp->prev_gmv > 0 ? (($camp->gmv - $camp->prev_gmv) / $camp->prev_gmv) * 100 : ($camp->gmv > 0 ? 100 : 0);
+                                    $roas_growth = $c_prev_roas > 0 ? (($c_roas - $c_prev_roas) / $c_prev_roas) * 100 : ($c_roas > 0 ? 100 : 0);
                                     
                                     $ai_status = '⚖️ Normal';
                                     $ai_color = 'var(--dsh-muted)';
@@ -489,27 +493,39 @@ document.addEventListener('DOMContentLoaded', function () {
                                         $ai_status = '🚨 Boncos (Stop!)';
                                         $ai_color = '#dc2626';
                                         $ai_bg = 'rgba(220, 38, 38, 0.05)';
-                                        $ai_note = 'Membakar uang tanpa hasil.';
+                                        if ($roas_growth < -20) {
+                                            $ai_note = 'ROAS anjlok ' . abs(round($roas_growth)) . '%. Kebocoran ekstrem!';
+                                        } else {
+                                            $ai_note = 'Membakar uang tanpa hasil konversi.';
+                                        }
                                     } elseif ($c_roas >= 5.0 && $camp->spend > 10000) {
                                         $ai_status = '💎 Hidden Gem';
                                         $ai_color = '#16a34a';
                                         $ai_bg = 'rgba(22, 163, 74, 0.05)';
-                                        $ai_note = 'Super efisien! Skalakan perlahan.';
+                                        if ($gmv_growth > 20) {
+                                            $ai_note = 'On Fire! GMV meroket ' . round($gmv_growth) . '%. Skalakan budget.';
+                                        } else {
+                                            $ai_note = 'Super efisien! Siap untuk diskalakan.';
+                                        }
                                     } elseif ($c_cvr < 0.5 && $camp->clicks > 100) {
                                         $ai_status = '⚠️ Window Shopping';
                                         $ai_color = '#eab308';
                                         $ai_bg = 'rgba(234, 179, 8, 0.05)';
-                                        $ai_note = 'Banyak klik tapi zonk. Cek harga.';
+                                        $ai_note = 'Banyak klik tapi zonk. Cek harga/kompetitor.';
                                     } elseif ($c_roas >= 2.0 && $c_roas < 5.0 && $camp->spend > 50000) {
                                         $ai_status = '🚀 Tulang Punggung';
                                         $ai_color = '#3b82f6';
                                         $ai_bg = 'rgba(59, 130, 246, 0.05)';
-                                        $ai_note = 'Mesin pencetak GMV stabil.';
+                                        if ($gmv_growth < -15) {
+                                            $ai_note = 'Volume GMV menyusut ' . abs(round($gmv_growth)) . '%. Cek budget harian.';
+                                        } else {
+                                            $ai_note = 'Mesin pencetak GMV berjalan stabil.';
+                                        }
                                     } elseif ($camp->spend < 10000) {
                                         $ai_status = '💤 Pasif';
                                         $ai_color = 'var(--dsh-muted)';
                                         $ai_bg = 'transparent';
-                                        $ai_note = 'Kekurangan trafik/budget.';
+                                        $ai_note = 'Kekurangan trafik atau dibatasi budget.';
                                     }
                                 @endphp
                                 <tr style="background: {{ $ai_bg }}; border-bottom: 1px solid var(--dsh-border);">
@@ -523,9 +539,21 @@ document.addEventListener('DOMContentLoaded', function () {
                                         <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">Rp {{ number_format($camp->spend, 0, ',', '.') }}</td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">Rp {{ number_format($camp->gmv, 0, ',', '.') }}</td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
+                                        Rp {{ number_format($camp->gmv, 0, ',', '.') }}
+                                        @if($gmv_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $gmv_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $gmv_growth > 0 ? '▲' : '▼' }} {{ abs(round($gmv_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $c_roas >= 4.0 ? '#16a34a' : ($c_roas >= 2.0 ? '#eab308' : '#dc2626') }};">
-                                        {{ $camp->spend > 0 ? number_format($camp->gmv / $camp->spend, 2) : 0 }}x
+                                        {{ number_format($c_roas, 2) }}x
+                                        @if($roas_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $roas_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $roas_growth > 0 ? '▲' : '▼' }} {{ abs(round($roas_growth)) }}%
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->clicks, 0, ',', '.') }}</td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->orders, 0, ',', '.') }}</td>
