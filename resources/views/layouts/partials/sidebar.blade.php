@@ -1430,8 +1430,8 @@
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceAds)
-                            <x-sidebar.sub-link href="{{ route('marketplace.ads') }}" icon="bi bi-bullseye"
-                                :active="request()->routeIs('marketplace.ads')">
+                            <x-sidebar.sub-link href="{{ route('marketplace.ads.dashboard') }}" icon="bi bi-bullseye"
+                                :active="request()->routeIs('marketplace.ads.dashboard')">
                                 Analisa Iklan
                             </x-sidebar.sub-link>
                         @endif

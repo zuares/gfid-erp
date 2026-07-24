@@ -1465,8 +1465,8 @@
                             @endif
 
                             @if ($hasMarketplaceAds)
-                                <a href="{{ route('marketplace.ads') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.ads') ? 'active' : '' }}">
+                                <a href="{{ route('marketplace.ads.dashboard') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.ads.dashboard') ? 'active' : '' }}">
                                     <span class="icon">🎯</span><span>Analisa Iklan</span>
                                 </a>
                             @endif
