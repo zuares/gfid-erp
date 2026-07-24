@@ -35,6 +35,35 @@
     background: var(--dsh-accent);
     color: #fff;
 }
+.dash-hero {
+    background: var(--dsh-bg);
+    border: 1px solid var(--dsh-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.dash-hero h1 { font-size: 1.25rem; font-weight: 800; margin: 0; }
+.dash-hero .sub { font-size: .8rem; color: var(--dsh-muted); margin-top: .2rem; }
+.role-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .6rem; border-radius: 6px; font-size: .7rem; font-weight: 600; background: var(--bg); border: 1px solid var(--dsh-border); color: var(--text); }
+
+.live-btn {
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+.live-on {
+    background: rgba(22, 163, 74, 0.1) !important;
+    color: #16a34a !important;
+    border: 1px solid #16a34a !important;
+}
+.live-off {
+    background: rgba(100, 116, 139, 0.1) !important;
+    color: var(--dsh-muted) !important;
+    border: 1px solid var(--dsh-border) !important;
+}
 body[data-theme="dark"] .dash-tab.active {
     background: var(--text);
     color: var(--bg);
@@ -168,6 +197,62 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+    // --- LIVE MODE (REALTIME) LOGIC ---
+    let liveCountdownInterval = null;
+    const liveBtn = document.getElementById('liveModeBtn');
+
+    window.toggleLiveMode = function() {
+        let isLive = localStorage.getItem('adsLiveMode') === 'true';
+        if(isLive) {
+            // turn off
+            localStorage.setItem('adsLiveMode', 'false');
+            liveBtn.innerHTML = '<i class="bi bi-broadcast"></i> Live Mode OFF';
+            liveBtn.classList.remove('live-on');
+            liveBtn.classList.add('live-off');
+            clearInterval(liveCountdownInterval);
+        } else {
+            // turn on
+            localStorage.setItem('adsLiveMode', 'true');
+            startLiveMode();
+        }
+    };
+
+    function startLiveMode() {
+        liveBtn.classList.remove('live-off');
+        liveBtn.classList.add('live-on');
+        
+        let secondsLeft = 300; // 5 minutes
+        
+        liveCountdownInterval = setInterval(() => {
+            secondsLeft--;
+            let m = Math.floor(secondsLeft / 60);
+            let s = secondsLeft % 60;
+            liveBtn.innerHTML = `<i class="bi bi-broadcast"></i> Live ON (${m}:${s.toString().padStart(2,'0')})`;
+            if(secondsLeft <= 0) {
+                liveBtn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Auto-Syncing...`;
+                clearInterval(liveCountdownInterval);
+                
+                // Submit hidden form to trigger background sync and reload
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{{ route("marketplace.ads.sync") }}';
+                
+                const csrf = document.createElement('input'); csrf.type = 'hidden'; csrf.name = '_token'; csrf.value = '{{ csrf_token() }}';
+                const store = document.createElement('input'); store.type = 'hidden'; store.name = 'store_id'; store.value = '{{ $storeId }}';
+                const type = document.createElement('input'); type.type = 'hidden'; type.name = 'sync_type'; type.value = 'hourly';
+                
+                form.appendChild(csrf); form.appendChild(store); form.appendChild(type);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }, 1000);
+    }
+
+    // Initialize on load
+    if(localStorage.getItem('adsLiveMode') === 'true') {
+        startLiveMode();
+    }
+
 });
 </script>
 @endpush
@@ -189,8 +274,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 Terakhir Sync: {{ $syncRuns->first()->updated_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }}
             </div>
             @endif
-            <div class="role-chip">
-                <i class="bi bi-clock"></i> Live Sync
+            <div id="liveModeBtn" class="role-chip live-btn live-off" onclick="toggleLiveMode()">
+                <i class="bi bi-broadcast"></i> Live Mode OFF
             </div>
         </div>
     </div>
