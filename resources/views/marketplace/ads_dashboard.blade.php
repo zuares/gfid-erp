@@ -375,15 +375,6 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="tab-pane" id="tab-daily">
             <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian</div>
             
-            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightDailyTrend">
-                    <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Menganalisis tren harian...
-                    </div>
-                </div>
-            </div>
-            
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
                 <!-- 1. TREN FINANSIAL HARIAN -->
                 <div class="dpanel p-3">
@@ -391,11 +382,19 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div>
                             <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Finansial Harian</div>
                             <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Finansial:</b> Selisih <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Profitabilitas. <b>AOV (Putus-putus)</b> = Rata-rata belanja (cek sensitivitas harga).
+                                💡 <b>Finansial:</b> Selisih <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Profitabilitas.
                             </div>
                         </div>
                         <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                     </div>
+                    
+                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTrend">
+                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            AI mendeteksi momentum finansial...
+                        </div>
+                    </div>
+                    
                     <div style="height: 280px;">
                         <canvas id="dailyChart"></canvas>
                     </div>
@@ -407,11 +406,19 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div>
                             <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Trafik Harian</div>
                             <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Trafik (Funnel):</b> <b>Impresi (Kuning)</b> vs <b>Klik (Biru)</b> = Rasio bocor. Awasi <b>Garis CTR (Ungu)</b>; jika anjlok, segera evaluasi foto/judul produk!
+                                💡 <b>Trafik (Funnel):</b> <b>Impresi (Kuning)</b> vs <b>Klik (Biru)</b> = Rasio bocor.
                             </div>
                         </div>
                         <div id="trafficSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                     </div>
+                    
+                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTraffic">
+                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            AI menganalisis kebocoran funnel...
+                        </div>
+                    </div>
+                    
                     <div style="height: 280px;">
                         <canvas id="trafficChart"></canvas>
                     </div>
@@ -1430,30 +1437,65 @@ document.addEventListener("DOMContentLoaded", function() {
                         let trendColor = '';
                         
                         if (isVolatile) {
-                            trendHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🎢 Fluktuasi Ekstrem Terdeteksi!</div>
-                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Performa iklan dari hari ke hari sangat tidak stabil. Hari terbaik (<b>${bestDay}</b>) mencetak ROAS <b>${maxRoas.toFixed(1)}x</b>, tapi hari terburuk (<b>${worstDay}</b>) anjlok hingga <b>${minRoas.toFixed(1)}x</b>. 💡 <b>Saran:</b> Algoritma GMV Max mungkin kebingungan. Coba pertahankan Target ROAS dan Budget di angka tetap selama 7 hari berturut-turut tanpa diubah agar mesin bisa belajar stabil.</div>`;
+                            trendHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🎢 Deteksi Volatilitas ROAS</div>
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Penyimpangan baku (StdDev) sangat tinggi. Hari terbaik (<b>${bestDay}</b>, ROAS <b>${maxRoas.toFixed(1)}x</b>) vs terburuk (<b>${worstDay}</b>, ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Hentikan perubahan pengaturan/budget GMV Max agar fase pembelajaran mesin stabil.</div>`;
                             trendColor = '#dc2626';
                         } else if (secondHalfGmv > firstHalfGmv * 1.2) {
-                            trendHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">📈 Momentum Positif (Uptrend)</div>
-                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Sistem mulai panas! Pendapatan di paruh kedua rentang waktu ini jauh lebih tinggi daripada paruh pertama. Puncak algoritma jatuh pada <b>${bestDay}</b> (ROAS <b>${maxRoas.toFixed(1)}x</b>). 💡 <b>Saran:</b> Anda berada di jalur yang benar. Jangan utak-atik Target ROAS, biarkan algoritma bekerja!</div>`;
+                            trendHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.8rem; margin-bottom: 0.2rem;">📈 Momentum Algoritma (Uptrend)</div>
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 melampaui Paruh-1. Algoritma optimal pada <b>${bestDay}</b> (ROAS <b>${maxRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Biarkan mesin *running*. Jangan ubah Target ROAS saat ini.</div>`;
                             trendColor = '#16a34a';
                         } else if (secondHalfGmv < firstHalfGmv * 0.8) {
-                            trendHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; margin-bottom: 0.3rem;">📉 Tren Penurunan (Downtrend)</div>
-                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Waspada, performa di paruh akhir mulai merosot dibanding hari-hari awal. Hari terburuk terjadi di <b>${worstDay}</b> (ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran:</b> Apakah ada kompetitor yang baru masuk, atau kampanye promosi toko Anda baru saja berakhir? Jika tren terus turun, coba perbarui foto produk di GMV Max.</div>`;
+                            trendHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.8rem; margin-bottom: 0.2rem;">📉 Peringatan Downtrend</div>
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 merosot. Puncak penurunan di <b>${worstDay}</b> (ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Cek *Traffic Funnel* di bawah. Jika trafik turun, masalah ada di kompetisi harga/posisi.</div>`;
                             trendColor = '#f59e0b';
                         } else {
-                            trendHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.85rem; margin-bottom: 0.3rem;">🛥️ Pelayaran Stabil (Konsisten)</div>
-                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Fluktuasi harian sangat wajar. Rata-rata ROAS harian Anda konsisten di angka <b>${avgTrendRoas.toFixed(1)}x</b>. Rekor terbaik ada di tanggal <b>${bestDay}</b>. 💡 <b>Saran:</b> Kestabilan ini sangat bagus untuk algoritma GMV Max. Jika Anda butuh pertumbuhan, naikkan Target ROAS sebesar 5-10% secara perlahan.</div>`;
+                            trendHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.8rem; margin-bottom: 0.2rem;">🛥️ Konvergensi Stabil</div>
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Rata-rata ROAS harian stabil di <b>${avgTrendRoas.toFixed(1)}x</b>. 💡 <b>Saran Teknis:</b> Sistem GMV Max telah konvergen. Untuk skalasi, *tweak* Target ROAS perlahan (Max 5% per hari).</div>`;
                             trendColor = '#3b82f6';
                         }
                         
                         insightDailyEl.innerHTML = trendHtml;
                         insightDailyEl.style.borderLeftColor = trendColor;
                         
+                        // --- AI TRAFFIC FUNNEL INSIGHTS ---
+                        const insightTrafficDailyEl = document.getElementById('insightDailyTraffic');
+                        if (insightTrafficDailyEl) {
+                            let maxImpressionsDay = activeDays.reduce((max, d) => (parseInt(d.impressions) > parseInt(max.impressions) ? d : max), activeDays[0]);
+                            let maxClicksDay = activeDays.reduce((max, d) => (parseInt(d.clicks) > parseInt(max.clicks) ? d : max), activeDays[0]);
+                            
+                            let impCtr = parseInt(maxImpressionsDay.impressions) > 0 ? (parseInt(maxImpressionsDay.clicks) / parseInt(maxImpressionsDay.impressions) * 100) : 0;
+                            let clkCvr = parseInt(maxClicksDay.clicks) > 0 ? (parseInt(maxClicksDay.orders) / parseInt(maxClicksDay.clicks) * 100) : 0;
+                            
+                            let tfHtml = '';
+                            let tfColor = '';
+                            
+                            if (parseInt(maxImpressionsDay.impressions) > 1000 && impCtr < 1.0) {
+                                tfHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🚨 Kebocoran Impresi Ekstrem</div>
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${maxImpressionsDay.date}</b>, iklan mendapat <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> impresi tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 💡 <b>Saran Teknis:</b> Iklan tayang tapi tidak diklik. Ini merusak *Quality Score*. Cek harga/thumbnail segera.</div>`;
+                                tfColor = '#dc2626';
+                            } else if (parseInt(maxClicksDay.clicks) > 50 && clkCvr < 0.5) {
+                                tfHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.8rem; margin-bottom: 0.2rem;">⚠️ Anomali *Bounce Rate*</div>
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${maxClicksDay.date}</b>, terjadi lonjakan <b>${parseInt(maxClicksDay.clicks).toLocaleString('id-ID')}</b> klik, tapi nyaris 0 pesanan (CVR <b>${clkCvr.toFixed(2)}%</b>). 💡 <b>Saran Teknis:</b> Cek log kompetitor di hari tersebut (apakah mereka sedang *Flash Sale*?) atau cek ketersediaan stok Anda.</div>`;
+                                tfColor = '#eab308';
+                            } else {
+                                tfHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.8rem; margin-bottom: 0.2rem;">✅ Distribusi *Funnel* Sehat</div>
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Tidak terdeteksi kebocoran parah pada hari dengan trafik tertinggi (<b>${maxImpressionsDay.date}</b>). Konversi klik ke pesanan mengalir normal.</div>`;
+                                tfColor = '#16a34a';
+                            }
+                            insightTrafficDailyEl.innerHTML = tfHtml;
+                            insightTrafficDailyEl.style.borderLeftColor = tfColor;
+                        }
+                        
                     } else {
                         insightDailyEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Butuh Lebih Banyak Hari</div>
                                                     <div style="font-size: 0.72rem; color: var(--dsh-muted);">AI membutuhkan minimal 3 hari data aktif untuk membaca tren dan volatilitas.</div>`;
                         insightDailyEl.style.borderLeftColor = 'var(--dsh-border)';
+                        
+                        let itEl = document.getElementById('insightDailyTraffic');
+                        if (itEl) {
+                            itEl.innerHTML = insightDailyEl.innerHTML;
+                            itEl.style.borderLeftColor = 'var(--dsh-border)';
+                        }
                     }
                 }
 
