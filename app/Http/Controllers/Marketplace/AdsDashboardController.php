@@ -126,9 +126,9 @@ class AdsDashboardController extends Controller
             $params['--to'] = now()->toDateString();
         }
         
-        // We use queue to avoid blocking
-        Artisan::queue($cmd, $params);
+        // We use call instead of queue for Live Mode to ensure data is updated immediately
+        Artisan::call($cmd, $params);
 
-        return back()->with('success', 'Proses sinkronisasi telah dijadwalkan di background.');
+        return back()->with('success', 'Data berhasil disinkronisasi.');
     }
 }
