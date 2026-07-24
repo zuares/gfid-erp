@@ -599,6 +599,25 @@ document.addEventListener("DOMContentLoaded", function() {
                 }),
                 datasets: [
                     {
+                        label: 'AOV',
+                        data: dailyData.map(d => {
+                            let gm = parseFloat(d.gmv || 0);
+                            let or = parseInt(d.orders || 0);
+                            return or > 0 ? parseFloat((gm/or).toFixed(0)) : 0;
+                        }),
+                        borderColor: '#94a3b8', // slate
+                        backgroundColor: '#94a3b8',
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 0, // hide dots
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#94a3b8',
+                        yAxisID: 'y2'
+                    },
+                    {
                         label: 'ROAS',
                         data: dailyData.map(d => {
                             let sp = parseFloat(d.spend || 0);
@@ -707,6 +726,12 @@ document.addEventListener("DOMContentLoaded", function() {
                             padding: 8,
                             callback: function(value) { return value + 'x'; }
                         }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: false,
+                        position: 'left',
+                        beginAtZero: true
                     }
                 }
             }
