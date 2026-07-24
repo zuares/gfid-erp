@@ -260,7 +260,10 @@ class MarketplaceBookingController extends Controller
             return response()->json($res['response'] ?? $res);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Marketplace Booking Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage()
+            ], 422);
         }
     }
 

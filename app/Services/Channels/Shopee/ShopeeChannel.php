@@ -501,9 +501,9 @@ class ShopeeChannel implements MarketplaceChannel
     /** Parameter pengiriman untuk booking (pickup/dropoff yang tersedia). */
     public function getBookingShippingParameter(Store $store, string $bookingSn): array
     {
-        return $this->get($store, '/api/v2/logistics/get_booking_shipping_parameter', [
-            'booking_sn' => $bookingSn,
-        ]);
+        // Shopee API tidak membedakan endpoint shipping_parameter untuk booking vs order biasa.
+        // Keduanya menggunakan /api/v2/logistics/get_shipping_parameter
+        return $this->getShippingParameter($store, $bookingSn);
     }
 
     /** Atur pengiriman booking. $params berisi salah satu dari pickup / dropoff. */
