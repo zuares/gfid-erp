@@ -97,15 +97,13 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
 if (config('services.shopee.ads_scheduler_enabled', env('SHOPEE_ADS_SCHEDULER_ENABLED', false))) {
     Schedule::command('marketplace:sync-ads')
         ->dailyAt('23:30')
-        ->runInBackground()
-        ->withoutOverlapping()
+        ->withoutOverlapping(30)
         ->name('sync-ads-daily');
 
     // Ads: sinkronisasi metrik per jam
     Schedule::command('marketplace:sync-ads', ['--hourly' => true])
         ->hourly()
-        ->runInBackground()
-        ->withoutOverlapping()
+        ->withoutOverlapping(30)
         ->name('sync-ads-hourly');
 }
 
