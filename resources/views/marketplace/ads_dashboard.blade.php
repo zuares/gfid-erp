@@ -430,6 +430,35 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="tab-pane" id="tab-campaigns">
             <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
             
+            @php
+                $totalBoncos = 0;
+                $totalHiddenGem = 0;
+                $totalSpendBoncos = 0;
+                foreach($campaigns as $c) {
+                    $r = $c->spend > 0 ? $c->gmv / $c->spend : 0;
+                    if ($c->spend > 50000 && $r < 1.5) { $totalBoncos++; $totalSpendBoncos += $c->spend; }
+                    elseif ($r >= 5.0 && $c->spend > 10000) { $totalHiddenGem++; }
+                }
+            @endphp
+            
+            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
+                <div class="dpanel p-3" style="border-left: 4px solid {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; background: var(--dsh-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; font-size: 0.85rem;">
+                        <i class="bi {{ $totalBoncos > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle' }}"></i> Audit Kampanye AI
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">
+                        @if($totalBoncos > 0)
+                            Ditemukan <b>{{ $totalBoncos }} kampanye berstatus Boncos</b> yang menyedot biaya sebesar <b>Rp {{ number_format($totalSpendBoncos, 0, ',', '.') }}</b>. Matikan atau perbaiki segera! 
+                        @else
+                            Tidak ada kampanye yang terindikasi boncos parah. Kondisi sangat sehat.
+                        @endif
+                        @if($totalHiddenGem > 0)
+                            Terdapat <b>{{ $totalHiddenGem }} produk *Hidden Gem*</b> dengan efisiensi tinggi yang siap untuk diskalakan.
+                        @endif
+                    </div>
+                </div>
+            </div>
+            
             <div class="dpanel">
                 <div class="table-responsive">
                     <table class="dpanel-table">
@@ -437,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <tr>
                                 <th>Kampanye</th>
                                 <th>Tipe</th>
-                                <th>Status</th>
+                                <th>Diagnosis AI</th>
                                 <th class="text-end">Biaya (Spend)</th>
                                 <th class="text-end">GMV</th>
                                 <th class="text-end">ROAS</th>
@@ -447,20 +476,55 @@ document.addEventListener('DOMContentLoaded', function () {
                         </thead>
                         <tbody>
                             @forelse($campaigns as $camp)
-                                <tr>
-                                    <td>
+                                @php
+                                    $c_roas = $camp->spend > 0 ? $camp->gmv / $camp->spend : 0;
+                                    $c_cvr = $camp->clicks > 0 ? ($camp->orders / $camp->clicks) * 100 : 0;
+                                    
+                                    $ai_status = '⚖️ Normal';
+                                    $ai_color = 'var(--dsh-muted)';
+                                    $ai_bg = 'transparent';
+                                    $ai_note = 'Performa standar.';
+                                    
+                                    if ($camp->spend > 50000 && $c_roas < 1.5) {
+                                        $ai_status = '🚨 Boncos (Stop!)';
+                                        $ai_color = '#dc2626';
+                                        $ai_bg = 'rgba(220, 38, 38, 0.05)';
+                                        $ai_note = 'Membakar uang tanpa hasil.';
+                                    } elseif ($c_roas >= 5.0 && $camp->spend > 10000) {
+                                        $ai_status = '💎 Hidden Gem';
+                                        $ai_color = '#16a34a';
+                                        $ai_bg = 'rgba(22, 163, 74, 0.05)';
+                                        $ai_note = 'Super efisien! Skalakan perlahan.';
+                                    } elseif ($c_cvr < 0.5 && $camp->clicks > 100) {
+                                        $ai_status = '⚠️ Window Shopping';
+                                        $ai_color = '#eab308';
+                                        $ai_bg = 'rgba(234, 179, 8, 0.05)';
+                                        $ai_note = 'Banyak klik tapi zonk. Cek harga.';
+                                    } elseif ($c_roas >= 2.0 && $c_roas < 5.0 && $camp->spend > 50000) {
+                                        $ai_status = '🚀 Tulang Punggung';
+                                        $ai_color = '#3b82f6';
+                                        $ai_bg = 'rgba(59, 130, 246, 0.05)';
+                                        $ai_note = 'Mesin pencetak GMV stabil.';
+                                    } elseif ($camp->spend < 10000) {
+                                        $ai_status = '💤 Pasif';
+                                        $ai_color = 'var(--dsh-muted)';
+                                        $ai_bg = 'transparent';
+                                        $ai_note = 'Kekurangan trafik/budget.';
+                                    }
+                                @endphp
+                                <tr style="background: {{ $ai_bg }}; border-bottom: 1px solid var(--dsh-border);">
+                                    <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
                                         <div style="font-weight: 700; color: var(--text);">{{ $camp->campaign_name }}</div>
-                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">ID: {{ $camp->channel_campaign_id }}</div>
+                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span></div>
                                     </td>
                                     <td><span style="font-size: .75rem; color: var(--dsh-muted);">{{ $camp->campaign_type }}</span></td>
                                     <td>
-                                        <span class="pill {{ $camp->status == 'ONGOING' ? 'green' : 'slate' }}">
-                                            {{ $camp->status }}
-                                        </span>
+                                        <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
+                                        <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">Rp {{ number_format($camp->spend, 0, ',', '.') }}</td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">Rp {{ number_format($camp->gmv, 0, ',', '.') }}</td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700;">
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $c_roas >= 4.0 ? '#16a34a' : ($c_roas >= 2.0 ? '#eab308' : '#dc2626') }};">
                                         {{ $camp->spend > 0 ? number_format($camp->gmv / $camp->spend, 2) : 0 }}x
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->clicks, 0, ',', '.') }}</td>
