@@ -1111,6 +1111,173 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
+
+    // ==========================================
+    // 4. HISTORICAL CHART (PERIOD-OVER-PERIOD)
+    // ==========================================
+    let histChart;
+    const ctxHist = document.getElementById('historicalChart');
+    const histContainer = ctxHist ? ctxHist.parentElement : null;
+    
+    try {
+        if (ctxHist && rawHistorical && rawHistorical.length > 0) {
+            // Check if all periods have 0 data
+            let hasAnyData = false;
+            rawHistorical.forEach(p => { if (p.data && p.data.length > 0) hasAnyData = true; });
+            
+            if (!hasAnyData) {
+                histContainer.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--dsh-muted);">Tidak ada data historis yang tersedia untuk rentang ini. Pastikan Anda telah melakukan Sinkronisasi data di bulan-bulan sebelumnya.</div>';
+            } else {
+                
+                // Calculate maxDays strictly from the selected date range
+                let maxDays = 0;
+                const fromElHist = document.getElementById('fromHidden');
+                const toElHist = document.getElementById('toHidden');
+                const dStartHist = fromElHist && fromElHist.value ? new Date(fromElHist.value) : new Date();
+                const dEndHist = toElHist && toElHist.value ? new Date(toElHist.value) : new Date();
+                if (dStartHist && dEndHist) {
+                    maxDays = Math.round((dEndHist - dStartHist) / (1000 * 60 * 60 * 24)) + 1;
+                }
+                if (maxDays < 1) maxDays = 1;
+                
+                // Generate X-Axis: "Hari 1", "Hari 2", etc.
+                let histLabels = [];
+                for (let i = 1; i <= maxDays; i++) {
+                    histLabels.push(`Hari ${i}`);
+                }
+
+                // Colors for periods
+                const lineColors = [
+                    '#ef4444', // Period 0 (Current) - Red
+                    '#94a3b8', // Period 1 (Last) - Slate
+                    'rgba(148, 163, 184, 0.4)', // Period 2 - Light Slate
+                    'rgba(148, 163, 184, 0.2)'  // Period 3 - Lighter
+                ];
+
+                const dashStyles = [
+                    [], // Solid
+                    [5, 5], // Dashed
+                    [2, 2], // Dotted
+                    [2, 4]
+                ];
+
+                const getMetricValue = (d, metric) => {
+                    let sp = parseFloat(d.spend || d.expense || 0);
+                    let gm = parseFloat(d.gmv || 0);
+                    if (metric === 'roas') {
+                        return sp > 0 ? (gm / sp) : 0;
+                    } else if (metric === 'gmv') {
+                        return gm;
+                    } else if (metric === 'spend') {
+                        return sp;
+                    }
+                    return 0;
+                };
+
+                const renderHistChart = (metric) => {
+                    let datasets = rawHistorical.map((period, idx) => {
+                        let dataPoints = new Array(maxDays).fill(null);
+                        
+                        // Align data to specific day offset
+                        if (period.start) {
+                            const pStart = new Date(period.start);
+                            period.data.forEach(d => {
+                                if (d.date) {
+                                    const pDate = new Date(d.date);
+                                    const dayOffset = Math.round((pDate - pStart) / (1000 * 60 * 60 * 24));
+                                    if (dayOffset >= 0 && dayOffset < maxDays) {
+                                        dataPoints[dayOffset] = getMetricValue(d, metric);
+                                    }
+                                }
+                            });
+                        }
+                        
+                        let label = idx === 0 ? 'Rentang Saat Ini' : `${idx} Rentang Lalu`;
+                        if (idx === 1) label = 'Rentang Sebelumnya';
+
+                        return {
+                            label: label,
+                            data: dataPoints,
+                            borderColor: lineColors[idx] || lineColors[0],
+                            borderWidth: idx === 0 ? 3 : 2,
+                            borderDash: dashStyles[idx] || [],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            fill: false,
+                            spanGaps: true
+                        };
+                    });
+
+                    if (histChart) {
+                        histChart.data.datasets = datasets;
+                        histChart.update();
+                    } else {
+                        histChart = new Chart(ctxHist.getContext('2d'), {
+                            type: 'line',
+                            data: {
+                                labels: histLabels,
+                                datasets: datasets
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: { mode: 'index', intersect: false },
+                                plugins: {
+                                    legend: { display: true, position: 'top', labels: { color: textColor } },
+                                    tooltip: {
+                                        backgroundColor: tooltipBg,
+                                        titleColor: tooltipText,
+                                        bodyColor: tooltipText,
+                                        borderColor: tooltipBorder,
+                                        borderWidth: 1,
+                                        padding: 10,
+                                        callbacks: {
+                                            label: function(context) {
+                                                let val = context.parsed.y;
+                                                if (metric === 'roas') return context.dataset.label + ': ' + val.toFixed(2) + 'x';
+                                                return context.dataset.label + ': ' + formatFullIDR(val);
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+                                    y: { 
+                                        grid: { color: gridColor }, 
+                                        beginAtZero: true,
+                                        ticks: {
+                                            callback: function(value) {
+                                                if (metric === 'roas') return value + 'x';
+                                                return formatShortIDR(value);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                };
+
+                // Initial render
+                renderHistChart('roas');
+
+                // Handle metric toggle
+                const metricSelect = document.getElementById('histMetricSelect');
+                if (metricSelect) {
+                    metricSelect.addEventListener('change', function(e) {
+                        renderHistChart(e.target.value);
+                    });
+                }
+            }
+        } else if (ctxHist) {
+             histContainer.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--dsh-muted);">Data rawHistorical tidak ditemukan atau kosong.</div>';
+        }
+    } catch (err) {
+        if (histContainer) {
+            histContainer.innerHTML = '<div style="color:#dc2626; padding: 20px; font-family: monospace;"><b>JS Error:</b> ' + err.message + '<br>' + err.stack + '</div>';
+        }
+    }
 });
 </script>
 @endif
