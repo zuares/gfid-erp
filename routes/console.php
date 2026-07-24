@@ -56,8 +56,7 @@ Artisan::command('production:seed-boms {--force : Jalankan tanpa konfirmasi saat
 // ── Storefront product ranking (setiap jam) ───────────────────────────────
 Schedule::command('storefront:rank-products')
     ->hourly()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 // Update harian setelah ganti hari
 Schedule::command('sales:rebuild-daily-item-sales --days=90')
@@ -73,44 +72,36 @@ Schedule::command('marketplace:sync-orders')
 
 Schedule::command('marketplace:sync-returns')
     ->hourly()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 Schedule::command('marketplace:sync-settlements')
     ->everyFourHours()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 Schedule::command('marketplace:sync-chats')
     ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 // Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
 Schedule::command('marketplace:sync-ads-daily --days=3')
     ->dailyAt('23:30')
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
 Schedule::command('marketplace:snapshot-products --sync')
     ->dailyAt('23:45')
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 // Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
 Schedule::command('marketplace:run-boosts')
     ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 // Proses antrean job (order webhook, download resi, sync historis) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
 Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3 --sleep=1')
     ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping();
 
 Schedule::command('marketplace:cleanup-labels')
-    ->dailyAt('01:00')
-    ->runInBackground();
+    ->dailyAt('01:00');
