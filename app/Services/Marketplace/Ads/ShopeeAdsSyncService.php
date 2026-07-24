@@ -231,7 +231,7 @@ class ShopeeAdsSyncService
             throw new \Exception("Gagal mengambil shop hourly: " . ($res['message'] ?? $res['error']));
         }
         
-        $list = data_get($res, 'response.hourly_performance', []);
+        $list = data_get($res, 'response', []);
         $run->total_received += count($list);
         
         foreach ($list as $d) {
