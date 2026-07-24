@@ -368,6 +368,31 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Performa per jam level toko (semua campaign CPC digabung).
+     * Endpoint: GET /api/v2/ads/get_all_cpc_ads_hourly_performance
+     * Date format: DD-MM-YYYY (only 1 day)
+     */
+    public function getAdsShopHourlyPerformance(Store $store, string $performanceDate): array
+    {
+        return $this->get($store, '/api/v2/ads/get_all_cpc_ads_hourly_performance', [
+            'performance_date' => $performanceDate,
+        ]);
+    }
+
+    /**
+     * Performa per jam level campaign.
+     * Endpoint: GET /api/v2/ads/get_product_campaign_hourly_performance
+     * Date format: DD-MM-YYYY (only 1 day)
+     */
+    public function getCampaignHourlyPerformance(Store $store, array $campaignIds, string $performanceDate): array
+    {
+        return $this->get($store, '/api/v2/ads/get_product_campaign_hourly_performance', [
+            'campaign_id_list' => implode(',', $campaignIds),
+            'performance_date' => $performanceDate,
+        ]);
+    }
+
+    /**
      * Refresh proaktif: kalau token tinggal ≤2 menit lagi (atau tidak diketahui
      * kapan kedaluwarsa), segarkan dulu sebelum memanggil API. Mencegah error
      * "Invalid access_token" yang muncul saat token pas kedaluwarsa.

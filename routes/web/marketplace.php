@@ -4,7 +4,7 @@ use App\Http\Controllers\Marketplace\MarketplaceOrderController;
 use App\Http\Controllers\Marketplace\MpReconciliationController;
 use App\Http\Controllers\Marketplace\MpReconciliationItemsController;
 use App\Http\Controllers\Marketplace\MpReconciliationQueueController;
-
+use App\Http\Controllers\Marketplace\AdsDashboardController;
 Route::middleware(['web', 'auth', 'access:marketplace'])
     ->prefix('marketplace')
     ->name('marketplace.')
@@ -66,4 +66,12 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
 
         Route::get('reconcile-items/packets', [MpReconciliationItemsController::class, 'packets'])
             ->name('reconcile.items.packets');
+
+        // =========================
+        // Marketplace Ads Dashboard
+        // =========================
+        Route::get('ads-dashboard', [AdsDashboardController::class, 'index'])
+            ->name('ads.dashboard');
+        Route::post('ads-dashboard/sync', [AdsDashboardController::class, 'sync'])
+            ->name('ads.sync');
     });

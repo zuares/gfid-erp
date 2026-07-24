@@ -94,10 +94,18 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->name("task_" . uniqid())->withoutOverlapping();
 
 // Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
-Schedule::call(fn () => Artisan::call('marketplace:sync-ads-daily', ['--days' => 3]))
+Schedule::command('marketplace:sync-ads')
     ->dailyAt('23:30')
-    ->name('sync-ads-daily')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->runInBackground()
+    ->withoutOverlapping()
+    ->name('sync-ads-daily');
+
+// Ads: sinkronisasi metrik per jam
+Schedule::command('marketplace:sync-ads', ['--hourly' => true])
+    ->hourly()
+    ->runInBackground()
+    ->withoutOverlapping()
+    ->name('sync-ads-hourly');
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
 Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync' => true]))
