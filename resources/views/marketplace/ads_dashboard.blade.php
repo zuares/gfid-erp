@@ -108,14 +108,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabBtns = document.querySelectorAll('.dash-tab');
     const tabPanes = document.querySelectorAll('.tab-pane');
 
+    const savedTab = localStorage.getItem('adsDashboardActiveTab');
+    if (savedTab) {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabPanes.forEach(p => p.classList.remove('active'));
+        const targetBtn = document.querySelector(`.dash-tab[data-target="${savedTab}"]`);
+        const targetPane = document.getElementById(savedTab);
+        if (targetBtn && targetPane) {
+            targetBtn.classList.add('active');
+            targetPane.classList.add('active');
+        } else {
+            tabBtns[0].classList.add('active');
+            tabPanes[0].classList.add('active');
+        }
+    }
+
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             tabPanes.forEach(p => p.classList.remove('active'));
 
             btn.classList.add('active');
-            const targetPane = document.getElementById(btn.getAttribute('data-target'));
+            const target = btn.getAttribute('data-target');
+            const targetPane = document.getElementById(target);
             if (targetPane) targetPane.classList.add('active');
+            
+            localStorage.setItem('adsDashboardActiveTab', target);
             
             window.dispatchEvent(new Event('resize')); // re-render charts
         });
@@ -483,6 +501,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                     
                                     $gmv_growth = $camp->prev_gmv > 0 ? (($camp->gmv - $camp->prev_gmv) / $camp->prev_gmv) * 100 : ($camp->gmv > 0 ? 100 : 0);
                                     $roas_growth = $c_prev_roas > 0 ? (($c_roas - $c_prev_roas) / $c_prev_roas) * 100 : ($c_roas > 0 ? 100 : 0);
+                                    $spend_growth = $camp->prev_spend > 0 ? (($camp->spend - $camp->prev_spend) / $camp->prev_spend) * 100 : ($camp->spend > 0 ? 100 : 0);
+                                    $clicks_growth = $camp->prev_clicks > 0 ? (($camp->clicks - $camp->prev_clicks) / $camp->prev_clicks) * 100 : ($camp->clicks > 0 ? 100 : 0);
+                                    $orders_growth = $camp->prev_orders > 0 ? (($camp->orders - $camp->prev_orders) / $camp->prev_orders) * 100 : ($camp->orders > 0 ? 100 : 0);
                                     
                                     $ai_status = '⚖️ Normal';
                                     $ai_color = 'var(--dsh-muted)';
@@ -538,7 +559,14 @@ document.addEventListener('DOMContentLoaded', function () {
                                         <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
                                         <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
                                     </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">Rp {{ number_format($camp->spend, 0, ',', '.') }}</td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
+                                        Rp {{ number_format($camp->spend, 0, ',', '.') }}
+                                        @if($spend_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $spend_growth > 0 ? '#dc2626' : '#16a34a' }};">
+                                                {{ $spend_growth > 0 ? '▲' : '▼' }} {{ abs(round($spend_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
                                         Rp {{ number_format($camp->gmv, 0, ',', '.') }}
                                         @if($gmv_growth != 0)
@@ -555,8 +583,22 @@ document.addEventListener('DOMContentLoaded', function () {
                                             </div>
                                         @endif
                                     </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->clicks, 0, ',', '.') }}</td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->orders, 0, ',', '.') }}</td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($camp->clicks, 0, ',', '.') }}
+                                        @if($clicks_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $clicks_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $clicks_growth > 0 ? '▲' : '▼' }} {{ abs(round($clicks_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($camp->orders, 0, ',', '.') }}
+                                        @if($orders_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $orders_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $orders_growth > 0 ? '▲' : '▼' }} {{ abs(round($orders_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
