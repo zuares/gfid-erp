@@ -448,7 +448,11 @@ document.addEventListener("DOMContentLoaded", function() {
         const dEnd = new Date(toEl.value);
         for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
             let ds = ymdLocal(d);
-            let found = rawDaily.find(item => item.date === ds);
+            let found = rawDaily.find(item => {
+                if(!item.date) return false;
+                let itemDate = new Date(item.date);
+                return ymdLocal(itemDate) === ds;
+            });
             dailyData.push(found ? found : { date: ds, spend: 0, gmv: 0, roas: 0 });
         }
     } else {
