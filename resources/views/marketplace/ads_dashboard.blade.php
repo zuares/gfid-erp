@@ -311,6 +311,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}">
             </div>
         </div>
+        <div class="filter-item">
+            <label>Bandingkan:</label>
+            <select name="compare_mode" onchange="this.form.submit()" style="background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 600; font-size: .85rem;">
+                <option value="prev_period" {{ (isset($compareMode) && $compareMode == 'prev_period') ? 'selected' : '' }}>Durasi Sama (Sblmnya)</option>
+                <option value="prev_month" {{ (isset($compareMode) && $compareMode == 'prev_month') ? 'selected' : '' }}>Bulan Lalu (Tgl Sama)</option>
+                <option value="prev_year" {{ (isset($compareMode) && $compareMode == 'prev_year') ? 'selected' : '' }}>Tahun Lalu (Tgl Sama)</option>
+            </select>
+        </div>
     </form>
 
     @if(empty($storeId))
