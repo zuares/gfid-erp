@@ -352,6 +352,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             
+            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHistorical">
+                    <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Menganalisis perbandingan periode...
+                    </div>
+                </div>
+            </div>
+            
             <div class="dpanel p-3">
                 <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
                     💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
@@ -1288,6 +1297,73 @@ document.addEventListener("DOMContentLoaded", function() {
                         renderHistChart(e.target.value);
                     });
                 }
+                
+                // ==========================================
+                // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
+                // ==========================================
+                const insightHistEl = document.getElementById('insightHistorical');
+                if (insightHistEl && rawHistorical.length >= 2) {
+                    // Extract current period (idx 0) and previous period (idx 1)
+                    let currentData = rawHistorical[0].data || [];
+                    let prevData = rawHistorical[1].data || [];
+                    
+                    let currSpend = currentData.reduce((sum, d) => sum + parseFloat(d.spend || d.expense || 0), 0);
+                    let currGmv = currentData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+                    let currRoas = currSpend > 0 ? (currGmv / currSpend) : 0;
+                    
+                    let prevSpend = prevData.reduce((sum, d) => sum + parseFloat(d.spend || d.expense || 0), 0);
+                    let prevGmv = prevData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+                    let prevRoas = prevSpend > 0 ? (prevGmv / prevSpend) : 0;
+                    
+                    // Prevent divide by zero if previous data is entirely 0
+                    if (prevSpend > 0 && prevGmv > 0) {
+                        let gmvGrowth = ((currGmv - prevGmv) / prevGmv) * 100;
+                        let spendGrowth = ((currSpend - prevSpend) / prevSpend) * 100;
+                        let roasGrowth = ((currRoas - prevRoas) / prevRoas) * 100;
+                        
+                        let histHtml = '';
+                        
+                        // Condition 1: Disaster Trend (Spend up, GMV down)
+                        if (spendGrowth > 5 && gmvGrowth < -5) {
+                            histHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🚨 Siaga Merah! (Boncos Progresif)</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Anda membakar uang <b>${Math.abs(spendGrowth).toFixed(1)}% lebih banyak</b> dari rentang sebelumnya, namun omzet justru anjlok <b>${Math.abs(gmvGrowth).toFixed(1)}%</b>. 💡 <b>Saran:</b> Hentikan eksperimen! Segera kembalikan strategi ke pengaturan bulan lalu.</div>`;
+                            insightHistEl.style.borderLeftColor = '#dc2626';
+                        } 
+                        // Condition 2: Spectacular Growth (GMV up, ROAS up)
+                        else if (gmvGrowth > 5 && roasGrowth > 5) {
+                            histHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🚀 Pertumbuhan Spektakuler!</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Omzet Anda melesat naik <b>${gmvGrowth.toFixed(1)}%</b> dan efisiensi (ROAS) juga membaik <b>${roasGrowth.toFixed(1)}%</b>. 💡 <b>Saran:</b> Strategi bulan ini sempurna! Pertahankan dan mulailah meriset kata kunci baru untuk terus berekspansi.</div>`;
+                            insightHistEl.style.borderLeftColor = '#16a34a';
+                        }
+                        // Condition 3: Scaled but Inefficient (GMV up, ROAS down significantly)
+                        else if (gmvGrowth > 10 && roasGrowth < -10) {
+                            histHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">📈 Skalasi Mahal (Tumbuh tapi Boros)</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Anda berhasil mendongkrak penjualan sebesar <b>${gmvGrowth.toFixed(1)}%</b>, tapi mengorbankan margin (ROAS turun <b>${Math.abs(roasGrowth).toFixed(1)}%</b>). 💡 <b>Saran:</b> Ini wajar saat fase 'Scaling'. Tapi pastikan HPP Anda masih bisa menutupi penurunan efisiensi ini.</div>`;
+                            insightHistEl.style.borderLeftColor = '#eab308';
+                        }
+                        // Condition 4: Slowdown (GMV down, Spend down)
+                        else if (gmvGrowth < -5 && spendGrowth < -5) {
+                            histHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; margin-bottom: 0.3rem;">📉 Perlambatan Tren</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Pendapatan turun <b>${Math.abs(gmvGrowth).toFixed(1)}%</b> beriringan dengan penurunan biaya iklan. 💡 <b>Saran:</b> Apakah ini karena kehabisan stok, kompetitor banting harga, atau akhir musim promo? Pantau pergerakan pasar!</div>`;
+                            insightHistEl.style.borderLeftColor = '#f59e0b';
+                        }
+                        // Condition 5: Stable
+                        else {
+                            let gmvDir = gmvGrowth >= 0 ? "naik" : "turun";
+                            histHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.85rem; margin-bottom: 0.3rem;">⚖️ Stabilitas Terjaga</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Performa iklan berjalan stabil. Omzet ${gmvDir} perlahan <b>${Math.abs(gmvGrowth).toFixed(1)}%</b> dengan tingkat efisiensi yang relatif sama dengan rentang sebelumnya.</div>`;
+                            insightHistEl.style.borderLeftColor = '#3b82f6';
+                        }
+                        insightHistEl.innerHTML = histHtml;
+                    } else {
+                        insightHistEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Menunggu Data Historis</div>
+                                                   <div style="font-size: 0.72rem; color: var(--dsh-muted);">Data pada rentang waktu sebelumnya (Period-1) kosong atau belum disinkronisasi, sehingga sistem tidak bisa membandingkan pertumbuhan.</div>`;
+                    }
+                } else if (insightHistEl) {
+                    insightHistEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Kurang Data Pembanding</div>
+                                               <div style="font-size: 0.72rem; color: var(--dsh-muted);">Data komparasi tidak cukup panjang untuk memunculkan wawasan AI historis.</div>`;
+                }
+
             }
         } else if (ctxHist) {
              histContainer.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--dsh-muted);">Data rawHistorical tidak ditemukan atau kosong.</div>';
