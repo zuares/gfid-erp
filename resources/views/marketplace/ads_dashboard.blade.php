@@ -275,11 +275,19 @@ document.addEventListener('DOMContentLoaded', function () {
             
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
                 <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Harian</div>
+                        <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text);"></div>
+                    </div>
                     <div style="height: 280px;">
                         <canvas id="dailyChart"></canvas>
                     </div>
                 </div>
                 <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Distribusi Per Jam</div>
+                        <div id="hourlySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text);"></div>
+                    </div>
                     <div style="height: 280px;">
                         <canvas id="hourlyChart"></canvas>
                     </div>
@@ -488,7 +496,23 @@ document.addEventListener("DOMContentLoaded", function() {
         if(value >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + ' Rb';
         return value;
     };
-    
+
+    // Calculate summaries for charts
+    let totalDailySpend = dailyData.reduce((sum, d) => sum + parseFloat(d.spend || 0), 0);
+    let totalDailyGmv = dailyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+    let dsEl = document.getElementById('dailySummary');
+    if(dsEl) {
+        dsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalDailySpend)} Biaya</span> &bull; <span style="color:#16a34a">Rp ${formatShortIDR(totalDailyGmv)} GMV</span>`;
+    }
+
+    let totalHourlySpend = hourlyData.reduce((sum, d) => sum + parseFloat(d.expense || 0), 0);
+    let totalHourlyClicks = hourlyData.reduce((sum, d) => sum + parseInt(d.clicks || 0), 0);
+    let totalHourlyOrders = hourlyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
+    let hsEl = document.getElementById('hourlySummary');
+    if(hsEl) {
+        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#8b5cf6">${totalHourlyClicks} Klik</span> &bull; <span style="color:#10b981">${totalHourlyOrders} Pesanan</span>`;
+    }
+
     // Helper: Format Full Rupiah untuk Tooltip
     const formatFullIDR = (value) => {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
