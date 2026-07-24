@@ -235,30 +235,76 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="dash-grid mb-3">
                 @php
                     $metrics = [
-                        ['title' => 'Biaya Iklan (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
-                        ['title' => 'GMV Iklan', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
+                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
+                        ['title' => 'GMV (Pendapatan)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
                         ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
                         ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
+                        ['title' => 'AOV', 'key' => 'aov', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
                         ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-eye'],
+                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'amber', 'icon' => 'bi-hand-index'],
                         ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'violet', 'icon' => 'bi-cursor'],
+                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
+                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-coin'],
                     ];
                 @endphp
                 @foreach($metrics as $m)
                     @php
+                        $currSpend = $kpi['current']->spend ?? 0;
+                        $currGmv = $kpi['current']->gmv ?? 0;
+                        $currOrders = $kpi['current']->orders ?? 0;
+                        $currClicks = $kpi['current']->clicks ?? 0;
+                        $currImpressions = $kpi['current']->impressions ?? 0;
+
+                        $prevSpend = $kpi['previous']->spend ?? 0;
+                        $prevGmv = $kpi['previous']->gmv ?? 0;
+                        $prevOrders = $kpi['previous']->orders ?? 0;
+                        $prevClicks = $kpi['previous']->clicks ?? 0;
+                        $prevImpressions = $kpi['previous']->impressions ?? 0;
+
                         $val = $kpi['current']->{$m['key']} ?? 0;
-                        if($m['key'] === 'roas' && isset($kpi['current']->spend) && $kpi['current']->spend > 0) {
-                            $val = round($kpi['current']->gmv / $kpi['current']->spend, 2);
+                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
+
+                        if($m['key'] === 'roas') {
+                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
+                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
+                        } elseif ($m['key'] === 'aov') {
+                            $val = $currOrders > 0 ? round($currGmv / $currOrders, 0) : 0;
+                            $prevVal = $prevOrders > 0 ? round($prevGmv / $prevOrders, 0) : 0;
+                        } elseif ($m['key'] === 'cpc') {
+                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
+                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
+                        } elseif ($m['key'] === 'ctr') {
+                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
+                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
+                        } elseif ($m['key'] === 'cvr') {
+                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
+                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
                         }
+
                         $change = $kpi['changes'][$m['key']] ?? 0;
+                        if (in_array($m['key'], ['aov', 'cpc', 'ctr', 'cvr'])) {
+                            if ($prevVal == 0) {
+                                $change = $val > 0 ? 100 : 0;
+                            } else {
+                                $change = round((($val - $prevVal) / $prevVal) * 100, 2);
+                            }
+                        }
+
                         $isUp = $change >= 0;
-                        $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
+                        
+                        // For cost metrics, going down is good (green). For others, going up is good.
+                        if (in_array($m['key'], ['spend', 'cpc'])) {
+                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
+                        } else {
+                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
+                        }
                     @endphp
                     <div class="kpi {{ $m['cls'] }}">
                         <div class="kpi-label">
                             <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
                             {{ $m['title'] }}
                         </div>
-                        <div class="kpi-value {{ $m['key'] == 'spend' || $m['key'] == 'gmv' ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
+                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
                             {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
                         </div>
                         <div class="kpi-sub">
