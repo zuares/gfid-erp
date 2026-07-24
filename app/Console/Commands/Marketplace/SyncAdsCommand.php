@@ -72,15 +72,14 @@ class SyncAdsCommand extends Command
                     $this->info("Dispatched backfill chain for Store {$store->name}");
                 }
             } else {
-                // Execute via Queue
-                $this->info("Mengantrekan sync untuk Store {$store->name} ke Queue");
+                // Execute synchronously (no queue worker needed)
+                $this->info("Menjalankan sync langsung untuk Store {$store->name}...");
                 
                 try {
-                    ShopeeAdsSyncJob::dispatch($store, Carbon::parse($from), Carbon::parse($to), $isHourly)
-                        ->onConnection('database')
-                        ->onQueue('shopee-ads');
+                    ShopeeAdsSyncJob::dispatchSync($store, Carbon::parse($from), Carbon::parse($to), $isHourly);
+                    $this->info("Sync selesai untuk Store {$store->name}.");
                 } catch (\Throwable $e) {
-                    $this->error("Error dispatch sync Store {$store->name}: " . $e->getMessage());
+                    $this->error("Error sync Store {$store->name}: " . $e->getMessage());
                 }
             }
         }
