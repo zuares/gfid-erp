@@ -56,6 +56,7 @@ Artisan::command('production:seed-boms {--force : Jalankan tanpa konfirmasi saat
 // ── Storefront product ranking (setiap jam) ───────────────────────────────
 Schedule::call(fn () => Artisan::call('storefront:rank-products'))
     ->hourly()
+    ->name('storefront-rank')
     ->withoutOverlapping();
 
 // Update harian setelah ganti hari
@@ -68,44 +69,53 @@ Schedule::call(fn () => Artisan::call('inventory:recalc-ads-from-daily', ['--day
 // Auto-cleanup file resi (.pdf.gz) setiap malam pukul 01:00
 Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->everyFiveMinutes()
+    ->name('sync-orders')
     ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->hourly()
+    ->name('sync-returns')
     ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements'))
     ->everyFourHours()
+    ->name('sync-settlements')
     ->withoutOverlapping();
 
 // Finance: sync order → settlement → COGS setiap 4 jam (profit per order)
 Schedule::call(fn () => Artisan::call('marketplace:sync-finance', ['--months' => 1]))
     ->everyFourHours()
+    ->name('sync-finance')
     ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->everyMinute()
+    ->name('sync-chats')
     ->withoutOverlapping();
 
 // Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
 Schedule::call(fn () => Artisan::call('marketplace:sync-ads-daily', ['--days' => 3]))
     ->dailyAt('23:30')
+    ->name('sync-ads-daily')
     ->withoutOverlapping();
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
 Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync' => true]))
     ->dailyAt('23:45')
+    ->name('snapshot-products')
     ->withoutOverlapping();
 
 // Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
 Schedule::call(fn () => Artisan::call('marketplace:run-boosts'))
     ->everyFiveMinutes()
+    ->name('run-boosts')
     ->withoutOverlapping();
 
 // Proses antrean job (order webhook, download resi, sync historis) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
 Schedule::call(fn () => Artisan::call('queue:work', ['--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
     ->everyMinute()
+    ->name('queue-work')
     ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:cleanup-labels'))
