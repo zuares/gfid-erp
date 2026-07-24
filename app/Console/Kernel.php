@@ -38,6 +38,11 @@ class Kernel extends ConsoleKernel
         $schedule->command('marketplace:sync-finance')
                  ->everyFourHours()
                  ->withoutOverlapping();
+
+        // Cron Job: Sinkronisasi Iklan (Shopee Ads) setiap 1 jam
+        $schedule->command('marketplace:sync-ads')
+                 ->hourly()
+                 ->withoutOverlapping();
     }
 
     protected function commands(): void
