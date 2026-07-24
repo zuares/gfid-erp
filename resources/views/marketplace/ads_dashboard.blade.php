@@ -268,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian & Per Jam</div>
             
-            <div class="dash-panels" style="grid-template-columns: 2fr 1fr;">
+            <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
                 <div class="dpanel p-3">
                     <div style="height: 280px;">
                         <canvas id="dailyChart"></canvas>
