@@ -629,6 +629,15 @@ document.addEventListener("DOMContentLoaded", function() {
         return value;
     };
 
+    // Helper: Format Indo Date (YYYY-MM-DD to DD MMM YYYY)
+    const formatIndoDate = (dateStr) => {
+        if(!dateStr) return '';
+        const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+        let parts = dateStr.split('-');
+        if(parts.length !== 3) return dateStr;
+        return parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+    };
+
     // Calculate summaries for charts
     let totalDailySpend = dailyData.reduce((sum, d) => sum + parseFloat(d.spend || 0), 0);
     let totalDailyGmv = dailyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
