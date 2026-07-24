@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div>
                             <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Harian</div>
                             <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Tips:</b> Jarak/selisih antara area <b>GMV</b> dan <b>Biaya</b> adalah Margin Kasar Anda. Awasi <b>Garis ROAS</b> agar tidak menukik tajam!
+                                💡 <b>Tips:</b> Selisih area <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Efisiensi iklan. <b>Garis AOV (Putus-putus)</b> = Daya beli (Rata-rata belanja).
                             </div>
                         </div>
                         <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
