@@ -393,6 +393,34 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Performa campaign GMV Max (GMS).
+     * Endpoint: POST /api/v2/ads/get_gms_campaign_performance
+     * Date format: YYYY-MM-DD
+     */
+    public function getGmsCampaignPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    {
+        return $this->post($store, '/api/v2/ads/get_gms_campaign_performance', [
+            'campaign_id_list' => array_map('intval', $campaignIds),
+            'start_date'       => $startDate,
+            'end_date'         => $endDate,
+        ]);
+    }
+
+    /**
+     * Performa item pada GMV Max (GMS).
+     * Endpoint: POST /api/v2/ads/get_gms_item_performance
+     * Date format: YYYY-MM-DD
+     */
+    public function getGmsItemPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    {
+        return $this->post($store, '/api/v2/ads/get_gms_item_performance', [
+            'campaign_id_list' => array_map('intval', $campaignIds),
+            'start_date'       => $startDate,
+            'end_date'         => $endDate,
+        ]);
+    }
+
+    /**
      * Refresh proaktif: kalau token tinggal ≤2 menit lagi (atau tidak diketahui
      * kapan kedaluwarsa), segarkan dulu sebelum memanggil API. Mencegah error
      * "Invalid access_token" yang muncul saat token pas kedaluwarsa.

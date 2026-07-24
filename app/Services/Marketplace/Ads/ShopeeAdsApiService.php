@@ -92,4 +92,14 @@ class ShopeeAdsApiService
     {
         return $this->execute($store, 'get_campaign_hourly_performance', fn() => $this->driver($store)->getCampaignHourlyPerformance($store, $campaignIds, $performanceDate));
     }
+
+    public function getGmsCampaignPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    {
+        return $this->execute($store, 'get_gms_campaign_performance', fn() => $this->driver($store)->getGmsCampaignPerformance($store, $campaignIds, $startDate, $endDate));
+    }
+
+    public function getGmsItemPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    {
+        return $this->execute($store, 'get_gms_item_performance', fn() => $this->driver($store)->getGmsItemPerformance($store, $campaignIds, $startDate, $endDate));
+    }
 }

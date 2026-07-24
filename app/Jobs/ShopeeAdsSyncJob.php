@@ -88,8 +88,11 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 // 3. Sync Shop Daily
                 $syncService->syncShopDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
                 
-                // 4. Sync Campaign Daily
+                // 4. Sync Campaign Daily (CPC)
                 $syncService->syncCampaignDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
+
+                // 5. Sync GMS Campaign & Item Daily
+                $syncService->syncGmsDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
             }
 
             $run->update([
