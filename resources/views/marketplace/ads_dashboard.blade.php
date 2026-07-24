@@ -348,6 +348,20 @@ document.addEventListener('DOMContentLoaded', function () {
                         <canvas id="hourlyChart"></canvas>
                     </div>
                 </div>
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Trafik Harian</div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
+                                💡 <b>Tips:</b> Jarak area <b>Impresi (Kuning)</b> & <b>Klik (Biru)</b> menunjukkan rasio bocornya trafik. Awasi <b>Garis CTR (Ungu)</b>; jika anjlok, perbaiki gambar/judul produk!
+                            </div>
+                        </div>
+                        <div id="trafficSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                    </div>
+                    <div style="height: 280px;">
+                        <canvas id="trafficChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -568,6 +582,14 @@ document.addEventListener("DOMContentLoaded", function() {
     let hsEl = document.getElementById('hourlySummary');
     if(hsEl) {
         hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">Rp ${formatShortIDR(totalHourlyGmv)} GMV</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
+    }
+
+    let totalDailyImpressions = dailyData.reduce((sum, d) => sum + parseInt(d.impressions || 0), 0);
+    let totalDailyClicks = dailyData.reduce((sum, d) => sum + parseInt(d.clicks || 0), 0);
+    let avgDailyCtr = totalDailyImpressions > 0 ? ((totalDailyClicks / totalDailyImpressions) * 100).toFixed(2) : "0.00";
+    let tsEl = document.getElementById('trafficSummary');
+    if(tsEl) {
+        tsEl.innerHTML = `<span style="color:#f59e0b">${formatShortIDR(totalDailyImpressions)} Impresi</span> &bull; <span style="color:#3b82f6">${formatShortIDR(totalDailyClicks)} Klik</span> &bull; <span style="color:#8b5cf6">${avgDailyCtr}% CTR</span>`;
     }
 
     // Helper: Format Full Rupiah untuk Tooltip
@@ -859,6 +881,119 @@ document.addEventListener("DOMContentLoaded", function() {
                         position: 'left',
                         beginAtZero: true
                     }
+                }
+            }
+        });
+    }
+
+    // --- DAILY TRAFFIC CHART ---
+    const ctxTraffic = document.getElementById("trafficChart");
+    if(ctxTraffic) {
+        const ctxTraffic2D = ctxTraffic.getContext('2d');
+        
+        let gradImp = ctxTraffic2D.createLinearGradient(0, 0, 0, 300);
+        gradImp.addColorStop(0, 'rgba(245, 158, 11, 0.25)'); // Amber
+        gradImp.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+        
+        let gradClick = ctxTraffic2D.createLinearGradient(0, 0, 0, 300);
+        gradClick.addColorStop(0, 'rgba(59, 130, 246, 0.25)'); // Blue
+        gradClick.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+        new Chart(ctxTraffic2D, {
+            type: 'line',
+            data: {
+                labels: dailyData.map(d => {
+                    const date = new Date(d.date);
+                    return date.getDate() + ' ' + date.toLocaleString('id-ID', { month: 'short' });
+                }),
+                datasets: [
+                    {
+                        label: 'CTR',
+                        data: dailyData.map(d => {
+                            let imp = parseInt(d.impressions || 0);
+                            let clk = parseInt(d.clicks || 0);
+                            return imp > 0 ? parseFloat(((clk/imp)*100).toFixed(2)) : 0;
+                        }),
+                        borderColor: '#8b5cf6', // Violet
+                        backgroundColor: '#8b5cf6',
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y2'
+                    },
+                    {
+                        label: 'Klik',
+                        data: dailyData.map(d => parseInt(d.clicks || 0)),
+                        borderColor: '#3b82f6',
+                        backgroundColor: gradClick,
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Impression',
+                        data: dailyData.map(d => parseInt(d.impressions || 0)),
+                        borderColor: '#f59e0b',
+                        backgroundColor: gradImp,
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, family: 'Inter, sans-serif' } } },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxPadding: 4,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.dataset.yAxisID === 'y2') {
+                                    return label + context.parsed.y + '%';
+                                } else {
+                                    return label + context.parsed.y.toLocaleString('id-ID');
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                    y: { 
+                        type: 'linear', position: 'left', beginAtZero: true, 
+                        grid: { color: gridColor, drawBorder: false }, 
+                        ticks: { font: { size: 10 }, padding: 8, callback: function(value) { return formatShortIDR(value); } } 
+                    },
+                    y1: { 
+                        type: 'linear', position: 'right', beginAtZero: true, 
+                        grid: { drawOnChartArea: false, drawBorder: false }, 
+                        ticks: { font: { size: 10 }, padding: 8, callback: function(value) { return formatShortIDR(value); } }
+                    },
+                    y2: { type: 'linear', display: false, position: 'left', beginAtZero: true }
                 }
             }
         });
