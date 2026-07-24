@@ -99,15 +99,6 @@ body[data-theme="dark"] .range-pill { color: #e5e7eb; background: rgba(255,255,2
 .range-pill .range-meta { display: inline-flex; align-items: center; gap: .5rem; flex: 0 0 auto; }
 .range-pill .tz { color: var(--dsh-muted); font-size: .82rem; }
 
-/* Sembunyikan input asli flatpickr yang ter-generate otomatis */
-.period-bar .flatpickr-input[type="text"] {
-    display: none !important;
-    opacity: 0;
-    position: absolute;
-    z-index: -9999;
-    width: 0; height: 0;
-}
-
 </style>
 @endpush
 
@@ -132,85 +123,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.dispatchEvent(new Event('resize')); // re-render charts on load
 
-    // Flatpickr & Preset Logic (Shipments Style)
-    const preset = document.getElementById('presetRange');
-    const toggleDate = document.getElementById('toggleDate');
-    const rangeText = document.getElementById('rangeText');
+    // Flatpickr Logic
+    const rangePicker = document.getElementById('rangePicker');
     const fromEl = document.getElementById('fromHidden');
     const toEl = document.getElementById('toHidden');
     const filterForm = document.getElementById('filterForm');
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
     
-    function setRangeText() {
-        if(!fromEl || !toEl || !fromEl.value || !toEl.value) { if(rangeText) rangeText.textContent = '-'; return; }
-        const idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-        const fmtDate = (str) => {
-            if(!str) return '';
-            const d = new Date(str);
-            return d.getDate() + ' ' + idMonths[d.getMonth()] + ' ' + d.getFullYear();
-        };
-        const f = fmtDate(fromEl.value);
-        const t = fmtDate(toEl.value);
-        if(rangeText) rangeText.textContent = (f === t) ? f : (f + ' - ' + t);
-    }
-    
-    function applyPreset(v) {
-        if(v === 'custom') return;
-        const now = new Date();
-        let start = new Date();
-        let end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        const n = parseInt(v) || 7;
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (n - 1));
-        
-        fromEl.value = ymd(start);
-        toEl.value = ymd(end);
-        setRangeText();
-        filterForm.submit();
-    }
-    
-    setRangeText();
-    
-    let fp = null;
-    if(typeof flatpickr !== 'undefined' && toggleDate) {
-        fp = flatpickr(toggleDate, {
+    if(typeof flatpickr !== 'undefined' && rangePicker) {
+        flatpickr(rangePicker, {
             mode: 'range',
             locale: 'id',
             showMonths: 1,
-            positionElement: toggleDate,
-            position: 'auto right',
+            dateFormat: 'd M Y',
             defaultDate: [fromEl.value, toEl.value],
             onChange: function(selectedDates, dateStr, instance) {
-                if(selectedDates.length < 2) return;
-                fromEl.value = ymd(selectedDates[0]);
-                toEl.value = ymd(selectedDates[1]);
-                setRangeText();
-                if(preset) preset.value = 'custom';
-                filterForm.submit();
+                if(selectedDates.length === 2) {
+                    fromEl.value = ymd(selectedDates[0]);
+                    toEl.value = ymd(selectedDates[1]);
+                    filterForm.submit();
+                }
             }
         });
-    }
-
-    if(toggleDate) {
-        toggleDate.addEventListener('click', () => {
-            if(preset) preset.value = 'custom';
-            if(fp) fp.open();
-        });
-    }
-
-    if(preset) {
-        preset.addEventListener('change', () => { applyPreset(preset.value); });
-        const now = new Date();
-        const endStr = ymd(now);
-        if(toEl.value === endStr) {
-            const dStart = new Date(fromEl.value);
-            const diffDays = Math.round((now - dStart) / (1000 * 60 * 60 * 24)) + 1;
-            if([7,14,30].includes(diffDays)) preset.value = diffDays.toString();
-            else preset.value = 'custom';
-        } else {
-            preset.value = 'custom';
-        }
     }
 });
 </script>
@@ -260,19 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="filter-item" style="flex: 2;">
             <label>Periode Data</label>
             <div class="period-bar">
-                <select class="range-pill" id="presetRange" style="appearance: none; padding-right: 2rem; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748b%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right .7rem top 50%; background-size: .65rem auto;">
-                    <option value="7">7 Hari Sebelumnya</option>
-                    <option value="14">14 Hari Sebelumnya</option>
-                    <option value="30">30 Hari Sebelumnya</option>
-                    <option value="custom">Pilih Tanggal...</option>
-                </select>
-                <button type="button" class="range-pill" id="toggleDate">
-                    <span class="range-text" id="rangeText">-</span>
-                    <span class="range-meta">
-                        <span class="tz">(GMT+07)</span>
-                        <span class="ico">📅</span>
-                    </span>
-                </button>
+                <input type="text" id="rangePicker" class="range-pill" style="width: 260px; text-align: center; cursor: pointer; background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 650; font-size: .85rem;" placeholder="Pilih Rentang Tanggal..." readonly>
                 <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}">
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}">
             </div>
@@ -675,7 +598,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         borderWidth: 2,
                         tension: 0.3,
-                        pointRadius: 2,
+                        pointRadius: hourlyData.length <= 1 ? 5 : 2,
                         yAxisID: 'y1'
                     }
                 ]
