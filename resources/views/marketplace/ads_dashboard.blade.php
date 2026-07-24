@@ -434,8 +434,33 @@ document.addEventListener('DOMContentLoaded', function () {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const dailyData = @json($dailyChartData);
-    const hourlyData = @json($heatmapData ?? []);
+    const rawDaily = @json($dailyChartData ?? []);
+    const rawHourly = @json($heatmapData ?? []);
+    
+    // Pad Daily Data to show full range
+    const dailyData = [];
+    const fromEl = document.getElementById('fromHidden');
+    const toEl = document.getElementById('toHidden');
+    if (fromEl && toEl && fromEl.value && toEl.value) {
+        // use ymd function defined earlier or create inline logic
+        function ymdLocal(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+        const dStart = new Date(fromEl.value);
+        const dEnd = new Date(toEl.value);
+        for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+            let ds = ymdLocal(d);
+            let found = rawDaily.find(item => item.date === ds);
+            dailyData.push(found ? found : { date: ds, spend: 0, gmv: 0, roas: 0 });
+        }
+    } else {
+        dailyData.push(...rawDaily);
+    }
+
+    // Pad Hourly Data to show full 24 hours
+    const hourlyData = [];
+    for (let i = 0; i < 24; i++) {
+        let found = rawHourly.find(d => parseInt(d.performance_hour) === i);
+        hourlyData.push(found ? found : { performance_hour: i, clicks: 0, orders: 0, expense: 0, gmv: 0 });
+    }
     
     // Theme & UX Colors
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
