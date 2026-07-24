@@ -1440,55 +1440,71 @@ document.addEventListener("DOMContentLoaded", function() {
                         
                         let firstHalfGmv = firstHalf.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
                         let secondHalfGmv = secondHalf.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+
+                        // ==========================================
+                        // 1. COMPUTE TRAFFIC & FUNNEL METRICS FIRST
+                        // ==========================================
+                        let maxImpressionsDay = activeDays.reduce((max, d) => (parseInt(d.impressions) > parseInt(max.impressions) ? d : max), activeDays[0]);
+                        let maxClicksDay = activeDays.reduce((max, d) => (parseInt(d.clicks) > parseInt(max.clicks) ? d : max), activeDays[0]);
                         
+                        let impCtr = parseInt(maxImpressionsDay.impressions) > 0 ? (parseInt(maxImpressionsDay.clicks) / parseInt(maxImpressionsDay.impressions) * 100) : 0;
+                        let clkCvr = parseInt(maxClicksDay.clicks) > 0 ? (parseInt(maxClicksDay.orders) / parseInt(maxClicksDay.clicks) * 100) : 0;
+                        
+                        let isImpressionLeak = (parseInt(maxImpressionsDay.impressions) > 1000 && impCtr < 1.0);
+                        let isBounceAnomaly = (parseInt(maxClicksDay.clicks) > 50 && clkCvr < 0.5);
+
+                        // ==========================================
+                        // 2. BUILD FINANCIAL NARRATIVE (WITH CROSS-REFERENCE)
+                        // ==========================================
                         let trendHtml = '';
-                        let trendIcon = '';
                         let trendColor = '';
                         
                         if (isVolatile) {
+                            let cause = isBounceAnomaly ? "Akar masalah ada di <b>Trafik (Anomali Bounce Rate)</b>, banyak klik bodong yang merusak rasio konversi." : "Algoritma GMV Max sedang kebingungan mencari audiens yang tepat.";
                             trendHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🎢 Deteksi Volatilitas ROAS</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Penyimpangan baku (StdDev) sangat tinggi. Hari terbaik (<b>${formatIndoDate(bestDay)}</b>, ROAS <b>${maxRoas.toFixed(1)}x</b>) vs terburuk (<b>${formatIndoDate(worstDay)}</b>, ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Hentikan perubahan pengaturan/budget GMV Max agar fase pembelajaran mesin stabil.</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Performa sangat tidak stabil (ROAS terbaik <b>${maxRoas.toFixed(1)}x</b> vs terburuk <b>${minRoas.toFixed(1)}x</b>). 🔗 <b>Korelasi AI:</b> ${cause} 💡 <b>Saran:</b> Hentikan perubahan budget/target ROAS agar mesin stabil.</div>`;
                             trendColor = '#dc2626';
                         } else if (secondHalfGmv > firstHalfGmv * 1.2) {
+                            let cause = (impCtr >= 1.0 && clkCvr >= 0.5) ? "Kenaikan ini didukung penuh oleh <b>Distribusi Funnel Trafik yang sangat sehat</b> (cek grafik di bawah)." : "Mesin mulai panas meskipun metrik klik belum sempurna.";
                             trendHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.8rem; margin-bottom: 0.2rem;">📈 Momentum Algoritma (Uptrend)</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 melampaui Paruh-1. Algoritma optimal pada <b>${formatIndoDate(bestDay)}</b> (ROAS <b>${maxRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Biarkan mesin *running*. Jangan ubah Target ROAS saat ini.</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 melampaui Paruh-1. Algoritma optimal pada <b>${formatIndoDate(bestDay)}</b>. 🔗 <b>Korelasi AI:</b> ${cause} 💡 <b>Saran:</b> Jangan ubah Target ROAS saat ini.</div>`;
                             trendColor = '#16a34a';
                         } else if (secondHalfGmv < firstHalfGmv * 0.8) {
+                            let cause = isImpressionLeak ? "Penyebab utamanya terlihat di <b>Trafik (Kebocoran Impresi Ekstrem)</b>; iklan tayang tapi orang malas klik." : "Trafik melemah, kemungkinan karena kalah bersaing harga dengan kompetitor.";
                             trendHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.8rem; margin-bottom: 0.2rem;">📉 Peringatan Downtrend</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 merosot. Puncak penurunan di <b>${formatIndoDate(worstDay)}</b> (ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Cek *Traffic Funnel* di bawah. Jika trafik turun, masalah ada di kompetisi harga/posisi.</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV merosot perlahan (puncak anjlok di <b>${formatIndoDate(worstDay)}</b>). 🔗 <b>Korelasi AI:</b> ${cause} 💡 <b>Saran:</b> Segera evaluasi harga atau perbarui foto produk di GMV Max.</div>`;
                             trendColor = '#f59e0b';
                         } else {
                             trendHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.8rem; margin-bottom: 0.2rem;">🛥️ Konvergensi Stabil</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Rata-rata ROAS harian stabil di <b>${avgTrendRoas.toFixed(1)}x</b>. 💡 <b>Saran Teknis:</b> Sistem GMV Max telah konvergen. Untuk skalasi, *tweak* Target ROAS perlahan (Max 5% per hari).</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">ROAS harian sangat stabil di <b>${avgTrendRoas.toFixed(1)}x</b>. 🔗 <b>Korelasi AI:</b> Trafik dan konversi berjalan selaras tanpa lonjakan aneh. 💡 <b>Saran:</b> Sistem GMV Max telah konvergen. Anda bisa naikkan Target ROAS 5% per hari.</div>`;
                             trendColor = '#3b82f6';
                         }
                         
                         insightDailyEl.innerHTML = trendHtml;
                         insightDailyEl.style.borderLeftColor = trendColor;
                         
-                        // --- AI TRAFFIC FUNNEL INSIGHTS ---
+                        // ==========================================
+                        // 3. BUILD TRAFFIC NARRATIVE (WITH CROSS-REFERENCE)
+                        // ==========================================
                         const insightTrafficDailyEl = document.getElementById('insightDailyTraffic');
                         if (insightTrafficDailyEl) {
-                            let maxImpressionsDay = activeDays.reduce((max, d) => (parseInt(d.impressions) > parseInt(max.impressions) ? d : max), activeDays[0]);
-                            let maxClicksDay = activeDays.reduce((max, d) => (parseInt(d.clicks) > parseInt(max.clicks) ? d : max), activeDays[0]);
-                            
-                            let impCtr = parseInt(maxImpressionsDay.impressions) > 0 ? (parseInt(maxImpressionsDay.clicks) / parseInt(maxImpressionsDay.impressions) * 100) : 0;
-                            let clkCvr = parseInt(maxClicksDay.clicks) > 0 ? (parseInt(maxClicksDay.orders) / parseInt(maxClicksDay.clicks) * 100) : 0;
-                            
                             let tfHtml = '';
                             let tfColor = '';
                             
-                            if (parseInt(maxImpressionsDay.impressions) > 1000 && impCtr < 1.0) {
+                            if (isImpressionLeak) {
+                                let impact = (secondHalfGmv < firstHalfGmv * 0.8) ? "Sistem akhirnya menghukum Anda dengan <b>Downtrend Finansial</b> di grafik atas." : "Hati-hati, lambat laun ini akan menyeret ROAS Anda ke bawah.";
                                 tfHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🚨 Kebocoran Impresi Ekstrem</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxImpressionsDay.date)}</b>, iklan mendapat <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> impresi tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 💡 <b>Saran Teknis:</b> Iklan tayang tapi tidak diklik. Ini merusak *Quality Score*. Cek harga/thumbnail segera.</div>`;
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxImpressionsDay.date)}</b>, ada <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> impresi tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 🔗 <b>Dampak Finansial:</b> ${impact} 💡 <b>Saran:</b> Iklan tayang tapi diabaikan. Cek harga/thumbnail segera!</div>`;
                                 tfColor = '#dc2626';
-                            } else if (parseInt(maxClicksDay.clicks) > 50 && clkCvr < 0.5) {
-                                tfHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.8rem; margin-bottom: 0.2rem;">⚠️ Anomali *Bounce Rate*</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxClicksDay.date)}</b>, terjadi lonjakan <b>${parseInt(maxClicksDay.clicks).toLocaleString('id-ID')}</b> klik, tapi nyaris 0 pesanan (CVR <b>${clkCvr.toFixed(2)}%</b>). 💡 <b>Saran Teknis:</b> Cek log kompetitor di hari tersebut (apakah mereka sedang *Flash Sale*?) atau cek ketersediaan stok Anda.</div>`;
+                            } else if (isBounceAnomaly) {
+                                let impact = isVolatile ? "Inilah alasan mengapa grafik <b>Finansial Anda sangat fluktuatif (Volatile)</b>." : "Budget Anda habis dimakan klik tanpa omzet.";
+                                tfHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.8rem; margin-bottom: 0.2rem;">⚠️ Anomali *Bounce Rate* (Klik Bodong)</div>
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxClicksDay.date)}</b>, terjadi <b>${parseInt(maxClicksDay.clicks).toLocaleString('id-ID')}</b> klik, tapi nyaris 0 pesanan (CVR <b>${clkCvr.toFixed(2)}%</b>). 🔗 <b>Dampak Finansial:</b> ${impact} 💡 <b>Saran:</b> Cek log kompetitor (apakah Flash Sale?) atau ketersediaan stok Anda.</div>`;
                                 tfColor = '#eab308';
                             } else {
+                                let impact = (secondHalfGmv > firstHalfGmv * 1.2) ? "Kondisi sehat ini mendorong <b>Momentum Algoritma (Uptrend)</b> pada grafik finansial Anda." : "Finansial Anda terlindungi dari kebocoran yang tidak perlu.";
                                 tfHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.8rem; margin-bottom: 0.2rem;">✅ Distribusi *Funnel* Sehat</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Tidak terdeteksi kebocoran parah pada puncak trafik (<b>${formatIndoDate(maxImpressionsDay.date)}</b>). Konversi ke pesanan mengalir normal.</div>`;
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Tidak ada kebocoran parah pada puncak trafik (<b>${formatIndoDate(maxImpressionsDay.date)}</b>). Konversi ke pesanan mengalir normal. 🔗 <b>Dampak Finansial:</b> ${impact}</div>`;
                                 tfColor = '#16a34a';
                             }
                             insightTrafficDailyEl.innerHTML = tfHtml;
