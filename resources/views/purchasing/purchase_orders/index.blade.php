@@ -141,6 +141,7 @@
                     </a>
                 </th>
             @endif
+            <th style="width: 120px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status PO</th>
             <th style="width: 150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Status Pembayaran</th>
             <th style="width: 90px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
         </tr>
@@ -249,6 +250,17 @@
                     <span class="fw-semibold mono">Rp {{ number_format($order->grand_total, 0, ',', '.') }}</span>
                 </td>
             @endif
+
+            <td class="mobile-hide">
+                @php
+                    $poBadgeStyle = match ($uiStatus) {
+                        'approved' => 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.2);',
+                        'cancelled' => 'background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);',
+                        default => 'background: rgba(100, 116, 139, 0.1); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2);',
+                    };
+                @endphp
+                <span class="badge py-1 px-2" style="font-weight: 600; font-size: .75rem; border-radius: 6px; {{ $poBadgeStyle }}">{{ $statusLabel }}</span>
+            </td>
 
             <td class="mobile-hide">
                 @if ($canSeeMoney)

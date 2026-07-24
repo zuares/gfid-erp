@@ -200,7 +200,11 @@
     @endif
     
     @if ($canSeeMoney && $canPay && $hasAp)
-         <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="Bayar PO"><i class="bi bi-cash-coin d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Bayar PO</span></button>
+        @if ($apOutstanding > 0.01)
+             <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="Bayar PO"><i class="bi bi-cash-coin d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Bayar PO</span></button>
+        @else
+             <button type="button" class="po-btn po-success" disabled style="opacity: 0.6; cursor: not-allowed;" title="PO Sudah Lunas"><i class="bi bi-check-circle d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Sudah Lunas</span></button>
+        @endif
     @endif
     
     {{-- Terima (buat GRN) --}}
