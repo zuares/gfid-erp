@@ -358,7 +358,7 @@ document.addEventListener('DOMContentLoaded', function () {
             @if(isset($syncRuns) && $syncRuns->isNotEmpty())
                 @php
                     $latestRun = $syncRuns->first();
-                    $lastSuccess = $syncRuns->firstWhere('status', 'success');
+                    $lastSuccess = $lastSuccessRun ?? null;
                 @endphp
                 @if($latestRun->status === 'error')
                     <div style="font-size: 0.7rem; color: #dc2626; text-align: right; margin-bottom: 0.25rem; font-weight: 600;">

@@ -268,8 +268,8 @@ class ShopeeAdsSyncService
         if (empty($campaigns)) return;
         
         $chunks = array_chunk($campaigns, 100);
-        $dFrom = Carbon::parse($dateFrom)->format('Y-m-d');
-        $dTo = Carbon::parse($dateTo)->format('Y-m-d');
+        $dFrom = Carbon::parse($dateFrom)->format('d-m-Y');
+        $dTo = Carbon::parse($dateTo)->format('d-m-Y');
         
         foreach ($chunks as $chunk) {
             usleep(250000); // Rate limiter

@@ -91,6 +91,11 @@ class AdsDashboardController extends Controller
             ->orderByDesc('id')
             ->limit(10)
             ->get();
+            
+        $lastSuccessRun = MarketplaceAdsSyncRun::where('store_id', $storeId)
+            ->where('status', 'success')
+            ->latest('id')
+            ->first();
 
         $heatmapData = $analytics->getHourlyHeatmap($storeId, $dateFrom, $dateTo);
         $historicalData = $analytics->getHistoricalComparison($storeId, $dateFrom, $dateTo, 3);
@@ -119,7 +124,7 @@ class AdsDashboardController extends Controller
             ->get();
 
         return view('marketplace.ads_dashboard', compact(
-            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData', 'itemPerformance'
+            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData', 'itemPerformance', 'lastSuccessRun'
         ));
     }
 
