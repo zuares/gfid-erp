@@ -78,6 +78,11 @@ Schedule::command('marketplace:sync-settlements')
     ->everyFourHours()
     ->withoutOverlapping();
 
+// Finance: sync order → settlement → COGS setiap 4 jam (profit per order)
+Schedule::command('marketplace:sync-finance --months=1')
+    ->everyFourHours()
+    ->withoutOverlapping();
+
 Schedule::command('marketplace:sync-chats')
     ->everyMinute()
     ->withoutOverlapping();

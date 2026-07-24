@@ -373,10 +373,6 @@ if (app()->environment(['local', 'testing'])) {
 // API endpoint for tracking
 Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'store'])->name('activity-logs.store')->middleware('auth')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::post('/api/marketplace/sync-finance-all', function () {
-    if (app()->environment('local') && function_exists('exec') && false === stripos(ini_get('disable_functions'), 'exec')) {
-        $artisan = base_path('artisan');
-    // Production: bypass batasan disable_functions exec dengan dispatch ke queue worker (menggunakan Job khusus agar tidak timeout)
-        \App\Jobs\SyncFinanceJob::dispatch();
-    }
+    \App\Jobs\SyncFinanceJob::dispatch();
     return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
