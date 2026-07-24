@@ -23,7 +23,8 @@ class MarketplaceLogisticsController extends Controller
             $order = MarketplaceOrder::where('store_id', $store->id)
                 ->where(function ($q) use ($orderSn) {
                     $q->where('channel_order_id', $orderSn)
-                      ->orWhere('external_order_id', $orderSn);
+                      ->orWhere('external_order_id', $orderSn)
+                      ->orWhere('booking_sn', $orderSn);
                 })
                 ->first();
 
@@ -32,8 +33,11 @@ class MarketplaceLogisticsController extends Controller
             }
 
             $awb = null;
-            if (method_exists($driver, 'getTrackingNumber')) {
-                $trackingResp = $driver->getTrackingNumber($store, $orderSn);
+            if (!empty($order->booking_sn) && method_exists($driver, 'getBookingTrackingNumber')) {
+                $trackingResp = $driver->getBookingTrackingNumber($store, $order->booking_sn);
+                $awb = $trackingResp['response']['tracking_number'] ?? null;
+            } elseif (method_exists($driver, 'getTrackingNumber')) {
+                $trackingResp = $driver->getTrackingNumber($store, $order->channel_order_id);
                 $awb = $trackingResp['response']['tracking_number'] ?? null;
             }
             if (!$awb && method_exists($driver, 'getOrderDetail')) {
