@@ -506,11 +506,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + parseFloat(d.expense || 0), 0);
-    let totalHourlyClicks = hourlyData.reduce((sum, d) => sum + parseInt(d.clicks || 0), 0);
     let totalHourlyOrders = hourlyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let hsEl = document.getElementById('hourlySummary');
     if(hsEl) {
-        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#8b5cf6">${totalHourlyClicks} Klik</span> &bull; <span style="color:#10b981">${totalHourlyOrders} Pesanan</span>`;
+        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">${totalHourlyOrders} Pesanan</span>`;
     }
 
     // Helper: Format Full Rupiah untuk Tooltip
@@ -651,18 +650,6 @@ document.addEventListener("DOMContentLoaded", function() {
                         pointRadius: hourlyData.length <= 1 ? 5 : 0,
                         pointHoverRadius: 5,
                         yAxisID: 'y'
-                    },
-                    {
-                        label: 'Klik',
-                        data: hourlyData.map(d => parseInt(d.clicks || 0)),
-                        borderColor: '#8b5cf6',
-                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: hourlyData.length <= 1 ? 5 : 0,
-                        pointHoverRadius: 5,
-                        yAxisID: 'y1'
                     },
                     {
                         label: 'Konversi (Pesanan)',
