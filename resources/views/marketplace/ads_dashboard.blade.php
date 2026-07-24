@@ -165,7 +165,9 @@ document.addEventListener('DOMContentLoaded', function () {
         fp = flatpickr(fpInput, {
             mode: 'range',
             locale: 'id',
-            showMonths: window.innerWidth > 768 ? 2 : 1,
+            showMonths: 1,
+            positionElement: toggleDate,
+            position: 'auto right',
             defaultDate: [fromEl.value, toEl.value],
             onChange: function(selectedDates, dateStr, instance) {
                 if(selectedDates.length < 2) return;
