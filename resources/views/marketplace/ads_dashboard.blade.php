@@ -1,419 +1,458 @@
 @extends('layouts.app')
 
-@section('content')
+@section('title', 'Analisis Iklan Shopee')
+
+@push('head')
 <style>
-    /* Premium UI/UX Customizations */
-    .ads-dashboard {
-        font-family: 'Inter', 'Roboto', sans-serif;
-        background: #f8f9fc;
-    }
-    
-    .premium-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
-        border: none;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .premium-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-    }
-    
-    .gradient-header {
-        background: linear-gradient(135deg, #f68048 0%, #ee4d2d 100%);
-        color: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.2);
-    }
+/* ─────────────────────────────────────────────────────────────────────────────
+   LAYOUT
+───────────────────────────────────────────────────────────────────────────── */
+.page-wrap {
+    max-width: 1080px;
+    margin-inline: auto;
+    padding-bottom: 3rem;
+}
 
-    .kpi-title {
-        font-size: 0.8rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #858796;
-    }
+/* ─────────────────────────────────────────────────────────────────────────────
+   KPI STRIP  (6 kolom → 3 di mobile)
+───────────────────────────────────────────────────────────────────────────── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: .6rem;
+    margin-bottom: .85rem;
+}
+.kpi-cell {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: .72rem .82rem;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+}
+.kpi-label {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-weight: 800;
+    margin-bottom: .18rem;
+}
+.kpi-value {
+    font-size: .95rem;
+    font-weight: 850;
+    line-height: 1.2;
+    color: var(--text);
+}
+.kpi-sub {
+    font-size: .72rem;
+    margin-top: .15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.kpi-sub.text-success { color: var(--success) !important; }
+.kpi-sub.text-danger { color: var(--danger) !important; }
 
-    .kpi-value {
-        font-size: 1.5rem;
-        font-weight: 800;
-        color: #2c3e50;
-    }
-    
-    .kpi-icon {
-        font-size: 2rem;
-        opacity: 0.1;
-        position: absolute;
-        right: 20px;
-        top: 20px;
-        color: #ee4d2d;
-    }
+/* ─────────────────────────────────────────────────────────────────────────────
+   FILTER CARD
+───────────────────────────────────────────────────────────────────────────── */
+.card-filter {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    padding: .8rem .9rem;
+    margin-bottom: .85rem;
+}
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: end;
+}
 
-    /* Custom Modern Tabs */
-    .nav-pills-custom .nav-link {
-        color: #6c757d;
-        background: #fff;
-        border-radius: 50rem;
-        padding: 0.6rem 1.5rem;
-        font-weight: 600;
-        border: 1px solid #e3e6f0;
-        margin-right: 0.5rem;
-        transition: all 0.3s ease;
-    }
-    
-    .nav-pills-custom .nav-link:hover {
-        background: #f1f3f9;
-    }
-    
-    .nav-pills-custom .nav-link.active {
-        color: #fff;
-        background: #ee4d2d;
-        border-color: #ee4d2d;
-        box-shadow: 0 4px 10px rgba(238, 77, 45, 0.3);
-    }
+/* ─────────────────────────────────────────────────────────────────────────────
+   TABS
+───────────────────────────────────────────────────────────────────────────── */
+.gf-tabs {
+    display: flex;
+    gap: 1rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1rem;
+}
+.gf-tab {
+    background: transparent;
+    border: none;
+    padding: .5rem 0;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.gf-tab:hover {
+    color: var(--text);
+}
+.gf-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+.tab-pane {
+    display: none;
+}
+.tab-pane.active {
+    display: block;
+}
 
-    /* Table Improvements */
-    .table-modern {
-        border-collapse: separate;
-        border-spacing: 0 10px;
-    }
-    
-    .table-modern thead th {
-        border: none;
-        background: transparent;
-        color: #a0a5b1;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 1px;
-    }
-    
-    .table-modern tbody tr {
-        background: #fff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-        border-radius: 8px;
-        transition: transform 0.2s ease;
-    }
-    
-    .table-modern tbody tr:hover {
-        transform: scale(1.01);
-    }
-    
-    .table-modern tbody td {
-        border: none;
-        padding: 1rem;
-        vertical-align: middle;
-    }
-    
-    .table-modern tbody td:first-child {
-        border-top-left-radius: 8px;
-        border-bottom-left-radius: 8px;
-    }
-    
-    .table-modern tbody td:last-child {
-        border-top-right-radius: 8px;
-        border-bottom-right-radius: 8px;
-    }
+/* ─────────────────────────────────────────────────────────────────────────────
+   TABLE CARD
+───────────────────────────────────────────────────────────────────────────── */
+.card-table {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0;
+}
+.table thead th {
+    background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
+    border-bottom: 1px solid var(--line);
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    white-space: nowrap;
+    padding: .52rem .65rem;
+    text-align: left;
+}
+.table tbody td {
+    vertical-align: middle;
+    font-size: .83rem;
+    padding: .58rem .65rem;
+    border-bottom: 1px solid var(--line);
+    color: var(--text);
+}
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr:hover { background: rgba(59,130,246,.04); }
 
-    .status-badge {
-        padding: 0.4rem 0.8rem;
-        border-radius: 50rem;
-        font-weight: 600;
-        font-size: 0.75rem;
-    }
-    
-    .status-ongoing { background: rgba(28, 200, 138, 0.1); color: #1cc88a; }
-    .status-ended { background: rgba(133, 135, 150, 0.1); color: #858796; }
-    .status-rate-limited { background: rgba(246, 194, 62, 0.1); color: #f6c23e; }
-    .status-error { background: rgba(231, 74, 59, 0.1); color: #e74a3b; }
-    .status-success { background: rgba(28, 200, 138, 0.1); color: #1cc88a; }
+/* ─────────────────────────────────────────────────────────────────────────────
+   BADGES
+───────────────────────────────────────────────────────────────────────────── */
+.badge-status {
+    border-radius: 999px;
+    font-size: .7rem;
+    padding: .1rem .6rem;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    display: inline-block;
+    font-weight: 600;
+}
+.badge-ongoing { background:rgba(22,163,74,.12);   color:#15803d; border-color:rgba(22,163,74,.6); }
+.badge-ended { background:rgba(148,163,184,.12); color:#64748b; border-color:rgba(148,163,184,.5); }
+.badge-warning { background:rgba(234,179,8,.10);   color:#a16207; border-color:rgba(234,179,8,.55); }
+.badge-danger { background:rgba(220,38,38,.08);   color:#b91c1c; border-color:rgba(220,38,38,.6); }
+
+body[data-theme="dark"] .badge-ongoing { color: var(--success); border-color: var(--success); }
+body[data-theme="dark"] .badge-ended { color: var(--muted); border-color: var(--muted); }
+body[data-theme="dark"] .badge-warning { color: #facc15; border-color: #facc15; }
+body[data-theme="dark"] .badge-danger { color: var(--danger); border-color: var(--danger); }
+
+/* Typography */
+.mono {
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
+}
+
+@media (max-width: 767.98px) {
+    .page-wrap   { padding-inline: .75rem; }
+    .card-filter { padding: .75rem .8rem; }
+    .kpi-grid    { grid-template-columns: repeat(3, minmax(0,1fr)); gap:.5rem; }
+    .filter-row  { flex-direction: column; align-items: stretch; }
+    .filter-row > div { width: 100%; }
+}
 </style>
+@endpush
 
-<div class="container-fluid py-4 ads-dashboard">
-    
-    <!-- Title & Filter -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="gradient-header d-flex justify-content-between align-items-center flex-wrap">
-                <div>
-                    <h1 class="h3 mb-1 text-white font-weight-bold">Analisis Iklan Shopee</h1>
-                    <p class="mb-0 text-white-50">Pantau performa, ROAS, dan kendalikan data iklan toko Anda.</p>
-                </div>
-            </div>
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Custom Tab Logic
+    const tabBtns = document.querySelectorAll('.gf-tab');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active classes
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+
+            // Add active class to clicked tab and corresponding pane
+            btn.classList.add('active');
+            const targetId = btn.getAttribute('data-target');
+            document.getElementById(targetId).classList.add('active');
+
+            // Trigger window resize to fix chart canvas scaling
+            window.dispatchEvent(new Event('resize'));
+        });
+    });
+});
+</script>
+@endpush
+
+@section('content')
+<div class="page-wrap py-3">
+
+    {{-- ── HEADER ──────────────────────────────────────────────────────────── --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-0 fw-bold" style="color: var(--text);">Analisis Iklan Shopee</h1>
+            <p class="mb-0" style="font-size: .8rem; color: var(--muted);">Pantau performa dan ROAS iklan toko Anda.</p>
         </div>
     </div>
 
     @if(session('error'))
-        <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4"><i class="fas fa-exclamation-circle me-2"></i> {{ session('error') }}</div>
+        <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-3 p-2" style="font-size: .85rem;"><i class="fas fa-exclamation-circle me-1"></i> {{ session('error') }}</div>
     @endif
     @if(session('success'))
-        <div class="alert alert-success shadow-sm border-0 rounded-3 mb-4"><i class="fas fa-check-circle me-2"></i> {{ session('success') }}</div>
+        <div class="alert alert-success shadow-sm border-0 rounded-3 mb-3 p-2" style="font-size: .85rem;"><i class="fas fa-check-circle me-1"></i> {{ session('success') }}</div>
     @endif
 
-    <div class="premium-card p-4 mb-4">
-        <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="row align-items-end g-3">
-            <div class="col-md-4">
-                <label class="form-label text-muted fw-bold small">Toko Shopee</label>
-                <select name="store_id" class="form-select border-0 bg-light" style="border-radius: 8px;" onchange="this.form.submit()">
+    {{-- ── FILTER ──────────────────────────────────────────────────────────── --}}
+    <div class="card-filter">
+        <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="filter-row">
+            <div style="flex: 1; min-width: 200px;">
+                <label class="kpi-label">Toko Shopee</label>
+                <select name="store_id" class="form-select form-select-sm" style="background-color: var(--bg); color: var(--text); border-color: var(--line);" onchange="this.form.submit()">
                     @foreach($stores as $s)
                         <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-3">
-                <label class="form-label text-muted fw-bold small">Dari Tanggal</label>
-                <input type="date" name="date_from" class="form-control border-0 bg-light" style="border-radius: 8px;" value="{{ $dateFrom }}">
+            <div style="flex: 1; min-width: 150px;">
+                <label class="kpi-label">Dari Tanggal</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" style="background-color: var(--bg); color: var(--text); border-color: var(--line);" value="{{ $dateFrom }}">
             </div>
-            <div class="col-md-3">
-                <label class="form-label text-muted fw-bold small">Sampai Tanggal</label>
-                <input type="date" name="date_to" class="form-control border-0 bg-light" style="border-radius: 8px;" value="{{ $dateTo }}">
+            <div style="flex: 1; min-width: 150px;">
+                <label class="kpi-label">Sampai Tanggal</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" style="background-color: var(--bg); color: var(--text); border-color: var(--line);" value="{{ $dateTo }}">
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn text-white w-100" style="background: #ee4d2d; border-radius: 8px;">
-                    <i class="fas fa-filter me-1"></i> Terapkan
+            <div>
+                <button type="submit" class="btn btn-primary btn-sm h-100 px-3">
+                    <i class="fas fa-filter"></i> Terapkan
                 </button>
             </div>
         </form>
     </div>
 
     @if(empty($storeId))
-        <div class="alert alert-info border-0 shadow-sm rounded-3">Pilih toko terlebih dahulu untuk melihat analisis.</div>
+        <div class="card-filter" style="text-align: center; color: var(--muted); padding: 2rem;">
+            Pilih toko terlebih dahulu untuk melihat analisis.
+        </div>
     @else
-        <!-- Custom Tabs -->
-        <ul class="nav nav-pills nav-pills-custom mb-4" id="adsTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">
-                    <i class="fas fa-chart-pie me-1"></i> Ringkasan
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="campaigns-tab" data-bs-toggle="pill" data-bs-target="#campaigns" type="button" role="tab" aria-controls="campaigns" aria-selected="false">
-                    <i class="fas fa-bullhorn me-1"></i> Kampanye
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="settings-tab" data-bs-toggle="pill" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">
-                    <i class="fas fa-cog me-1"></i> Pengaturan & Riwayat
-                </button>
-            </li>
-        </ul>
+        {{-- ── TABS NAV ──────────────────────────────────────────────────────────── --}}
+        <div class="gf-tabs">
+            <button class="gf-tab active" data-target="tab-overview"><i class="fas fa-chart-pie me-1"></i> Ringkasan</button>
+            <button class="gf-tab" data-target="tab-campaigns"><i class="fas fa-bullhorn me-1"></i> Kampanye</button>
+            <button class="gf-tab" data-target="tab-settings"><i class="fas fa-cog me-1"></i> Pengaturan & Riwayat</button>
+        </div>
 
-        <div class="tab-content" id="adsTabContent">
-            
-            <!-- TAB: OVERVIEW -->
-            <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
-                <!-- KPI Cards -->
-                <div class="row mb-2">
+        {{-- ── TABS CONTENT ──────────────────────────────────────────────────────────── --}}
+        
+        <!-- TAB: OVERVIEW -->
+        <div class="tab-pane active" id="tab-overview">
+            <!-- KPI STRIP -->
+            <div class="kpi-grid">
+                @php
+                    $metrics = [
+                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => ''],
+                        ['title' => 'GMV Iklan', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => ''],
+                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x'],
+                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => ''],
+                        ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => ''],
+                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => ''],
+                    ];
+                @endphp
+                @foreach($metrics as $m)
                     @php
-                        $metrics = [
-                            ['title' => 'Biaya Iklan (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'icon' => 'fa-wallet'],
-                            ['title' => 'GMV Iklan', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'icon' => 'fa-shopping-bag'],
-                            ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'icon' => 'fa-rocket'],
-                            ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'icon' => 'fa-box-open'],
-                            ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'icon' => 'fa-eye'],
-                            ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'icon' => 'fa-mouse-pointer'],
-                        ];
+                        $val = $kpi['current']->{$m['key']} ?? 0;
+                        if($m['key'] === 'roas' && isset($kpi['current']->spend) && $kpi['current']->spend > 0) {
+                            $val = round($kpi['current']->gmv / $kpi['current']->spend, 2);
+                        }
+                        $change = $kpi['changes'][$m['key']] ?? 0;
+                        $isUp = $change >= 0;
+                        $color = $isUp ? 'text-success' : 'text-danger';
                     @endphp
-                    
-                    @foreach($metrics as $m)
-                        @php
-                            $val = $kpi['current']->{$m['key']} ?? 0;
-                            if($m['key'] === 'roas' && isset($kpi['current']->spend) && $kpi['current']->spend > 0) {
-                                $val = round($kpi['current']->gmv / $kpi['current']->spend, 2);
-                            }
-                            $change = $kpi['changes'][$m['key']] ?? 0;
-                            $isUp = $change >= 0;
-                            $color = $isUp ? 'text-success' : 'text-danger';
-                        @endphp
-                        <div class="col-xl-4 col-md-6 mb-4">
-                            <div class="premium-card h-100 p-4 position-relative overflow-hidden">
-                                <i class="fas {{ $m['icon'] }} kpi-icon"></i>
-                                <div class="kpi-title mb-1">{{ $m['title'] }}</div>
-                                <div class="kpi-value mb-2">
-                                    {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
-                                </div>
-                                <div class="text-xs {{ $color }} fw-bold">
-                                    <i class="fas fa-arrow-{{ $isUp ? 'up' : 'down' }}"></i> {{ abs($change) }}% vs lalu
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-
-                <!-- Charts -->
-                <div class="row">
-                    <div class="col-xl-8 col-lg-7 mb-4">
-                        <div class="premium-card h-100 p-4">
-                            <h6 class="font-weight-bold text-dark mb-4">Tren Performa Harian</h6>
-                            <div class="chart-area" style="height: 320px;">
-                                <canvas id="dailyChart"></canvas>
-                            </div>
+                    <div class="kpi-cell">
+                        <div class="kpi-label">{{ $m['title'] }}</div>
+                        <div class="kpi-value mono">{{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}</div>
+                        <div class="kpi-sub {{ $color }} fw-bold">
+                            <i class="fas fa-arrow-{{ $isUp ? 'up' : 'down' }}"></i> {{ abs($change) }}% vs lalu
                         </div>
                     </div>
-                    <div class="col-xl-4 col-lg-5 mb-4">
-                        <div class="premium-card h-100 p-4">
-                            <h6 class="font-weight-bold text-dark mb-4">Distribusi Per Jam</h6>
-                            <div class="chart-pie" style="height: 320px;">
-                                <canvas id="hourlyChart"></canvas>
-                            </div>
+                @endforeach
+            </div>
+
+            <!-- CHARTS -->
+            <div class="row g-3 mb-3">
+                <div class="col-lg-8">
+                    <div class="card-table p-3 h-100">
+                        <div class="kpi-label mb-3">Tren Performa Harian</div>
+                        <div style="height: 280px;">
+                            <canvas id="dailyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card-table p-3 h-100">
+                        <div class="kpi-label mb-3">Distribusi Klik Per Jam</div>
+                        <div style="height: 280px;">
+                            <canvas id="hourlyChart"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- TAB: CAMPAIGNS -->
-            <div class="tab-pane fade" id="campaigns" role="tabpanel" aria-labelledby="campaigns-tab">
-                <div class="premium-card p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h6 class="font-weight-bold text-dark m-0">Daftar Kampanye Aktif & Historis</h6>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-modern w-100">
-                            <thead>
+        <!-- TAB: CAMPAIGNS -->
+        <div class="tab-pane" id="tab-campaigns">
+            <div class="card-table">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Kampanye</th>
+                                <th>Tipe</th>
+                                <th>Status</th>
+                                <th class="text-end">Biaya</th>
+                                <th class="text-end">GMV</th>
+                                <th class="text-center">ROAS</th>
+                                <th class="text-end">ACOS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($campaigns as $camp)
                                 <tr>
-                                    <th>Kampanye</th>
-                                    <th>Tipe</th>
-                                    <th>Status</th>
-                                    <th>Biaya (Spend)</th>
-                                    <th>GMV</th>
-                                    <th>ROAS</th>
-                                    <th>Target ROAS</th>
-                                    <th>ACOS</th>
+                                    <td>
+                                        <div class="fw-bold" style="color: var(--text);">{{ $camp->campaign_name }}</div>
+                                        <div class="mono" style="font-size: .7rem; color: var(--muted);">ID: {{ $camp->channel_campaign_id }}</div>
+                                    </td>
+                                    <td><span style="font-size: .75rem; color: var(--muted);">{{ $camp->campaign_type }}</span></td>
+                                    <td>
+                                        <span class="badge-status {{ $camp->status == 'ONGOING' ? 'badge-ongoing' : 'badge-ended' }}">
+                                            {{ $camp->status }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end mono fw-bold">Rp {{ number_format($camp->spend, 0, ',', '.') }}</td>
+                                    <td class="text-end mono fw-bold" style="color: var(--success);">Rp {{ number_format($camp->gmv, 0, ',', '.') }}</td>
+                                    <td class="text-center mono fw-bold">
+                                        {{ $camp->spend > 0 ? number_format($camp->gmv / $camp->spend, 2) : 0 }}x
+                                    </td>
+                                    <td class="text-end mono">{{ $camp->gmv > 0 ? number_format(($camp->spend / $camp->gmv) * 100, 2) : 0 }}%</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($campaigns as $camp)
-                                    <tr>
-                                        <td>
-                                            <span class="fw-bold text-dark">{{ $camp->campaign_name }}</span>
-                                            <div class="text-muted small">ID: {{ $camp->channel_campaign_id }}</div>
-                                        </td>
-                                        <td>{{ $camp->campaign_type }}</td>
-                                        <td>
-                                            <span class="status-badge {{ $camp->status == 'ONGOING' ? 'status-ongoing' : 'status-ended' }}">
-                                                {{ $camp->status }}
-                                            </span>
-                                        </td>
-                                        <td class="fw-bold">Rp {{ number_format($camp->spend, 0, ',', '.') }}</td>
-                                        <td class="fw-bold text-success">Rp {{ number_format($camp->gmv, 0, ',', '.') }}</td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <i class="fas fa-bolt text-warning me-1"></i>
-                                                {{ $camp->spend > 0 ? number_format($camp->gmv / $camp->spend, 2) : 0 }}x
-                                            </div>
-                                        </td>
-                                        <td>{{ $camp->target_roas ?? '-' }}</td>
-                                        <td>{{ $camp->gmv > 0 ? number_format(($camp->spend / $camp->gmv) * 100, 2) : 0 }}%</td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="8" class="text-center text-muted py-5">
-                                            <div class="mb-3"><i class="fas fa-folder-open fa-3x text-light"></i></div>
-                                            Belum ada data kampanye tersimpan.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-4" style="color: var(--muted);">
+                                        Belum ada data kampanye tersimpan.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        </div>
 
-            <!-- TAB: SETTINGS & LOGS -->
-            <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
-                <div class="row">
-                    <!-- Sync Trigger Card -->
-                    <div class="col-lg-4 mb-4">
-                        <div class="premium-card p-4 h-100">
-                            <h6 class="font-weight-bold text-dark mb-4"><i class="fas fa-sync-alt me-2 text-primary"></i> Pusat Sinkronisasi</h6>
-                            <p class="text-muted small mb-4">Tarik data iklan terbaru dari Shopee secara manual atau jalankan backfill historis.</p>
-                            
-                            <form action="{{ route('marketplace.ads.sync') }}" method="POST">
-                                @csrf
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small text-muted">Toko Target</label>
-                                    <select name="store_id" class="form-select bg-light border-0" style="border-radius: 8px;" required>
-                                        @foreach($stores as $s)
-                                            <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold small text-muted">Mode Sinkronisasi</label>
-                                    <select name="sync_type" class="form-select bg-light border-0" style="border-radius: 8px;">
-                                        <option value="incremental">Incremental (Hari ini & Kemarin)</option>
-                                        <option value="hourly">Hourly (Khusus Jam Ini)</option>
-                                        <option value="backfill">Historical Backfill (6 Bulan Terakhir)</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100 shadow-sm" style="border-radius: 8px; font-weight: 600;">
-                                    Jalankan Sync Sekarang
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- Sync Logs Card -->
-                    <div class="col-lg-8 mb-4">
-                        <div class="premium-card p-4 h-100">
-                            <h6 class="font-weight-bold text-dark mb-4"><i class="fas fa-history me-2 text-primary"></i> Riwayat Sinkronisasi Terakhir</h6>
-                            <div class="table-responsive">
-                                <table class="table table-modern w-100">
-                                    <thead>
-                                        <tr>
-                                            <th>Waktu Mulai</th>
-                                            <th>Tipe</th>
-                                            <th>Status</th>
-                                            <th>Detail / Error</th>
-                                            <th>Statistik</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @if(isset($syncRuns) && $syncRuns->count() > 0)
-                                            @foreach($syncRuns as $run)
-                                                @php
-                                                    $statusClass = 'status-warning';
-                                                    if ($run->status == 'success') $statusClass = 'status-success';
-                                                    elseif ($run->status == 'error') $statusClass = 'status-error';
-                                                    elseif ($run->status == 'rate_limited') $statusClass = 'status-rate-limited';
-                                                @endphp
-                                                <tr>
-                                                    <td>
-                                                        <div class="fw-bold">{{ $run->created_at->format('d/m/Y') }}</div>
-                                                        <div class="small text-muted">{{ $run->created_at->format('H:i:s') }}</div>
-                                                    </td>
-                                                    <td><span class="badge bg-light text-dark border">{{ $run->sync_type }}</span></td>
-                                                    <td><span class="status-badge {{ $statusClass }}">{{ strtoupper($run->status) }}</span></td>
-                                                    <td>
-                                                        <div class="small text-muted" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $run->error_message }}">
-                                                            {{ $run->error_message ?? '-' }}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div class="small">
-                                                            <i class="fas fa-cloud-download-alt text-primary me-1"></i> {{ $run->total_requests }} req <br>
-                                                            <i class="fas fa-database text-success me-1"></i> {{ $run->total_updated }} rows
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        @else
-                                            <tr>
-                                                <td colspan="5" class="text-center text-muted py-4">Belum ada riwayat sinkronisasi untuk toko ini.</td>
-                                            </tr>
-                                        @endif
-                                    </tbody>
-                                </table>
+        <!-- TAB: SETTINGS & LOGS -->
+        <div class="tab-pane" id="tab-settings">
+            <div class="row g-3 mb-3">
+                <!-- Sync Form -->
+                <div class="col-lg-4">
+                    <div class="card-filter h-100 m-0">
+                        <div class="kpi-label mb-3"><i class="fas fa-sync-alt me-1"></i> Pusat Sinkronisasi</div>
+                        <p style="font-size: .8rem; color: var(--muted);">Tarik data iklan terbaru secara manual dari API Shopee.</p>
+                        
+                        <form action="{{ route('marketplace.ads.sync') }}" method="POST">
+                            @csrf
+                            <div class="mb-2">
+                                <label class="kpi-label" style="font-size: .65rem;">Toko Target</label>
+                                <select name="store_id" class="form-select form-select-sm" style="background-color: var(--bg); color: var(--text); border-color: var(--line);" required>
+                                    @foreach($stores as $s)
+                                        <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
+                            <div class="mb-3">
+                                <label class="kpi-label" style="font-size: .65rem;">Mode Sinkronisasi</label>
+                                <select name="sync_type" class="form-select form-select-sm" style="background-color: var(--bg); color: var(--text); border-color: var(--line);">
+                                    <option value="incremental">Incremental (Hari ini & Kemarin)</option>
+                                    <option value="hourly">Hourly (Khusus Jam Ini)</option>
+                                    <option value="backfill">Historical Backfill (6 Bulan)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
+                                Jalankan Sync
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Sync Logs -->
+                <div class="col-lg-8">
+                    <div class="card-table h-100 m-0">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Waktu Mulai</th>
+                                        <th>Tipe</th>
+                                        <th>Status</th>
+                                        <th>Detail / Error</th>
+                                        <th class="text-end">Req/Rows</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if(isset($syncRuns) && $syncRuns->count() > 0)
+                                        @foreach($syncRuns as $run)
+                                            @php
+                                                $statusClass = 'badge-warning';
+                                                if ($run->status == 'success') $statusClass = 'badge-ongoing';
+                                                elseif ($run->status == 'error') $statusClass = 'badge-danger';
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-bold" style="color: var(--text);">{{ $run->created_at->format('d/m/Y') }}</div>
+                                                    <div class="mono" style="font-size: .7rem; color: var(--muted);">{{ $run->created_at->format('H:i:s') }}</div>
+                                                </td>
+                                                <td><span style="font-size: .75rem; color: var(--muted);">{{ $run->sync_type }}</span></td>
+                                                <td><span class="badge-status {{ $statusClass }}">{{ strtoupper($run->status) }}</span></td>
+                                                <td>
+                                                    <div style="font-size: .75rem; color: var(--muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $run->error_message }}">
+                                                        {{ $run->error_message ?? '-' }}
+                                                    </div>
+                                                </td>
+                                                <td class="text-end mono" style="font-size: .75rem;">
+                                                    {{ $run->total_requests }} / <span class="text-success">{{ $run->total_updated }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    @else
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4" style="color: var(--muted);">Belum ada riwayat sinkronisasi.</td>
+                                        </tr>
+                                    @endif
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
     @endif
 </div>
@@ -427,110 +466,100 @@ document.addEventListener("DOMContentLoaded", function() {
     const dailyData = @json($dailyChartData);
     const hourlyData = @json($heatmapData ?? []);
     
-    let dailyChartInstance = null;
-    let hourlyChartInstance = null;
+    // Theme colors matching CSS vars
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#e5e7eb' : '#111827';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    
+    // Default Chart Config
+    Chart.defaults.color = textColor;
+    Chart.defaults.font.family = 'ui-monospace, SFMono-Regular, Menlo, Consolas';
 
-    function renderCharts() {
-        // Daily Line Chart
-        if(document.getElementById("dailyChart") && !dailyChartInstance) {
-            const ctxDaily = document.getElementById("dailyChart").getContext('2d');
-            
-            // Create gradient for Spend
-            let gradientSpend = ctxDaily.createLinearGradient(0, 0, 0, 300);
-            gradientSpend.addColorStop(0, 'rgba(238, 77, 45, 0.4)');
-            gradientSpend.addColorStop(1, 'rgba(238, 77, 45, 0.0)');
-
-            dailyChartInstance = new Chart(ctxDaily, {
-                type: 'line',
-                data: {
-                    labels: dailyData.map(d => d.date),
-                    datasets: [
-                        {
-                            label: 'Spend (Rp)',
-                            data: dailyData.map(d => parseFloat(d.spend)),
-                            borderColor: '#ee4d2d',
-                            backgroundColor: gradientSpend,
-                            fill: true,
-                            tension: 0.4, // Smooth curves
-                            borderWidth: 2,
-                            pointBackgroundColor: '#ee4d2d',
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'GMV (Rp)',
-                            data: dailyData.map(d => parseFloat(d.gmv)),
-                            borderColor: '#1cc88a',
-                            backgroundColor: 'transparent',
-                            tension: 0.4,
-                            borderWidth: 2,
-                            pointBackgroundColor: '#1cc88a',
-                            yAxisID: 'y1'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
+    // Daily Line Chart
+    if(document.getElementById("dailyChart")) {
+        const ctxDaily = document.getElementById("dailyChart").getContext('2d');
+        
+        new Chart(ctxDaily, {
+            type: 'line',
+            data: {
+                labels: dailyData.map(d => d.date),
+                datasets: [
+                    {
+                        label: 'Spend (Rp)',
+                        data: dailyData.map(d => parseFloat(d.spend)),
+                        borderColor: '#2563eb', // accent
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        yAxisID: 'y'
                     },
-                    plugins: {
-                        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } }
+                    {
+                        label: 'GMV (Rp)',
+                        data: dailyData.map(d => parseFloat(d.gmv)),
+                        borderColor: '#16a34a', // success
+                        backgroundColor: 'transparent',
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6 } } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                    y: { 
+                        type: 'linear', position: 'left', beginAtZero: true, 
+                        grid: { color: gridColor },
+                        ticks: { font: { size: 10 } }
                     },
-                    scales: {
-                        x: { grid: { display: false } },
-                        y: { type: 'linear', position: 'left', beginAtZero: true, border: { dash: [4, 4] } },
-                        y1: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+                    y1: { 
+                        type: 'linear', position: 'right', beginAtZero: true, 
+                        grid: { drawOnChartArea: false },
+                        ticks: { font: { size: 10 } }
                     }
                 }
-            });
-        }
-
-        // Hourly Bar Chart
-        if(document.getElementById("hourlyChart") && !hourlyChartInstance) {
-            const ctxHourly = document.getElementById("hourlyChart").getContext('2d');
-            hourlyChartInstance = new Chart(ctxHourly, {
-                type: 'bar',
-                data: {
-                    labels: hourlyData.map(d => d.performance_hour + ':00'),
-                    datasets: [
-                        {
-                            label: 'Clicks',
-                            data: hourlyData.map(d => parseInt(d.clicks)),
-                            backgroundColor: '#4e73df',
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: { grid: { display: false } },
-                        y: { beginAtZero: true, border: { dash: [4, 4] } }
-                    }
-                }
-            });
-        }
-    }
-
-    // Render initially
-    renderCharts();
-
-    // Re-render charts when switching tabs because canvas size might collapse when hidden
-    const tabEls = document.querySelectorAll('button[data-bs-toggle="pill"]');
-    tabEls.forEach(tab => {
-        tab.addEventListener('shown.bs.tab', function (event) {
-            if (event.target.id === 'overview-tab') {
-                if (dailyChartInstance) dailyChartInstance.resize();
-                if (hourlyChartInstance) hourlyChartInstance.resize();
             }
         });
-    });
+    }
+
+    // Hourly Bar Chart
+    if(document.getElementById("hourlyChart")) {
+        const ctxHourly = document.getElementById("hourlyChart").getContext('2d');
+        new Chart(ctxHourly, {
+            type: 'bar',
+            data: {
+                labels: hourlyData.map(d => d.performance_hour + ':00'),
+                datasets: [
+                    {
+                        label: 'Clicks',
+                        data: hourlyData.map(d => parseInt(d.clicks)),
+                        backgroundColor: '#60a5fa',
+                        borderRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: gridColor },
+                        ticks: { font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    }
 });
 </script>
 @endif
