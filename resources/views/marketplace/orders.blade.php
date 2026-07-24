@@ -1686,7 +1686,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         let updatedCount = 0;
         for (const o of rows) {
             try {
-                const res = await fetch(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/sync-awb`);
+                const sn = o.booking_sn || o.channel_order_id;
+                const res = await fetch(`/api/marketplace/stores/${o.store_id}/orders/${sn}/sync-awb`);
                 const data = await res.json();
                 if (data.success && data.awb) {
                     o.shipping_awb_no = data.awb;

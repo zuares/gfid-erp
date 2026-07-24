@@ -41,12 +41,16 @@ class MarketplaceLogisticsController extends Controller
                 $awb = $trackingResp['response']['tracking_number'] ?? null;
             }
             if (!$awb && method_exists($driver, 'getOrderDetail')) {
-                $details = $driver->getOrderDetail($store, [$orderSn]);
-                $list = $details['response']['order_list'] ?? [];
-                if (count($list) > 0) {
-                    $remoteRaw = $list[0];
-                    if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
-                        $awb = $remoteRaw['package_list'][0]['tracking_number'];
+                // Ensure we use the actual order_sn for getOrderDetail, as booking_sn will cause an error
+                $actualOrderSn = $order->channel_order_id;
+                if (!empty($actualOrderSn) && $actualOrderSn !== $order->booking_sn) {
+                    $details = $driver->getOrderDetail($store, [$actualOrderSn]);
+                    $list = $details['response']['order_list'] ?? [];
+                    if (count($list) > 0) {
+                        $remoteRaw = $list[0];
+                        if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
+                            $awb = $remoteRaw['package_list'][0]['tracking_number'];
+                        }
                     }
                 }
             }
@@ -59,6 +63,7 @@ class MarketplaceLogisticsController extends Controller
             return response()->json(['success' => false, 'message' => 'AWB not found or unchanged', 'awb' => $order->shipping_awb_no]);
 
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('syncAwb Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString(), 'orderSn' => $orderSn]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
