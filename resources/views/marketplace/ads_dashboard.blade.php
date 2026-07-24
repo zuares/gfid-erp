@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
             mode: 'range',
             locale: 'id',
             showMonths: 1,
-            dateFormat: 'd M Y',
+            dateFormat: 'Y-m-d',
             defaultDate: [fromEl.value, toEl.value],
             onChange: function(selectedDates, dateStr, instance) {
                 if(selectedDates.length === 2) {
