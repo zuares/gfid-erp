@@ -95,8 +95,31 @@ class AdsDashboardController extends Controller
         $heatmapData = $analytics->getHourlyHeatmap($storeId, $dateFrom, $dateTo);
         $historicalData = $analytics->getHistoricalComparison($storeId, $dateFrom, $dateTo, 3);
 
+        // Fetch GMS Item Performance
+        $itemPerformance = \Illuminate\Support\Facades\DB::table('marketplace_ads_item_dailies')
+            ->leftJoin('marketplace_products', function ($join) {
+                $join->on('marketplace_ads_item_dailies.channel_item_id', '=', 'marketplace_products.item_id')
+                     ->on('marketplace_ads_item_dailies.store_id', '=', 'marketplace_products.store_id');
+            })
+            ->where('marketplace_ads_item_dailies.store_id', $storeId)
+            ->whereBetween('marketplace_ads_item_dailies.date', [$dateFrom, $dateTo])
+            ->selectRaw('
+                marketplace_ads_item_dailies.channel_item_id,
+                MAX(marketplace_products.item_name) as item_name,
+                SUM(marketplace_ads_item_dailies.impressions) as impressions,
+                SUM(marketplace_ads_item_dailies.clicks) as clicks,
+                SUM(marketplace_ads_item_dailies.expense) as spend,
+                SUM(marketplace_ads_item_dailies.broad_order) as orders,
+                SUM(marketplace_ads_item_dailies.broad_gmv) as gmv
+            ')
+            ->groupBy('marketplace_ads_item_dailies.channel_item_id')
+            ->havingRaw('impressions > 0 OR spend > 0')
+            ->orderByDesc('spend')
+            ->limit(30)
+            ->get();
+
         return view('marketplace.ads_dashboard', compact(
-            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData'
+            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData', 'itemPerformance'
         ));
     }
 

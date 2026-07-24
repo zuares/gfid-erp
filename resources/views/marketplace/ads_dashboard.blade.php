@@ -435,6 +435,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <button class="dash-tab active" data-target="tab-dashboard">Dasbor Eksekutif</button>
                 <button class="dash-tab" data-target="tab-daily">Analisis Harian</button>
                 <button class="dash-tab" data-target="tab-campaigns">Rincian Kampanye</button>
+                <button class="dash-tab" data-target="tab-items">Performa Produk</button>
                 <button class="dash-tab" data-target="tab-sync">Sinkronisasi</button>
             </div>
         </div>
@@ -806,6 +807,82 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
+        </div>
+
+        <!-- TAB PERFORMA PRODUK (GMV MAX) -->
+        <div class="tab-pane" id="tab-items">
+            <div class="dash-sec"><i class="bi bi-box-seam"></i> Performa Produk (GMV Max)</div>
+            
+            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: var(--dsh-accent); font-size: 0.85rem;">
+                        <i class="bi bi-info-circle"></i> Info Data GMV Max
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">
+                        Tabel ini menampilkan performa spesifik per produk berdasarkan data **Shop GMV Max (GMS)**.
+                        Metrik di bawah ini ditarik langsung dari mesin otomatisasi Shopee.
+                    </div>
+                </div>
+            </div>
+
+            <div class="dpanel">
+                <div class="table-responsive">
+                    <table class="dpanel-table">
+                        <thead>
+                            <tr>
+                                <th>Produk / Item ID</th>
+                                <th class="text-end">Biaya (Spend)</th>
+                                <th class="text-end">GMV</th>
+                                <th class="text-end">ROAS</th>
+                                <th class="text-end">Impresi</th>
+                                <th class="text-end">Klik</th>
+                                <th class="text-end">Pesanan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($itemPerformance ?? [] as $item)
+                                @php
+                                    $itemRoas = $item->spend > 0 ? $item->gmv / $item->spend : 0;
+                                @endphp
+                                <tr>
+                                    <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
+                                        <div style="font-weight: 700; color: var(--text); white-space: normal; max-width: 300px;">
+                                            {{ $item->item_name ?? 'Produk Tidak Diketahui' }}
+                                        </div>
+                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
+                                            ID: {{ $item->channel_item_id }}
+                                        </div>
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
+                                        Rp {{ number_format($item->spend, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
+                                        Rp {{ number_format($item->gmv, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $itemRoas >= 4.0 ? '#16a34a' : ($itemRoas >= 2.0 ? '#eab308' : '#dc2626') }};">
+                                        {{ number_format($itemRoas, 2) }}x
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($item->impressions, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($item->clicks, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($item->orders, 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                                        Belum ada data performa item GMV Max.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- SINKRONISASI TAB -->
