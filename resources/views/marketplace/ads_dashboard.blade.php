@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
     // ==========================================
     // 4. HISTORICAL CHART (PERIOD-OVER-PERIOD)
     // ==========================================
@@ -156,8 +157,10 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Calculate maxDays strictly from the selected date range
         let maxDays = 0;
-        const dStart = fromEl && fromEl.value ? new Date(fromEl.value) : new Date();
-        const dEnd = toEl && toEl.value ? new Date(toEl.value) : new Date();
+        const fromElHist = document.getElementById('fromHidden');
+        const toElHist = document.getElementById('toHidden');
+        const dStart = fromElHist && fromElHist.value ? new Date(fromElHist.value) : new Date();
+        const dEnd = toElHist && toElHist.value ? new Date(toElHist.value) : new Date();
         if (dStart && dEnd) {
             maxDays = Math.round((dEnd - dStart) / (1000 * 60 * 60 * 24)) + 1;
         }
