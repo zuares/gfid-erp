@@ -163,6 +163,11 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="sub">Pemantauan biaya, GMV, dan kontrol ROAS harian.</div>
         </div>
         <div>
+            @if(isset($syncRuns) && $syncRuns->isNotEmpty())
+            <div style="font-size: 0.72rem; color: var(--dsh-muted); text-align: right; margin-bottom: 0.35rem; font-weight: 500;">
+                Terakhir Sync: {{ $syncRuns->first()->updated_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }}
+            </div>
+            @endif
             <div class="role-chip">
                 <i class="bi bi-clock"></i> Live Sync
             </div>
@@ -612,6 +617,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 labels: hourlyData.map(d => d.performance_hour + ':00'),
                 datasets: [
                     {
+                        label: 'Biaya (Spend)',
+                        data: hourlyData.map(d => parseFloat(d.expense || 0)),
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: hourlyData.length <= 1 ? 5 : 0,
+                        pointHoverRadius: 5,
+                        yAxisID: 'y'
+                    },
+                    {
                         label: 'Klik',
                         data: hourlyData.map(d => parseInt(d.clicks || 0)),
                         borderColor: '#8b5cf6',
@@ -621,7 +638,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         tension: 0.4,
                         pointRadius: hourlyData.length <= 1 ? 5 : 0,
                         pointHoverRadius: 5,
-                        yAxisID: 'y'
+                        yAxisID: 'y1'
                     },
                     {
                         label: 'Konversi (Pesanan)',
@@ -665,7 +682,11 @@ document.addEventListener("DOMContentLoaded", function() {
                         position: 'left',
                         beginAtZero: true, 
                         grid: { color: gridColor, drawBorder: false }, 
-                        ticks: { font: { size: 10 }, padding: 8 }
+                        ticks: { 
+                            font: { size: 10 }, 
+                            padding: 8,
+                            callback: function(value) { return formatShortIDR(value); }
+                        }
                     },
                     y1: {
                         type: 'linear',
