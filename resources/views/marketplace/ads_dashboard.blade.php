@@ -375,6 +375,15 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="tab-pane" id="tab-daily">
             <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian</div>
             
+            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightDailyTrend">
+                    <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Menganalisis tren harian...
+                    </div>
+                </div>
+            </div>
+            
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
                 <!-- 1. TREN FINANSIAL HARIAN -->
                 <div class="dpanel p-3">
@@ -1372,6 +1381,80 @@ document.addEventListener("DOMContentLoaded", function() {
                 } else if (insightHistEl) {
                     insightHistEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Kurang Data Pembanding</div>
                                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Data komparasi tidak cukup panjang untuk memunculkan wawasan AI historis.</div>`;
+                }
+
+                // ==========================================
+                // AI INSIGHTS DAILY TREND (ANALISIS HARIAN)
+                // ==========================================
+                const insightDailyEl = document.getElementById('insightDailyTrend');
+                if (insightDailyEl && dailyData.length > 0) {
+                    // Filter out zero spend days for accurate analysis
+                    let activeDays = dailyData.filter(d => parseFloat(d.spend || 0) > 0);
+                    
+                    if (activeDays.length > 2) {
+                        let bestDay = null;
+                        let worstDay = null;
+                        let maxRoas = -1;
+                        let minRoas = 999999;
+                        
+                        let totalTrendRoas = 0;
+                        let roasArray = [];
+
+                        activeDays.forEach(d => {
+                            let r = parseFloat(d.spend) > 0 ? (parseFloat(d.gmv || 0) / parseFloat(d.spend)) : 0;
+                            totalTrendRoas += r;
+                            roasArray.push(r);
+                            
+                            if (r > maxRoas) { maxRoas = r; bestDay = d.date; }
+                            // Consider worst day only if they spent a decent amount (e.g. > 10000)
+                            if (r < minRoas && parseFloat(d.spend) > 10000) { minRoas = r; worstDay = d.date; }
+                        });
+                        
+                        let avgTrendRoas = totalTrendRoas / activeDays.length;
+                        
+                        // Calculate Volatility (Standard Deviation)
+                        let variance = roasArray.reduce((acc, val) => acc + Math.pow(val - avgTrendRoas, 2), 0) / roasArray.length;
+                        let stdDev = Math.sqrt(variance);
+                        let isVolatile = stdDev > (avgTrendRoas * 0.5); // If std dev is > 50% of mean
+                        
+                        // Trend Direction (Compare first half to second half)
+                        let halfPoint = Math.floor(activeDays.length / 2);
+                        let firstHalf = activeDays.slice(0, halfPoint);
+                        let secondHalf = activeDays.slice(halfPoint);
+                        
+                        let firstHalfGmv = firstHalf.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+                        let secondHalfGmv = secondHalf.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+                        
+                        let trendHtml = '';
+                        let trendIcon = '';
+                        let trendColor = '';
+                        
+                        if (isVolatile) {
+                            trendHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🎢 Fluktuasi Ekstrem Terdeteksi!</div>
+                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Performa iklan dari hari ke hari sangat tidak stabil. Hari terbaik (<b>${bestDay}</b>) mencetak ROAS <b>${maxRoas.toFixed(1)}x</b>, tapi hari terburuk (<b>${worstDay}</b>) anjlok hingga <b>${minRoas.toFixed(1)}x</b>. 💡 <b>Saran:</b> Algoritma GMV Max mungkin kebingungan. Coba pertahankan Target ROAS dan Budget di angka tetap selama 7 hari berturut-turut tanpa diubah agar mesin bisa belajar stabil.</div>`;
+                            trendColor = '#dc2626';
+                        } else if (secondHalfGmv > firstHalfGmv * 1.2) {
+                            trendHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">📈 Momentum Positif (Uptrend)</div>
+                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Sistem mulai panas! Pendapatan di paruh kedua rentang waktu ini jauh lebih tinggi daripada paruh pertama. Puncak algoritma jatuh pada <b>${bestDay}</b> (ROAS <b>${maxRoas.toFixed(1)}x</b>). 💡 <b>Saran:</b> Anda berada di jalur yang benar. Jangan utak-atik Target ROAS, biarkan algoritma bekerja!</div>`;
+                            trendColor = '#16a34a';
+                        } else if (secondHalfGmv < firstHalfGmv * 0.8) {
+                            trendHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; margin-bottom: 0.3rem;">📉 Tren Penurunan (Downtrend)</div>
+                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Waspada, performa di paruh akhir mulai merosot dibanding hari-hari awal. Hari terburuk terjadi di <b>${worstDay}</b> (ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran:</b> Apakah ada kompetitor yang baru masuk, atau kampanye promosi toko Anda baru saja berakhir? Jika tren terus turun, coba perbarui foto produk di GMV Max.</div>`;
+                            trendColor = '#f59e0b';
+                        } else {
+                            trendHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.85rem; margin-bottom: 0.3rem;">🛥️ Pelayaran Stabil (Konsisten)</div>
+                                         <div style="font-size: 0.72rem; color: var(--dsh-muted);">Fluktuasi harian sangat wajar. Rata-rata ROAS harian Anda konsisten di angka <b>${avgTrendRoas.toFixed(1)}x</b>. Rekor terbaik ada di tanggal <b>${bestDay}</b>. 💡 <b>Saran:</b> Kestabilan ini sangat bagus untuk algoritma GMV Max. Jika Anda butuh pertumbuhan, naikkan Target ROAS sebesar 5-10% secara perlahan.</div>`;
+                            trendColor = '#3b82f6';
+                        }
+                        
+                        insightDailyEl.innerHTML = trendHtml;
+                        insightDailyEl.style.borderLeftColor = trendColor;
+                        
+                    } else {
+                        insightDailyEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Butuh Lebih Banyak Hari</div>
+                                                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">AI membutuhkan minimal 3 hari data aktif untuk membaca tren dan volatilitas.</div>`;
+                        insightDailyEl.style.borderLeftColor = 'var(--dsh-border)';
+                    }
                 }
 
             }
