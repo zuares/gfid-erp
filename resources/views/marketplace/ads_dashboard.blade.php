@@ -275,9 +275,14 @@ document.addEventListener('DOMContentLoaded', function () {
             
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
                 <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Harian</div>
-                        <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text);"></div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Harian</div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
+                                💡 <b>Tips:</b> Jarak/selisih antara area <b>GMV</b> dan <b>Biaya</b> adalah Margin Kasar Anda. Awasi <b>Garis ROAS</b> agar tidak menukik tajam!
+                            </div>
+                        </div>
+                        <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                     </div>
                     <div style="height: 280px;">
                         <canvas id="dailyChart"></canvas>
