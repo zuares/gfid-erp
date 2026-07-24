@@ -199,21 +199,18 @@ class ShopeeAdsSyncService
                         [
                             'store_id' => $store->id,
                             'channel_campaign_id' => $channelCampaignId,
-                            'report_date' => $date, // Using report_date mapping
+                            'date' => $date,
                         ],
                         [
-                            'impressions' => $d['impression'] ?? 0,
-                            'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
-                            'ctr'         => $d['ctr'] ?? null,
-                            'spend'       => $d['expense'] ?? 0,
-                            'orders'      => $d['broad_order'] ?? 0,
-                            'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? 0,
-                            'roas'        => $d['broad_roi'] ?? null,
-                            'cpc'         => $d['cpc'] ?? null,
-                            'cvr'         => $d['conversion_rate'] ?? null,
-                            'direct_gmv'  => $d['direct_gmv'] ?? 0,
-                            'direct_roas' => $d['direct_roi'] ?? null,
-                            'raw_json'    => $d,
+                            'impressions'  => $d['impression'] ?? 0,
+                            'clicks'       => $d['clicks'] ?? $d['click'] ?? 0,
+                            'expense'      => $d['expense'] ?? 0,
+                            'broad_order'  => $d['broad_order'] ?? 0,
+                            'broad_gmv'    => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? 0,
+                            'direct_order' => $d['direct_order'] ?? 0,
+                            'direct_gmv'   => $d['direct_gmv'] ?? 0,
+                            'cpc'          => $d['cpc'] ?? null,
+                            'raw_json'     => $d,
                         ]
                     );
                     $run->total_updated++;
