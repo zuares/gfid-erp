@@ -21,7 +21,10 @@ class MarketplaceLogisticsController extends Controller
         try {
             $driver = $this->manager->driver($store);
             $order = MarketplaceOrder::where('store_id', $store->id)
-                ->where('channel_order_id', $orderSn)
+                ->where(function ($q) use ($orderSn) {
+                    $q->where('channel_order_id', $orderSn)
+                      ->orWhere('external_order_id', $orderSn);
+                })
                 ->first();
 
             if (!$order) {
