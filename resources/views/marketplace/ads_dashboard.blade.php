@@ -99,6 +99,15 @@ body[data-theme="dark"] .range-pill { color: #e5e7eb; background: rgba(255,255,2
 .range-pill .range-meta { display: inline-flex; align-items: center; gap: .5rem; flex: 0 0 auto; }
 .range-pill .tz { color: var(--dsh-muted); font-size: .82rem; }
 
+/* Sembunyikan input asli flatpickr yang ter-generate otomatis */
+.period-bar .flatpickr-input[type="text"] {
+    display: none !important;
+    opacity: 0;
+    position: absolute;
+    z-index: -9999;
+    width: 0; height: 0;
+}
+
 </style>
 @endpush
 
@@ -561,7 +570,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         fill: true,
                         tension: 0.4, // kurva halus
                         borderWidth: 2,
-                        pointRadius: 0, // sembunyikan titik secara default
+                        pointRadius: dailyData.length <= 1 ? 5 : 0, // munculkan titik jika data cuma 1
                         pointHitRadius: 15, // area hover titik diperbesar
                         pointHoverRadius: 4, // ukuran titik saat di-hover
                         pointHoverBackgroundColor: '#dc2626',
@@ -575,7 +584,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         fill: true,
                         tension: 0.4, // kurva halus
                         borderWidth: 2,
-                        pointRadius: 0,
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
                         pointHitRadius: 15,
                         pointHoverRadius: 4,
                         pointHoverBackgroundColor: '#16a34a',
