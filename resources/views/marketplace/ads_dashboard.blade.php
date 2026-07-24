@@ -84,6 +84,21 @@ body[data-theme="dark"] .filter-item input, body[data-theme="dark"] .filter-item
 }
 .dpanel-table tbody tr:last-child td { border-bottom: none; }
 .dpanel-table tbody tr:hover td { background: rgba(148,163,184,.04); }
+
+/* Periode Bar (Pill) selaras dengan Shipments */
+.period-bar { display: flex; gap: .75rem; align-items: center; }
+.period-select { border-radius: 8px; flex: 1; max-width: 250px; font-size: .8rem; padding: .4rem .6rem; border: 1px solid var(--dsh-border); background: var(--bg); color: var(--text); }
+.range-pill {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: .7rem;
+    border: 1px solid var(--dsh-border); background: rgba(148,163,184,.06); padding: .4rem .85rem; border-radius: 8px;
+    cursor: pointer; font-size: .85rem; color: var(--text, #0f172a); transition: background .2s ease;
+}
+body[data-theme="dark"] .range-pill { color: #e5e7eb; background: rgba(255,255,255,.05); }
+.range-pill:hover { background: rgba(148,163,184,.12); }
+.range-pill .range-text { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
+.range-pill .range-meta { display: inline-flex; align-items: center; gap: .5rem; flex: 0 0 auto; }
+.range-pill .tz { color: var(--dsh-muted); font-size: .82rem; }
+
 </style>
 @endpush
 
@@ -103,6 +118,86 @@ document.addEventListener('DOMContentLoaded', function () {
             window.dispatchEvent(new Event('resize')); // re-render charts
         });
     });
+
+    // Flatpickr & Preset Logic (Shipments Style)
+    const preset = document.getElementById('presetRange');
+    const toggleDate = document.getElementById('toggleDate');
+    const rangeText = document.getElementById('rangeText');
+    const fromEl = document.getElementById('fromHidden');
+    const toEl = document.getElementById('toHidden');
+    const fpInput = document.getElementById('rangePicker');
+    const filterForm = document.getElementById('filterForm');
+
+    function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+    
+    function setRangeText() {
+        if(!fromEl || !toEl || !fromEl.value || !toEl.value) { if(rangeText) rangeText.textContent = '-'; return; }
+        const idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+        const fmtDate = (str) => {
+            if(!str) return '';
+            const d = new Date(str);
+            return d.getDate() + ' ' + idMonths[d.getMonth()] + ' ' + d.getFullYear();
+        };
+        const f = fmtDate(fromEl.value);
+        const t = fmtDate(toEl.value);
+        if(rangeText) rangeText.textContent = (f === t) ? f : (f + ' - ' + t);
+    }
+    
+    function applyPreset(v) {
+        if(v === 'custom') return;
+        const now = new Date();
+        let start = new Date();
+        let end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        const n = parseInt(v) || 7;
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (n - 1));
+        
+        fromEl.value = ymd(start);
+        toEl.value = ymd(end);
+        setRangeText();
+        filterForm.submit();
+    }
+    
+    setRangeText();
+    
+    let fp = null;
+    if(typeof flatpickr !== 'undefined' && fpInput) {
+        fp = flatpickr(fpInput, {
+            mode: 'range',
+            locale: 'id',
+            showMonths: window.innerWidth > 768 ? 2 : 1,
+            defaultDate: [fromEl.value, toEl.value],
+            onChange: function(selectedDates, dateStr, instance) {
+                if(selectedDates.length < 2) return;
+                fromEl.value = ymd(selectedDates[0]);
+                toEl.value = ymd(selectedDates[1]);
+                setRangeText();
+                if(preset) preset.value = 'custom';
+                filterForm.submit();
+            }
+        });
+    }
+
+    if(toggleDate) {
+        toggleDate.addEventListener('click', () => {
+            if(preset) preset.value = 'custom';
+            if(fp) fp.open();
+        });
+    }
+
+    if(preset) {
+        preset.addEventListener('change', () => { applyPreset(preset.value); });
+        const now = new Date();
+        const endStr = ymd(now);
+        if(toEl.value === endStr) {
+            const dStart = new Date(fromEl.value);
+            const diffDays = Math.round((now - dStart) / (1000 * 60 * 60 * 24)) + 1;
+            if([7,14,30].includes(diffDays)) preset.value = diffDays.toString();
+            else preset.value = 'custom';
+        } else {
+            preset.value = 'custom';
+        }
+    }
 });
 </script>
 @endpush
@@ -139,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {{-- ==============================================
          FILTER
     ============================================== --}}
-    <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="dash-filter">
+    <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="dash-filter" id="filterForm">
         <div class="filter-item">
             <label>Toko Shopee</label>
             <select name="store_id" onchange="this.form.submit()">
@@ -148,18 +243,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 @endforeach
             </select>
         </div>
-        <div class="filter-item" style="max-width: 160px;">
-            <label>Dari Tanggal</label>
-            <input type="date" name="date_from" value="{{ $dateFrom }}">
-        </div>
-        <div class="filter-item" style="max-width: 160px;">
-            <label>Sampai Tanggal</label>
-            <input type="date" name="date_to" value="{{ $dateTo }}">
-        </div>
-        <div>
-            <button type="submit" class="act" style="border:none; background: var(--dsh-accent); color: #fff; padding: .4rem .9rem;">
-                <i class="bi bi-funnel"></i> Terapkan
-            </button>
+        <div class="filter-item" style="flex: 2;">
+            <label>Periode Data</label>
+            <div class="period-bar">
+                <select class="period-select" id="presetRange">
+                    <option value="7">7 Hari Sebelumnya</option>
+                    <option value="14">14 Hari Sebelumnya</option>
+                    <option value="30">30 Hari Sebelumnya</option>
+                    <option value="custom">Pilih Tanggal...</option>
+                </select>
+                <button type="button" class="range-pill" id="toggleDate">
+                    <span class="range-text" id="rangeText">-</span>
+                    <span class="range-meta">
+                        <span class="tz">(GMT+07)</span>
+                        <span class="ico">📅</span>
+                    </span>
+                </button>
+                <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}">
+                <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}">
+                <input type="text" id="rangePicker" class="visually-hidden" aria-hidden="true" tabindex="-1" style="display:none;">
+            </div>
         </div>
     </form>
 
