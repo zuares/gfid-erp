@@ -221,8 +221,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ============================================== --}}
         <div>
             <div class="dash-tabs">
-                <button class="dash-tab active" data-target="tab-dashboard">Dashboard</button>
-                <button class="dash-tab" data-target="tab-historical">Komparasi Historis</button>
+                <button class="dash-tab active" data-target="tab-dashboard">Dasbor Eksekutif</button>
+                <button class="dash-tab" data-target="tab-daily">Analisis Harian</button>
                 <button class="dash-tab" data-target="tab-campaigns">Rincian Kampanye</button>
                 <button class="dash-tab" data-target="tab-sync">Sinkronisasi</button>
             </div>
@@ -329,7 +329,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTime"></div>
             </div>
 
-            <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian & Per Jam</div>
+            <div class="dash-sec mt-4"><i class="bi bi-clock"></i> Heatmap Jam Tayang Efektif (Golden Hours)</div>
+            <div class="dpanel p-3 mb-4">
+                <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                    💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
+                </div>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="hourlyChart"></canvas>
+                </div>
+            </div>
+            
+            <hr class="my-4" style="border-color: var(--dsh-border);">
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="dash-sec mb-0"><i class="bi bi-clock-history"></i> Komparasi Historis (Period-over-Period)</div>
+                <div>
+                    <select id="histMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border);">
+                        <option value="roas">Metrik: ROAS</option>
+                        <option value="gmv">Metrik: GMV (Pendapatan)</option>
+                        <option value="spend">Metrik: Biaya (Spend)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="dpanel p-3">
+                <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                    💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
+                </div>
+                <div style="position: relative; height: 350px;">
+                    <canvas id="historicalChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ANALISIS HARIAN TAB -->
+        <div class="tab-pane" id="tab-daily">
+            <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian</div>
             
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
                 <!-- 1. TREN FINANSIAL HARIAN -->
@@ -363,25 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <canvas id="trafficChart"></canvas>
                     </div>
                 </div>
-
-                <!-- 3. DISTRIBUSI PER JAM -->
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Distribusi Per Jam (Dayparting)</div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Dayparting:</b> Cari jam di mana <b>Garis ROAS (Emas)</b> memuncak dan <b>Siluet Trafik</b> tebal. Itu adalah <b>Jam Emas</b> untuk menaikkan bid iklan!
-                            </div>
-                        </div>
-                        <div id="hourlySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                    </div>
-                    <div style="height: 280px;">
-                        <canvas id="hourlyChart"></canvas>
-                    </div>
-                </div>
             </div>
-        </div>
-
         </div>
 
         <!-- TAB RINCIAN KAMPANYE -->
@@ -437,27 +454,6 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
-        <!-- TAB KOMPARASI HISTORIS -->
-        <div class="tab-pane" id="tab-historical">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="dash-sec mb-0"><i class="bi bi-clock-history"></i> Komparasi Historis (Period-over-Period)</div>
-                <div>
-                    <select id="histMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border);">
-                        <option value="roas">Metrik: ROAS</option>
-                        <option value="gmv">Metrik: GMV (Pendapatan)</option>
-                        <option value="spend">Metrik: Biaya (Spend)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="dpanel p-3">
-                <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                    💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
-                </div>
-                <div style="position: relative; height: 350px;">
-                    <canvas id="historicalChart"></canvas>
-                </div>
-            </div>
         </div>
 
         <!-- SINKRONISASI TAB -->
