@@ -505,9 +505,10 @@ document.addEventListener("DOMContentLoaded", function() {
     // Calculate summaries for charts
     let totalDailySpend = dailyData.reduce((sum, d) => sum + parseFloat(d.spend || 0), 0);
     let totalDailyGmv = dailyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+    let totalDailyRoas = totalDailySpend > 0 ? (totalDailyGmv / totalDailySpend).toFixed(2) : "0.00";
     let dsEl = document.getElementById('dailySummary');
     if(dsEl) {
-        dsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalDailySpend)} Biaya</span> &bull; <span style="color:#16a34a">Rp ${formatShortIDR(totalDailyGmv)} GMV</span>`;
+        dsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalDailySpend)} Biaya</span> &bull; <span style="color:#16a34a">Rp ${formatShortIDR(totalDailyGmv)} GMV</span> &bull; <span style="color:#eab308">${totalDailyRoas}x ROAS</span>`;
     }
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + parseFloat(d.expense || 0), 0);
@@ -547,32 +548,50 @@ document.addEventListener("DOMContentLoaded", function() {
                 }),
                 datasets: [
                     {
-                        label: 'Spend',
-                        data: dailyData.map(d => parseFloat(d.spend || 0)),
-                        borderColor: '#dc2626',
-                        backgroundColor: gradientSpend,
-                        fill: true,
-                        tension: 0.4, // kurva halus
+                        label: 'ROAS',
+                        data: dailyData.map(d => {
+                            let sp = parseFloat(d.spend || 0);
+                            let gm = parseFloat(d.gmv || 0);
+                            return sp > 0 ? parseFloat((gm/sp).toFixed(2)) : 0;
+                        }),
+                        borderColor: '#eab308', // Gold
+                        backgroundColor: '#eab308',
+                        fill: false,
+                        tension: 0.4,
                         borderWidth: 2,
-                        pointRadius: dailyData.length <= 1 ? 5 : 0, // munculkan titik jika data cuma 1
-                        pointHitRadius: 15, // area hover titik diperbesar
-                        pointHoverRadius: 4, // ukuran titik saat di-hover
-                        pointHoverBackgroundColor: '#dc2626',
-                        yAxisID: 'y'
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#eab308',
+                        yAxisID: 'y1'
                     },
                     {
-                        label: 'GMV',
+                        label: 'GMV (Pendapatan)',
                         data: dailyData.map(d => parseFloat(d.gmv || 0)),
                         borderColor: '#16a34a',
                         backgroundColor: gradientGMV,
                         fill: true,
-                        tension: 0.4, // kurva halus
+                        tension: 0.4, 
                         borderWidth: 2,
                         pointRadius: dailyData.length <= 1 ? 5 : 0,
                         pointHitRadius: 15,
                         pointHoverRadius: 4,
                         pointHoverBackgroundColor: '#16a34a',
-                        yAxisID: 'y1'
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Biaya (Spend)',
+                        data: dailyData.map(d => parseFloat(d.spend || 0)),
+                        borderColor: '#dc2626',
+                        backgroundColor: gradientSpend,
+                        fill: true,
+                        tension: 0.4, 
+                        borderWidth: 2,
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#dc2626',
+                        yAxisID: 'y'
                     }
                 ]
             },
@@ -581,7 +600,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 maintainAspectRatio: false,
                 interaction: {
                     mode: 'index',
-                    intersect: false, // tooltip muncul jika kursor berada pada kolom x yang sama
+                    intersect: false,
                 },
                 plugins: {
                     legend: { 
@@ -600,7 +619,13 @@ document.addEventListener("DOMContentLoaded", function() {
                         boxPadding: 4,
                         callbacks: {
                             label: function(context) {
-                                return context.dataset.label + ': ' + formatFullIDR(context.parsed.y);
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.dataset.yAxisID === 'y1') {
+                                    return label + context.parsed.y + 'x';
+                                } else {
+                                    return label + formatFullIDR(context.parsed.y);
+                                }
                             }
                         }
                     }
@@ -629,7 +654,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         ticks: { 
                             font: { size: 10 }, 
                             padding: 8,
-                            callback: function(value) { return formatShortIDR(value); }
+                            callback: function(value) { return value + 'x'; }
                         }
                     }
                 }
