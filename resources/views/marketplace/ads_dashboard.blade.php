@@ -638,37 +638,41 @@ document.addEventListener("DOMContentLoaded", function() {
         tsEl.innerHTML = `<span style="color:#f59e0b">${formatShortIDR(totalDailyImpressions)} Impresi</span> &bull; <span style="color:#3b82f6">${formatShortIDR(totalDailyClicks)} Klik</span> &bull; <span style="color:#8b5cf6">${avgDailyCtr}% CTR</span>`;
     }
 
-    // --- AI INSIGHTS GENERATOR (SMART EDITION) ---
+    // --- AI INSIGHTS GENERATOR (ULTRA SMART EDITION) ---
     let totalDailyOrders = dailyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let avgDailyCvr = totalDailyClicks > 0 ? ((totalDailyOrders / totalDailyClicks) * 100).toFixed(2) : "0.00";
     let avgCpc = totalDailyClicks > 0 ? (totalDailySpend / totalDailyClicks) : 0;
     
-    // Hitung durasi (hari) untuk membandingkan spend dengan threshold
+    // Hitung Average Order Value (AOV) / Rata-rata Nilai Pesanan
+    let aov = totalDailyOrders > 0 ? (totalDailyGmv / totalDailyOrders) : 0;
+    // Asumsi batas aman CPC adalah 10% dari AOV (Batas wajar margin)
+    let maxSafeCpc = aov * 0.10;
+    
     let dayCount = dailyData.length || 1;
 
-    // 1. Health Check & Scaling
+    // 1. Health Check & Margin Analysis
     let healthEl = document.getElementById('insightHealth');
     if (healthEl) {
         let healthHtml = '';
         if (totalDailyRoas >= 5.0 && (totalDailySpend / dayCount) < 50000) {
-            healthHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🚀 Peluang Skalasi (Scaling)</div>
-                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS Anda luar biasa (<b>${totalDailyRoas}x</b>), tapi pengeluaran sangat irit. Anda kehilangan momentum! 💡 <b>Saran:</b> Naikkan batas modal harian 15-20% secara perlahan untuk mendominasi pasar.</div>`;
+            healthHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🚀 Kehilangan Momentum (Scaling)</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS Anda luar biasa (<b>${totalDailyRoas}x</b>), tapi modal harian terlalu kecil. Anda membiarkan kompetitor mengambil sisa pelanggan! 💡 <b>Saran:</b> Naikkan modal harian 15-20%.</div>`;
             healthEl.style.borderLeftColor = '#16a34a';
         } else if (totalDailyRoas >= 4.0) {
-            healthHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🟢 Iklan Sangat Sehat</div>
-                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">Efisiensi luar biasa dengan ROAS <b>${totalDailyRoas}x</b>. GMV menutupi biaya iklan dengan margin profit yang sangat aman. Pertahankan!</div>`;
+            healthHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🟢 Mesin Profit Maksimal</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">Efisiensi luar biasa dengan ROAS <b>${totalDailyRoas}x</b>. Rata-rata keranjang belanja (AOV) berada di <b>Rp ${formatShortIDR(aov)}</b>. Pertahankan strategi ini!</div>`;
             healthEl.style.borderLeftColor = '#16a34a';
-        } else if (totalDailyRoas >= 2.0 && avgCpc > 2000) {
-            healthHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">🟡 Waspada Biaya Klik (CPC)</div>
-                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">Masih profit (ROAS <b>${totalDailyRoas}x</b>), tapi biaya per klik mahal (<b>Rp ${formatShortIDR(avgCpc)}</b>). 💡 <b>Saran:</b> Turunkan sedikit bid pada kata kunci Pencarian Luas untuk menjaga margin.</div>`;
-            healthEl.style.borderLeftColor = '#eab308';
+        } else if (totalDailyRoas >= 1.5 && avgCpc > maxSafeCpc && maxSafeCpc > 0) {
+            healthHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🚨 Bahaya Margin (CPC vs AOV)</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">Biaya per klik Anda (<b>Rp ${formatShortIDR(avgCpc)}</b>) terlalu mahal dibanding rata-rata nilai pesanan (<b>Rp ${formatShortIDR(aov)}</b>). Ini akan menggerus profit bersih Anda! 💡 <b>Saran:</b> Turunkan batas bid maksimal Anda segera.</div>`;
+            healthEl.style.borderLeftColor = '#dc2626';
         } else if (totalDailyRoas >= 2.0) {
-            healthHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">🟡 Status Waspada</div>
-                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS berada di level <b>${totalDailyRoas}x</b>. Masih profit, namun margin mulai menipis. Evaluasi kampanye yang memakan biaya besar tapi seret penjualan.</div>`;
+            healthHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">🟡 Profit Tipis (Waspada)</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS di level <b>${totalDailyRoas}x</b>. Masih profit, namun sangat rentan jika ada retur barang atau perang harga. Evaluasi kata kunci yang banyak klik tapi nol order.</div>`;
             healthEl.style.borderLeftColor = '#eab308';
         } else {
-            healthHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🔴 Indikasi Boncos</div>
-                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS anjlok di angka <b>${totalDailyRoas}x</b>. 💡 <b>Saran:</b> Segera matikan atau kurangi setengah bid pada kata kunci yang sudah menyedot Rp 50.000 tanpa hasil konversi!</div>`;
+            healthHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🔴 Darurat Kebocoran Anggaran</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS hancur di angka <b>${totalDailyRoas}x</b>. Anda mensubsidi pembeli. 💡 <b>Saran:</b> Matikan semua *broad match* (pencarian luas) dan sisakan hanya *exact match* yang terbukti menghasilkan penjualan!</div>`;
             healthEl.style.borderLeftColor = '#dc2626';
         }
         healthEl.innerHTML = healthHtml;
@@ -1323,35 +1327,41 @@ document.addEventListener("DOMContentLoaded", function() {
                         
                         let histHtml = '';
                         
-                        // Condition 1: Disaster Trend (Spend up, GMV down)
-                        if (spendGrowth > 5 && gmvGrowth < -5) {
-                            histHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🚨 Siaga Merah! (Boncos Progresif)</div>
-                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Anda membakar uang <b>${Math.abs(spendGrowth).toFixed(1)}% lebih banyak</b> dari rentang sebelumnya, namun omzet justru anjlok <b>${Math.abs(gmvGrowth).toFixed(1)}%</b>. 💡 <b>Saran:</b> Hentikan eksperimen! Segera kembalikan strategi ke pengaturan bulan lalu.</div>`;
-                            insightHistEl.style.borderLeftColor = '#dc2626';
-                        } 
-                        // Condition 2: Spectacular Growth (GMV up, ROAS up)
-                        else if (gmvGrowth > 5 && roasGrowth > 5) {
-                            histHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🚀 Pertumbuhan Spektakuler!</div>
-                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Omzet Anda melesat naik <b>${gmvGrowth.toFixed(1)}%</b> dan efisiensi (ROAS) juga membaik <b>${roasGrowth.toFixed(1)}%</b>. 💡 <b>Saran:</b> Strategi bulan ini sempurna! Pertahankan dan mulailah meriset kata kunci baru untuk terus berekspansi.</div>`;
-                            insightHistEl.style.borderLeftColor = '#16a34a';
+                        // Condition 0: Data Too Small to Judge
+                        if (currGmv < 50000 && prevGmv < 50000) {
+                            histHtml = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">🔍 Data Belum Signifikan</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Penjualan di kedua periode masih sangat kecil (di bawah 50rb) sehingga persentase pertumbuhan belum relevan untuk dianalisis.</div>`;
+                            insightHistEl.style.borderLeftColor = 'var(--dsh-border)';
                         }
-                        // Condition 3: Scaled but Inefficient (GMV up, ROAS down significantly)
-                        else if (gmvGrowth > 10 && roasGrowth < -10) {
-                            histHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">📈 Skalasi Mahal (Tumbuh tapi Boros)</div>
-                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Anda berhasil mendongkrak penjualan sebesar <b>${gmvGrowth.toFixed(1)}%</b>, tapi mengorbankan margin (ROAS turun <b>${Math.abs(roasGrowth).toFixed(1)}%</b>). 💡 <b>Saran:</b> Ini wajar saat fase 'Scaling'. Tapi pastikan HPP Anda masih bisa menutupi penurunan efisiensi ini.</div>`;
+                        // Condition 1: Anomaly - Huge spending spike but no GMV
+                        else if (spendGrowth > 100 && gmvGrowth < 10) {
+                            histHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🚨 ANOMALI: Kebocoran Fatal!</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Ada yang salah! Anda membakar uang <b>${spendGrowth.toFixed(1)}%</b> lebih gila dari bulan lalu, tapi omzet hanya bergerak <b>${gmvGrowth.toFixed(1)}%</b>. 💡 <b>Saran:</b> Segera cek laporan kata kunci! Ada kata kunci pencarian luas yang menyedot budget tanpa ampun.</div>`;
+                            insightHistEl.style.borderLeftColor = '#dc2626';
+                        }
+                        // Condition 2: Law of Diminishing Returns
+                        else if (spendGrowth > 30 && gmvGrowth > 0 && gmvGrowth < (spendGrowth / 2)) {
+                            histHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">⚠️ Hukum Hasil yang Berkurang (Diminishing Returns)</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Biaya iklan dinaikkan <b>${spendGrowth.toFixed(1)}%</b> tapi omzet hanya naik <b>${gmvGrowth.toFixed(1)}%</b>. Anda mulai membeli klik-klik sampah/mahal. 💡 <b>Saran:</b> Skalasi sudah mentok. Jangan naikkan budget lagi, fokus pada optimasi tingkat konversi (CVR).</div>`;
                             insightHistEl.style.borderLeftColor = '#eab308';
                         }
+                        // Condition 3: Healthy Scaling (Algorithmic Favor)
+                        else if (spendGrowth > 10 && gmvGrowth >= spendGrowth) {
+                            histHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🚀 Momentum Skalasi Maksimal</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Sempurna! Anda menambah modal <b>${spendGrowth.toFixed(1)}%</b> dan dibalas dengan kenaikan omzet <b>${gmvGrowth.toFixed(1)}%</b>. Algoritma Shopee sedang memihak produk Anda. 💡 <b>Saran:</b> Injak gas! Naikkan budget pelan-pelan selagi momentum ini ada.</div>`;
+                            insightHistEl.style.borderLeftColor = '#16a34a';
+                        }
                         // Condition 4: Slowdown (GMV down, Spend down)
-                        else if (gmvGrowth < -5 && spendGrowth < -5) {
-                            histHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; margin-bottom: 0.3rem;">📉 Perlambatan Tren</div>
-                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Pendapatan turun <b>${Math.abs(gmvGrowth).toFixed(1)}%</b> beriringan dengan penurunan biaya iklan. 💡 <b>Saran:</b> Apakah ini karena kehabisan stok, kompetitor banting harga, atau akhir musim promo? Pantau pergerakan pasar!</div>`;
+                        else if (gmvGrowth < -10 && spendGrowth < -10) {
+                            histHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; margin-bottom: 0.3rem;">📉 Tren Gugur (Dying Trend)</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Pasar mereda. Pendapatan anjlok <b>${Math.abs(gmvGrowth).toFixed(1)}%</b> dan sistem mengerem biaya iklan sebesar <b>${Math.abs(spendGrowth).toFixed(1)}%</b>. 💡 <b>Saran:</b> Cek siklus musiman (habis gajian/tanggal kembar). Jika bukan karena musim, berarti kompetitor merebut pasar Anda!</div>`;
                             insightHistEl.style.borderLeftColor = '#f59e0b';
                         }
-                        // Condition 5: Stable
+                        // Condition 5: Stable with subtle warnings
                         else {
                             let gmvDir = gmvGrowth >= 0 ? "naik" : "turun";
-                            histHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.85rem; margin-bottom: 0.3rem;">⚖️ Stabilitas Terjaga</div>
-                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Performa iklan berjalan stabil. Omzet ${gmvDir} perlahan <b>${Math.abs(gmvGrowth).toFixed(1)}%</b> dengan tingkat efisiensi yang relatif sama dengan rentang sebelumnya.</div>`;
+                            histHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.85rem; margin-bottom: 0.3rem;">⚖️ Stabilitas (Fase Plateau)</div>
+                                        <div style="font-size: 0.72rem; color: var(--dsh-muted);">Bisnis berjalan stabil bagai mesin. Omzet ${gmvDir} perlahan <b>${Math.abs(gmvGrowth).toFixed(1)}%</b> dengan struktur biaya yang terjaga. 💡 <b>Saran:</b> Saatnya bereksperimen dengan 1-2 kata kunci baru tanpa mengganggu kampanye utama.</div>`;
                             insightHistEl.style.borderLeftColor = '#3b82f6';
                         }
                         insightHistEl.innerHTML = histHtml;
