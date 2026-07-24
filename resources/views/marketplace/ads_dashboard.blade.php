@@ -500,42 +500,78 @@ document.addEventListener("DOMContentLoaded", function() {
     const dailyData = @json($dailyChartData);
     const hourlyData = @json($heatmapData ?? []);
     
-    // Theme colors
+    // Theme & UX Colors
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = isDark ? '#e5e7eb' : '#0f172a';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const textColor = isDark ? '#94a3b8' : '#64748b'; // softer text for axes
+    const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+    const tooltipBg = isDark ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.95)';
+    const tooltipBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)';
+    const tooltipText = isDark ? '#f8fafc' : '#0f172a';
     
     Chart.defaults.color = textColor;
-    Chart.defaults.font.family = 'ui-monospace, SFMono-Regular, Menlo, Consolas';
+    Chart.defaults.font.family = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
-    // Daily Line Chart
-    if(document.getElementById("dailyChart")) {
-        const ctxDaily = document.getElementById("dailyChart").getContext('2d');
+    // Helper: Format Rupiah Singkat (Jt/Rb)
+    const formatShortIDR = (value) => {
+        if(value >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + ' Jt';
+        if(value >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + ' Rb';
+        return value;
+    };
+    
+    // Helper: Format Full Rupiah untuk Tooltip
+    const formatFullIDR = (value) => {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+    };
+
+    // --- DAILY LINE CHART ---
+    const ctxDaily = document.getElementById("dailyChart");
+    if(ctxDaily) {
+        const ctxDaily2D = ctxDaily.getContext('2d');
         
-        new Chart(ctxDaily, {
+        // Buat Gradient (atas lebih pekat, bawah memudar)
+        let gradientSpend = ctxDaily2D.createLinearGradient(0, 0, 0, 300);
+        gradientSpend.addColorStop(0, 'rgba(220, 38, 38, 0.25)'); // Red pekat
+        gradientSpend.addColorStop(1, 'rgba(220, 38, 38, 0.0)');  // Red pudar
+
+        let gradientGMV = ctxDaily2D.createLinearGradient(0, 0, 0, 300);
+        gradientGMV.addColorStop(0, 'rgba(22, 163, 74, 0.25)'); // Green pekat
+        gradientGMV.addColorStop(1, 'rgba(22, 163, 74, 0.0)');  // Green pudar
+
+        new Chart(ctxDaily2D, {
             type: 'line',
             data: {
-                labels: dailyData.map(d => d.date),
+                labels: dailyData.map(d => {
+                    // ubah format "2026-07-22" jadi "22 Jul"
+                    const date = new Date(d.date);
+                    return date.getDate() + ' ' + date.toLocaleString('id-ID', { month: 'short' });
+                }),
                 datasets: [
                     {
-                        label: 'Spend (Rp)',
+                        label: 'Spend',
                         data: dailyData.map(d => parseFloat(d.spend)),
                         borderColor: '#dc2626',
-                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                        backgroundColor: gradientSpend,
                         fill: true,
-                        tension: 0.3,
+                        tension: 0.4, // kurva halus
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 0, // sembunyikan titik secara default
+                        pointHitRadius: 15, // area hover titik diperbesar
+                        pointHoverRadius: 4, // ukuran titik saat di-hover
+                        pointHoverBackgroundColor: '#dc2626',
                         yAxisID: 'y'
                     },
                     {
-                        label: 'GMV (Rp)',
+                        label: 'GMV',
                         data: dailyData.map(d => parseFloat(d.gmv)),
                         borderColor: '#16a34a',
-                        backgroundColor: 'transparent',
-                        tension: 0.3,
+                        backgroundColor: gradientGMV,
+                        fill: true,
+                        tension: 0.4, // kurva halus
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#16a34a',
                         yAxisID: 'y1'
                     }
                 ]
@@ -543,48 +579,105 @@ document.addEventListener("DOMContentLoaded", function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6 } } },
+                interaction: {
+                    mode: 'index',
+                    intersect: false, // tooltip muncul jika kursor berada pada kolom x yang sama
+                },
+                plugins: {
+                    legend: { 
+                        position: 'top', 
+                        labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, family: 'Inter, sans-serif' } } 
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxPadding: 4,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + formatFullIDR(context.parsed.y);
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { font: { size: 10 } } 
+                    },
                     y: { 
-                        type: 'linear', position: 'left', beginAtZero: true, 
-                        grid: { color: gridColor }, ticks: { font: { size: 10 } }
+                        type: 'linear', 
+                        position: 'left', 
+                        beginAtZero: true, 
+                        grid: { color: gridColor, drawBorder: false }, 
+                        ticks: { 
+                            font: { size: 10 }, 
+                            padding: 8,
+                            callback: function(value) { return formatShortIDR(value); }
+                        }
                     },
                     y1: { 
-                        type: 'linear', position: 'right', beginAtZero: true, 
-                        grid: { drawOnChartArea: false }, ticks: { font: { size: 10 } }
+                        type: 'linear', 
+                        position: 'right', 
+                        beginAtZero: true, 
+                        grid: { drawOnChartArea: false, drawBorder: false }, 
+                        ticks: { 
+                            font: { size: 10 }, 
+                            padding: 8,
+                            callback: function(value) { return formatShortIDR(value); }
+                        }
                     }
                 }
             }
         });
     }
 
-    // Hourly Bar Chart
-    if(document.getElementById("hourlyChart")) {
-        const ctxHourly = document.getElementById("hourlyChart").getContext('2d');
-        new Chart(ctxHourly, {
+    // --- HOURLY BAR CHART ---
+    const ctxHourly = document.getElementById("hourlyChart");
+    if(ctxHourly) {
+        new Chart(ctxHourly.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: hourlyData.map(d => d.performance_hour + ':00'),
                 datasets: [
                     {
-                        label: 'Clicks',
+                        label: 'Klik (Clicks)',
                         data: hourlyData.map(d => parseInt(d.clicks)),
                         backgroundColor: '#60a5fa',
-                        borderRadius: 2
+                        hoverBackgroundColor: '#3b82f6',
+                        borderRadius: 4,
+                        barPercentage: 0.7
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        displayColors: false
+                    }
+                },
                 scales: {
                     x: { grid: { display: false }, ticks: { font: { size: 10 } } },
                     y: { 
                         beginAtZero: true, 
-                        grid: { color: gridColor }, ticks: { font: { size: 10 } }
+                        grid: { color: gridColor, drawBorder: false }, 
+                        ticks: { font: { size: 10 }, padding: 8 }
                     }
                 }
             }
