@@ -1438,15 +1438,15 @@ document.addEventListener("DOMContentLoaded", function() {
                         
                         if (isVolatile) {
                             trendHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🎢 Deteksi Volatilitas ROAS</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Penyimpangan baku (StdDev) sangat tinggi. Hari terbaik (<b>${bestDay}</b>, ROAS <b>${maxRoas.toFixed(1)}x</b>) vs terburuk (<b>${worstDay}</b>, ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Hentikan perubahan pengaturan/budget GMV Max agar fase pembelajaran mesin stabil.</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">Penyimpangan baku (StdDev) sangat tinggi. Hari terbaik (<b>${formatIndoDate(bestDay)}</b>, ROAS <b>${maxRoas.toFixed(1)}x</b>) vs terburuk (<b>${formatIndoDate(worstDay)}</b>, ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Hentikan perubahan pengaturan/budget GMV Max agar fase pembelajaran mesin stabil.</div>`;
                             trendColor = '#dc2626';
                         } else if (secondHalfGmv > firstHalfGmv * 1.2) {
                             trendHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.8rem; margin-bottom: 0.2rem;">📈 Momentum Algoritma (Uptrend)</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 melampaui Paruh-1. Algoritma optimal pada <b>${bestDay}</b> (ROAS <b>${maxRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Biarkan mesin *running*. Jangan ubah Target ROAS saat ini.</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 melampaui Paruh-1. Algoritma optimal pada <b>${formatIndoDate(bestDay)}</b> (ROAS <b>${maxRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Biarkan mesin *running*. Jangan ubah Target ROAS saat ini.</div>`;
                             trendColor = '#16a34a';
                         } else if (secondHalfGmv < firstHalfGmv * 0.8) {
                             trendHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.8rem; margin-bottom: 0.2rem;">📉 Peringatan Downtrend</div>
-                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 merosot. Puncak penurunan di <b>${worstDay}</b> (ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Cek *Traffic Funnel* di bawah. Jika trafik turun, masalah ada di kompetisi harga/posisi.</div>`;
+                                         <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 merosot. Puncak penurunan di <b>${formatIndoDate(worstDay)}</b> (ROAS <b>${minRoas.toFixed(1)}x</b>). 💡 <b>Saran Teknis:</b> Cek *Traffic Funnel* di bawah. Jika trafik turun, masalah ada di kompetisi harga/posisi.</div>`;
                             trendColor = '#f59e0b';
                         } else {
                             trendHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.8rem; margin-bottom: 0.2rem;">🛥️ Konvergensi Stabil</div>
@@ -1471,15 +1471,15 @@ document.addEventListener("DOMContentLoaded", function() {
                             
                             if (parseInt(maxImpressionsDay.impressions) > 1000 && impCtr < 1.0) {
                                 tfHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🚨 Kebocoran Impresi Ekstrem</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${maxImpressionsDay.date}</b>, iklan mendapat <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> impresi tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 💡 <b>Saran Teknis:</b> Iklan tayang tapi tidak diklik. Ini merusak *Quality Score*. Cek harga/thumbnail segera.</div>`;
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxImpressionsDay.date)}</b>, iklan mendapat <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> impresi tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 💡 <b>Saran Teknis:</b> Iklan tayang tapi tidak diklik. Ini merusak *Quality Score*. Cek harga/thumbnail segera.</div>`;
                                 tfColor = '#dc2626';
                             } else if (parseInt(maxClicksDay.clicks) > 50 && clkCvr < 0.5) {
                                 tfHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.8rem; margin-bottom: 0.2rem;">⚠️ Anomali *Bounce Rate*</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${maxClicksDay.date}</b>, terjadi lonjakan <b>${parseInt(maxClicksDay.clicks).toLocaleString('id-ID')}</b> klik, tapi nyaris 0 pesanan (CVR <b>${clkCvr.toFixed(2)}%</b>). 💡 <b>Saran Teknis:</b> Cek log kompetitor di hari tersebut (apakah mereka sedang *Flash Sale*?) atau cek ketersediaan stok Anda.</div>`;
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxClicksDay.date)}</b>, terjadi lonjakan <b>${parseInt(maxClicksDay.clicks).toLocaleString('id-ID')}</b> klik, tapi nyaris 0 pesanan (CVR <b>${clkCvr.toFixed(2)}%</b>). 💡 <b>Saran Teknis:</b> Cek log kompetitor di hari tersebut (apakah mereka sedang *Flash Sale*?) atau cek ketersediaan stok Anda.</div>`;
                                 tfColor = '#eab308';
                             } else {
                                 tfHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.8rem; margin-bottom: 0.2rem;">✅ Distribusi *Funnel* Sehat</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Tidak terdeteksi kebocoran parah pada hari dengan trafik tertinggi (<b>${maxImpressionsDay.date}</b>). Konversi klik ke pesanan mengalir normal.</div>`;
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Tidak terdeteksi kebocoran parah pada puncak trafik (<b>${formatIndoDate(maxImpressionsDay.date)}</b>). Konversi ke pesanan mengalir normal.</div>`;
                                 tfColor = '#16a34a';
                             }
                             insightTrafficDailyEl.innerHTML = tfHtml;
