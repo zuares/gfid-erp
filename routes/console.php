@@ -54,59 +54,59 @@ Artisan::command('production:seed-boms {--force : Jalankan tanpa konfirmasi saat
 })->purpose('Generate BOM finished goods produksi sendiri kecuali kategori SHT.');
 
 // ── Storefront product ranking (setiap jam) ───────────────────────────────
-Schedule::command('storefront:rank-products')
+Schedule::call(fn () => Artisan::call('storefront:rank-products'))
     ->hourly()
     ->withoutOverlapping();
 
 // Update harian setelah ganti hari
-Schedule::command('sales:rebuild-daily-item-sales --days=90')
+Schedule::call(fn () => Artisan::call('sales:rebuild-daily-item-sales', ['--days' => 90]))
     ->dailyAt('00:05');
 
-Schedule::command('inventory:recalc-ads-from-daily --days=30')
+Schedule::call(fn () => Artisan::call('inventory:recalc-ads-from-daily', ['--days' => 30]))
     ->dailyAt('00:10');
 
 // Auto-cleanup file resi (.pdf.gz) setiap malam pukul 01:00
-Schedule::command('marketplace:sync-orders')
+Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
-Schedule::command('marketplace:sync-returns')
+Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->hourly()
     ->withoutOverlapping();
 
-Schedule::command('marketplace:sync-settlements')
+Schedule::call(fn () => Artisan::call('marketplace:sync-settlements'))
     ->everyFourHours()
     ->withoutOverlapping();
 
 // Finance: sync order → settlement → COGS setiap 4 jam (profit per order)
-Schedule::command('marketplace:sync-finance --months=1')
+Schedule::call(fn () => Artisan::call('marketplace:sync-finance', ['--months' => 1]))
     ->everyFourHours()
     ->withoutOverlapping();
 
-Schedule::command('marketplace:sync-chats')
+Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->everyMinute()
     ->withoutOverlapping();
 
 // Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
-Schedule::command('marketplace:sync-ads-daily --days=3')
+Schedule::call(fn () => Artisan::call('marketplace:sync-ads-daily', ['--days' => 3]))
     ->dailyAt('23:30')
     ->withoutOverlapping();
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
-Schedule::command('marketplace:snapshot-products --sync')
+Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync' => true]))
     ->dailyAt('23:45')
     ->withoutOverlapping();
 
 // Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
-Schedule::command('marketplace:run-boosts')
+Schedule::call(fn () => Artisan::call('marketplace:run-boosts'))
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
 // Proses antrean job (order webhook, download resi, sync historis) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
-Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3 --sleep=1')
+Schedule::call(fn () => Artisan::call('queue:work', ['--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
     ->everyMinute()
     ->withoutOverlapping();
 
-Schedule::command('marketplace:cleanup-labels')
+Schedule::call(fn () => Artisan::call('marketplace:cleanup-labels'))
     ->dailyAt('01:00');
