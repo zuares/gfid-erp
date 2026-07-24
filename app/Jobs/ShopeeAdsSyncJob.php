@@ -27,7 +27,6 @@ class ShopeeAdsSyncJob implements ShouldQueue
         $this->dateFrom = $dateFrom;
         $this->dateTo = $dateTo;
         $this->isHourly = $isHourly;
-        $this->onQueue('shopee-ads');
     }
 
     public function middleware()
