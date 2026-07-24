@@ -137,23 +137,33 @@ class ShopeeAdsSyncService
         
         foreach ($list as $d) {
             if (empty($d['date'])) continue;
-            $date = Carbon::createFromFormat('d-m-Y', $d['date'])->format('Y-m-d');
+            $dateObj = Carbon::createFromFormat('d-m-Y', $d['date']);
+            $record = MarketplaceAdsDaily::where('store_id', $store->id)
+                ->whereDate('date', $dateObj)
+                ->first();
+                
+            $payload = [
+                'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
+                'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
+                'ctr'         => $d['ctr'] ?? null,
+                'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
+                'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
+                'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
+                'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
+                'cpc'         => $d['cpc'] ?? null,
+                'cvr'         => $d['conversion_rate'] ?? null,
+                'raw_json'    => $d,
+            ];
             
-            MarketplaceAdsDaily::updateOrCreate(
-                ['store_id' => $store->id, 'date' => $date],
-                [
-                    'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
-                    'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
-                    'ctr'         => $d['ctr'] ?? null,
-                    'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
-                    'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
-                    'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
-                    'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
-                    'cpc'         => $d['cpc'] ?? null,
-                    'cvr'         => $d['conversion_rate'] ?? null,
-                    'raw_json'    => $d,
-                ]
-            );
+            if ($record) {
+                $record->update($payload);
+            } else {
+                MarketplaceAdsDaily::create(array_merge([
+                    'store_id' => $store->id,
+                    'date' => $dateObj->format('Y-m-d')
+                ], $payload));
+            }
+            
             $run->total_updated++;
         }
     }

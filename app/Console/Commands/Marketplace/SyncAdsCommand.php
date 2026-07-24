@@ -72,25 +72,15 @@ class SyncAdsCommand extends Command
                     $this->info("Dispatched backfill chain for Store {$store->name}");
                 }
             } else {
-                // Execute directly synchronously
-                $this->info("Menjalankan sync untuk Store {$store->name}");
+                // Execute via Queue
+                $this->info("Mengantrekan sync untuk Store {$store->name} ke Queue");
                 
-                $syncTypes = ['balance', 'campaigns'];
-                if ($isHourly) {
-                    $syncTypes[] = 'hourly';
-                } else {
-                    $syncTypes[] = 'daily';
-                }
-                
-                foreach ($syncTypes as $type) {
-                    try {
-                        app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class)->syncBalance($store, new \App\Models\MarketplaceAdsSyncRun()); // Mocked run for sync command without proper run tracking yet
-                        // Real implementation will be within the job or directly called
-                        ShopeeAdsSyncJob::dispatchSync($store, Carbon::parse($from), Carbon::parse($to), $isHourly);
-                        break; // dispatchSync handles all
-                    } catch (\Throwable $e) {
-                        $this->error("Error sync {$type} Store {$store->name}: " . $e->getMessage());
-                    }
+                try {
+                    ShopeeAdsSyncJob::dispatch($store, Carbon::parse($from), Carbon::parse($to), $isHourly)
+                        ->onConnection('database')
+                        ->onQueue('shopee-ads');
+                } catch (\Throwable $e) {
+                    $this->error("Error dispatch sync Store {$store->name}: " . $e->getMessage());
                 }
             }
         }

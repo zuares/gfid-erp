@@ -1862,21 +1862,31 @@ class MarketplaceController extends Controller
                     $rawDate = $d['date'] ?? null;
                     if (! $rawDate) continue;
                     // Shopee kirim DD-MM-YYYY
-                    $date = \Carbon\Carbon::createFromFormat('d-m-Y', $rawDate)->toDateString();
+                    $dateObj = \Carbon\Carbon::createFromFormat('d-m-Y', $rawDate);
 
-                    \App\Models\MarketplaceAdsDaily::updateOrCreate(
-                        ['store_id' => $store->id, 'date' => $date],
-                        [
-                            'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
-                            'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
-                            'ctr'         => $d['ctr'] ?? null,
-                            'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
-                            'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
-                            'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
-                            'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
-                            'raw_json'    => $d,
-                        ]
-                    );
+                    $record = \App\Models\MarketplaceAdsDaily::where('store_id', $store->id)
+                        ->whereDate('date', clone $dateObj)
+                        ->first();
+                        
+                    $payload = [
+                        'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
+                        'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
+                        'ctr'         => $d['ctr'] ?? null,
+                        'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
+                        'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
+                        'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
+                        'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
+                        'raw_json'    => $d,
+                    ];
+                    
+                    if ($record) {
+                        $record->update($payload);
+                    } else {
+                        \App\Models\MarketplaceAdsDaily::create(array_merge([
+                            'store_id' => $store->id, 
+                            'date' => $dateObj->format('Y-m-d')
+                        ], $payload));
+                    }
                     $saved++;
                 }
             } catch (\Throwable $e) {
