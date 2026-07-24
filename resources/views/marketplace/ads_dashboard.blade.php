@@ -320,12 +320,13 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian & Per Jam</div>
             
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
+                <!-- 1. TREN FINANSIAL HARIAN -->
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Harian</div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Finansial Harian</div>
                             <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Tips:</b> Selisih area <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Efisiensi iklan. <b>Garis AOV (Putus-putus)</b> = Daya beli (Rata-rata belanja).
+                                💡 <b>Finansial:</b> Selisih <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Profitabilitas. <b>AOV (Putus-putus)</b> = Rata-rata belanja (cek sensitivitas harga).
                             </div>
                         </div>
                         <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
@@ -334,32 +335,36 @@ document.addEventListener('DOMContentLoaded', function () {
                         <canvas id="dailyChart"></canvas>
                     </div>
                 </div>
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Distribusi Per Jam</div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Tips:</b> Cari jam saat <b>Garis Emas (ROAS)</b> memuncak. Itu adalah jam paling untung untuk gas iklan!
-                            </div>
-                        </div>
-                        <div id="hourlySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                    </div>
-                    <div style="height: 280px;">
-                        <canvas id="hourlyChart"></canvas>
-                    </div>
-                </div>
+
+                <!-- 2. TREN TRAFIK HARIAN -->
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Trafik Harian</div>
                             <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Tips:</b> Jarak area <b>Impresi (Kuning)</b> & <b>Klik (Biru)</b> menunjukkan rasio bocornya trafik. Awasi <b>Garis CTR (Ungu)</b>; jika anjlok, perbaiki gambar/judul produk!
+                                💡 <b>Trafik (Funnel):</b> <b>Impresi (Kuning)</b> vs <b>Klik (Biru)</b> = Rasio bocor. Awasi <b>Garis CTR (Ungu)</b>; jika anjlok, segera evaluasi foto/judul produk!
                             </div>
                         </div>
                         <div id="trafficSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                     </div>
                     <div style="height: 280px;">
                         <canvas id="trafficChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 3. DISTRIBUSI PER JAM -->
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Distribusi Per Jam (Dayparting)</div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
+                                💡 <b>Dayparting:</b> Cari jam di mana <b>Garis ROAS (Emas)</b> memuncak dan <b>Siluet Trafik</b> tebal. Itu adalah <b>Jam Emas</b> untuk menaikkan bid iklan!
+                            </div>
+                        </div>
+                        <div id="hourlySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                    </div>
+                    <div style="height: 280px;">
+                        <canvas id="hourlyChart"></canvas>
                     </div>
                 </div>
             </div>
