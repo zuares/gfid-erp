@@ -284,9 +284,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
                 <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Distribusi Per Jam</div>
-                        <div id="hourlySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text);"></div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Distribusi Per Jam</div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
+                                💡 <b>Tips:</b> Cari jam saat <b>Garis Emas (ROAS)</b> memuncak. Itu adalah jam paling untung untuk gas iklan!
+                            </div>
+                        </div>
+                        <div id="hourlySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                     </div>
                     <div style="height: 280px;">
                         <canvas id="hourlyChart"></canvas>
