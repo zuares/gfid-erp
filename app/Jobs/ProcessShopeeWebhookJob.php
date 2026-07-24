@@ -458,7 +458,14 @@ class ProcessShopeeWebhookJob implements ShouldQueue
         } else {
             Log::info("Order/Booking {$bookingSn} not found locally during booking_trackingno_update. Syncing via API.");
             try {
-                app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $bookingSn);
+                // Untuk kilat, order_sn mungkin belum terbentuk atau belum ditarik. 
+                // Karena kita sudah mengupdate MarketplaceBooking di atas, kita cukup memicu event.
+                // Jika ingin menarik detail penuh, kita panggil syncBookings (atau getBookingDetail).
+                // Saat ini, updateOrCreate MarketplaceBooking di atas sudah cukup sebagai dasar data.
+                
+                // Gunakan SyncMarketplaceBookings job untuk menarik detail booking ini
+                dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, $bookingSn, null, false));
+                
                 event(new \App\Events\OrderUpdated($store->id, $bookingSn, null));
             } catch (\Exception $e) {
                 Log::error("Failed to sync missing booking/order {$bookingSn}: " . $e->getMessage());
