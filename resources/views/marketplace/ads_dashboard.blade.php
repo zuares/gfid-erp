@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function () {
         flatpickr(rangePicker, {
             mode: 'range',
             locale: 'id',
-            showMonths: 1,
+            showMonths: 2, // Tampilkan 2 bulan berjejer agar mudah pilih rentang panjang
             dateFormat: 'Y-m-d',
             defaultDate: [fromEl.value, toEl.value],
             onChange: function(selectedDates, dateStr, instance) {
