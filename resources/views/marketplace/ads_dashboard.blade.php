@@ -514,7 +514,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 datasets: [
                     {
                         label: 'Spend',
-                        data: dailyData.map(d => parseFloat(d.spend)),
+                        data: dailyData.map(d => parseFloat(d.spend || 0)),
                         borderColor: '#dc2626',
                         backgroundColor: gradientSpend,
                         fill: true,
@@ -528,7 +528,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     },
                     {
                         label: 'GMV',
-                        data: dailyData.map(d => parseFloat(d.gmv)),
+                        data: dailyData.map(d => parseFloat(d.gmv || 0)),
                         borderColor: '#16a34a',
                         backgroundColor: gradientGMV,
                         fill: true,
@@ -614,7 +614,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     {
                         label: 'Klik',
                         type: 'bar',
-                        data: hourlyData.map(d => parseInt(d.clicks)),
+                        data: hourlyData.map(d => parseInt(d.clicks || 0)),
                         backgroundColor: 'rgba(139, 92, 246, 0.8)',
                         borderRadius: 4,
                         yAxisID: 'y'
@@ -622,7 +622,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     {
                         label: 'Konversi (Pesanan)',
                         type: 'line',
-                        data: hourlyData.map(d => parseInt(d.orders)),
+                        data: hourlyData.map(d => parseInt(d.orders || 0)),
                         borderColor: 'rgba(16, 185, 129, 1)',
                         backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         borderWidth: 2,
