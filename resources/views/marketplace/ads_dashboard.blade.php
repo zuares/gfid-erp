@@ -318,6 +318,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 @endforeach
             </div>
 
+            <div class="dash-sec"><i class="bi bi-robot"></i> Asisten Analisis (Berdasarkan Rentang Tanggal)</div>
+            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHealth"></div>
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTraffic"></div>
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTime"></div>
+            </div>
+
             <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian & Per Jam</div>
             
             <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
@@ -596,6 +603,78 @@ document.addEventListener("DOMContentLoaded", function() {
     let tsEl = document.getElementById('trafficSummary');
     if(tsEl) {
         tsEl.innerHTML = `<span style="color:#f59e0b">${formatShortIDR(totalDailyImpressions)} Impresi</span> &bull; <span style="color:#3b82f6">${formatShortIDR(totalDailyClicks)} Klik</span> &bull; <span style="color:#8b5cf6">${avgDailyCtr}% CTR</span>`;
+    }
+
+    // --- AI INSIGHTS GENERATOR ---
+    let totalDailyOrders = dailyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
+    let avgDailyCvr = totalDailyClicks > 0 ? ((totalDailyOrders / totalDailyClicks) * 100).toFixed(2) : "0.00";
+
+    // 1. Health Check
+    let healthEl = document.getElementById('insightHealth');
+    if (healthEl) {
+        let healthHtml = '';
+        if (totalDailyRoas >= 4.0) {
+            healthHtml = `<div style="font-weight: 700; color: #16a34a; font-size: 0.85rem; margin-bottom: 0.3rem;">🟢 Iklan Sangat Sehat</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">Efisiensi luar biasa dengan ROAS <b>${totalDailyRoas}x</b>. GMV menutupi biaya iklan dengan margin profit yang sangat aman. Pertahankan!</div>`;
+            healthEl.style.borderLeftColor = '#16a34a';
+        } else if (totalDailyRoas >= 2.0) {
+            healthHtml = `<div style="font-weight: 700; color: #eab308; font-size: 0.85rem; margin-bottom: 0.3rem;">🟡 Status Waspada</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS berada di level <b>${totalDailyRoas}x</b>. Masih profit, namun margin mulai menipis. Evaluasi kampanye yang memakan biaya besar tapi seret penjualan.</div>`;
+            healthEl.style.borderLeftColor = '#eab308';
+        } else {
+            healthHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">🔴 Indikasi Boncos</div>
+                          <div style="font-size: 0.72rem; color: var(--dsh-muted);">ROAS anjlok di angka <b>${totalDailyRoas}x</b>. Segera matikan/kurangi bid pada kampanye yang menyedot biaya tanpa hasil!</div>`;
+            healthEl.style.borderLeftColor = '#dc2626';
+        }
+        healthEl.innerHTML = healthHtml;
+    }
+
+    // 2. Traffic Detective
+    let trafficEl = document.getElementById('insightTraffic');
+    if (trafficEl) {
+        let trafficHtml = '';
+        if (avgDailyCtr < 1.5 && totalDailyImpressions > 1000) {
+            trafficHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">📉 Kebocoran Trafik (CTR)</div>
+                           <div style="font-size: 0.72rem; color: var(--dsh-muted);">CTR sangat rendah (<b>${avgDailyCtr}%</b>). Pembeli melihat iklan tapi enggan klik. 💡 Saran: Segera ganti Foto Utama atau Judul Produk!</div>`;
+            trafficEl.style.borderLeftColor = '#dc2626';
+        } else if (avgDailyCvr < 2.0 && totalDailyClicks > 100) {
+            trafficHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; margin-bottom: 0.3rem;">🛒 Konversi Rendah (CVR)</div>
+                           <div style="font-size: 0.72rem; color: var(--dsh-muted);">CTR aman, tapi Konversi (CVR) hanya <b>${avgDailyCvr}%</b>. Orang klik tapi ragu beli. 💡 Saran: Cek harga kompetitor, voucher, atau rating produk.</div>`;
+            trafficEl.style.borderLeftColor = '#f59e0b';
+        } else {
+            trafficHtml = `<div style="font-weight: 700; color: #3b82f6; font-size: 0.85rem; margin-bottom: 0.3rem;">🚀 Trafik Optimal</div>
+                           <div style="font-size: 0.72rem; color: var(--dsh-muted);">Daya tarik iklan (CTR <b>${avgDailyCtr}%</b>) dan daya beli (CVR <b>${avgDailyCvr}%</b>) berada dalam kondisi prima.</div>`;
+            trafficEl.style.borderLeftColor = '#3b82f6';
+        }
+        trafficEl.innerHTML = trafficHtml;
+    }
+
+    // 3. Golden Hour
+    let timeEl = document.getElementById('insightTime');
+    if (timeEl) {
+        let bestHour = '-';
+        let highestRoas = 0;
+        hourlyData.forEach(d => {
+            let sp = parseFloat(d.expense || 0);
+            let gm = parseFloat(d.gmv || 0);
+            if (sp > 1000) { // minimum spend threshold
+                let r = gm / sp;
+                if (r > highestRoas) {
+                    highestRoas = r;
+                    bestHour = d.performance_hour;
+                }
+            }
+        });
+        
+        if (highestRoas > 0) {
+            timeEl.innerHTML = `<div style="font-weight: 700; color: #8b5cf6; font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Waktu Emas (Dayparting)</div>
+                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Puncak efisiensi tertinggi terjadi pada pukul <b>${bestHour}:00</b> (ROAS ${highestRoas.toFixed(2)}x). 💡 Saran: Naikkan bid iklan secara agresif di jam ini!</div>`;
+            timeEl.style.borderLeftColor = '#8b5cf6';
+        } else {
+            timeEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Data Waktu Belum Cukup</div>
+                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Belum ada jam dengan pengeluaran dan konversi yang cukup signifikan untuk menyimpulkan Waktu Emas.</div>`;
+            timeEl.style.borderLeftColor = 'var(--dsh-border)';
+        }
     }
 
     // Helper: Format Full Rupiah untuk Tooltip
