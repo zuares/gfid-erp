@@ -136,9 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
             mode: 'range',
             locale: 'id',
             showMonths: 1,
-            altInput: true,
-            altFormat: 'd M Y',
-            dateFormat: 'Y-m-d',
+            dateFormat: 'd M Y',
             defaultDate: [fromEl.value, toEl.value],
             onChange: function(selectedDates, dateStr, instance) {
                 if(selectedDates.length === 2) {
@@ -148,17 +146,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-        
-        // Ensure the generated altInput gets our pill styling
-        setTimeout(() => {
-            const altInp = rangePicker.nextElementSibling;
-            if(altInp && altInp.classList.contains('flatpickr-input')) {
-                altInp.className = 'range-pill';
-                altInp.style.width = '240px';
-                altInp.style.textAlign = 'center';
-                altInp.style.cursor = 'pointer';
-            }
-        }, 100);
     }
 });
 </script>
@@ -208,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="filter-item" style="flex: 2;">
             <label>Periode Data</label>
             <div class="period-bar">
-                <input type="text" id="rangePicker" style="display:none;">
+                <input type="text" id="rangePicker" class="range-pill" style="width: 260px; text-align: center; cursor: pointer; background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 650; font-size: .85rem;" placeholder="Pilih Rentang Tanggal..." readonly>
                 <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}">
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}">
             </div>
