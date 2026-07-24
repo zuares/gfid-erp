@@ -748,6 +748,20 @@ document.addEventListener("DOMContentLoaded", function() {
                 datasets: [
                     {
                         type: 'line',
+                        label: 'Klik (Trafik)',
+                        data: hourlyData.map(d => parseInt(d.clicks || 0)),
+                        borderColor: 'rgba(148, 163, 184, 0)',
+                        backgroundColor: 'rgba(148, 163, 184, 0.15)',
+                        borderWidth: 0,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 0,
+                        yAxisID: 'y2'
+                    },
+                    {
+                        type: 'line',
                         label: 'ROAS',
                         data: hourlyData.map(d => {
                             let sp = parseFloat(d.expense || 0);
@@ -806,6 +820,8 @@ document.addEventListener("DOMContentLoaded", function() {
                                 if (label) label += ': ';
                                 if (context.dataset.yAxisID === 'y1') {
                                     return label + context.parsed.y + 'x';
+                                } else if (context.dataset.yAxisID === 'y2') {
+                                    return label + context.parsed.y;
                                 } else {
                                     return label + formatFullIDR(context.parsed.y);
                                 }
@@ -836,6 +852,12 @@ document.addEventListener("DOMContentLoaded", function() {
                             padding: 8,
                             callback: function(value) { return value + 'x'; }
                         }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: false,
+                        position: 'left',
+                        beginAtZero: true
                     }
                 }
             }
