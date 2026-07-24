@@ -105,7 +105,23 @@ body[data-theme="dark"] .range-pill { color: #e5e7eb; background: rgba(255,255,2
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    window.dispatchEvent(new Event('resize')); // re-render charts
+    const tabBtns = document.querySelectorAll('.dash-tab');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+
+            btn.classList.add('active');
+            const targetPane = document.getElementById(btn.getAttribute('data-target'));
+            if (targetPane) targetPane.classList.add('active');
+            
+            window.dispatchEvent(new Event('resize')); // re-render charts
+        });
+    });
+
+    window.dispatchEvent(new Event('resize')); // re-render charts on load
 
     // Flatpickr & Preset Logic (Shipments Style)
     const preset = document.getElementById('presetRange');
@@ -263,9 +279,21 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     @else
         {{-- ==============================================
-             CONTENT (Unified)
+             TABS
         ============================================== --}}
         <div>
+            <div class="dash-tabs">
+                <button class="dash-tab active" data-target="tab-dashboard">Dashboard</button>
+                <button class="dash-tab" data-target="tab-sync">Sinkronisasi</button>
+            </div>
+        </div>
+
+        {{-- ==============================================
+             TAB CONTENT
+        ============================================== --}}
+        
+        <!-- DASHBOARD TAB -->
+        <div class="tab-pane active" id="tab-dashboard">
             
             <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI)</div>
             
@@ -376,8 +404,10 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
-        <!-- SETTINGS & LOGS -->
-        <div class="mt-4">
+        </div>
+
+        <!-- SINKRONISASI TAB -->
+        <div class="tab-pane" id="tab-sync">
             
             <div class="dash-panels" style="grid-template-columns: 1fr 2.5fr;">
                 <!-- Sync Form -->
@@ -622,12 +652,16 @@ document.addEventListener("DOMContentLoaded", function() {
                 labels: hourlyData.map(d => d.performance_hour + ':00'),
                 datasets: [
                     {
-                        label: 'Klik (Clicks)',
+                        label: 'Klik',
                         data: hourlyData.map(d => parseInt(d.clicks)),
-                        backgroundColor: '#60a5fa',
-                        hoverBackgroundColor: '#3b82f6',
-                        borderRadius: 4,
-                        barPercentage: 0.7
+                        backgroundColor: 'rgba(139, 92, 246, 0.8)',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Konversi',
+                        data: hourlyData.map(d => parseInt(d.orders)),
+                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                        borderRadius: 4
                     }
                 ]
             },
