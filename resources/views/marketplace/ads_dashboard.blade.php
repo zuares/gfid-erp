@@ -270,9 +270,24 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
         <div>
             @if(isset($syncRuns) && $syncRuns->isNotEmpty())
-            <div style="font-size: 0.72rem; color: var(--dsh-muted); text-align: right; margin-bottom: 0.35rem; font-weight: 500;">
-                Terakhir Sync: {{ $syncRuns->first()->updated_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }}
-            </div>
+                @php
+                    $latestRun = $syncRuns->first();
+                    $lastSuccess = $syncRuns->firstWhere('status', 'success');
+                @endphp
+                @if($latestRun->status === 'error')
+                    <div style="font-size: 0.7rem; color: #dc2626; text-align: right; margin-bottom: 0.25rem; font-weight: 600;">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Sync Gagal: {{ Str::limit($latestRun->error_message, 60) }}
+                    </div>
+                @endif
+                <div style="font-size: 0.72rem; color: var(--dsh-muted); text-align: right; margin-bottom: 0.35rem; font-weight: 500;">
+                    @if($lastSuccess)
+                        <span style="color: #16a34a;"><i class="bi bi-check-circle-fill"></i></span>
+                        Terakhir Sync: {{ $lastSuccess->updated_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }}
+                    @else
+                        <span style="color: #eab308;"><i class="bi bi-clock"></i></span>
+                        Belum pernah sync berhasil
+                    @endif
+                </div>
             @endif
             <div id="liveModeBtn" class="role-chip live-btn live-off" onclick="toggleLiveMode()">
                 <i class="bi bi-broadcast"></i> Live Mode OFF
