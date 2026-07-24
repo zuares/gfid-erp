@@ -22,6 +22,13 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'shopee' => [
+        'partner_id' => env('SHOPEE_PARTNER_ID'),
+        'partner_key' => env('SHOPEE_PARTNER_KEY'),
+        'environment' => env('SHOPEE_ENVIRONMENT', 'sandbox'), // 'sandbox' atau 'production'
+        'ads_scheduler_enabled' => env('SHOPEE_ADS_SCHEDULER_ENABLED', false),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
