@@ -14,7 +14,7 @@ class SyncFinanceJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 1800; // 30 menit
-    public $tries = 1;
+    public $tries = 3;
 
     public function handle()
     {
