@@ -366,8 +366,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <th>Status</th>
                                 <th class="text-end">Biaya (Spend)</th>
                                 <th class="text-end">GMV</th>
-                                <th class="text-center">ROAS</th>
-                                <th class="text-end">ACOS</th>
+                                <th class="text-end">ROAS</th>
+                                <th class="text-end">Klik</th>
+                                <th class="text-end">Pesanan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -653,15 +654,22 @@ document.addEventListener("DOMContentLoaded", function() {
                 datasets: [
                     {
                         label: 'Klik',
+                        type: 'bar',
                         data: hourlyData.map(d => parseInt(d.clicks)),
                         backgroundColor: 'rgba(139, 92, 246, 0.8)',
-                        borderRadius: 4
+                        borderRadius: 4,
+                        yAxisID: 'y'
                     },
                     {
-                        label: 'Konversi',
+                        label: 'Konversi (Pesanan)',
+                        type: 'line',
                         data: hourlyData.map(d => parseInt(d.orders)),
-                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                        borderRadius: 4
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        yAxisID: 'y1'
                     }
                 ]
             },
@@ -670,7 +678,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: { 
-                    legend: { display: false },
+                    legend: { 
+                        display: true, 
+                        position: 'top', 
+                        labels: { usePointStyle: true, boxWidth: 6, font: { size: 10, family: 'Inter, sans-serif' } } 
+                    },
                     tooltip: {
                         backgroundColor: tooltipBg,
                         titleColor: tooltipText,
@@ -685,9 +697,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 scales: {
                     x: { grid: { display: false }, ticks: { font: { size: 10 } } },
                     y: { 
+                        type: 'linear',
+                        position: 'left',
                         beginAtZero: true, 
                         grid: { color: gridColor, drawBorder: false }, 
                         ticks: { font: { size: 10 }, padding: 8 }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: true,
+                        grid: { drawOnChartArea: false, drawBorder: false },
+                        ticks: { font: { size: 10 }, padding: 8, precision: 0 }
                     }
                 }
             }
