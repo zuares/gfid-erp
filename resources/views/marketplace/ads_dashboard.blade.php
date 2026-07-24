@@ -382,10 +382,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">Rp {{ number_format($camp->spend, 0, ',', '.') }}</td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">Rp {{ number_format($camp->gmv, 0, ',', '.') }}</td>
-                                    <td class="text-center" style="font-family: ui-monospace, monospace; font-weight:700;">
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700;">
                                         {{ $camp->spend > 0 ? number_format($camp->gmv / $camp->spend, 2) : 0 }}x
                                     </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ $camp->gmv > 0 ? number_format(($camp->spend / $camp->gmv) * 100, 2) : 0 }}%</td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->clicks, 0, ',', '.') }}</td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">{{ number_format($camp->orders, 0, ',', '.') }}</td>
                                 </tr>
                             @empty
                                 <tr>

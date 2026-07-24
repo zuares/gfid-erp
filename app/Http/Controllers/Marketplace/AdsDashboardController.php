@@ -44,10 +44,22 @@ class AdsDashboardController extends Controller
             ->orderBy('date')
             ->get();
             
-        // Fetch Campaigns
+        // Fetch Campaigns (Dynamic aggregation from dailies based on date filter)
         $campaigns = MarketplaceAdCampaign::where('store_id', $storeId)
-            ->orderByDesc('spend')
-            ->get();
+            ->withSum(['dailies as sum_expense' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'expense')
+            ->withSum(['dailies as sum_gmv' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_gmv')
+            ->withSum(['dailies as sum_clicks' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'clicks')
+            ->withSum(['dailies as sum_orders' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_order')
+            ->get()
+            ->map(function ($camp) {
+                $camp->spend = $camp->sum_expense ?? 0;
+                $camp->gmv = $camp->sum_gmv ?? 0;
+                $camp->clicks = $camp->sum_clicks ?? 0;
+                $camp->orders = $camp->sum_orders ?? 0;
+                return $camp;
+            })
+            ->sortByDesc('spend')
+            ->values();
             
         // Fetch Sync Runs
         $syncRuns = MarketplaceAdsSyncRun::where('store_id', $storeId)
