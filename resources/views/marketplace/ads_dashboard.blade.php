@@ -50,7 +50,7 @@
 .role-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .6rem; border-radius: 6px; font-size: .7rem; font-weight: 600; background: var(--bg); border: 1px solid var(--dsh-border); color: var(--text); }
 
 .live-btn {
-    cursor: pointer;
+    cursor: default;
     transition: all 0.2s;
     user-select: none;
 }
@@ -196,62 +196,31 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-
-    // --- LIVE MODE (REALTIME) LOGIC ---
-    let liveCountdownInterval = null;
-    const liveBtn = document.getElementById('liveModeBtn');
-
-    window.toggleLiveMode = function() {
-        let isLive = localStorage.getItem('adsLiveMode') === 'true';
-        if(isLive) {
-            // turn off
-            localStorage.setItem('adsLiveMode', 'false');
-            liveBtn.innerHTML = '<i class="bi bi-broadcast"></i> Live Mode OFF';
-            liveBtn.classList.remove('live-on');
-            liveBtn.classList.add('live-off');
-            clearInterval(liveCountdownInterval);
+    // --- NEXT SYNC COUNTDOWN INDICATOR ---
+    const syncChip = document.getElementById('syncCountdown');
+    
+    function updateSyncCountdown() {
+        const now = new Date();
+        const nextSync = new Date(now);
+        nextSync.setHours(now.getHours() + 1, 0, 0, 0); // next :00
+        
+        const diffMs = nextSync - now;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffSec = Math.floor((diffMs % 60000) / 1000);
+        
+        if (diffMin <= 1) {
+            syncChip.innerHTML = `<i class="bi bi-arrow-repeat"></i> Sync segera...`;
+            syncChip.classList.remove('live-off');
+            syncChip.classList.add('live-on');
         } else {
-            // turn on
-            localStorage.setItem('adsLiveMode', 'true');
-            startLiveMode();
+            syncChip.innerHTML = `<i class="bi bi-clock-history"></i> Sync berikutnya: ${diffMin} mnt`;
+            syncChip.classList.remove('live-on');
+            syncChip.classList.add('live-off');
         }
-    };
-
-    function startLiveMode() {
-        liveBtn.classList.remove('live-off');
-        liveBtn.classList.add('live-on');
-        
-        let secondsLeft = 300; // 5 minutes
-        
-        liveCountdownInterval = setInterval(() => {
-            secondsLeft--;
-            let m = Math.floor(secondsLeft / 60);
-            let s = secondsLeft % 60;
-            liveBtn.innerHTML = `<i class="bi bi-broadcast"></i> Live ON (${m}:${s.toString().padStart(2,'0')})`;
-            if(secondsLeft <= 0) {
-                liveBtn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Auto-Syncing...`;
-                clearInterval(liveCountdownInterval);
-                
-                // Submit hidden form to trigger background sync and reload
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '{{ route("marketplace.ads.sync") }}';
-                
-                const csrf = document.createElement('input'); csrf.type = 'hidden'; csrf.name = '_token'; csrf.value = '{{ csrf_token() }}';
-                const store = document.createElement('input'); store.type = 'hidden'; store.name = 'store_id'; store.value = '{{ $storeId }}';
-                const type = document.createElement('input'); type.type = 'hidden'; type.name = 'sync_type'; type.value = 'hourly';
-                
-                form.appendChild(csrf); form.appendChild(store); form.appendChild(type);
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }, 1000);
     }
-
-    // Initialize on load
-    if(localStorage.getItem('adsLiveMode') === 'true') {
-        startLiveMode();
-    }
+    
+    updateSyncCountdown();
+    setInterval(updateSyncCountdown, 30000); // update tiap 30 detik
 
 });
 </script>
@@ -289,8 +258,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     @endif
                 </div>
             @endif
-            <div id="liveModeBtn" class="role-chip live-btn live-off" onclick="toggleLiveMode()">
-                <i class="bi bi-broadcast"></i> Live Mode OFF
+            <div id="syncCountdown" class="role-chip live-btn live-off">
+                <i class="bi bi-clock-history"></i> Menghitung...
             </div>
         </div>
     </div>
