@@ -58,6 +58,7 @@ class AdsDashboardController extends Controller
                 $camp->orders = $camp->sum_orders ?? 0;
                 return $camp;
             })
+            ->filter(fn($camp) => $camp->spend > 0)
             ->sortByDesc('spend')
             ->values();
             

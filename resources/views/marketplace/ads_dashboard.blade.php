@@ -105,19 +105,7 @@ body[data-theme="dark"] .range-pill { color: #e5e7eb; background: rgba(255,255,2
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tabBtns = document.querySelectorAll('.dash-tab');
-    const tabPanes = document.querySelectorAll('.tab-pane');
-
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabPanes.forEach(p => p.classList.remove('active'));
-
-            btn.classList.add('active');
-            document.getElementById(btn.getAttribute('data-target')).classList.add('active');
-            window.dispatchEvent(new Event('resize')); // re-render charts
-        });
-    });
+    window.dispatchEvent(new Event('resize')); // re-render charts
 
     // Flatpickr & Preset Logic (Shipments Style)
     const preset = document.getElementById('presetRange');
@@ -275,22 +263,9 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     @else
         {{-- ==============================================
-             TABS
+             CONTENT (Unified)
         ============================================== --}}
         <div>
-            <div class="dash-tabs">
-                <button class="dash-tab active" data-target="tab-overview">Ringkasan</button>
-                <button class="dash-tab" data-target="tab-campaigns">Kampanye</button>
-                <button class="dash-tab" data-target="tab-settings">Sync & Log</button>
-            </div>
-        </div>
-
-        {{-- ==============================================
-             TAB CONTENT
-        ============================================== --}}
-        
-        <!-- TAB 1: OVERVIEW -->
-        <div class="tab-pane active" id="tab-overview">
             
             <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI)</div>
             
@@ -349,8 +324,8 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
-        <!-- TAB 2: CAMPAIGNS -->
-        <div class="tab-pane" id="tab-campaigns">
+        <!-- CAMPAIGNS -->
+        <div class="mt-4">
             <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
             
             <div class="dpanel">
@@ -401,8 +376,8 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
-        <!-- TAB 3: SETTINGS & LOGS -->
-        <div class="tab-pane" id="tab-settings">
+        <!-- SETTINGS & LOGS -->
+        <div class="mt-4">
             
             <div class="dash-panels" style="grid-template-columns: 1fr 2.5fr;">
                 <!-- Sync Form -->
