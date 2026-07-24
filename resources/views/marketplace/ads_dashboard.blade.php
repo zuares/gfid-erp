@@ -219,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div>
             <div class="dash-tabs">
                 <button class="dash-tab active" data-target="tab-dashboard">Dashboard</button>
+                <button class="dash-tab" data-target="tab-campaigns">Rincian Kampanye</button>
                 <button class="dash-tab" data-target="tab-sync">Sinkronisasi</button>
             </div>
         </div>
@@ -370,8 +371,10 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
-        <!-- CAMPAIGNS -->
-        <div class="mt-4">
+        </div>
+
+        <!-- TAB RINCIAN KAMPANYE -->
+        <div class="tab-pane" id="tab-campaigns">
             <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
             
             <div class="dpanel">
@@ -412,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
                                         Belum ada data kampanye.
                                     </td>
                                 </tr>
@@ -421,8 +424,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     </table>
                 </div>
             </div>
-        </div>
-
         </div>
 
         <!-- SINKRONISASI TAB -->
