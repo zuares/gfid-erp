@@ -43,19 +43,33 @@ class ShopeeAdsSyncJob implements ShouldQueue
     protected Carbon $dateFrom;
     protected Carbon $dateTo;
     protected bool $isHourly;
+    public ?int $syncRunId = null;
 
 
 
     public function handle(ShopeeAdsSyncService $syncService)
     {
-        $run = MarketplaceAdsSyncRun::create([
-            'store_id' => $this->store->id,
-            'sync_type' => $this->isHourly ? 'hourly_all' : 'daily_all',
-            'date_from' => $this->dateFrom->toDateString(),
-            'date_to' => $this->dateTo->toDateString(),
-            'status' => 'processing',
-            'started_at' => now(),
-        ]);
+        if ($this->syncRunId) {
+            $run = MarketplaceAdsSyncRun::find($this->syncRunId);
+        }
+
+        if (!isset($run) || !$run) {
+            $run = MarketplaceAdsSyncRun::create([
+                'store_id' => $this->store->id,
+                'sync_type' => $this->isHourly ? 'hourly_all' : 'daily_all',
+                'date_from' => $this->dateFrom->toDateString(),
+                'date_to' => $this->dateTo->toDateString(),
+                'status' => 'processing',
+                'started_at' => now(),
+            ]);
+            $this->syncRunId = $run->id;
+        } else {
+            $run->update([
+                'status' => 'processing',
+                'started_at' => now(),
+                'finished_at' => null,
+            ]);
+        }
 
         try {
             // 1. Sync Balance
@@ -84,6 +98,16 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 'finished_at' => now(),
             ]);
 
+        } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+            $run->update([
+                'status' => 'rate_limited',
+                'error_message' => $e->getMessage(),
+                'finished_at' => null, // Not final
+            ]);
+
+            // Release back to queue with delay
+            $this->release($e->retryAfter);
+            return;
         } catch (\Throwable $e) {
             $run->update([
                 'status' => 'error',
@@ -91,6 +115,20 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 'finished_at' => now(),
             ]);
             throw $e;
+        }
+    }
+
+    public function failed(\Throwable $exception)
+    {
+        if ($this->syncRunId) {
+            $run = MarketplaceAdsSyncRun::find($this->syncRunId);
+            if ($run && $run->status !== 'success') {
+                $run->update([
+                    'status' => 'error',
+                    'error_message' => substr($exception->getMessage(), 0, 1000),
+                    'finished_at' => now(),
+                ]);
+            }
         }
     }
 }

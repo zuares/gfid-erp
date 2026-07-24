@@ -67,7 +67,6 @@ class ShopeeAdsSyncService
         // 2. Ambil Settings per chunk (API max 100)
         $chunks = array_chunk($campaignIds, 100);
         foreach ($chunks as $chunk) {
-            usleep(250000); // Rate limiter: 0.25 detik
             $res = $this->api->getCampaignSettingInfo($store, $chunk);
             $run->total_requests++;
             

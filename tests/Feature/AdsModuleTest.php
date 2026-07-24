@@ -59,7 +59,7 @@ class AdsModuleTest extends TestCase
     public function test_user_without_access_is_rejected()
     {
         // For testing, assuming 'operating' role doesn't have marketplace access by default unless given in DB.
-        $user = $this->createUser('operating'); 
+        $user = $this->createUser('operating');
         $response = $this->actingAs($user)->get(route('marketplace.ads.dashboard'));
         // If middleware works, it should be 403 or redirect
         $response->assertStatus(403);
@@ -70,7 +70,7 @@ class AdsModuleTest extends TestCase
     {
         $user = $this->createUser('admin');
         $store = $this->createStore();
-        
+
         $response = $this->actingAs($user)->get(route('marketplace.ads.dashboard', ['store_id' => $store->id]));
         $response->assertStatus(200);
     }
@@ -81,21 +81,21 @@ class AdsModuleTest extends TestCase
     {
         Queue::fake();
         $store = $this->createStore();
-        
+
         // Mocking user who has access to marketplace but is not admin/owner
         $userNonAdmin = \Mockery::mock(\App\Models\User::class)->makePartial();
         $userNonAdmin->shouldReceive('hasRole')->andReturn(false);
         $userNonAdmin->id = 999;
-        
+
         // Assume user passes middleware by manually bypassing it or just let's use a real user and bypass middleware
         $this->withoutMiddleware(); // Bypass middleware so we only test the controller logic
-        
+
         $response1 = $this->actingAs($userNonAdmin)->post(route('marketplace.ads.sync'), [
             'store_id' => $store->id,
             'sync_type' => 'backfill'
         ]);
         $response1->assertSessionHas('error'); // Cannot backfill
-        
+
         $userAdmin = \Mockery::mock(\App\Models\User::class)->makePartial();
         $userAdmin->shouldReceive('hasRole')->andReturn(true);
         $userAdmin->id = 1000;
@@ -125,7 +125,7 @@ class AdsModuleTest extends TestCase
             ['store_id' => $store->id, 'channel_campaign_id' => '-', 'performance_date' => $date, 'performance_hour' => 12],
             ['impression' => 150, 'clicks' => 15, 'expense' => 7000]
         );
-        
+
         $this->assertDatabaseCount('marketplace_ads_hourly_performances', 1);
         $this->assertDatabaseHas('marketplace_ads_hourly_performances', ['impression' => 150]);
     }
@@ -135,7 +135,7 @@ class AdsModuleTest extends TestCase
     {
         $store1 = $this->createStore('S1');
         $store2 = $this->createStore('S2');
-        
+
         MarketplaceAdsHourlyPerformance::updateOrCreate(
             ['store_id' => $store1->id, 'channel_campaign_id' => '-', 'performance_date' => '2026-07-01', 'performance_hour' => 1],
             ['expense' => 100]
@@ -144,7 +144,7 @@ class AdsModuleTest extends TestCase
             ['store_id' => $store2->id, 'channel_campaign_id' => '-', 'performance_date' => '2026-07-01', 'performance_hour' => 1],
             ['expense' => 200]
         );
-        
+
         $this->assertDatabaseCount('marketplace_ads_hourly_performances', 2);
     }
 
@@ -158,20 +158,20 @@ class AdsModuleTest extends TestCase
         $store = $this->createStore();
         $service = app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
         $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
-        
+
         $api->shouldReceive('getCampaignSettingInfo')
             ->twice() // 150 items = 2 chunks
             ->andReturn(['response' => ['campaign_list' => []]]);
-            
+
         $api->shouldReceive('getCampaignIdList')
             ->once()
             ->andReturn(['response' => ['campaign_id_list' => array_fill(0, 150, 1), 'page_info' => ['has_more' => false]]]);
 
         $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
-        
+
         $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
         $service->syncCampaignsAndSettings($store, $run);
-        
+
         $this->assertTrue(true); // Should receive twice
     }
 
@@ -182,7 +182,7 @@ class AdsModuleTest extends TestCase
         Bus::fake(); // Fake the bus so chain isn't executed
 
         $store = $this->createStore('CHAIN');
-        
+
         $this->artisan('marketplace:sync-ads', [
             '--store' => $store->id,
             '--backfill' => true,
@@ -197,15 +197,15 @@ class AdsModuleTest extends TestCase
     {
         $store = $this->createStore();
         $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
-        
+
         $api->shouldReceive('getAdsShopHourlyPerformance')
             ->times(3) // 3 dates
             ->andReturn(['response' => ['hourly_performance' => []]]);
-            
+
         $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
-        
+
         $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
-        
+
         // Simulate Hourly Job handles 3 days
         $start = Carbon::parse('2026-07-01');
         $end = Carbon::parse('2026-07-03');
@@ -213,7 +213,7 @@ class AdsModuleTest extends TestCase
             $service->syncShopHourlyPerformance($store, $start->toDateString(), $run);
             $start->addDay();
         }
-        
+
         $this->assertTrue(true);
     }
 
@@ -221,20 +221,43 @@ class AdsModuleTest extends TestCase
     public function test_job_status_on_error()
     {
         $store = $this->createStore();
-        
+
         Http::fake([
             '*api/v2/ads/get_total_balance*' => Http::response(['error' => 'API_ERROR', 'message' => 'Limit exceeded']),
         ]);
-        
+
         $job = new ShopeeAdsSyncJob($store, now(), now());
         try {
             $job->handle(app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class));
         } catch (\Exception $e) {
             // caught
         }
-        
+
         $run = MarketplaceAdsSyncRun::latest()->first();
         $this->assertEquals('error', $run->status);
+    }
+
+    public function test_job_status_on_rate_limit()
+    {
+        $store = $this->createStore();
+
+        // Mock fake 429
+        Http::fake([
+            '*api/v2/ads/get_total_balance*' => Http::response([
+                'error' => 'Too_many_requests',
+                'message' => 'Rate limit exceeded'
+            ], 429, ['Retry-After' => '120']),
+        ]);
+
+        $job = new ShopeeAdsSyncJob($store, now(), now());
+        try {
+            $job->handle(app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class));
+        } catch (\Exception $e) {
+            // caught just in case release() throws when running locally without a queue worker
+        }
+
+        $run = MarketplaceAdsSyncRun::latest()->first();
+        $this->assertEquals('rate_limited', $run->status);
     }
 
     // 14. API success membuat sync run success
@@ -252,7 +275,7 @@ class AdsModuleTest extends TestCase
 
         $job2 = new ShopeeAdsSyncJob($store, now(), now());
         $job2->handle(app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class));
-        
+
         $run2 = MarketplaceAdsSyncRun::latest()->first();
         $this->assertEquals('success', $run2->status);
     }
@@ -261,12 +284,12 @@ class AdsModuleTest extends TestCase
     public function test_malformed_response_handled_gracefully()
     {
         $store = $this->createStore();
-        
+
         // Return HTML instead of JSON
         Http::fake([
             '*api/v2/ads/get_total_balance*' => Http::response('<html>Bad Gateway</html>', 502),
         ]);
-        
+
         $job = new ShopeeAdsSyncJob($store, now(), now());
         try {
             $job->handle(app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class));
@@ -293,18 +316,18 @@ class AdsModuleTest extends TestCase
         $jobDaily = new ShopeeAdsSyncJob($store, now(), now(), false);
         $jobHourly = new ShopeeAdsSyncJob($store, now(), now(), true);
         $jobOtherStore = new ShopeeAdsSyncJob($store2, now(), now(), false);
-        
+
         $middlewaresDaily = $jobDaily->middleware();
         $middlewaresHourly = $jobHourly->middleware();
         $middlewaresOtherStore = $jobOtherStore->middleware();
 
         $this->assertCount(1, $middlewaresDaily);
         $this->assertInstanceOf(\Illuminate\Queue\Middleware\WithoutOverlapping::class, $middlewaresDaily[0]);
-        
+
         // Assert lock keys
         $this->assertEquals($middlewaresDaily[0]->key, $middlewaresHourly[0]->key);
         $this->assertNotEquals($middlewaresDaily[0]->key, $middlewaresOtherStore[0]->key);
-        
+
         // Assert lock parameters
         $this->assertEquals(2100, $middlewaresDaily[0]->expiresAfter);
         $this->assertEquals(60, $middlewaresDaily[0]->releaseAfter);
@@ -313,7 +336,7 @@ class AdsModuleTest extends TestCase
     public function test_datetime_and_date_not_duplicated()
     {
         $store = $this->createStore('DD1');
-        
+
         // Simulasikan data lama berformat Y-m-d H:i:s masuk ke database (karena driver/skema lama)
         // Kita paksa insert string
         \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
@@ -323,7 +346,7 @@ class AdsModuleTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        
+
         $this->assertDatabaseCount('marketplace_ads_dailies', 1);
 
         // Simulasi ShopeeAdsSyncService menerima payload dengan tanggal "22-07-2026"
@@ -338,16 +361,16 @@ class AdsModuleTest extends TestCase
                 ]
             ]
         ]);
-        
+
         $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
         $run = \App\Models\MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
-        
+
         // Eksekusi yang memicu updateOrCreate yang sudah di-fix
         $service->syncShopDailyPerformance($store, '2026-07-22', '2026-07-22', $run);
-        
+
         // Pastikan tidak ada insert ganda (karena whereDate bisa menemukan data 00:00:00)
         $this->assertDatabaseCount('marketplace_ads_dailies', 1);
-        
+
         // Pastikan terupdate menjadi impressions 50
         $this->assertDatabaseHas('marketplace_ads_dailies', [
             'store_id' => $store->id,
@@ -358,15 +381,15 @@ class AdsModuleTest extends TestCase
     public function test_sync_ads_command_uses_queue()
     {
         Queue::fake();
-        
+
         $store = $this->createStore('CMD1');
-        
+
         $this->artisan('marketplace:sync-ads', [
             '--store' => $store->id,
             '--from' => '2026-07-23',
             '--to' => '2026-07-24',
         ])->assertSuccessful();
-        
+
         Queue::assertPushed(ShopeeAdsSyncJob::class, function ($job) use ($store) {
             $jobStore = (new \ReflectionProperty($job, 'store'))->getValue($job);
             return $jobStore->id === $store->id &&

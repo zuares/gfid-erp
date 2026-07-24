@@ -28,14 +28,30 @@ class ShopeeAdsApiService
     protected function execute(Store $store, string $endpoint, callable $callable)
     {
         try {
+            usleep(500000); // Centralized rate limiting pace: 0.5 detik
+
             $response = $callable();
-            
+
+            // Tangkap 429 Rate Limit
+            if (isset($response['_meta']['http_status']) && $response['_meta']['http_status'] == 429) {
+                $retryAfter = (int) ($response['_meta']['retry_after'] ?? 0);
+                if ($retryAfter <= 0) {
+                    $retryAfter = 300; // fallback aman 5 menit
+                }
+                $retryAfter += random_int(15, 60); // jitter
+
+                Log::warning("[ShopeeAdsApiService] Rate limit (429) {$endpoint} untuk toko {$store->id}. Delay: {$retryAfter}s.");
+                throw new \App\Exceptions\ShopeeAdsRateLimitException($retryAfter, "Shopee Ads API rate limit reached pada endpoint {$endpoint}");
+            }
+
             // Log if there's an error from Shopee Ads API
             if (!empty($response['error'])) {
                 Log::warning("[ShopeeAdsApiService] Error {$endpoint} untuk toko {$store->id}: " . ($response['message'] ?? $response['error']));
             }
-            
+
             return $response;
+        } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             Log::error("[ShopeeAdsApiService] Exception {$endpoint} untuk toko {$store->id}: " . $e->getMessage());
             throw $e;
