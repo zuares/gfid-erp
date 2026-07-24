@@ -506,10 +506,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + parseFloat(d.expense || 0), 0);
-    let totalHourlyOrders = hourlyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
+    let totalHourlyGmv = hourlyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+    let totalHourlyRoas = totalHourlySpend > 0 ? (totalHourlyGmv / totalHourlySpend).toFixed(2) : "0.00";
     let hsEl = document.getElementById('hourlySummary');
     if(hsEl) {
-        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">${totalHourlyOrders} Pesanan</span>`;
+        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">Rp ${formatShortIDR(totalHourlyGmv)} GMV</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
     }
 
     // Helper: Format Full Rupiah untuk Tooltip
@@ -635,33 +636,42 @@ document.addEventListener("DOMContentLoaded", function() {
     const ctxHourly = document.getElementById("hourlyChart");
     if(ctxHourly) {
         new Chart(ctxHourly.getContext('2d'), {
-            type: 'line',
+            type: 'bar',
             data: {
                 labels: hourlyData.map(d => d.performance_hour + ':00'),
                 datasets: [
                     {
+                        type: 'line',
+                        label: 'ROAS',
+                        data: hourlyData.map(d => {
+                            let sp = parseFloat(d.expense || 0);
+                            let gm = parseFloat(d.gmv || 0);
+                            return sp > 0 ? parseFloat((gm/sp).toFixed(2)) : 0;
+                        }),
+                        borderColor: '#eab308',
+                        backgroundColor: '#eab308',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        type: 'bar',
                         label: 'Biaya (Spend)',
                         data: hourlyData.map(d => parseFloat(d.expense || 0)),
-                        borderColor: '#dc2626',
-                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: hourlyData.length <= 1 ? 5 : 0,
-                        pointHoverRadius: 5,
+                        backgroundColor: 'rgba(220, 38, 38, 0.85)',
+                        borderRadius: 4,
                         yAxisID: 'y'
                     },
                     {
-                        label: 'Konversi (Pesanan)',
-                        data: hourlyData.map(d => parseInt(d.orders || 0)),
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: hourlyData.length <= 1 ? 5 : 0,
-                        pointHoverRadius: 5,
-                        yAxisID: 'y1'
+                        type: 'bar',
+                        label: 'GMV (Pendapatan)',
+                        data: hourlyData.map(d => parseFloat(d.gmv || 0)),
+                        backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                        borderRadius: 4,
+                        yAxisID: 'y'
                     }
                 ]
             },
@@ -683,7 +693,18 @@ document.addEventListener("DOMContentLoaded", function() {
                         borderWidth: 1,
                         padding: 10,
                         cornerRadius: 8,
-                        displayColors: false
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.dataset.yAxisID === 'y1') {
+                                    return label + context.parsed.y + 'x';
+                                } else {
+                                    return label + formatFullIDR(context.parsed.y);
+                                }
+                            }
+                        }
                     }
                 },
                 scales: {
@@ -704,7 +725,11 @@ document.addEventListener("DOMContentLoaded", function() {
                         position: 'right',
                         beginAtZero: true,
                         grid: { drawOnChartArea: false, drawBorder: false },
-                        ticks: { font: { size: 10 }, padding: 8, precision: 0 }
+                        ticks: { 
+                            font: { size: 10 }, 
+                            padding: 8,
+                            callback: function(value) { return value + 'x'; }
+                        }
                     }
                 }
             }
