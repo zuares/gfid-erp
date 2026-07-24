@@ -147,6 +147,142 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+    // ==========================================
+    // 4. HISTORICAL CHART (PERIOD-OVER-PERIOD)
+    // ==========================================
+    let histChart;
+    const ctxHist = document.getElementById('historicalChart');
+    if (ctxHist && rawHistorical && rawHistorical.length > 0) {
+        
+        // Find max days across periods
+        let maxDays = 0;
+        rawHistorical.forEach(period => {
+            if (period.data.length > maxDays) maxDays = period.data.length;
+        });
+        
+        // Generate X-Axis: "Hari 1", "Hari 2", etc.
+        let histLabels = [];
+        for (let i = 1; i <= maxDays; i++) {
+            histLabels.push(`Hari ${i}`);
+        }
+
+        // Colors for periods
+        const lineColors = [
+            '#ef4444', // Period 0 (Current) - Red
+            '#94a3b8', // Period 1 (Last) - Slate
+            'rgba(148, 163, 184, 0.4)', // Period 2 - Light Slate
+            'rgba(148, 163, 184, 0.2)'  // Period 3 - Lighter
+        ];
+
+        const dashStyles = [
+            [], // Solid
+            [5, 5], // Dashed
+            [2, 2], // Dotted
+            [2, 4]
+        ];
+
+        const getMetricValue = (d, metric) => {
+            let sp = parseFloat(d.spend || d.expense || 0);
+            let gm = parseFloat(d.gmv || 0);
+            if (metric === 'roas') {
+                return sp > 0 ? (gm / sp) : 0;
+            } else if (metric === 'gmv') {
+                return gm;
+            } else if (metric === 'spend') {
+                return sp;
+            }
+            return 0;
+        };
+
+        const renderHistChart = (metric) => {
+            let datasets = rawHistorical.map((period, idx) => {
+                let dataPoints = [];
+                for (let i = 0; i < maxDays; i++) {
+                    if (i < period.data.length) {
+                        dataPoints.push(getMetricValue(period.data[i], metric));
+                    } else {
+                        dataPoints.push(null);
+                    }
+                }
+                
+                let label = idx === 0 ? 'Rentang Saat Ini' : `${idx} Rentang Lalu`;
+                if (idx === 1) label = 'Rentang Sebelumnya';
+
+                return {
+                    label: label,
+                    data: dataPoints,
+                    borderColor: lineColors[idx] || lineColors[0],
+                    borderWidth: idx === 0 ? 3 : 2,
+                    borderDash: dashStyles[idx] || [],
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: false
+                };
+            });
+
+            if (histChart) {
+                histChart.data.datasets = datasets;
+                histChart.update();
+            } else {
+                histChart = new Chart(ctxHist.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: histLabels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: true, position: 'top', labels: { color: textColor } },
+                            tooltip: {
+                                backgroundColor: tooltipBg,
+                                titleColor: tooltipText,
+                                bodyColor: tooltipText,
+                                borderColor: tooltipBorder,
+                                borderWidth: 1,
+                                padding: 10,
+                                callbacks: {
+                                    label: function(context) {
+                                        let val = context.parsed.y;
+                                        if (metric === 'roas') return context.dataset.label + ': ' + val.toFixed(2) + 'x';
+                                        return context.dataset.label + ': ' + formatFullIDR(val);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+                            y: { 
+                                grid: { color: gridColor }, 
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        if (metric === 'roas') return value + 'x';
+                                        return formatShortIDR(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        };
+
+        // Initial render
+        renderHistChart('roas');
+
+        // Handle metric toggle
+        const metricSelect = document.getElementById('histMetricSelect');
+        if (metricSelect) {
+            metricSelect.addEventListener('change', function(e) {
+                renderHistChart(e.target.value);
+            });
+        }
+    }
+
 });
 </script>
 @endpush
@@ -219,6 +355,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div>
             <div class="dash-tabs">
                 <button class="dash-tab active" data-target="tab-dashboard">Dashboard</button>
+                <button class="dash-tab" data-target="tab-historical">Komparasi Historis</button>
                 <button class="dash-tab" data-target="tab-campaigns">Rincian Kampanye</button>
                 <button class="dash-tab" data-target="tab-sync">Sinkronisasi</button>
             </div>
@@ -433,6 +570,29 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
+        <!-- TAB KOMPARASI HISTORIS -->
+        <div class="tab-pane" id="tab-historical">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="dash-sec mb-0"><i class="bi bi-clock-history"></i> Komparasi Historis (Period-over-Period)</div>
+                <div>
+                    <select id="histMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border);">
+                        <option value="roas">Metrik: ROAS</option>
+                        <option value="gmv">Metrik: GMV (Pendapatan)</option>
+                        <option value="spend">Metrik: Biaya (Spend)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="dpanel p-3">
+                <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                    💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
+                </div>
+                <div style="position: relative; height: 350px;">
+                    <canvas id="historicalChart"></canvas>
+                </div>
+            </div>
+        </div>
+
         <!-- SINKRONISASI TAB -->
         <div class="tab-pane" id="tab-sync">
             
@@ -532,6 +692,7 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener("DOMContentLoaded", function() {
     const rawDaily = @json($dailyChartData ?? []);
     const rawHourly = @json($heatmapData ?? []);
+    const rawHistorical = @json($historicalData ?? []);
     
     // Pad Daily Data to show full range
     const dailyData = [];

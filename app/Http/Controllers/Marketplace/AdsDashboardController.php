@@ -69,9 +69,10 @@ class AdsDashboardController extends Controller
             ->get();
 
         $heatmapData = $analytics->getHourlyHeatmap($storeId, $dateFrom, $dateTo);
+        $historicalData = $analytics->getHistoricalComparison($storeId, $dateFrom, $dateTo, 3);
 
         return view('marketplace.ads_dashboard', compact(
-            'stores', 'storeId', 'dateFrom', 'dateTo', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData'
+            'stores', 'storeId', 'dateFrom', 'dateTo', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData'
         ));
     }
 

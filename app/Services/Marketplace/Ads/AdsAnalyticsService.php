@@ -73,4 +73,29 @@ class AdsAnalyticsService
             ->orderBy('performance_hour')
             ->get();
     }
+
+    public function getHistoricalComparison(int $storeId, string $dateFrom, string $dateTo, int $periods = 3)
+    {
+        $days = Carbon::parse($dateFrom)->diffInDays(Carbon::parse($dateTo)) + 1;
+        $results = [];
+        
+        for ($i = 0; $i < $periods; $i++) {
+            $start = Carbon::parse($dateFrom)->subDays($days * $i)->toDateString();
+            $end = Carbon::parse($dateTo)->subDays($days * $i)->toDateString();
+            
+            $daily = MarketplaceAdsDaily::where('store_id', $storeId)
+                ->whereBetween('date', [$start, $end])
+                ->orderBy('date')
+                ->get();
+                
+            $results[] = [
+                'period_index' => $i,
+                'start' => $start,
+                'end' => $end,
+                'data' => $daily
+            ];
+        }
+        
+        return $results;
+    }
 }
