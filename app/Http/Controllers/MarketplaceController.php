@@ -1824,6 +1824,7 @@ class MarketplaceController extends Controller
 
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
+            ->where('is_active', true)
             ->when($request->filled('store_id'), fn ($q) => $q->where('id', $request->integer('store_id')))
             ->get();
 
