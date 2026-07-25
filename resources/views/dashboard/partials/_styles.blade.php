@@ -34,9 +34,13 @@
     .dash-hero .hero-date { color: var(--dsh-muted); font-weight: 500; font-size: .78rem; white-space: nowrap; }
 
     /* ---------- Section title ---------- */
-    .dash-sec { font-size: .72rem; font-weight: 700; text-transform: none; letter-spacing: 0;
-        color: var(--dsh-muted); margin: .55rem 0 -.1rem; display: flex; align-items: center; gap: .4rem; }
-    .dash-sec .bi { font-size: .9rem; opacity: .8; }
+    .dash-sec {
+        font-size: 0.95rem; font-weight: 700; text-transform: none; letter-spacing: -0.01em;
+        color: var(--text); margin: 1.5rem 0 1rem; padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--dsh-border);
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .dash-sec .bi { font-size: 1.1rem; color: var(--dsh-accent); }
 
     /* ---------- KPI grid ---------- */
     .dash-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); }
