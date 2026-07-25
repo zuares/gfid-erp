@@ -247,7 +247,7 @@ class ShopeeAdsSyncService
                     'store_id' => $store->id,
                     'campaign_id' => null,
                     'channel_campaign_id' => '-',
-                    'performance_date' => $date,
+                    'performance_date' => Carbon::parse($date)->format('Y-m-d 00:00:00'),
                     'performance_hour' => (int) $hour,
                 ],
                 [
