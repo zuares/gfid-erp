@@ -1215,10 +1215,24 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 const data = await res.json();
                 
-                if (data.status === 'success' || (res.ok && (!data.errors || data.errors.length === 0))) {
-                    loading.style.display = 'none';
-                    success.style.display = 'block';
-                    setTimeout(() => location.reload(), 1500);
+                if (res.ok) {
+                    // Check if there are errors
+                    const hasErrors = data.errors && data.errors.length > 0;
+                    if (hasErrors) {
+                        alert('Sync Selesai dengan beberapa masalah:\n' + data.errors.join("\n"));
+                    }
+                    
+                    // If we saved some data, OR if the API explicitly said success (with no data returned e.g. empty), 
+                    // we should consider it a partial/full success and reload to show data.
+                    if ((data.saved !== undefined && data.saved > 0) || !hasErrors) {
+                        loading.style.display = 'none';
+                        success.style.display = 'block';
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        // All failed, no data saved
+                        loading.style.display = 'none';
+                        form.style.display = 'block';
+                    }
                 } else {
                     let errMsg = data.message || 'Terjadi kesalahan saat sync.';
                     if (data.errors && data.errors.length > 0) {
