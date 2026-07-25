@@ -94,7 +94,7 @@ body[data-theme="dark"] {
     align-items: center;
     box-shadow: var(--glass-shadow);
     position: relative;
-    overflow: hidden;
+    z-index: 20;
 }
 
 .dash-hero::before {
@@ -262,7 +262,7 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
 .mini-log-toggle.open .chevron { transform: rotate(180deg); }
 
 .mini-log-panel {
-    position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 9999;
     min-width: 380px; max-width: 440px;
     background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border); border-radius: 12px;
