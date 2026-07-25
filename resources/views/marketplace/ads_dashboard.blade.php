@@ -674,13 +674,31 @@ document.addEventListener('click', function(e) {
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTime"></div>
             </div>
 
-            <div class="dash-sec mt-4"><i class="bi bi-clock"></i> Heatmap Jam Tayang Efektif (Golden Hours)</div>
-            <div class="dpanel p-3 mb-4">
-                <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                    💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
+            <div class="dash-panels mt-4 mb-4" style="grid-template-columns: 1fr 2fr; gap: 1rem;">
+                {{-- PIE CHART KAMPANYE --}}
+                <div class="dpanel p-3">
+                    <div class="dash-sec mt-0 mb-2"><i class="bi bi-pie-chart text-primary"></i> Proporsi Biaya Kampanye</div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                        Top 5 kampanye dengan pengeluaran terbesar (Rp).
+                    </div>
+                    <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($campaigns) || count($campaigns) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data kampanye aktif.</div>
+                        @else
+                            <canvas id="campaignPieChart"></canvas>
+                        @endif
+                    </div>
                 </div>
-                <div style="position: relative; height: 200px;">
-                    <canvas id="hourlyChart"></canvas>
+
+                {{-- HEATMAP JAM TAYANG --}}
+                <div class="dpanel p-3">
+                    <div class="dash-sec mt-0 mb-2"><i class="bi bi-clock text-primary"></i> Heatmap Jam Tayang (Golden Hours)</div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                        💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
+                    </div>
+                    <div style="position: relative; height: 230px;">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
                 </div>
             </div>
             
@@ -2226,6 +2244,47 @@ document.addEventListener("DOMContentLoaded", function() {
                         renderHistChart(this.dataset.val);
                     });
                 });
+                
+                // ==========================================
+                // PIE CHART KAMPANYE
+                // ==========================================
+                const rawCamps = @json(array_slice($campaigns->toArray(), 0, 5));
+                const pieCtx = document.getElementById('campaignPieChart');
+                if (pieCtx && rawCamps && rawCamps.length > 0) {
+                    const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                    new Chart(pieCtx.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: rawCamps.map(c => c.campaign_name),
+                            datasets: [{
+                                data: rawCamps.map(c => parseFloat(c.spend || 0)),
+                                backgroundColor: bgColors,
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '65%',
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: tooltipBg,
+                                    titleColor: tooltipText,
+                                    bodyColor: tooltipText,
+                                    borderColor: tooltipBorder,
+                                    borderWidth: 1,
+                                    padding: 10,
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            return ctx.label + ': Rp ' + formatShortIDR(ctx.raw);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
                 
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
