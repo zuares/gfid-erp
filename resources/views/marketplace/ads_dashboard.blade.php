@@ -2255,19 +2255,24 @@ document.addEventListener("DOMContentLoaded", function() {
                     new Chart(pieCtx.getContext('2d'), {
                         type: 'doughnut',
                         data: {
-                            labels: rawCamps.map(c => c.campaign_name),
+                            labels: rawCamps.map(c => c.campaign_name.length > 20 ? c.campaign_name.substring(0,20) + '...' : c.campaign_name),
                             datasets: [{
                                 data: rawCamps.map(c => parseFloat(c.spend || 0)),
                                 backgroundColor: bgColors,
-                                borderWidth: 0
+                                borderWidth: 2,
+                                borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
+                                hoverOffset: 4
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            cutout: '65%',
+                            cutout: '60%',
                             plugins: {
-                                legend: { display: false },
+                                legend: { 
+                                    position: 'right',
+                                    labels: { boxWidth: 10, font: { size: 10 }, color: textColor }
+                                },
                                 tooltip: {
                                     backgroundColor: tooltipBg,
                                     titleColor: tooltipText,
