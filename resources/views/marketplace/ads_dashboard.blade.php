@@ -756,6 +756,409 @@ document.addEventListener('click', function(e) {
                 </div>
             </div>
 
+            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI) Keseluruhan</div>
+            
+            <div class="dash-grid mb-4">
+                @php
+                    $metrics = [
+                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
+                        ['title' => 'GMV (Pendapatan)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
+                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
+                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
+                        ['title' => 'AOV', 'key' => 'aov', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
+                        ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-eye'],
+                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'amber', 'icon' => 'bi-hand-index'],
+                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'violet', 'icon' => 'bi-cursor'],
+                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
+                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-coin'],
+                    ];
+                @endphp
+                @foreach($metrics as $m)
+                    @php
+                        $currSpend = $kpi['current']->spend ?? 0;
+                        $currGmv = $kpi['current']->gmv ?? 0;
+                        $currOrders = $kpi['current']->orders ?? 0;
+                        $currClicks = $kpi['current']->clicks ?? 0;
+                        $currImpressions = $kpi['current']->impressions ?? 0;
+
+                        $prevSpend = $kpi['previous']->spend ?? 0;
+                        $prevGmv = $kpi['previous']->gmv ?? 0;
+                        $prevOrders = $kpi['previous']->orders ?? 0;
+                        $prevClicks = $kpi['previous']->clicks ?? 0;
+                        $prevImpressions = $kpi['previous']->impressions ?? 0;
+
+                        $val = $kpi['current']->{$m['key']} ?? 0;
+                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
+
+                        if($m['key'] === 'roas') {
+                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
+                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
+                        } elseif ($m['key'] === 'aov') {
+                            $val = $currOrders > 0 ? round($currGmv / $currOrders, 0) : 0;
+                            $prevVal = $prevOrders > 0 ? round($prevGmv / $prevOrders, 0) : 0;
+                        } elseif ($m['key'] === 'cpc') {
+                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
+                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
+                        } elseif ($m['key'] === 'ctr') {
+                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
+                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
+                        } elseif ($m['key'] === 'cvr') {
+                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
+                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
+                        }
+
+                        $change = $kpi['changes'][$m['key']] ?? 0;
+                        if (in_array($m['key'], ['aov', 'cpc', 'ctr', 'cvr'])) {
+                            if ($prevVal == 0) {
+                                $change = $val > 0 ? 100 : 0;
+                            } else {
+                                $change = round((($val - $prevVal) / $prevVal) * 100, 2);
+                            }
+                        }
+
+                        $isUp = $change >= 0;
+                        
+                        // For cost metrics, going down is good (green). For others, going up is good.
+                        if (in_array($m['key'], ['spend', 'cpc'])) {
+                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
+                        } else {
+                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
+                        }
+                    @endphp
+                    <div class="kpi {{ $m['cls'] }}">
+                        <div class="kpi-label">
+                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
+                            {{ $m['title'] }}
+                        </div>
+                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
+                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
+                        </div>
+                        <div class="kpi-sub">
+                            <span style="font-weight:700; {{ $colorClass }}">
+                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
+                            </span> 
+                            vs rentang lalu
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            <hr class="my-4" style="border-color: var(--dsh-border);">
+            
+            <div class="dash-sec-focal mt-4 mb-3 p-3 p-md-4" style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
+                    <div>
+                        <div class="dash-sec mb-1" style="font-size: 0.95rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis</div>
+                        <div style="font-size: 0.75rem; color: var(--dsh-muted);">Perbandingan performa dengan periode sebelumnya.</div>
+                    </div>
+                    <div style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
+                        <input type="hidden" id="histMetricSelect" value="roas">
+                        <div class="dash-tabs-modern" id="histMetricChips" style="padding: 0.25rem;">
+                            <button class="dash-tab-sm active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
+                            <button class="dash-tab-sm" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
+                            <button class="dash-tab-sm" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
+                            <button class="dash-tab-sm" data-val="impressions"><i class="bi bi-eye"></i> Impresi</button>
+                            <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
+                            <button class="dash-tab-sm" data-val="ctr"><i class="bi bi-hand-index"></i> CTR</button>
+                            <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHistorical">
+                    <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Menganalisis perbandingan periode...
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dpanel p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                        💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
+                    </div>
+                    <div id="histSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                </div>
+                <div style="position: relative; height: 350px;">
+                    <canvas id="historicalChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ANALISIS HARIAN TAB -->
+        <div class="tab-pane" id="tab-daily">
+<div class="dash-panels mb-4" style="grid-template-columns: 1fr;">
+                {{-- HEATMAP JAM TAYANG --}}
+                <div class="dpanel p-3">
+                    <div class="dash-sec mt-0 mb-2"><i class="bi bi-clock text-primary"></i> Heatmap Jam Tayang (Golden Hours)</div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                        💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
+                    </div>
+                    <div style="position: relative; height: 250px;">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            
+            <div class="dash-sec mt-4"><i class="bi bi-graph-up"></i> Grafik Performa Harian</div>
+            
+            <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
+                <!-- 1. TREN FINANSIAL HARIAN -->
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Finansial Harian</div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
+                                💡 <b>Finansial:</b> Selisih <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Profitabilitas.
+                            </div>
+                        </div>
+                        <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                    </div>
+                    
+                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTrend">
+                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            AI mendeteksi momentum finansial...
+                        </div>
+                    </div>
+                    
+                    <div style="height: 280px;">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 2. TREN TRAFIK HARIAN -->
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Trafik Harian</div>
+                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
+                                💡 <b>Trafik (Funnel):</b> <b>Impresi (Kuning)</b> vs <b>Klik (Biru)</b> = Rasio bocor.
+                            </div>
+                        </div>
+                        <div id="trafficSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                    </div>
+                    
+                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTraffic">
+                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            AI menganalisis kebocoran funnel...
+                        </div>
+                    </div>
+                    
+                    <div style="height: 280px;">
+                        <canvas id="trafficChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB RINCIAN KAMPANYE -->
+        <div class="tab-pane" id="tab-campaigns">
+            <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
+            
+            @php
+                $totalBoncos = 0;
+                $totalHiddenGem = 0;
+                $totalSpendBoncos = 0;
+                foreach($campaigns as $c) {
+                    $r = $c->spend > 0 ? $c->gmv / $c->spend : 0;
+                    if ($c->spend > 50000 && $r < 1.5) { $totalBoncos++; $totalSpendBoncos += $c->spend; }
+                    elseif ($r >= 5.0 && $c->spend > 10000) { $totalHiddenGem++; }
+                }
+            @endphp
+            
+            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
+                <div class="dpanel p-3" style="border-left: 4px solid {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; background: var(--dsh-bg);">
+                    <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; font-size: 0.85rem;">
+                        <i class="bi {{ $totalBoncos > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle' }}"></i> Audit Kampanye AI
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">
+                        @if($totalBoncos > 0)
+                            Ditemukan <b>{{ $totalBoncos }} kampanye berstatus Boncos</b> yang menyedot biaya sebesar <b>Rp {{ number_format($totalSpendBoncos, 0, ',', '.') }}</b>. Matikan atau perbaiki segera! 
+                        @else
+                            Tidak ada kampanye yang terindikasi boncos parah. Kondisi sangat sehat.
+                        @endif
+                        @if($totalHiddenGem > 0)
+                            Terdapat <b>{{ $totalHiddenGem }} produk *Hidden Gem*</b> dengan efisiensi tinggi yang siap untuk diskalakan.
+                        @endif
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dpanel">
+                <div class="table-responsive">
+                    <table class="dpanel-table">
+                        <thead>
+                            <tr>
+                                <th>Kampanye</th>
+                                <th>Tipe</th>
+                                <th>Diagnosis AI</th>
+                                <th class="text-end">Biaya (Spend)</th>
+                                <th class="text-end">GMV</th>
+                                <th class="text-end">ROAS</th>
+                                <th class="text-end">Klik</th>
+                                <th class="text-end">Pesanan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($campaigns as $camp)
+                                @php
+                                    $c_roas = $camp->spend > 0 ? $camp->gmv / $camp->spend : 0;
+                                    $c_prev_roas = $camp->prev_spend > 0 ? $camp->prev_gmv / $camp->prev_spend : 0;
+                                    $c_cvr = $camp->clicks > 0 ? ($camp->orders / $camp->clicks) * 100 : 0;
+                                    
+                                    $gmv_growth = $camp->prev_gmv > 0 ? (($camp->gmv - $camp->prev_gmv) / $camp->prev_gmv) * 100 : ($camp->gmv > 0 ? 100 : 0);
+                                    $roas_growth = $c_prev_roas > 0 ? (($c_roas - $c_prev_roas) / $c_prev_roas) * 100 : ($c_roas > 0 ? 100 : 0);
+                                    $spend_growth = $camp->prev_spend > 0 ? (($camp->spend - $camp->prev_spend) / $camp->prev_spend) * 100 : ($camp->spend > 0 ? 100 : 0);
+                                    $clicks_growth = $camp->prev_clicks > 0 ? (($camp->clicks - $camp->prev_clicks) / $camp->prev_clicks) * 100 : ($camp->clicks > 0 ? 100 : 0);
+                                    $orders_growth = $camp->prev_orders > 0 ? (($camp->orders - $camp->prev_orders) / $camp->prev_orders) * 100 : ($camp->orders > 0 ? 100 : 0);
+                                    
+                                    $ai_status = '⚖️ Normal';
+                                    $ai_color = 'var(--dsh-muted)';
+                                    $ai_bg = 'transparent';
+                                    $ai_note = 'Performa standar.';
+                                    
+                                    if ($camp->spend > 50000 && $c_roas < 1.5) {
+                                        $ai_status = '🚨 Boncos (Stop!)';
+                                        $ai_color = '#dc2626';
+                                        $ai_bg = 'rgba(220, 38, 38, 0.05)';
+                                        if ($roas_growth < -20) {
+                                            $ai_note = 'ROAS anjlok ' . abs(round($roas_growth)) . '%. Kebocoran ekstrem!';
+                                        } else {
+                                            $ai_note = 'Membakar uang tanpa hasil konversi.';
+                                        }
+                                    } elseif ($c_roas >= 5.0 && $camp->spend > 10000) {
+                                        $ai_status = '💎 Hidden Gem';
+                                        $ai_color = '#16a34a';
+                                        $ai_bg = 'rgba(22, 163, 74, 0.05)';
+                                        if ($gmv_growth > 20) {
+                                            $ai_note = 'On Fire! GMV meroket ' . round($gmv_growth) . '%. Skalakan budget.';
+                                        } else {
+                                            $ai_note = 'Super efisien! Siap untuk diskalakan.';
+                                        }
+                                    } elseif ($c_cvr < 0.5 && $camp->clicks > 100) {
+                                        $ai_status = '⚠️ Window Shopping';
+                                        $ai_color = '#eab308';
+                                        $ai_bg = 'rgba(234, 179, 8, 0.05)';
+                                        $ai_note = 'Banyak klik tapi zonk. Cek harga/kompetitor.';
+                                    } elseif ($c_roas >= 2.0 && $c_roas < 5.0 && $camp->spend > 50000) {
+                                        $ai_status = '🚀 Tulang Punggung';
+                                        $ai_color = '#3b82f6';
+                                        $ai_bg = 'rgba(59, 130, 246, 0.05)';
+                                        if ($gmv_growth < -15) {
+                                            $ai_note = 'Volume GMV menyusut ' . abs(round($gmv_growth)) . '%. Cek budget harian.';
+                                        } else {
+                                            $ai_note = 'Mesin pencetak GMV berjalan stabil.';
+                                        }
+                                    } elseif ($camp->spend < 10000) {
+                                        $ai_status = '💤 Pasif';
+                                        $ai_color = 'var(--dsh-muted)';
+                                        $ai_bg = 'transparent';
+                                        $ai_note = 'Kekurangan trafik atau dibatasi budget.';
+                                    }
+                                @endphp
+                                <tr style="background: {{ $ai_bg }}; border-bottom: 1px solid var(--dsh-border);">
+                                    <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
+                                        <div style="font-weight: 700; color: var(--text);">{{ $camp->campaign_name }}</div>
+                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
+                                            ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span>
+                                            &bull; <a href="javascript:void(0)" onclick='openCampaignHourlyModal("{{ $camp->channel_campaign_id }}", @json($camp->campaign_name))' style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @php
+                                            $allGmv = (float)$camp->gmv;
+                                            $allDirect = (float)$camp->direct_gmv;
+                                            
+                                            $campType = 'Belum Ada Data';
+                                            $campTypeColor = '#64748b';
+                                            $campTypeBg = 'rgba(100,116,139,0.1)';
+                                            
+                                            if ($allGmv > 0 && $allDirect == 0) {
+                                                $campType = 'GMV Max';
+                                                $campTypeColor = '#2563eb';
+                                                $campTypeBg = 'rgba(37,99,235,0.1)';
+                                            } elseif ($allDirect > 0 && $allGmv == $allDirect) {
+                                                $campType = 'Pencarian (CPC)';
+                                                $campTypeColor = '#ca8a04';
+                                                $campTypeBg = 'rgba(234,179,8,0.1)';
+                                            } elseif ($allGmv > 0 && $allDirect > 0 && $allGmv != $allDirect) {
+                                                $campType = 'GMV Max'; // Most campaigns with mixed GMV are actually GMV Max with some direct conversions
+                                                $campTypeColor = '#2563eb';
+                                                $campTypeBg = 'rgba(37,99,235,0.1)';
+                                            }
+                                        @endphp
+                                        <span style="background: {{ $campTypeBg }}; color: {{ $campTypeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $campType }}</span>
+                                    </td>
+                                    <td>
+                                        <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
+                                        <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
+                                        Rp {{ number_format($camp->spend, 0, ',', '.') }}
+                                        @if($spend_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $spend_growth > 0 ? '#dc2626' : '#16a34a' }};">
+                                                {{ $spend_growth > 0 ? '▲' : '▼' }} {{ abs(round($spend_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
+                                        Rp {{ number_format($camp->gmv, 0, ',', '.') }}
+                                        @if($gmv_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $gmv_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $gmv_growth > 0 ? '▲' : '▼' }} {{ abs(round($gmv_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $c_roas >= 4.0 ? '#16a34a' : ($c_roas >= 2.0 ? '#eab308' : '#dc2626') }};">
+                                        {{ number_format($c_roas, 2) }}x
+                                        @if($roas_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $roas_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $roas_growth > 0 ? '▲' : '▼' }} {{ abs(round($roas_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($camp->clicks, 0, ',', '.') }}
+                                        @if($clicks_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $clicks_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $clicks_growth > 0 ? '▲' : '▼' }} {{ abs(round($clicks_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
+                                        {{ number_format($camp->orders, 0, ',', '.') }}
+                                        @if($orders_growth != 0)
+                                            <div style="font-size: 0.65rem; color: {{ $orders_growth > 0 ? '#16a34a' : '#dc2626' }};">
+                                                {{ $orders_growth > 0 ? '▲' : '▼' }} {{ abs(round($orders_growth)) }}%
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                                        Belum ada data kampanye.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- TAB PERFORMA PRODUK (GMV MAX) -->
+        <div class="tab-pane" id="tab-items">
+
+
             <div class="dash-sec"><i class="bi bi-robot"></i> Asisten Analisis (Berdasarkan Rentang Tanggal)</div>
             <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHealth"></div>
@@ -927,406 +1330,6 @@ document.addEventListener('click', function(e) {
                     <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                     Menganalisis performa produk...
                 </div>
-            </div>
-
-            <div class="dash-panels mb-4" style="grid-template-columns: 1fr;">
-                {{-- HEATMAP JAM TAYANG --}}
-                <div class="dpanel p-3">
-                    <div class="dash-sec mt-0 mb-2"><i class="bi bi-clock text-primary"></i> Heatmap Jam Tayang (Golden Hours)</div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
-                    </div>
-                    <div style="position: relative; height: 250px;">
-                        <canvas id="hourlyChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            
-            <hr class="my-4" style="border-color: var(--dsh-border);">
-            
-            <div class="dash-sec-focal mt-4 mb-3 p-3 p-md-4" style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
-                    <div>
-                        <div class="dash-sec mb-1" style="font-size: 0.95rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis</div>
-                        <div style="font-size: 0.75rem; color: var(--dsh-muted);">Perbandingan performa dengan periode sebelumnya.</div>
-                    </div>
-                    <div style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
-                        <input type="hidden" id="histMetricSelect" value="roas">
-                        <div class="dash-tabs-modern" id="histMetricChips" style="padding: 0.25rem;">
-                            <button class="dash-tab-sm active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
-                            <button class="dash-tab-sm" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
-                            <button class="dash-tab-sm" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
-                            <button class="dash-tab-sm" data-val="impressions"><i class="bi bi-eye"></i> Impresi</button>
-                            <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
-                            <button class="dash-tab-sm" data-val="ctr"><i class="bi bi-hand-index"></i> CTR</button>
-                            <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHistorical">
-                    <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Menganalisis perbandingan periode...
-                    </div>
-                </div>
-            </div>
-            
-            <div class="dpanel p-3">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
-                    </div>
-                    <div id="histSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                </div>
-                <div style="position: relative; height: 350px;">
-                    <canvas id="historicalChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- ANALISIS HARIAN TAB -->
-        <div class="tab-pane" id="tab-daily">
-            <div class="dash-sec"><i class="bi bi-graph-up"></i> Grafik Performa Harian</div>
-            
-            <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
-                <!-- 1. TREN FINANSIAL HARIAN -->
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Finansial Harian</div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Finansial:</b> Selisih <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Profitabilitas.
-                            </div>
-                        </div>
-                        <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                    </div>
-                    
-                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTrend">
-                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            AI mendeteksi momentum finansial...
-                        </div>
-                    </div>
-                    
-                    <div style="height: 280px;">
-                        <canvas id="dailyChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- 2. TREN TRAFIK HARIAN -->
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Trafik Harian</div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Trafik (Funnel):</b> <b>Impresi (Kuning)</b> vs <b>Klik (Biru)</b> = Rasio bocor.
-                            </div>
-                        </div>
-                        <div id="trafficSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                    </div>
-                    
-                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTraffic">
-                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            AI menganalisis kebocoran funnel...
-                        </div>
-                    </div>
-                    
-                    <div style="height: 280px;">
-                        <canvas id="trafficChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB RINCIAN KAMPANYE -->
-        <div class="tab-pane" id="tab-campaigns">
-            <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
-            
-            @php
-                $totalBoncos = 0;
-                $totalHiddenGem = 0;
-                $totalSpendBoncos = 0;
-                foreach($campaigns as $c) {
-                    $r = $c->spend > 0 ? $c->gmv / $c->spend : 0;
-                    if ($c->spend > 50000 && $r < 1.5) { $totalBoncos++; $totalSpendBoncos += $c->spend; }
-                    elseif ($r >= 5.0 && $c->spend > 10000) { $totalHiddenGem++; }
-                }
-            @endphp
-            
-            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
-                <div class="dpanel p-3" style="border-left: 4px solid {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; background: var(--dsh-bg);">
-                    <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; font-size: 0.85rem;">
-                        <i class="bi {{ $totalBoncos > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle' }}"></i> Audit Kampanye AI
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">
-                        @if($totalBoncos > 0)
-                            Ditemukan <b>{{ $totalBoncos }} kampanye berstatus Boncos</b> yang menyedot biaya sebesar <b>Rp {{ number_format($totalSpendBoncos, 0, ',', '.') }}</b>. Matikan atau perbaiki segera! 
-                        @else
-                            Tidak ada kampanye yang terindikasi boncos parah. Kondisi sangat sehat.
-                        @endif
-                        @if($totalHiddenGem > 0)
-                            Terdapat <b>{{ $totalHiddenGem }} produk *Hidden Gem*</b> dengan efisiensi tinggi yang siap untuk diskalakan.
-                        @endif
-                    </div>
-                </div>
-            </div>
-            
-            <div class="dpanel">
-                <div class="table-responsive">
-                    <table class="dpanel-table">
-                        <thead>
-                            <tr>
-                                <th>Kampanye</th>
-                                <th>Tipe</th>
-                                <th>Diagnosis AI</th>
-                                <th class="text-end">Biaya (Spend)</th>
-                                <th class="text-end">GMV</th>
-                                <th class="text-end">ROAS</th>
-                                <th class="text-end">Klik</th>
-                                <th class="text-end">Pesanan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($campaigns as $camp)
-                                @php
-                                    $c_roas = $camp->spend > 0 ? $camp->gmv / $camp->spend : 0;
-                                    $c_prev_roas = $camp->prev_spend > 0 ? $camp->prev_gmv / $camp->prev_spend : 0;
-                                    $c_cvr = $camp->clicks > 0 ? ($camp->orders / $camp->clicks) * 100 : 0;
-                                    
-                                    $gmv_growth = $camp->prev_gmv > 0 ? (($camp->gmv - $camp->prev_gmv) / $camp->prev_gmv) * 100 : ($camp->gmv > 0 ? 100 : 0);
-                                    $roas_growth = $c_prev_roas > 0 ? (($c_roas - $c_prev_roas) / $c_prev_roas) * 100 : ($c_roas > 0 ? 100 : 0);
-                                    $spend_growth = $camp->prev_spend > 0 ? (($camp->spend - $camp->prev_spend) / $camp->prev_spend) * 100 : ($camp->spend > 0 ? 100 : 0);
-                                    $clicks_growth = $camp->prev_clicks > 0 ? (($camp->clicks - $camp->prev_clicks) / $camp->prev_clicks) * 100 : ($camp->clicks > 0 ? 100 : 0);
-                                    $orders_growth = $camp->prev_orders > 0 ? (($camp->orders - $camp->prev_orders) / $camp->prev_orders) * 100 : ($camp->orders > 0 ? 100 : 0);
-                                    
-                                    $ai_status = '⚖️ Normal';
-                                    $ai_color = 'var(--dsh-muted)';
-                                    $ai_bg = 'transparent';
-                                    $ai_note = 'Performa standar.';
-                                    
-                                    if ($camp->spend > 50000 && $c_roas < 1.5) {
-                                        $ai_status = '🚨 Boncos (Stop!)';
-                                        $ai_color = '#dc2626';
-                                        $ai_bg = 'rgba(220, 38, 38, 0.05)';
-                                        if ($roas_growth < -20) {
-                                            $ai_note = 'ROAS anjlok ' . abs(round($roas_growth)) . '%. Kebocoran ekstrem!';
-                                        } else {
-                                            $ai_note = 'Membakar uang tanpa hasil konversi.';
-                                        }
-                                    } elseif ($c_roas >= 5.0 && $camp->spend > 10000) {
-                                        $ai_status = '💎 Hidden Gem';
-                                        $ai_color = '#16a34a';
-                                        $ai_bg = 'rgba(22, 163, 74, 0.05)';
-                                        if ($gmv_growth > 20) {
-                                            $ai_note = 'On Fire! GMV meroket ' . round($gmv_growth) . '%. Skalakan budget.';
-                                        } else {
-                                            $ai_note = 'Super efisien! Siap untuk diskalakan.';
-                                        }
-                                    } elseif ($c_cvr < 0.5 && $camp->clicks > 100) {
-                                        $ai_status = '⚠️ Window Shopping';
-                                        $ai_color = '#eab308';
-                                        $ai_bg = 'rgba(234, 179, 8, 0.05)';
-                                        $ai_note = 'Banyak klik tapi zonk. Cek harga/kompetitor.';
-                                    } elseif ($c_roas >= 2.0 && $c_roas < 5.0 && $camp->spend > 50000) {
-                                        $ai_status = '🚀 Tulang Punggung';
-                                        $ai_color = '#3b82f6';
-                                        $ai_bg = 'rgba(59, 130, 246, 0.05)';
-                                        if ($gmv_growth < -15) {
-                                            $ai_note = 'Volume GMV menyusut ' . abs(round($gmv_growth)) . '%. Cek budget harian.';
-                                        } else {
-                                            $ai_note = 'Mesin pencetak GMV berjalan stabil.';
-                                        }
-                                    } elseif ($camp->spend < 10000) {
-                                        $ai_status = '💤 Pasif';
-                                        $ai_color = 'var(--dsh-muted)';
-                                        $ai_bg = 'transparent';
-                                        $ai_note = 'Kekurangan trafik atau dibatasi budget.';
-                                    }
-                                @endphp
-                                <tr style="background: {{ $ai_bg }}; border-bottom: 1px solid var(--dsh-border);">
-                                    <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
-                                        <div style="font-weight: 700; color: var(--text);">{{ $camp->campaign_name }}</div>
-                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
-                                            ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span>
-                                            &bull; <a href="javascript:void(0)" onclick="openCampaignHourlyModal('{{ $camp->channel_campaign_id }}', '{{ addslashes($camp->campaign_name) }}')" style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        @php
-                                            $allGmv = (float)$camp->gmv;
-                                            $allDirect = (float)$camp->direct_gmv;
-                                            
-                                            $campType = 'Belum Ada Data';
-                                            $campTypeColor = '#64748b';
-                                            $campTypeBg = 'rgba(100,116,139,0.1)';
-                                            
-                                            if ($allGmv > 0 && $allDirect == 0) {
-                                                $campType = 'GMV Max';
-                                                $campTypeColor = '#2563eb';
-                                                $campTypeBg = 'rgba(37,99,235,0.1)';
-                                            } elseif ($allDirect > 0 && $allGmv == $allDirect) {
-                                                $campType = 'Pencarian (CPC)';
-                                                $campTypeColor = '#ca8a04';
-                                                $campTypeBg = 'rgba(234,179,8,0.1)';
-                                            } elseif ($allGmv > 0 && $allDirect > 0 && $allGmv != $allDirect) {
-                                                $campType = 'GMV Max'; // Most campaigns with mixed GMV are actually GMV Max with some direct conversions
-                                                $campTypeColor = '#2563eb';
-                                                $campTypeBg = 'rgba(37,99,235,0.1)';
-                                            }
-                                        @endphp
-                                        <span style="background: {{ $campTypeBg }}; color: {{ $campTypeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $campType }}</span>
-                                    </td>
-                                    <td>
-                                        <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
-                                        <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
-                                        Rp {{ number_format($camp->spend, 0, ',', '.') }}
-                                        @if($spend_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $spend_growth > 0 ? '#dc2626' : '#16a34a' }};">
-                                                {{ $spend_growth > 0 ? '▲' : '▼' }} {{ abs(round($spend_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
-                                        Rp {{ number_format($camp->gmv, 0, ',', '.') }}
-                                        @if($gmv_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $gmv_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $gmv_growth > 0 ? '▲' : '▼' }} {{ abs(round($gmv_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $c_roas >= 4.0 ? '#16a34a' : ($c_roas >= 2.0 ? '#eab308' : '#dc2626') }};">
-                                        {{ number_format($c_roas, 2) }}x
-                                        @if($roas_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $roas_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $roas_growth > 0 ? '▲' : '▼' }} {{ abs(round($roas_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($camp->clicks, 0, ',', '.') }}
-                                        @if($clicks_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $clicks_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $clicks_growth > 0 ? '▲' : '▼' }} {{ abs(round($clicks_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($camp->orders, 0, ',', '.') }}
-                                        @if($orders_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $orders_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $orders_growth > 0 ? '▲' : '▼' }} {{ abs(round($orders_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
-                                        Belum ada data kampanye.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        </div>
-
-        <!-- TAB PERFORMA PRODUK (GMV MAX) -->
-        <div class="tab-pane" id="tab-items">
-            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI) Keseluruhan</div>
-            
-            <div class="dash-grid mb-4">
-                @php
-                    $metrics = [
-                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
-                        ['title' => 'GMV (Pendapatan)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
-                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
-                        ['title' => 'AOV', 'key' => 'aov', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
-                        ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-eye'],
-                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'amber', 'icon' => 'bi-hand-index'],
-                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'violet', 'icon' => 'bi-cursor'],
-                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
-                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-coin'],
-                    ];
-                @endphp
-                @foreach($metrics as $m)
-                    @php
-                        $currSpend = $kpi['current']->spend ?? 0;
-                        $currGmv = $kpi['current']->gmv ?? 0;
-                        $currOrders = $kpi['current']->orders ?? 0;
-                        $currClicks = $kpi['current']->clicks ?? 0;
-                        $currImpressions = $kpi['current']->impressions ?? 0;
-
-                        $prevSpend = $kpi['previous']->spend ?? 0;
-                        $prevGmv = $kpi['previous']->gmv ?? 0;
-                        $prevOrders = $kpi['previous']->orders ?? 0;
-                        $prevClicks = $kpi['previous']->clicks ?? 0;
-                        $prevImpressions = $kpi['previous']->impressions ?? 0;
-
-                        $val = $kpi['current']->{$m['key']} ?? 0;
-                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
-
-                        if($m['key'] === 'roas') {
-                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
-                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
-                        } elseif ($m['key'] === 'aov') {
-                            $val = $currOrders > 0 ? round($currGmv / $currOrders, 0) : 0;
-                            $prevVal = $prevOrders > 0 ? round($prevGmv / $prevOrders, 0) : 0;
-                        } elseif ($m['key'] === 'cpc') {
-                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
-                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
-                        } elseif ($m['key'] === 'ctr') {
-                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
-                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
-                        } elseif ($m['key'] === 'cvr') {
-                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
-                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
-                        }
-
-                        $change = $kpi['changes'][$m['key']] ?? 0;
-                        if (in_array($m['key'], ['aov', 'cpc', 'ctr', 'cvr'])) {
-                            if ($prevVal == 0) {
-                                $change = $val > 0 ? 100 : 0;
-                            } else {
-                                $change = round((($val - $prevVal) / $prevVal) * 100, 2);
-                            }
-                        }
-
-                        $isUp = $change >= 0;
-                        
-                        // For cost metrics, going down is good (green). For others, going up is good.
-                        if (in_array($m['key'], ['spend', 'cpc'])) {
-                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
-                        } else {
-                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
-                        }
-                    @endphp
-                    <div class="kpi {{ $m['cls'] }}">
-                        <div class="kpi-label">
-                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
-                            {{ $m['title'] }}
-                        </div>
-                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
-                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
-                        </div>
-                        <div class="kpi-sub">
-                            <span style="font-weight:700; {{ $colorClass }}">
-                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
-                            </span> 
-                            vs rentang lalu
-                        </div>
-                    </div>
-                @endforeach
             </div>
 
             <div class="dash-sec"><i class="bi bi-box-seam"></i> Rincian Produk (GMV Max)</div>
@@ -1662,6 +1665,7 @@ document.addEventListener('click', function(e) {
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     window.clearAdsData = async function() {
@@ -1949,7 +1953,6 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 @if(!empty($dailyChartData))
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const rawDaily = @json($dailyChartData ?? []);
