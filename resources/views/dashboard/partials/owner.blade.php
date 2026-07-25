@@ -86,8 +86,185 @@
     ])
 </div>
 
+{{-- ================= ANALITIK IKLAN ================= --}}
+<div class="dash-sec mt-4"><i class="bi bi-megaphone"></i> Analitik Iklan Marketplace (7 Hari Terakhir)</div>
+<div class="dash-panels mb-4" style="grid-template-columns: 2fr 1fr; gap: 1rem;">
+    
+    {{-- HEATMAP JAM TAYANG --}}
+    <div class="dpanel p-3">
+        <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
+            Heatmap Jam Tayang Efektif (Golden Hours)
+        </div>
+        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 1rem;">
+            Menampilkan performa metrik (GMV / Biaya) per jam tayang dari data mesin. Semakin pekat warnanya, semakin tinggi performanya.
+        </div>
+        <div style="position: relative; height: 250px;">
+            <canvas id="execHeatmapChart"></canvas>
+        </div>
+    </div>
+
+    {{-- PIE CHART KAMPANYE --}}
+    <div class="dpanel p-3">
+        <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
+            Proporsi Biaya per Kampanye
+        </div>
+        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 1rem;">
+            Top 5 kampanye dengan pengeluaran terbesar.
+        </div>
+        <div style="position: relative; height: 250px; display: flex; justify-content: center; align-items: center;">
+            @if(empty($d['ads_campaigns']) || count($d['ads_campaigns']) === 0)
+                <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data kampanye aktif.</div>
+            @else
+                <canvas id="execPieChart"></canvas>
+            @endif
+        </div>
+    </div>
+
+</div>
+
 {{-- ================= DAFTAR ================= --}}
 <div class="dash-panels">
     @include('dashboard.partials._list_orders', ['title' => 'Pesanan belum dikirim', 'rows' => $d['list_todo'], 'link' => $r('marketplace.orders')])
     @include('dashboard.partials._list_stock', ['title' => 'Stok kritis (perlu segera)', 'rows' => $d['list_stock'], 'link' => $r('inventory.stocks.items')])
 </div>
+
+@push('head')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const rawHourly = @json($d['ads_hourly'] ?? []);
+    const rawCampaigns = @json($d['ads_campaigns'] ?? []);
+    
+    // Theme configs
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+    const tooltipBg = isDark ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.95)';
+    const tooltipBorder = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)';
+    const tooltipText = isDark ? '#f8fafc' : '#0f172a';
+    
+    Chart.defaults.color = textColor;
+    Chart.defaults.font.family = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+
+    // 1. HEATMAP CHART
+    if (rawHourly.length > 0) {
+        const hourlyData = [];
+        for (let i = 0; i < 24; i++) {
+            let found = rawHourly.find(d => parseInt(d.performance_hour) === i);
+            hourlyData.push(found ? found : { performance_hour: i, clicks: 0, orders: 0, spend: 0, gmv: 0 });
+        }
+        
+        const labels = hourlyData.map(d => String(d.performance_hour).padStart(2, '0') + ':00');
+        const spendData = hourlyData.map(d => parseFloat(d.spend));
+        const gmvData = hourlyData.map(d => parseFloat(d.gmv));
+        
+        const ctxHeatmap = document.getElementById('execHeatmapChart').getContext('2d');
+        new Chart(ctxHeatmap, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'GMV (Pendapatan)',
+                        data: gmvData,
+                        backgroundColor: '#10b981', // Green
+                        borderRadius: 4,
+                        order: 1
+                    },
+                    {
+                        label: 'Biaya (Spend)',
+                        data: spendData,
+                        type: 'line',
+                        borderColor: '#ef4444', // Red
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        order: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12 } },
+                    tooltip: {
+                        backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText,
+                        borderColor: tooltipBorder, borderWidth: 1, padding: 10,
+                        callbacks: {
+                            label: function(ctx) {
+                                let val = ctx.raw;
+                                let str = val;
+                                if(val >= 1000000) str = (val/1000000).toFixed(1) + ' Jt';
+                                else if(val >= 1000) str = (val/1000).toFixed(1) + ' Rb';
+                                return ctx.dataset.label + ': Rp ' + str;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: {
+                        callback: function(v) {
+                            if(v >= 1000000) return (v/1000000).toFixed(0) + 'Jt';
+                            if(v >= 1000) return (v/1000).toFixed(0) + 'Rb';
+                            return v;
+                        }
+                    }},
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // 2. PIE CHART
+    if (rawCampaigns.length > 0) {
+        const pieLabels = rawCampaigns.map(c => c.campaign_name.length > 20 ? c.campaign_name.substring(0,20)+'...' : c.campaign_name);
+        const pieData = rawCampaigns.map(c => parseFloat(c.total_spend));
+        
+        // Brand colors
+        const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b'];
+        
+        const ctxPie = document.getElementById('execPieChart').getContext('2d');
+        new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+                labels: pieLabels,
+                datasets: [{
+                    data: pieData,
+                    backgroundColor: colors,
+                    borderWidth: 2,
+                    borderColor: isDark ? '#1e293b' : '#ffffff',
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { boxWidth: 10, font: { size: 10 } }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText,
+                        borderColor: tooltipBorder, borderWidth: 1, padding: 10,
+                        callbacks: {
+                            label: function(ctx) {
+                                let val = ctx.raw;
+                                let str = val;
+                                if(val >= 1000000) str = (val/1000000).toFixed(1) + ' Jt';
+                                else if(val >= 1000) str = (val/1000).toFixed(1) + ' Rb';
+                                return ' Biaya: Rp ' + str;
+                            }
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    }
+});
+</script>
+@endpush

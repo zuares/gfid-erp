@@ -18,29 +18,28 @@ body {
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 :root {
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.4);
-    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-    --hero-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    --card-hover-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.1);
+    --card-bg: #ffffff;
+    --card-border: #e2e8f0;
+    --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --hero-bg: #f8fafc;
+    --card-hover-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     --dsh-accent-hover: #1d4ed8;
 }
 
 body[data-theme="dark"] {
-    --glass-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.05);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-    --hero-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    --card-hover-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.4);
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --hero-bg: #0f172a;
+    --card-hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
 .dpanel {
-    background: var(--glass-bg);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .dpanel:hover {
@@ -50,10 +49,9 @@ body[data-theme="dark"] {
 
 .dash-tabs {
     display: inline-flex;
-    background: var(--glass-bg);
-    backdrop-filter: none;
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     border-radius: 10px;
     padding: .35rem;
     gap: .35rem;
@@ -86,15 +84,14 @@ body[data-theme="dark"] {
 }
 
 .dash-hero {
-    background: var(--hero-gradient);
-    border: 1px solid var(--glass-border);
+    background: var(--hero-bg);
+    border: 1px solid var(--card-border);
     border-radius: 16px;
-    padding: 2rem;
+    padding: 1.5rem 2rem;
     margin-bottom: 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--glass-shadow);
     position: relative;
     z-index: 20;
 }
@@ -116,9 +113,8 @@ body[data-theme="dark"] {
 .role-chip { 
     display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .75rem; 
     border-radius: 8px; font-size: .75rem; font-weight: 600; 
-    background: var(--glass-bg); backdrop-filter: blur(8px);
-    border: 1px solid var(--glass-border); color: var(--text); 
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border); color: var(--text); 
 }
 
 .live-btn {
@@ -135,7 +131,7 @@ body[data-theme="dark"] {
 .live-off {
     background: rgba(100, 116, 139, 0.1) !important;
     color: var(--dsh-muted) !important;
-    border: 1px solid var(--glass-border) !important;
+    border: 1px solid var(--card-border) !important;
 }
 body[data-theme="dark"] .live-on { color: #4ade80 !important; }
 
@@ -154,16 +150,14 @@ body[data-theme="dark"] .dash-tab.active {
 
 /* Filter Container */
 .dash-filter {
-    background: var(--glass-bg);
-    backdrop-filter: none;
-    border: 1px solid var(--glass-border);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     border-radius: 12px;
     padding: 1rem 1.25rem;
     display: flex;
     gap: 1rem;
     align-items: flex-end;
     flex-wrap: wrap;
-    box-shadow: var(--glass-shadow);
     margin-bottom: 1.5rem;
 }
 .filter-item { flex: 1; min-width: 180px; }
@@ -187,7 +181,7 @@ body[data-theme="dark"] .filter-item input, body[data-theme="dark"] .filter-item
 .dpanel-table thead th {
     background: rgba(241, 245, 249, 0.6);
     backdrop-filter: blur(4px);
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--card-border);
     font-size: .75rem;
     font-weight: 700;
     color: var(--dsh-muted);
@@ -200,7 +194,7 @@ body[data-theme="dark"] .dpanel-table thead th { background: rgba(30, 41, 59, 0.
 .dpanel-table tbody td {
     padding: .85rem 1rem;
     font-size: .85rem;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--card-border);
     color: var(--text, #0f172a);
     vertical-align: middle;
     transition: background 0.2s ease;
@@ -213,7 +207,7 @@ body[data-theme="dark"] .dpanel-table tbody tr:hover td { background: rgba(51, 6
 .period-bar { display: flex; gap: .75rem; align-items: center; }
 .range-pill {
     display: inline-flex; align-items: center; justify-content: space-between; gap: .75rem;
-    border: 1px solid var(--glass-border); background: var(--bg); padding: .5rem 1rem; border-radius: 8px;
+    border: 1px solid var(--card-border); background: var(--bg); padding: .5rem 1rem; border-radius: 8px;
     cursor: pointer; font-size: .85rem; color: var(--text, #0f172a); font-weight: 600;
     transition: all 0.25s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
@@ -226,12 +220,12 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
 
 /* Kpi Cards Upgrade */
 .kpi {
-    background: var(--glass-bg);
+    background: var(--card-bg);
     backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--card-border);
     border-radius: 12px;
     padding: 1.25rem;
-    box-shadow: var(--glass-shadow);
+    box-shadow: var(--card-shadow);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
@@ -253,8 +247,8 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
     display: inline-flex; align-items: center; gap: .4rem;
     padding: .35rem .7rem; border-radius: 8px; font-size: .72rem; font-weight: 600;
     cursor: pointer; user-select: none;
-    background: var(--glass-bg); backdrop-filter: blur(8px);
-    border: 1px solid var(--glass-border);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     color: var(--dsh-muted); transition: all 0.25s ease;
 }
 .mini-log-toggle:hover { border-color: var(--dsh-accent); color: var(--dsh-accent); }
@@ -266,9 +260,9 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
 .mini-log-panel {
     position: absolute; top: calc(100% + 8px); right: 0; z-index: 9999;
     min-width: 380px; max-width: 440px;
-    background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--glass-border); border-radius: 12px;
-    box-shadow: 0 16px 48px -12px rgba(0,0,0,0.15);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border); border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
     padding: 0; overflow: hidden;
     opacity: 0; transform: translateY(-8px) scale(0.97); pointer-events: none;
     transition: opacity 0.25s ease, transform 0.25s ease;
@@ -512,12 +506,12 @@ document.addEventListener('click', function(e) {
                 @endif
                 
                 @if(auth()->user()->role === 'owner')
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="clearAdsData()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: rgba(239, 68, 68, 0.1); color: #ef4444; box-shadow: var(--glass-shadow);">
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="clearAdsData()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); color: #ef4444; box-shadow: var(--card-shadow);">
                     <i class="bi bi-trash"></i> Bersihkan Data
                 </button>
                 @endif
                 
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: var(--glass-shadow); color: var(--text);">
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text);">
                     <i class="bi bi-arrow-repeat"></i> Sync Manual
                 </button>
             </div>
@@ -639,92 +633,7 @@ document.addEventListener('click', function(e) {
         <!-- DASHBOARD TAB -->
         <div class="tab-pane active" id="tab-dashboard">
             
-            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI)</div>
-            
-            <div class="dash-grid mb-3">
-                @php
-                    $metrics = [
-                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
-                        ['title' => 'GMV (Pendapatan)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
-                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
-                        ['title' => 'AOV', 'key' => 'aov', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
-                        ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-eye'],
-                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'amber', 'icon' => 'bi-hand-index'],
-                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'violet', 'icon' => 'bi-cursor'],
-                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
-                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-coin'],
-                    ];
-                @endphp
-                @foreach($metrics as $m)
-                    @php
-                        $currSpend = $kpi['current']->spend ?? 0;
-                        $currGmv = $kpi['current']->gmv ?? 0;
-                        $currOrders = $kpi['current']->orders ?? 0;
-                        $currClicks = $kpi['current']->clicks ?? 0;
-                        $currImpressions = $kpi['current']->impressions ?? 0;
 
-                        $prevSpend = $kpi['previous']->spend ?? 0;
-                        $prevGmv = $kpi['previous']->gmv ?? 0;
-                        $prevOrders = $kpi['previous']->orders ?? 0;
-                        $prevClicks = $kpi['previous']->clicks ?? 0;
-                        $prevImpressions = $kpi['previous']->impressions ?? 0;
-
-                        $val = $kpi['current']->{$m['key']} ?? 0;
-                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
-
-                        if($m['key'] === 'roas') {
-                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
-                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
-                        } elseif ($m['key'] === 'aov') {
-                            $val = $currOrders > 0 ? round($currGmv / $currOrders, 0) : 0;
-                            $prevVal = $prevOrders > 0 ? round($prevGmv / $prevOrders, 0) : 0;
-                        } elseif ($m['key'] === 'cpc') {
-                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
-                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
-                        } elseif ($m['key'] === 'ctr') {
-                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
-                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
-                        } elseif ($m['key'] === 'cvr') {
-                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
-                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
-                        }
-
-                        $change = $kpi['changes'][$m['key']] ?? 0;
-                        if (in_array($m['key'], ['aov', 'cpc', 'ctr', 'cvr'])) {
-                            if ($prevVal == 0) {
-                                $change = $val > 0 ? 100 : 0;
-                            } else {
-                                $change = round((($val - $prevVal) / $prevVal) * 100, 2);
-                            }
-                        }
-
-                        $isUp = $change >= 0;
-                        
-                        // For cost metrics, going down is good (green). For others, going up is good.
-                        if (in_array($m['key'], ['spend', 'cpc'])) {
-                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
-                        } else {
-                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
-                        }
-                    @endphp
-                    <div class="kpi {{ $m['cls'] }}">
-                        <div class="kpi-label">
-                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
-                            {{ $m['title'] }}
-                        </div>
-                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
-                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
-                        </div>
-                        <div class="kpi-sub">
-                            <span style="font-weight:700; {{ $colorClass }}">
-                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
-                            </span> 
-                            vs rentang lalu
-                        </div>
-                    </div>
-                @endforeach
-            </div>
 
             <div class="dash-sec"><i class="bi bi-robot"></i> Asisten Analisis (Berdasarkan Rentang Tanggal)</div>
             <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
@@ -1003,6 +912,93 @@ document.addEventListener('click', function(e) {
 
         <!-- TAB PERFORMA PRODUK (GMV MAX) -->
         <div class="tab-pane" id="tab-items">
+            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI) Keseluruhan</div>
+            
+            <div class="dash-grid mb-4">
+                @php
+                    $metrics = [
+                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
+                        ['title' => 'GMV (Pendapatan)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
+                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
+                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
+                        ['title' => 'AOV', 'key' => 'aov', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
+                        ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-eye'],
+                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'amber', 'icon' => 'bi-hand-index'],
+                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'violet', 'icon' => 'bi-cursor'],
+                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
+                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-coin'],
+                    ];
+                @endphp
+                @foreach($metrics as $m)
+                    @php
+                        $currSpend = $kpi['current']->spend ?? 0;
+                        $currGmv = $kpi['current']->gmv ?? 0;
+                        $currOrders = $kpi['current']->orders ?? 0;
+                        $currClicks = $kpi['current']->clicks ?? 0;
+                        $currImpressions = $kpi['current']->impressions ?? 0;
+
+                        $prevSpend = $kpi['previous']->spend ?? 0;
+                        $prevGmv = $kpi['previous']->gmv ?? 0;
+                        $prevOrders = $kpi['previous']->orders ?? 0;
+                        $prevClicks = $kpi['previous']->clicks ?? 0;
+                        $prevImpressions = $kpi['previous']->impressions ?? 0;
+
+                        $val = $kpi['current']->{$m['key']} ?? 0;
+                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
+
+                        if($m['key'] === 'roas') {
+                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
+                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
+                        } elseif ($m['key'] === 'aov') {
+                            $val = $currOrders > 0 ? round($currGmv / $currOrders, 0) : 0;
+                            $prevVal = $prevOrders > 0 ? round($prevGmv / $prevOrders, 0) : 0;
+                        } elseif ($m['key'] === 'cpc') {
+                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
+                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
+                        } elseif ($m['key'] === 'ctr') {
+                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
+                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
+                        } elseif ($m['key'] === 'cvr') {
+                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
+                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
+                        }
+
+                        $change = $kpi['changes'][$m['key']] ?? 0;
+                        if (in_array($m['key'], ['aov', 'cpc', 'ctr', 'cvr'])) {
+                            if ($prevVal == 0) {
+                                $change = $val > 0 ? 100 : 0;
+                            } else {
+                                $change = round((($val - $prevVal) / $prevVal) * 100, 2);
+                            }
+                        }
+
+                        $isUp = $change >= 0;
+                        
+                        // For cost metrics, going down is good (green). For others, going up is good.
+                        if (in_array($m['key'], ['spend', 'cpc'])) {
+                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
+                        } else {
+                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
+                        }
+                    @endphp
+                    <div class="kpi {{ $m['cls'] }}">
+                        <div class="kpi-label">
+                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
+                            {{ $m['title'] }}
+                        </div>
+                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
+                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
+                        </div>
+                        <div class="kpi-sub">
+                            <span style="font-weight:700; {{ $colorClass }}">
+                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
+                            </span> 
+                            vs rentang lalu
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
             <div class="dash-sec"><i class="bi bi-box-seam"></i> Performa Produk (GMV Max)</div>
             
             <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
@@ -1156,7 +1152,7 @@ document.addEventListener('click', function(e) {
 <!-- Modal Sync Manual -->
 <div class="modal fade" id="modalSyncAds" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:20px; background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
+        <div class="modal-content" style="border-radius:16px; background: var(--card-bg); border: 1px solid var(--card-border); box-shadow: var(--card-shadow);">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold" style="color: var(--text);">Manual Sync Shopee Ads</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
