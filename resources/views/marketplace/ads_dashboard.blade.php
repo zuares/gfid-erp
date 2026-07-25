@@ -421,6 +421,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
 
+// --- SYNC MANUAL ---
+window.syncAdsManual = async function() {
+    if (!confirm('Jalankan proses sinkronisasi Shopee Ads secara manual? Data akan diperbarui di latar belakang.')) return;
+    
+    const btn = document.getElementById('btnSyncAds');
+    let oldText = '';
+    if (btn) {
+        oldText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:1rem;height:1rem;border-width:.15em;vertical-align:middle;margin-right:4px;"></span> Syncing...';
+        btn.disabled = true;
+    }
+    
+    try {
+        const res = await fetch('/api/marketplace/sync-ads-manual', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            }
+        });
+        const data = await res.json();
+        alert(data.message || 'Sync berhasil dijadwalkan.');
+        setTimeout(() => location.reload(), 2000);
+    } catch (err) {
+        alert('Gagal trigger sync ads: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.innerHTML = oldText;
+            btn.disabled = false;
+        }
+    }
+};
+
 // --- MINI LOG TOGGLE ---
 function toggleMiniLog() {
     const panel = document.getElementById('miniLogPanel');
@@ -494,6 +528,10 @@ document.addEventListener('click', function(e) {
                     <span class="chevron">▼</span>
                 </div>
                 @endif
+                
+                <button class="btn btn-sm btn-ship-outline btn-pill" id="btnSyncAds" onclick="syncAdsManual()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: var(--glass-shadow); color: var(--text); cursor: pointer;">
+                    <i class="bi bi-arrow-repeat"></i> Sync Manual
+                </button>
             </div>
 
             {{-- Mini Log Panel (Dropdown) --}}
