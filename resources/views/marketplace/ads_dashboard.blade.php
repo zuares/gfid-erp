@@ -238,6 +238,18 @@ body[data-theme="dark"] .dash-tabs-modern { background: rgba(30, 41, 59, 0.5); }
     box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
 }
 
+.dash-tab-sm {
+    border: none; background: transparent; padding: 0.4rem 0.8rem; border-radius: 8px;
+    font-weight: 600; font-size: 0.75rem; color: var(--dsh-muted); cursor: pointer;
+    transition: all 0.2s ease; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;
+}
+.dash-tab-sm:hover { color: var(--text); }
+.dash-tab-sm.active {
+    background: var(--card-bg); color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
+}
+body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
+
 .kpi {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
@@ -682,13 +694,14 @@ document.addEventListener('click', function(e) {
                     </div>
                     <div style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
                         <input type="hidden" id="histMetricSelect" value="roas">
-                        <div class="dash-tabs-modern" id="histMetricChips">
-                            <button class="dash-tab-m active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
-                            <button class="dash-tab-m" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
-                            <button class="dash-tab-m" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
-                            <button class="dash-tab-m" data-val="impressions"><i class="bi bi-eye"></i> Impresi</button>
-                            <button class="dash-tab-m" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
-                            <button class="dash-tab-m" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
+                        <div class="dash-tabs-modern" id="histMetricChips" style="padding: 0.25rem;">
+                            <button class="dash-tab-sm active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
+                            <button class="dash-tab-sm" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
+                            <button class="dash-tab-sm" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
+                            <button class="dash-tab-sm" data-val="impressions"><i class="bi bi-eye"></i> Impresi</button>
+                            <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
+                            <button class="dash-tab-sm" data-val="ctr"><i class="bi bi-hand-index"></i> CTR</button>
+                            <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
                         </div>
                     </div>
                 </div>
@@ -2040,6 +2053,9 @@ document.addEventListener("DOMContentLoaded", function() {
                         return parseFloat(d.impressions || 0);
                     } else if (metric === 'clicks') {
                         return clicks;
+                    } else if (metric === 'ctr') {
+                        let im = parseFloat(d.impressions || 0);
+                        return im > 0 ? (clicks / im) * 100 : 0;
                     } else if (metric === 'cvr') {
                         return clicks > 0 ? (orders / clicks) * 100 : 0;
                     }
@@ -2110,7 +2126,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                                 let metric = document.getElementById('histMetricSelect').value;
                                                 if (metric === 'roas') {
                                                     return ctx.dataset.label + ': ' + val.toFixed(2) + 'x';
-                                                } else if (metric === 'cvr') {
+                                                } else if (metric === 'cvr' || metric === 'ctr') {
                                                     return ctx.dataset.label + ': ' + val.toFixed(2) + '%';
                                                 } else if (metric === 'impressions' || metric === 'clicks') {
                                                     return ctx.dataset.label + ': ' + val.toLocaleString('id-ID');
@@ -2133,7 +2149,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                             callback: function(value) {
                                                 let metric = document.getElementById('histMetricSelect').value;
                                                 if (metric === 'roas') return value + 'x';
-                                                if (metric === 'cvr') return value + '%';
+                                                if (metric === 'cvr' || metric === 'ctr') return value + '%';
                                                 if (metric === 'impressions' || metric === 'clicks') {
                                                     if (value >= 1000000) return (value/1000000).toFixed(1) + 'M';
                                                     if (value >= 1000) return (value/1000).toFixed(1) + 'K';
@@ -2167,12 +2183,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
                         let formatVal = (v) => {
                             if (metric === 'roas') return v.toFixed(2) + 'x';
-                            if (metric === 'cvr') return v.toFixed(2) + '%';
+                            if (metric === 'cvr' || metric === 'ctr') return v.toFixed(2) + '%';
                             if (metric === 'impressions' || metric === 'clicks') return Math.round(v).toLocaleString('id-ID');
                             return 'Rp ' + formatShortIDR(v);
                         };
 
-                        let isAvg = (metric === 'roas' || metric === 'cvr');
+                        let isAvg = (metric === 'roas' || metric === 'cvr' || metric === 'ctr');
                         html += `<div style="margin-bottom:2px;">Sekarang: <span style="color:var(--dsh-accent)">${isAvg ? 'Rata-rata' : 'Total'} ${formatVal(isAvg ? currAvg : currSum)}</span></div>`;
                         if (datasets.length > 1) {
                             let diff = 0;
@@ -2201,7 +2217,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 // Handle metric toggle
                 const metricSelect = document.getElementById('histMetricSelect');
-                const metricChips = document.querySelectorAll('#histMetricChips .dash-tab-m');
+                const metricChips = document.querySelectorAll('#histMetricChips .dash-tab-sm');
                 metricChips.forEach(chip => {
                     chip.addEventListener('click', function() {
                         metricChips.forEach(c => c.classList.remove('active'));
