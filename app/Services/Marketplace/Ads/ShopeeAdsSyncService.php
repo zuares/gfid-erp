@@ -330,6 +330,17 @@ class ShopeeAdsSyncService
                 if (empty($res['error']) && !empty($res['response']['report'])) {
                     $report = $res['response']['report'];
                     
+                    // Pastikan ada parent campaign untuk GMS agar muncul di Daftar Kampanye
+                    \App\Models\MarketplaceAdCampaign::updateOrCreate(
+                        ['store_id' => $store->id, 'channel_campaign_id' => 'GMS-' . $store->id],
+                        [
+                            'campaign_name' => 'GMV Max (Semua Produk)',
+                            'bidding_method' => 'auto',
+                            'status' => 'ONGOING',
+                            'synced_at' => now(),
+                        ]
+                    );
+                    
                     // Simpan per hari dengan ID dummy untuk global GMS
                     MarketplaceAdCampaignDaily::updateOrCreate(
                         [

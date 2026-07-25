@@ -1079,25 +1079,23 @@ document.addEventListener('click', function(e) {
                                     </td>
                                     <td>
                                         @php
-                                            $allGmv = (float)$camp->gmv;
-                                            $allDirect = (float)$camp->direct_gmv;
-                                            
-                                            $campType = 'Belum Ada Data';
+                                            $campType = 'Tidak Diketahui';
                                             $campTypeColor = '#64748b';
                                             $campTypeBg = 'rgba(100,116,139,0.1)';
                                             
-                                            if ($allGmv > 0 && $allDirect == 0) {
+                                            // Menggunakan data API yang lebih relevan (bidding_method & ad_type)
+                                            if (str_starts_with($camp->channel_campaign_id, 'GMS-')) {
                                                 $campType = 'GMV Max';
                                                 $campTypeColor = '#2563eb';
                                                 $campTypeBg = 'rgba(37,99,235,0.1)';
-                                            } elseif ($allDirect > 0 && $allGmv == $allDirect) {
+                                            } elseif (isset($camp->ad_type) && in_array($camp->ad_type, ['search', 'manual'])) {
                                                 $campType = 'Pencarian (CPC)';
                                                 $campTypeColor = '#ca8a04';
                                                 $campTypeBg = 'rgba(234,179,8,0.1)';
-                                            } elseif ($allGmv > 0 && $allDirect > 0 && $allGmv != $allDirect) {
-                                                $campType = 'GMV Max'; // Most campaigns with mixed GMV are actually GMV Max with some direct conversions
-                                                $campTypeColor = '#2563eb';
-                                                $campTypeBg = 'rgba(37,99,235,0.1)';
+                                            } elseif ($camp->bidding_method == 'auto') {
+                                                $campType = 'Auto Bidding';
+                                                $campTypeColor = '#9333ea';
+                                                $campTypeBg = 'rgba(147,51,234,0.1)';
                                             }
                                         @endphp
                                         <span style="background: {{ $campTypeBg }}; color: {{ $campTypeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $campType }}</span>
