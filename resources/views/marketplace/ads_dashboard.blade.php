@@ -1080,6 +1080,20 @@ document.addEventListener('click', function(e) {
         <!-- SINKRONISASI TAB -->
         <div class="tab-pane" id="tab-sync">
             
+            <!-- Live Progress Bar (Hidden by default) -->
+            <div id="liveSyncProgress" class="dpanel mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi Sedang Berjalan...</span>
+                    <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: var(--dsh-border); border-radius: 4px; overflow: hidden;">
+                    <div id="liveSyncBar" style="width: 0%; height: 100%; background: var(--dsh-accent); transition: width 0.3s ease;"></div>
+                </div>
+                <div id="liveSyncLog" style="margin-top: .5rem; font-size: .7rem; font-family: ui-monospace, monospace; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    Menghubungkan ke server...
+                </div>
+            </div>
+
             <div class="dash-panels" style="grid-template-columns: 1fr;">
                 <!-- Sync Logs -->
                 <div>
@@ -1142,7 +1156,7 @@ document.addEventListener('click', function(e) {
 <!-- Modal Sync Manual -->
 <div class="modal fade" id="modalSyncAds" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:20px; background: var(--glass-bg); backdrop-filter: none; border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
+        <div class="modal-content" style="border-radius:20px; background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold" style="color: var(--text);">Manual Sync Shopee Ads</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1264,6 +1278,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 const logEl = document.getElementById('syncLogs');
                 const progressBar = document.getElementById('syncProgressBar');
                 
+                const liveProgress = document.getElementById('liveSyncProgress');
+                const liveBar = document.getElementById('liveSyncBar');
+                const livePercent = document.getElementById('liveSyncPercent');
+                const liveLog = document.getElementById('liveSyncLog');
+                
+                if (liveProgress) liveProgress.style.display = 'block';
+                
                 let savedData = 0;
                 let hasErrors = false;
                 let allErrors = [];
@@ -1287,10 +1308,13 @@ document.addEventListener("DOMContentLoaded", function() {
                                 const color = data.type === 'done' ? '#60a5fa' : (data.type === 'info' ? '#facc15' : '#a1a1aa');
                                 logEl.innerHTML += `<div style="color: ${color};">> ${data.message}</div>`;
                                 logEl.scrollTop = logEl.scrollHeight;
+                                if (liveLog) liveLog.innerText = `> ${data.message}`;
                             }
                             
                             if (data.progress !== undefined && data.progress !== null) {
                                 progressBar.style.width = data.progress + '%';
+                                if (liveBar) liveBar.style.width = data.progress + '%';
+                                if (livePercent) livePercent.innerText = Math.round(data.progress) + '%';
                             }
                             
                             if (data.type === 'done') {
