@@ -674,36 +674,67 @@ document.addEventListener('click', function(e) {
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTime"></div>
             </div>
 
-            <div class="dash-panels mt-4 mb-4" style="grid-template-columns: 1fr 2fr; gap: 1rem;">
-                {{-- PIE CHART PRODUK --}}
+            <div class="dash-panels mt-4 mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                {{-- PIE CHART BIAYA --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-pie-chart text-primary"></i> Proporsi Produk</div>
-                        <select id="pieMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border); font-size: 0.75rem;">
-                            <option value="spend">Biaya</option>
-                            <option value="gmv">GMV</option>
-                            <option value="clicks">Klik</option>
-                        </select>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-wallet2 text-danger"></i> Proporsi Biaya</div>
                     </div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        Top 5 produk dengan proporsi terbesar.
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Top 5 produk penyerap biaya terbesar.
                     </div>
                     <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
                             <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
-                            <canvas id="campaignPieChart"></canvas>
+                            <canvas id="pieChartSpend"></canvas>
                         @endif
                     </div>
                 </div>
 
+                {{-- PIE CHART GMV --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bag-check text-success"></i> Proporsi GMV</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Top 5 produk penyumbang GMV terbesar.
+                    </div>
+                    <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="pieChartGmv"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- PIE CHART KLIK --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Proporsi Klik</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Top 5 produk dengan klik terbanyak.
+                    </div>
+                    <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="pieChartClicks"></canvas>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="dash-panels mb-4" style="grid-template-columns: 1fr;">
                 {{-- HEATMAP JAM TAYANG --}}
                 <div class="dpanel p-3">
                     <div class="dash-sec mt-0 mb-2"><i class="bi bi-clock text-primary"></i> Heatmap Jam Tayang (Golden Hours)</div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
                         💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
                     </div>
-                    <div style="position: relative; height: 230px;">
+                    <div style="position: relative; height: 250px;">
                         <canvas id="hourlyChart"></canvas>
                     </div>
                 </div>
@@ -2253,18 +2284,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 // ==========================================
-                // PIE CHART PRODUK
+                // PIE CHART PRODUK (3 Charts)
                 // ==========================================
                 const rawItems = @json($itemPerformance->toArray());
-                const pieCtx = document.getElementById('campaignPieChart');
-                let pieChartInstance = null;
 
-                const renderPieChart = (metric) => {
-                    if (!pieCtx || !rawItems || rawItems.length === 0) return;
+                const renderSinglePie = (ctxId, metric, labelFormat) => {
+                    const ctx = document.getElementById(ctxId);
+                    if (!ctx || !rawItems || rawItems.length === 0) return;
                     
-                    // Sort and get top 5 based on selected metric
                     let sorted = [...rawItems].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
-                    
                     const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
                     const pieLabels = sorted.map(c => {
                         let name = c.item_sku || c.item_name || 'Unknown Product';
@@ -2272,58 +2300,49 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                     const pieData = sorted.map(c => parseFloat(c[metric] || 0));
 
-                    if (pieChartInstance) {
-                        pieChartInstance.data.labels = pieLabels;
-                        pieChartInstance.data.datasets[0].data = pieData;
-                        pieChartInstance.update();
-                    } else {
-                        pieChartInstance = new Chart(pieCtx.getContext('2d'), {
-                            type: 'doughnut',
-                            data: {
-                                labels: pieLabels,
-                                datasets: [{
-                                    data: pieData,
-                                    backgroundColor: bgColors,
-                                    borderWidth: 2,
-                                    borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
-                                    hoverOffset: 4
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                cutout: '60%',
-                                plugins: {
-                                    legend: { 
-                                        position: 'right',
-                                        labels: { boxWidth: 10, font: { size: 10 }, color: textColor }
-                                    },
-                                    tooltip: {
-                                        backgroundColor: tooltipBg,
-                                        titleColor: tooltipText,
-                                        bodyColor: tooltipText,
-                                        borderColor: tooltipBorder,
-                                        borderWidth: 1,
-                                        padding: 10,
-                                        callbacks: {
-                                            label: function(ctx) {
-                                                let m = document.getElementById('pieMetricSelect').value;
-                                                if (m === 'clicks') return ctx.label + ': ' + ctx.raw.toLocaleString('id-ID');
-                                                return ctx.label + ': Rp ' + formatShortIDR(ctx.raw);
-                                            }
+                    new Chart(ctx.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: pieLabels,
+                            datasets: [{
+                                data: pieData,
+                                backgroundColor: bgColors,
+                                borderWidth: 2,
+                                borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '55%',
+                            plugins: {
+                                legend: { 
+                                    position: 'bottom',
+                                    labels: { boxWidth: 10, font: { size: 10 }, color: textColor, padding: 10 }
+                                },
+                                tooltip: {
+                                    backgroundColor: tooltipBg,
+                                    titleColor: tooltipText,
+                                    bodyColor: tooltipText,
+                                    borderColor: tooltipBorder,
+                                    borderWidth: 1,
+                                    padding: 10,
+                                    callbacks: {
+                                        label: function(c) {
+                                            if (labelFormat === 'currency') return c.label + ': Rp ' + formatShortIDR(c.raw);
+                                            return c.label + ': ' + c.raw.toLocaleString('id-ID');
                                         }
                                     }
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 };
-
-                const pieMetricSelect = document.getElementById('pieMetricSelect');
-                if (pieMetricSelect) {
-                    pieMetricSelect.addEventListener('change', (e) => renderPieChart(e.target.value));
-                    renderPieChart(pieMetricSelect.value);
-                }
+                
+                renderSinglePie('pieChartSpend', 'spend', 'currency');
+                renderSinglePie('pieChartGmv', 'gmv', 'currency');
+                renderSinglePie('pieChartClicks', 'clicks', 'number');
                 
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
