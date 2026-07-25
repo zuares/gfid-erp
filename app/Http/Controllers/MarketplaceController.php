@@ -1922,7 +1922,16 @@ class MarketplaceController extends Controller
                         $sendEvent('log', "[{$store->name}] Performa kampanye tersimpan.", $baseProgress + 25);
 
                         $syncService->syncGmsDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 28);
+                        $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 27);
+
+                        $sendEvent('log', "[{$store->name}] Mengambil data performa per-jam (heatmap)...", $baseProgress + 28);
+                        $hStart = clone $currentStart;
+                        while ($hStart->lessThanOrEqualTo($currentEnd)) {
+                            $syncService->syncShopHourlyPerformance($store, $hStart->format('Y-m-d'), $run);
+                            $hStart->addDay();
+                            usleep(100000); // 0.1s rate limit
+                        }
+                        $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 30);
                     } catch (\Throwable $e) {
                         $errors[] = "[{$store->name}] " . $e->getMessage();
                         $sendEvent('log', "[{$store->name}] Kesalahan pada periode ini: " . $e->getMessage());
