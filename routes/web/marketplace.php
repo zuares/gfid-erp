@@ -84,4 +84,6 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.gms.action');
         Route::post('ads-dashboard/gms-campaign-edit', [AdsDashboardController::class, 'actionGmsCampaign'])
             ->name('ads.gms.campaign.edit');
+        Route::post('ads-dashboard/cpc-campaign-edit', [AdsDashboardController::class, 'actionCpcCampaign'])
+            ->name('ads.cpc.campaign.edit');
     });

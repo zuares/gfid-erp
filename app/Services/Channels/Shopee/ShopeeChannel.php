@@ -416,6 +416,17 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->post($store, '/api/v2/ads/edit_gms_product_campaign', $payload);
     }
 
+    public function editManualProductAds(Store $store, int $campaignId, string $action, array $params = []): array
+    {
+        $payload = array_merge([
+            'reference_id' => uniqid('cpc-'),
+            'campaign_id' => $campaignId,
+            'edit_action' => $action,
+        ], $params);
+
+        return $this->post($store, '/api/v2/ads/edit_manual_product_ads', $payload);
+    }
+
     /**
      * Performa per jam level toko (semua campaign CPC digabung).
      * Endpoint: GET /api/v2/ads/get_all_cpc_ads_hourly_performance

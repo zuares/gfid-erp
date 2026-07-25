@@ -290,6 +290,67 @@ class AdsDashboardController extends Controller
         }
     }
 
+    public function actionCpcCampaign(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
+    {
+        $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'campaign_id' => 'required|numeric',
+            'roas_target' => 'nullable|numeric|min:0',
+            'daily_budget' => 'nullable|numeric|min:0'
+        ]);
+
+        $store = Store::find($request->input('store_id'));
+        if (!$store) {
+            return response()->json(['status' => 'error', 'message' => 'Store not found.'], 404);
+        }
+
+        $campaignId = (int)$request->input('campaign_id');
+        $roasTarget = $request->input('roas_target');
+        $dailyBudget = $request->input('daily_budget');
+        
+        $results = [];
+
+        try {
+            // Ubah ROAS
+            if ($roasTarget !== null && $roasTarget !== '') {
+                $params = ['roas_target' => (float)$roasTarget];
+                $resRoas = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_roas_target', $params);
+                if (!empty($resRoas['error'])) {
+                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error'])], 400);
+                }
+                $results[] = 'Target ROAS (' . ($roasTarget == 0 ? 'Auto' : $roasTarget) . ')';
+                
+                // Jeda sebentar agar tidak melanggar rate limit Shopee
+                usleep(300000); 
+            }
+
+            // Ubah Budget
+            if ($dailyBudget !== null && $dailyBudget !== '') {
+                $params = ['budget' => (float)$dailyBudget];
+                $resBudget = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_budget', $params);
+                if (!empty($resBudget['error'])) {
+                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah Budget: ' . ($resBudget['message'] ?? $resBudget['error'])], 400);
+                }
+                $results[] = 'Batas Modal Harian (' . ($dailyBudget == 0 ? 'Tidak Terbatas' : number_format($dailyBudget, 0, ',', '.')) . ')';
+            }
+
+            if (empty($results)) {
+                return response()->json(['status' => 'error', 'message' => 'Tidak ada pengaturan yang diubah.'], 400);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pengaturan Kampanye CPC berhasil disimpan: ' . implode(' dan ', $results)
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function actionGmsCampaign(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
     {
         $request->validate([
