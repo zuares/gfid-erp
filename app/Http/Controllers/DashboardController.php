@@ -69,12 +69,12 @@ class DashboardController extends Controller
         $adsHourly = [];
         $adsCampaigns = [];
         try {
-            if (Schema::hasTable('marketplace_ads_hourlies') && Schema::hasTable('marketplace_ads_campaign_dailies')) {
+            if (Schema::hasTable('marketplace_ads_hourly_performances') && Schema::hasTable('marketplace_ad_campaign_dailies')) {
                 $from = Carbon::today()->subDays(6)->toDateString();
                 $to = Carbon::today()->toDateString();
                 
                 // 1. Heatmap (7 Days)
-                $adsHourly = DB::table('marketplace_ads_hourlies')
+                $adsHourly = DB::table('marketplace_ads_hourly_performances')
                     ->selectRaw('performance_hour, SUM(expense) as spend, SUM(broad_gmv) as gmv, SUM(clicks) as clicks, SUM(broad_order) as orders')
                     ->whereBetween('date', [$from, $to])
                     ->groupBy('performance_hour')
@@ -82,10 +82,10 @@ class DashboardController extends Controller
                     ->get();
                     
                 // 2. Top 5 Campaigns Spend Share (7 Days)
-                $adsCampaigns = DB::table('marketplace_ads_campaign_dailies')
-                    ->join('marketplace_ad_campaigns', 'marketplace_ads_campaign_dailies.channel_campaign_id', '=', 'marketplace_ad_campaigns.campaign_id')
-                    ->selectRaw('marketplace_ad_campaigns.campaign_name, SUM(marketplace_ads_campaign_dailies.expense) as total_spend')
-                    ->whereBetween('marketplace_ads_campaign_dailies.date', [$from, $to])
+                $adsCampaigns = DB::table('marketplace_ad_campaign_dailies')
+                    ->join('marketplace_ad_campaigns', 'marketplace_ad_campaign_dailies.channel_campaign_id', '=', 'marketplace_ad_campaigns.campaign_id')
+                    ->selectRaw('marketplace_ad_campaigns.campaign_name, SUM(marketplace_ad_campaign_dailies.expense) as total_spend')
+                    ->whereBetween('marketplace_ad_campaign_dailies.date', [$from, $to])
                     ->groupBy('marketplace_ad_campaigns.campaign_name')
                     ->having('total_spend', '>', 0)
                     ->orderByDesc('total_spend')
