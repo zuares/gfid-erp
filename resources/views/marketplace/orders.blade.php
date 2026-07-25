@@ -625,10 +625,10 @@ body[data-theme="dark"] .kpi{
 body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
 .kpi .val{ font-weight:650; color:var(--shp-accent); }
 
-.btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
-.btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
-.btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
-.btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+.btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; padding:.32rem .75rem; border-radius:8px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; box-shadow: var(--glass-shadow); transition: all 0.2s; }
+.btn-ship-primary:hover{ transform: translateY(-1px); background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
+.btn-ship-outline{ color:var(--text)!important; background:var(--glass-bg)!important; border:1px solid var(--glass-border)!important; padding:.32rem .75rem; border-radius:8px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; backdrop-filter: blur(12px); box-shadow: var(--glass-shadow); transition: all 0.2s; }
+.btn-ship-outline:hover{ transform: translateY(-1px); background:rgba(255,255,255,0.8)!important; color:#0f172a!important; }
 .btn-fresh{ border:1px solid #fecaca; color:#b91c1c; background:transparent; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; }
 .btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
 
@@ -703,7 +703,6 @@ body[data-theme="dark"] .ord-table tbody tr td {
                     Menyinkronkan...
                 </span>
             </h1>
-            <div class="sub">Manajemen pesanan dari semua toko dan channel marketplace</div>
         </div>
         <div class="controls">
             {{-- Hidden date inputs --}}
@@ -752,22 +751,6 @@ body[data-theme="dark"] .ord-table tbody tr td {
             {{-- Sync --}}
             <span id="lastSyncTime" style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;" class="mobile-hide"></span>
             <button class="btn-ship-primary" onclick="openQuickSync()">🔄 <span class="mobile-hide">Sync Pesanan</span></button>
-
-            {{-- Sync Latar Belakang / Backfill Histori — dispatch ke queue (Artisan::queue),
-                 TIDAK blocking, mengikuti endpoint yang SUDAH ADA & dipakai di /marketplace/toko
-                 (force-sync-background, sync-historical). Tidak mengubah openQuickSync()
-                 atau alur Sync Pesanan yang sudah berjalan — murni tambahan. --}}
-            <div style="position:relative" class="mobile-hide">
-                <button class="btn-ship-outline" id="btnBgSync" onclick="toggleDropdown('ddBgSync', event)" title="Sync di latar belakang / tarik histori masa lalu — untuk backlog besar">
-                    <span style="opacity:0.7;">⏱</span> <span class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">Latar Belakang</span>
-                </button>
-                <div class="hdr-dropdown" id="ddBgSync" style="right:0;left:auto;min-width:260px">
-                    <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">SYNC LATAR BELAKANG / BACKFILL HISTORI (PER TOKO)</div>
-                    <div id="bgSyncDropdownItems" style="padding:.2rem 0"></div>
-                </div>
-            </div>
-
-            <button class="btn-ship-outline" onclick="loadOrders()" title="Segarkan Data">🔃</button>
         </div>
     </div>
 
