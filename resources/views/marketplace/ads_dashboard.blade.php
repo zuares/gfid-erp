@@ -798,7 +798,7 @@ document.addEventListener('click', function(e) {
                 {{-- CHART KLIK --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bar-chart-steps text-primary"></i> Top 5 Klik</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Top 5 Trafik (Klik)</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
                         Produk dengan klik terbanyak (ID).
@@ -808,6 +808,57 @@ document.addEventListener('click', function(e) {
                             <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
                             <canvas id="chartClicks"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART IMPRESI --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Top 5 Impresi</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan tayangan terbanyak (ID).
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartImpressions"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART CTR --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-hand-index text-warning"></i> Top 5 CTR</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan rasio klik tertinggi (ID).
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartCtr"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART CVR --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-funnel" style="color: #a855f7;"></i> Top 5 CVR</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan tingkat konversi tertinggi (ID).
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartCvr"></canvas>
                         @endif
                     </div>
                 </div>
@@ -2370,9 +2421,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 // ==========================================
-                // CHART PRODUK (3 Bar Charts)
+                // CHART PRODUK (6 Bar Charts)
                 // ==========================================
-                const rawItems = @json($itemPerformance->toArray());
+                const rawItems = @json($itemPerformance->toArray()).map(c => {
+                    c.ctr = parseFloat(c.impressions) > 0 ? (parseFloat(c.clicks) / parseFloat(c.impressions)) * 100 : 0;
+                    c.cvr = parseFloat(c.clicks) > 0 ? (parseFloat(c.orders) / parseFloat(c.clicks)) * 100 : 0;
+                    return c;
+                });
 
                 const renderSingleChart = (ctxId, metric, labelFormat, colorTheme) => {
                     const ctx = document.getElementById(ctxId);
@@ -2394,7 +2449,9 @@ document.addEventListener("DOMContentLoaded", function() {
                             ctx.save();
                             chart.getDatasetMeta(0).data.forEach((bar, index) => {
                                 const value = data.datasets[0].data[index];
-                                const formattedValue = labelFormat === 'currency' ? 'Rp ' + formatShortIDR(value) : value.toLocaleString('id-ID');
+                                let formattedValue = value.toLocaleString('id-ID');
+                                if (labelFormat === 'currency') formattedValue = 'Rp ' + formatShortIDR(value);
+                                if (labelFormat === 'percent') formattedValue = value.toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
                                 
                                 ctx.font = 'bold 10px "Inter", sans-serif';
                                 ctx.textBaseline = 'middle';
@@ -2458,6 +2515,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                         },
                                         label: function(c) {
                                             if (labelFormat === 'currency') return 'Nilai: Rp ' + formatShortIDR(c.raw);
+                                            if (labelFormat === 'percent') return 'Nilai: ' + c.raw.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
                                             return 'Nilai: ' + c.raw.toLocaleString('id-ID');
                                         }
                                     }
@@ -2481,10 +2539,13 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                 };
                 
-                // Colors matched to the BI icons: Danger (Red) for Biaya, Success (Green) for GMV, Primary (Blue) for Klik
-                renderSingleChart('chartSpend', 'spend', 'currency', 'rgba(239, 68, 68, 0.85)');
-                renderSingleChart('chartGmv', 'gmv', 'currency', 'rgba(16, 185, 129, 0.85)');
-                renderSingleChart('chartClicks', 'clicks', 'number', 'rgba(59, 130, 246, 0.85)');
+                // Colors matched to the BI icons:
+                renderSingleChart('chartSpend', 'spend', 'currency', 'rgba(239, 68, 68, 0.85)'); // Danger (Red)
+                renderSingleChart('chartGmv', 'gmv', 'currency', 'rgba(16, 185, 129, 0.85)'); // Success (Green)
+                renderSingleChart('chartClicks', 'clicks', 'number', 'rgba(59, 130, 246, 0.85)'); // Primary (Blue)
+                renderSingleChart('chartImpressions', 'impressions', 'number', 'rgba(14, 165, 233, 0.85)'); // Info (Sky)
+                renderSingleChart('chartCtr', 'ctr', 'percent', 'rgba(245, 158, 11, 0.85)'); // Warning (Amber)
+                renderSingleChart('chartCvr', 'cvr', 'percent', 'rgba(168, 85, 247, 0.85)'); // Purple
                 
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
