@@ -216,9 +216,9 @@ class AdsDashboardController extends Controller
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'balance' => $balance['data'] ?? [],
-                    'toggle_info' => $toggleInfo['data'] ?? [],
-                    'facil_rate' => $facilRate['data'] ?? [],
+                    'balance' => $balance['response'] ?? [],
+                    'toggle_info' => $toggleInfo['response'] ?? [],
+                    'facil_rate' => $facilRate['response'] ?? [],
                 ]
             ]);
         } catch (\Exception $e) {

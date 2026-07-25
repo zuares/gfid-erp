@@ -462,9 +462,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
 
-
-});
-
 // --- FETCH REAL-TIME STATUS ---
 function fetchRealtimeStatus() {
     const storeId = document.querySelector('select[name="store_id"]').value;
@@ -482,11 +479,11 @@ function fetchRealtimeStatus() {
                 const formatRp = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
                 
                 // Format total balance (gratis + berbayar)
-                const totalBal = formatRp(bal.balance || 0);
+                const totalBal = formatRp(bal.total_balance || 0);
                 
                 // Auto top-up status
                 let topupHtml = '';
-                if (toggle.auto_topup_status === 1) {
+                if (toggle.auto_top_up === true) {
                     topupHtml = `<span style="color: #16a34a; font-weight: 700;"><i class="bi bi-check-circle-fill"></i> AKTIF</span>`;
                 } else {
                     topupHtml = `<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-x-circle-fill"></i> NON-AKTIF</span>`;
@@ -2390,6 +2387,35 @@ document.addEventListener("DOMContentLoaded", function() {
                         return [id, sku];
                     });
                     
+                    const customLabelPlugin = {
+                        id: 'customLabels',
+                        afterDatasetsDraw: (chart) => {
+                            const { ctx, data } = chart;
+                            ctx.save();
+                            chart.getDatasetMeta(0).data.forEach((bar, index) => {
+                                const value = data.datasets[0].data[index];
+                                const formattedValue = labelFormat === 'currency' ? 'Rp ' + formatShortIDR(value) : value.toLocaleString('id-ID');
+                                
+                                ctx.font = 'bold 10px "Inter", sans-serif';
+                                ctx.textBaseline = 'middle';
+                                
+                                const textWidth = ctx.measureText(formattedValue).width;
+                                const barWidth = bar.width;
+                                
+                                if (barWidth > textWidth + 15) {
+                                    ctx.fillStyle = '#ffffff';
+                                    ctx.textAlign = 'right';
+                                    ctx.fillText(formattedValue, bar.x - 6, bar.y + 1);
+                                } else {
+                                    ctx.fillStyle = document.body.getAttribute('data-theme') === 'dark' ? '#94a3b8' : '#64748b';
+                                    ctx.textAlign = 'left';
+                                    ctx.fillText(formattedValue, bar.x + 6, bar.y + 1);
+                                }
+                            });
+                            ctx.restore();
+                        }
+                    };
+
                     const barData = sorted.map(c => parseFloat(c[metric] || 0));
 
                     new Chart(ctx.getContext('2d'), {
@@ -2403,10 +2429,16 @@ document.addEventListener("DOMContentLoaded", function() {
                                 barThickness: 16
                             }]
                         },
+                        plugins: [customLabelPlugin],
                         options: {
                             indexAxis: 'y',
                             responsive: true,
                             maintainAspectRatio: false,
+                            layout: {
+                                padding: {
+                                    right: 50 // Give space for labels drawn outside the bar
+                                }
+                            },
                             plugins: {
                                 legend: { display: false },
                                 tooltip: {
