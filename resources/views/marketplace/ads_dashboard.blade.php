@@ -761,6 +761,7 @@ document.addEventListener('click', function(e) {
             </div>
 
             <div class="dash-panels mt-4 mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                {{-- BARIS 1: TRAFFIC --}}
                 {{-- CHART IMPRESI --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -812,6 +813,59 @@ document.addEventListener('click', function(e) {
                     </div>
                 </div>
 
+                {{-- BARIS 2: CONVERSION --}}
+                {{-- CHART PESANAN --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-box-seam text-success"></i> Top 5 Pesanan</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan jumlah pesanan terbanyak.
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartOrders"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART CVR --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-funnel" style="color: #a855f7;"></i> Top 5 CVR</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan tingkat konversi tertinggi.
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartCvr"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART CPA --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cash-coin text-danger"></i> Top 5 CPA</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan biaya per pesanan tertinggi.
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartCpa"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- BARIS 3: FINANCIAL --}}
                 {{-- CHART BIAYA --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -846,19 +900,19 @@ document.addEventListener('click', function(e) {
                     </div>
                 </div>
 
-                {{-- CHART CVR --}}
+                {{-- CHART ROAS --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-funnel" style="color: #a855f7;"></i> Top 5 CVR</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-lightning-charge text-warning"></i> Top 5 ROAS</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan tingkat konversi tertinggi.
+                        Produk dengan pengembalian iklan terbaik (x).
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
                             <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
-                            <canvas id="chartCvr"></canvas>
+                            <canvas id="chartRoas"></canvas>
                         @endif
                     </div>
                 </div>
@@ -2421,11 +2475,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 // ==========================================
-                // CHART PRODUK (6 Bar Charts)
+                // CHART PRODUK (9 Bar Charts)
                 // ==========================================
                 const rawItems = @json($itemPerformance->toArray()).map(c => {
                     c.ctr = parseFloat(c.impressions) > 0 ? (parseFloat(c.clicks) / parseFloat(c.impressions)) * 100 : 0;
                     c.cvr = parseFloat(c.clicks) > 0 ? (parseFloat(c.orders) / parseFloat(c.clicks)) * 100 : 0;
+                    c.roas = parseFloat(c.spend) > 0 ? (parseFloat(c.gmv) / parseFloat(c.spend)) : 0;
+                    c.cpa = parseFloat(c.orders) > 0 ? (parseFloat(c.spend) / parseFloat(c.orders)) : 0;
                     return c;
                 });
 
@@ -2477,6 +2533,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 let formattedValue = value.toLocaleString('id-ID');
                                 if (labelFormat === 'currency') formattedValue = 'Rp ' + formatShortIDR(value);
                                 if (labelFormat === 'percent') formattedValue = value.toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
+                                if (labelFormat === 'multiplier') formattedValue = value.toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 2}) + 'x';
                                 
                                 ctx.font = 'bold 10px "Inter", sans-serif';
                                 ctx.textBaseline = 'middle';
@@ -2541,6 +2598,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                         label: function(c) {
                                             if (labelFormat === 'currency') return 'Nilai: Rp ' + formatShortIDR(c.raw);
                                             if (labelFormat === 'percent') return 'Nilai: ' + c.raw.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+                                            if (labelFormat === 'multiplier') return 'Nilai: ' + c.raw.toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'x';
                                             return 'Nilai: ' + c.raw.toLocaleString('id-ID');
                                         }
                                     }
@@ -2564,12 +2622,17 @@ document.addEventListener("DOMContentLoaded", function() {
                 };
                 
                 // Colors matched to the BI icons:
+                renderSingleChart('chartImpressions', 'impressions', 'number', 'rgba(14, 165, 233, 0.85)'); // Info (Sky)
+                renderSingleChart('chartClicks', 'clicks', 'number', 'rgba(59, 130, 246, 0.85)'); // Primary (Blue)
+                renderSingleChart('chartCtr', 'ctr', 'percent', 'rgba(245, 158, 11, 0.85)'); // Warning (Amber)
+                
+                renderSingleChart('chartOrders', 'orders', 'number', 'rgba(16, 185, 129, 0.85)'); // Success (Green)
+                renderSingleChart('chartCvr', 'cvr', 'percent', 'rgba(168, 85, 247, 0.85)'); // Purple
+                renderSingleChart('chartCpa', 'cpa', 'currency', 'rgba(239, 68, 68, 0.85)'); // Danger (Red)
+                
                 renderSingleChart('chartSpend', 'spend', 'currency', 'rgba(239, 68, 68, 0.85)'); // Danger (Red)
                 renderSingleChart('chartGmv', 'gmv', 'currency', 'rgba(16, 185, 129, 0.85)'); // Success (Green)
-                renderSingleChart('chartClicks', 'clicks', 'number', 'rgba(59, 130, 246, 0.85)'); // Primary (Blue)
-                renderSingleChart('chartImpressions', 'impressions', 'number', 'rgba(14, 165, 233, 0.85)'); // Info (Sky)
-                renderSingleChart('chartCtr', 'ctr', 'percent', 'rgba(245, 158, 11, 0.85)'); // Warning (Amber)
-                renderSingleChart('chartCvr', 'cvr', 'percent', 'rgba(168, 85, 247, 0.85)'); // Purple
+                renderSingleChart('chartRoas', 'roas', 'multiplier', 'rgba(245, 158, 11, 0.85)'); // Warning (Amber)
                 
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
