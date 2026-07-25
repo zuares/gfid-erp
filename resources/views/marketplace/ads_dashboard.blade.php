@@ -346,7 +346,7 @@ body[data-theme="dark"] .mini-log-entry:hover { background: rgba(255,255,255,0.0
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tabBtns = document.querySelectorAll('.dash-tab-m');
+    const tabBtns = document.querySelectorAll('.dash-tab-m[data-target]');
     const tabPanes = document.querySelectorAll('.tab-pane');
 
     const savedTab = localStorage.getItem('adsDashboardActiveTab');
