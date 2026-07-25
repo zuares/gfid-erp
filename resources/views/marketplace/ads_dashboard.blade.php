@@ -661,6 +661,8 @@ document.addEventListener('click', function(e) {
                         <option value="roas">Metrik: ROAS</option>
                         <option value="gmv">Metrik: GMV (Pendapatan)</option>
                         <option value="spend">Metrik: Biaya (Spend)</option>
+                        <option value="impressions">Metrik: Impresi (Tayangan)</option>
+                        <option value="clicks">Metrik: Kunjungan (Klik)</option>
                     </select>
                 </div>
             </div>
@@ -2001,6 +2003,10 @@ document.addEventListener("DOMContentLoaded", function() {
                         return gm;
                     } else if (metric === 'spend') {
                         return sp;
+                    } else if (metric === 'impressions') {
+                        return parseFloat(d.impressions || 0);
+                    } else if (metric === 'clicks') {
+                        return parseFloat(d.clicks || 0);
                     }
                     return 0;
                 };
@@ -2064,10 +2070,19 @@ document.addEventListener("DOMContentLoaded", function() {
                                         borderWidth: 1,
                                         padding: 10,
                                         callbacks: {
-                                            label: function(context) {
-                                                let val = context.parsed.y;
-                                                if (metric === 'roas') return context.dataset.label + ': ' + val.toFixed(2) + 'x';
-                                                return context.dataset.label + ': ' + formatFullIDR(val);
+                                            label: function(ctx) {
+                                                let val = ctx.raw;
+                                                let metric = histMetricSelect.value;
+                                                if (metric === 'roas') {
+                                                    return ctx.dataset.label + ': ' + val.toFixed(2) + 'x';
+                                                } else if (metric === 'impressions' || metric === 'clicks') {
+                                                    return ctx.dataset.label + ': ' + val.toLocaleString('id-ID');
+                                                } else {
+                                                    let str = val;
+                                                    if(val >= 1000000) str = (val/1000000).toFixed(1) + ' Jt';
+                                                    else if(val >= 1000) str = (val/1000).toFixed(1) + ' Rb';
+                                                    return ctx.dataset.label + ': Rp ' + str;
+                                                }
                                             }
                                         }
                                     }
@@ -2075,11 +2090,17 @@ document.addEventListener("DOMContentLoaded", function() {
                                 scales: {
                                     x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
                                     y: { 
+                                        beginAtZero: true, 
                                         grid: { color: gridColor }, 
-                                        beginAtZero: true,
                                         ticks: {
                                             callback: function(value) {
+                                                let metric = histMetricSelect.value;
                                                 if (metric === 'roas') return value + 'x';
+                                                if (metric === 'impressions' || metric === 'clicks') {
+                                                    if (value >= 1000000) return (value/1000000).toFixed(1) + 'M';
+                                                    if (value >= 1000) return (value/1000).toFixed(1) + 'K';
+                                                    return value;
+                                                }
                                                 return formatShortIDR(value);
                                             }
                                         }
