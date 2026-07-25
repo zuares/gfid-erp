@@ -388,6 +388,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     toEl.value = ymd(selectedDates[1]);
                     filterForm.submit();
                 }
+            },
+            onClose: function(selectedDates, dateStr, instance) {
+                // Jika user hanya memilih 1 tanggal lalu klik di luar kalender (menutup picker),
+                // asumsikan mereka ingin melihat data khusus 1 hari tersebut.
+                if(selectedDates.length === 1) {
+                    fromEl.value = ymd(selectedDates[0]);
+                    toEl.value = ymd(selectedDates[0]);
+                    
+                    // Supaya visual input text-nya rapi menjadi "YYYY-MM-DD — YYYY-MM-DD"
+                    instance.setDate([selectedDates[0], selectedDates[0]], false);
+                    
+                    filterForm.submit();
+                }
             }
         });
     }
