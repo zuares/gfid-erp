@@ -13,7 +13,6 @@ class MarketplaceAdsDaily extends Model
     ];
 
     protected $casts = [
-        'date'     => 'date',
         'raw_json' => 'array',
     ];
 
