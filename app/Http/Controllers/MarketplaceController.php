@@ -1883,63 +1883,79 @@ class MarketplaceController extends Controller
 
                 // 2. Performa harian
                 $sendEvent('log', "[{$store->name}] Sinkronisasi performa harian...", $baseProgress + 15);
-                try {
-                    $res = $driver->getAdsShopDailyPerformance(
-                        $store,
-                        \Carbon\Carbon::parse($dateFrom)->format('d-m-Y'),
-                        \Carbon\Carbon::parse($dateTo)->format('d-m-Y'),
-                    );
-
-                    if (! empty($res['error'])) {
-                        $errMsg = $res['message'] ?? $res['error'];
-                        $errors[] = "[{$store->name}] " . $errMsg;
-                        $sendEvent('log', "[{$store->name}] Gagal menarik performa: " . $errMsg, $baseProgress + 20);
-                        continue;
+                
+                $currentStart = \Carbon\Carbon::parse($dateFrom);
+                $finalEnd     = \Carbon\Carbon::parse($dateTo);
+                $storeSaved   = 0;
+                
+                while ($currentStart->lessThanOrEqualTo($finalEnd)) {
+                    $currentEnd = clone $currentStart;
+                    $currentEnd->addDays(29);
+                    if ($currentEnd->greaterThan($finalEnd)) {
+                        $currentEnd = clone $finalEnd;
                     }
+                    
+                    $sendEvent('log', "[{$store->name}] Menarik periode " . $currentStart->format('d-m-Y') . " s/d " . $currentEnd->format('d-m-Y'), $baseProgress + 20);
+                    
+                    try {
+                        $res = $driver->getAdsShopDailyPerformance(
+                            $store,
+                            $currentStart->format('d-m-Y'),
+                            $currentEnd->format('d-m-Y'),
+                        );
 
-                    $days = data_get($res, 'response.day_list')
-                        ?? data_get($res, 'response.daily_performance')
-                        ?? (is_array($res['response'] ?? null) && array_is_list($res['response']) ? $res['response'] : []);
-
-                    $sendEvent('log', "[{$store->name}] Ditemukan " . count($days) . " baris data. Menyimpan...", $baseProgress + 25);
-                    $storeSaved = 0;
-
-                    foreach ($days as $d) {
-                        $rawDate = $d['date'] ?? null;
-                        if (! $rawDate) continue;
-                        $dateObj = \Carbon\Carbon::createFromFormat('d-m-Y', $rawDate);
-
-                        $record = \App\Models\MarketplaceAdsDaily::where('store_id', $store->id)
-                            ->whereDate('date', clone $dateObj)
-                            ->first();
-                            
-                        $payload = [
-                            'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
-                            'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
-                            'ctr'         => $d['ctr'] ?? null,
-                            'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
-                            'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
-                            'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
-                            'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
-                            'raw_json'    => $d,
-                        ];
-                        
-                        if ($record) {
-                            $record->update($payload);
+                        if (! empty($res['error'])) {
+                            $errMsg = $res['message'] ?? $res['error'];
+                            $errors[] = "[{$store->name}][{$currentStart->format('d/m')}] " . $errMsg;
+                            $sendEvent('log', "[{$store->name}] Gagal menarik performa: " . $errMsg, $baseProgress + 25);
                         } else {
-                            \App\Models\MarketplaceAdsDaily::create(array_merge([
-                                'store_id' => $store->id, 
-                                'date' => $dateObj->format('Y-m-d')
-                            ], $payload));
+                            $days = data_get($res, 'response.day_list')
+                                ?? data_get($res, 'response.daily_performance')
+                                ?? (is_array($res['response'] ?? null) && array_is_list($res['response']) ? $res['response'] : []);
+
+                            $sendEvent('log', "[{$store->name}] Ditemukan " . count($days) . " baris data. Menyimpan...", $baseProgress + 25);
+
+                            foreach ($days as $d) {
+                                $rawDate = $d['date'] ?? null;
+                                if (! $rawDate) continue;
+                                $dateObj = \Carbon\Carbon::createFromFormat('d-m-Y', $rawDate);
+
+                                $record = \App\Models\MarketplaceAdsDaily::where('store_id', $store->id)
+                                    ->whereDate('date', clone $dateObj)
+                                    ->first();
+                                    
+                                $payload = [
+                                    'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
+                                    'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
+                                    'ctr'         => $d['ctr'] ?? null,
+                                    'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
+                                    'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
+                                    'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
+                                    'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
+                                    'raw_json'    => $d,
+                                ];
+                                
+                                if ($record) {
+                                    $record->update($payload);
+                                } else {
+                                    \App\Models\MarketplaceAdsDaily::create(array_merge([
+                                        'store_id' => $store->id, 
+                                        'date' => $dateObj->format('Y-m-d')
+                                    ], $payload));
+                                }
+                                $saved++;
+                                $storeSaved++;
+                            }
                         }
-                        $saved++;
-                        $storeSaved++;
+                    } catch (\Throwable $e) {
+                        $errors[] = "[{$store->name}] " . $e->getMessage();
+                        $sendEvent('log', "[{$store->name}] Kesalahan internal: " . $e->getMessage());
                     }
-                    $sendEvent('log', "[{$store->name}] Berhasil menyimpan {$storeSaved} baris.", $baseProgress + (90 / $totalStores));
-                } catch (\Throwable $e) {
-                    $errors[] = "[{$store->name}] " . $e->getMessage();
-                    $sendEvent('log', "[{$store->name}] Kesalahan internal: " . $e->getMessage());
+                    
+                    $currentStart = $currentEnd->addDay();
+                    usleep(500000); // 0.5 sec delay between chunks to avoid rate limiting
                 }
+                $sendEvent('log', "[{$store->name}] Berhasil menyimpan total {$storeSaved} baris harian.", $baseProgress + (90 / $totalStores));
             }
 
             $sendEvent('done', 'Sinkronisasi selesai!', 100, [
