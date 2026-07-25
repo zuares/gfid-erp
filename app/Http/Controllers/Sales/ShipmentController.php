@@ -46,6 +46,166 @@ class ShipmentController extends Controller
         protected JournalService $journalService
     ) {}
 
+    /**
+     * Halaman Kirim Paket Manual — form + preview label 100×150mm.
+     */
+    public function manualShipment()
+    {
+        $shipments = Shipment::with(['creator'])
+            ->where('shipment_type', 'manual')
+            ->orderBy('id', 'desc')
+            ->paginate(15);
+
+        return view('sales.manual-shipment', compact('shipments'));
+    }
+
+    public function manualShipmentStore(Request $request)
+    {
+        $data = $request->validate([
+            'receiverName'    => ['required', 'string'],
+            'receiverPhone'   => ['required', 'string'],
+            'receiverAddress' => ['required', 'string'],
+            'items'           => ['required', 'array', 'min:1'],
+            'items.*.id'      => ['required', 'exists:items,id'],
+            'items.*.qty'     => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($data) {
+                $code = Shipment::generateCode('MNL');
+                
+                $receiverData = [
+                    'nama' => $data['receiverName'],
+                    'phone' => $data['receiverPhone'],
+                    'alamat' => $data['receiverAddress'],
+                ];
+
+                $shipment = Shipment::create([
+                    'code'          => $code,
+                    'shipment_type' => 'manual',
+                    'date'          => now()->toDateString(),
+                    'status'        => 'draft', // sedang dipacking
+                    'notes'         => json_encode($receiverData),
+                    'created_by'    => Auth::id(),
+                ]);
+
+                // Create lines and reserve stock if warehouse available
+                $warehouse = $this->whRts();
+                
+                foreach ($data['items'] as $itemData) {
+                    $item = Item::find($itemData['id']);
+                    
+                    if ($warehouse) {
+                        app(\App\Services\Inventory\InventoryService::class)->reserveStock(
+                            warehouseId: $warehouse->id,
+                            itemId: $item->id,
+                            qty: $itemData['qty'],
+                            allowNegative: true 
+                        );
+                    }
+
+                    ShipmentLine::create([
+                        'shipment_id'   => $shipment->id,
+                        'item_id'       => $item->id,
+                        'qty_expected'  => 0,
+                        'qty_scanned'   => $itemData['qty'],
+                        'allocated_qty' => $itemData['qty'],
+                        'uom'           => $item->uom ?? 'pcs',
+                    ]);
+                }
+            });
+
+            return redirect()->route('sales.shipments.index')
+                ->with('status', 'success')
+                ->with('message', 'Paket manual berhasil dibuat (Draft).');
+        } catch (\Throwable $e) {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')
+                ->with('message', 'Gagal membuat paket: ' . $e->getMessage());
+        }
+    }
+
+    public function manualShipmentPost(Shipment $shipment)
+    {
+        if ($shipment->shipment_type !== 'manual') {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Bukan shipment manual.');
+        }
+
+        if (!empty($shipment->posted_at) || $shipment->status !== 'draft') {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Hanya shipment draft yang bisa diposting.');
+        }
+
+        $warehouse = $this->whRts();
+        if (!$warehouse) {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+        }
+
+        $shipment->load('lines.item');
+        $stockErrors = $this->checkStockSufficiency($shipment, $warehouse);
+        if (!empty($stockErrors)) {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')
+                ->with('message', 'Stok WH-RTS tidak cukup.')
+                ->with('stock_insufficient', $stockErrors);
+        }
+
+        try {
+            DB::transaction(function () use ($shipment, $warehouse) {
+                // Update status to submitted so doPostShipment will run
+                $shipment->status = 'submitted';
+                $shipment->save();
+                
+                $this->doPostShipment($shipment, $warehouse);
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Gagal posting: ' . $e->getMessage());
+        }
+
+        return redirect()->route('sales.shipments.index')
+            ->with('status', 'success')->with('message', 'Paket berhasil dikirim & stok WH-RTS berkurang.');
+    }
+
+    public function manualShipmentDestroy(Shipment $shipment)
+    {
+        if ($shipment->shipment_type !== 'manual') {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Bukan shipment manual.');
+        }
+
+        if ($shipment->status !== 'draft') {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Hanya shipment draft yang bisa dihapus.');
+        }
+
+        try {
+            DB::transaction(function () use ($shipment) {
+                $warehouse = $this->whRts();
+                $lines = ShipmentLine::where('shipment_id', $shipment->id)->get();
+                foreach ($lines as $line) {
+                    if ($warehouse && $line->allocated_qty > 0) {
+                        app(\App\Services\Inventory\InventoryService::class)->releaseStock(
+                            $warehouse->id,
+                            $line->item_id,
+                            $line->allocated_qty
+                        );
+                    }
+                    $line->delete();
+                }
+                $shipment->delete();
+            });
+
+            return redirect()->route('sales.shipments.index')
+                ->with('status', 'success')->with('message', 'Paket manual berhasil dihapus.');
+        } catch (\Throwable $e) {
+            return redirect()->route('sales.shipments.manual')
+                ->with('status', 'error')->with('message', 'Gagal menghapus: ' . $e->getMessage());
+        }
+    }
+
     protected function whRts(): ?Warehouse
     {
         if ($this->whRtsCached) {

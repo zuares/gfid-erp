@@ -1519,6 +1519,12 @@
                                     <span class="icon">＋</span><span>Pengiriman Baru</span>
                                 </a>
                             @endif
+                            @if ($router->has('sales.shipments.manual'))
+                                <a href="{{ route('sales.shipments.manual') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipments.manual') ? 'active' : '' }}">
+                                    <span class="icon">📦</span><span>Kirim Paket Manual</span>
+                                </a>
+                            @endif
 
                             <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Retur Pengiriman</div>
 

@@ -1495,6 +1495,12 @@
                                 Kirim Baru
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($router->has('sales.shipments.manual'))
+                            <x-sidebar.sub-link href="{{ route('sales.shipments.manual') }}" icon="bi bi-box-seam"
+                                :active="request()->routeIs('sales.shipments.manual')">
+                                Kirim Paket Manual
+                            </x-sidebar.sub-link>
+                        @endif
 
                         @php $subhead('Returns'); @endphp
                         @if ($hasSalesShipmentReturnsIndex)

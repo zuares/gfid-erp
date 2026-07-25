@@ -180,7 +180,140 @@
             min-height:38px;
         }
     }
+
+    /* ═══════════════════════════════
+       PREVIEW MODAL (Custom)
+    ═══════════════════════════════ */
+    .ms-modal-backdrop {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(15,23,42,.6);
+        backdrop-filter: blur(4px);
+        z-index: 9990;
+        display: none;
+        align-items: center; justify-content: center;
+        padding: 1rem;
+    }
+    .ms-modal-backdrop.show { display: flex; }
+    
+    .ms-modal-content {
+        background: var(--card, #fff);
+        border-radius: 24px;
+        width: 100%; max-width: 500px;
+        box-shadow: 0 20px 40px rgba(0,0,0,.2);
+        overflow: hidden;
+        display: flex; flex-direction: column;
+        max-height: 90vh;
+    }
+    .ms-modal-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--shp-border, rgba(148,163,184,.15));
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .ms-modal-header h3 {
+        margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--text, #0f172a);
+    }
+    .ms-modal-close {
+        background: transparent; border: none; font-size: 1.5rem; color: var(--muted); cursor: pointer;
+    }
+    .ms-modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        background: #e2e8f0;
+        display: flex; justify-content: center;
+    }
+    body[data-theme="dark"] .ms-modal-body { background: #0f172a; }
+    
+    .ms-modal-footer {
+        padding: 1.25rem 1.5rem;
+        border-top: 1px solid var(--shp-border, rgba(148,163,184,.15));
+        display: flex; justify-content: flex-end; gap: .75rem;
+    }
+
+    /* ═══════════════════════════════
+       LABEL (100mm × 150mm)
+    ═══════════════════════════════ */
+    .label-wrap {
+        width: 100mm;
+        min-height: 150mm;
+        background: #fff;
+        color: #0f172a;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        position: relative;
+        box-shadow: 0 8px 32px rgba(0,0,0,.15);
+        overflow: hidden;
+    }
+
+    .label-header {
+        background: #fff;
+        color: #000;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 2px solid #000;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .label-header .logo-svg { width: 36px; height: 36px; flex-shrink: 0; object-fit: contain; }
+    .label-header .brand-text { font-size: 18px; font-weight: 900; letter-spacing: -.5px; color: #000; }
+    .label-header .brand-sub { font-size: 8px; font-weight: 800; color: #000; letter-spacing: 1px; text-transform: uppercase; margin-top: 1px; }
+
+    .label-section { padding: 8px 14px; border-bottom: 1.5px dashed #000; }
+    .label-section:last-child { border-bottom: none; }
+    .label-section-title { font-size: 7px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.2px; color: #000; margin-bottom: 4px; }
+    .label-name { font-size: 13px; font-weight: 900; line-height: 1.2; margin-bottom: 2px; text-transform: uppercase; color: #000; }
+    .label-phone { font-size: 11px; font-weight: 700; color: #000; display: flex; align-items: center; gap: 4px; }
+    .label-phone .phone-icon { font-size: 10px; }
+    .label-address { font-size: 11px; font-weight: 500; line-height: 1.35; color: #000; margin-top: 4px; word-break: break-word; }
+    .label-items { font-size: 9px; font-weight: 600; color: #000; margin-top: 6px; line-height: 1.4; }
+    .label-item-row { display: flex; justify-content: space-between; border-bottom: 1px solid #ccc; padding: 2px 0; color: #000; }
+    .label-item-row:last-child { border-bottom: none; }
+
+    .label-divider { display: flex; align-items: center; gap: 8px; padding: 3px 14px; background: #fff; }
+    .label-divider::before, .label-divider::after { content: ''; flex: 1; height: 1px; background: #000; }
+    .label-divider .arrow-icon { font-size: 14px; color: #000; }
+
+    .label-promo { background: #fff; padding: 10px 14px; text-align: center; border-bottom: 1.5px dashed #000; }
+    .label-promo-title { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #000; margin-bottom: 6px; }
+    .label-promo-content { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .label-qr { flex-shrink: 0; }
+    .label-qr canvas, .label-qr img { width: 60px !important; height: 60px !important; }
+    .label-promo-info { text-align: left; }
+    .label-promo-url { font-size: 12px; font-weight: 900; color: #000; margin-bottom: 4px; }
+    .label-promo-socials { display: flex; flex-direction: column; gap: 3px; }
+    .label-promo-social-item { display: flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 600; color: #000; }
+    .label-promo-social-item img { width: 13px; height: 13px; object-fit: contain; filter: grayscale(100%) contrast(200%); }
+
+    .label-footer { 
+        background: #fff; 
+        color: #000; 
+        text-align: center; 
+        padding: 8px 14px; 
+        font-size: 8px; 
+        font-weight: 800; 
+        letter-spacing: .3px; 
+        border-top: 2px solid #000; 
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .label-footer strong { color: #000; font-weight: 900; }
+
+    @media print {
+        @page { size: 100mm 150mm; margin: 0; }
+        body * { visibility: hidden; }
+        #modalPreview, #modalPreview * { visibility: visible; }
+        #modalPreview { position: absolute; left: 0; top: 0; width: 100mm; height: 150mm; margin: 0; padding: 0; display: block !important; background: none !important; }
+        .ms-modal-content { box-shadow: none !important; border-radius: 0 !important; max-width: none !important; border: none !important; background: none !important; margin: 0 !important; padding: 0 !important; }
+        .ms-modal-header, .ms-modal-footer, .no-print { display: none !important; }
+        .ms-modal-body { padding: 0 !important; background: #fff !important; display: block !important; overflow: visible !important; }
+        .label-wrap { width: 100mm !important; min-height: 150mm !important; box-shadow: none !important; margin: 0 !important; position: absolute; top: 0; left: 0; }
+    }
+
+    body[data-theme="dark"] .ms-modal-content { background: #1e293b; }
+    body[data-theme="dark"] .ms-modal-header h3 { color: #f1f5f9; }
+    body[data-theme="dark"] .ms-modal-header, body[data-theme="dark"] .ms-modal-footer { border-color: rgba(51,65,85,.6); }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 @endpush
 
 @section('content')
@@ -396,9 +529,54 @@
                                     </td>
 
                                     <td class="text-end ship-row-action">
-                                        <a href="{{ $actionRoute }}" class="btn btn-sm btn-ship-outline btn-pill">
-                                            {{ $actionLabel }}
-                                        </a>
+                                        @if($shipment->shipment_type === 'manual')
+                                            @php 
+                                                $recv = ['nama' => '-', 'phone' => '-', 'alamat' => '-'];
+                                                if ($shipment->notes) {
+                                                    $decoded = json_decode($shipment->notes, true);
+                                                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                                        $recv = array_merge($recv, $decoded);
+                                                    }
+                                                }
+                                                $linesJson = $shipment->lines->map(fn($l) => [
+                                                    'code' => $l->item->code ?? '', 
+                                                    'name' => $l->item->name ?? '', 
+                                                    'qty' => $l->qty_scanned
+                                                ])->toJson();
+                                            @endphp
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <button type="button" class="btn btn-sm btn-ship-outline btn-pill"
+                                                    data-code="{{ $shipment->code }}"
+                                                    data-date="{{ $fmtDate($shipment->date, 'd M Y') }}"
+                                                    data-nama="{{ $recv['nama'] }}"
+                                                    data-phone="{{ $recv['phone'] }}"
+                                                    data-alamat="{{ $recv['alamat'] }}"
+                                                    data-items="{{ $linesJson }}"
+                                                    onclick="openPreview(this)" title="Preview Label">
+                                                    <i class="bi bi-printer"></i>
+                                                </button>
+                                                
+                                                @if($uiStatus === 'draft')
+                                                    <form action="{{ route('sales.shipments.manual.post', $shipment) }}" method="POST" class="d-inline" onsubmit="return confirm('Kirim paket manual ini? Stok WH-RTS akan dipotong.');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill" title="Kirim/Post">
+                                                            <i class="bi bi-send"></i>
+                                                        </button>
+                                                    </form>
+                                                    
+                                                    <form action="{{ route('sales.shipments.manual.destroy', $shipment) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus paket manual ini?');">
+                                                        @csrf @method('DELETE')
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill" style="border-color:#fecaca;" title="Hapus">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <a href="{{ $actionRoute }}" class="btn btn-sm btn-ship-outline btn-pill w-100">
+                                                {{ $actionLabel }}
+                                            </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -415,4 +593,170 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL PREVIEW LABEL (Manual Shipment) -->
+<div class="ms-modal-backdrop" id="modalPreview">
+    <div class="ms-modal-content">
+        <div class="ms-modal-header no-print">
+            <h3><i class="bi bi-zoom-in"></i> Preview Label Cetak</h3>
+            <button class="ms-modal-close" onclick="closePreview()">&times;</button>
+        </div>
+        
+        <div class="ms-modal-body" id="previewArea">
+            <div class="label-wrap" id="labelWrap">
+                <!-- Label Header -->
+                <div class="label-header">
+                    <img src="{{ asset('images/logo-mark.svg') }}" alt="GF Logo" class="logo-svg" style="filter: brightness(0); width: 36px; height: 36px;">
+                    <div>
+                        <div class="brand-text">GREATFIT.ID</div>
+                        <div class="brand-sub">Manual Shipping Label</div>
+                    </div>
+                </div>
+
+                <!-- Resi Placeholder -->
+                <div class="label-section" style="padding: 12px 14px; text-align: center;">
+                    <div style="border: 2px dashed #000; min-height: 90px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #64748b; letter-spacing: 1.5px; font-size: 11px; text-transform: uppercase;">
+                        [ TEMPEL / TULIS NO RESI DI SINI ]
+                    </div>
+                </div>
+
+                <!-- Pengirim -->
+                <div class="label-section">
+                    <div class="label-section-title">✉ Pengirim</div>
+                    <div class="label-name" id="lblSenderName">GREATFIT.ID</div>
+                    <div class="label-phone">
+                        <span class="phone-icon">📞</span>
+                        <span id="lblSenderPhone">081224889319</span>
+                    </div>
+                </div>
+
+                <!-- Arrow Divider -->
+                <div class="label-divider">
+                    <span class="arrow-icon">▼</span>
+                </div>
+
+                <!-- Penerima -->
+                <div class="label-section">
+                    <div class="label-section-title">📍 Penerima</div>
+                    <div class="label-name" id="lblRecvName">—</div>
+                    <div class="label-phone">
+                        <span class="phone-icon">📞</span>
+                        <span id="lblRecvPhone">—</span>
+                    </div>
+                    <div class="label-address" id="lblRecvAddress">—</div>
+                </div>
+                
+                <!-- Items Summary -->
+                <div class="label-section">
+                    <div class="label-section-title">📦 Daftar Item</div>
+                    <div class="label-items" id="lblItemsList">
+                        <!-- Items will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Promo Section -->
+                <div class="label-promo">
+                    <div class="label-promo-title">✨ Kunjungi Kami ✨</div>
+                    <div class="label-promo-content">
+                        <div class="label-qr" id="labelQrCode"></div>
+                        <div class="label-promo-info">
+                            <div class="label-promo-url">www.greatfit.id</div>
+                            <div class="label-promo-socials">
+                                <div class="label-promo-social-item">
+                                    <img src="{{ asset('img/social/IG.png') }}" alt="IG"> @greatfit.id
+                                </div>
+                                <div class="label-promo-social-item">
+                                    <img src="{{ asset('img/social/WA.png') }}" alt="WA"> 081224889319
+                                </div>
+                                <div class="label-promo-social-item">
+                                    <img src="{{ asset('img/social/TT.png') }}" alt="TT"> @greatfit.id
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="label-footer" style="display:flex; justify-content:space-between; align-items:center; padding: 8px 14px;">
+                    <span id="lblShipmentCode" style="font-weight: 900; letter-spacing: 1px;">MNL-XXX</span>
+                    <span>Terima kasih sudah berbelanja di <strong>Greatfit</strong> 🩵</span>
+                    <span id="lblShipmentDate">01 JAN 2026</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="ms-modal-footer no-print">
+            <button class="ms-btn ms-btn-outline" onclick="closePreview()" style="padding:.5rem 1rem; border-radius:10px; border:1px solid #cbd5e1; background:transparent; cursor:pointer;">Tutup</button>
+            <button class="ms-btn ms-btn-primary" onclick="printLabel()" style="padding:.5rem 1rem; border-radius:10px; border:none; background:#3b82f6; color:#fff; cursor:pointer;"><i class="bi bi-printer"></i> Cetak Label</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let qrGenerated = false;
+
+function openPreview(btn) {
+    const code = btn.getAttribute('data-code');
+    const date = btn.getAttribute('data-date');
+    const nama = btn.getAttribute('data-nama');
+    const phone = btn.getAttribute('data-phone');
+    const alamat = btn.getAttribute('data-alamat');
+    let items = [];
+    try {
+        items = JSON.parse(btn.getAttribute('data-items'));
+    } catch(e) {}
+
+    document.getElementById('lblShipmentCode').textContent = code;
+    document.getElementById('lblShipmentDate').textContent = date;
+    document.getElementById('lblRecvName').textContent = nama.toUpperCase();
+    document.getElementById('lblRecvPhone').textContent = phone;
+    document.getElementById('lblRecvAddress').textContent = alamat;
+    
+    // Render items
+    const itemsContainer = document.getElementById('lblItemsList');
+    itemsContainer.innerHTML = '';
+    
+    if(items && items.length > 0) {
+        items.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = 'label-item-row';
+            row.style.alignItems = 'center';
+            row.innerHTML = `
+                <div style="flex:1; padding-right:10px; line-height:1.2;">
+                    ${index + 1}. <strong style="font-size:10px;">${item.name || item.code}</strong><br>
+                    <span style="color:#475569; font-size:8px; margin-left:12px;">${item.code}</span>
+                </div>
+                <strong style="font-size:11px;">x${item.qty}</strong>
+            `;
+            itemsContainer.appendChild(row);
+        });
+    } else {
+        itemsContainer.innerHTML = '<i>Data item tidak tersedia</i>';
+    }
+    
+    // Generate QR once
+    if (!qrGenerated && typeof QRCode !== 'undefined') {
+        const qrContainer = document.getElementById('labelQrCode');
+        new QRCode(qrContainer, {
+            text: 'https://www.greatfit.id',
+            width: 60,
+            height: 60,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+        qrGenerated = true;
+    }
+    
+    document.getElementById('modalPreview').classList.add('show');
+}
+
+function closePreview() {
+    document.getElementById('modalPreview').classList.remove('show');
+}
+
+function printLabel() {
+    window.print();
+}
+</script>
 @endsection

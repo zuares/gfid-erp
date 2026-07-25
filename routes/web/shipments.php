@@ -107,6 +107,20 @@ Route::middleware(['web', 'auth', 'access:sales'])
         Route::patch('shipment-return-lines/{line}', [ShipmentReturnController::class, 'updateLineQty'])
             ->name('shipment_returns.update_line_qty');
 
+        /**
+         * =========================
+         *  MANUAL SHIPMENT LABEL
+         * =========================
+         */
+        Route::get('manual-shipment', [ShipmentController::class, 'manualShipment'])
+            ->name('shipments.manual');
+        Route::post('manual-shipment', [ShipmentController::class, 'manualShipmentStore'])
+            ->name('shipments.manual.store');
+        Route::post('manual-shipment/{shipment}/post', [ShipmentController::class, 'manualShipmentPost'])
+            ->name('shipments.manual.post');
+        Route::delete('manual-shipment/{shipment}', [ShipmentController::class, 'manualShipmentDestroy'])
+            ->name('shipments.manual.destroy');
+
         // AJAX: lookup shipment by code (for return create form)
         Route::get('api/shipments/lookup', function (\Illuminate\Http\Request $req) {
             $code = strtoupper(trim($req->query('code', '')));
