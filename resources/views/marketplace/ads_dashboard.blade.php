@@ -14,9 +14,14 @@ body {
     font-family: 'Inter', sans-serif !important;
 }
 
+.spin-icon { animation: spin 1.5s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
 :root {
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.4);
+    --bg: #09090b;
+    --card-bg: rgba(24, 24, 27, 0.4);
+    --glass-bg: rgba(24, 24, 27, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.05);
     --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
     --hero-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
     --card-hover-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.1);
@@ -1165,12 +1170,19 @@ document.addEventListener('click', function(e) {
                 </form>
 
                 <!-- Loading State (Hidden by default) -->
-                <div id="loadingSyncAds" style="display: none; text-align: center; padding: 2rem 0;">
-                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                <div id="loadingSyncAds" style="display: none; text-align: left; padding: 1rem;">
+                    <div style="text-align: center; margin-bottom: 1.5rem;">
+                        <h6 class="fw-bold" style="color: var(--text);"><i class="bi bi-arrow-repeat spin-icon" style="display: inline-block;"></i> Sedang Menarik Data...</h6>
+                        <p style="font-size: .8rem; color: var(--dsh-muted);">Proses ini mengambil performa iklan langsung dari Shopee.</p>
                     </div>
-                    <h6 class="fw-bold" style="color: var(--text);">Sedang Menarik Data...</h6>
-                    <p style="font-size: .8rem; color: var(--dsh-muted);">Proses ini mengambil performa iklan langsung dari Shopee.<br>Mohon tunggu sebentar.</p>
+                    
+                    <div class="progress mb-3" style="height: 10px; border-radius: 10px; background: var(--dsh-border);">
+                        <div id="syncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background: var(--dsh-accent);" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    
+                    <div id="syncLogs" style="background: rgba(0,0,0,0.4); border: 1px solid var(--dsh-border); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; color: #a1a1aa; height: 150px; overflow-y: auto; text-align: left; line-height: 1.5;">
+                        <div style="color: #4ade80;">> Menghubungkan ke server...</div>
+                    </div>
                 </div>
                 
                 <!-- Success State (Hidden by default) -->
@@ -1207,38 +1219,75 @@ document.addEventListener("DOMContentLoaded", function() {
                 const res = await fetch(form.action, {
                     method: 'POST',
                     headers: {
-                        'Accept': 'application/json',
+                        'Accept': 'application/x-ndjson',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
                     body: formData
                 });
                 
-                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error('Terjadi kesalahan koneksi (' + res.status + ')');
+                }
                 
-                if (res.ok) {
-                    // Check if there are errors
-                    const hasErrors = data.errors && data.errors.length > 0;
-                    if (hasErrors) {
-                        alert('Sync Selesai dengan beberapa masalah:\n' + data.errors.join("\n"));
-                    }
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                const logEl = document.getElementById('syncLogs');
+                const progressBar = document.getElementById('syncProgressBar');
+                
+                let savedData = 0;
+                let hasErrors = false;
+                let allErrors = [];
+                let isDone = false;
+                
+                logEl.innerHTML = '<div style="color: #4ade80;">> Menghubungkan ke server...</div>';
+                progressBar.style.width = '0%';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
                     
-                    // If we saved some data, OR if the API explicitly said success (with no data returned e.g. empty), 
-                    // we should consider it a partial/full success and reload to show data.
-                    if ((data.saved !== undefined && data.saved > 0) || !hasErrors) {
-                        loading.style.display = 'none';
-                        success.style.display = 'block';
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        // All failed, no data saved
-                        loading.style.display = 'none';
-                        form.style.display = 'block';
+                    const chunkStr = decoder.decode(value, { stream: true });
+                    const lines = chunkStr.split('\n').filter(line => line.trim() !== '');
+                    
+                    for (const line of lines) {
+                        try {
+                            const data = JSON.parse(line);
+                            
+                            if (data.type === 'log' || data.type === 'info' || data.type === 'done') {
+                                const color = data.type === 'done' ? '#60a5fa' : (data.type === 'info' ? '#facc15' : '#a1a1aa');
+                                logEl.innerHTML += `<div style="color: ${color};">> ${data.message}</div>`;
+                                logEl.scrollTop = logEl.scrollHeight;
+                            }
+                            
+                            if (data.progress !== undefined && data.progress !== null) {
+                                progressBar.style.width = data.progress + '%';
+                            }
+                            
+                            if (data.type === 'done') {
+                                isDone = true;
+                                savedData = data.saved || 0;
+                                if (data.errors && data.errors.length > 0) {
+                                    hasErrors = true;
+                                    allErrors = data.errors;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse NDJSON line:', line, e);
+                        }
                     }
+                }
+                
+                if (hasErrors) {
+                    alert('Sync Selesai dengan beberapa masalah:\n' + allErrors.join("\n"));
+                }
+                
+                if (savedData > 0 || !hasErrors) {
+                    loading.style.display = 'none';
+                    success.style.display = 'block';
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    let errMsg = data.message || 'Terjadi kesalahan saat sync.';
-                    if (data.errors && data.errors.length > 0) {
-                        errMsg = data.errors.join("\n");
-                    }
-                    throw new Error(errMsg);
+                    loading.style.display = 'none';
+                    form.style.display = 'block';
                 }
             } catch (err) {
                 alert('Gagal:\n' + err.message);
