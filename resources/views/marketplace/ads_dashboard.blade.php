@@ -1503,6 +1503,12 @@ document.addEventListener('click', function(e) {
                         <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Minimal Rp 20.000. Contoh: 50000</small>
                     </div>
                     
+                    <div class="mb-3">
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">ID Kampanye GMV Max (Opsional)</label>
+                        <input type="number" id="gmsCampaignId" class="form-control" placeholder="Contoh: 123456789" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" min="0">
+                        <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Biarkan kosong untuk mengubah kampanye GMV Max utama/seluruh toko.</small>
+                    </div>
+
                     <div class="mb-4">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Target ROAS (x)</label>
                         <input type="number" id="gmsRoasTarget" class="form-control" placeholder="Contoh: 5.5, atau 0 untuk Auto" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" min="0" step="0.1">
@@ -3214,9 +3220,7 @@ function submitGmsSettings(e) {
     const storeId = document.getElementById('gmsStoreId').value;
     const dailyBudget = document.getElementById('gmsDailyBudget').value;
     const roasTarget = document.getElementById('gmsRoasTarget').value;
-    
-    // We need to pass the campaign ID if we have it. We can get it from the blade variable if there's only one, or leave it empty so backend uses default.
-    // For now we'll send it null so backend handles it without it (or the API will use the default shop GMS campaign).
+    const campaignId = document.getElementById('gmsCampaignId').value;
     
     if (!dailyBudget && !roasTarget) {
         alert('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
@@ -3237,7 +3241,8 @@ function submitGmsSettings(e) {
         body: JSON.stringify({
             store_id: storeId,
             daily_budget: dailyBudget,
-            roas_target: roasTarget
+            roas_target: roasTarget,
+            campaign_id: campaignId || null
         })
     })
     .then(r => r.json())
