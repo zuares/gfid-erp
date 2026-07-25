@@ -18,14 +18,11 @@ body {
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 :root {
-    --bg: #09090b;
-    --card-bg: rgba(24, 24, 27, 0.4);
-    --glass-bg: rgba(24, 24, 27, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.4);
     --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
     --hero-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
     --card-hover-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.1);
-    --dsh-accent: #2563eb;
     --dsh-accent-hover: #1d4ed8;
 }
 
@@ -1157,11 +1154,12 @@ document.addEventListener('click', function(e) {
                         </select>
                     </div>
                     <div class="mb-4">
-                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Mode Sinkronisasi</label>
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Jangka Waktu Sinkronisasi</label>
                         <select name="sync_type" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);">
-                            <option value="incremental">Incremental (Hari ini & Kemarin)</option>
-                            <option value="hourly">Hourly (Khusus Jam Ini)</option>
-                            <option value="backfill">Historical Backfill (6 Bulan)</option>
+                            <option value="1_week">1 Minggu Terakhir</option>
+                            <option value="1_month">1 Bulan Terakhir</option>
+                            <option value="3_months">3 Bulan Terakhir</option>
+                            <option value="custom">Berdasarkan Tanggal Filter</option>
                         </select>
                     </div>
                     <button type="submit" class="btn w-100 fw-bold" style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">

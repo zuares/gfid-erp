@@ -1819,8 +1819,20 @@ class MarketplaceController extends Controller
     {
         set_time_limit(120);
 
-        $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
-        $dateTo   = $request->input('date_to',   now()->toDateString());
+        $syncType = $request->input('sync_type', '1_week');
+        $dateTo   = now()->toDateString();
+        
+        if ($syncType === '1_week') {
+            $dateFrom = now()->subDays(7)->toDateString();
+        } elseif ($syncType === '1_month') {
+            $dateFrom = now()->subDays(30)->toDateString();
+        } elseif ($syncType === '3_months') {
+            $dateFrom = now()->subDays(90)->toDateString();
+        } else {
+            // custom
+            $dateFrom = $request->input('date_from', now()->subDays(7)->toDateString());
+            $dateTo   = $request->input('date_to', now()->toDateString());
+        }
 
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
