@@ -1882,12 +1882,28 @@ class MarketplaceController extends Controller
                     $sendEvent('log', "[{$store->name}] Gagal menarik saldo: " . $e->getMessage(), $baseProgress + 10);
                 }
 
-                // 2. Performa harian
-                $sendEvent('log', "[{$store->name}] Sinkronisasi performa harian...", $baseProgress + 15);
+                $syncService = app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
+                $run = \App\Models\MarketplaceAdsSyncRun::create([
+                    'store_id' => $store->id,
+                    'sync_type' => 'manual_dashboard',
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'status' => 'processing',
+                    'started_at' => now(),
+                ]);
+
+                $sendEvent('log', "[{$store->name}] Sinkronisasi Daftar Kampanye...", $baseProgress + 12);
+                try {
+                    $syncService->syncCampaignsAndSettings($store, $run);
+                } catch (\Throwable $e) {
+                    $sendEvent('log', "[{$store->name}] Gagal menarik daftar kampanye: " . $e->getMessage(), $baseProgress + 15);
+                }
+
+                // 2. Performa harian, kampanye, dan produk
+                $sendEvent('log', "[{$store->name}] Memulai sinkronisasi performa...", $baseProgress + 15);
                 
                 $currentStart = \Carbon\Carbon::parse($dateFrom);
                 $finalEnd     = \Carbon\Carbon::parse($dateTo);
-                $storeSaved   = 0;
                 
                 while ($currentStart->lessThanOrEqualTo($finalEnd)) {
                     $currentEnd = clone $currentStart;
@@ -1898,72 +1914,26 @@ class MarketplaceController extends Controller
                     
                     $sendEvent('log', "[{$store->name}] Menarik periode " . $currentStart->format('d-m-Y') . " s/d " . $currentEnd->format('d-m-Y'), $baseProgress + 20);
                     
-                    
                     try {
-                        $res = $driver->getAdsShopDailyPerformance(
-                            $store,
-                            $currentStart->format('d-m-Y'),
-                            $currentEnd->format('d-m-Y'),
-                        );
+                        $syncService->syncShopDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                        $sendEvent('log', "[{$store->name}] Performa harian toko tersimpan.", $baseProgress + 22);
 
-                        \Log::info("SHOPEE_ADS_API_RESULT for {$store->name} ({$currentStart->format('d-m-Y')} to {$currentEnd->format('d-m-Y')}):", [
-                            'error' => $res['error'] ?? null,
-                            'message' => $res['message'] ?? null,
-                            'day_list_count' => count(data_get($res, 'response.day_list') ?? [])
-                        ]);
+                        $syncService->syncCampaignDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                        $sendEvent('log', "[{$store->name}] Performa kampanye tersimpan.", $baseProgress + 25);
 
-                        if (! empty($res['error'])) {
-                            $errMsg = $res['message'] ?? $res['error'];
-                            $errors[] = "[{$store->name}][{$currentStart->format('d/m')}] " . $errMsg;
-                            $sendEvent('log', "[{$store->name}] Gagal menarik performa: " . $errMsg, $baseProgress + 25);
-                        } else {
-                            $days = data_get($res, 'response.day_list')
-                                ?? data_get($res, 'response.daily_performance')
-                                ?? (is_array($res['response'] ?? null) && array_is_list($res['response']) ? $res['response'] : []);
-
-                            $sendEvent('log', "[{$store->name}] Ditemukan " . count($days) . " baris data. Menyimpan...", $baseProgress + 25);
-
-                            foreach ($days as $d) {
-                                $rawDate = $d['date'] ?? null;
-                                if (! $rawDate) continue;
-                                $dateObj = \Carbon\Carbon::createFromFormat('d-m-Y', $rawDate);
-
-                                $record = \App\Models\MarketplaceAdsDaily::where('store_id', $store->id)
-                                    ->whereDate('date', clone $dateObj)
-                                    ->first();
-                                    
-                                $payload = [
-                                    'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
-                                    'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
-                                    'ctr'         => $d['ctr'] ?? null,
-                                    'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
-                                    'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
-                                    'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
-                                    'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
-                                    'raw_json'    => $d,
-                                ];
-                                
-                                if ($record) {
-                                    $record->update($payload);
-                                } else {
-                                    \App\Models\MarketplaceAdsDaily::create(array_merge([
-                                        'store_id' => $store->id, 
-                                        'date' => $dateObj->format('Y-m-d')
-                                    ], $payload));
-                                }
-                                $saved++;
-                                $storeSaved++;
-                            }
-                        }
+                        $syncService->syncGmsDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                        $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 28);
                     } catch (\Throwable $e) {
                         $errors[] = "[{$store->name}] " . $e->getMessage();
-                        $sendEvent('log', "[{$store->name}] Kesalahan internal: " . $e->getMessage());
+                        $sendEvent('log', "[{$store->name}] Kesalahan pada periode ini: " . $e->getMessage());
                     }
                     
                     $currentStart = $currentEnd->addDay();
-                    usleep(500000); // 0.5 sec delay between chunks to avoid rate limiting
+                    usleep(500000); // 0.5 sec delay between chunks
                 }
-                $sendEvent('log', "[{$store->name}] Berhasil menyimpan total {$storeSaved} baris harian.", $baseProgress + (90 / $totalStores));
+                $run->update(['status' => 'success', 'finished_at' => now()]);
+                $saved += $run->total_updated;
+                $sendEvent('log', "[{$store->name}] Berhasil memperbarui {$run->total_updated} baris data.", $baseProgress + (90 / $totalStores));
             }
 
             $sendEvent('done', 'Sinkronisasi selesai!', 100, [
