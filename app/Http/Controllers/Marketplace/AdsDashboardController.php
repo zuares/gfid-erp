@@ -78,10 +78,11 @@ class AdsDashboardController extends Controller
             ->withSum(['dailies as sum_prev_direct_orders' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'direct_order')
             ->get()
             ->map(function ($camp) {
-                $camp->sum_gmv = ($camp->sum_broad_gmv ?? 0) + ($camp->sum_direct_gmv ?? 0);
-                $camp->sum_orders = ($camp->sum_broad_orders ?? 0) + ($camp->sum_direct_orders ?? 0);
-                $camp->sum_prev_gmv = ($camp->sum_prev_broad_gmv ?? 0) + ($camp->sum_prev_direct_gmv ?? 0);
-                $camp->sum_prev_orders = ($camp->sum_prev_broad_orders ?? 0) + ($camp->sum_prev_direct_orders ?? 0);
+                // Shopee API: broad_gmv dan broad_orders merupakan total keseluruhan (termasuk direct)
+                $camp->sum_gmv = $camp->sum_broad_gmv ?? 0;
+                $camp->sum_orders = $camp->sum_broad_orders ?? 0;
+                $camp->sum_prev_gmv = $camp->sum_prev_broad_gmv ?? 0;
+                $camp->sum_prev_orders = $camp->sum_prev_broad_orders ?? 0;
                 
                 $roas = $camp->sum_expense > 0 ? $camp->sum_gmv / $camp->sum_expense : 0;
                 $prevRoas = $camp->sum_prev_expense > 0 ? $camp->sum_prev_gmv / $camp->sum_prev_expense : 0;
@@ -139,9 +140,8 @@ class AdsDashboardController extends Controller
                 SUM(marketplace_ads_item_dailies.impressions) as impressions,
                 SUM(marketplace_ads_item_dailies.clicks) as clicks,
                 SUM(marketplace_ads_item_dailies.expense) as spend,
-                SUM(marketplace_ads_item_dailies.broad_order + marketplace_ads_item_dailies.direct_order) as orders,
-                SUM(marketplace_ads_item_dailies.broad_gmv + marketplace_ads_item_dailies.direct_gmv) as gmv,
-                SUM(marketplace_ads_item_dailies.broad_gmv) as broad_gmv_sum,
+                SUM(marketplace_ads_item_dailies.broad_gmv) as gmv,
+                SUM(marketplace_ads_item_dailies.broad_order) as orders,
                 SUM(marketplace_ads_item_dailies.direct_gmv) as direct_gmv_sum
             ')
             ->groupBy('marketplace_ads_item_dailies.channel_item_id')
