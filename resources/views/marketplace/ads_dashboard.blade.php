@@ -245,6 +245,86 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
 .kpi-label { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display:flex; align-items:center; gap:0.5rem; opacity:0.8;}
 .kpi-value { font-size: 1.75rem; font-weight: 800; margin: 0.5rem 0; letter-spacing: -0.02em; }
 .kpi-sub { font-size: .75rem; opacity: 0.85; }
+
+/* ─── Mini Sync Log ─── */
+.mini-log-toggle {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .35rem .7rem; border-radius: 8px; font-size: .72rem; font-weight: 600;
+    cursor: pointer; user-select: none;
+    background: var(--glass-bg); backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border);
+    color: var(--dsh-muted); transition: all 0.25s ease;
+}
+.mini-log-toggle:hover { border-color: var(--dsh-accent); color: var(--dsh-accent); }
+.mini-log-toggle .chevron {
+    display: inline-block; transition: transform 0.3s ease; font-size: .6rem;
+}
+.mini-log-toggle.open .chevron { transform: rotate(180deg); }
+
+.mini-log-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+    min-width: 380px; max-width: 440px;
+    background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border); border-radius: 12px;
+    box-shadow: 0 16px 48px -12px rgba(0,0,0,0.15);
+    padding: 0; overflow: hidden;
+    opacity: 0; transform: translateY(-8px) scale(0.97); pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.mini-log-panel.show {
+    opacity: 1; transform: translateY(0) scale(1); pointer-events: auto;
+}
+body[data-theme="dark"] .mini-log-panel {
+    box-shadow: 0 16px 48px -12px rgba(0,0,0,0.5);
+}
+
+.mini-log-header {
+    padding: .65rem .85rem; font-size: .72rem; font-weight: 700;
+    color: var(--dsh-muted); text-transform: uppercase; letter-spacing: .06em;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex; align-items: center; gap: .4rem;
+}
+
+.mini-log-entry {
+    display: grid; grid-template-columns: 24px 1fr auto;
+    gap: .5rem; align-items: center;
+    padding: .55rem .85rem;
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+    font-size: .72rem;
+    transition: background 0.15s ease;
+}
+.mini-log-entry:last-child { border-bottom: none; }
+.mini-log-entry:hover { background: rgba(0,0,0,0.02); }
+body[data-theme="dark"] .mini-log-entry { border-bottom-color: rgba(255,255,255,0.03); }
+body[data-theme="dark"] .mini-log-entry:hover { background: rgba(255,255,255,0.03); }
+
+.mle-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .6rem;
+}
+.mle-icon.success { background: rgba(22,163,74,0.12); color: #16a34a; }
+.mle-icon.error   { background: rgba(220,38,38,0.12); color: #dc2626; }
+.mle-icon.processing { background: rgba(37,99,235,0.12); color: #2563eb; }
+.mle-icon.rate_limited { background: rgba(234,179,8,0.12); color: #ca8a04; }
+
+.mle-info { line-height: 1.35; }
+.mle-time { font-weight: 600; color: var(--text, #0f172a); }
+.mle-type { color: var(--dsh-muted); font-size: .65rem; }
+.mle-badge {
+    font-size: .6rem; font-weight: 700; letter-spacing: .03em;
+    padding: .15rem .4rem; border-radius: 5px;
+    text-transform: uppercase; white-space: nowrap;
+}
+.mle-badge.success { background: rgba(22,163,74,0.1); color: #16a34a; }
+.mle-badge.error   { background: rgba(220,38,38,0.1); color: #dc2626; }
+.mle-badge.processing { background: rgba(37,99,235,0.1); color: #2563eb; }
+.mle-badge.rate_limited { background: rgba(234,179,8,0.1); color: #ca8a04; }
+
+.mle-stats { color: var(--dsh-muted); font-size: .62rem; margin-top: .1rem; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.mle-icon.processing i { animation: spin 1.2s linear infinite; }
 </style>
 @endpush
 
@@ -340,6 +420,34 @@ document.addEventListener('DOMContentLoaded', function () {
     setInterval(updateSyncCountdown, 30000); // update tiap 30 detik
 
 });
+
+// --- MINI LOG TOGGLE ---
+function toggleMiniLog() {
+    const panel = document.getElementById('miniLogPanel');
+    const toggle = document.getElementById('miniLogToggle');
+    if (!panel || !toggle) return;
+    
+    const isOpen = panel.classList.contains('show');
+    if (isOpen) {
+        panel.classList.remove('show');
+        toggle.classList.remove('open');
+    } else {
+        panel.classList.add('show');
+        toggle.classList.add('open');
+    }
+}
+
+// Close mini log on click outside
+document.addEventListener('click', function(e) {
+    const panel = document.getElementById('miniLogPanel');
+    const toggle = document.getElementById('miniLogToggle');
+    if (!panel || !toggle) return;
+    
+    if (!panel.contains(e.target) && !toggle.contains(e.target)) {
+        panel.classList.remove('show');
+        toggle.classList.remove('open');
+    }
+});
 </script>
 @endpush
 
@@ -354,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <h1>Analisis Iklan Shopee</h1>
             <div class="sub">Pemantauan biaya, GMV, dan kontrol ROAS harian.</div>
         </div>
-        <div>
+        <div style="position: relative; text-align: right;">
             @if(isset($syncRuns) && $syncRuns->isNotEmpty())
                 @php
                     $latestRun = $syncRuns->first();
@@ -375,9 +483,66 @@ document.addEventListener('DOMContentLoaded', function () {
                     @endif
                 </div>
             @endif
-            <div id="syncCountdown" class="role-chip live-btn live-off">
-                <i class="bi bi-clock-history"></i> Menghitung...
+            <div style="display: flex; gap: .5rem; justify-content: flex-end; align-items: center;">
+                <div id="syncCountdown" class="role-chip live-btn live-off">
+                    <i class="bi bi-clock-history"></i> Menghitung...
+                </div>
+                {{-- Mini Log Toggle --}}
+                @if(isset($syncRuns) && $syncRuns->isNotEmpty())
+                <div class="mini-log-toggle" id="miniLogToggle" onclick="toggleMiniLog()">
+                    <i class="bi bi-terminal"></i> Log
+                    <span class="chevron">▼</span>
+                </div>
+                @endif
             </div>
+
+            {{-- Mini Log Panel (Dropdown) --}}
+            @if(isset($syncRuns) && $syncRuns->isNotEmpty())
+            <div class="mini-log-panel" id="miniLogPanel">
+                <div class="mini-log-header">
+                    <i class="bi bi-activity"></i> Riwayat Sinkronisasi Terakhir
+                </div>
+                @foreach($syncRuns->take(7) as $sr)
+                    @php
+                        $statusClass = match($sr->status) {
+                            'success' => 'success',
+                            'error' => 'error',
+                            'processing' => 'processing',
+                            'rate_limited' => 'rate_limited',
+                            default => 'processing'
+                        };
+                        $statusIcon = match($sr->status) {
+                            'success' => 'bi-check-lg',
+                            'error' => 'bi-x-lg',
+                            'processing' => 'bi-arrow-repeat',
+                            'rate_limited' => 'bi-hourglass-split',
+                            default => 'bi-question'
+                        };
+                        $statusLabel = match($sr->status) {
+                            'success' => 'OK',
+                            'error' => 'GAGAL',
+                            'processing' => 'PROSES',
+                            'rate_limited' => 'LIMIT',
+                            default => $sr->status
+                        };
+                    @endphp
+                    <div class="mini-log-entry">
+                        <div class="mle-icon {{ $statusClass }}">
+                            <i class="bi {{ $statusIcon }}"></i>
+                        </div>
+                        <div class="mle-info">
+                            <div class="mle-time">{{ $sr->started_at ? \Carbon\Carbon::parse($sr->started_at)->timezone('Asia/Jakarta')->format('d/m H:i') : '-' }}</div>
+                            <div class="mle-stats">{{ $sr->sync_type ?? '-' }} · {{ $sr->total_requests ?? 0 }} req · {{ $sr->total_updated ?? 0 }} row
+                                @if($sr->error_message)
+                                    · <span style="color: #dc2626;">{{ Str::limit($sr->error_message, 40) }}</span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="mle-badge {{ $statusClass }}">{{ $statusLabel }}</div>
+                    </div>
+                @endforeach
+            </div>
+            @endif
         </div>
     </div>
 
