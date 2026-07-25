@@ -101,7 +101,7 @@ if (config('services.shopee.ads_scheduler_enabled', env('SHOPEE_ADS_SCHEDULER_EN
         ->name('sync-ads-daily');
 
     // Ads: sinkronisasi metrik per jam
-    Schedule::command('marketplace:sync-ads', ['--hourly' => true])
+    Schedule::command('marketplace:sync-ads', ['--hourly'])
         ->hourly()
         ->withoutOverlapping(30)
         ->name('sync-ads-hourly');
