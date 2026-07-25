@@ -20,6 +20,7 @@ class AdsDashboardController extends Controller
         // 1. Dapatkan daftar store milik user (atau semua jika role mencukupi)
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
+            ->where('is_active', true)
             ->get();
             
         $storeId = $request->input('store_id', $stores->first()?->id);
