@@ -1818,6 +1818,7 @@ class MarketplaceController extends Controller
     public function syncAdsDaily(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         set_time_limit(120);
+        \Log::info('SYNC_ADS_DAILY CALLED', $request->all());
 
         $syncType = $request->input('sync_type', '1_week');
         $dateTo   = now()->toDateString();
@@ -1897,12 +1898,19 @@ class MarketplaceController extends Controller
                     
                     $sendEvent('log', "[{$store->name}] Menarik periode " . $currentStart->format('d-m-Y') . " s/d " . $currentEnd->format('d-m-Y'), $baseProgress + 20);
                     
+                    
                     try {
                         $res = $driver->getAdsShopDailyPerformance(
                             $store,
                             $currentStart->format('d-m-Y'),
                             $currentEnd->format('d-m-Y'),
                         );
+
+                        \Log::info("SHOPEE_ADS_API_RESULT for {$store->name} ({$currentStart->format('d-m-Y')} to {$currentEnd->format('d-m-Y')}):", [
+                            'error' => $res['error'] ?? null,
+                            'message' => $res['message'] ?? null,
+                            'day_list_count' => count(data_get($res, 'response.day_list') ?? [])
+                        ]);
 
                         if (! empty($res['error'])) {
                             $errMsg = $res['message'] ?? $res['error'];
