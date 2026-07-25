@@ -96,7 +96,14 @@ class ShopeeAdsSyncService
                         'status' => $common['status'] ?? null,
                         'ad_type' => $common['ad_type'] ?? null,
                         'bidding_method' => $common['bidding_method'] ?? null,
-                        'campaign_status' => $common['campaign_status'] ?? null,
+                        'campaign_status' => match($common['campaign_status'] ?? null) {
+                            1 => 'normal',
+                            2 => 'ended',
+                            3 => 'paused',
+                            4 => 'abnormal',
+                            5 => 'deleted',
+                            default => $common['campaign_status'] ?? null,
+                        },
                         'campaign_placement' => $common['campaign_placement'] ?? null,
                         'campaign_budget' => $common['budget'] ?? null,
                         'target_roas' => $auto['target_roas'] ?? null,
@@ -264,34 +271,97 @@ class ShopeeAdsSyncService
 
     public function syncGmsDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
     {
+        // Hanya sync kampanye yang AKTIF (status ongoing/paused, bukan ended/deleted)
+        // Ini mengurangi 405 kampanye menjadi hanya ~10-30 yang relevan
         $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)
+            ->whereIn('campaign_status', ['ongoing', 'normal', 'paused'])
             ->pluck('channel_campaign_id')
             ->toArray();
             
-        if (empty($campaigns)) return;
+        // Fallback: jika semua campaign_status null/kosong, ambil yang punya data baru-baru ini
+        if (empty($campaigns)) {
+            $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)
+                ->whereNotIn('campaign_status', ['ended', 'deleted', 'abnormal'])
+                ->pluck('channel_campaign_id')
+                ->toArray();
+        }
         
-        $start = Carbon::parse($dateFrom);
-        $end = Carbon::parse($dateTo);
-
-        while ($start->lte($end)) {
-            $dateStr = $start->format('d-m-Y');
-            $dbDate = $start->format('Y-m-d');
+        if (empty($campaigns)) {
+            Log::info("[ShopeeAdsSync] No active GMS campaigns for store {$store->id}, skipping.");
+            return;
+        }
+        
+        Log::info("[ShopeeAdsSync] GMS sync for store {$store->id}: {$dateFrom} to {$dateTo}, " . count($campaigns) . " active campaigns.");
+        
+        $dFrom = Carbon::parse($dateFrom)->format('d-m-Y');
+        $dTo = Carbon::parse($dateTo)->format('d-m-Y');
+        $dbDateFrom = Carbon::parse($dateFrom)->format('Y-m-d');
+        $dbDateTo = Carbon::parse($dateTo)->format('Y-m-d');
+        
+        foreach ($campaigns as $campaignId) {
+            usleep(300000); // 3 req/sec pace
             
-            foreach ($campaigns as $campaignId) {
-                usleep(200000); // 5 requests per sec to avoid rate limits
+            // 1. Campaign Performance (1 API call per campaign, covers full date range)
+            try {
+                $res = $this->api->getGmsCampaignPerformance($store, [$campaignId], $dFrom, $dTo);
+                $run->total_requests++;
                 
-                // 1. Sync Campaign Performance
-                try {
-                    $res = $this->api->getGmsCampaignPerformance($store, [$campaignId], $dateStr, $dateStr);
-                    $run->total_requests++;
+                if (empty($res['error']) && !empty($res['response']['report'])) {
+                    $report = $res['response']['report'];
                     
-                    if (empty($res['error']) && !empty($res['response']['report'])) {
-                        $report = $res['response']['report'];
-                        MarketplaceAdCampaignDaily::updateOrCreate(
+                    // Simpan sebagai agregat untuk seluruh rentang tanggal
+                    MarketplaceAdCampaignDaily::updateOrCreate(
+                        [
+                            'store_id' => $store->id,
+                            'channel_campaign_id' => $campaignId,
+                            'date' => $dbDateTo, // gunakan tanggal terakhir sebagai penanda
+                        ],
+                        [
+                            'impressions'  => $report['impression'] ?? 0,
+                            'clicks'       => $report['clicks'] ?? $report['click'] ?? 0,
+                            'expense'      => $report['expense'] ?? 0,
+                            'broad_order'  => $report['broad_order'] ?? 0,
+                            'broad_gmv'    => $report['broad_gmv'] ?? 0,
+                            'direct_order' => $report['direct_order'] ?? 0,
+                            'direct_gmv'   => $report['direct_gmv'] ?? 0,
+                            'cpc'          => $report['cpc'] ?? null,
+                            'raw_json'     => $report,
+                        ]
+                    );
+                    $run->total_updated++;
+                    
+                    // Skip item sync jika kampanye ini 0 expense (tidak ada pengeluaran = tidak perlu detail item)
+                    $expense = $report['expense'] ?? 0;
+                    if ($expense <= 0) continue;
+                } else {
+                    continue; // Tidak ada data campaign, skip item sync juga
+                }
+            } catch (\Throwable $e) {
+                Log::warning("[ShopeeAdsSync] GMS Campaign Sync failed for camp {$campaignId}: " . $e->getMessage());
+                continue;
+            }
+
+            // 2. Item Performance (hanya jika campaign punya expense > 0)
+            usleep(300000);
+            try {
+                $resItem = $this->api->getGmsItemPerformance($store, [$campaignId], $dFrom, $dTo);
+                $run->total_requests++;
+                
+                if (empty($resItem['error']) && !empty($resItem['response']['result_list'])) {
+                    $itemList = $resItem['response']['result_list'];
+                    
+                    foreach ($itemList as $item) {
+                        $channelItemId = $item['item_id'] ?? null;
+                        $report = $item['report'] ?? [];
+                        
+                        if (empty($channelItemId) || empty($report)) continue;
+                        
+                        \App\Models\MarketplaceAdsItemDaily::updateOrCreate(
                             [
                                 'store_id' => $store->id,
                                 'channel_campaign_id' => $campaignId,
-                                'date' => $dbDate,
+                                'channel_item_id' => $channelItemId,
+                                'date' => $dbDateTo,
                             ],
                             [
                                 'impressions'  => $report['impression'] ?? 0,
@@ -305,54 +375,11 @@ class ShopeeAdsSyncService
                                 'raw_json'     => $report,
                             ]
                         );
-                        $run->total_updated++;
                     }
-                } catch (\Throwable $e) {
-                    Log::warning("[ShopeeAdsSync] GMS Campaign Sync failed for camp {$campaignId}: " . $e->getMessage());
                 }
-
-                // 2. Sync Item Performance
-                usleep(200000);
-                try {
-                    $resItem = $this->api->getGmsItemPerformance($store, [$campaignId], $dateStr, $dateStr);
-                    $run->total_requests++;
-                    
-                    if (empty($resItem['error']) && !empty($resItem['response']['result_list'])) {
-                        $itemList = $resItem['response']['result_list'];
-                        
-                        foreach ($itemList as $item) {
-                            $channelItemId = $item['item_id'] ?? null;
-                            $report = $item['report'] ?? [];
-                            
-                            if (empty($channelItemId) || empty($report)) continue;
-                            
-                            \App\Models\MarketplaceAdsItemDaily::updateOrCreate(
-                                [
-                                    'store_id' => $store->id,
-                                    'channel_campaign_id' => $campaignId,
-                                    'channel_item_id' => $channelItemId,
-                                    'date' => $dbDate,
-                                ],
-                                [
-                                    'impressions'  => $report['impression'] ?? 0,
-                                    'clicks'       => $report['clicks'] ?? $report['click'] ?? 0,
-                                    'expense'      => $report['expense'] ?? 0,
-                                    'broad_order'  => $report['broad_order'] ?? 0,
-                                    'broad_gmv'    => $report['broad_gmv'] ?? 0,
-                                    'direct_order' => $report['direct_order'] ?? 0,
-                                    'direct_gmv'   => $report['direct_gmv'] ?? 0,
-                                    'cpc'          => $report['cpc'] ?? null,
-                                    'raw_json'     => $report,
-                                ]
-                            );
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning("[ShopeeAdsSync] GMS Item Sync failed for camp {$campaignId}: " . $e->getMessage());
-                }
+            } catch (\Throwable $e) {
+                Log::warning("[ShopeeAdsSync] GMS Item Sync failed for camp {$campaignId}: " . $e->getMessage());
             }
-            
-            $start->addDay();
         }
     }
 }

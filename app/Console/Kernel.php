@@ -39,15 +39,9 @@ class Kernel extends ConsoleKernel
                  ->everyFourHours()
                  ->withoutOverlapping();
 
-        // Cron Job: Sinkronisasi Performa Iklan Harian (Shopee Ads) setiap jam 02:00 dini hari
-        $schedule->command('marketplace:sync-ads')
-                 ->dailyAt('02:00')
-                 ->withoutOverlapping();
-
-        // Cron Job: Sinkronisasi Performa Iklan Per-Jam (Shopee Ads) setiap jam
-        $schedule->command('marketplace:sync-ads --hourly')
-                 ->hourly()
-                 ->withoutOverlapping();
+        // NOTE: Jadwal Ads (daily + hourly) sudah didefinisikan di routes/console.php
+        // dengan flag SHOPEE_ADS_SCHEDULER_ENABLED dan withoutOverlapping(30).
+        // Jangan duplikasi di sini.
     }
 
     protected function commands(): void
