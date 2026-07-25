@@ -678,7 +678,7 @@ document.addEventListener('click', function(e) {
                 {{-- PIE CHART PRODUK --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="dash-sec mt-0 mb-0"><i class="bi bi-pie-chart text-primary"></i> Proporsi Produk</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-pie-chart text-primary"></i> Proporsi Produk</div>
                         <select id="pieMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border); font-size: 0.75rem;">
                             <option value="spend">Biaya</option>
                             <option value="gmv">GMV</option>
@@ -2267,7 +2267,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
                     const pieLabels = sorted.map(c => {
-                        let name = c.item_name || 'Unknown Product';
+                        let name = c.item_sku || c.item_name || 'Unknown Product';
                         return name.length > 20 ? name.substring(0,20) + '...' : name;
                     });
                     const pieData = sorted.map(c => parseFloat(c[metric] || 0));

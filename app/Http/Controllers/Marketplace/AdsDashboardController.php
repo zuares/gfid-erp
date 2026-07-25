@@ -111,6 +111,7 @@ class AdsDashboardController extends Controller
             ->whereBetween('marketplace_ads_item_dailies.date', [$dateFrom, $dateTo])
             ->selectRaw('
                 marketplace_ads_item_dailies.channel_item_id,
+                MAX(marketplace_products.item_sku) as item_sku,
                 MAX(marketplace_products.item_name) as item_name,
                 SUM(marketplace_ads_item_dailies.impressions) as impressions,
                 SUM(marketplace_ads_item_dailies.clicks) as clicks,
