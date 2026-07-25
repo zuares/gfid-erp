@@ -219,6 +219,25 @@ body[data-theme="dark"] .range-pill { color: #f8fafc; background: rgba(30, 41, 5
 body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
 
 /* Kpi Cards Upgrade */
+.dash-tabs-modern {
+    display: inline-flex;
+    background: rgba(148, 163, 184, 0.1);
+    padding: 0.35rem;
+    border-radius: 12px;
+    gap: 0.25rem;
+}
+body[data-theme="dark"] .dash-tabs-modern { background: rgba(30, 41, 59, 0.5); }
+.dash-tab-m {
+    border: none; background: transparent; padding: 0.6rem 1.25rem; border-radius: 8px;
+    font-weight: 600; font-size: 0.85rem; color: var(--dsh-muted); cursor: pointer;
+    transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+}
+.dash-tab-m:hover { color: var(--text); }
+.dash-tab-m.active {
+    background: var(--card-bg); color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
+}
+
 .kpi {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
@@ -327,21 +346,21 @@ body[data-theme="dark"] .mini-log-entry:hover { background: rgba(255,255,255,0.0
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tabBtns = document.querySelectorAll('.dash-tab');
+    const tabBtns = document.querySelectorAll('.dash-tab-m');
     const tabPanes = document.querySelectorAll('.tab-pane');
 
     const savedTab = localStorage.getItem('adsDashboardActiveTab');
     if (savedTab) {
         tabBtns.forEach(b => b.classList.remove('active'));
         tabPanes.forEach(p => p.classList.remove('active'));
-        const targetBtn = document.querySelector(`.dash-tab[data-target="${savedTab}"]`);
+        const targetBtn = document.querySelector(`.dash-tab-m[data-target="${savedTab}"]`);
         const targetPane = document.getElementById(savedTab);
         if (targetBtn && targetPane) {
             targetBtn.classList.add('active');
             targetPane.classList.add('active');
         } else {
-            tabBtns[0].classList.add('active');
-            tabPanes[0].classList.add('active');
+            if (tabBtns.length > 0) tabBtns[0].classList.add('active');
+            if (tabPanes.length > 0) tabPanes[0].classList.add('active');
         }
     }
 
@@ -349,17 +368,18 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             tabPanes.forEach(p => p.classList.remove('active'));
-
+            
             btn.classList.add('active');
-            const target = btn.getAttribute('data-target');
-            const targetPane = document.getElementById(target);
-            if (targetPane) targetPane.classList.add('active');
-            
-            localStorage.setItem('adsDashboardActiveTab', target);
-            
-            window.dispatchEvent(new Event('resize')); // re-render charts
+            const targetId = btn.getAttribute('data-target');
+            document.getElementById(targetId).classList.add('active');
+            localStorage.setItem('adsDashboardActiveTab', targetId);
+
+            if (targetId === 'tab-daily' && !dailyChart) {
+                setTimeout(() => { renderDailyChart(document.getElementById('metricSelect').value); }, 100);
+            }
         });
     });
+
 
     window.dispatchEvent(new Event('resize')); // re-render charts on load
 
@@ -614,15 +634,15 @@ document.addEventListener('click', function(e) {
         </div>
     @else
         {{-- ==============================================
-             TABS
+             TABS (SEGMENTED CONTROL)
         ============================================== --}}
-        <div>
-            <div class="dash-tabs">
-                <button class="dash-tab active" data-target="tab-dashboard">Dasbor Eksekutif</button>
-                <button class="dash-tab" data-target="tab-daily">Analisis Harian</button>
-                <button class="dash-tab" data-target="tab-campaigns">Rincian Kampanye</button>
-                <button class="dash-tab" data-target="tab-items">Performa Produk</button>
-                <button class="dash-tab" data-target="tab-sync">Sinkronisasi</button>
+        <div style="margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
+            <div class="dash-tabs-modern">
+                <button class="dash-tab-m active" data-target="tab-dashboard"><i class="bi bi-grid-1x2"></i> Ringkasan Utama</button>
+                <button class="dash-tab-m" data-target="tab-daily"><i class="bi bi-graph-up"></i> Tren Harian</button>
+                <button class="dash-tab-m" data-target="tab-campaigns"><i class="bi bi-megaphone"></i> Kampanye</button>
+                <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Performa Produk</button>
+                <button class="dash-tab-m" data-target="tab-sync"><i class="bi bi-cloud-arrow-down"></i> Sinkronisasi</button>
             </div>
         </div>
 
@@ -663,6 +683,7 @@ document.addEventListener('click', function(e) {
                         <option value="spend">Metrik: Biaya (Spend)</option>
                         <option value="impressions">Metrik: Impresi (Tayangan)</option>
                         <option value="clicks">Metrik: Kunjungan (Klik)</option>
+                        <option value="cvr">Metrik: Konversi (CVR)</option>
                     </select>
                 </div>
             </div>
@@ -2000,6 +2021,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 const getMetricValue = (d, metric) => {
                     let sp = parseFloat(d.spend || d.expense || 0);
                     let gm = parseFloat(d.gmv || 0);
+                    let clicks = parseFloat(d.clicks || 0);
+                    let orders = parseFloat(d.orders || d.broad_order || d.direct_order || 0);
+
                     if (metric === 'roas') {
                         return sp > 0 ? (gm / sp) : 0;
                     } else if (metric === 'gmv') {
@@ -2009,7 +2033,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     } else if (metric === 'impressions') {
                         return parseFloat(d.impressions || 0);
                     } else if (metric === 'clicks') {
-                        return parseFloat(d.clicks || 0);
+                        return clicks;
+                    } else if (metric === 'cvr') {
+                        return clicks > 0 ? (orders / clicks) * 100 : 0;
                     }
                     return 0;
                 };
@@ -2078,6 +2104,8 @@ document.addEventListener("DOMContentLoaded", function() {
                                                 let metric = histMetricSelect.value;
                                                 if (metric === 'roas') {
                                                     return ctx.dataset.label + ': ' + val.toFixed(2) + 'x';
+                                                } else if (metric === 'cvr') {
+                                                    return ctx.dataset.label + ': ' + val.toFixed(2) + '%';
                                                 } else if (metric === 'impressions' || metric === 'clicks') {
                                                     return ctx.dataset.label + ': ' + val.toLocaleString('id-ID');
                                                 } else {
@@ -2099,6 +2127,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                             callback: function(value) {
                                                 let metric = histMetricSelect.value;
                                                 if (metric === 'roas') return value + 'x';
+                                                if (metric === 'cvr') return value + '%';
                                                 if (metric === 'impressions' || metric === 'clicks') {
                                                     if (value >= 1000000) return (value/1000000).toFixed(1) + 'M';
                                                     if (value >= 1000) return (value/1000).toFixed(1) + 'K';
@@ -2132,15 +2161,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
                         let formatVal = (v) => {
                             if (metric === 'roas') return v.toFixed(2) + 'x';
+                            if (metric === 'cvr') return v.toFixed(2) + '%';
                             if (metric === 'impressions' || metric === 'clicks') return Math.round(v).toLocaleString('id-ID');
                             return 'Rp ' + formatShortIDR(v);
                         };
 
-                        html += `<div style="margin-bottom:2px;">Sekarang: <span style="color:var(--dsh-accent)">${metric === 'roas' ? 'Rata-rata' : 'Total'} ${formatVal(metric === 'roas' ? currAvg : currSum)}</span></div>`;
+                        let isAvg = (metric === 'roas' || metric === 'cvr');
+                        html += `<div style="margin-bottom:2px;">Sekarang: <span style="color:var(--dsh-accent)">${isAvg ? 'Rata-rata' : 'Total'} ${formatVal(isAvg ? currAvg : currSum)}</span></div>`;
                         if (datasets.length > 1) {
                             let diff = 0;
-                            let compareVal1 = metric === 'roas' ? currAvg : currSum;
-                            let compareVal2 = metric === 'roas' ? prevAvg : prevSum;
+                            let compareVal1 = isAvg ? currAvg : currSum;
+                            let compareVal2 = isAvg ? prevAvg : prevSum;
                             
                             if (compareVal2 > 0) diff = ((compareVal1 - compareVal2) / compareVal2) * 100;
                             else if (compareVal1 > 0) diff = 100;
@@ -2151,7 +2182,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             }
                             let sign = diff > 0 ? '+' : '';
 
-                            html += `<div style="font-size:0.75rem; color:var(--dsh-muted)">Sebelumnya: ${formatVal(metric === 'roas' ? prevAvg : prevSum)} 
+                            html += `<div style="font-size:0.75rem; color:var(--dsh-muted)">Sebelumnya: ${formatVal(isAvg ? prevAvg : prevSum)} 
                                      <span style="color:${color}; font-weight:bold; margin-left:5px;">(${sign}${diff.toFixed(1)}%)</span></div>`;
                         }
                         
