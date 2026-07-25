@@ -63,6 +63,16 @@ class ShopeeAdsApiService
         return $this->execute($store, 'get_total_balance', fn() => $this->driver($store)->getAdsTotalBalance($store));
     }
 
+    public function getAdsShopToggleInfo(Store $store): array
+    {
+        return $this->execute($store, 'get_shop_toggle_info', fn() => $this->driver($store)->getAdsShopToggleInfo($store));
+    }
+
+    public function getAdsFacilShopRate(Store $store): array
+    {
+        return $this->execute($store, 'get_ads_facil_shop_rate', fn() => $this->driver($store)->getAdsFacilShopRate($store));
+    }
+
     public function getCampaignIdList(Store $store, int $pageNo = 1, int $pageSize = 100): array
     {
         return $this->execute($store, 'get_campaign_id_list', fn() => $this->driver($store)->getCampaignIdList($store, $pageNo, $pageSize));

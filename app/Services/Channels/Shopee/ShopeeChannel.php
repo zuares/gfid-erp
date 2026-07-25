@@ -355,6 +355,24 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Status Auto Top-up dan toggle toko lainnya.
+     * Endpoint: GET /api/v2/ads/get_shop_toggle_info
+     */
+    public function getAdsShopToggleInfo(Store $store): array
+    {
+        return $this->get($store, '/api/v2/ads/get_shop_toggle_info', []);
+    }
+
+    /**
+     * Data Ads Fácil (Layanan iklan Shopee untuk negara tertentu).
+     * Endpoint: GET /api/v2/ads/get_ads_facil_shop_rate
+     */
+    public function getAdsFacilShopRate(Store $store): array
+    {
+        return $this->get($store, '/api/v2/ads/get_ads_facil_shop_rate', []);
+    }
+
+    /**
      * Performa iklan harian level TOKO (semua campaign CPC digabung).
      * Endpoint: GET /api/v2/ads/get_all_cpc_ads_daily_performance
      * Date format: DD-MM-YYYY

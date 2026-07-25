@@ -675,53 +675,53 @@ document.addEventListener('click', function(e) {
             </div>
 
             <div class="dash-panels mt-4 mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-                {{-- PIE CHART BIAYA --}}
+                {{-- CHART BIAYA --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-wallet2 text-danger"></i> Proporsi Biaya</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bar-chart-steps text-danger"></i> Top 5 Biaya</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Top 5 produk penyerap biaya terbesar.
+                        Produk penyerap biaya terbesar (ID).
                     </div>
-                    <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
                             <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
-                            <canvas id="pieChartSpend"></canvas>
+                            <canvas id="chartSpend"></canvas>
                         @endif
                     </div>
                 </div>
 
-                {{-- PIE CHART GMV --}}
+                {{-- CHART GMV --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bag-check text-success"></i> Proporsi GMV</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bar-chart-steps text-success"></i> Top 5 GMV</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Top 5 produk penyumbang GMV terbesar.
+                        Produk penyumbang GMV terbesar (ID).
                     </div>
-                    <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
                             <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
-                            <canvas id="pieChartGmv"></canvas>
+                            <canvas id="chartGmv"></canvas>
                         @endif
                     </div>
                 </div>
 
-                {{-- PIE CHART KLIK --}}
+                {{-- CHART KLIK --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Proporsi Klik</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bar-chart-steps text-primary"></i> Top 5 Klik</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Top 5 produk dengan klik terbanyak.
+                        Produk dengan klik terbanyak (ID).
                     </div>
-                    <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
                             <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
-                            <canvas id="pieChartClicks"></canvas>
+                            <canvas id="chartClicks"></canvas>
                         @endif
                     </div>
                 </div>
@@ -2284,43 +2284,35 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 // ==========================================
-                // PIE CHART PRODUK (3 Charts)
+                // CHART PRODUK (3 Bar Charts)
                 // ==========================================
                 const rawItems = @json($itemPerformance->toArray());
 
-                const renderSinglePie = (ctxId, metric, labelFormat) => {
+                const renderSingleChart = (ctxId, metric, labelFormat, colorTheme) => {
                     const ctx = document.getElementById(ctxId);
                     if (!ctx || !rawItems || rawItems.length === 0) return;
                     
                     let sorted = [...rawItems].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
-                    const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                    const pieLabels = sorted.map(c => {
-                        let name = c.item_sku || c.item_name || 'Unknown Product';
-                        return name.length > 20 ? name.substring(0,20) + '...' : name;
-                    });
-                    const pieData = sorted.map(c => parseFloat(c[metric] || 0));
+                    const barLabels = sorted.map(c => c.channel_item_id || c.item_sku || 'Unknown');
+                    const barData = sorted.map(c => parseFloat(c[metric] || 0));
 
                     new Chart(ctx.getContext('2d'), {
-                        type: 'doughnut',
+                        type: 'bar',
                         data: {
-                            labels: pieLabels,
+                            labels: barLabels,
                             datasets: [{
-                                data: pieData,
-                                backgroundColor: bgColors,
-                                borderWidth: 2,
-                                borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
-                                hoverOffset: 4
+                                data: barData,
+                                backgroundColor: colorTheme,
+                                borderRadius: 4,
+                                barThickness: 16
                             }]
                         },
                         options: {
+                            indexAxis: 'y',
                             responsive: true,
                             maintainAspectRatio: false,
-                            cutout: '55%',
                             plugins: {
-                                legend: { 
-                                    position: 'bottom',
-                                    labels: { boxWidth: 10, font: { size: 10 }, color: textColor, padding: 10 }
-                                },
+                                legend: { display: false },
                                 tooltip: {
                                     backgroundColor: tooltipBg,
                                     titleColor: tooltipText,
@@ -2330,19 +2322,34 @@ document.addEventListener("DOMContentLoaded", function() {
                                     padding: 10,
                                     callbacks: {
                                         label: function(c) {
-                                            if (labelFormat === 'currency') return c.label + ': Rp ' + formatShortIDR(c.raw);
-                                            return c.label + ': ' + c.raw.toLocaleString('id-ID');
+                                            if (labelFormat === 'currency') return 'Rp ' + formatShortIDR(c.raw);
+                                            return c.raw.toLocaleString('id-ID');
                                         }
                                     }
+                                }
+                            },
+                            scales: {
+                                x: { 
+                                    display: false, 
+                                    grid: { display: false } 
+                                },
+                                y: { 
+                                    grid: { display: false }, 
+                                    ticks: { 
+                                        color: textColor,
+                                        font: { size: 10, family: 'Inter, sans-serif' }
+                                    },
+                                    border: { display: false }
                                 }
                             }
                         }
                     });
                 };
                 
-                renderSinglePie('pieChartSpend', 'spend', 'currency');
-                renderSinglePie('pieChartGmv', 'gmv', 'currency');
-                renderSinglePie('pieChartClicks', 'clicks', 'number');
+                // Colors matched to the BI icons: Danger (Red) for Biaya, Success (Green) for GMV, Primary (Blue) for Klik
+                renderSingleChart('chartSpend', 'spend', 'currency', 'rgba(239, 68, 68, 0.85)');
+                renderSingleChart('chartGmv', 'gmv', 'currency', 'rgba(16, 185, 129, 0.85)');
+                renderSingleChart('chartClicks', 'clicks', 'number', 'rgba(59, 130, 246, 0.85)');
                 
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)

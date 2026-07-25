@@ -76,4 +76,6 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.sync');
         Route::post('ads-dashboard/clear', [AdsDashboardController::class, 'clear'])
             ->name('ads.clear');
+        Route::get('ads-dashboard/realtime-status', [AdsDashboardController::class, 'realtimeStatus'])
+            ->name('ads.realtime.status');
     });

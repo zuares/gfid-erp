@@ -12,6 +12,7 @@ use App\Services\Marketplace\Ads\AdsAnalyticsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use App\Services\Marketplace\Ads\ShopeeAdsApiService;
 
 class AdsDashboardController extends Controller
 {
@@ -192,6 +193,36 @@ class AdsDashboardController extends Controller
             \Illuminate\Support\Facades\DB::table($table)->truncate();
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Semua data iklan berhasil dihapus.']);
+    public function realtimeStatus(Request $request, ShopeeAdsApiService $adsApi)
+    {
+        $storeId = $request->input('store_id');
+        if (!$storeId) {
+            return response()->json(['error' => 'store_id is required'], 400);
+        }
+
+        $store = Store::find($storeId);
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        try {
+            $balance = $adsApi->getAdsTotalBalance($store);
+            $toggleInfo = $adsApi->getAdsShopToggleInfo($store);
+            $facilRate = $adsApi->getAdsFacilShopRate($store);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'balance' => $balance['data'] ?? [],
+                    'toggle_info' => $toggleInfo['data'] ?? [],
+                    'facil_rate' => $facilRate['data'] ?? [],
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }
