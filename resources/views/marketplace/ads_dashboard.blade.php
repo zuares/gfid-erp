@@ -1156,15 +1156,29 @@ document.addEventListener('click', function(e) {
                                         </div>
                                     </td>
                                     <td>
-                                        @if(($camp->sum_broad_gmv ?? 0) > 0 && ($camp->sum_direct_gmv ?? 0) == 0)
-                                            <span style="background: rgba(37,99,235,0.1); color: #2563eb; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMV Max</span>
-                                        @elseif(($camp->sum_direct_gmv ?? 0) > 0 && ($camp->sum_broad_gmv ?? 0) == 0)
-                                            <span style="background: rgba(234,179,8,0.1); color: #ca8a04; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">Pencarian (CPC)</span>
-                                        @elseif(($camp->sum_direct_gmv ?? 0) > 0 && ($camp->sum_broad_gmv ?? 0) > 0)
-                                            <span style="background: rgba(147,51,234,0.1); color: #9333ea; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMS + CPC</span>
-                                        @else
-                                            <span style="background: rgba(100,116,139,0.1); color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">Unknown</span>
-                                        @endif
+                                        @php
+                                            $allGmv = (float)$camp->gmv;
+                                            $allDirect = (float)$camp->direct_gmv;
+                                            
+                                            $campType = 'Belum Ada Data';
+                                            $campTypeColor = '#64748b';
+                                            $campTypeBg = 'rgba(100,116,139,0.1)';
+                                            
+                                            if ($allGmv > 0 && $allDirect == 0) {
+                                                $campType = 'GMV Max';
+                                                $campTypeColor = '#2563eb';
+                                                $campTypeBg = 'rgba(37,99,235,0.1)';
+                                            } elseif ($allDirect > 0 && $allGmv == $allDirect) {
+                                                $campType = 'Pencarian (CPC)';
+                                                $campTypeColor = '#ca8a04';
+                                                $campTypeBg = 'rgba(234,179,8,0.1)';
+                                            } elseif ($allGmv > 0 && $allDirect > 0 && $allGmv != $allDirect) {
+                                                $campType = 'GMV Max'; // Most campaigns with mixed GMV are actually GMV Max with some direct conversions
+                                                $campTypeColor = '#2563eb';
+                                                $campTypeBg = 'rgba(37,99,235,0.1)';
+                                            }
+                                        @endphp
+                                        <span style="background: {{ $campTypeBg }}; color: {{ $campTypeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $campType }}</span>
                                     </td>
                                     <td>
                                         <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
