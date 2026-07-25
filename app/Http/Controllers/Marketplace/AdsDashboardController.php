@@ -157,6 +157,10 @@ class AdsDashboardController extends Controller
         // We use call instead of queue for Live Mode to ensure data is updated immediately
         Artisan::call($cmd, $params);
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['status' => 'success', 'message' => 'Data berhasil disinkronisasi.']);
+        }
+
         return back()->with('success', 'Data berhasil disinkronisasi.');
     }
 }

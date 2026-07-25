@@ -1127,7 +1127,8 @@ document.addEventListener('click', function(e) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ route('marketplace.ads.sync') }}" method="POST">
+                <!-- Form State -->
+                <form id="formSyncAds" action="{{ route('marketplace.ads.sync') }}" method="POST">
                     @csrf
                     <div class="mb-3">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
@@ -1149,6 +1150,22 @@ document.addEventListener('click', function(e) {
                         <i class="bi bi-cloud-download"></i> Jalankan Sync
                     </button>
                 </form>
+
+                <!-- Loading State (Hidden by default) -->
+                <div id="loadingSyncAds" style="display: none; text-align: center; padding: 2rem 0;">
+                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h6 class="fw-bold" style="color: var(--text);">Sedang Menarik Data...</h6>
+                    <p style="font-size: .8rem; color: var(--dsh-muted);">Proses ini mengambil performa iklan langsung dari Shopee.<br>Mohon tunggu sebentar.</p>
+                </div>
+                
+                <!-- Success State (Hidden by default) -->
+                <div id="successSyncAds" style="display: none; text-align: center; padding: 2rem 0;">
+                    <div style="font-size: 3rem; color: #16a34a; margin-bottom: 1rem;"><i class="bi bi-check-circle-fill"></i></div>
+                    <h6 class="fw-bold" style="color: var(--text);">Sinkronisasi Selesai!</h6>
+                    <p style="font-size: .8rem; color: var(--dsh-muted);">Data berhasil diperbarui.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1157,6 +1174,50 @@ document.addEventListener('click', function(e) {
 @endsection
 
 @push('scripts')
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const formSync = document.getElementById('formSyncAds');
+    if (formSync) {
+        formSync.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const loading = document.getElementById('loadingSyncAds');
+            const success = document.getElementById('successSyncAds');
+            
+            // Hide form, show loading
+            form.style.display = 'none';
+            loading.style.display = 'block';
+            
+            try {
+                const formData = new FormData(form);
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: formData
+                });
+                
+                const data = await res.json();
+                
+                if (data.status === 'success' || res.ok) {
+                    loading.style.display = 'none';
+                    success.style.display = 'block';
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    throw new Error(data.message || 'Terjadi kesalahan saat sync.');
+                }
+            } catch (err) {
+                alert('Gagal: ' + err.message);
+                loading.style.display = 'none';
+                form.style.display = 'block';
+            }
+        });
+    }
+});
+</script>
 @if(!empty($dailyChartData))
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
