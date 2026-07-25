@@ -103,7 +103,8 @@ class AdsDashboardController extends Controller
                 $camp->prev_orders = $camp->sum_prev_orders ?? 0;
                 return $camp;
             })
-            ->filter(fn($camp) => $camp->spend > 0 || $camp->prev_spend > 0)
+            // Tampilkan kampanye yang sedang berjalan ATAU yang memiliki spend
+            ->filter(fn($camp) => $camp->status === 'ONGOING' || $camp->spend > 0 || $camp->prev_spend > 0)
             ->sortByDesc('spend')
             ->values();
             

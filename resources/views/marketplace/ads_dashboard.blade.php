@@ -1189,8 +1189,6 @@ document.addEventListener('click', function(e) {
             <!-- CLOSE inner-campaign-settings -->
         </div>
 
-        </div>
-
         <!-- TAB PERFORMA PRODUK (GMV MAX) -->
         <div class="tab-pane" id="tab-items">
 
