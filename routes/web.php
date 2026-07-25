@@ -377,7 +377,4 @@ Route::post('/api/marketplace/sync-finance-all', function () {
     return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
-Route::post('/api/marketplace/sync-ads-manual', function () {
-    \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads');
-    return response()->json(['status' => 'success', 'message' => 'Sync Shopee Ads manual sedang berjalan di background. Silakan cek mini-log beberapa saat lagi.']);
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+

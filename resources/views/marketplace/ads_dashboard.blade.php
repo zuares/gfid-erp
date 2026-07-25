@@ -421,39 +421,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
 
-// --- SYNC MANUAL ---
-window.syncAdsManual = async function() {
-    if (!confirm('Jalankan proses sinkronisasi Shopee Ads secara manual? Data akan diperbarui di latar belakang.')) return;
-    
-    const btn = document.getElementById('btnSyncAds');
-    let oldText = '';
-    if (btn) {
-        oldText = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:1rem;height:1rem;border-width:.15em;vertical-align:middle;margin-right:4px;"></span> Syncing...';
-        btn.disabled = true;
-    }
-    
-    try {
-        const res = await fetch('/api/marketplace/sync-ads-manual', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            }
-        });
-        const data = await res.json();
-        alert(data.message || 'Sync berhasil dijadwalkan.');
-        setTimeout(() => location.reload(), 2000);
-    } catch (err) {
-        alert('Gagal trigger sync ads: ' + err.message);
-    } finally {
-        if (btn) {
-            btn.innerHTML = oldText;
-            btn.disabled = false;
-        }
-    }
-};
 
 // --- MINI LOG TOGGLE ---
 function toggleMiniLog() {
@@ -529,7 +496,7 @@ document.addEventListener('click', function(e) {
                 </div>
                 @endif
                 
-                <button class="btn btn-sm btn-ship-outline btn-pill" id="btnSyncAds" onclick="syncAdsManual()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: var(--glass-shadow); color: var(--text); cursor: pointer;">
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: var(--glass-shadow); color: var(--text);">
                     <i class="bi bi-arrow-repeat"></i> Sync Manual
                 </button>
             </div>
@@ -1092,36 +1059,7 @@ document.addEventListener('click', function(e) {
         <!-- SINKRONISASI TAB -->
         <div class="tab-pane" id="tab-sync">
             
-            <div class="dash-panels" style="grid-template-columns: 1fr 2.5fr;">
-                <!-- Sync Form -->
-                <div>
-                    <div class="dash-sec"><i class="bi bi-arrow-repeat"></i> Manual Sync</div>
-                    <div class="dpanel p-3">
-                        <form action="{{ route('marketplace.ads.sync') }}" method="POST">
-                            @csrf
-                            <div class="mb-2">
-                                <label style="font-size: .72rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .2rem;">Toko Target</label>
-                                <select name="store_id" style="width: 100%; font-size: .8rem; padding: .4rem .6rem; border-radius: 6px; border: 1px solid var(--dsh-border); background: var(--bg); color: var(--text);" required>
-                                    @foreach($stores as $s)
-                                        <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label style="font-size: .72rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .2rem;">Mode Sinkronisasi</label>
-                                <select name="sync_type" style="width: 100%; font-size: .8rem; padding: .4rem .6rem; border-radius: 6px; border: 1px solid var(--dsh-border); background: var(--bg); color: var(--text);">
-                                    <option value="incremental">Incremental (Hari ini & Kemarin)</option>
-                                    <option value="hourly">Hourly (Khusus Jam Ini)</option>
-                                    <option value="backfill">Historical Backfill (6 Bulan)</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="act" style="border:none; background: var(--dsh-accent); color: #fff; width: 100%; justify-content: center;">
-                                <i class="bi bi-cloud-download"></i> Jalankan Sync
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
+            <div class="dash-panels" style="grid-template-columns: 1fr;">
                 <!-- Sync Logs -->
                 <div>
                     <div class="dash-sec"><i class="bi bi-clock-history"></i> Riwayat Sinkronisasi (Log)</div>
@@ -1179,6 +1117,43 @@ document.addEventListener('click', function(e) {
 
     @endif
 </div>
+
+<!-- Modal Sync Manual -->
+<div class="modal fade" id="modalSyncAds" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" style="color: var(--text);">Manual Sync Shopee Ads</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ route('marketplace.ads.sync') }}" method="POST">
+                    @csrf
+                    <div class="mb-3">
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
+                        <select name="store_id" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" required>
+                            @foreach($stores as $s)
+                                <option value="{{ $s->id }}" {{ isset($storeId) && $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Mode Sinkronisasi</label>
+                        <select name="sync_type" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);">
+                            <option value="incremental">Incremental (Hari ini & Kemarin)</option>
+                            <option value="hourly">Hourly (Khusus Jam Ini)</option>
+                            <option value="backfill">Historical Backfill (6 Bulan)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn w-100 fw-bold" style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">
+                        <i class="bi bi-cloud-download"></i> Jalankan Sync
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
