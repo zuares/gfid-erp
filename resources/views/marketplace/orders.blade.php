@@ -13,6 +13,14 @@
         from { opacity: 0; transform: translateY(15px); }
         to { opacity: 1; transform: translateY(0); }
     }
+    
+    @keyframes tabFadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-tab {
+        animation: tabFadeIn 0.35s ease-out forwards;
+    }
 
     :root{
         --shp-accent:#334155;
@@ -1541,6 +1549,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         const subTabRrcContainer = document.getElementById('subTabRrcContainer');
         if (subTabRrcContainer) {
             subTabRrcContainer.style.display = (tab === 'rrc') ? 'flex' : 'none';
+        }
+
+        const bodyContainer = document.getElementById('ordersBody');
+        if (bodyContainer) {
+            bodyContainer.classList.remove('animate-tab');
+            void bodyContainer.offsetWidth; // trigger reflow
+            bodyContainer.classList.add('animate-tab');
         }
 
         // Tab Retur/Refund/Batal: data diambil LIVE dari API Shopee, bukan dari
