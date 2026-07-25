@@ -319,8 +319,8 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 /* ── Table overrides ── */
 .ord-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .ord-table thead tr th {
-    font-size: .68rem; font-weight: 700; letter-spacing: 0;
-    color: var(--shp-muted); text-transform: none; padding: .55rem .65rem;
+    font-size: .64rem; font-weight: 700; letter-spacing: 0;
+    color: var(--shp-muted); text-transform: none; padding: .5rem .5rem;
     border-bottom: 1px solid var(--shp-border); background: var(--card,#fff); white-space: nowrap;
     position: sticky; top: 0; z-index: 10; text-align: left;
 }
@@ -337,13 +337,13 @@ body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98)
 .ord-table tbody tr { transition: all .15s ease; }
 .ord-table tbody tr:hover td { background: #f8fafc; }
 .ord-table tbody tr td {
-    padding: .65rem .65rem; border-bottom: 1px solid rgba(148,163,184,.12);
-    vertical-align: middle; font-size: .8rem;
+    padding: .5rem .5rem; border-bottom: 1px solid rgba(148,163,184,.12);
+    vertical-align: middle; font-size: .7rem;
 }
 
 /* ── Order ID cell ── */
 .ord-id {
-    font-size: .75rem; font-weight: 800; color: #0f172a;
+    font-size: .7rem; font-weight: 800; color: #0f172a;
     font-family: 'SF Mono', 'Menlo', monospace; letter-spacing: -.01em;
     word-break: break-all;
 }
@@ -3239,35 +3239,35 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 // auto-arrange, tapi backend aman — error already_arranged diperlakukan
                 // sebagai sukses (lihat MarketplaceLogisticsController::arrangeShipment).
                 if (o.order_status === 'UNPAID') {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                    logisticsBtn = `<button class="btn-ship-outline" style="color:#16a34a!important;border-color:#bbf7d0!important;background:#f0fdf4!important;font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
                     logisticsBtn = `
                     <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                        <button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
+                        <button class="btn-ship-primary" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
+                        <button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
                     </div>`;
                 }
             } else if (activeTab === 'processed') {
                 logisticsBtn = `
                 <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                    <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
-                    <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>
+                    <button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
+                    <button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>
                 </div>`;
             } else if (activeTab === 'ready') {
                 if (o.order_status === 'UNPAID') {
                     // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                    logisticsBtn = `<button class="btn-ship-outline" style="color:#16a34a!important;border-color:#bbf7d0!important;background:#f0fdf4!important;font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
                     const bkArg = o.is_kilat ? `, '${o.booking_sn || o.channel_order_id}'` : '';
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
+                    logisticsBtn = `<button class="btn-ship-primary" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}'${bkArg})">🚚 Atur Pengiriman</button>`;
                 }
             } else {
                 if (o.order_status === 'UNPAID') {
-                    logisticsBtn = `<button class="btn btn-sm btn-outline-success" style="font-size:0.7rem;padding:0.15rem 0.5rem;width:100%" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
+                    logisticsBtn = `<button class="btn-ship-outline" style="color:#16a34a!important;border-color:#bbf7d0!important;background:#f0fdf4!important;font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
-                    logisticsBtn = `<button class="btn-ship-primary" style="font-size:0.7rem;padding:0.2rem 0.5rem;width:100%;border-radius:5px" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
+                    logisticsBtn = `<button class="btn-ship-primary" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    logisticsBtn = `<button class="btn-ship-outline" style="font-size:0.7rem;padding:0.2rem 0.5rem;width:100%;border-radius:5px" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>`;
+                    logisticsBtn = `<button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>`;
                 }
             }
 
