@@ -228,4 +228,34 @@ class AdsDashboardController extends Controller
             ], 500);
         }
     }
+
+    public function campaignHourly(Request $request, ShopeeAdsApiService $adsApi)
+    {
+        $storeId = $request->input('store_id');
+        $campaignId = $request->input('campaign_id');
+        $date = $request->input('date', now()->format('d-m-Y'));
+
+        if (!$storeId || !$campaignId) {
+            return response()->json(['error' => 'store_id dan campaign_id diperlukan'], 400);
+        }
+
+        $store = Store::find($storeId);
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        try {
+            $res = $adsApi->getCampaignHourlyPerformance($store, [$campaignId], $date);
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $res['response'] ?? []
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

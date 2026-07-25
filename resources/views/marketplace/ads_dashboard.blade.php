@@ -918,6 +918,14 @@ document.addEventListener('click', function(e) {
                 </div>
             </div>
 
+            <div class="dash-sec mt-2 mb-2"><i class="bi bi-stars text-warning"></i> Kesimpulan Performa Produk</div>
+            <div class="dpanel p-3 mb-4" id="productInsights" style="border-left: 4px solid #a855f7;">
+                <div class="d-flex align-items-center" style="color: var(--dsh-muted); font-size: 0.8rem;">
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Menganalisis performa produk...
+                </div>
+            </div>
+
             <div class="dash-panels mb-4" style="grid-template-columns: 1fr;">
                 {{-- HEATMAP JAM TAYANG --}}
                 <div class="dpanel p-3">
@@ -1139,7 +1147,10 @@ document.addEventListener('click', function(e) {
                                 <tr style="background: {{ $ai_bg }}; border-bottom: 1px solid var(--dsh-border);">
                                     <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
                                         <div style="font-weight: 700; color: var(--text);">{{ $camp->campaign_name }}</div>
-                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span></div>
+                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
+                                            ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span>
+                                            &bull; <a href="javascript:void(0)" onclick="openCampaignHourlyModal('{{ $camp->channel_campaign_id }}', '{{ addslashes($camp->campaign_name) }}')" style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
+                                        </div>
                                     </td>
                                     <td><span style="font-size: .75rem; color: var(--dsh-muted);">{{ $camp->campaign_type }}</span></td>
                                     <td>
@@ -1497,14 +1508,38 @@ document.addEventListener('click', function(e) {
                 <div id="successSyncAds" style="display: none; text-align: center; padding: 2rem 0;">
                     <div style="font-size: 3rem; color: #16a34a; margin-bottom: 1rem;"><i class="bi bi-check-circle-fill"></i></div>
                     <h6 class="fw-bold" style="color: var(--text);">Sinkronisasi Selesai!</h6>
-                    <p style="font-size: .8rem; color: var(--dsh-muted);">Data berhasil diperbarui.</p>
+        </div>
+    </div>
+
+    <!-- MODAL CAMPAIGN HOURLY -->
+    <div class="modal fade" id="modalCampaignHourly" tabindex="-1" aria-labelledby="modalCampaignHourlyLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content" style="background: var(--dsh-bg); color: var(--text); border: 1px solid var(--dsh-border); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                <div class="modal-header" style="border-bottom: 1px solid var(--dsh-border);">
+                    <h6 class="modal-title" id="modalCampaignHourlyLabel" style="font-weight: 700;">
+                        <i class="bi bi-clock-history text-primary"></i> Performa 24 Jam (Hari Ini)
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: var(--btn-close-filter);"></button>
+                </div>
+                <div class="modal-body" style="background: var(--card-bg);">
+                    <div id="campaignHourlySubtitle" style="font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 1rem;">Memuat data...</div>
+                    <div id="campaignHourlyLoader" style="text-align: center; padding: 3rem 0; color: var(--dsh-muted);">
+                        <div class="spinner-border text-primary mb-2" role="status"></div>
+                        <div style="font-size: 0.8rem;">Menarik data live dari Shopee API...</div>
+                    </div>
+                    <div id="campaignHourlyContent" style="display: none;">
+                        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 0.5rem;">
+                            💡 <b>Tips:</b> Gunakan grafik ini untuk melihat jam tayang paling optimal bagi kampanye Anda. Sesuaikan budget harian berdasarkan jam-jam ramai.
+                        </div>
+                        <div style="position: relative; height: 300px; width: 100%;">
+                            <canvas id="campaignHourlyChartCanvas"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-@endsection
 
 @push('scripts')
 <script>
@@ -1638,8 +1673,162 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
+
+    // ==========================================
+    // CAMPAIGN HOURLY MODAL SCRIPT
+    // ==========================================
+    let campaignHourlyChartObj = null;
+
+    window.openCampaignHourlyModal = function(campaignId, campaignName) {
+        const storeId = document.querySelector('select[name="store_id"]').value;
+        const modalEl = document.getElementById('modalCampaignHourly');
+        const modal = new bootstrap.Modal(modalEl);
+        
+        document.getElementById('campaignHourlySubtitle').innerHTML = `Kampanye: <span style="color:var(--dsh-primary);">${campaignName}</span>`;
+        document.getElementById('campaignHourlyLoader').style.display = 'block';
+        document.getElementById('campaignHourlyContent').style.display = 'none';
+        
+        modal.show();
+
+        fetch(`{{ route('marketplace.ads.campaign.hourly') }}?store_id=${storeId}&campaign_id=${campaignId}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('campaignHourlyLoader').style.display = 'none';
+                if (data.status === 'success') {
+                    document.getElementById('campaignHourlyContent').style.display = 'block';
+                    renderCampaignHourlyChart(data.data.campaign_list?.[0]?.hourly_performance || []);
+                } else {
+                    document.getElementById('campaignHourlyLoader').style.display = 'block';
+                    document.getElementById('campaignHourlyLoader').innerHTML = `<i class="bi bi-x-circle text-danger fs-3"></i><br>Gagal menarik data performa: ${data.message || 'Error API'}`;
+                }
+            })
+            .catch(err => {
+                document.getElementById('campaignHourlyLoader').style.display = 'block';
+                document.getElementById('campaignHourlyLoader').innerHTML = `<i class="bi bi-wifi-off text-danger fs-3"></i><br>Koneksi terputus.`;
+            });
+    };
+
+    function renderCampaignHourlyChart(hourlyData) {
+        const ctx = document.getElementById('campaignHourlyChartCanvas').getContext('2d');
+        if (campaignHourlyChartObj) {
+            campaignHourlyChartObj.destroy();
+        }
+
+        if (!hourlyData || hourlyData.length === 0) {
+            ctx.canvas.parentElement.innerHTML = `<div style="text-align:center; padding: 2rem; color:var(--dsh-muted); font-size:0.8rem;">Belum ada data performa 24 jam untuk kampanye ini pada hari ini.</div><canvas id="campaignHourlyChartCanvas" style="display:none;"></canvas>`;
+            return;
+        }
+
+        // Data is likely grouped by hour, let's create a 0-23 timeline
+        const labels = Array.from({length: 24}, (_, i) => `${String(i).padStart(2, '0')}:00`);
+        const clicks = new Array(24).fill(0);
+        const spend = new Array(24).fill(0);
+        const gmv = new Array(24).fill(0);
+
+        hourlyData.forEach(row => {
+            if (row.time !== undefined && row.time >= 0 && row.time <= 23) {
+                clicks[row.time] = row.click || row.clicks || 0;
+                spend[row.time] = row.expense || row.spend || 0;
+                gmv[row.time] = row.broad_gmv || row.gmv || 0;
+            }
+        });
+
+        campaignHourlyChartObj = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'GMV (Rp)',
+                        data: gmv,
+                        borderColor: 'rgba(16, 185, 129, 0.9)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        yAxisID: 'y1',
+                        tension: 0.4,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: 'Klik',
+                        data: clicks,
+                        borderColor: 'rgba(59, 130, 246, 0.9)',
+                        backgroundColor: 'transparent',
+                        type: 'bar',
+                        yAxisID: 'y',
+                        order: 2
+                    },
+                    {
+                        label: 'Biaya (Rp)',
+                        data: spend,
+                        borderColor: 'rgba(239, 68, 68, 0.9)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        fill: true,
+                        yAxisID: 'y1',
+                        tension: 0.4,
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    x: {
+                        grid: { color: document.body.getAttribute('data-theme') === 'dark' ? '#334155' : '#e2e8f0', drawBorder: false },
+                        ticks: { color: document.body.getAttribute('data-theme') === 'dark' ? '#94a3b8' : '#64748b', font: { size: 10 } }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Trafik (Klik)', color: '#3b82f6', font: { size: 10 } },
+                        grid: { display: false },
+                        ticks: { color: document.body.getAttribute('data-theme') === 'dark' ? '#94a3b8' : '#64748b', font: { size: 10 } }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Finansial (Rp)', color: '#10b981', font: { size: 10 } },
+                        grid: { color: document.body.getAttribute('data-theme') === 'dark' ? '#334155' : '#e2e8f0' },
+                        ticks: { 
+                            color: document.body.getAttribute('data-theme') === 'dark' ? '#94a3b8' : '#64748b', 
+                            font: { size: 10 },
+                            callback: function(v) { return formatShortIDR(v); }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: document.body.getAttribute('data-theme') === 'dark' ? '#f8fafc' : '#334155', font: { size: 11, family: 'Inter, sans-serif' }, boxWidth: 12 }
+                    },
+                    tooltip: {
+                        backgroundColor: document.body.getAttribute('data-theme') === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                        titleColor: document.body.getAttribute('data-theme') === 'dark' ? '#f1f5f9' : '#0f172a',
+                        bodyColor: document.body.getAttribute('data-theme') === 'dark' ? '#cbd5e1' : '#334155',
+                        borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#334155' : '#e2e8f0',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(c) {
+                                if (c.dataset.yAxisID === 'y1') return c.dataset.label + ': Rp ' + c.raw.toLocaleString('id-ID');
+                                return c.dataset.label + ': ' + c.raw.toLocaleString('id-ID');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 });
 </script>
+@endpush
+
 @if(!empty($dailyChartData))
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -2634,6 +2823,63 @@ document.addEventListener("DOMContentLoaded", function() {
                 renderSingleChart('chartGmv', 'gmv', 'currency', 'rgba(16, 185, 129, 0.85)'); // Success (Green)
                 renderSingleChart('chartRoas', 'roas', 'multiplier', 'rgba(245, 158, 11, 0.85)'); // Warning (Amber)
                 
+                // ==========================================
+                // KESIMPULAN PRODUK (INSIGHTS)
+                // ==========================================
+                const generateProductInsights = () => {
+                    const container = document.getElementById('productInsights');
+                    if (!container) return;
+
+                    if (!rawItems || rawItems.length === 0) {
+                        container.innerHTML = '<div style="color: var(--dsh-muted); font-size: 0.85rem;">Belum ada data performa produk untuk dianalisis.</div>';
+                        return;
+                    }
+
+                    let insightsHtml = '';
+
+                    // 1. Star Product (Top GMV)
+                    let topGmv = [...rawItems].sort((a,b) => parseFloat(b.gmv || 0) - parseFloat(a.gmv || 0))[0];
+                    if (topGmv && parseFloat(topGmv.gmv) > 0) {
+                        let sku = topGmv.item_sku || topGmv.channel_item_id;
+                        let name = topGmv.item_name || 'Produk';
+                        if (name.length > 25) name = name.substring(0, 25) + '...';
+                        insightsHtml += `<div class="mb-2"><i class="bi bi-star-fill text-warning me-2"></i> <b>Produk Bintang:</b> SKU <b>${sku}</b> (${name}) adalah penyumbang GMV terbesar (Rp ${formatShortIDR(topGmv.gmv)}). Pastikan stok produk ini selalu aman.</div>`;
+                    }
+
+                    // 2. Bleeding Product (High Spend, Low ROAS)
+                    let topSpend = [...rawItems].sort((a,b) => parseFloat(b.spend || 0) - parseFloat(a.spend || 0))[0];
+                    if (topSpend && parseFloat(topSpend.spend) > 0) {
+                        let sku = topSpend.item_sku || topSpend.channel_item_id;
+                        let roas = parseFloat(topSpend.roas || 0);
+                        if (roas < 2 && parseFloat(topSpend.spend) > 5000) {
+                            insightsHtml += `<div class="mb-2"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> <b>Perlu Evaluasi:</b> SKU <b>${sku}</b> menyerap biaya tertinggi (Rp ${formatShortIDR(topSpend.spend)}) namun ROAS-nya hanya ${roas.toFixed(1)}x. Pertimbangkan untuk menurunkan batas bid atau mengevaluasi ulang kata kunci.</div>`;
+                        } else {
+                            insightsHtml += `<div class="mb-2"><i class="bi bi-wallet2 text-danger me-2"></i> <b>Investasi Utama:</b> SKU <b>${sku}</b> menyerap biaya tertinggi (Rp ${formatShortIDR(topSpend.spend)}) dengan tingkat ROAS sebesar ${roas.toFixed(1)}x.</div>`;
+                        }
+                    }
+
+                    // 3. Hidden Gem (High CVR/CTR)
+                    let topCvr = [...rawItems].sort((a,b) => parseFloat(b.cvr || 0) - parseFloat(a.cvr || 0))[0];
+                    if (topCvr && parseFloat(topCvr.cvr) > 3 && parseFloat(topCvr.spend) > 0) {
+                        let sku = topCvr.item_sku || topCvr.channel_item_id;
+                        insightsHtml += `<div class="mb-0"><i class="bi bi-gem text-info me-2"></i> <b>Peluang Emas:</b> SKU <b>${sku}</b> memiliki konversi (CVR) sangat baik yaitu ${parseFloat(topCvr.cvr).toFixed(1)}%. Direkomendasikan untuk sedikit menaikkan bid pada produk ini agar tayangannya bertambah.</div>`;
+                    } else {
+                        let topCtr = [...rawItems].sort((a,b) => parseFloat(b.ctr || 0) - parseFloat(a.ctr || 0))[0];
+                        if (topCtr && parseFloat(topCtr.ctr) > 5) {
+                            let sku = topCtr.item_sku || topCtr.channel_item_id;
+                            insightsHtml += `<div class="mb-0"><i class="bi bi-hand-index text-info me-2"></i> <b>Daya Tarik Tinggi:</b> SKU <b>${sku}</b> memiliki rasio klik (CTR) yang sangat memikat yaitu ${parseFloat(topCtr.ctr).toFixed(1)}%.</div>`;
+                        }
+                    }
+
+                    if (insightsHtml === '') {
+                        insightsHtml = '<div style="color: var(--dsh-muted); font-size: 0.85rem;">Performa produk relatif merata, tidak ada anomali signifikan yang terdeteksi.</div>';
+                    }
+
+                    container.innerHTML = `<div style="font-size: 0.85rem; line-height: 1.5; color: var(--text);">${insightsHtml}</div>`;
+                };
+                
+                setTimeout(generateProductInsights, 200);
+
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
                 // ==========================================

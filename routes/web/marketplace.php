@@ -78,4 +78,6 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.clear');
         Route::get('ads-dashboard/realtime-status', [AdsDashboardController::class, 'realtimeStatus'])
             ->name('ads.realtime.status');
+        Route::get('ads-dashboard/campaign-hourly', [AdsDashboardController::class, 'campaignHourly'])
+            ->name('ads.campaign.hourly');
     });
