@@ -1898,20 +1898,26 @@ class MarketplaceController extends Controller
                     'started_at' => now(),
                 ]);
 
+                $isRateLimited = false;
                 $sendEvent('log', "[{$store->name}] Sinkronisasi Daftar Kampanye...", $baseProgress + 12);
                 try {
                     $syncService->syncCampaignsAndSettings($store, $run);
+                } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                    $isRateLimited = true;
+                    $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu " . ceil($e->retryAfter / 60) . " menit). Sinkronisasi dihentikan sementara.";
+                    $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai.", $baseProgress + 15);
                 } catch (\Throwable $e) {
                     $sendEvent('log', "[{$store->name}] Gagal menarik daftar kampanye: " . $e->getMessage(), $baseProgress + 15);
                 }
 
                 // 2. Performa harian, kampanye, dan produk
-                $sendEvent('log', "[{$store->name}] Memulai sinkronisasi performa...", $baseProgress + 15);
-                
-                $currentStart = \Carbon\Carbon::parse($dateFrom);
-                $finalEnd     = \Carbon\Carbon::parse($dateTo);
-                
-                while ($currentStart->lessThanOrEqualTo($finalEnd)) {
+                if (!$isRateLimited) {
+                    $sendEvent('log', "[{$store->name}] Memulai sinkronisasi performa...", $baseProgress + 15);
+                    
+                    $currentStart = \Carbon\Carbon::parse($dateFrom);
+                    $finalEnd     = \Carbon\Carbon::parse($dateTo);
+                    
+                    while ($currentStart->lessThanOrEqualTo($finalEnd)) {
                     $currentEnd = clone $currentStart;
                     $currentEnd->addDays(29);
                     if ($currentEnd->greaterThan($finalEnd)) {
@@ -1933,11 +1939,18 @@ class MarketplaceController extends Controller
                         $sendEvent('log', "[{$store->name}] Mengambil data performa per-jam (heatmap)...", $baseProgress + 28);
                         $hStart = clone $currentStart;
                         while ($hStart->lessThanOrEqualTo($currentEnd)) {
-                            $syncService->syncShopHourlyPerformance($store, $hStart->format('Y-m-d'), $run);
+                            // OPTIMIZATION: Only sync hourly data for the last 3 days to save rate limit
+                            if ($hStart->diffInDays(now()) <= 3) {
+                                $syncService->syncShopHourlyPerformance($store, $hStart->format('Y-m-d'), $run);
+                                usleep(250000); // 0.25s delay
+                            }
                             $hStart->addDay();
-                            usleep(100000); // 0.1s rate limit
                         }
                         $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 30);
+                    } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                        $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu " . ceil($e->retryAfter / 60) . " menit). Sinkronisasi dihentikan sementara.";
+                        $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai. Silakan coba lagi nanti.");
+                        break; // Stop syncing this store for now
                     } catch (\Throwable $e) {
                         $errors[] = "[{$store->name}] " . $e->getMessage();
                         $sendEvent('log', "[{$store->name}] Kesalahan pada periode ini: " . $e->getMessage());
@@ -1946,6 +1959,8 @@ class MarketplaceController extends Controller
                     $currentStart = $currentEnd->addDay();
                     usleep(500000); // 0.5 sec delay between chunks
                 }
+                } // End if (!$isRateLimited)
+                
                 $run->update(['status' => 'success', 'finished_at' => now()]);
                 $saved += $run->total_updated;
                 $sendEvent('log', "[{$store->name}] Berhasil memperbarui {$run->total_updated} baris data.", $baseProgress + (90 / $totalStores));
