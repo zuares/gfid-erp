@@ -607,6 +607,9 @@ document.addEventListener('click', function(e) {
                 </button>
                 @endif
                 
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalGmsSettings" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--dsh-accent); background: rgba(37, 99, 235, 0.05); color: var(--dsh-accent); margin-right: 0.5rem;">
+                    <i class="bi bi-gear"></i> Pengaturan GMV Max
+                </button>
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text);">
                     <i class="bi bi-arrow-repeat"></i> Sync Manual
                 </button>
@@ -1152,7 +1155,17 @@ document.addEventListener('click', function(e) {
                                             &bull; <a href="javascript:void(0)" onclick="openCampaignHourlyModal('{{ $camp->channel_campaign_id }}', '{{ addslashes($camp->campaign_name) }}')" style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
                                         </div>
                                     </td>
-                                    <td><span style="font-size: .75rem; color: var(--dsh-muted);">{{ $camp->campaign_type }}</span></td>
+                                    <td>
+                                        @if(($camp->sum_broad_gmv ?? 0) > 0 && ($camp->sum_direct_gmv ?? 0) == 0)
+                                            <span style="background: rgba(37,99,235,0.1); color: #2563eb; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMV Max</span>
+                                        @elseif(($camp->sum_direct_gmv ?? 0) > 0 && ($camp->sum_broad_gmv ?? 0) == 0)
+                                            <span style="background: rgba(234,179,8,0.1); color: #ca8a04; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">Pencarian (CPC)</span>
+                                        @elseif(($camp->sum_direct_gmv ?? 0) > 0 && ($camp->sum_broad_gmv ?? 0) > 0)
+                                            <span style="background: rgba(147,51,234,0.1); color: #9333ea; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMS + CPC</span>
+                                        @else
+                                            <span style="background: rgba(100,116,139,0.1); color: #64748b; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">Unknown</span>
+                                        @endif
+                                    </td>
                                     <td>
                                         <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
                                         <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
@@ -1328,6 +1341,7 @@ document.addEventListener('click', function(e) {
                                 <th class="text-end">Impresi</th>
                                 <th class="text-end">Klik</th>
                                 <th class="text-end">Pesanan</th>
+                                <th class="text-end">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1340,8 +1354,15 @@ document.addEventListener('click', function(e) {
                                         <div style="font-weight: 700; color: var(--text); white-space: normal; max-width: 300px;">
                                             {{ $item->item_name ?? 'Produk Tidak Diketahui' }}
                                         </div>
-                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
-                                            ID: {{ $item->channel_item_id }}
+                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted); display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                                            <span>ID: {{ $item->channel_item_id }}</span>
+                                            @if($item->broad_gmv_sum > 0 && $item->direct_gmv_sum == 0)
+                                                <span style="background: rgba(37,99,235,0.1); color: #2563eb; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMV Max</span>
+                                            @elseif($item->direct_gmv_sum > 0 && $item->broad_gmv_sum == 0)
+                                                <span style="background: rgba(234,179,8,0.1); color: #ca8a04; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">Pencarian (CPC)</span>
+                                            @elseif($item->direct_gmv_sum > 0 && $item->broad_gmv_sum > 0)
+                                                <span style="background: rgba(147,51,234,0.1); color: #9333ea; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMS + CPC</span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
@@ -1362,10 +1383,15 @@ document.addEventListener('click', function(e) {
                                     <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
                                         {{ number_format($item->orders, 0, ',', '.') }}
                                     </td>
+                                    <td class="text-end">
+                                        <button onclick="toggleGmsItem('{{ $item->channel_item_id }}', 'remove', this)" class="btn btn-sm btn-outline-danger" style="font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                                            <i class="bi bi-pause-circle"></i> Hentikan GMS
+                                        </button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
                                         Belum ada data performa item GMV Max.
                                     </td>
                                 </tr>
@@ -1450,6 +1476,46 @@ document.addEventListener('click', function(e) {
         </div>
 
     @endif
+</div>
+
+<!-- Modal GMS Settings -->
+<div class="modal fade" id="modalGmsSettings" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; background: var(--card-bg); border: 1px solid var(--card-border); box-shadow: var(--card-shadow);">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" style="color: var(--text);">Pengaturan GMV Max</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formGmsSettings" onsubmit="submitGmsSettings(event)">
+                    <div class="mb-3">
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
+                        <select id="gmsStoreId" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" required>
+                            @foreach($stores as $s)
+                                <option value="{{ $s->id }}" {{ isset($storeId) && $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Batas Modal Harian (Rp)</label>
+                        <input type="number" id="gmsDailyBudget" class="form-control" placeholder="Biarkan kosong jika tidak diubah" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" min="0" step="1000">
+                        <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Minimal Rp 20.000. Contoh: 50000</small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Target ROAS (x)</label>
+                        <input type="number" id="gmsRoasTarget" class="form-control" placeholder="Contoh: 5.5, atau 0 untuk Auto" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" min="0" step="0.1">
+                        <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Isi 0 untuk Auto Bidding. Maksimal 1 angka di belakang koma.</small>
+                    </div>
+
+                    <button type="submit" id="btnSubmitGmsSettings" class="btn w-100 fw-bold" style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">
+                        <i class="bi bi-cloud-arrow-up"></i> Simpan Pengaturan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Sync Manual -->
@@ -3092,6 +3158,106 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 });
+
+function toggleGmsItem(itemId, action, btn) {
+    if (!confirm('Apakah Anda yakin ingin ' + (action === 'add' ? 'mengaktifkan' : 'mematikan') + ' GMS untuk item ini?')) return;
+    
+    let originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon" style="display:inline-block"></i> Proses...';
+    
+    fetch('{{ route("marketplace.ads.gms.action") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            store_id: '{{ $storeId ?? "" }}',
+            item_id: itemId,
+            action: action
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert(res.message);
+            // Ubah tombol
+            if (action === 'remove') {
+                btn.className = 'btn btn-sm btn-outline-success';
+                btn.innerHTML = '<i class="bi bi-play-circle"></i> Aktifkan GMS';
+                btn.setAttribute('onclick', `toggleGmsItem('${itemId}', 'add', this)`);
+            } else {
+                btn.className = 'btn btn-sm btn-outline-danger';
+                btn.innerHTML = '<i class="bi bi-pause-circle"></i> Hentikan GMS';
+                btn.setAttribute('onclick', `toggleGmsItem('${itemId}', 'remove', this)`);
+            }
+        } else {
+            alert('Error: ' + res.message);
+            btn.innerHTML = originalHtml;
+        }
+    })
+    .catch(err => {
+        alert('Terjadi kesalahan koneksi.');
+        btn.innerHTML = originalHtml;
+    })
+    .finally(() => {
+        btn.disabled = false;
+    });
+}
+
+function submitGmsSettings(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('btnSubmitGmsSettings');
+    const storeId = document.getElementById('gmsStoreId').value;
+    const dailyBudget = document.getElementById('gmsDailyBudget').value;
+    const roasTarget = document.getElementById('gmsRoasTarget').value;
+    
+    // We need to pass the campaign ID if we have it. We can get it from the blade variable if there's only one, or leave it empty so backend uses default.
+    // For now we'll send it null so backend handles it without it (or the API will use the default shop GMS campaign).
+    
+    if (!dailyBudget && !roasTarget) {
+        alert('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
+        return;
+    }
+    
+    let originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat spin-icon" style="display:inline-block"></i> Menyimpan...';
+    
+    fetch('{{ route("marketplace.ads.gms.campaign.edit") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            store_id: storeId,
+            daily_budget: dailyBudget,
+            roas_target: roasTarget
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert(res.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalGmsSettings'));
+            if (modal) modal.hide();
+        } else {
+            alert('Error: ' + res.message);
+        }
+    })
+    .catch(err => {
+        alert('Terjadi kesalahan koneksi.');
+    })
+    .finally(() => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    });
+}
 </script>
 @endif
 @endpush

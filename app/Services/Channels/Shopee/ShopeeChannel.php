@@ -386,6 +386,37 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Endpoint: POST /api/v2/ads/edit_gms_item_product_campaign
+     * Add/remove items to/from the GMS Campaign
+     */
+    public function editGmsItemProductCampaign(Store $store, string $action, array $itemIds, ?int $campaignId = null): array
+    {
+        $payload = [
+            'edit_action' => $action,
+            'item_id_list' => array_values(array_map('intval', $itemIds)),
+        ];
+        
+        if ($campaignId) {
+            $payload['campaign_id'] = (int) $campaignId;
+        }
+
+        return $this->post($store, '/api/v2/ads/edit_gms_item_product_campaign', $payload);
+    }
+
+    /**
+     * Endpoint: POST /api/v2/ads/edit_gms_product_campaign
+     * Edit a GMS campaign (Budget, ROAS Target, Status)
+     */
+    public function editGmsProductCampaign(Store $store, string $action, array $params = []): array
+    {
+        $payload = array_merge([
+            'edit_action' => $action,
+        ], $params);
+
+        return $this->post($store, '/api/v2/ads/edit_gms_product_campaign', $payload);
+    }
+
+    /**
      * Performa per jam level toko (semua campaign CPC digabung).
      * Endpoint: GET /api/v2/ads/get_all_cpc_ads_hourly_performance
      * Date format: DD-MM-YYYY (only 1 day)

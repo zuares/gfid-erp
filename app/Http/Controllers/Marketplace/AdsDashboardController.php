@@ -65,15 +65,34 @@ class AdsDashboardController extends Controller
         // Fetch Campaigns (Dynamic aggregation from dailies based on date filter)
         $campaigns = MarketplaceAdCampaign::where('store_id', $storeId)
             ->withSum(['dailies as sum_expense' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'expense')
-            ->withSum(['dailies as sum_gmv' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_gmv')
+            ->withSum(['dailies as sum_broad_gmv' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_gmv')
+            ->withSum(['dailies as sum_direct_gmv' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'direct_gmv')
             ->withSum(['dailies as sum_clicks' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'clicks')
-            ->withSum(['dailies as sum_orders' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_order')
+            ->withSum(['dailies as sum_broad_orders' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'broad_order')
+            ->withSum(['dailies as sum_direct_orders' => fn($q) => $q->whereBetween('date', [$dateFrom, $dateTo])], 'direct_order')
             ->withSum(['dailies as sum_prev_expense' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'expense')
-            ->withSum(['dailies as sum_prev_gmv' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'broad_gmv')
+            ->withSum(['dailies as sum_prev_broad_gmv' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'broad_gmv')
+            ->withSum(['dailies as sum_prev_direct_gmv' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'direct_gmv')
             ->withSum(['dailies as sum_prev_clicks' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'clicks')
-            ->withSum(['dailies as sum_prev_orders' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'broad_order')
+            ->withSum(['dailies as sum_prev_broad_orders' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'broad_order')
+            ->withSum(['dailies as sum_prev_direct_orders' => fn($q) => $q->whereBetween('date', [$prevDateFrom, $prevDateTo])], 'direct_order')
             ->get()
             ->map(function ($camp) {
+                $camp->sum_gmv = ($camp->sum_broad_gmv ?? 0) + ($camp->sum_direct_gmv ?? 0);
+                $camp->sum_orders = ($camp->sum_broad_orders ?? 0) + ($camp->sum_direct_orders ?? 0);
+                $camp->sum_prev_gmv = ($camp->sum_prev_broad_gmv ?? 0) + ($camp->sum_prev_direct_gmv ?? 0);
+                $camp->sum_prev_orders = ($camp->sum_prev_broad_orders ?? 0) + ($camp->sum_prev_direct_orders ?? 0);
+                
+                $roas = $camp->sum_expense > 0 ? $camp->sum_gmv / $camp->sum_expense : 0;
+                $prevRoas = $camp->sum_prev_expense > 0 ? $camp->sum_prev_gmv / $camp->sum_prev_expense : 0;
+                
+                $camp->roas = $roas;
+                $camp->prev_roas = $prevRoas;
+                
+                $camp->roas_growth = $prevRoas > 0 ? (($roas - $prevRoas) / $prevRoas) * 100 : 0;
+                $camp->spend_growth = $camp->sum_prev_expense > 0 ? (($camp->sum_expense - $camp->sum_prev_expense) / $camp->sum_prev_expense) * 100 : 0;
+                $camp->gmv_growth = $camp->sum_prev_gmv > 0 ? (($camp->sum_gmv - $camp->sum_prev_gmv) / $camp->sum_prev_gmv) * 100 : 0;
+
                 $camp->spend = $camp->sum_expense ?? 0;
                 $camp->gmv = $camp->sum_gmv ?? 0;
                 $camp->clicks = $camp->sum_clicks ?? 0;
@@ -117,8 +136,10 @@ class AdsDashboardController extends Controller
                 SUM(marketplace_ads_item_dailies.impressions) as impressions,
                 SUM(marketplace_ads_item_dailies.clicks) as clicks,
                 SUM(marketplace_ads_item_dailies.expense) as spend,
-                SUM(marketplace_ads_item_dailies.broad_order) as orders,
-                SUM(marketplace_ads_item_dailies.broad_gmv) as gmv
+                SUM(marketplace_ads_item_dailies.broad_order + marketplace_ads_item_dailies.direct_order) as orders,
+                SUM(marketplace_ads_item_dailies.broad_gmv + marketplace_ads_item_dailies.direct_gmv) as gmv,
+                SUM(marketplace_ads_item_dailies.broad_gmv) as broad_gmv_sum,
+                SUM(marketplace_ads_item_dailies.direct_gmv) as direct_gmv_sum
             ')
             ->groupBy('marketplace_ads_item_dailies.channel_item_id')
             ->orderByDesc('spend')
@@ -225,6 +246,103 @@ class AdsDashboardController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function actionGmsItem(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
+    {
+        $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'item_id' => 'required|numeric',
+            'action' => 'required|in:add,remove'
+        ]);
+
+        $store = Store::find($request->input('store_id'));
+        if (!$store) {
+            return response()->json(['status' => 'error', 'message' => 'Store not found.'], 404);
+        }
+
+        try {
+            $res = $shopeeChannel->editGmsItemProductCampaign(
+                $store,
+                $request->input('action'),
+                [$request->input('item_id')]
+            );
+
+            if (!empty($res['error'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $res['message'] ?? $res['error']
+                ], 400);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Berhasil ' . ($request->input('action') === 'add' ? 'menambahkan' : 'mengeluarkan') . ' produk dari GMV Max.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function actionGmsCampaign(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
+    {
+        $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'campaign_id' => 'nullable|numeric',
+            'roas_target' => 'nullable|numeric|min:0',
+            'daily_budget' => 'nullable|numeric|min:0'
+        ]);
+
+        $store = Store::find($request->input('store_id'));
+        if (!$store) {
+            return response()->json(['status' => 'error', 'message' => 'Store not found.'], 404);
+        }
+
+        $campaignId = $request->input('campaign_id');
+        $roasTarget = $request->input('roas_target');
+        $dailyBudget = $request->input('daily_budget');
+        
+        $results = [];
+
+        try {
+            // Ubah ROAS
+            if ($roasTarget !== null && $roasTarget !== '') {
+                $params = ['roas_target' => (float)$roasTarget];
+                if ($campaignId) $params['campaign_id'] = (int)$campaignId;
+                
+                $resRoas = $shopeeChannel->editGmsProductCampaign($store, 'change_roas_target', $params);
+                if (!empty($resRoas['error'])) {
+                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error'])], 400);
+                }
+                $results[] = 'Target ROAS (' . ($roasTarget == 0 ? 'Auto' : $roasTarget) . ')';
+            }
+
+            // Ubah Budget
+            if ($dailyBudget !== null && $dailyBudget !== '') {
+                $params = ['daily_budget' => (float)$dailyBudget];
+                if ($campaignId) $params['campaign_id'] = (int)$campaignId;
+                
+                $resBudget = $shopeeChannel->editGmsProductCampaign($store, 'change_budget', $params);
+                if (!empty($resBudget['error'])) {
+                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah budget: ' . ($resBudget['message'] ?? $resBudget['error'])], 400);
+                }
+                $results[] = 'Batas Modal Harian';
+            }
+
+            if (empty($results)) {
+                return response()->json(['status' => 'error', 'message' => 'Tidak ada data yang diubah.'], 400);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Berhasil memperbarui ' . implode(' dan ', $results) . ' pada kampanye GMV Max.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
 

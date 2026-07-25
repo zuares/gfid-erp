@@ -80,4 +80,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.realtime.status');
         Route::get('ads-dashboard/campaign-hourly', [AdsDashboardController::class, 'campaignHourly'])
             ->name('ads.campaign.hourly');
+        Route::post('ads-dashboard/gms-item-action', [AdsDashboardController::class, 'actionGmsItem'])
+            ->name('ads.gms.action');
+        Route::post('ads-dashboard/gms-campaign-edit', [AdsDashboardController::class, 'actionGmsCampaign'])
+            ->name('ads.gms.campaign.edit');
     });
