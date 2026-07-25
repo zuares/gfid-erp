@@ -148,8 +148,10 @@ class AdsDashboardController extends Controller
             ->limit(30)
             ->get();
 
+        $adsSetting = \App\Models\MarketplaceAdsSetting::where('store_id', $storeId)->first();
+
         return view('marketplace.ads_dashboard', compact(
-            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData', 'itemPerformance', 'lastSuccessRun'
+            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData', 'itemPerformance', 'lastSuccessRun', 'adsSetting'
         ));
     }
 

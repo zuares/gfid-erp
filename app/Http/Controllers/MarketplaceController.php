@@ -3330,5 +3330,26 @@ class MarketplaceController extends Controller
             'status'  => $status,
         ]);
     }
+    public function saveAdsSetting(Request $request)
+    {
+        $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'target_roas' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
 
+        $setting = \App\Models\MarketplaceAdsSetting::updateOrCreate(
+            ['store_id' => $request->store_id],
+            [
+                'target_roas' => $request->target_roas,
+                'notes' => $request->notes,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengaturan kampanye berhasil disimpan.',
+            'data' => $setting
+        ]);
+    }
 }

@@ -959,7 +959,14 @@ document.addEventListener('click', function(e) {
 
         <!-- TAB RINCIAN KAMPANYE -->
         <div class="tab-pane" id="tab-campaigns">
-            <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
+            <!-- INNER TABS FOR KAMPANYE -->
+            <div class="dash-tabs-modern mb-3">
+                <button class="dash-tab-sm inner-tab-btn active" data-inner-target="inner-campaign-list"><i class="bi bi-list-ul"></i> Daftar Kampanye</button>
+                <button class="dash-tab-sm inner-tab-btn" data-inner-target="inner-campaign-settings"><i class="bi bi-gear"></i> Pengaturan & Target</button>
+            </div>
+
+            <div id="inner-campaign-list" class="inner-tab-pane active" style="display: block;">
+                <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
             
             @php
                 $totalBoncos = 0;
@@ -1151,6 +1158,35 @@ document.addEventListener('click', function(e) {
                     </table>
                 </div>
             </div>
+            </div> <!-- CLOSE inner-campaign-list -->
+
+            <!-- INNER TAB: PENGATURAN KAMPANYE -->
+            <div id="inner-campaign-settings" class="inner-tab-pane" style="display: none;">
+                <div class="dash-sec"><i class="bi bi-gear"></i> Pengaturan & Target Kampanye</div>
+                
+                <div class="dpanel p-4" style="max-width: 600px; background: var(--card-bg);">
+                    <form id="formAdsSetting">
+                        <div class="mb-3">
+                            <label style="font-size: .8rem; font-weight: 600; color: var(--dsh-muted); margin-bottom: .4rem; display: block;">Target ROAS Global</label>
+                            <div class="input-group">
+                                <span class="input-group-text" style="background: var(--bg); border-color: var(--card-border); color: var(--text);">x</span>
+                                <input type="number" step="0.01" class="form-control" name="target_roas" value="{{ $adsSetting->target_roas ?? '' }}" placeholder="Contoh: 5.5" style="background: var(--bg); border-color: var(--card-border); color: var(--text);">
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--dsh-muted); margin-top: .4rem;">Nilai ROAS yang ingin dicapai secara rata-rata untuk seluruh kampanye.</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label style="font-size: .8rem; font-weight: 600; color: var(--dsh-muted); margin-bottom: .4rem; display: block;">Catatan Strategi & Aturan Khusus</label>
+                            <textarea class="form-control" name="notes" rows="4" placeholder="Tuliskan catatan strategi bidding atau instruksi khusus..." style="background: var(--bg); border-color: var(--card-border); color: var(--text);">{{ $adsSetting->notes ?? '' }}</textarea>
+                        </div>
+                        
+                        <button type="button" onclick="saveAdsSetting()" class="btn btn-primary" style="font-weight: 600; font-size: .85rem; padding: .6rem 1.25rem; border-radius: 8px;">
+                            <i class="bi bi-save"></i> Simpan Pengaturan
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <!-- CLOSE inner-campaign-settings -->
         </div>
 
         </div>
@@ -3417,6 +3453,74 @@ function submitGmsSettings(e) {
     .finally(() => {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
+    });
+}
+// INNER TABS LOGIC
+document.querySelectorAll('.inner-tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        // Hapus class active dari semua tombol di grup yang sama
+        const container = this.closest('.dash-tabs-modern');
+        container.querySelectorAll('.inner-tab-btn').forEach(b => b.classList.remove('active'));
+        
+        // Tambahkan class active ke tombol yang diklik
+        this.classList.add('active');
+        
+        // Sembunyikan semua inner pane
+        const targetId = this.getAttribute('data-inner-target');
+        const parentPane = this.closest('.tab-pane');
+        parentPane.querySelectorAll('.inner-tab-pane').forEach(pane => {
+            pane.style.display = 'none';
+            pane.classList.remove('active');
+        });
+        
+        // Tampilkan inner pane yang dituju
+        const targetPane = document.getElementById(targetId);
+        if(targetPane) {
+            targetPane.style.display = 'block';
+            // setTimeout agar animasi css bisa jalan (karena ganti display)
+            setTimeout(() => targetPane.classList.add('active'), 10);
+        }
+    });
+});
+
+function saveAdsSetting() {
+    const form = document.getElementById('formAdsSetting');
+    const formData = new FormData(form);
+    const storeIdElement = document.querySelector('select[name="store_id"]');
+    const storeId = storeIdElement ? storeIdElement.value : null;
+    
+    if(!storeId) {
+        alert("Pilih toko terlebih dahulu dari filter di atas.");
+        return;
+    }
+    
+    const payload = {
+        store_id: storeId,
+        target_roas: formData.get('target_roas'),
+        notes: formData.get('notes')
+    };
+
+    fetch('/marketplace/ads-settings/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            // Gunakan meta tag CSRF token yang sudah ada di head
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : ''
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            alert(data.message);
+        } else {
+            alert('Gagal menyimpan: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan saat menyimpan pengaturan.');
     });
 }
 </script>
