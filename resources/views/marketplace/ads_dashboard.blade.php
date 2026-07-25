@@ -1215,15 +1215,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 const data = await res.json();
                 
-                if (data.status === 'success' || res.ok) {
+                if (data.status === 'success' || (res.ok && (!data.errors || data.errors.length === 0))) {
                     loading.style.display = 'none';
                     success.style.display = 'block';
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    throw new Error(data.message || 'Terjadi kesalahan saat sync.');
+                    let errMsg = data.message || 'Terjadi kesalahan saat sync.';
+                    if (data.errors && data.errors.length > 0) {
+                        errMsg = data.errors.join("\n");
+                    }
+                    throw new Error(errMsg);
                 }
             } catch (err) {
-                alert('Gagal: ' + err.message);
+                alert('Gagal:\n' + err.message);
                 loading.style.display = 'none';
                 form.style.display = 'block';
             }

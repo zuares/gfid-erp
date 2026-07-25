@@ -1831,7 +1831,12 @@ class MarketplaceController extends Controller
         $errors = [];
 
         foreach ($stores as $store) {
-            $driver = $this->manager->driver($store);
+            try {
+                $driver = $this->manager->driver($store);
+            } catch (\Throwable $e) {
+                $errors[] = "[{$store->name}] " . $e->getMessage();
+                continue;
+            }
 
             // 1. Snapshot saldo
             try {
