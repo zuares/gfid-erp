@@ -96,9 +96,9 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
 // Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
 if (config('services.shopee.ads_scheduler_enabled', env('SHOPEE_ADS_SCHEDULER_ENABLED', false))) {
     Schedule::command('marketplace:sync-ads')
-        ->dailyAt('23:30')
+        ->everyFourHours()
         ->withoutOverlapping(30)
-        ->name('sync-ads-daily');
+        ->name('sync-ads-main');
 
     // Ads: sinkronisasi metrik per jam
     Schedule::command('marketplace:sync-ads', ['--hourly'])
