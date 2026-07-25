@@ -677,9 +677,16 @@ document.addEventListener('click', function(e) {
             <div class="dash-panels mt-4 mb-4" style="grid-template-columns: 1fr 2fr; gap: 1rem;">
                 {{-- PIE CHART KAMPANYE --}}
                 <div class="dpanel p-3">
-                    <div class="dash-sec mt-0 mb-2"><i class="bi bi-pie-chart text-primary"></i> Proporsi Biaya Kampanye</div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="dash-sec mt-0 mb-0"><i class="bi bi-pie-chart text-primary"></i> Proporsi Kampanye</div>
+                        <select id="pieMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border); font-size: 0.75rem;">
+                            <option value="spend">Biaya</option>
+                            <option value="gmv">GMV</option>
+                            <option value="clicks">Klik</option>
+                        </select>
+                    </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        Top 5 kampanye dengan pengeluaran terbesar (Rp).
+                        Top 5 kampanye dengan proporsi terbesar.
                     </div>
                     <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($campaigns) || count($campaigns) === 0)
@@ -2248,50 +2255,74 @@ document.addEventListener("DOMContentLoaded", function() {
                 // ==========================================
                 // PIE CHART KAMPANYE
                 // ==========================================
-                const rawCamps = @json(array_slice($campaigns->toArray(), 0, 5));
+                const rawCamps = @json($campaigns->toArray());
                 const pieCtx = document.getElementById('campaignPieChart');
-                if (pieCtx && rawCamps && rawCamps.length > 0) {
+                let pieChartInstance = null;
+
+                const renderPieChart = (metric) => {
+                    if (!pieCtx || !rawCamps || rawCamps.length === 0) return;
+                    
+                    // Sort and get top 5 based on selected metric
+                    let sorted = [...rawCamps].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
+                    
                     const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                    new Chart(pieCtx.getContext('2d'), {
-                        type: 'doughnut',
-                        data: {
-                            labels: rawCamps.map(c => {
-                                let name = c.campaign_name || 'Unknown Campaign';
-                                return name.length > 20 ? name.substring(0,20) + '...' : name;
-                            }),
-                            datasets: [{
-                                data: rawCamps.map(c => parseFloat(c.spend || 0)),
-                                backgroundColor: bgColors,
-                                borderWidth: 2,
-                                borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
-                                hoverOffset: 4
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            cutout: '60%',
-                            plugins: {
-                                legend: { 
-                                    position: 'right',
-                                    labels: { boxWidth: 10, font: { size: 10 }, color: textColor }
-                                },
-                                tooltip: {
-                                    backgroundColor: tooltipBg,
-                                    titleColor: tooltipText,
-                                    bodyColor: tooltipText,
-                                    borderColor: tooltipBorder,
-                                    borderWidth: 1,
-                                    padding: 10,
-                                    callbacks: {
-                                        label: function(ctx) {
-                                            return ctx.label + ': Rp ' + formatShortIDR(ctx.raw);
+                    const pieLabels = sorted.map(c => {
+                        let name = c.campaign_name || 'Unknown Campaign';
+                        return name.length > 20 ? name.substring(0,20) + '...' : name;
+                    });
+                    const pieData = sorted.map(c => parseFloat(c[metric] || 0));
+
+                    if (pieChartInstance) {
+                        pieChartInstance.data.labels = pieLabels;
+                        pieChartInstance.data.datasets[0].data = pieData;
+                        pieChartInstance.update();
+                    } else {
+                        pieChartInstance = new Chart(pieCtx.getContext('2d'), {
+                            type: 'doughnut',
+                            data: {
+                                labels: pieLabels,
+                                datasets: [{
+                                    data: pieData,
+                                    backgroundColor: bgColors,
+                                    borderWidth: 2,
+                                    borderColor: document.body.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff',
+                                    hoverOffset: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                cutout: '60%',
+                                plugins: {
+                                    legend: { 
+                                        position: 'right',
+                                        labels: { boxWidth: 10, font: { size: 10 }, color: textColor }
+                                    },
+                                    tooltip: {
+                                        backgroundColor: tooltipBg,
+                                        titleColor: tooltipText,
+                                        bodyColor: tooltipText,
+                                        borderColor: tooltipBorder,
+                                        borderWidth: 1,
+                                        padding: 10,
+                                        callbacks: {
+                                            label: function(ctx) {
+                                                let m = document.getElementById('pieMetricSelect').value;
+                                                if (m === 'clicks') return ctx.label + ': ' + ctx.raw.toLocaleString('id-ID');
+                                                return ctx.label + ': Rp ' + formatShortIDR(ctx.raw);
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    });
+                        });
+                    }
+                };
+
+                const pieMetricSelect = document.getElementById('pieMetricSelect');
+                if (pieMetricSelect) {
+                    pieMetricSelect.addEventListener('change', (e) => renderPieChart(e.target.value));
+                    renderPieChart(pieMetricSelect.value);
                 }
                 
                 // ==========================================
