@@ -5,6 +5,15 @@
 
 @push('head')
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    body { font-family: 'Inter', sans-serif !important; }
+
+    @keyframes slideUpFade {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
     :root{
         --shp-accent:#334155;
         --shp-accent-2:#1f2937;
@@ -194,6 +203,7 @@ body[data-theme="dark"] .ord-subtab:hover:not(.active) { background: rgba(255,25
     box-shadow: var(--glass-shadow);
     border-radius: 12px; overflow: hidden;
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s;
+    animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shadow: var(--glass-shadow); }
 .ord-card:hover { transform: translateY(-2px); box-shadow: var(--card-hover-shadow); }
