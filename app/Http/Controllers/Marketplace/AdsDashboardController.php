@@ -121,7 +121,6 @@ class AdsDashboardController extends Controller
                 SUM(marketplace_ads_item_dailies.broad_gmv) as gmv
             ')
             ->groupBy('marketplace_ads_item_dailies.channel_item_id')
-            ->havingRaw('impressions > 0 OR spend > 0')
             ->orderByDesc('spend')
             ->limit(30)
             ->get();

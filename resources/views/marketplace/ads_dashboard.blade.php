@@ -1302,7 +1302,7 @@ document.addEventListener('click', function(e) {
                 @endforeach
             </div>
 
-            <div class="dash-sec"><i class="bi bi-box-seam"></i> Performa Produk (GMV Max)</div>
+            <div class="dash-sec"><i class="bi bi-box-seam"></i> Rincian Produk (GMV Max)</div>
             
             <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
@@ -1508,8 +1508,12 @@ document.addEventListener('click', function(e) {
                 <div id="successSyncAds" style="display: none; text-align: center; padding: 2rem 0;">
                     <div style="font-size: 3rem; color: #16a34a; margin-bottom: 1rem;"><i class="bi bi-check-circle-fill"></i></div>
                     <h6 class="fw-bold" style="color: var(--text);">Sinkronisasi Selesai!</h6>
+                </div>
+            </div>
         </div>
     </div>
+</div>
+
 
     <!-- MODAL CAMPAIGN HOURLY -->
     <div class="modal fade" id="modalCampaignHourly" tabindex="-1" aria-labelledby="modalCampaignHourlyLabel" aria-hidden="true">
@@ -1540,6 +1544,8 @@ document.addEventListener('click', function(e) {
         </div>
     </div>
 </div>
+
+@endsection
 
 @push('scripts')
 <script>
@@ -1696,7 +1702,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('campaignHourlyLoader').style.display = 'none';
                 if (data.status === 'success') {
                     document.getElementById('campaignHourlyContent').style.display = 'block';
-                    renderCampaignHourlyChart(data.data.campaign_list?.[0]?.hourly_performance || []);
+                    renderCampaignHourlyChart(data.data.campaign_list?.[0]?.daily_performance || []);
                 } else {
                     document.getElementById('campaignHourlyLoader').style.display = 'block';
                     document.getElementById('campaignHourlyLoader').innerHTML = `<i class="bi bi-x-circle text-danger fs-3"></i><br>Gagal menarik data performa: ${data.message || 'Error API'}`;
@@ -1827,7 +1833,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-@endpush
 
 @if(!empty($dailyChartData))
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

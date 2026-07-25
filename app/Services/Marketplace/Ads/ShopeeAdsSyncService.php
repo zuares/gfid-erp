@@ -312,23 +312,32 @@ class ShopeeAdsSyncService
         $dbDateFrom = Carbon::parse($dateFrom)->format('Y-m-d');
         $dbDateTo = Carbon::parse($dateTo)->format('Y-m-d');
         
+        $start = Carbon::parse($dateFrom);
+        $end = Carbon::parse($dateTo);
+        $days = $start->diffInDays($end) + 1;
+        
         foreach ($campaigns as $campaignId) {
-            usleep(300000); // 3 req/sec pace
+            for ($i = 0; $i < $days; $i++) {
+                $currentCarbon = $start->copy()->addDays($i);
+                $dCurrent = $currentCarbon->format('d-m-Y');
+                $dbCurrent = $currentCarbon->format('Y-m-d');
+                
+                usleep(300000); // 3 req/sec pace
             
-            // 1. Campaign Performance (1 API call per campaign, covers full date range)
+            // 1. Campaign Performance (1 API call per campaign per day)
             try {
-                $res = $this->api->getGmsCampaignPerformance($store, [$campaignId], $dFrom, $dTo);
+                $res = $this->api->getGmsCampaignPerformance($store, [$campaignId], $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
                 if (empty($res['error']) && !empty($res['response']['report'])) {
                     $report = $res['response']['report'];
                     
-                    // Simpan sebagai agregat untuk seluruh rentang tanggal
+                    // Simpan per hari
                     MarketplaceAdCampaignDaily::updateOrCreate(
                         [
                             'store_id' => $store->id,
                             'channel_campaign_id' => $campaignId,
-                            'date' => $dbDateTo, // gunakan tanggal terakhir sebagai penanda
+                            'date' => $dbCurrent,
                         ],
                         [
                             'impressions'  => $report['impression'] ?? 0,
@@ -358,7 +367,7 @@ class ShopeeAdsSyncService
             // 2. Item Performance (hanya jika campaign punya expense > 0)
             usleep(300000);
             try {
-                $resItem = $this->api->getGmsItemPerformance($store, [$campaignId], $dFrom, $dTo);
+                $resItem = $this->api->getGmsItemPerformance($store, [$campaignId], $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
                 if (empty($resItem['error']) && !empty($resItem['response']['result_list'])) {
@@ -375,7 +384,7 @@ class ShopeeAdsSyncService
                                 'store_id' => $store->id,
                                 'channel_campaign_id' => $campaignId,
                                 'channel_item_id' => $channelItemId,
-                                'date' => $dbDateTo,
+                                'date' => $dbCurrent,
                             ],
                             [
                                 'impressions'  => $report['impression'] ?? 0,
@@ -393,6 +402,7 @@ class ShopeeAdsSyncService
                 }
             } catch (\Throwable $e) {
                 Log::warning("[ShopeeAdsSync] GMS Item Sync failed for camp {$campaignId}: " . $e->getMessage());
+            }
             }
         }
     }
