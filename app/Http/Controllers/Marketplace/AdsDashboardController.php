@@ -142,6 +142,7 @@ class AdsDashboardController extends Controller
                 SUM(marketplace_ads_item_dailies.expense) as spend,
                 SUM(marketplace_ads_item_dailies.broad_gmv) as gmv,
                 SUM(marketplace_ads_item_dailies.broad_order) as orders,
+                SUM(marketplace_ads_item_dailies.broad_gmv) as broad_gmv_sum,
                 SUM(marketplace_ads_item_dailies.direct_gmv) as direct_gmv_sum
             ')
             ->groupBy('marketplace_ads_item_dailies.channel_item_id')
