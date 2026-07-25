@@ -265,7 +265,6 @@ class ShopeeAdsSyncService
     public function syncGmsDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
     {
         $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)
-            ->where('campaign_type', 'gms') // Wait, do we know which ones are GMS? If not, just fetch all.
             ->pluck('channel_campaign_id')
             ->toArray();
             
