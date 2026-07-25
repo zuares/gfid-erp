@@ -2107,7 +2107,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                         callbacks: {
                                             label: function(ctx) {
                                                 let val = ctx.raw;
-                                                let metric = histMetricSelect.value;
+                                                let metric = document.getElementById('histMetricSelect').value;
                                                 if (metric === 'roas') {
                                                     return ctx.dataset.label + ': ' + val.toFixed(2) + 'x';
                                                 } else if (metric === 'cvr') {
@@ -2131,7 +2131,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                         grid: { color: gridColor }, 
                                         ticks: {
                                             callback: function(value) {
-                                                let metric = histMetricSelect.value;
+                                                let metric = document.getElementById('histMetricSelect').value;
                                                 if (metric === 'roas') return value + 'x';
                                                 if (metric === 'cvr') return value + '%';
                                                 if (metric === 'impressions' || metric === 'clicks') {
