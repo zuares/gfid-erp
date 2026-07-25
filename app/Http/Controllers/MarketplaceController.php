@@ -1817,7 +1817,7 @@ class MarketplaceController extends Controller
      */
     public function syncAdsDaily(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        set_time_limit(120);
+        set_time_limit(300);
         \Log::info('SYNC_ADS_DAILY CALLED', $request->all());
 
         $syncType = $request->input('sync_type', '1_week');
