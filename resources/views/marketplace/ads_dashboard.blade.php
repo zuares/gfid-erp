@@ -2255,7 +2255,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     new Chart(pieCtx.getContext('2d'), {
                         type: 'doughnut',
                         data: {
-                            labels: rawCamps.map(c => c.campaign_name.length > 20 ? c.campaign_name.substring(0,20) + '...' : c.campaign_name),
+                            labels: rawCamps.map(c => {
+                                let name = c.campaign_name || 'Unknown Campaign';
+                                return name.length > 20 ? name.substring(0,20) + '...' : name;
+                            }),
                             datasets: [{
                                 data: rawCamps.map(c => parseFloat(c.spend || 0)),
                                 backgroundColor: bgColors,
