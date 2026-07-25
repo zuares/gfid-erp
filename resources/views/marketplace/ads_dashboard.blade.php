@@ -689,8 +689,8 @@ document.addEventListener('click', function(e) {
             <div class="dash-sec-focal mt-4 mb-3 p-3 p-md-4" style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
                 <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
                     <div>
-                        <div class="dash-sec mb-1" style="font-size: 1.1rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis (Period-over-Period)</div>
-                        <div style="font-size: 0.8rem; color: var(--dsh-muted);">Pilih metrik di bawah untuk membandingkan performa saat ini dengan rentang sebelumnya.</div>
+                        <div class="dash-sec mb-1" style="font-size: 0.95rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis</div>
+                        <div style="font-size: 0.75rem; color: var(--dsh-muted);">Perbandingan performa dengan periode sebelumnya.</div>
                     </div>
                     <div style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
                         <input type="hidden" id="histMetricSelect" value="roas">
