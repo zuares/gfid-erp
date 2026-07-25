@@ -69,8 +69,20 @@ class ShopeeAdsSyncService
         // 2. Ambil Settings per chunk (API max 100)
         $chunks = array_chunk($campaignIds, 100);
         foreach ($chunks as $chunk) {
-            $res = $this->api->getCampaignSettingInfo($store, $chunk);
-            $run->total_requests++;
+            $retry = 0;
+            $res = null;
+            while ($retry < 3) {
+                $res = $this->api->getCampaignSettingInfo($store, $chunk);
+                $run->total_requests++;
+                
+                if (!empty($res['error']) && $res['error'] === 'error_rate_limit') {
+                    Log::warning("[ShopeeAdsSync] Rate limit hit for setting info chunk. Retrying in 2s...");
+                    sleep(2);
+                    $retry++;
+                    continue;
+                }
+                break;
+            }
             
             if (!empty($res['error'])) {
                 Log::warning("[ShopeeAdsSync] Error sync setting info chunk: " . ($res['message'] ?? $res['error']));
@@ -93,7 +105,7 @@ class ShopeeAdsSyncService
                         'channel_campaign_id' => $channelCampaignId,
                     ],
                     [
-                        'campaign_name' => $common['campaign_name'] ?? null,
+                        'campaign_name' => $common['ad_name'] ?? $common['campaign_name'] ?? null,
                         'campaign_type' => $common['campaign_type'] ?? null,
                         'status' => $common['status'] ?? null,
                         'ad_type' => $common['ad_type'] ?? null,
