@@ -1208,7 +1208,7 @@ document.addEventListener("DOMContentLoaded", function() {
     window.clearAdsData = async function() {
         if (confirm('Anda yakin ingin membersihkan semua data performa iklan? Proses ini tidak dapat dibatalkan.')) {
             try {
-                const res = await fetch("/ads-dashboard/clear", {
+                const res = await fetch("{{ route('marketplace.ads.clear') }}", {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
