@@ -1823,7 +1823,13 @@ class MarketplaceController extends Controller
         $syncType = $request->input('sync_type', '1_week');
         $dateTo   = now()->toDateString();
         
-        if ($syncType === '1_week') {
+        if ($syncType === 'today') {
+            $dateFrom = now()->toDateString();
+            $dateTo   = now()->toDateString();
+        } elseif ($syncType === 'yesterday') {
+            $dateFrom = now()->subDay()->toDateString();
+            $dateTo   = now()->subDay()->toDateString();
+        } elseif ($syncType === '1_week') {
             $dateFrom = now()->subDays(7)->toDateString();
         } elseif ($syncType === '1_month') {
             $dateFrom = now()->subDays(30)->toDateString();

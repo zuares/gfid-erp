@@ -1162,6 +1162,8 @@ document.addEventListener('click', function(e) {
                     <div class="mb-4">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Jangka Waktu Sinkronisasi</label>
                         <select name="sync_type" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);">
+                            <option value="today">Hari Ini</option>
+                            <option value="yesterday">Kemarin</option>
                             <option value="1_week">1 Minggu Terakhir</option>
                             <option value="1_month">1 Bulan Terakhir</option>
                             <option value="3_months">3 Bulan Terakhir</option>
