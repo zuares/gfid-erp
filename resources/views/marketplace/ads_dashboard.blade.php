@@ -1067,7 +1067,7 @@ document.addEventListener('click', function(e) {
                                         <div style="font-weight: 700; color: var(--text);">{{ $camp->campaign_name }}</div>
                                         <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
                                             ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span>
-                                            &bull; <a href="javascript:void(0)" onclick="openCampaignHourlyModal('{{ $camp->channel_campaign_id }}', '{{ addslashes($camp->campaign_name) }}')" style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
+                                            &bull; <a href="javascript:void(0)" onclick='openCampaignHourlyModal("{{ $camp->channel_campaign_id }}", @json($camp->campaign_name))' style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
                                         </div>
                                     </td>
                                     <td>
@@ -1651,6 +1651,7 @@ document.addEventListener('click', function(e) {
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     window.clearAdsData = async function() {
@@ -1938,7 +1939,6 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 @if(!empty($dailyChartData))
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const rawDaily = @json($dailyChartData ?? []);
