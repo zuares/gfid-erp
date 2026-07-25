@@ -164,4 +164,33 @@ class AdsDashboardController extends Controller
 
         return back()->with('success', 'Data berhasil disinkronisasi.');
     }
+
+    public function clear(Request $request)
+    {
+        if (auth()->user()->role !== 'owner') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $tables = [
+            'marketplace_ad_campaign_dailies',
+            'marketplace_ad_campaigns',
+            'marketplace_ad_groups',
+            'marketplace_ad_item_maps',
+            'marketplace_ads_balance_logs',
+            'marketplace_ads_campaign_items',
+            'marketplace_ads_dailies',
+            'marketplace_ads_hourly_performances',
+            'marketplace_ads_item_dailies',
+            'marketplace_ads_sync_runs',
+            'mp_ads_imports',
+            'mp_ads_rows',
+            'store_ad_spend_dailies'
+        ];
+
+        foreach ($tables as $table) {
+            \Illuminate\Support\Facades\DB::table($table)->truncate();
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'Semua data iklan berhasil dihapus.']);
+    }
 }

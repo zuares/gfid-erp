@@ -511,6 +511,12 @@ document.addEventListener('click', function(e) {
                 </div>
                 @endif
                 
+                @if(auth()->user()->role === 'owner')
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="clearAdsData()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: rgba(239, 68, 68, 0.1); color: #ef4444; box-shadow: var(--glass-shadow);">
+                    <i class="bi bi-trash"></i> Bersihkan Data
+                </button>
+                @endif
+                
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--glass-border); background: var(--glass-bg); box-shadow: var(--glass-shadow); color: var(--text);">
                     <i class="bi bi-arrow-repeat"></i> Sync Manual
                 </button>
@@ -1143,7 +1149,7 @@ document.addEventListener('click', function(e) {
             </div>
             <div class="modal-body">
                 <!-- Form State -->
-                <form id="formSyncAds" action="{{ route('marketplace.ads.sync') }}" method="POST">
+                <form id="formSyncAds" action="/ads-daily/sync" method="POST">
                     @csrf
                     <div class="mb-3">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
@@ -1199,6 +1205,30 @@ document.addEventListener('click', function(e) {
 @push('scripts')
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    window.clearAdsData = async function() {
+        if (confirm('Anda yakin ingin membersihkan semua data performa iklan? Proses ini tidak dapat dibatalkan.')) {
+            try {
+                const res = await fetch("/ads-dashboard/clear", {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('Data iklan berhasil dibersihkan!');
+                    location.reload();
+                } else {
+                    throw new Error(data.message || 'Terjadi kesalahan.');
+                }
+            } catch (err) {
+                alert('Gagal membersihkan data: ' + err.message);
+            }
+        }
+    };
+
     const formSync = document.getElementById('formSyncAds');
     if (formSync) {
         formSync.addEventListener('submit', async function(e) {
