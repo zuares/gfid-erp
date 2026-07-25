@@ -1393,11 +1393,11 @@ document.addEventListener('click', function(e) {
                                             @if($item->broad_gmv_sum > 0 || $item->gms_campaign_id || $item->any_campaign_id)
                                                 <div class="input-group input-group-sm" style="max-width: 180px;">
                                                     <span class="input-group-text" style="font-size: 0.7rem; background: var(--bg); border-color: var(--dsh-border); color: var(--dsh-muted);">Modal Rp</span>
-                                                    <input type="number" id="inlineGmsBudget_{{ $item->channel_item_id }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="Kosong=Tetap" min="20000" step="1000">
+                                                    <input type="number" id="inlineGmsBudget_{{ $item->channel_item_id }}" value="{{ $item->gms_campaign_budget > 0 ? (int)$item->gms_campaign_budget : '' }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="Kosong=Tetap" min="20000" step="1000">
                                                 </div>
                                                 <div class="input-group input-group-sm" style="max-width: 180px;">
                                                     <span class="input-group-text" style="font-size: 0.7rem; background: var(--bg); border-color: var(--dsh-border); color: var(--dsh-muted);">ROAS (x)</span>
-                                                    <input type="number" id="inlineGmsRoas_{{ $item->channel_item_id }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="0=Auto" step="0.1">
+                                                    <input type="number" id="inlineGmsRoas_{{ $item->channel_item_id }}" value="{{ isset($item->gms_target_roas) ? (float)$item->gms_target_roas : '' }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="0=Auto" step="0.1">
                                                     <button class="btn btn-outline-primary" type="button" onclick="submitInlineGms('{{ $item->channel_item_id }}', '{{ $item->gms_campaign_id ?? $item->any_campaign_id }}', '{{ $storeId }}', this)" title="Simpan Pengaturan GMV Max" style="border-color: var(--dsh-border);">
                                                         <i class="bi bi-check-lg"></i>
                                                     </button>
