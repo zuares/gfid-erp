@@ -36,8 +36,8 @@ body[data-theme="dark"] {
 
 .dpanel {
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -51,7 +51,7 @@ body[data-theme="dark"] {
 .dash-tabs {
     display: inline-flex;
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
+    backdrop-filter: none;
     border: 1px solid var(--glass-border);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     border-radius: 10px;
@@ -155,7 +155,7 @@ body[data-theme="dark"] .dash-tab.active {
 /* Filter Container */
 .dash-filter {
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
+    backdrop-filter: none;
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 1rem 1.25rem;
@@ -499,7 +499,7 @@ document.addEventListener('click', function(e) {
                     @endif
                 </div>
             @endif
-            <div style="display: flex; gap: .5rem; justify-content: flex-end; align-items: center;">
+            <div style="display: flex; gap: .5rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
                 <div id="syncCountdown" class="role-chip live-btn live-off">
                     <i class="bi bi-clock-history"></i> Menghitung...
                 </div>
@@ -1142,7 +1142,7 @@ document.addEventListener('click', function(e) {
 <!-- Modal Sync Manual -->
 <div class="modal fade" id="modalSyncAds" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:20px; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
+        <div class="modal-content" style="border-radius:20px; background: var(--glass-bg); backdrop-filter: none; border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold" style="color: var(--text);">Manual Sync Shopee Ads</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
