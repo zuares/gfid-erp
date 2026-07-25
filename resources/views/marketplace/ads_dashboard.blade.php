@@ -463,6 +463,73 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 
+});
+
+// --- FETCH REAL-TIME STATUS ---
+function fetchRealtimeStatus() {
+    const storeId = document.querySelector('select[name="store_id"]').value;
+    const container = document.getElementById('realtimeStatusContainer');
+    if (!storeId || !container) return;
+
+    fetch(`{{ route('marketplace.ads.realtime.status') }}?store_id=${storeId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const bal = data.data.balance || {};
+                const toggle = data.data.toggle_info || {};
+                const facil = data.data.facil_rate || {};
+                
+                const formatRp = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+                
+                // Format total balance (gratis + berbayar)
+                const totalBal = formatRp(bal.balance || 0);
+                
+                // Auto top-up status
+                let topupHtml = '';
+                if (toggle.auto_topup_status === 1) {
+                    topupHtml = `<span style="color: #16a34a; font-weight: 700;"><i class="bi bi-check-circle-fill"></i> AKTIF</span>`;
+                } else {
+                    topupHtml = `<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-x-circle-fill"></i> NON-AKTIF</span>`;
+                }
+                
+                // Ads Facil Status
+                let facilHtml = '';
+                if (facil.shop_rate && facil.shop_rate > 0) {
+                     facilHtml = `<span style="color: #2563eb; font-weight: 700;"><i class="bi bi-info-circle-fill"></i> TERSEDIA (${facil.shop_rate}%)</span>`;
+                } else {
+                     facilHtml = `<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-dash-circle-fill"></i> TIDAK TERSEDIA</span>`;
+                }
+
+                container.innerHTML = `
+                    <div class="dpanel p-3" style="border-left: 4px solid #f59e0b; animation: fadeIn 0.4s ease-out;">
+                        <div class="kpi-label" style="color: #b45309;"><i class="bi bi-wallet2"></i> Total Saldo Iklan</div>
+                        <div class="kpi-value" style="font-size: 1.5rem; color: #92400e;">${totalBal}</div>
+                        <div class="kpi-sub" style="color: var(--dsh-muted);">Update secara real-time</div>
+                    </div>
+                    <div class="dpanel p-3" style="border-left: 4px solid #16a34a; animation: fadeIn 0.4s ease-out; animation-delay: 0.1s; animation-fill-mode: both;">
+                        <div class="kpi-label" style="color: #15803d;"><i class="bi bi-arrow-repeat"></i> Auto Top-Up</div>
+                        <div class="kpi-value" style="font-size: 1.2rem; margin-top: 0.75rem;">${topupHtml}</div>
+                        <div class="kpi-sub" style="color: var(--dsh-muted); margin-top: 0.25rem;">Pengisian saldo otomatis</div>
+                    </div>
+                    <div class="dpanel p-3" style="border-left: 4px solid #2563eb; animation: fadeIn 0.4s ease-out; animation-delay: 0.2s; animation-fill-mode: both;">
+                        <div class="kpi-label" style="color: #1d4ed8;"><i class="bi bi-globe"></i> Ads Fácil</div>
+                        <div class="kpi-value" style="font-size: 1.2rem; margin-top: 0.75rem;">${facilHtml}</div>
+                        <div class="kpi-sub" style="color: var(--dsh-muted); margin-top: 0.25rem;">Dukungan rate khusus Ads Fácil</div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `<div class="dpanel p-3 w-100" style="color: #dc2626; border-left: 4px solid #dc2626;">Gagal memuat informasi real-time.</div>`;
+            }
+        })
+        .catch(err => {
+            container.innerHTML = `<div class="dpanel p-3 w-100" style="color: #dc2626; border-left: 4px solid #dc2626;">Koneksi error: Gagal memuat informasi.</div>`;
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(fetchRealtimeStatus, 500); // Fetch after 500ms
+});
+
 // --- MINI LOG TOGGLE ---
 function toggleMiniLog() {
     const panel = document.getElementById('miniLogPanel');
@@ -665,7 +732,29 @@ document.addEventListener('click', function(e) {
         <!-- DASHBOARD TAB -->
         <div class="tab-pane active" id="tab-dashboard">
             
-
+            {{-- INFORMASI SALDO & STATUS TOKO (REAL-TIME) --}}
+            <div class="dash-sec"><i class="bi bi-wallet2 text-primary"></i> Informasi Saldo & Status Toko (Real-time)</div>
+            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;" id="realtimeStatusContainer">
+                {{-- Skeleton Loaders --}}
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-6 mb-2"></span>
+                        <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
+                    </div>
+                </div>
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-7 mb-2"></span>
+                        <span class="placeholder col-5 d-block" style="height: 2rem;"></span>
+                    </div>
+                </div>
+                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-8 mb-2"></span>
+                        <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
+                    </div>
+                </div>
+            </div>
 
             <div class="dash-sec"><i class="bi bi-robot"></i> Asisten Analisis (Berdasarkan Rentang Tanggal)</div>
             <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
@@ -2293,7 +2382,15 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (!ctx || !rawItems || rawItems.length === 0) return;
                     
                     let sorted = [...rawItems].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
-                    const barLabels = sorted.map(c => c.channel_item_id || c.item_sku || 'Unknown');
+                    
+                    // Create multiline labels: Line 1 = SKU/ID, Line 2 = Product Name (truncated)
+                    const barLabels = sorted.map(c => {
+                        let sku = c.item_sku || c.channel_item_id || 'Unknown ID';
+                        let name = c.item_name || 'Unknown Product';
+                        if (name.length > 22) name = name.substring(0, 22) + '...';
+                        return [sku, name];
+                    });
+                    
                     const barData = sorted.map(c => parseFloat(c[metric] || 0));
 
                     new Chart(ctx.getContext('2d'), {
@@ -2321,9 +2418,16 @@ document.addEventListener("DOMContentLoaded", function() {
                                     borderWidth: 1,
                                     padding: 10,
                                     callbacks: {
+                                        title: function(context) {
+                                            // Get the original full item name from the sorted array
+                                            let idx = context[0].dataIndex;
+                                            let fullSku = sorted[idx].item_sku || sorted[idx].channel_item_id;
+                                            let fullName = sorted[idx].item_name || 'Unknown Product';
+                                            return fullSku + ' | ' + fullName;
+                                        },
                                         label: function(c) {
-                                            if (labelFormat === 'currency') return 'Rp ' + formatShortIDR(c.raw);
-                                            return c.raw.toLocaleString('id-ID');
+                                            if (labelFormat === 'currency') return 'Nilai: Rp ' + formatShortIDR(c.raw);
+                                            return 'Nilai: ' + c.raw.toLocaleString('id-ID');
                                         }
                                     }
                                 }
@@ -2336,7 +2440,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 y: { 
                                     grid: { display: false }, 
                                     ticks: { 
-                                        color: textColor,
+                                        color: document.body.getAttribute('data-theme') === 'dark' ? '#94a3b8' : '#64748b', // Muted slate color for labels
                                         font: { size: 10, family: 'Inter, sans-serif' }
                                     },
                                     border: { display: false }

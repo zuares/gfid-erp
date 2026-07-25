@@ -193,6 +193,9 @@ class AdsDashboardController extends Controller
             \Illuminate\Support\Facades\DB::table($table)->truncate();
         }
 
+        return response()->json(['status' => 'success', 'message' => 'Semua data iklan berhasil dihapus.']);
+    }
+
     public function realtimeStatus(Request $request, ShopeeAdsApiService $adsApi)
     {
         $storeId = $request->input('store_id');
