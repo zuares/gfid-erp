@@ -675,10 +675,10 @@ document.addEventListener('click', function(e) {
             </div>
 
             <div class="dash-panels mt-4 mb-4" style="grid-template-columns: 1fr 2fr; gap: 1rem;">
-                {{-- PIE CHART KAMPANYE --}}
+                {{-- PIE CHART PRODUK --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="dash-sec mt-0 mb-0"><i class="bi bi-pie-chart text-primary"></i> Proporsi Kampanye</div>
+                        <div class="dash-sec mt-0 mb-0"><i class="bi bi-pie-chart text-primary"></i> Proporsi Produk</div>
                         <select id="pieMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border); font-size: 0.75rem;">
                             <option value="spend">Biaya</option>
                             <option value="gmv">GMV</option>
@@ -686,11 +686,11 @@ document.addEventListener('click', function(e) {
                         </select>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        Top 5 kampanye dengan proporsi terbesar.
+                        Top 5 produk dengan proporsi terbesar.
                     </div>
                     <div style="position: relative; height: 230px; display: flex; justify-content: center; align-items: center;">
-                        @if(empty($campaigns) || count($campaigns) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data kampanye aktif.</div>
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
                         @else
                             <canvas id="campaignPieChart"></canvas>
                         @endif
@@ -2253,21 +2253,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 
                 // ==========================================
-                // PIE CHART KAMPANYE
+                // PIE CHART PRODUK
                 // ==========================================
-                const rawCamps = @json($campaigns->toArray());
+                const rawItems = @json($itemPerformance->toArray());
                 const pieCtx = document.getElementById('campaignPieChart');
                 let pieChartInstance = null;
 
                 const renderPieChart = (metric) => {
-                    if (!pieCtx || !rawCamps || rawCamps.length === 0) return;
+                    if (!pieCtx || !rawItems || rawItems.length === 0) return;
                     
                     // Sort and get top 5 based on selected metric
-                    let sorted = [...rawCamps].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
+                    let sorted = [...rawItems].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
                     
                     const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
                     const pieLabels = sorted.map(c => {
-                        let name = c.campaign_name || 'Unknown Campaign';
+                        let name = c.item_name || 'Unknown Product';
                         return name.length > 20 ? name.substring(0,20) + '...' : name;
                     });
                     const pieData = sorted.map(c => parseFloat(c[metric] || 0));
