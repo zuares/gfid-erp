@@ -1389,14 +1389,24 @@ document.addEventListener('click', function(e) {
                                         {{ number_format($item->orders, 0, ',', '.') }}
                                     </td>
                                     <td class="text-end">
-                                        @if($item->broad_gmv_sum > 0 || $item->gms_campaign_id || $item->any_campaign_id)
-                                            <button type="button" class="btn btn-sm btn-outline-primary mb-1" style="font-size: 0.7rem; border-radius: 6px; padding: 0.2rem 0.5rem;" onclick="openGmsSettingsForProduct('{{ $item->gms_campaign_id ?? $item->any_campaign_id }}')" title="Pengaturan GMV Max">
-                                                <i class="bi bi-gear"></i> Set GMS
+                                        <div class="d-flex flex-column gap-2 align-items-end" style="min-width: 180px;">
+                                            @if($item->broad_gmv_sum > 0 || $item->gms_campaign_id || $item->any_campaign_id)
+                                                <div class="input-group input-group-sm" style="max-width: 180px;">
+                                                    <span class="input-group-text" style="font-size: 0.7rem; background: var(--bg); border-color: var(--dsh-border); color: var(--dsh-muted);">Modal Rp</span>
+                                                    <input type="number" id="inlineGmsBudget_{{ $item->channel_item_id }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="Kosong=Tetap" min="20000" step="1000">
+                                                </div>
+                                                <div class="input-group input-group-sm" style="max-width: 180px;">
+                                                    <span class="input-group-text" style="font-size: 0.7rem; background: var(--bg); border-color: var(--dsh-border); color: var(--dsh-muted);">ROAS (x)</span>
+                                                    <input type="number" id="inlineGmsRoas_{{ $item->channel_item_id }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="0=Auto" step="0.1">
+                                                    <button class="btn btn-outline-primary" type="button" onclick="submitInlineGms('{{ $item->channel_item_id }}', '{{ $item->gms_campaign_id ?? $item->any_campaign_id }}', '{{ $storeId }}', this)" title="Simpan Pengaturan GMV Max" style="border-color: var(--dsh-border);">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                </div>
+                                            @endif
+                                            <button onclick="toggleGmsItem('{{ $item->channel_item_id }}', 'remove', this)" class="btn btn-sm btn-outline-danger mt-1 w-100" style="font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 6px; max-width: 180px;">
+                                                <i class="bi bi-pause-circle"></i> Hentikan GMS
                                             </button>
-                                        @endif
-                                        <button onclick="toggleGmsItem('{{ $item->channel_item_id }}', 'remove', this)" class="btn btn-sm btn-outline-danger" style="font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 6px;">
-                                            <i class="bi bi-pause-circle"></i> Hentikan GMS
-                                        </button>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -3231,6 +3241,54 @@ function openGmsSettingsForProduct(campaignId) {
     }
     const modal = new bootstrap.Modal(document.getElementById('modalGmsSettings'));
     modal.show();
+}
+
+function submitInlineGms(channelItemId, campaignId, storeId, btnElement) {
+    const budgetInput = document.getElementById('inlineGmsBudget_' + channelItemId).value;
+    const roasInput = document.getElementById('inlineGmsRoas_' + channelItemId).value;
+    
+    if (!budgetInput && !roasInput) {
+        alert('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
+        return;
+    }
+
+    const originalHtml = btnElement.innerHTML;
+    btnElement.disabled = true;
+    btnElement.innerHTML = '<i class="bi bi-arrow-repeat spin-icon"></i>';
+
+    fetch('{{ route("marketplace.ads.gms.campaign.edit") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            store_id: storeId,
+            daily_budget: budgetInput,
+            roas_target: roasInput,
+            campaign_id: campaignId || null
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.status === 'success') {
+            btnElement.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
+            setTimeout(() => {
+                btnElement.innerHTML = originalHtml;
+                btnElement.disabled = false;
+            }, 2000);
+        } else {
+            alert(res.message || 'Gagal menyimpan pengaturan.');
+            btnElement.innerHTML = originalHtml;
+            btnElement.disabled = false;
+        }
+    })
+    .catch(err => {
+        alert('Terjadi kesalahan koneksi.');
+        btnElement.innerHTML = originalHtml;
+        btnElement.disabled = false;
+    });
 }
 
 function submitGmsSettings(e) {
