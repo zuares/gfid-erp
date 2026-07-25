@@ -54,8 +54,10 @@ class ShopeeAdsSyncService
                 throw new \Exception("Gagal mengambil campaign id list: " . ($res['message'] ?? $res['error']));
             }
             
-            $list = data_get($res, 'response.campaign_id_list', []);
-            $campaignIds = array_merge($campaignIds, $list);
+            $list = data_get($res, 'response.campaign_list', []);
+            $extractedIds = array_map(function($c) { return $c['campaign_id'] ?? null; }, $list);
+            $extractedIds = array_filter($extractedIds); // remove nulls
+            $campaignIds = array_merge($campaignIds, $extractedIds);
             
             $pageInfo = data_get($res, 'response.page_info');
             $hasMore = $pageInfo['has_more'] ?? false;
