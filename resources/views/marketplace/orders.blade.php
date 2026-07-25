@@ -214,11 +214,11 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
     gap: .5rem; padding: .7rem .9rem .55rem;
 }
 .ord-card-meta { min-width: 0; }
-.ord-card-meta .ord-id { font-size: .78rem; font-weight:600; }
+.ord-card-meta .ord-id { font-size: .72rem; font-weight:700; }
 .ord-card-sub {
     display: flex; align-items: center; gap: .4rem; margin-top: .18rem; flex-wrap: wrap;
 }
-.ord-card-sub-text { font-size: .68rem; color: var(--shp-muted); font-weight: 500; }
+.ord-card-sub-text { font-size: .62rem; color: var(--shp-muted); font-weight: 500; }
 .ord-card-actions { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
 .ord-card-section { border-top: 1px solid var(--shp-border); }
 /* Accordion trigger */
@@ -229,7 +229,7 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 }
 .ord-acc-toggle:hover { background: rgba(148,163,184,.05); }
 .ord-acc-label {
-    font-size: .68rem; font-weight: 600; color: var(--shp-muted); letter-spacing: 0;
+    font-size: .62rem; font-weight: 600; color: var(--shp-muted); letter-spacing: 0;
     text-transform: none; display: flex; align-items: center; gap: .35rem;
 }
 .ord-acc-count {
@@ -2519,7 +2519,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         // Urutkan berdasarkan pesanan terbaru
         rows.sort((a, b) => new Date(b.ordered_at || 0) - new Date(a.ordered_at || 0));
 
-        const cards = rows.map(o => {
+        const cards = rows.map((o, idx) => {
             const items  = o.items || [];
             const urgent = ACTIVE_ORDER_STATUSES.includes(o.order_status);
             const isFulfilled = fulfilledOrderIds.has(o.id);
@@ -2664,7 +2664,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
             orderIdHtml += slaBadge;
 
-            return `<div class="ord-card ${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" style="overflow:hidden">
+            return `<div class="ord-card ${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" style="overflow:hidden; animation-delay: ${idx * 0.04}s">
                 <div class="ord-card-header">
                     <div class="ord-card-meta">
                         <div class="ord-id">${orderIdHtml}</div>
