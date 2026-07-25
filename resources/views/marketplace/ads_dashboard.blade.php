@@ -2383,12 +2383,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     let sorted = [...rawItems].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
                     
-                    // Create multiline labels: Line 1 = SKU/ID, Line 2 = Product Name (truncated)
+                    // Create multiline labels: Line 1 = Product ID, Line 2 = SKU
                     const barLabels = sorted.map(c => {
-                        let sku = c.item_sku || c.channel_item_id || 'Unknown ID';
-                        let name = c.item_name || 'Unknown Product';
-                        if (name.length > 22) name = name.substring(0, 22) + '...';
-                        return [sku, name];
+                        let id = c.channel_item_id || 'No ID';
+                        let sku = c.item_sku || '-';
+                        return [id, sku];
                     });
                     
                     const barData = sorted.map(c => parseFloat(c[metric] || 0));
