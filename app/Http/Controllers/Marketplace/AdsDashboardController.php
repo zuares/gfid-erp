@@ -131,6 +131,8 @@ class AdsDashboardController extends Controller
             ->whereBetween('marketplace_ads_item_dailies.date', [$dateFrom, $dateTo])
             ->selectRaw('
                 marketplace_ads_item_dailies.channel_item_id,
+                MAX(marketplace_ads_item_dailies.channel_campaign_id) as any_campaign_id,
+                MAX(CASE WHEN marketplace_ads_item_dailies.broad_gmv > 0 OR marketplace_ads_item_dailies.broad_order > 0 THEN marketplace_ads_item_dailies.channel_campaign_id ELSE NULL END) as gms_campaign_id,
                 MAX(marketplace_products.item_sku) as item_sku,
                 MAX(marketplace_products.item_name) as item_name,
                 SUM(marketplace_ads_item_dailies.impressions) as impressions,

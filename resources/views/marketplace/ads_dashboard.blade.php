@@ -1356,6 +1356,11 @@ document.addEventListener('click', function(e) {
                                         </div>
                                         <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted); display: flex; align-items: center; gap: 6px; margin-top: 4px;">
                                             <span>ID: {{ $item->channel_item_id }}</span>
+                                            @if($item->gms_campaign_id)
+                                                <span>Camp: {{ $item->gms_campaign_id }}</span>
+                                            @elseif($item->any_campaign_id)
+                                                <span>Camp: {{ $item->any_campaign_id }}</span>
+                                            @endif
                                             @if($item->broad_gmv_sum > 0 && $item->direct_gmv_sum == 0)
                                                 <span style="background: rgba(37,99,235,0.1); color: #2563eb; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMV Max</span>
                                             @elseif($item->direct_gmv_sum > 0 && $item->broad_gmv_sum == 0)
@@ -1384,6 +1389,11 @@ document.addEventListener('click', function(e) {
                                         {{ number_format($item->orders, 0, ',', '.') }}
                                     </td>
                                     <td class="text-end">
+                                        @if($item->broad_gmv_sum > 0 || $item->gms_campaign_id || $item->any_campaign_id)
+                                            <button type="button" class="btn btn-sm btn-outline-primary mb-1" style="font-size: 0.7rem; border-radius: 6px; padding: 0.2rem 0.5rem;" onclick="openGmsSettingsForProduct('{{ $item->gms_campaign_id ?? $item->any_campaign_id }}')" title="Pengaturan GMV Max">
+                                                <i class="bi bi-gear"></i> Set GMS
+                                            </button>
+                                        @endif
                                         <button onclick="toggleGmsItem('{{ $item->channel_item_id }}', 'remove', this)" class="btn btn-sm btn-outline-danger" style="font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 6px;">
                                             <i class="bi bi-pause-circle"></i> Hentikan GMS
                                         </button>
@@ -3211,6 +3221,16 @@ function toggleGmsItem(itemId, action, btn) {
     .finally(() => {
         btn.disabled = false;
     });
+}
+
+function openGmsSettingsForProduct(campaignId) {
+    if (campaignId) {
+        document.getElementById('gmsCampaignId').value = campaignId;
+    } else {
+        document.getElementById('gmsCampaignId').value = '';
+    }
+    const modal = new bootstrap.Modal(document.getElementById('modalGmsSettings'));
+    modal.show();
 }
 
 function submitGmsSettings(e) {
