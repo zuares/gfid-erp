@@ -88,21 +88,8 @@
 
 {{-- ================= ANALITIK IKLAN ================= --}}
 <div class="dash-sec mt-4"><i class="bi bi-megaphone"></i> Analitik Iklan Marketplace (7 Hari Terakhir)</div>
-<div class="dash-panels mb-4" style="grid-template-columns: 2fr 1fr; gap: 1rem;">
+<div class="dash-panels mb-4" style="grid-template-columns: 1fr 2fr; gap: 1rem;">
     
-    {{-- HEATMAP JAM TAYANG --}}
-    <div class="dpanel p-3">
-        <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
-            Heatmap Jam Tayang Efektif (Golden Hours)
-        </div>
-        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 1rem;">
-            Menampilkan performa metrik (GMV / Biaya) per jam tayang dari data mesin. Semakin pekat warnanya, semakin tinggi performanya.
-        </div>
-        <div style="position: relative; height: 250px;">
-            <canvas id="execHeatmapChart"></canvas>
-        </div>
-    </div>
-
     {{-- PIE CHART KAMPANYE --}}
     <div class="dpanel p-3">
         <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
@@ -117,6 +104,19 @@
             @else
                 <canvas id="execPieChart"></canvas>
             @endif
+        </div>
+    </div>
+
+    {{-- HEATMAP JAM TAYANG --}}
+    <div class="dpanel p-3">
+        <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
+            Heatmap Jam Tayang Efektif (Golden Hours)
+        </div>
+        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 1rem;">
+            Menampilkan performa metrik (GMV / Biaya) per jam tayang dari data mesin. Semakin pekat warnanya, semakin tinggi performanya.
+        </div>
+        <div style="position: relative; height: 250px;">
+            <canvas id="execHeatmapChart"></canvas>
         </div>
     </div>
 

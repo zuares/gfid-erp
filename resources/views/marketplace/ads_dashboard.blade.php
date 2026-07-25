@@ -677,8 +677,11 @@ document.addEventListener('click', function(e) {
             </div>
             
             <div class="dpanel p-3">
-                <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                    💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
+                        💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
+                    </div>
+                    <div id="histSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                 </div>
                 <div style="position: relative; height: 350px;">
                     <canvas id="historicalChart"></canvas>
@@ -2108,6 +2111,51 @@ document.addEventListener("DOMContentLoaded", function() {
                                 }
                             }
                         });
+                    }
+
+                    // Update histSummary
+                    const summaryEl = document.getElementById('histSummary');
+                    if (summaryEl && datasets.length > 0) {
+                        let html = '';
+                        // Rentang saat ini is dataset 0, previous is dataset 1
+                        const currData = datasets[0].data.filter(v => v !== null);
+                        const currSum = currData.reduce((a,b)=>a+b, 0);
+                        let currAvg = currData.length > 0 ? (currSum / currData.length) : 0;
+                        
+                        let prevSum = 0;
+                        let prevAvg = 0;
+                        if (datasets.length > 1) {
+                            const prevData = datasets[1].data.filter(v => v !== null);
+                            prevSum = prevData.reduce((a,b)=>a+b, 0);
+                            prevAvg = prevData.length > 0 ? (prevSum / prevData.length) : 0;
+                        }
+
+                        let formatVal = (v) => {
+                            if (metric === 'roas') return v.toFixed(2) + 'x';
+                            if (metric === 'impressions' || metric === 'clicks') return Math.round(v).toLocaleString('id-ID');
+                            return 'Rp ' + formatShortIDR(v);
+                        };
+
+                        html += `<div style="margin-bottom:2px;">Sekarang: <span style="color:var(--dsh-accent)">${metric === 'roas' ? 'Rata-rata' : 'Total'} ${formatVal(metric === 'roas' ? currAvg : currSum)}</span></div>`;
+                        if (datasets.length > 1) {
+                            let diff = 0;
+                            let compareVal1 = metric === 'roas' ? currAvg : currSum;
+                            let compareVal2 = metric === 'roas' ? prevAvg : prevSum;
+                            
+                            if (compareVal2 > 0) diff = ((compareVal1 - compareVal2) / compareVal2) * 100;
+                            else if (compareVal1 > 0) diff = 100;
+
+                            let color = diff >= 0 ? '#10b981' : '#ef4444';
+                            if (metric === 'spend' || metric === 'cpc') {
+                                color = diff > 0 ? '#ef4444' : '#10b981'; // Spend going up is bad (red)
+                            }
+                            let sign = diff > 0 ? '+' : '';
+
+                            html += `<div style="font-size:0.75rem; color:var(--dsh-muted)">Sebelumnya: ${formatVal(metric === 'roas' ? prevAvg : prevSum)} 
+                                     <span style="color:${color}; font-weight:bold; margin-left:5px;">(${sign}${diff.toFixed(1)}%)</span></div>`;
+                        }
+                        
+                        summaryEl.innerHTML = html;
                     }
                 };
 
