@@ -761,13 +761,64 @@ document.addEventListener('click', function(e) {
             </div>
 
             <div class="dash-panels mt-4 mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                {{-- CHART IMPRESI --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Top 5 Impresi</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan tayangan terbanyak.
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartImpressions"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART KLIK --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Top 5 Trafik (Klik)</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan klik terbanyak.
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartClicks"></canvas>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- CHART CTR --}}
+                <div class="dpanel p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-hand-index text-warning"></i> Top 5 CTR</div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
+                        Produk dengan rasio klik tertinggi.
+                    </div>
+                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
+                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                        @else
+                            <canvas id="chartCtr"></canvas>
+                        @endif
+                    </div>
+                </div>
+
                 {{-- CHART BIAYA --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bar-chart-steps text-danger"></i> Top 5 Biaya</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-wallet2 text-danger"></i> Top 5 Biaya</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk penyerap biaya terbesar (ID).
+                        Produk penyerap biaya terbesar.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
@@ -781,10 +832,10 @@ document.addEventListener('click', function(e) {
                 {{-- CHART GMV --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bar-chart-steps text-success"></i> Top 5 GMV</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bag-check text-success"></i> Top 5 GMV</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk penyumbang GMV terbesar (ID).
+                        Produk penyumbang GMV terbesar.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
@@ -795,64 +846,13 @@ document.addEventListener('click', function(e) {
                     </div>
                 </div>
 
-                {{-- CHART KLIK --}}
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Top 5 Trafik (Klik)</div>
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan klik terbanyak (ID).
-                    </div>
-                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
-                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
-                        @else
-                            <canvas id="chartClicks"></canvas>
-                        @endif
-                    </div>
-                </div>
-
-                {{-- CHART IMPRESI --}}
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Top 5 Impresi</div>
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan tayangan terbanyak (ID).
-                    </div>
-                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
-                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
-                        @else
-                            <canvas id="chartImpressions"></canvas>
-                        @endif
-                    </div>
-                </div>
-
-                {{-- CHART CTR --}}
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-hand-index text-warning"></i> Top 5 CTR</div>
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan rasio klik tertinggi (ID).
-                    </div>
-                    <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
-                        @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
-                        @else
-                            <canvas id="chartCtr"></canvas>
-                        @endif
-                    </div>
-                </div>
-
                 {{-- CHART CVR --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-funnel" style="color: #a855f7;"></i> Top 5 CVR</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan tingkat konversi tertinggi (ID).
+                        Produk dengan tingkat konversi tertinggi.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
