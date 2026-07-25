@@ -2435,12 +2435,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     let sorted = [...rawItems].sort((a,b) => parseFloat(b[metric] || 0) - parseFloat(a[metric] || 0)).slice(0, 5);
                     
-                    // Create multiline labels: Line 1 = Product ID, Line 2 = SKU
-                    const barLabels = sorted.map(c => {
-                        let id = c.channel_item_id || 'No ID';
-                        let sku = c.item_sku || '-';
-                        return [id, sku];
-                    });
+                    // The original barLabels array is no longer strictly needed for drawing since we hide default ticks,
+                    // but we pass empty strings so Chart.js knows how many bars to draw.
+                    const barLabels = sorted.map(() => '');
                     
                     const customLabelPlugin = {
                         id: 'customLabels',
@@ -2448,6 +2445,34 @@ document.addEventListener("DOMContentLoaded", function() {
                             const { ctx, data } = chart;
                             ctx.save();
                             chart.getDatasetMeta(0).data.forEach((bar, index) => {
+                                // 1. Draw Custom Y-Axis Labels (Rich text)
+                                const sku = sorted[index].item_sku || '-';
+                                const id = sorted[index].channel_item_id || 'No ID';
+                                
+                                const textColor = document.body.getAttribute('data-theme') === 'dark' ? '#f8fafc' : '#334155';
+                                const mutedColor = document.body.getAttribute('data-theme') === 'dark' ? '#64748b' : '#94a3b8';
+
+                                ctx.textAlign = 'right';
+                                
+                                // SKU (Focal Point)
+                                ctx.font = 'bold 11px "Inter", sans-serif';
+                                ctx.fillStyle = textColor;
+                                ctx.textBaseline = 'bottom';
+                                
+                                // Truncate SKU if too long for the left padding (approx 120px)
+                                let displaySku = sku;
+                                if (ctx.measureText(displaySku).width > 110) {
+                                    displaySku = displaySku.substring(0, 15) + '...';
+                                }
+                                ctx.fillText(displaySku, bar.base - 10, bar.y - 1);
+                                
+                                // Product ID (Muted & Small)
+                                ctx.font = 'normal 9px "Inter", sans-serif';
+                                ctx.fillStyle = mutedColor;
+                                ctx.textBaseline = 'top';
+                                ctx.fillText(id, bar.base - 10, bar.y + 1);
+
+                                // 2. Draw the metric value on/outside the bar
                                 const value = data.datasets[0].data[index];
                                 let formattedValue = value.toLocaleString('id-ID');
                                 if (labelFormat === 'currency') formattedValue = 'Rp ' + formatShortIDR(value);
@@ -2493,7 +2518,8 @@ document.addEventListener("DOMContentLoaded", function() {
                             maintainAspectRatio: false,
                             layout: {
                                 padding: {
-                                    right: 50 // Give space for labels drawn outside the bar
+                                    left: 125, // Reserve space for custom rich Y-axis labels
+                                    right: 50 // Give space for values drawn outside the bar
                                 }
                             },
                             plugins: {
@@ -2507,7 +2533,6 @@ document.addEventListener("DOMContentLoaded", function() {
                                     padding: 10,
                                     callbacks: {
                                         title: function(context) {
-                                            // Get the original full item name from the sorted array
                                             let idx = context[0].dataIndex;
                                             let fullSku = sorted[idx].item_sku || sorted[idx].channel_item_id;
                                             let fullName = sorted[idx].item_name || 'Unknown Product';
@@ -2529,8 +2554,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 y: { 
                                     grid: { display: false }, 
                                     ticks: { 
-                                        color: document.body.getAttribute('data-theme') === 'dark' ? '#94a3b8' : '#64748b', // Muted slate color for labels
-                                        font: { size: 10, family: 'Inter, sans-serif' }
+                                        display: false // Hide default ticks as we draw them manually
                                     },
                                     border: { display: false }
                                 }
