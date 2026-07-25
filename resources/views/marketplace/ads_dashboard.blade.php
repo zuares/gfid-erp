@@ -674,17 +674,23 @@ document.addEventListener('click', function(e) {
             
             <hr class="my-4" style="border-color: var(--dsh-border);">
             
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="dash-sec mb-0"><i class="bi bi-clock-history"></i> Komparasi Historis (Period-over-Period)</div>
-                <div>
-                    <select id="histMetricSelect" class="form-select form-select-sm" style="width: auto; background: var(--dsh-panel); color: var(--text); border-color: var(--dsh-border);">
-                        <option value="roas">Metrik: ROAS</option>
-                        <option value="gmv">Metrik: GMV (Pendapatan)</option>
-                        <option value="spend">Metrik: Biaya (Spend)</option>
-                        <option value="impressions">Metrik: Impresi (Tayangan)</option>
-                        <option value="clicks">Metrik: Kunjungan (Klik)</option>
-                        <option value="cvr">Metrik: Konversi (CVR)</option>
-                    </select>
+            <div class="dash-sec-focal mt-4 mb-3 p-3 p-md-4" style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
+                    <div>
+                        <div class="dash-sec mb-1" style="font-size: 1.1rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis (Period-over-Period)</div>
+                        <div style="font-size: 0.8rem; color: var(--dsh-muted);">Pilih metrik di bawah untuk membandingkan performa saat ini dengan rentang sebelumnya.</div>
+                    </div>
+                    <div style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
+                        <input type="hidden" id="histMetricSelect" value="roas">
+                        <div class="dash-tabs-modern" id="histMetricChips">
+                            <button class="dash-tab-m active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
+                            <button class="dash-tab-m" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
+                            <button class="dash-tab-m" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
+                            <button class="dash-tab-m" data-val="impressions"><i class="bi bi-eye"></i> Impresi</button>
+                            <button class="dash-tab-m" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
+                            <button class="dash-tab-m" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -2195,11 +2201,15 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 // Handle metric toggle
                 const metricSelect = document.getElementById('histMetricSelect');
-                if (metricSelect) {
-                    metricSelect.addEventListener('change', function(e) {
-                        renderHistChart(e.target.value);
+                const metricChips = document.querySelectorAll('#histMetricChips .dash-tab-m');
+                metricChips.forEach(chip => {
+                    chip.addEventListener('click', function() {
+                        metricChips.forEach(c => c.classList.remove('active'));
+                        this.classList.add('active');
+                        metricSelect.value = this.dataset.val;
+                        renderHistChart(this.dataset.val);
                     });
-                }
+                });
                 
                 // ==========================================
                 // AI INSIGHTS HISTORICAL (PERIOD-OVER-PERIOD)
