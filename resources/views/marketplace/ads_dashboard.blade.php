@@ -1149,7 +1149,7 @@ document.addEventListener('click', function(e) {
             </div>
             <div class="modal-body">
                 <!-- Form State -->
-                <form id="formSyncAds" action="/ads-daily/sync" method="POST">
+                <form id="formSyncAds" action="/api/marketplace/ads-daily/sync" method="POST">
                     @csrf
                     <div class="mb-3">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
