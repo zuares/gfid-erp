@@ -1815,7 +1815,7 @@ class MarketplaceController extends Controller
      * Sync performa iklan harian ke DB (semua toko Shopee atau satu toko).
      * Simpan snapshot saldo sekalian.
      */
-    public function syncAdsDaily(Request $request): JsonResponse
+    public function syncAdsDaily(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         set_time_limit(120);
 
