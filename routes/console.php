@@ -93,19 +93,8 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->name('sync-chats')
     ->name("task_" . uniqid())->withoutOverlapping();
 
-// Ads: simpan performa harian + snapshot saldo ke DB (untuk analisa historis)
-if (config('services.shopee.ads_scheduler_enabled', env('SHOPEE_ADS_SCHEDULER_ENABLED', false))) {
-    Schedule::command('marketplace:sync-ads')
-        ->everyFourHours()
-        ->withoutOverlapping(30)
-        ->name('sync-ads-main');
-
-    // Ads: sinkronisasi metrik per jam
-    Schedule::command('marketplace:sync-ads', ['--hourly'])
-        ->hourly()
-        ->withoutOverlapping(30)
-        ->name('sync-ads-hourly');
-}
+// Ads: jadwal sync sudah dipindahkan ke app/Console/Kernel.php
+// agar tidak bergantung pada env flag dan pasti ter-load oleh Laravel.
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
 Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync' => true]))

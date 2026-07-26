@@ -39,9 +39,9 @@ class Kernel extends ConsoleKernel
                  ->everyFourHours()
                  ->withoutOverlapping();
 
-        // NOTE: Jadwal Ads (daily + hourly) sudah didefinisikan di routes/console.php
-        // dengan flag SHOPEE_ADS_SCHEDULER_ENABLED dan withoutOverlapping(30).
-        // Jangan duplikasi di sini.
+        // NOTE: Laravel 12 menggunakan withSchedule() di bootstrap/app.php
+        // Semua jadwal ads sync sudah didefinisikan di sana.
+        // Kernel.php ini TIDAK digunakan oleh Laravel 12.
     }
 
     protected function commands(): void

@@ -116,13 +116,15 @@ class ShopeeAdsSyncService
                             3 => 'paused',
                             4 => 'abnormal',
                             5 => 'deleted',
+                            // API juga bisa return string langsung
+                            'normal', 'ongoing', 'closed', 'paused', 'ended', 'abnormal', 'deleted' => $common['campaign_status'],
                             default => $common['campaign_status'] ?? null,
                         },
                         'campaign_placement' => $common['campaign_placement'] ?? null,
-                        'campaign_budget' => $common['budget'] ?? null,
-                        'target_roas' => $auto['target_roas'] ?? null,
-                        'started_at' => isset($common['start_time']) && $common['start_time'] > 0 ? Carbon::createFromTimestamp($common['start_time']) : null,
-                        'ended_at' => isset($common['end_time']) && $common['end_time'] > 0 ? Carbon::createFromTimestamp($common['end_time']) : null,
+                        'campaign_budget' => $common['campaign_budget'] ?? $common['budget'] ?? null,
+                        'target_roas' => $auto['roas_target'] ?? $auto['target_roas'] ?? null,
+                        'started_at' => isset($common['campaign_duration']['start_time']) && $common['campaign_duration']['start_time'] > 0 ? Carbon::createFromTimestamp($common['campaign_duration']['start_time']) : (isset($common['start_time']) && $common['start_time'] > 0 ? Carbon::createFromTimestamp($common['start_time']) : null),
+                        'ended_at' => isset($common['campaign_duration']['end_time']) && $common['campaign_duration']['end_time'] > 0 ? Carbon::createFromTimestamp($common['campaign_duration']['end_time']) : (isset($common['end_time']) && $common['end_time'] > 0 ? Carbon::createFromTimestamp($common['end_time']) : null),
                         'raw_setting_payload' => $setting,
                         'setting_synced_at' => now(),
                     ]
@@ -130,8 +132,21 @@ class ShopeeAdsSyncService
                 
                 $run->total_updated++;
 
-                // Item list (jika ada)
-                if (isset($setting['product_ads_info']['item_list'])) {
+                // Item list: simpan item yang terhubung ke kampanye
+                $itemIdList = $common['item_id_list'] ?? [];
+                if (!empty($itemIdList)) {
+                    // Simpan item pertama langsung di campaign (untuk join cepat)
+                    $campaign->update(['channel_item_id' => $itemIdList[0]]);
+                    
+                    foreach ($itemIdList as $itemId) {
+                        MarketplaceAdsCampaignItem::updateOrCreate(
+                            ['campaign_id' => $campaign->id, 'channel_item_id' => $itemId],
+                            ['status' => $common['campaign_status'] ?? null]
+                        );
+                    }
+                }
+                // Fallback: cek product_ads_info (format lama)
+                if (empty($itemIdList) && isset($setting['product_ads_info']['item_list'])) {
                     foreach ($setting['product_ads_info']['item_list'] as $item) {
                         MarketplaceAdsCampaignItem::updateOrCreate(
                             ['campaign_id' => $campaign->id, 'channel_item_id' => $item['item_id']],
@@ -210,7 +225,9 @@ class ShopeeAdsSyncService
             
             foreach ($list as $camp) {
                 $channelCampaignId = $camp['campaign_id'] ?? null;
-                $dailyList = $camp['daily_performance'] ?? [];
+                $adType = $camp['ad_type'] ?? null;
+                // API returns metrics_list instead of daily_performance
+                $dailyList = $camp['metrics_list'] ?? $camp['daily_performance'] ?? [];
                 
                 foreach ($dailyList as $d) {
                     if (empty($d['date'])) continue;
@@ -223,6 +240,7 @@ class ShopeeAdsSyncService
                             'date' => $date,
                         ],
                         [
+                            'ad_type'      => $adType,
                             'impressions'  => $d['impression'] ?? 0,
                             'clicks'       => $d['clicks'] ?? $d['click'] ?? 0,
                             'expense'      => $d['expense'] ?? 0,

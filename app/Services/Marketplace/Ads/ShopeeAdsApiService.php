@@ -110,6 +110,8 @@ class ShopeeAdsApiService
 
     public function getGmsItemPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
     {
-        return $this->execute($store, 'get_gms_item_performance', fn() => $this->driver($store)->getGmsItemPerformance($store, $campaignIds, $startDate, $endDate));
+        // For GMS item performance, it takes a single campaign ID or null. We'll pass null to get store-wide, or the first ID if available.
+        $campaignId = !empty($campaignIds) ? (int)$campaignIds[0] : null;
+        return $this->execute($store, 'get_gms_item_performance', fn() => $this->driver($store)->getGmsItemPerformance($store, $campaignId, $startDate, $endDate));
     }
 }

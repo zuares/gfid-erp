@@ -352,6 +352,50 @@ body[data-theme="dark"] .mini-log-entry:hover { background: rgba(255,255,255,0.0
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .mle-icon.processing i { animation: spin 1.2s linear infinite; }
+
+/* Custom Table SM (Ultra Compact) */
+.dpanel-table-sm thead th {
+    font-size: 0.65rem !important;
+    padding: 0.25rem 0.5rem !important;
+    letter-spacing: 0.05em;
+    background: transparent !important;
+}
+.dpanel-table-sm tbody td {
+    font-size: 0.7rem !important;
+    padding: 0.35rem 0.5rem !important;
+    border-bottom: 1px solid rgba(0,0,0,0.04) !important;
+}
+body[data-theme="dark"] .dpanel-table-sm tbody td {
+    border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+}
+
+/* Responsive Overrides */
+@media (max-width: 768px) {
+    .dash-hero {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1.25rem 1rem;
+        gap: 1rem;
+    }
+    .dash-hero > div {
+        text-align: left !important;
+    }
+    .dash-filter {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filter-item {
+        width: 100%;
+        min-width: unset;
+    }
+    .range-pill {
+        font-size: 0.75rem;
+        padding: 0.5rem;
+    }
+    .dpanel-table {
+        min-width: 1000px; /* force horizontal scroll on mobile */
+    }
+}
 </style>
 @endpush
 
@@ -385,10 +429,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const targetId = btn.getAttribute('data-target');
             document.getElementById(targetId).classList.add('active');
             localStorage.setItem('adsDashboardActiveTab', targetId);
-
-            if (targetId === 'tab-daily' && !dailyChart) {
-                setTimeout(() => { renderDailyChart(document.getElementById('metricSelect').value); }, 100);
-            }
         });
     });
 
@@ -498,20 +538,25 @@ function fetchRealtimeStatus() {
                 }
 
                 container.innerHTML = `
-                    <div class="dpanel p-3" style="border-left: 4px solid #f59e0b; animation: fadeIn 0.4s ease-out;">
-                        <div class="kpi-label" style="color: #b45309;"><i class="bi bi-wallet2"></i> Total Saldo Iklan</div>
-                        <div class="kpi-value" style="font-size: 1.5rem; color: #92400e;">${totalBal}</div>
-                        <div class="kpi-sub" style="color: var(--dsh-muted);">Update secara real-time</div>
+                    <div class="dpanel" style="padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05); animation: fadeIn 0.4s ease-out; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.65rem; color: #b45309; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;"><i class="bi bi-wallet2"></i> Saldo Iklan</div>
+                            <div style="font-size: 1.15rem; font-weight: 700; color: #92400e;">${totalBal}</div>
+                        </div>
                     </div>
-                    <div class="dpanel p-3" style="border-left: 4px solid #16a34a; animation: fadeIn 0.4s ease-out; animation-delay: 0.1s; animation-fill-mode: both;">
-                        <div class="kpi-label" style="color: #15803d;"><i class="bi bi-arrow-repeat"></i> Auto Top-Up</div>
-                        <div class="kpi-value" style="font-size: 1.2rem; margin-top: 0.75rem;">${topupHtml}</div>
-                        <div class="kpi-sub" style="color: var(--dsh-muted); margin-top: 0.25rem;">Pengisian saldo otomatis</div>
+                    
+                    <div class="dpanel" style="padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(22, 163, 74, 0.2); background: rgba(22, 163, 74, 0.05); animation: fadeIn 0.4s ease-out; animation-delay: 0.1s; animation-fill-mode: both; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.65rem; color: #15803d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;"><i class="bi bi-arrow-repeat"></i> Auto Top-Up</div>
+                            <div style="font-size: 0.95rem; margin-top: 4px;">${topupHtml}</div>
+                        </div>
                     </div>
-                    <div class="dpanel p-3" style="border-left: 4px solid #2563eb; animation: fadeIn 0.4s ease-out; animation-delay: 0.2s; animation-fill-mode: both;">
-                        <div class="kpi-label" style="color: #1d4ed8;"><i class="bi bi-globe"></i> Ads Fácil</div>
-                        <div class="kpi-value" style="font-size: 1.2rem; margin-top: 0.75rem;">${facilHtml}</div>
-                        <div class="kpi-sub" style="color: var(--dsh-muted); margin-top: 0.25rem;">Dukungan rate khusus Ads Fácil</div>
+
+                    <div class="dpanel" style="padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(37, 99, 235, 0.2); background: rgba(37, 99, 235, 0.05); animation: fadeIn 0.4s ease-out; animation-delay: 0.2s; animation-fill-mode: both; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.65rem; color: #1d4ed8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;"><i class="bi bi-globe"></i> Ads Fácil</div>
+                            <div style="font-size: 0.95rem; margin-top: 4px;">${facilHtml}</div>
+                        </div>
                     </div>
                 `;
             } else {
@@ -554,6 +599,49 @@ document.addEventListener('click', function(e) {
         toggle.classList.remove('open');
     }
 });
+function toggleCampaignStatus(el, campId, action) {
+    if (!confirm('Apakah Anda yakin ingin ' + (action === 'pause' ? 'menjeda (pause)' : 'melanjutkan (resume)') + ' kampanye ini?')) {
+        return;
+    }
+    
+    const storeId = "{{ $storeId }}";
+    let payload = {
+        _token: document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '',
+        store_id: storeId,
+        campaign_id: campId,
+        status_action: action
+    };
+    
+    // Show loading on the icon
+    const originalClass = el.className;
+    el.className = 'spinner-border spinner-border-sm text-primary';
+    el.style.opacity = '1';
+    
+    fetch('/marketplace/ads-dashboard/cpc-campaign-edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': payload._token
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Update UI by reloading the page to reflect the new badge, or we can just reload the page for simplicity
+            window.location.reload();
+        } else {
+            alert('Gagal mengubah status: ' + (data.message || 'Unknown error'));
+            el.className = originalClass;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan sistem.');
+        el.className = originalClass;
+    });
+}
 </script>
 @endpush
 
@@ -609,6 +697,9 @@ document.addEventListener('click', function(e) {
                 
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalGmsSettings" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--dsh-accent); background: rgba(37, 99, 235, 0.05); color: var(--dsh-accent); margin-right: 0.5rem;">
                     <i class="bi bi-gear"></i> Pengaturan GMV Max
+                </button>
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncLogs" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text); margin-right: 0.5rem;">
+                    <i class="bi bi-journal-text"></i> Log Sync
                 </button>
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text);">
                     <i class="bi bi-arrow-repeat"></i> Sync Manual
@@ -718,10 +809,9 @@ document.addEventListener('click', function(e) {
         <div style="margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
             <div class="dash-tabs-modern">
                 <button class="dash-tab-m active" data-target="tab-dashboard"><i class="bi bi-grid-1x2"></i> Ringkasan Utama</button>
-                <button class="dash-tab-m" data-target="tab-daily"><i class="bi bi-graph-up"></i> Tren Harian</button>
                 <button class="dash-tab-m" data-target="tab-campaigns"><i class="bi bi-megaphone"></i> Kampanye</button>
                 <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Performa Produk</button>
-                <button class="dash-tab-m" data-target="tab-sync"><i class="bi bi-cloud-arrow-down"></i> Sinkronisasi</button>
+                <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profitabilitas</button>
             </div>
         </div>
 
@@ -732,9 +822,23 @@ document.addEventListener('click', function(e) {
         <!-- DASHBOARD TAB -->
         <div class="tab-pane active" id="tab-dashboard">
             
+            <!-- Live Progress Bar (Hidden by default) -->
+            <div id="liveSyncProgress" class="dpanel mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi Sedang Berjalan...</span>
+                    <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: var(--dsh-border); border-radius: 4px; overflow: hidden;">
+                    <div id="liveSyncBar" style="width: 0%; height: 100%; background: var(--dsh-accent); transition: width 0.3s ease;"></div>
+                </div>
+                <div id="liveSyncLog" style="margin-top: .5rem; font-size: .7rem; font-family: ui-monospace, monospace; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    Menghubungkan ke server...
+                </div>
+            </div>
+
             {{-- INFORMASI SALDO & STATUS TOKO (REAL-TIME) --}}
             <div class="dash-sec"><i class="bi bi-wallet2 text-primary"></i> Informasi Saldo & Status Toko (Real-time)</div>
-            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;" id="realtimeStatusContainer">
+            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;" id="realtimeStatusContainer">
                 {{-- Skeleton Loaders --}}
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
                     <div class="placeholder-glow">
@@ -756,92 +860,7 @@ document.addEventListener('click', function(e) {
                 </div>
             </div>
 
-            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI) Keseluruhan</div>
-            
-            <div class="dash-grid mb-4">
-                @php
-                    $metrics = [
-                        ['title' => 'Biaya (Spend)', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
-                        ['title' => 'GMV (Pendapatan)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
-                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
-                        ['title' => 'AOV', 'key' => 'aov', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
-                        ['title' => 'Impression', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-eye'],
-                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'amber', 'icon' => 'bi-hand-index'],
-                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'violet', 'icon' => 'bi-cursor'],
-                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
-                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-coin'],
-                    ];
-                @endphp
-                @foreach($metrics as $m)
-                    @php
-                        $currSpend = $kpi['current']->spend ?? 0;
-                        $currGmv = $kpi['current']->gmv ?? 0;
-                        $currOrders = $kpi['current']->orders ?? 0;
-                        $currClicks = $kpi['current']->clicks ?? 0;
-                        $currImpressions = $kpi['current']->impressions ?? 0;
 
-                        $prevSpend = $kpi['previous']->spend ?? 0;
-                        $prevGmv = $kpi['previous']->gmv ?? 0;
-                        $prevOrders = $kpi['previous']->orders ?? 0;
-                        $prevClicks = $kpi['previous']->clicks ?? 0;
-                        $prevImpressions = $kpi['previous']->impressions ?? 0;
-
-                        $val = $kpi['current']->{$m['key']} ?? 0;
-                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
-
-                        if($m['key'] === 'roas') {
-                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
-                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
-                        } elseif ($m['key'] === 'aov') {
-                            $val = $currOrders > 0 ? round($currGmv / $currOrders, 0) : 0;
-                            $prevVal = $prevOrders > 0 ? round($prevGmv / $prevOrders, 0) : 0;
-                        } elseif ($m['key'] === 'cpc') {
-                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
-                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
-                        } elseif ($m['key'] === 'ctr') {
-                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
-                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
-                        } elseif ($m['key'] === 'cvr') {
-                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
-                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
-                        }
-
-                        $change = $kpi['changes'][$m['key']] ?? 0;
-                        if (in_array($m['key'], ['aov', 'cpc', 'ctr', 'cvr'])) {
-                            if ($prevVal == 0) {
-                                $change = $val > 0 ? 100 : 0;
-                            } else {
-                                $change = round((($val - $prevVal) / $prevVal) * 100, 2);
-                            }
-                        }
-
-                        $isUp = $change >= 0;
-                        
-                        // For cost metrics, going down is good (green). For others, going up is good.
-                        if (in_array($m['key'], ['spend', 'cpc'])) {
-                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
-                        } else {
-                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
-                        }
-                    @endphp
-                    <div class="kpi {{ $m['cls'] }}">
-                        <div class="kpi-label">
-                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
-                            {{ $m['title'] }}
-                        </div>
-                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
-                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
-                        </div>
-                        <div class="kpi-sub">
-                            <span style="font-weight:700; {{ $colorClass }}">
-                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
-                            </span> 
-                            vs rentang lalu
-                        </div>
-                    </div>
-                @endforeach
-            </div>
 
             <hr class="my-4" style="border-color: var(--dsh-border);">
             
@@ -886,10 +905,7 @@ document.addEventListener('click', function(e) {
                     <canvas id="historicalChart"></canvas>
                 </div>
             </div>
-        </div>
-
-        <!-- ANALISIS HARIAN TAB -->
-        <div class="tab-pane" id="tab-daily">
+        <!-- ANALISIS HARIAN TAB (DIGABUNG KE RINGKASAN UTAMA) -->
 <div class="dash-panels mb-4" style="grid-template-columns: 1fr;">
                 {{-- HEATMAP JAM TAYANG --}}
                 <div class="dpanel p-3">
@@ -957,22 +973,198 @@ document.addEventListener('click', function(e) {
             </div>
         </div>
 
-        <!-- TAB RINCIAN KAMPANYE -->
+        <!-- TAB PROFITABILITAS -->
+        <div class="tab-pane" id="tab-profit">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="m-0" style="font-weight: 700; color: var(--text); font-size: 1.1rem;"><i class="bi bi-cash-coin text-success"></i> Analisis Profitabilitas</h5>
+            </div>
+            @include('marketplace.partials._profitability_tab')
+        </div>
+
+        <!-- TAB KAMPANYE -->
         <div class="tab-pane" id="tab-campaigns">
-            <!-- INNER TABS FOR KAMPANYE -->
-            <div class="dash-tabs-modern mb-3">
-                <button class="dash-tab-sm inner-tab-btn active" data-inner-target="inner-campaign-list"><i class="bi bi-list-ul"></i> Daftar Kampanye</button>
-                <button class="dash-tab-sm inner-tab-btn" data-inner-target="inner-campaign-settings"><i class="bi bi-gear"></i> Pengaturan & Target</button>
+            
+            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI) Kampanye</div>
+            
+            <div class="dash-grid mb-4">
+                @php
+                    // Calculate Global Profit Data
+                    $totalNetRevenue = 0;
+                    $totalCogs = 0;
+                    foreach($campaigns as $camp) {
+                        if ($camp->spend > 0 || $camp->gmv > 0) {
+                            $netRev = $camp->gmv * ($camp->net_revenue_ratio ?? 0.89);
+                            $totalNetRevenue += $netRev;
+                            $totalCogs += $camp->gmv * ($camp->cogs_ratio ?? 0);
+                        }
+                    }
+                    
+                    // Inject to KPI current
+                    if (!isset($kpi['current'])) $kpi['current'] = new \stdClass();
+                    if (!isset($kpi['previous'])) $kpi['previous'] = new \stdClass();
+                    
+                    $currGmv = $kpi['current']->gmv ?? 0;
+                    $currSpend = $kpi['current']->spend ?? 0;
+                    $currOrders = $kpi['current']->orders ?? 0;
+                    
+                    $kpi['current']->net_revenue = $totalNetRevenue;
+                    $kpi['current']->net_profit = $totalNetRevenue - $totalCogs - ($currSpend * 1.11);
+                    $kpi['current']->aov_net = $currOrders > 0 ? $totalNetRevenue / $currOrders : 0;
+                    
+                    // Estimate previous based on current ratios
+                    $prevGmv = $kpi['previous']->gmv ?? 0;
+                    $prevSpend = $kpi['previous']->spend ?? 0;
+                    $prevOrders = $kpi['previous']->orders ?? 0;
+                    
+                    $revRatio = $currGmv > 0 ? $totalNetRevenue / $currGmv : 0.89;
+                    $cogsRatio = $currGmv > 0 ? $totalCogs / $currGmv : 0.60;
+                    
+                    $kpi['previous']->net_revenue = $prevGmv * $revRatio;
+                    $kpi['previous']->net_profit = ($prevGmv * $revRatio) - ($prevGmv * $cogsRatio) - ($prevSpend * 1.11);
+                    $kpi['previous']->aov_net = $prevOrders > 0 ? ($prevGmv * $revRatio) / $prevOrders : 0;
+
+                    $metrics = [
+                        ['title' => 'Biaya (Topup PPN)', 'key' => 'spend_topup', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
+                        ['title' => 'GMV (Kotor)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
+                        ['title' => 'Net Revenue', 'key' => 'net_revenue', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'blue', 'icon' => 'bi-cash-coin'],
+                        ['title' => 'Net Profit', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'emerald', 'icon' => 'bi-piggy-bank'],
+                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
+                        ['title' => 'AOV Net', 'key' => 'aov_net', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
+                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
+                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
+                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-cursor'],
+                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-coin'],
+                    ];
+                @endphp
+                @foreach($metrics as $m)
+                    @php
+                        $currSpend = $kpi['current']->spend ?? 0;
+                        $currGmv = $kpi['current']->gmv ?? 0;
+                        $currOrders = $kpi['current']->orders ?? 0;
+                        $currClicks = $kpi['current']->clicks ?? 0;
+                        $currImpressions = $kpi['current']->impressions ?? 0;
+
+                        $prevSpend = $kpi['previous']->spend ?? 0;
+                        $prevGmv = $kpi['previous']->gmv ?? 0;
+                        $prevOrders = $kpi['previous']->orders ?? 0;
+                        $prevClicks = $kpi['previous']->clicks ?? 0;
+                        $prevImpressions = $kpi['previous']->impressions ?? 0;
+
+                        $val = $kpi['current']->{$m['key']} ?? 0;
+                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
+
+                        if($m['key'] === 'roas') {
+                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
+                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
+                        } elseif ($m['key'] === 'spend_topup') {
+                            $val = $currSpend * 1.11;
+                            $prevVal = $prevSpend * 1.11;
+                        } elseif ($m['key'] === 'cpc') {
+                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
+                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
+                        } elseif ($m['key'] === 'ctr') {
+                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
+                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
+                        } elseif ($m['key'] === 'cvr') {
+                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
+                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
+                        }
+
+                        $change = $kpi['changes'][$m['key']] ?? 0;
+                        if (in_array($m['key'], ['aov', 'aov_net', 'cpc', 'ctr', 'cvr', 'net_revenue', 'net_profit', 'spend_topup'])) {
+                            if ($prevVal == 0) {
+                                $change = $val > 0 ? 100 : 0;
+                            } else {
+                                $change = round((($val - $prevVal) / abs($prevVal)) * 100, 2);
+                            }
+                        }
+
+
+                        $isUp = $change >= 0;
+                        
+                        // For cost metrics, going down is good (green). For others, going up is good.
+                        if (in_array($m['key'], ['spend', 'cpc', 'spend_topup'])) {
+                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
+                        } else {
+                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
+                        }
+                    @endphp
+                    <div class="kpi {{ $m['cls'] }}">
+                        <div class="kpi-label">
+                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
+                            {{ $m['title'] }}
+                        </div>
+                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
+                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
+                        </div>
+                        <div class="kpi-sub">
+                            <span style="font-weight:700; {{ $colorClass }}">
+                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
+                            </span> 
+                            vs rentang lalu
+                        </div>
+                    </div>
+                @endforeach
             </div>
 
-            <div id="inner-campaign-list" class="inner-tab-pane active" style="display: block;">
-                <div class="dash-sec"><i class="bi bi-megaphone"></i> Daftar Kampanye</div>
+            <!-- INNER TABS FOR KAMPANYE -->
+            <div class="dash-tabs-modern mb-3">
+                <button class="dash-tab-sm inner-tab-btn active" data-inner-target="inner-campaign-gms"><i class="bi bi-lightning-charge"></i> GMV Max</button>
+                <button class="dash-tab-sm inner-tab-btn" data-inner-target="inner-campaign-individual"><i class="bi bi-list-ul"></i> Iklan Individual</button>
+            </div>
+
+            <div id="inner-campaign-gms" class="inner-tab-pane active" style="display: block;">
+                <div class="dash-sec"><i class="bi bi-gear"></i> Konfigurasi Kampanye Auto (GMV Max)</div>
+                <div class="dpanel p-4 mb-4" style="background: var(--card-bg);">
+                    @if($autoCampaign)
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                    <h5 style="margin: 0; font-weight: 700; color: var(--text);">{{ $autoCampaign->campaign_name ?: 'GMV Max (Auto)' }}</h5>
+                                    @if($autoCampaign->campaign_status === 'ongoing')
+                                        <span class="badge" style="background: #16a34a; color: #fff; font-weight: 600; border-radius: 6px;">Berjalan</span>
+                                    @elseif($autoCampaign->campaign_status === 'paused')
+                                        <span class="badge" style="background: #eab308; color: #fff; font-weight: 600; border-radius: 6px;">Jeda</span>
+                                    @elseif($autoCampaign->campaign_status)
+                                        <span class="badge bg-secondary" style="border-radius: 6px;">{{ ucfirst($autoCampaign->campaign_status) }}</span>
+                                    @endif
+                                </div>
+                                <div style="font-family: ui-monospace, monospace; font-size: .85rem; color: var(--dsh-muted);">
+                                    Camp ID: {{ $autoCampaign->channel_campaign_id }} &bull; Budget: <span style="font-weight: 600; color: var(--text);">{{ $autoCampaign->campaign_budget > 0 ? 'Rp ' . number_format($autoCampaign->campaign_budget, 0, ',', '.') : 'Unlimited' }}</span>
+                                </div>
+                            </div>
+                            
+                            <div style="text-align: right; background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.1); padding: 12px 24px; border-radius: 12px; min-width: 150px;">
+                                <div style="font-size: .75rem; font-weight: 600; color: var(--dsh-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Target ROAS</div>
+                                <div style="font-weight: 800; font-size: 1.5rem; color: var(--dsh-accent); font-variant-numeric: tabular-nums;">
+                                    {{ $autoCampaign->target_roas ? number_format($autoCampaign->target_roas, 2).'x' : 'Auto' }}
+                                </div>
+                            </div>
+                        </div>
+                    @else
+                        <div class="text-center py-3" style="color: var(--dsh-muted); font-size: .9rem;">
+                            <i class="bi bi-info-circle mb-2" style="font-size: 1.5rem; display: block;"></i>
+                            Data kampanye GMV Max (Auto) belum tersinkronisasi.<br>
+                            Sistem akan menarik pengaturannya dari Shopee pada saat sinkronisasi berikutnya.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Daftar Produk GMV Max (Otomatis)</div>
+                <div class="dpanel">
+                    @include('marketplace.partials._gms_item_table', ['gmsItems' => $gmsItems, 'globalRoas' => $adsSetting->target_roas ?? null])
+                </div>
+            </div>
+
+            <div id="inner-campaign-individual" class="inner-tab-pane" style="display: none;">
+                <div class="dash-sec"><i class="bi bi-megaphone"></i> Iklan Individual (Pencarian & Serupa)</div>
             
             @php
                 $totalBoncos = 0;
                 $totalHiddenGem = 0;
                 $totalSpendBoncos = 0;
-                foreach($campaigns as $c) {
+                $individualCamps = $campaigns->filter(fn($c) => !str_starts_with($c->channel_campaign_id, 'GMS-'));
+                foreach($individualCamps as $c) {
                     $r = $c->spend > 0 ? $c->gmv / $c->spend : 0;
                     if ($c->spend > 50000 && $r < 1.5) { $totalBoncos++; $totalSpendBoncos += $c->spend; }
                     elseif ($r >= 5.0 && $c->spend > 10000) { $totalHiddenGem++; }
@@ -998,193 +1190,10 @@ document.addEventListener('click', function(e) {
             </div>
             
             <div class="dpanel">
-                <div class="table-responsive">
-                    <table class="dpanel-table">
-                        <thead>
-                            <tr>
-                                <th>Kampanye</th>
-                                <th>Tipe</th>
-                                <th>Diagnosis AI</th>
-                                <th class="text-end">Biaya (Spend)</th>
-                                <th class="text-end">GMV</th>
-                                <th class="text-end">ROAS</th>
-                                <th class="text-end">Klik</th>
-                                <th class="text-end">Pesanan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($campaigns as $camp)
-                                @php
-                                    $c_roas = $camp->spend > 0 ? $camp->gmv / $camp->spend : 0;
-                                    $c_prev_roas = $camp->prev_spend > 0 ? $camp->prev_gmv / $camp->prev_spend : 0;
-                                    $c_cvr = $camp->clicks > 0 ? ($camp->orders / $camp->clicks) * 100 : 0;
-                                    
-                                    $gmv_growth = $camp->prev_gmv > 0 ? (($camp->gmv - $camp->prev_gmv) / $camp->prev_gmv) * 100 : ($camp->gmv > 0 ? 100 : 0);
-                                    $roas_growth = $c_prev_roas > 0 ? (($c_roas - $c_prev_roas) / $c_prev_roas) * 100 : ($c_roas > 0 ? 100 : 0);
-                                    $spend_growth = $camp->prev_spend > 0 ? (($camp->spend - $camp->prev_spend) / $camp->prev_spend) * 100 : ($camp->spend > 0 ? 100 : 0);
-                                    $clicks_growth = $camp->prev_clicks > 0 ? (($camp->clicks - $camp->prev_clicks) / $camp->prev_clicks) * 100 : ($camp->clicks > 0 ? 100 : 0);
-                                    $orders_growth = $camp->prev_orders > 0 ? (($camp->orders - $camp->prev_orders) / $camp->prev_orders) * 100 : ($camp->orders > 0 ? 100 : 0);
-                                    
-                                    $ai_status = '⚖️ Normal';
-                                    $ai_color = 'var(--dsh-muted)';
-                                    $ai_bg = 'transparent';
-                                    $ai_note = 'Performa standar.';
-                                    
-                                    if ($camp->spend > 50000 && $c_roas < 1.5) {
-                                        $ai_status = '🚨 Boncos (Stop!)';
-                                        $ai_color = '#dc2626';
-                                        $ai_bg = 'rgba(220, 38, 38, 0.05)';
-                                        if ($roas_growth < -20) {
-                                            $ai_note = 'ROAS anjlok ' . abs(round($roas_growth)) . '%. Kebocoran ekstrem!';
-                                        } else {
-                                            $ai_note = 'Membakar uang tanpa hasil konversi.';
-                                        }
-                                    } elseif ($c_roas >= 5.0 && $camp->spend > 10000) {
-                                        $ai_status = '💎 Hidden Gem';
-                                        $ai_color = '#16a34a';
-                                        $ai_bg = 'rgba(22, 163, 74, 0.05)';
-                                        if ($gmv_growth > 20) {
-                                            $ai_note = 'On Fire! GMV meroket ' . round($gmv_growth) . '%. Skalakan budget.';
-                                        } else {
-                                            $ai_note = 'Super efisien! Siap untuk diskalakan.';
-                                        }
-                                    } elseif ($c_cvr < 0.5 && $camp->clicks > 100) {
-                                        $ai_status = '⚠️ Window Shopping';
-                                        $ai_color = '#eab308';
-                                        $ai_bg = 'rgba(234, 179, 8, 0.05)';
-                                        $ai_note = 'Banyak klik tapi zonk. Cek harga/kompetitor.';
-                                    } elseif ($c_roas >= 2.0 && $c_roas < 5.0 && $camp->spend > 50000) {
-                                        $ai_status = '🚀 Tulang Punggung';
-                                        $ai_color = '#3b82f6';
-                                        $ai_bg = 'rgba(59, 130, 246, 0.05)';
-                                        if ($gmv_growth < -15) {
-                                            $ai_note = 'Volume GMV menyusut ' . abs(round($gmv_growth)) . '%. Cek budget harian.';
-                                        } else {
-                                            $ai_note = 'Mesin pencetak GMV berjalan stabil.';
-                                        }
-                                    } elseif ($camp->spend < 10000) {
-                                        $ai_status = '💤 Pasif';
-                                        $ai_color = 'var(--dsh-muted)';
-                                        $ai_bg = 'transparent';
-                                        $ai_note = 'Kekurangan trafik atau dibatasi budget.';
-                                    }
-                                @endphp
-                                <tr style="background: {{ $ai_bg }}; border-bottom: 1px solid var(--dsh-border);">
-                                    <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
-                                        <div style="font-weight: 700; color: var(--text);">{{ $camp->campaign_name }}</div>
-                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">
-                                            ID: {{ $camp->channel_campaign_id }} &bull; <span class="{{ $camp->status == 'ONGOING' ? 'text-success' : 'text-muted' }}">{{ $camp->status }}</span>
-                                            &bull; <a href="javascript:void(0)" onclick='openCampaignHourlyModal("{{ $camp->channel_campaign_id }}", @json($camp->campaign_name))' style="color: #2563eb; text-decoration: none; font-weight: 600;"><i class="bi bi-clock-history"></i> Cek 24 Jam</a>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        @php
-                                            $campType = 'Tidak Diketahui';
-                                            $campTypeColor = '#64748b';
-                                            $campTypeBg = 'rgba(100,116,139,0.1)';
-                                            
-                                            // Menggunakan data API yang lebih relevan (bidding_method & ad_type)
-                                            if (str_starts_with($camp->channel_campaign_id, 'GMS-')) {
-                                                $campType = 'GMV Max';
-                                                $campTypeColor = '#2563eb';
-                                                $campTypeBg = 'rgba(37,99,235,0.1)';
-                                            } elseif (isset($camp->ad_type) && in_array($camp->ad_type, ['search', 'manual'])) {
-                                                $campType = 'Pencarian (CPC)';
-                                                $campTypeColor = '#ca8a04';
-                                                $campTypeBg = 'rgba(234,179,8,0.1)';
-                                            } elseif ($camp->bidding_method == 'auto') {
-                                                $campType = 'Auto Bidding';
-                                                $campTypeColor = '#9333ea';
-                                                $campTypeBg = 'rgba(147,51,234,0.1)';
-                                            }
-                                        @endphp
-                                        <span style="background: {{ $campTypeBg }}; color: {{ $campTypeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $campType }}</span>
-                                    </td>
-                                    <td>
-                                        <div style="font-weight: 700; color: {{ $ai_color }}; font-size: 0.75rem;">{{ $ai_status }}</div>
-                                        <div style="font-size: 0.65rem; color: var(--dsh-muted); opacity: 0.9;">{{ $ai_note }}</div>
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
-                                        Rp {{ number_format($camp->spend, 0, ',', '.') }}
-                                        @if($spend_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $spend_growth > 0 ? '#dc2626' : '#16a34a' }};">
-                                                {{ $spend_growth > 0 ? '▲' : '▼' }} {{ abs(round($spend_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
-                                        Rp {{ number_format($camp->gmv, 0, ',', '.') }}
-                                        @if($gmv_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $gmv_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $gmv_growth > 0 ? '▲' : '▼' }} {{ abs(round($gmv_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $c_roas >= 4.0 ? '#16a34a' : ($c_roas >= 2.0 ? '#eab308' : '#dc2626') }};">
-                                        {{ number_format($c_roas, 2) }}x
-                                        @if($roas_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $roas_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $roas_growth > 0 ? '▲' : '▼' }} {{ abs(round($roas_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($camp->clicks, 0, ',', '.') }}
-                                        @if($clicks_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $clicks_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $clicks_growth > 0 ? '▲' : '▼' }} {{ abs(round($clicks_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($camp->orders, 0, ',', '.') }}
-                                        @if($orders_growth != 0)
-                                            <div style="font-size: 0.65rem; color: {{ $orders_growth > 0 ? '#16a34a' : '#dc2626' }};">
-                                                {{ $orders_growth > 0 ? '▲' : '▼' }} {{ abs(round($orders_growth)) }}%
-                                            </div>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
-                                        Belum ada data kampanye.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                @include('marketplace.partials._campaign_table', ['campaigns' => $individualCamps])
             </div>
-            </div> <!-- CLOSE inner-campaign-list -->
+            </div> <!-- CLOSE inner-campaign-individual -->
 
-            <!-- INNER TAB: PENGATURAN KAMPANYE -->
-            <div id="inner-campaign-settings" class="inner-tab-pane" style="display: none;">
-                <div class="dash-sec"><i class="bi bi-gear"></i> Pengaturan & Target Kampanye</div>
-                
-                <div class="dpanel p-4" style="max-width: 600px; background: var(--card-bg);">
-                    <form id="formAdsSetting">
-                        <div class="mb-3">
-                            <label style="font-size: .8rem; font-weight: 600; color: var(--dsh-muted); margin-bottom: .4rem; display: block;">Target ROAS Global</label>
-                            <div class="input-group">
-                                <span class="input-group-text" style="background: var(--bg); border-color: var(--card-border); color: var(--text);">x</span>
-                                <input type="number" step="0.01" class="form-control" name="target_roas" value="{{ $adsSetting->target_roas ?? '' }}" placeholder="Contoh: 5.5" style="background: var(--bg); border-color: var(--card-border); color: var(--text);">
-                            </div>
-                            <div style="font-size: 0.7rem; color: var(--dsh-muted); margin-top: .4rem;">Nilai ROAS yang ingin dicapai secara rata-rata untuk seluruh kampanye.</div>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label style="font-size: .8rem; font-weight: 600; color: var(--dsh-muted); margin-bottom: .4rem; display: block;">Catatan Strategi & Aturan Khusus</label>
-                            <textarea class="form-control" name="notes" rows="4" placeholder="Tuliskan catatan strategi bidding atau instruksi khusus..." style="background: var(--bg); border-color: var(--card-border); color: var(--text);">{{ $adsSetting->notes ?? '' }}</textarea>
-                        </div>
-                        
-                        <button type="button" onclick="saveAdsSetting()" class="btn btn-primary" style="font-weight: 600; font-size: .85rem; padding: .6rem 1.25rem; border-radius: 8px;">
-                            <i class="bi bi-save"></i> Simpan Pengaturan
-                        </button>
-                    </form>
-                </div>
-            </div>
-            <!-- CLOSE inner-campaign-settings -->
         </div>
 
         <!-- TAB PERFORMA PRODUK (GMV MAX) -->
@@ -1364,16 +1373,16 @@ document.addEventListener('click', function(e) {
                 </div>
             </div>
 
-            <div class="dash-sec"><i class="bi bi-box-seam"></i> Rincian Produk (GMV Max)</div>
+            <div class="dash-sec"><i class="bi bi-box-seam"></i> Rincian Semua Produk (CPC + GMV Max)</div>
             
             <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
                     <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: var(--dsh-accent); font-size: 0.85rem;">
-                        <i class="bi bi-info-circle"></i> Info Data GMV Max
+                        <i class="bi bi-info-circle"></i> Info Data Produk
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted);">
-                        Tabel ini menampilkan performa spesifik per produk berdasarkan data **Shop GMV Max (GMS)**.
-                        Metrik di bawah ini ditarik langsung dari mesin otomatisasi Shopee.
+                        Tabel ini menampilkan performa per produk dari <b>semua kampanye iklan</b> (CPC + GMV Max).
+                        Metrik diagregasi berdasarkan rentang tanggal yang dipilih.
                     </div>
                 </div>
             </div>
@@ -1383,41 +1392,47 @@ document.addEventListener('click', function(e) {
                     <table class="dpanel-table">
                         <thead>
                             <tr>
-                                <th>Produk / Item ID</th>
+                                <th>Produk / Kampanye</th>
+                                <th>Tipe</th>
+                                <th>Status</th>
                                 <th class="text-end">Biaya (Spend)</th>
                                 <th class="text-end">GMV</th>
                                 <th class="text-end">ROAS</th>
                                 <th class="text-end">Impresi</th>
                                 <th class="text-end">Klik</th>
                                 <th class="text-end">Pesanan</th>
-                                <th class="text-end">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($itemPerformance ?? [] as $item)
                                 @php
                                     $itemRoas = $item->spend > 0 ? $item->gmv / $item->spend : 0;
+                                    $isGms = str_starts_with($item->channel_campaign_id ?? '', 'GMS-');
+                                    $typeLabel = $isGms ? 'GMV Max' : 'CPC';
+                                    $typeColor = $isGms ? '#2563eb' : '#ca8a04';
+                                    $typeBg = $isGms ? 'rgba(37,99,235,0.1)' : 'rgba(234,179,8,0.1)';
+                                    $statusLabel = $item->campaign_status ?? '-';
+                                    $statusColor = $statusLabel === 'ongoing' ? '#16a34a' : ($statusLabel === 'paused' ? '#eab308' : '#64748b');
                                 @endphp
                                 <tr>
                                     <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
                                         <div style="font-weight: 700; color: var(--text); white-space: normal; max-width: 300px;">
-                                            {{ $item->item_name ?? 'Produk Tidak Diketahui' }}
+                                            {{ $item->item_name ?? $item->campaign_name ?? 'Produk Tidak Diketahui' }}
                                         </div>
                                         <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted); display: flex; align-items: center; gap: 6px; margin-top: 4px;">
-                                            <span>ID: {{ $item->channel_item_id }}</span>
-                                            @if($item->gms_campaign_id)
-                                                <span>Camp: {{ $item->gms_campaign_id }}</span>
-                                            @elseif($item->any_campaign_id)
-                                                <span>Camp: {{ $item->any_campaign_id }}</span>
+                                            @if($item->channel_item_id)
+                                                <span>ID: {{ $item->channel_item_id }}</span>
                                             @endif
-                                            @if($item->broad_gmv_sum > 0 && $item->direct_gmv_sum == 0)
-                                                <span style="background: rgba(37,99,235,0.1); color: #2563eb; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMV Max</span>
-                                            @elseif($item->direct_gmv_sum > 0 && $item->broad_gmv_sum == 0)
-                                                <span style="background: rgba(234,179,8,0.1); color: #ca8a04; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">Pencarian (CPC)</span>
-                                            @elseif($item->direct_gmv_sum > 0 && $item->broad_gmv_sum > 0)
-                                                <span style="background: rgba(147,51,234,0.1); color: #9333ea; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">GMS + CPC</span>
+                                            @if($item->item_sku)
+                                                <span>SKU: {{ $item->item_sku }}</span>
                                             @endif
                                         </div>
+                                    </td>
+                                    <td>
+                                        <span style="background: {{ $typeBg }}; color: {{ $typeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $typeLabel }}</span>
+                                    </td>
+                                    <td>
+                                        <span style="color: {{ $statusColor }}; font-weight: 700; font-size: 0.72rem; text-transform: capitalize;">{{ $statusLabel }}</span>
                                     </td>
                                     <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
                                         Rp {{ number_format($item->spend, 0, ',', '.') }}
@@ -1437,39 +1452,11 @@ document.addEventListener('click', function(e) {
                                     <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
                                         {{ number_format($item->orders, 0, ',', '.') }}
                                     </td>
-                                    <td class="text-end">
-                                        <div class="d-flex flex-column gap-2 align-items-end" style="min-width: 180px;">
-                                            @php
-                                                $isGms = !empty($item->gms_campaign_id) || (empty($item->any_campaign_id) && $item->broad_gmv_sum > 0);
-                                                $funcSubmit = $isGms ? 'submitInlineGms' : 'submitInlineCpc';
-                                                $campIdSubmit = $isGms ? ($item->gms_campaign_id ?? '') : $item->any_campaign_id;
-                                                $titleSubmit = $isGms ? 'Simpan Pengaturan GMV Max' : 'Simpan Pengaturan Iklan Manual (CPC)';
-                                            @endphp
-                                            @if($item->broad_gmv_sum > 0 || $item->gms_campaign_id || $item->any_campaign_id)
-                                                <div class="input-group input-group-sm" style="max-width: 180px;">
-                                                    <span class="input-group-text" style="font-size: 0.7rem; background: var(--bg); border-color: var(--dsh-border); color: var(--dsh-muted);">Modal Rp</span>
-                                                    <input type="number" id="inlineBudget_{{ $item->channel_item_id }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="Kosong=Tetap" min="20000" step="1000">
-                                                </div>
-                                                <div class="input-group input-group-sm" style="max-width: 180px;">
-                                                    <span class="input-group-text" style="font-size: 0.7rem; background: var(--bg); border-color: var(--dsh-border); color: var(--dsh-muted);">ROAS (x)</span>
-                                                    <input type="number" id="inlineRoas_{{ $item->channel_item_id }}" class="form-control text-end" style="font-size: 0.75rem; background: var(--bg); border-color: var(--dsh-border); color: var(--text);" placeholder="0=Auto" step="0.1">
-                                                    <button class="btn btn-outline-primary" type="button" onclick="{{ $funcSubmit }}('{{ $item->channel_item_id }}', '{{ $campIdSubmit }}', '{{ $storeId }}', this)" title="{{ $titleSubmit }}" style="border-color: var(--dsh-border);">
-                                                        <i class="bi bi-check-lg"></i>
-                                                    </button>
-                                                </div>
-                                            @endif
-                                            @if($isGms)
-                                            <button onclick="toggleGmsItem('{{ $item->channel_item_id }}', 'remove', this)" class="btn btn-sm btn-outline-danger mt-1 w-100" style="font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 6px; max-width: 180px;">
-                                                <i class="bi bi-pause-circle"></i> Hentikan GMS
-                                            </button>
-                                            @endif
-                                        </div>
-                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
-                                        Belum ada data performa item GMV Max.
+                                    <td colspan="9" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                                        Belum ada data performa produk.
                                     </td>
                                 </tr>
                             @endforelse
@@ -1479,28 +1466,15 @@ document.addEventListener('click', function(e) {
             </div>
         </div>
 
-        <!-- SINKRONISASI TAB -->
-        <div class="tab-pane" id="tab-sync">
-            
-            <!-- Live Progress Bar (Hidden by default) -->
-            <div id="liveSyncProgress" class="dpanel mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi Sedang Berjalan...</span>
-                    <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
-                </div>
-                <div style="width: 100%; height: 6px; background: var(--dsh-border); border-radius: 4px; overflow: hidden;">
-                    <div id="liveSyncBar" style="width: 0%; height: 100%; background: var(--dsh-accent); transition: width 0.3s ease;"></div>
-                </div>
-                <div id="liveSyncLog" style="margin-top: .5rem; font-size: .7rem; font-family: ui-monospace, monospace; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    Menghubungkan ke server...
-                </div>
-            </div>
-
-            <div class="dash-panels" style="grid-template-columns: 1fr;">
-                <!-- Sync Logs -->
-                <div>
-                    <div class="dash-sec"><i class="bi bi-clock-history"></i> Riwayat Sinkronisasi (Log)</div>
-                    <div class="dpanel">
+        <!-- SINKRONISASI LOG (MODAL) -->
+        <div class="modal fade" id="modalSyncLogs" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden;">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold" style="color: var(--text);"><i class="bi bi-clock-history"></i> Riwayat Sinkronisasi (Log)</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
                         <div class="table-responsive">
                             <table class="dpanel-table">
                                 <thead>
@@ -1549,7 +1523,6 @@ document.addEventListener('click', function(e) {
                     </div>
                 </div>
             </div>
-
         </div>
 
     @endif
@@ -1557,7 +1530,7 @@ document.addEventListener('click', function(e) {
 
 <!-- Modal GMS Settings -->
 <div class="modal fade" id="modalGmsSettings" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="border-radius:16px; background: var(--card-bg); border: 1px solid var(--card-border); box-shadow: var(--card-shadow);">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold" style="color: var(--text);">Pengaturan GMV Max</h5>
@@ -1565,24 +1538,8 @@ document.addEventListener('click', function(e) {
             </div>
             <div class="modal-body">
                 <form id="formGmsSettings" onsubmit="submitGmsSettings(event)">
-                    <div class="mb-3">
-                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
-                        <select id="gmsStoreId" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" required>
-                            @foreach($stores as $s)
-                                <option value="{{ $s->id }}" {{ isset($storeId) && $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Batas Modal Harian (Rp)</label>
-                        <input type="number" id="gmsDailyBudget" class="form-control" placeholder="Biarkan kosong jika tidak diubah" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" min="0" step="1000">
-                        <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Minimal Rp 20.000. Contoh: 50000</small>
-                    </div>
-                    
-                    <div class="mb-3">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">ID Kampanye GMV Max (Opsional)</label>
-                        <input type="number" id="gmsCampaignId" class="form-control" placeholder="Contoh: 123456789" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" min="0">
+                        <input type="text" id="gmsCampaignId" class="form-control" placeholder="Contoh: 123456789" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);">
                         <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Biarkan kosong untuk mengubah kampanye GMV Max utama/seluruh toko.</small>
                     </div>
 
@@ -2935,7 +2892,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                         title: function(context) {
                                             let idx = context[0].dataIndex;
                                             let fullSku = sorted[idx].item_sku || sorted[idx].channel_item_id;
-                                            let fullName = sorted[idx].item_name || 'Unknown Product';
+                                            let fullName = sorted[idx].item_name || sorted[idx].campaign_name || 'Unknown Product';
                                             return fullSku + ' | ' + fullName;
                                         },
                                         label: function(c) {
@@ -2995,7 +2952,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     let topGmv = [...rawItems].sort((a,b) => parseFloat(b.gmv || 0) - parseFloat(a.gmv || 0))[0];
                     if (topGmv && parseFloat(topGmv.gmv) > 0) {
                         let sku = topGmv.item_sku || topGmv.channel_item_id;
-                        let name = topGmv.item_name || 'Produk';
+                        let name = topGmv.item_name || topGmv.campaign_name || 'Produk';
                         if (name.length > 25) name = name.substring(0, 25) + '...';
                         insightsHtml += `<div class="mb-2"><i class="bi bi-star-fill text-warning me-2"></i> <b>Produk Bintang:</b> SKU <b>${sku}</b> (${name}) adalah penyumbang GMV terbesar (Rp ${formatShortIDR(topGmv.gmv)}). Pastikan stok produk ini selalu aman.</div>`;
                     }
@@ -3296,8 +3253,9 @@ function openGmsSettingsForProduct(campaignId) {
     } else {
         document.getElementById('gmsCampaignId').value = '';
     }
-    const modal = new bootstrap.Modal(document.getElementById('modalGmsSettings'));
-    modal.show();
+    // Pindah ke tab Kampanye dan scroll ke atas
+    document.querySelector('.dash-tab-m[data-target="tab-campaigns"]').click();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function submitInlineGms(channelItemId, campaignId, storeId, btnElement) {
@@ -3437,8 +3395,6 @@ function submitGmsSettings(e) {
     .then(res => {
         if (res.status === 'success') {
             alert(res.message);
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalGmsSettings'));
-            if (modal) modal.hide();
         } else {
             alert('Error: ' + res.message);
         }
@@ -3521,4 +3477,144 @@ function saveAdsSetting() {
 }
 </script>
 @endif
+<script>
+function showInlineEdit(el) {
+    const wrapper = el.closest('.inline-edit-wrapper');
+    wrapper.querySelector('.inline-edit-text').style.display = 'none';
+    const inputContainer = wrapper.querySelector('.inline-edit-input');
+    inputContainer.style.display = 'inline-flex';
+    const input = inputContainer.querySelector('input');
+    input.focus();
+    
+    // Add event listener for Enter key
+    input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveInlineEdit(inputContainer.querySelector('.text-success'));
+        }
+    }, { once: true });
+}
+
+function cancelInlineEdit(el) {
+    const wrapper = el.closest('.inline-edit-wrapper');
+    wrapper.querySelector('.inline-edit-input').style.display = 'none';
+    wrapper.querySelector('.inline-edit-text').style.display = 'inline';
+    
+    // Reset value
+    const input = wrapper.querySelector('input');
+    input.value = wrapper.getAttribute('data-val');
+}
+
+function saveInlineEdit(el) {
+    const wrapper = el.closest('.inline-edit-wrapper');
+    const input = wrapper.querySelector('input');
+    const newVal = input.value;
+    const oldVal = wrapper.getAttribute('data-val');
+    
+    if (newVal === oldVal) {
+        cancelInlineEdit(el);
+        return;
+    }
+    
+    const type = wrapper.getAttribute('data-type');
+    const campId = wrapper.getAttribute('data-camp');
+    const storeId = "{{ $storeId }}";
+    
+    let payload = {
+        _token: document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '',
+        store_id: storeId,
+        campaign_id: campId
+    };
+    
+    if (type === 'daily_budget') {
+        payload.daily_budget = newVal;
+    } else if (type === 'roas_target') {
+        payload.roas_target = newVal;
+    }
+    
+    const originalContent = wrapper.querySelector('.inline-edit-text').innerHTML;
+    wrapper.querySelector('.inline-edit-text').innerHTML = '<span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span> Menyimpan...';
+    wrapper.querySelector('.inline-edit-input').style.display = 'none';
+    wrapper.querySelector('.inline-edit-text').style.display = 'inline';
+    
+    fetch('/marketplace/ads-dashboard/cpc-campaign-edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': payload._token
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Update UI
+            wrapper.setAttribute('data-val', newVal);
+            let displayVal = '';
+            if (type === 'daily_budget') {
+                let numVal = parseFloat(newVal);
+                displayVal = numVal > 0 ? 'Rp ' + numVal.toLocaleString('id-ID') : 'Unlimited';
+            } else {
+                let numVal = parseFloat(newVal);
+                displayVal = numVal > 0 ? numVal.toFixed(2) + 'x' : 'Auto';
+            }
+            wrapper.querySelector('.inline-edit-text').innerHTML = displayVal + ' <i class="bi bi-pencil-fill text-muted" style="font-size: .6rem; opacity: 0.5;"></i>';
+            
+            // Optional: alert('Tersimpan!');
+        } else {
+            alert('Gagal menyimpan: ' + (data.message || 'Unknown error'));
+            wrapper.querySelector('.inline-edit-text').innerHTML = originalContent;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan saat menyimpan pengaturan.');
+        wrapper.querySelector('.inline-edit-text').innerHTML = originalContent;
+    });
+}
+function toggleCampaignStatus(el, campId, action) {
+    if (!confirm('Apakah Anda yakin ingin ' + (action === 'pause' ? 'menjeda (pause)' : 'melanjutkan (resume)') + ' kampanye ini?')) {
+        return;
+    }
+    
+    const storeId = "{{ $storeId }}";
+    let payload = {
+        _token: document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '',
+        store_id: storeId,
+        campaign_id: campId,
+        status_action: action
+    };
+    
+    // Show loading on the icon
+    const originalClass = el.className;
+    el.className = 'spinner-border spinner-border-sm text-primary';
+    el.style.opacity = '1';
+    
+    fetch('/marketplace/ads-dashboard/cpc-campaign-edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': payload._token
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Update UI by reloading the page to reflect the new badge, or we can just reload the page for simplicity
+            window.location.reload();
+        } else {
+            alert('Gagal mengubah status: ' + (data.message || 'Unknown error'));
+            el.className = originalClass;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan sistem.');
+        el.className = originalClass;
+    });
+}
+</script>
 @endpush

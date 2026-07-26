@@ -276,6 +276,7 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->get($store, '/api/v2/ads/get_product_level_campaign_id_list', [
             'page_no'   => $pageNo,
             'page_size' => $pageSize,
+            'ad_type'   => 'all',
         ]);
     }
 
@@ -471,13 +472,19 @@ class ShopeeChannel implements MarketplaceChannel
      * Endpoint: POST /api/v2/ads/get_gms_item_performance
      * Date format: YYYY-MM-DD
      */
-    public function getGmsItemPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    public function getGmsItemPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate, int $offset = 0, int $limit = 50): array
     {
-        return $this->post($store, '/api/v2/ads/get_gms_item_performance', [
-            'campaign_id_list' => array_map('intval', $campaignIds),
-            'start_date'       => $startDate,
-            'end_date'         => $endDate,
-        ]);
+        $payload = [
+            'start_date' => $startDate,
+            'end_date'   => $endDate,
+            'offset'     => $offset,
+            'limit'      => $limit,
+        ];
+        if ($campaignId) {
+            $payload['campaign_id'] = $campaignId;
+        }
+
+        return $this->post($store, '/api/v2/ads/get_gms_item_performance', $payload);
     }
 
     /**

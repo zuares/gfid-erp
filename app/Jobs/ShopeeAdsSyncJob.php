@@ -70,29 +70,40 @@ class ShopeeAdsSyncJob implements ShouldQueue
             ]);
         }
 
+        // Helper: simpan counter setelah setiap step agar tidak hilang kalau crash
+        $saveProgress = function () use ($run) {
+            $run->save();
+        };
+
         try {
             // 1. Sync Balance
             $syncService->syncBalance($this->store, $run);
+            $saveProgress();
             
             // 2. Sync Campaigns and Settings
             $syncService->syncCampaignsAndSettings($this->store, $run);
+            $saveProgress();
 
             if ($this->isHourly) {
                 // Hourly hanya menerima 1 hari, jadi loop per hari
                 $start = clone $this->dateFrom;
                 while ($start->lte($this->dateTo)) {
                     $syncService->syncShopHourlyPerformance($this->store, $start->toDateString(), $run);
+                    $saveProgress();
                     $start->addDay();
                 }
             } else {
                 // 3. Sync Shop Daily
                 $syncService->syncShopDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
+                $saveProgress();
                 
                 // 4. Sync Campaign Daily (CPC)
                 $syncService->syncCampaignDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
+                $saveProgress();
 
                 // 5. Sync GMS Campaign & Item Daily
                 $syncService->syncGmsDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
+                $saveProgress();
             }
 
             $run->update([
@@ -107,13 +118,22 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 'finished_at' => null, // Not final
             ]);
 
-            // Release back to queue with delay
-            $this->release($e->retryAfter);
+            // release() hanya bekerja dalam konteks queue worker.
+            // Saat dispatchSync() (tanpa queue), gunakan sleep + retry manual.
+            try {
+                $this->release($e->retryAfter);
+            } catch (\Throwable) {
+                // Fallback untuk dispatchSync: log dan throw agar caller tahu
+                \Illuminate\Support\Facades\Log::warning(
+                    "[ShopeeAdsSync] Rate limited (sync mode). Retry after {$e->retryAfter}s. " . $e->getMessage()
+                );
+                throw $e;
+            }
             return;
         } catch (\Throwable $e) {
             $run->update([
                 'status' => 'error',
-                'error_message' => $e->getMessage(),
+                'error_message' => substr($e->getMessage(), 0, 1000),
                 'finished_at' => now(),
             ]);
             throw $e;
