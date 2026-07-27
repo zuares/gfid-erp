@@ -77,7 +77,7 @@ class MarketplaceSyncService
      * Mengembalikan array: found, synced, order_sn_list, message.
      * Melempar \RuntimeException jika API error.
      */
-    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false, ?callable $onProgress = null): array
+    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false, ?callable $onProgress = null, string $timeRangeField = 'update_time'): array
     {
         // Pelaporan progres bersifat opsional — dipakai untuk sync latar belakang
         // agar UI bisa menampilkan persentase. Aman jika callback null / melempar.
@@ -109,7 +109,7 @@ class MarketplaceSyncService
 
             // 1. Ambil daftar order per status
             while ($hasMore) {
-                $listResponse = $driver->getOrders($store, $windowFrom, $windowTo, $pageSize, $cursor, $status);
+                $listResponse = $driver->getOrders($store, $windowFrom, $windowTo, $pageSize, $cursor, $status, $timeRangeField);
 
                 if (! empty($listResponse['error'])) {
                     $this->log($store, 'sync_orders', 'failed', $listResponse['message'] ?? $listResponse['error'], $listResponse);
@@ -232,6 +232,165 @@ class MarketplaceSyncService
      *
      * @return array{found: int, new: int, updated: int}
      */
+    /**
+     * Pastikan toko siap dipanggil API: coba refresh token bila kedaluwarsa.
+     * SATU-SATUNYA pre-check koneksi sisi console/service — dipakai
+     * marketplace:sync-orders & shopee:sync-historical-orders (sebelumnya blok
+     * refresh TOKEN_EXPIRED yang sama persis terduplikasi di kedua command).
+     */
+    public function ensureStoreConnected(Store $store): bool
+    {
+        if ($store->connection_status === 'TOKEN_EXPIRED') {
+            try {
+                $driver = $this->manager->driver($store);
+                if (method_exists($driver, 'refreshToken')) {
+                    $driver->refreshToken($store);
+                    $store->refresh();
+                }
+            } catch (\Throwable $e) {
+                Log::warning('ensureStoreConnected: token refresh gagal', [
+                    'store_id' => $store->id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $store->connection_status === 'CONNECTED';
+    }
+
+    /**
+     * Sync order rentang PANJANG secara berjendela (per <=14 hari) dengan lock
+     * per-jendela — kunci yang SAMA dengan sync 5-menit (sync_store_{id}) supaya
+     * tidak tabrakan, tapi dilepas di tiap jendela agar cron tidak terblokir lama.
+     *
+     * SATU-SATUNYA implementasi loop berjendela: dipakai marketplace:sync-orders
+     * (--days > 14) dan shopee:sync-historical-orders. Sebelumnya logika ini
+     * terduplikasi di dua command dengan perilaku lock berbeda (command sync-orders
+     * memegang satu lock TTL 240 dtk yang kedaluwarsa di tengah rentang panjang).
+     *
+     * @param callable|null $onWindow fn(int $index, int $total, int $wFrom, int $wTo, ?array $result, ?\Throwable $error): void
+     * @return array{windows:int, new:int, updated:int, failed:int, skipped_locked:int}
+     */
+    public function syncOrdersWindowed(
+        Store $store,
+        int $timeFrom,
+        int $timeTo,
+        int $pageSize = 50,
+        string $timeRangeField = 'update_time',
+        bool $newestFirst = false,
+        ?callable $onWindow = null,
+        int $pauseSeconds = 1,
+    ): array {
+        $windows = $this->splitTimeWindows($timeFrom, $timeTo);
+        if ($newestFirst) {
+            $windows = array_reverse($windows); // backfill: data terbaru masuk duluan
+        }
+
+        $totals = ['windows' => count($windows), 'new' => 0, 'updated' => 0, 'failed' => 0, 'skipped_locked' => 0];
+
+        foreach ($windows as $i => [$wFrom, $wTo]) {
+            $lock   = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
+            $result = null;
+            $error  = null;
+
+            try {
+                $lock->block(120); // tunggu maks 2 menit bila proses lain sedang sync toko ini
+                $result = $this->syncOrders($store, $wFrom, $wTo, $pageSize, false, null, $timeRangeField);
+                $totals['new']     += (int) ($result['new'] ?? 0);
+                $totals['updated'] += (int) ($result['updated'] ?? 0);
+            } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
+                $totals['skipped_locked']++;
+                $error = $e;
+            } catch (\Throwable $e) {
+                $totals['failed']++;
+                $error = $e;
+                Log::warning('syncOrdersWindowed: jendela gagal', [
+                    'store_id' => $store->id,
+                    'from'     => date('Y-m-d', $wFrom),
+                    'to'       => date('Y-m-d', $wTo),
+                    'error'    => $e->getMessage(),
+                ]);
+            } finally {
+                optional($lock)->release();
+            }
+
+            if ($onWindow) {
+                try { $onWindow($i + 1, $totals['windows'], $wFrom, $wTo, $result, $error); } catch (\Throwable $e) { /* abaikan */ }
+            }
+
+            if ($pauseSeconds > 0 && $i + 1 < $totals['windows']) {
+                sleep($pauseSeconds); // jeda antar jendela, jaring pengaman rate limit
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Promosi booking Pesanan Kilat → order bernomor pesanan.
+     *
+     * Alur API Shopee: setelah pengiriman diatur (v2.logistics.ship_booking),
+     * Shopee mencocokkan booking ke order buyer secara ASINKRON. Begitu MATCHED,
+     * v2.order.get_booking_detail mengembalikan order_sn untuk booking_sn tsb.
+     * Method ini: lengkapi order_sn dari get_booking_detail bila belum tercatat,
+     * tarik order-nya via syncOrdersBySn() bila belum ada di marketplace_orders,
+     * lalu tautkan booking_sn ke order lokal.
+     *
+     * @return string|null order_sn bila sudah MATCHED & tertaut, null bila belum.
+     */
+    public function promoteBookingToOrder(Store $store, string $bookingSn): ?string
+    {
+        $booking = \App\Models\MarketplaceBooking::where('store_id', $store->id)
+            ->where('booking_sn', $bookingSn)
+            ->first();
+        if (! $booking) {
+            return null;
+        }
+
+        // order_sn belum tercatat → ambil dari get_booking_detail (muncul saat MATCHED).
+        if (blank($booking->order_sn)) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getBookingDetail')) {
+                $det  = $driver->getBookingDetail($store, $bookingSn);
+                $list = data_get($det, 'response.booking_list') ?? data_get($det, 'response.order_list', []);
+                $d    = collect($list)->firstWhere('booking_sn', $bookingSn) ?? ($list[0] ?? null);
+                // Dua bentuk response yang terlihat di production: order_sn langsung,
+                // atau bersarang di order_list[0].order_sn.
+                $orderSn = $d['order_sn'] ?? data_get($d, 'order_list.0.order_sn');
+                if (! empty($orderSn)) {
+                    $booking->order_sn = $orderSn;
+                    if (! empty($d['booking_status'])) {
+                        $booking->booking_status = $d['booking_status'];
+                    }
+                    $booking->save();
+                }
+            }
+        }
+
+        if (blank($booking->order_sn)) {
+            return null; // belum MATCHED
+        }
+
+        // Order lokal belum ada → backfill via detail order (idempotent).
+        $exists = MarketplaceOrder::where('channel_order_id', $booking->order_sn)
+            ->orWhere('external_order_id', $booking->order_sn)
+            ->exists();
+        if (! $exists) {
+            $this->syncOrdersBySn($store, [$booking->order_sn]);
+        }
+
+        // Tautkan booking_sn ke order lokal (channel_order_id ATAU external_order_id).
+        MarketplaceOrder::where('store_id', $store->id)
+            ->where(function ($q) use ($booking) {
+                $q->where('channel_order_id', $booking->order_sn)
+                  ->orWhere('external_order_id', $booking->order_sn);
+            })
+            ->whereNull('booking_sn')
+            ->update(['booking_sn' => $bookingSn]);
+
+        return $booking->order_sn;
+    }
+
     public function syncOrdersBySn(Store $store, array $orderSnList): array
     {
         $orderSnList = array_values(array_unique(array_filter($orderSnList)));
@@ -270,17 +429,6 @@ class MarketplaceSyncService
 
         return ['found' => count($orderSnList), 'new' => $stats['new'], 'updated' => $stats['updated']];
     }
-
-    /**
-     * Maksimal percobaan panggilan get_escrow_detail (1 percobaan awal + 2 retry).
-     */
-    private const ESCROW_MAX_ATTEMPTS = 3;
-
-    /**
-     * Maksimal detik menunggu antar-retry, dibatasi supaya Retry-After yang besar
-     * dari Shopee tidak menahan proses batch terlalu lama.
-     */
-    private const ESCROW_MAX_RETRY_SLEEP_SECONDS = 10;
 
     /**
      * Cooldown minimum (menit) sebelum settlement yang BELUM final
@@ -559,39 +707,26 @@ class MarketplaceSyncService
      */
     private function getEscrowDetailWithRetry(MarketplaceChannel $driver, Store $store, string $orderSn): array
     {
-        $attempt = 0;
-        $response = [];
+        // CATATAN KONSOLIDASI: loop retry transien (429/5xx/koneksi putus) yang dulu
+        // ada di sini DIHAPUS — sekarang ditangani SATU kali di lapisan channel
+        // (ShopeeChannel::resilientRequest: backoff + cooldown 429 global per toko).
+        // Dobel retry di dua lapis = hingga 9 panggilan API untuk satu order gagal.
+        // Wrapper ini dipertahankan hanya untuk instrumentasi (durasi, http_status)
+        // dengan BENTUK RETURN yang sama persis (payload + meta) supaya
+        // validateEscrowIncome()/mapEscrowSettlement()/laporan --inspect tidak berubah.
         $startedAt = hrtime(true);
 
-        while ($attempt < self::ESCROW_MAX_ATTEMPTS) {
-            $attempt++;
-
-            try {
-                $response = $driver->getEscrowDetail($store, $orderSn);
-            } catch (\Illuminate\Http\Client\ConnectionException $e) {
-                $response = [
-                    'error'   => 'connection_exception',
-                    'message' => $e->getMessage(),
-                    '_meta'   => ['http_status' => null, 'retry_after' => null],
-                ];
-            }
-
-            $httpStatus = $response['_meta']['http_status'] ?? null;
-            $isConnectionIssue = ($response['error'] ?? null) === 'connection_exception';
-            $isTransient = $isConnectionIssue || $httpStatus === 429 || ($httpStatus !== null && $httpStatus >= 500);
-
-            if (! $isTransient || $attempt >= self::ESCROW_MAX_ATTEMPTS) {
-                break;
-            }
-
-            $retryAfter = $response['_meta']['retry_after'] ?? null;
-            $sleepSeconds = is_numeric($retryAfter) ? (int) $retryAfter : (2 * $attempt);
-            $sleepSeconds = min($sleepSeconds, self::ESCROW_MAX_RETRY_SLEEP_SECONDS);
-
-            if ($sleepSeconds > 0) {
-                sleep($sleepSeconds);
-            }
+        try {
+            $response = $driver->getEscrowDetail($store, $orderSn);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $response = [
+                'error'   => 'connection_exception',
+                'message' => $e->getMessage(),
+                '_meta'   => ['http_status' => null, 'retry_after' => null],
+            ];
         }
+
+        $attempt = 1; // retry sesungguhnya terjadi di dalam channel (transparan di sini)
 
         $durationMs = (hrtime(true) - $startedAt) / 1_000_000;
 
@@ -1468,8 +1603,20 @@ class MarketplaceSyncService
                     $outerStats['updated']++;
                 }
 
+                // Pre-download resi: HANYA order segar (≤7 hari — backfill histori tidak
+                // butuh label) dan yang label-nya belum ter-cache. Job-nya sendiri unik
+                // per (store, order_sn), jadi sync berulang tidak menumpuk duplikat.
                 if (in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
-                    \App\Jobs\DownloadMarketplaceShippingDocumentJob::dispatch($store->id, $detail['order_sn']);
+                    $orderedTs = isset($detail['create_time']) ? (int) $detail['create_time'] : null;
+                    $isFresh = $orderedTs === null || $orderedTs >= now()->subDays(7)->timestamp;
+                    if ($isFresh) {
+                        $labelDisk = \Illuminate\Support\Facades\Storage::disk('local');
+                        $sn = $detail['order_sn'];
+                        if (! $labelDisk->exists("shipping_labels/{$store->id}/{$sn}.pdf.gz")
+                            && ! $labelDisk->exists("shipping_labels/{$store->id}/{$sn}_nocard.pdf.gz")) {
+                            \App\Jobs\DownloadMarketplaceShippingDocumentJob::dispatch($store->id, $sn);
+                        }
+                    }
                 }
 
                 $existingItems = $order->items->keyBy(function ($item) {

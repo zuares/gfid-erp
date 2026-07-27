@@ -396,6 +396,142 @@ body[data-theme="dark"] .dpanel-table-sm tbody td {
         min-width: 1000px; /* force horizontal scroll on mobile */
     }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   PENYELARASAN DENGAN GAYA SHIPMENTS — flat, rapat, tenang.
+   Lapisan override (ditaruh paling akhir agar menang tanpa menghapus
+   definisi di atas). Tidak mengubah struktur/fitur apa pun.
+═════════════════════════════════════════════════════════════════════════ */
+
+/* Hero → topbar kompak ala ship-topbar */
+.dash-hero {
+    border-radius: 10px;
+    padding: .8rem 1rem;
+    margin-bottom: .9rem;
+    background: var(--card-bg);
+}
+.dash-hero::before { display: none; }
+.dash-hero h1 { font-size: 1rem; font-weight: 750; letter-spacing: 0; }
+.dash-hero .sub { font-size: .78rem; margin-top: .15rem; }
+.dash-hero .btn { margin-right: 0 !important; } /* gap parent sudah cukup */
+
+/* Kartu: flat seperti shipments — tanpa bayangan & hover-lift */
+.dpanel {
+    border-radius: 10px;
+    box-shadow: none;
+}
+.dpanel:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Tab bar: rapat + sticky seperti topbar shipments */
+.dash-tabs-modern {
+    border-radius: 9px;
+    padding: .25rem;
+    box-shadow: none;
+    position: sticky;
+    top: 0;
+    z-index: 250;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+}
+body[data-theme="dark"] .dash-tabs-modern { background: var(--card-bg); }
+.dash-tab-m { border-radius: 7px; font-size: .8rem; }
+.dash-tab-m.active { box-shadow: none; }
+
+/* Tombol & chip: radius 7px konsisten, tanpa bayangan */
+.btn-pill, .role-chip, .mini-log-toggle { border-radius: 7px !important; box-shadow: none !important; }
+
+/* Tabel: header kecil-tenang tanpa uppercase, padding rapat ala table-list */
+.dpanel-table thead th {
+    font-size: .68rem;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #64748b;
+    padding: .52rem .62rem;
+}
+body[data-theme="dark"] .dpanel-table thead th { color: #9ca3af; }
+.dpanel-table tbody td { padding: .52rem .62rem; }
+
+/* Label filter & input: tanpa uppercase, radius 7px */
+.filter-item label { text-transform: none; letter-spacing: 0; }
+.filter-select, .dash .form-control, .dash .form-select { border-radius: 7px; }
+
+/* Pill status (riwayat sync dll.): titik indikator ala badge-status shipments */
+.pill, .badge-status { border-radius: 7px; }
+
+/* ── Input periode & kalender flatpickr: kompak-minimalis ── */
+.range-pill {
+    width: 240px;
+    text-align: left;
+    cursor: pointer;
+    background: rgba(148,163,184,.06);
+    border: 1px solid var(--dsh-border);
+    padding: .4rem .85rem .4rem 2.1rem;
+    border-radius: 7px;
+    color: var(--text, #0f172a);
+    font-weight: 650;
+    font-size: .82rem;
+}
+.range-pill:hover { border-color: var(--dsh-accent); }
+.range-pill:focus { outline: none; border-color: var(--dsh-accent); }
+
+.ads-fp {
+    border-radius: 10px !important;
+    border: 1px solid var(--dsh-border) !important;
+    box-shadow: 0 10px 30px rgba(15,23,42,.14) !important;
+    font-family: 'Inter', sans-serif !important;
+    overflow: hidden;
+}
+.ads-fp .flatpickr-months { padding: .25rem 0; }
+.ads-fp .flatpickr-current-month { font-size: .85rem; font-weight: 700; }
+.ads-fp .flatpickr-weekday { font-size: .64rem; font-weight: 700; }
+.ads-fp .flatpickr-day {
+    border-radius: 7px;
+    font-size: .78rem;
+    height: 32px;
+    line-height: 32px;
+    max-width: 34px;
+}
+.ads-fp .flatpickr-day.selected,
+.ads-fp .flatpickr-day.startRange,
+.ads-fp .flatpickr-day.endRange {
+    background: var(--dsh-accent);
+    border-color: var(--dsh-accent);
+}
+.ads-fp .flatpickr-day.inRange {
+    background: rgba(37,99,235,.1);
+    border-color: transparent;
+    box-shadow: none;
+    color: var(--dsh-accent);
+}
+.ads-fp .flatpickr-day.today { border-color: var(--dsh-accent); }
+.ads-fp-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    padding: .5rem .55rem;
+    border-top: 1px solid rgba(148,163,184,.25);
+    background: var(--card-bg);
+}
+.ads-fp-chip {
+    border: 1px solid rgba(148,163,184,.35);
+    background: transparent;
+    border-radius: 999px;
+    padding: .22rem .6rem;
+    font-size: .68rem;
+    font-weight: 650;
+    color: #475569;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+}
+.ads-fp-chip:hover { border-color: var(--dsh-accent); color: var(--dsh-accent); }
+body[data-theme="dark"] .ads-fp { background: #1e293b !important; }
+body[data-theme="dark"] .ads-fp .flatpickr-day { color: #e2e8f0; }
+body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
+
+@keyframes adsToastIn { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 </style>
 @endpush
 
@@ -432,6 +568,23 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // Shortcut: semua pintu "log" menuju satu tempat — tab Sync.
+    window.openSyncTab = function () {
+        const btn = document.querySelector('.dash-tab-m[data-target="tab-sync"]');
+        if (btn) btn.click();
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+    };
+
+    // Ingat filter terakhir (toko + periode + mode banding) selama sesi browser.
+    try {
+        if (window.location.search && window.location.search.length > 1) {
+            sessionStorage.setItem('adsDashFilters', window.location.search);
+        } else {
+            const savedQ = sessionStorage.getItem('adsDashFilters');
+            if (savedQ && savedQ.length > 1) window.location.replace(window.location.pathname + savedQ);
+        }
+    } catch (e) {}
+
 
     window.dispatchEvent(new Event('resize')); // re-render charts on load
 
@@ -443,32 +596,63 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
     
+    function applyRange(from, to) {
+        fromEl.value = ymd(from);
+        toEl.value = ymd(to);
+        if (window.__dashLoading) window.__dashLoading();
+        filterForm.submit();
+    }
+
     if(typeof flatpickr !== 'undefined' && rangePicker) {
         flatpickr(rangePicker, {
             mode: 'range',
             locale: 'id',
-            showMonths: 2, // Tampilkan 2 bulan berjejer agar mudah pilih rentang panjang
+            showMonths: 1, // kompak — rentang panjang lebih cepat lewat preset di bawah kalender
             dateFormat: 'Y-m-d',
+            altInput: true,            // tampilan manusiawi: "1 Mei 2026 s.d. 27 Jul 2026"
+            altFormat: 'j M Y',
+            altInputClass: 'range-pill',
             defaultDate: [fromEl.value, toEl.value],
             onChange: function(selectedDates, dateStr, instance) {
                 if(selectedDates.length === 2) {
-                    fromEl.value = ymd(selectedDates[0]);
-                    toEl.value = ymd(selectedDates[1]);
-                    filterForm.submit();
+                    applyRange(selectedDates[0], selectedDates[1]);
                 }
             },
             onClose: function(selectedDates, dateStr, instance) {
-                // Jika user hanya memilih 1 tanggal lalu klik di luar kalender (menutup picker),
-                // asumsikan mereka ingin melihat data khusus 1 hari tersebut.
+                // Pilih 1 tanggal lalu tutup = lihat data 1 hari itu.
                 if(selectedDates.length === 1) {
-                    fromEl.value = ymd(selectedDates[0]);
-                    toEl.value = ymd(selectedDates[0]);
-                    
-                    // Supaya visual input text-nya rapi menjadi "YYYY-MM-DD — YYYY-MM-DD"
                     instance.setDate([selectedDates[0], selectedDates[0]], false);
-                    
-                    filterForm.submit();
+                    applyRange(selectedDates[0], selectedDates[0]);
                 }
+            },
+            onReady: function(sd, ds, instance) {
+                // Preset sekali-klik di kaki kalender — pengganti teks petunjuk:
+                // tombolnya sendiri yang menjelaskan.
+                instance.calendarContainer.classList.add('ads-fp');
+                const bar = document.createElement('div');
+                bar.className = 'ads-fp-presets';
+                const mk = (label, fn) => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'ads-fp-chip';
+                    b.textContent = label;
+                    b.addEventListener('click', () => {
+                        const [f, t] = fn();
+                        instance.setDate([f, t], false);
+                        instance.close();
+                        applyRange(f, t);
+                    });
+                    bar.appendChild(b);
+                };
+                const today = () => new Date();
+                const back = (n) => { const t = today(); const f = new Date(); f.setDate(t.getDate() - (n - 1)); return [f, t]; };
+                mk('Hari Ini',   () => { const t = today(); return [t, t]; });
+                mk('7 Hari',     () => back(7));
+                mk('30 Hari',    () => back(30));
+                mk('90 Hari',    () => back(90));
+                mk('Bulan Ini',  () => { const t = today(); return [new Date(t.getFullYear(), t.getMonth(), 1), t]; });
+                mk('Bulan Lalu', () => { const t = today(); return [new Date(t.getFullYear(), t.getMonth() - 1, 1), new Date(t.getFullYear(), t.getMonth(), 0)]; });
+                instance.calendarContainer.appendChild(bar);
             }
         });
     }
@@ -572,39 +756,13 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(fetchRealtimeStatus, 500); // Fetch after 500ms
 });
 
-// --- MINI LOG TOGGLE ---
-function toggleMiniLog() {
-    const panel = document.getElementById('miniLogPanel');
-    const toggle = document.getElementById('miniLogToggle');
-    if (!panel || !toggle) return;
-    
-    const isOpen = panel.classList.contains('show');
-    if (isOpen) {
-        panel.classList.remove('show');
-        toggle.classList.remove('open');
-    } else {
-        panel.classList.add('show');
-        toggle.classList.add('open');
-    }
-}
-
-// Close mini log on click outside
-document.addEventListener('click', function(e) {
-    const panel = document.getElementById('miniLogPanel');
-    const toggle = document.getElementById('miniLogToggle');
-    if (!panel || !toggle) return;
-    
-    if (!panel.contains(e.target) && !toggle.contains(e.target)) {
-        panel.classList.remove('show');
-        toggle.classList.remove('open');
-    }
-});
 function toggleCampaignStatus(el, campId, action) {
     if (!confirm('Apakah Anda yakin ingin ' + (action === 'pause' ? 'menjeda (pause)' : 'melanjutkan (resume)') + ' kampanye ini?')) {
         return;
     }
     
     const storeId = "{{ $storeId }}";
+    if (storeId === 'all') { showToast('Mode Semua Toko — pilih satu toko dulu untuk aksi ini.'); return; }
     let payload = {
         _token: document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '',
         store_id: storeId,
@@ -632,13 +790,13 @@ function toggleCampaignStatus(el, campId, action) {
             // Update UI by reloading the page to reflect the new badge, or we can just reload the page for simplicity
             window.location.reload();
         } else {
-            alert('Gagal mengubah status: ' + (data.message || 'Unknown error'));
+            showToast('Gagal mengubah status: ' + (data.message || 'Unknown error'));
             el.className = originalClass;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Terjadi kesalahan sistem.');
+        showToast('Terjadi kesalahan sistem.');
         el.className = originalClass;
     });
 }
@@ -647,6 +805,38 @@ function toggleCampaignStatus(el, campId, action) {
 
 @section('content')
 <div class="dash py-3">
+
+    {{-- Toast ringan pengganti alert() — tipe otomatis dari isi pesan --}}
+    <div id="adsToastWrap" style="position:fixed; top:14px; right:14px; z-index:4000; display:flex; flex-direction:column; gap:.4rem; max-width:340px;"></div>
+    {{-- Overlay loading saat ganti filter — respons instan --}}
+    <div id="dashLoadingOverlay" style="display:none; position:fixed; inset:0; z-index:5000; background:rgba(15,23,42,.35); backdrop-filter:blur(2px); align-items:center; justify-content:center;">
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1rem 1.5rem; display:flex; align-items:center; gap:.7rem; font-size:.85rem; font-weight:700; color:var(--text);">
+            <i class="bi bi-arrow-repeat spin-icon" style="display:inline-block; color:var(--dsh-accent); font-size:1.1rem;"></i> Memuat data&hellip;
+        </div>
+    </div>
+    <script>
+    window.__dashLoading = function () {
+        const o = document.getElementById('dashLoadingOverlay');
+        if (o) o.style.display = 'flex';
+    };
+    window.showToast = function (msg) {
+        try {
+            const wrap = document.getElementById('adsToastWrap');
+            const s = String(msg || '');
+            let fg = '#1d4ed8', bg = 'rgba(59,130,246,.12)', bd = 'rgba(59,130,246,.35)', ic = 'bi-info-circle';
+            if (/berhasil|selesai|sukses/i.test(s)) { fg = '#15803d'; bg = 'rgba(22,163,74,.12)'; bd = 'rgba(22,163,74,.35)'; ic = 'bi-check-circle'; }
+            else if (/gagal|error|kesalahan|tidak ditemukan/i.test(s)) { fg = '#b91c1c'; bg = 'rgba(220,38,38,.12)'; bd = 'rgba(220,38,38,.35)'; ic = 'bi-x-circle'; }
+            else if (/harap|tunggu|dibatalkan|peringatan/i.test(s)) { fg = '#b45309'; bg = 'rgba(245,158,11,.14)'; bd = 'rgba(245,158,11,.4)'; ic = 'bi-exclamation-triangle'; }
+            const t = document.createElement('div');
+            t.style.cssText = 'display:flex; gap:.5rem; align-items:flex-start; padding:.6rem .8rem; border-radius:10px; font-size:.78rem; font-weight:600; color:' + fg + '; background:' + bg + '; border:1px solid ' + bd + '; backdrop-filter:blur(6px); box-shadow:0 6px 20px rgba(15,23,42,.15); animation:adsToastIn .25s ease;';
+            t.innerHTML = '<i class="bi ' + ic + '" style="margin-top:1px;"></i><span></span>';
+            t.querySelector('span').textContent = s;
+            t.addEventListener('click', () => t.remove());
+            wrap.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 350); }, 4500);
+        } catch (e) { /* fallback terakhir */ window.alert(msg); }
+    };
+    </script>
 
     {{-- ==============================================
          HERO SECTION (Header)
@@ -681,14 +871,6 @@ function toggleCampaignStatus(el, campId, action) {
                 <div id="syncCountdown" class="role-chip live-btn live-off">
                     <i class="bi bi-clock-history"></i> Menghitung...
                 </div>
-                {{-- Mini Log Toggle --}}
-                @if(isset($syncRuns) && $syncRuns->isNotEmpty())
-                <div class="mini-log-toggle" id="miniLogToggle" onclick="toggleMiniLog()">
-                    <i class="bi bi-terminal"></i> Log
-                    <span class="chevron">▼</span>
-                </div>
-                @endif
-                
                 @if(auth()->user()->role === 'owner')
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="clearAdsData()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); color: #ef4444; box-shadow: var(--card-shadow);">
                     <i class="bi bi-trash"></i> Bersihkan Data
@@ -698,61 +880,13 @@ function toggleCampaignStatus(el, campId, action) {
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalGmsSettings" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--dsh-accent); background: rgba(37, 99, 235, 0.05); color: var(--dsh-accent); margin-right: 0.5rem;">
                     <i class="bi bi-gear"></i> Pengaturan GMV Max
                 </button>
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncLogs" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text); margin-right: 0.5rem;">
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="openSyncTab()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text); margin-right: 0.5rem;">
                     <i class="bi bi-journal-text"></i> Log Sync
                 </button>
                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text);">
                     <i class="bi bi-arrow-repeat"></i> Sync Manual
                 </button>
             </div>
-
-            {{-- Mini Log Panel (Dropdown) --}}
-            @if(isset($syncRuns) && $syncRuns->isNotEmpty())
-            <div class="mini-log-panel" id="miniLogPanel">
-                <div class="mini-log-header">
-                    <i class="bi bi-activity"></i> Riwayat Sinkronisasi Terakhir
-                </div>
-                @foreach($syncRuns->take(7) as $sr)
-                    @php
-                        $statusClass = match($sr->status) {
-                            'success' => 'success',
-                            'error' => 'error',
-                            'processing' => 'processing',
-                            'rate_limited' => 'rate_limited',
-                            default => 'processing'
-                        };
-                        $statusIcon = match($sr->status) {
-                            'success' => 'bi-check-lg',
-                            'error' => 'bi-x-lg',
-                            'processing' => 'bi-arrow-repeat',
-                            'rate_limited' => 'bi-hourglass-split',
-                            default => 'bi-question'
-                        };
-                        $statusLabel = match($sr->status) {
-                            'success' => 'OK',
-                            'error' => 'GAGAL',
-                            'processing' => 'PROSES',
-                            'rate_limited' => 'LIMIT',
-                            default => $sr->status
-                        };
-                    @endphp
-                    <div class="mini-log-entry">
-                        <div class="mle-icon {{ $statusClass }}">
-                            <i class="bi {{ $statusIcon }}"></i>
-                        </div>
-                        <div class="mle-info">
-                            <div class="mle-time">{{ $sr->started_at ? \Carbon\Carbon::parse($sr->started_at)->timezone('Asia/Jakarta')->format('d/m H:i') : '-' }}</div>
-                            <div class="mle-stats">{{ $sr->sync_type ?? '-' }} · {{ $sr->total_requests ?? 0 }} req · {{ $sr->total_updated ?? 0 }} row
-                                @if($sr->error_message)
-                                    · <span style="color: #dc2626;">{{ Str::limit($sr->error_message, 40) }}</span>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="mle-badge {{ $statusClass }}">{{ $statusLabel }}</div>
-                    </div>
-                @endforeach
-            </div>
-            @endif
         </div>
     </div>
 
@@ -773,7 +907,8 @@ function toggleCampaignStatus(el, campId, action) {
     <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="dash-filter" id="filterForm">
         <div class="filter-item">
             <label>Toko Shopee</label>
-            <select name="store_id" onchange="this.form.submit()">
+            <select name="store_id" onchange="__dashLoading(); this.form.submit()">
+                <option value="all" {{ $storeId == 'all' ? 'selected' : '' }}>&#127970; Semua Toko</option>
                 @foreach($stores as $s)
                     <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
                 @endforeach
@@ -781,15 +916,16 @@ function toggleCampaignStatus(el, campId, action) {
         </div>
         <div class="filter-item" style="flex: 2;">
             <label>Periode Data</label>
-            <div class="period-bar">
-                <input type="text" id="rangePicker" class="range-pill" style="width: 260px; text-align: center; cursor: pointer; background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 650; font-size: .85rem;" placeholder="Pilih Rentang Tanggal..." readonly>
+            <div class="period-bar" style="position: relative;">
+                <i class="bi bi-calendar3" style="position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--dsh-muted); font-size:.8rem; pointer-events:none; z-index:2;"></i>
+                <input type="text" id="rangePicker" class="range-pill" placeholder="Pilih tanggal" readonly>
                 <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}">
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}">
             </div>
         </div>
         <div class="filter-item">
             <label>Bandingkan:</label>
-            <select name="compare_mode" onchange="this.form.submit()" style="background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 600; font-size: .85rem;">
+            <select name="compare_mode" onchange="__dashLoading(); this.form.submit()" style="background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 600; font-size: .85rem;">
                 <option value="prev_period" {{ (isset($compareMode) && $compareMode == 'prev_period') ? 'selected' : '' }}>Durasi Sama (Sblmnya)</option>
                 <option value="prev_month" {{ (isset($compareMode) && $compareMode == 'prev_month') ? 'selected' : '' }}>Bulan Lalu (Tgl Sama)</option>
                 <option value="prev_year" {{ (isset($compareMode) && $compareMode == 'prev_year') ? 'selected' : '' }}>Tahun Lalu (Tgl Sama)</option>
@@ -812,6 +948,7 @@ function toggleCampaignStatus(el, campId, action) {
                 <button class="dash-tab-m" data-target="tab-campaigns"><i class="bi bi-megaphone"></i> Kampanye</button>
                 <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Performa Produk</button>
                 <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profitabilitas</button>
+                <button class="dash-tab-m" data-target="tab-sync"><i class="bi bi-arrow-repeat"></i> Sync <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
         </div>
 
@@ -833,6 +970,64 @@ function toggleCampaignStatus(el, campId, action) {
                 </div>
                 <div id="liveSyncLog" style="margin-top: .5rem; font-size: .7rem; font-family: ui-monospace, monospace; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     Menghubungkan ke server...
+                </div>
+            </div>
+
+            {{-- RINGKASAN PROFITABILITAS — angka bisnis dulu, baru metrik iklan --}}
+            @php
+                $rSpend  = (float) ($kpi['current']->spend ?? 0);
+                $rGmv    = (float) ($kpi['current']->gmv ?? 0);
+                $rOrders = (int) ($kpi['current']->orders ?? 0);
+                $rNetRevenue = 0.0; $rCogs = 0.0; $rUntung = 0; $rRugi = 0;
+                foreach ($campaigns as $c) {
+                    if (!($c->spend > 0 || $c->gmv > 0)) continue;
+                    $rNetRevenue += $c->gmv * ($c->net_revenue_ratio ?? 0.781);
+                    $rCogs += ($c->unit_cogs > 0 && ($c->items_sold ?? 0) > 0)
+                        ? $c->unit_cogs * $c->items_sold
+                        : $c->gmv * ($c->cogs_ratio ?? 0);
+                    if ($c->profit_after_ads !== null) { $c->profit_after_ads >= 0 ? $rUntung++ : $rRugi++; }
+                }
+                $rProfit = $rNetRevenue - $rCogs - ($rSpend * 1.11);
+                $rRoas   = $rSpend > 0 ? $rGmv / $rSpend : 0;
+                // Pembanding periode lalu: estimasi rasio periode ini (selaras tab Kampanye)
+                $pGmv = (float) ($kpi['previous']->gmv ?? 0);
+                $pSpend = (float) ($kpi['previous']->spend ?? 0);
+                $revR = $rGmv > 0 ? $rNetRevenue / $rGmv : 0.781;
+                $cogsR = $rGmv > 0 ? $rCogs / $rGmv : 0;
+                $pProfit = ($pGmv * $revR) - ($pGmv * $cogsR) - ($pSpend * 1.11);
+                $dProfit = $pProfit != 0.0 ? (($rProfit - $pProfit) / abs($pProfit)) * 100 : ($rProfit > 0 ? 100 : 0);
+                $rfmt = fn ($n) => 'Rp ' . number_format(abs($n), 0, ',', '.');
+                $rProfitPos = $rProfit >= 0;
+            @endphp
+            <div class="dash-sec" style="display:flex; justify-content:space-between; align-items:center;">
+                <span><i class="bi bi-piggy-bank text-success"></i> Profitabilitas Periode Ini</span>
+                <a href="javascript:void(0)" onclick="document.querySelector('.dash-tab-m[data-target=&quot;tab-profit&quot;]').click()" style="font-size:.7rem; font-weight:700; color:var(--dsh-accent); text-decoration:none;">Lihat rincian &rarr;</a>
+            </div>
+            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: .75rem;">
+                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.3); background:rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.06);">
+                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }};"><i class="bi bi-piggy-bank"></i> Net Profit</div>
+                    <div style="font-size:1.25rem; font-weight:800; color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }}; font-variant-numeric:tabular-nums;">{{ $rProfit < 0 ? '-' : '' }}{{ $rfmt($rProfit) }}</div>
+                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">{{ $rUntung }} untung &bull; {{ $rRugi }} rugi &bull; <span style="font-weight:700; color:{{ $dProfit >= 0 ? '#16a34a' : '#dc2626' }};"><i class="bi bi-arrow-{{ $dProfit >= 0 ? 'up' : 'down' }}-right"></i> {{ number_format(abs($dProfit), 1, ',', '.') }}%</span> vs lalu</div>
+                </div>
+                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(3,105,161,.25); background:rgba(3,105,161,.05);">
+                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0369a1;"><i class="bi bi-cash-coin"></i> Pendapatan Bersih</div>
+                    <div style="font-size:1.25rem; font-weight:800; color:#0369a1; font-variant-numeric:tabular-nums;">{{ $rfmt($rNetRevenue) }}</div>
+                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">Omzet (GMV): {{ $rfmt($rGmv) }}</div>
+                </div>
+                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(148,163,184,.3); background:rgba(148,163,184,.06);">
+                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--dsh-muted);"><i class="bi bi-box-seam"></i> Modal (HPP)</div>
+                    <div style="font-size:1.25rem; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rCogs) }}</div>
+                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">dari pcs terjual &times; HPP</div>
+                </div>
+                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(245,158,11,.3); background:rgba(245,158,11,.06);">
+                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#b45309;"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
+                    <div style="font-size:1.25rem; font-weight:800; color:#92400e; font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rSpend * 1.11) }}</div>
+                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">nyata {{ $rfmt($rSpend) }} + PPN 11%</div>
+                </div>
+                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(37,99,235,.25); background:rgba(37,99,235,.05);">
+                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#1d4ed8;"><i class="bi bi-lightning-charge"></i> ROAS &bull; Pesanan</div>
+                    <div style="font-size:1.25rem; font-weight:800; color:#1d4ed8; font-variant-numeric:tabular-nums;">{{ number_format($rRoas, 2, ',', '.') }}x <span style="font-size:.85rem; color:var(--text);">&bull; {{ number_format($rOrders, 0, ',', '.') }}</span></div>
+                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">omzet per rupiah iklan &bull; total order</div>
                 </div>
             </div>
 
@@ -981,6 +1176,11 @@ function toggleCampaignStatus(el, campId, action) {
             @include('marketplace.partials._profitability_tab')
         </div>
 
+        <!-- TAB SYNC -->
+        <div class="tab-pane" id="tab-sync">
+            @include('marketplace.partials._sync_tab')
+        </div>
+
         <!-- TAB KAMPANYE -->
         <div class="tab-pane" id="tab-campaigns">
             
@@ -993,9 +1193,12 @@ function toggleCampaignStatus(el, campId, action) {
                     $totalCogs = 0;
                     foreach($campaigns as $camp) {
                         if ($camp->spend > 0 || $camp->gmv > 0) {
-                            $netRev = $camp->gmv * ($camp->net_revenue_ratio ?? 0.89);
+                            $netRev = $camp->gmv * ($camp->net_revenue_ratio ?? 0.781);
                             $totalNetRevenue += $netRev;
-                            $totalCogs += $camp->gmv * ($camp->cogs_ratio ?? 0);
+                            // COGS eksak: HPP × pcs terjual (fallback rasio utk data lama)
+                            $totalCogs += ($camp->unit_cogs > 0 && ($camp->items_sold ?? 0) > 0)
+                                ? $camp->unit_cogs * $camp->items_sold
+                                : $camp->gmv * ($camp->cogs_ratio ?? 0);
                         }
                     }
                     
@@ -1467,64 +1670,6 @@ function toggleCampaignStatus(el, campId, action) {
         </div>
 
         <!-- SINKRONISASI LOG (MODAL) -->
-        <div class="modal fade" id="modalSyncLogs" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden;">
-                    <div class="modal-header border-0 pb-0">
-                        <h5 class="modal-title fw-bold" style="color: var(--text);"><i class="bi bi-clock-history"></i> Riwayat Sinkronisasi (Log)</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="table-responsive">
-                            <table class="dpanel-table">
-                                <thead>
-                                    <tr>
-                                        <th>Waktu Mulai</th>
-                                        <th>Tipe</th>
-                                        <th>Status</th>
-                                        <th>Detail / Error</th>
-                                        <th class="text-end">Req/Rows</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @if(isset($syncRuns) && $syncRuns->count() > 0)
-                                        @foreach($syncRuns as $run)
-                                            @php
-                                                $statusClass = 'slate';
-                                                if ($run->status == 'success') $statusClass = 'green';
-                                                elseif ($run->status == 'error') $statusClass = 'red';
-                                                elseif ($run->status == 'rate_limited') $statusClass = 'amber';
-                                            @endphp
-                                            <tr>
-                                                <td>
-                                                    <div style="font-weight: 700; color: var(--text);">{{ $run->created_at->format('d/m/Y') }}</div>
-                                                    <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted);">{{ $run->created_at->format('H:i:s') }}</div>
-                                                </td>
-                                                <td><span style="font-size: .75rem; color: var(--dsh-muted);">{{ $run->sync_type }}</span></td>
-                                                <td><span class="pill {{ $statusClass }}">{{ strtoupper($run->status) }}</span></td>
-                                                <td>
-                                                    <div style="font-size: .75rem; color: var(--dsh-muted); max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $run->error_message }}">
-                                                        {{ $run->error_message ?? '-' }}
-                                                    </div>
-                                                </td>
-                                                <td class="text-end" style="font-family: ui-monospace, monospace; font-size: .75rem; font-weight: 650; color: var(--text);">
-                                                    {{ $run->total_requests }} <span style="font-weight: normal; color: var(--dsh-muted);">/</span> <span style="color: #16a34a;">{{ $run->total_updated }}</span>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    @else
-                                        <tr>
-                                            <td colspan="5" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">Belum ada riwayat sinkronisasi.</td>
-                                        </tr>
-                                    @endif
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
     @endif
 </div>
 
@@ -1559,11 +1704,20 @@ function toggleCampaignStatus(el, campId, action) {
 </div>
 
 <!-- Modal Sync Manual -->
+<style>
+#syncRangeOptions .sync-range-card { display:flex; align-items:center; justify-content:space-between; gap:.6rem; border:1px solid var(--dsh-border); border-radius:10px; padding:.5rem .7rem; cursor:pointer; margin:0; background: var(--bg); transition: border-color .15s, box-shadow .15s; }
+#syncRangeOptions .sync-range-card:hover { border-color: var(--dsh-accent); }
+#syncRangeOptions .sync-range-card:has(input:checked) { border-color: var(--dsh-accent); box-shadow: 0 0 0 1px var(--dsh-accent) inset; }
+#syncRangeOptions input[type=radio] { accent-color: var(--dsh-accent); }
+</style>
 <div class="modal fade" id="modalSyncAds" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; background: var(--card-bg); border: 1px solid var(--card-border); box-shadow: var(--card-shadow);">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold" style="color: var(--text);">Manual Sync Shopee Ads</h5>
+                <div>
+                    <h5 class="modal-title fw-bold" style="color: var(--text); margin-bottom:.1rem;">Manual Sync Shopee Ads</h5>
+                    <div style="font-size:.72rem; color: var(--dsh-muted);">Tarik data performa iklan terbaru langsung dari Shopee</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -1572,48 +1726,138 @@ function toggleCampaignStatus(el, campId, action) {
                     @csrf
                     <div class="mb-3">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
-                        <select name="store_id" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" required>
+                        <select name="store_id" class="form-control" style="border-radius: 10px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);" required>
+                            <option value="all">&#127970; Semua Toko (bergiliran)</option>
                             @foreach($stores as $s)
                                 <option value="{{ $s->id }}" {{ isset($storeId) && $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="mb-4">
-                        <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Jangka Waktu Sinkronisasi</label>
-                        <select name="sync_type" class="form-control" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);">
-                            <option value="today">Hari Ini</option>
-                            <option value="yesterday">Kemarin</option>
-                            <option value="1_week">1 Minggu Terakhir</option>
-                            <option value="1_month">1 Bulan Terakhir</option>
-                            <option value="3_months">3 Bulan Terakhir</option>
-                            <option value="custom">Berdasarkan Tanggal Filter</option>
-                        </select>
+
+                    <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Jangka Waktu Sinkronisasi</label>
+                    <div id="syncRangeOptions" style="display:grid; gap:.45rem; margin-bottom:.6rem;">
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="today">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">Hari Ini</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Paling cepat &bull; &plusmn;10 detik</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-sun" style="color:var(--dsh-muted);"></i>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="yesterday">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">Kemarin</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">&plusmn;10 detik</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-moon" style="color:var(--dsh-muted);"></i>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="1_week" checked>
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">1 Minggu Terakhir</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Direkomendasikan &bull; &plusmn;30 detik</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-calendar-week" style="color:var(--dsh-muted);"></i>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="1_month">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">1 Bulan Terakhir</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">&plusmn;1&ndash;2 menit</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-calendar-month" style="color:var(--dsh-muted);"></i>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="2_months">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">2 Bulan Terakhir</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">&plusmn;2&ndash;3 menit &bull; progress live di sini</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-calendar-range" style="color:var(--dsh-muted);"></i>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="3_months">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">3 Bulan Terakhir</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Pintar &mdash; hanya tarik tanggal yang belum ada</span>
+                                </span>
+                            </span>
+                            <span style="font-size:.6rem; font-weight:700; letter-spacing:.03em; background:rgba(59,130,246,.14); color:#3b82f6; padding:.18rem .5rem; border-radius:999px;">BACKGROUND</span>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="6_months">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">6 Bulan Terakhir</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Maksimum riwayat &bull; hanya tarik yang kurang</span>
+                                </span>
+                            </span>
+                            <span style="font-size:.6rem; font-weight:700; letter-spacing:.03em; background:rgba(59,130,246,.14); color:#3b82f6; padding:.18rem .5rem; border-radius:999px;">BACKGROUND</span>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="custom">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">Ikut Filter Tanggal</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Sesuai rentang filter di halaman ini</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-sliders" style="color:var(--dsh-muted);"></i>
+                        </label>
                     </div>
+                    <div style="font-size:.68rem; color:var(--dsh-muted); margin-bottom:1rem;">
+                        <i class="bi bi-info-circle"></i> Rentang lebih dari 2 bulan otomatis diproses di background agar aman dari batas API Shopee.
+                    </div>
+
                     <button type="submit" class="btn w-100 fw-bold" style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">
                         <i class="bi bi-cloud-download"></i> Jalankan Sync
                     </button>
                 </form>
 
-                <!-- Loading State (Hidden by default) -->
-                <div id="loadingSyncAds" style="display: none; text-align: left; padding: 1rem;">
-                    <div style="text-align: center; margin-bottom: 1.5rem;">
-                        <h6 class="fw-bold" style="color: var(--text);"><i class="bi bi-arrow-repeat spin-icon" style="display: inline-block;"></i> Sedang Menarik Data...</h6>
-                        <p style="font-size: .8rem; color: var(--dsh-muted);">Proses ini mengambil performa iklan langsung dari Shopee.</p>
+                <!-- Loading State -->
+                <div id="loadingSyncAds" style="display: none; padding:.25rem 0;">
+                    <div style="text-align:center; margin-bottom:1rem;">
+                        <h6 class="fw-bold" style="color: var(--text); margin-bottom:.2rem;"><i class="bi bi-arrow-repeat spin-icon" style="display: inline-block;"></i> Sedang Menarik Data&hellip;</h6>
+                        <div id="syncStatusLine" style="font-size:.75rem; color:var(--dsh-muted); min-height:1.2em;">Menghubungkan ke server&hellip;</div>
                     </div>
-                    
-                    <div class="progress mb-3" style="height: 10px; border-radius: 10px; background: var(--dsh-border);">
-                        <div id="syncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background: var(--dsh-accent);" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="progress flex-grow-1" style="height: 10px; border-radius: 10px; background: var(--dsh-border);">
+                            <div id="syncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background: var(--dsh-accent);"></div>
+                        </div>
+                        <span id="syncPercentText" style="font-size:.72rem; font-weight:700; color:var(--text); min-width:2.6rem; text-align:right;">0%</span>
                     </div>
-                    
-                    <div id="syncLogs" style="background: rgba(0,0,0,0.4); border: 1px solid var(--dsh-border); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; color: #a1a1aa; height: 150px; overflow-y: auto; text-align: left; line-height: 1.5;">
-                        <div style="color: #4ade80;">> Menghubungkan ke server...</div>
+                    <div id="syncLogs" style="background: rgba(0,0,0,0.4); border: 1px solid var(--dsh-border); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.72rem; color: #a1a1aa; height: 130px; overflow-y: auto; text-align: left; line-height: 1.5;"></div>
+                    <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.5rem; text-align:center;">
+                        <i class="bi bi-shield-check"></i> Aman menutup jendela ini &mdash; proses tetap berjalan di server.
                     </div>
                 </div>
-                
-                <!-- Success State (Hidden by default) -->
-                <div id="successSyncAds" style="display: none; text-align: center; padding: 2rem 0;">
-                    <div style="font-size: 3rem; color: #16a34a; margin-bottom: 1rem;"><i class="bi bi-check-circle-fill"></i></div>
-                    <h6 class="fw-bold" style="color: var(--text);">Sinkronisasi Selesai!</h6>
+
+                <!-- Result State (sukses / background / warning / error) -->
+                <div id="resultSyncAds" style="display: none; text-align: center; padding: 1.25rem 0;">
+                    <div id="resultSyncIcon" style="font-size: 3rem; margin-bottom: .75rem;"></div>
+                    <h6 id="resultSyncTitle" class="fw-bold" style="color: var(--text);"></h6>
+                    <div id="resultSyncMessage" style="font-size:.78rem; color:var(--dsh-muted); max-width: 320px; margin: 0 auto;"></div>
+                    <div id="resultSyncErrors" style="display:none; text-align:left; font-size:.72rem; color:var(--text); background:var(--bg); border:1px solid var(--dsh-border); border-radius:8px; padding:.6rem .75rem; margin:.75rem auto 0; max-width:340px; max-height:120px; overflow-y:auto;"></div>
+                    <div class="d-flex gap-2 justify-content-center" style="margin-top:1rem;">
+                        <button type="button" id="btnSyncRetry" class="btn fw-bold" style="display:none; border:1px solid var(--dsh-border); color:var(--text); border-radius:10px; font-size:.8rem; padding:.45rem 1rem;">
+                            <i class="bi bi-arrow-counterclockwise"></i> Coba Lagi
+                        </button>
+                        <button type="button" id="btnSyncClose" class="btn fw-bold" style="background: var(--dsh-accent); color:#fff; border-radius:10px; font-size:.8rem; padding:.45rem 1rem;">
+                            Tutup &amp; Muat Ulang
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1658,7 +1902,12 @@ function toggleCampaignStatus(el, campId, action) {
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     window.clearAdsData = async function() {
-        if (confirm('Anda yakin ingin membersihkan semua data performa iklan? Proses ini tidak dapat dibatalkan.')) {
+        const jawaban = prompt('PERINGATAN: SEMUA data performa iklan + riwayat sync akan dihapus PERMANEN dan harus di-backfill ulang dari Shopee.\n\nKetik HAPUS (huruf besar) untuk melanjutkan:');
+        if (jawaban !== 'HAPUS') {
+            if (jawaban !== null) showToast('Dibatalkan — ketik HAPUS persis untuk konfirmasi.');
+            return;
+        }
+        {
             try {
                 const res = await fetch("{{ route('marketplace.ads.clear') }}", {
                     method: 'POST',
@@ -1670,30 +1919,82 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert('Data iklan berhasil dibersihkan!');
+                    showToast('Data iklan berhasil dibersihkan!');
                     location.reload();
                 } else {
                     throw new Error(data.message || 'Terjadi kesalahan.');
                 }
             } catch (err) {
-                alert('Gagal membersihkan data: ' + err.message);
+                showToast('Gagal membersihkan data: ' + err.message);
             }
         }
     };
 
     const formSync = document.getElementById('formSyncAds');
     if (formSync) {
+        const syncModalEl = document.getElementById('modalSyncAds');
+        const syncLoadingEl = document.getElementById('loadingSyncAds');
+        const syncResultEl = document.getElementById('resultSyncAds');
+        let syncRunning = false;
+
+        const showSyncState = (state) => {
+            formSync.style.display = state === 'form' ? 'block' : 'none';
+            syncLoadingEl.style.display = state === 'loading' ? 'block' : 'none';
+            syncResultEl.style.display = state === 'result' ? 'block' : 'none';
+        };
+
+        const showSyncResult = (opts) => {
+            const iconEl = document.getElementById('resultSyncIcon');
+            iconEl.innerHTML = opts.icon;
+            iconEl.style.color = opts.color;
+            document.getElementById('resultSyncTitle').innerText = opts.title;
+            document.getElementById('resultSyncMessage').innerText = opts.message || '';
+            const errBox = document.getElementById('resultSyncErrors');
+            if (opts.errors && opts.errors.length) {
+                errBox.innerHTML = opts.errors.map(er => '<div style="margin-bottom:.35rem;"><i class="bi bi-exclamation-triangle" style="color:#f59e0b;"></i> ' + er + '</div>').join('');
+                errBox.style.display = 'block';
+            } else {
+                errBox.style.display = 'none';
+            }
+            document.getElementById('btnSyncRetry').style.display = opts.canRetry ? 'inline-block' : 'none';
+            showSyncState('result');
+            if (opts.autoReload) setTimeout(() => location.reload(), 1800);
+        };
+
+        document.getElementById('btnSyncRetry').addEventListener('click', () => showSyncState('form'));
+        document.getElementById('btnSyncClose').addEventListener('click', () => location.reload());
+        if (syncModalEl) syncModalEl.addEventListener('show.bs.modal', () => { if (!syncRunning) showSyncState('form'); });
+
         formSync.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+            if (syncRunning) return;
+            syncRunning = true;
+
             const form = this;
-            const loading = document.getElementById('loadingSyncAds');
-            const success = document.getElementById('successSyncAds');
-            
-            // Hide form, show loading
-            form.style.display = 'none';
-            loading.style.display = 'block';
-            
+            showSyncState('loading');
+
+            const logEl = document.getElementById('syncLogs');
+            const progressBar = document.getElementById('syncProgressBar');
+            const percentText = document.getElementById('syncPercentText');
+            const statusLine = document.getElementById('syncStatusLine');
+
+            const liveProgress = document.getElementById('liveSyncProgress');
+            const liveBar = document.getElementById('liveSyncBar');
+            const livePercent = document.getElementById('liveSyncPercent');
+            const liveLog = document.getElementById('liveSyncLog');
+            if (liveProgress) liveProgress.style.display = 'block';
+
+            logEl.innerHTML = '<div style="color: #4ade80;">> Menghubungkan ke server...</div>';
+            progressBar.style.width = '0%';
+            percentText.innerText = '0%';
+            statusLine.innerText = 'Menghubungkan ke server\u2026';
+
+            let savedData = 0;
+            let allErrors = [];
+            let isDone = false;
+            let doneStatus = null;
+            let doneMessage = '';
+
             try {
                 const formData = new FormData(form);
                 const res = await fetch(form.action, {
@@ -1704,85 +2005,101 @@ document.addEventListener("DOMContentLoaded", function() {
                     },
                     body: formData
                 });
-                
+
                 if (!res.ok) {
                     throw new Error('Terjadi kesalahan koneksi (' + res.status + ')');
                 }
-                
+
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
-                const logEl = document.getElementById('syncLogs');
-                const progressBar = document.getElementById('syncProgressBar');
-                
-                const liveProgress = document.getElementById('liveSyncProgress');
-                const liveBar = document.getElementById('liveSyncBar');
-                const livePercent = document.getElementById('liveSyncPercent');
-                const liveLog = document.getElementById('liveSyncLog');
-                
-                if (liveProgress) liveProgress.style.display = 'block';
-                
-                let savedData = 0;
-                let hasErrors = false;
-                let allErrors = [];
-                let isDone = false;
-                
-                logEl.innerHTML = '<div style="color: #4ade80;">> Menghubungkan ke server...</div>';
-                progressBar.style.width = '0%';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    
+
                     const chunkStr = decoder.decode(value, { stream: true });
                     const lines = chunkStr.split('\n').filter(line => line.trim() !== '');
-                    
+
                     for (const line of lines) {
                         try {
                             const data = JSON.parse(line);
-                            
+
                             if (data.type === 'log' || data.type === 'info' || data.type === 'done') {
                                 const color = data.type === 'done' ? '#60a5fa' : (data.type === 'info' ? '#facc15' : '#a1a1aa');
-                                logEl.innerHTML += `<div style="color: ${color};">> ${data.message}</div>`;
+                                logEl.innerHTML += '<div style="color: ' + color + ';">> ' + data.message + '</div>';
                                 logEl.scrollTop = logEl.scrollHeight;
-                                if (liveLog) liveLog.innerText = `> ${data.message}`;
+                                statusLine.innerText = data.message;
+                                if (liveLog) liveLog.innerText = '> ' + data.message;
                             }
-                            
+
                             if (data.progress !== undefined && data.progress !== null) {
-                                progressBar.style.width = data.progress + '%';
-                                if (liveBar) liveBar.style.width = data.progress + '%';
-                                if (livePercent) livePercent.innerText = Math.round(data.progress) + '%';
+                                const pct = Math.min(100, Math.round(data.progress));
+                                progressBar.style.width = pct + '%';
+                                percentText.innerText = pct + '%';
+                                if (liveBar) liveBar.style.width = pct + '%';
+                                if (livePercent) livePercent.innerText = pct + '%';
                             }
-                            
+
                             if (data.type === 'done') {
                                 isDone = true;
                                 savedData = data.saved || 0;
+                                doneStatus = data.status || 'success';
+                                doneMessage = data.message || '';
                                 if (data.errors && data.errors.length > 0) {
-                                    hasErrors = true;
                                     allErrors = data.errors;
                                 }
                             }
-                        } catch (e) {
-                            console.error('Failed to parse NDJSON line:', line, e);
+                        } catch (parseErr) {
+                            console.error('Failed to parse NDJSON line:', line, parseErr);
                         }
                     }
                 }
-                
-                if (hasErrors) {
-                    alert('Sync Selesai dengan beberapa masalah:\n' + allErrors.join("\n"));
-                }
-                
-                if (savedData > 0 || !hasErrors) {
-                    loading.style.display = 'none';
-                    success.style.display = 'block';
-                    setTimeout(() => location.reload(), 1500);
+
+                syncRunning = false;
+
+                if (doneStatus === 'queued') {
+                    showSyncResult({
+                        icon: '<i class="bi bi-clock-history"></i>',
+                        color: '#3b82f6',
+                        title: 'Diproses di Background',
+                        message: doneMessage || 'Rentang panjang diproses bertahap di server. Pantau progresnya di bagian Riwayat Sync.',
+                        canRetry: false
+                    });
+                } else if (allErrors.length > 0) {
+                    showSyncResult({
+                        icon: '<i class="bi bi-exclamation-circle-fill"></i>',
+                        color: '#f59e0b',
+                        title: 'Selesai dengan Catatan',
+                        message: savedData > 0 ? savedData + ' baris data berhasil diperbarui, tapi ada kendala:' : 'Sync tidak selesai sepenuhnya:',
+                        errors: allErrors,
+                        canRetry: true
+                    });
+                } else if (!isDone) {
+                    showSyncResult({
+                        icon: '<i class="bi bi-wifi-off"></i>',
+                        color: '#ef4444',
+                        title: 'Koneksi Terputus',
+                        message: 'Streaming terputus sebelum selesai. Tenang \u2014 proses tetap dilanjutkan di server; cek Riwayat Sync beberapa saat lagi.',
+                        canRetry: true
+                    });
                 } else {
-                    loading.style.display = 'none';
-                    form.style.display = 'block';
+                    showSyncResult({
+                        icon: '<i class="bi bi-check-circle-fill"></i>',
+                        color: '#16a34a',
+                        title: 'Sinkronisasi Selesai!',
+                        message: savedData + ' baris data diperbarui. Halaman akan dimuat ulang\u2026',
+                        autoReload: true
+                    });
                 }
             } catch (err) {
-                alert('Gagal:\n' + err.message);
-                loading.style.display = 'none';
-                form.style.display = 'block';
+                syncRunning = false;
+                showSyncResult({
+                    icon: '<i class="bi bi-x-circle-fill"></i>',
+                    color: '#ef4444',
+                    title: 'Gagal Terhubung',
+                    message: err.message,
+                    canRetry: true
+                });
             }
         });
     }
@@ -3222,7 +3539,7 @@ function toggleGmsItem(itemId, action, btn) {
     .then(r => r.json())
     .then(res => {
         if (res.status === 'success') {
-            alert(res.message);
+            showToast(res.message);
             // Ubah tombol
             if (action === 'remove') {
                 btn.className = 'btn btn-sm btn-outline-success';
@@ -3234,12 +3551,12 @@ function toggleGmsItem(itemId, action, btn) {
                 btn.setAttribute('onclick', `toggleGmsItem('${itemId}', 'remove', this)`);
             }
         } else {
-            alert('Error: ' + res.message);
+            showToast('Error: ' + res.message);
             btn.innerHTML = originalHtml;
         }
     })
     .catch(err => {
-        alert('Terjadi kesalahan koneksi.');
+        showToast('Terjadi kesalahan koneksi.');
         btn.innerHTML = originalHtml;
     })
     .finally(() => {
@@ -3263,7 +3580,7 @@ function submitInlineGms(channelItemId, campaignId, storeId, btnElement) {
     const roasInput = document.getElementById('inlineRoas_' + channelItemId).value;
     
     if (!budgetInput && !roasInput) {
-        alert('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
+        showToast('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
         return;
     }
 
@@ -3294,13 +3611,13 @@ function submitInlineGms(channelItemId, campaignId, storeId, btnElement) {
                 btnElement.disabled = false;
             }, 2000);
         } else {
-            alert(res.message || 'Gagal menyimpan pengaturan.');
+            showToast(res.message || 'Gagal menyimpan pengaturan.');
             btnElement.innerHTML = originalHtml;
             btnElement.disabled = false;
         }
     })
     .catch(err => {
-        alert('Terjadi kesalahan koneksi.');
+        showToast('Terjadi kesalahan koneksi.');
         btnElement.innerHTML = originalHtml;
         btnElement.disabled = false;
     });
@@ -3311,12 +3628,12 @@ function submitInlineCpc(channelItemId, campaignId, storeId, btnElement) {
     const roasInput = document.getElementById('inlineRoas_' + channelItemId).value;
     
     if (!budgetInput && !roasInput) {
-        alert('Harap isi minimal salah satu pengaturan (Budget atau ROAS) untuk kampanye CPC.');
+        showToast('Harap isi minimal salah satu pengaturan (Budget atau ROAS) untuk kampanye CPC.');
         return;
     }
 
     if (!campaignId) {
-        alert('ID Kampanye CPC tidak ditemukan.');
+        showToast('ID Kampanye CPC tidak ditemukan.');
         return;
     }
 
@@ -3347,13 +3664,13 @@ function submitInlineCpc(channelItemId, campaignId, storeId, btnElement) {
                 btnElement.disabled = false;
             }, 2000);
         } else {
-            alert(res.message || 'Gagal menyimpan pengaturan CPC.');
+            showToast(res.message || 'Gagal menyimpan pengaturan CPC.');
             btnElement.innerHTML = originalHtml;
             btnElement.disabled = false;
         }
     })
     .catch(err => {
-        alert('Terjadi kesalahan koneksi.');
+        showToast('Terjadi kesalahan koneksi.');
         btnElement.innerHTML = originalHtml;
         btnElement.disabled = false;
     });
@@ -3369,7 +3686,7 @@ function submitGmsSettings(e) {
     const campaignId = document.getElementById('gmsCampaignId').value;
     
     if (!dailyBudget && !roasTarget) {
-        alert('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
+        showToast('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
         return;
     }
     
@@ -3394,13 +3711,13 @@ function submitGmsSettings(e) {
     .then(r => r.json())
     .then(res => {
         if (res.status === 'success') {
-            alert(res.message);
+            showToast(res.message);
         } else {
-            alert('Error: ' + res.message);
+            showToast('Error: ' + res.message);
         }
     })
     .catch(err => {
-        alert('Terjadi kesalahan koneksi.');
+        showToast('Terjadi kesalahan koneksi.');
     })
     .finally(() => {
         btn.innerHTML = originalHtml;
@@ -3442,7 +3759,7 @@ function saveAdsSetting() {
     const storeId = storeIdElement ? storeIdElement.value : null;
     
     if(!storeId) {
-        alert("Pilih toko terlebih dahulu dari filter di atas.");
+        showToast("Pilih toko terlebih dahulu dari filter di atas.");
         return;
     }
     
@@ -3465,14 +3782,14 @@ function saveAdsSetting() {
     .then(response => response.json())
     .then(data => {
         if(data.success) {
-            alert(data.message);
+            showToast(data.message);
         } else {
-            alert('Gagal menyimpan: ' + (data.message || 'Unknown error'));
+            showToast('Gagal menyimpan: ' + (data.message || 'Unknown error'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Terjadi kesalahan saat menyimpan pengaturan.');
+        showToast('Terjadi kesalahan saat menyimpan pengaturan.');
     });
 }
 </script>
@@ -3519,6 +3836,7 @@ function saveInlineEdit(el) {
     const type = wrapper.getAttribute('data-type');
     const campId = wrapper.getAttribute('data-camp');
     const storeId = "{{ $storeId }}";
+    if (storeId === 'all') { showToast('Mode Semua Toko — pilih satu toko dulu untuk aksi ini.'); return; }
     
     let payload = {
         _token: document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '',
@@ -3561,15 +3879,15 @@ function saveInlineEdit(el) {
             }
             wrapper.querySelector('.inline-edit-text').innerHTML = displayVal + ' <i class="bi bi-pencil-fill text-muted" style="font-size: .6rem; opacity: 0.5;"></i>';
             
-            // Optional: alert('Tersimpan!');
+            // Optional: showToast('Tersimpan!');
         } else {
-            alert('Gagal menyimpan: ' + (data.message || 'Unknown error'));
+            showToast('Gagal menyimpan: ' + (data.message || 'Unknown error'));
             wrapper.querySelector('.inline-edit-text').innerHTML = originalContent;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Terjadi kesalahan saat menyimpan pengaturan.');
+        showToast('Terjadi kesalahan saat menyimpan pengaturan.');
         wrapper.querySelector('.inline-edit-text').innerHTML = originalContent;
     });
 }
@@ -3579,6 +3897,7 @@ function toggleCampaignStatus(el, campId, action) {
     }
     
     const storeId = "{{ $storeId }}";
+    if (storeId === 'all') { showToast('Mode Semua Toko — pilih satu toko dulu untuk aksi ini.'); return; }
     let payload = {
         _token: document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '',
         store_id: storeId,
@@ -3606,13 +3925,13 @@ function toggleCampaignStatus(el, campId, action) {
             // Update UI by reloading the page to reflect the new badge, or we can just reload the page for simplicity
             window.location.reload();
         } else {
-            alert('Gagal mengubah status: ' + (data.message || 'Unknown error'));
+            showToast('Gagal mengubah status: ' + (data.message || 'Unknown error'));
             el.className = originalClass;
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Terjadi kesalahan sistem.');
+        showToast('Terjadi kesalahan sistem.');
         el.className = originalClass;
     });
 }

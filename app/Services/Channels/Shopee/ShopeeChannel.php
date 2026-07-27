@@ -46,40 +46,165 @@ class ShopeeChannel implements MarketplaceChannel
         return hash_hmac('sha256', $baseString, $this->partnerKey($store));
     }
 
+    // ─── Lapisan resiliensi terpusat ─────────────────────────────────────────
+    // SEMUA panggilan API Shopee (orders, chat, returns, bookings, logistics,
+    // ads, escrow, dst.) lewat get()/post() di bawah — jadi pacing antar-request,
+    // retry dengan backoff, dan cooldown rate-limit otomatis berlaku untuk semua
+    // halaman & proses (web, cron, queue) tanpa perlu diubah satu-satu.
+
     protected function get(Store $store, string $path, array $params = []): array
     {
-        $this->ensureFreshToken($store); // proaktif: refresh sebelum kedaluwarsa
-        $result = $this->doGet($store, $path, $params);
-
-        $error = $result['error'] ?? '';
-        $msg = strtolower((string)($result['message'] ?? ''));
-
-        // Token kedaluwarsa → auto-refresh sekali lalu retry
-        if ($error === 'error_auth' || str_contains($msg, 'expired') || str_contains($msg, 'access_token') || str_contains((string)$error, 'access_token')) {
-            $refreshed = $this->refreshToken($store);
-            if (empty($refreshed['error'])) {
-                $store->refresh(); // reload credentials dari DB
-                $result = $this->doGet($store, $path, $params);
-            }
-        }
-
-        return $result;
+        // GET aman di-retry penuh (idempotent): 429, 5xx, maupun gangguan koneksi.
+        return $this->resilientRequest($store, fn () => $this->doGet($store, $path, $params), true);
     }
 
     protected function post(Store $store, string $path, array $body = []): array
     {
-        $this->ensureFreshToken($store); // proaktif: refresh sebelum kedaluwarsa
-        $result = $this->doPost($store, $path, $body);
+        // POST TIDAK di-retry untuk 5xx/timeout — request bisa saja sudah diproses
+        // server (mis. kirim chat, atur pengiriman) dan retry akan menduplikasi aksi.
+        // Hanya 429 yang aman di-retry (request pasti ditolak sebelum diproses).
+        return $this->resilientRequest($store, fn () => $this->doPost($store, $path, $body), false);
+    }
 
-        $error = $result['error'] ?? '';
-        $msg = strtolower((string)($result['message'] ?? ''));
+    /**
+     * Sisa detik cooldown rate-limit global untuk toko ini (0 = tidak ada).
+     * Di-set saat Shopee menjawab 429 supaya SEMUA proses ikut menahan diri.
+     */
+    protected function cooldownRemaining(Store $store): int
+    {
+        $shopId = $this->shopId($store) ?: $store->id;
+        return max(0, (int) Cache::get("shopee:cooldown:{$shopId}", 0) - time());
+    }
 
-        if ($error === 'error_auth' || str_contains($msg, 'expired') || str_contains($msg, 'access_token') || str_contains((string)$error, 'access_token')) {
-            $refreshed = $this->refreshToken($store);
-            if (empty($refreshed['error'])) {
-                $store->refresh();
-                $result = $this->doPost($store, $path, $body);
+    /**
+     * Pacing lintas-proses: jaga jarak minimum antar panggilan API per toko
+     * (default 150 ms ≈ 6-7 req/detik, aman di bawah batas ±10 QPS Shopee).
+     * Best-effort — kegagalan lock tidak pernah menggagalkan request.
+     */
+    protected function pace(Store $store): void
+    {
+        $minGapMs = max(0, (int) config('shopee.min_gap_ms', 150));
+        if ($minGapMs === 0) {
+            return;
+        }
+
+        $shopId = $this->shopId($store) ?: $store->id;
+        $key    = "shopee:last_call:{$shopId}";
+        $lock   = Cache::lock("shopee:pace:{$shopId}", 5);
+        $locked = false;
+
+        try {
+            $locked = $lock->block(5);
+            $last = (float) Cache::get($key, 0);
+            $wait = ($last + $minGapMs / 1000) - microtime(true);
+            if ($wait > 0) {
+                usleep((int) round(min($wait, 2.0) * 1_000_000));
             }
+            Cache::put($key, microtime(true), 30);
+        } catch (\Throwable $e) {
+            // pacing best-effort
+        } finally {
+            if ($locked) {
+                optional($lock)->release();
+            }
+        }
+    }
+
+    /**
+     * Eksekusi request dengan: refresh token proaktif + auto-refresh saat expired,
+     * cooldown rate-limit global per toko, pacing antar panggilan, dan retry
+     * eksponensial (dengan jitter) untuk error transien.
+     *
+     * @param bool $retryTransient true (GET): retry juga untuk 5xx/koneksi putus.
+     *                             false (POST): hanya retry untuk 429.
+     */
+    protected function resilientRequest(Store $store, callable $call, bool $retryTransient = true): array
+    {
+        $this->ensureFreshToken($store); // proaktif: refresh sebelum kedaluwarsa
+
+        $isConsole   = app()->runningInConsole();
+        $maxAttempts = max(1, (int) (config('shopee.retry_max_attempts') ?: ($isConsole ? 3 : 2)));
+        $result      = [];
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            // 1) Hormati cooldown 429 yang di-set proses lain
+            $remaining = $this->cooldownRemaining($store);
+            if ($remaining > 0) {
+                sleep(min($remaining, $isConsole ? 60 : 2));
+                $remaining = $this->cooldownRemaining($store);
+                if ($remaining > 0 && ! $isConsole) {
+                    // Request web jangan digantung — beri jawaban jelas ke UI.
+                    return [
+                        'error'   => 'rate_limit_cooldown',
+                        'message' => "Shopee sedang membatasi permintaan (rate limit). Coba lagi ±{$remaining} detik lagi.",
+                        '_meta'   => ['http_status' => 429, 'retry_after' => $remaining],
+                    ];
+                }
+            }
+
+            // 2) Jaga jarak antar panggilan
+            $this->pace($store);
+
+            try {
+                $result = $call();
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                $result = [
+                    'error'   => 'connection_exception',
+                    'message' => $e->getMessage(),
+                    '_meta'   => ['http_status' => null, 'retry_after' => null],
+                ];
+            }
+
+            // 3) Token kedaluwarsa → refresh sekali lalu ulangi panggilan
+            $error = (string) ($result['error'] ?? '');
+            $msg   = strtolower((string) ($result['message'] ?? ''));
+            if ($error === 'error_auth' || str_contains($msg, 'expired') || str_contains($msg, 'access_token') || str_contains($error, 'access_token')) {
+                $refreshed = $this->refreshToken($store);
+                if (empty($refreshed['error'])) {
+                    $store->refresh(); // reload credentials dari DB
+                    try {
+                        $result = $call();
+                    } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                        $result = [
+                            'error'   => 'connection_exception',
+                            'message' => $e->getMessage(),
+                            '_meta'   => ['http_status' => null, 'retry_after' => null],
+                        ];
+                    }
+                    $error = (string) ($result['error'] ?? '');
+                    $msg   = strtolower((string) ($result['message'] ?? ''));
+                }
+            }
+
+            // 4) Klasifikasi error
+            $status        = $result['_meta']['http_status'] ?? null;
+            $isRateLimited = $status === 429
+                || str_contains(strtolower($error), 'rate_limit')
+                || str_contains($msg, 'rate limit');
+            $isTransient   = $error === 'connection_exception'
+                || ($status !== null && $status >= 500);
+
+            if ($isRateLimited) {
+                // Set cooldown global per toko supaya proses lain ikut menahan diri.
+                $retryAfter = (int) ($result['_meta']['retry_after'] ?? 0);
+                if ($retryAfter <= 0) {
+                    $retryAfter = (int) config('shopee.rate_limit_cooldown', 30);
+                }
+                $retryAfter += random_int(1, 5); // jitter antar proses
+                $shopId = $this->shopId($store) ?: $store->id;
+                Cache::put("shopee:cooldown:{$shopId}", time() + $retryAfter, $retryAfter + 5);
+                Log::warning("[shopee] Rate limit (429) toko #{$store->id}; cooldown {$retryAfter}s (attempt {$attempt}/{$maxAttempts}).");
+            }
+
+            $shouldRetry = $isRateLimited || ($retryTransient && $isTransient);
+            if (! $shouldRetry || $attempt >= $maxAttempts) {
+                break;
+            }
+
+            // 5) Backoff eksponensial + jitter; request web dibatasi ketat agar tidak menggantung
+            $cap   = $isConsole ? max(1, (int) config('shopee.retry_max_sleep', 15)) : 3;
+            $sleep = min((2 ** $attempt) + random_int(0, 1000) / 1000, $cap);
+            usleep((int) round($sleep * 1_000_000));
         }
 
         return $result;
@@ -97,7 +222,7 @@ class ShopeeChannel implements MarketplaceChannel
             'sign'         => $this->sign($store, $path, $timestamp),
         ], $params);
 
-        $response = Http::timeout(30)->get($this->baseUrl($store) . $path, $query);
+        $response = Http::connectTimeout(10)->timeout(30)->get($this->baseUrl($store) . $path, $query);
 
         return $this->withHttpMeta($response);
     }
@@ -114,7 +239,7 @@ class ShopeeChannel implements MarketplaceChannel
             'sign'         => $this->sign($store, $path, $timestamp),
         ];
 
-        $response = Http::timeout(30)->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
+        $response = Http::connectTimeout(10)->timeout(30)->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
 
         return $this->withHttpMeta($response);
     }
@@ -165,10 +290,14 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->get($store, '/api/v2/shop/get_shop_info');
     }
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array
     {
+        // Shopee get_order_list hanya menerima 'create_time' atau 'update_time'
+        // (rentang maksimal 15 hari per panggilan — dipecah di MarketplaceSyncService).
         $params = [
-            'time_range_field' => 'update_time',
+            'time_range_field' => in_array($timeRangeField, ['create_time', 'update_time'], true)
+                ? $timeRangeField
+                : 'update_time',
             'time_from' => $timeFrom,
             'time_to' => $timeTo,
             'page_size' => $pageSize,
@@ -621,9 +750,24 @@ class ShopeeChannel implements MarketplaceChannel
     /** Parameter pengiriman untuk booking (pickup/dropoff yang tersedia). */
     public function getBookingShippingParameter(Store $store, string $bookingSn): array
     {
-        // Shopee API tidak membedakan endpoint shipping_parameter untuk booking vs order biasa.
-        // Keduanya menggunakan /api/v2/logistics/get_shipping_parameter
-        return $this->getShippingParameter($store, $bookingSn);
+        // PERBAIKAN: Shopee PUNYA endpoint khusus booking — satu keluarga dengan
+        // ship_booking, get_booking_tracking_number, create_booking_shipping_document,
+        // dst. yang semuanya sudah dipakai di file ini. Implementasi lama salah
+        // meneruskan ke get_shipping_parameter?order_sn={booking_sn}, yang SELALU
+        // dijawab Shopee "The order_sn {order_sn} is not exist." untuk booking
+        // yang belum MATCHED — itulah error di modal Atur Pengiriman kilat.
+        $res = $this->get($store, '/api/v2/logistics/get_booking_shipping_parameter', [
+            'booking_sn' => $bookingSn,
+        ]);
+
+        // Fallback kompatibilitas: bila endpoint booking tidak dikenal (region/versi
+        // API tertentu) ATAU sn yang dikirim ternyata order_sn biasa, coba jalur order.
+        $err = strtolower((string) ($res['error'] ?? ''));
+        if ($err !== '' && (str_contains($err, 'not_found') || str_contains($err, 'error_path') || str_contains($err, 'invalid_path') || str_contains($err, 'booking_sn'))) {
+            return $this->getShippingParameter($store, $bookingSn);
+        }
+
+        return $res;
     }
 
     /** Atur pengiriman booking. $params berisi salah satu dari pickup / dropoff. */

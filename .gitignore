@@ -111,3 +111,4 @@ CUTOFF_*.md
 RUNBOOK_*.md
 .fuse_hidden*
 .claude/
+_to_delete/

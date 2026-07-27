@@ -57,17 +57,22 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         // ── Shopee Ads: sinkronisasi otomatis ───────────────────────────
-        // Setiap 4 jam: sync data harian (Balance + Campaigns + CPC + GMS) 3 hari terakhir
+        // Setiap 4 jam (menit 0): sync data harian (Balance + Campaigns + CPC + GMS) 3 hari terakhir
         $schedule->command('marketplace:sync-ads')
             ->everyFourHours()
+            ->name('sync-ads-main')
             ->withoutOverlapping(30)
-            ->name('sync-ads-main');
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/sync-ads.log'));
 
-        // Setiap jam: sync data per jam (untuk heatmap)
+        // Setiap jam di menit 30: sync data per jam (untuk heatmap).
+        // Menit 30 dipilih agar tidak tabrakan dengan sync-ads-main yang jalan di menit 0.
         $schedule->command('marketplace:sync-ads', ['--hourly'])
-            ->hourly()
+            ->hourlyAt(30)
+            ->name('sync-ads-hourly')
             ->withoutOverlapping(30)
-            ->name('sync-ads-hourly');
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/sync-ads.log'));
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -8,7 +8,13 @@ interface MarketplaceChannel
 {
     public function getShopInfo(Store $store): array;
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array;
+    /**
+     * @param string $timeRangeField 'update_time' (default, untuk sync rutin agar
+     *                               perubahan status ikut tertangkap) atau
+     *                               'create_time' (untuk backfill/histori agar
+     *                               setiap periode deterministik per tanggal order dibuat).
+     */
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array;
 
     public function getOrderDetail(Store $store, array $orderSnList): array;
 

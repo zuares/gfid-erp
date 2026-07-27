@@ -28,7 +28,7 @@ class ShopeeAdsApiService
     protected function execute(Store $store, string $endpoint, callable $callable)
     {
         try {
-            usleep(500000); // Centralized rate limiting pace: 0.5 detik
+            usleep(250000); // Centralized pace 0.25s (~4 req/dtk, masih jauh di bawah QPS cap; cooldown 429 jadi jaring pengaman)
 
             $response = $callable();
 
@@ -39,6 +39,15 @@ class ShopeeAdsApiService
                     $retryAfter = 300; // fallback aman 5 menit
                 }
                 $retryAfter += random_int(15, 60); // jitter
+
+                // Cooldown global per toko: SEMUA proses sync ads (queue, cron,
+                // manual) menunda diri sampai jendela rate limit berlalu,
+                // supaya tidak membuang percobaan selagi Shopee masih menolak.
+                \Illuminate\Support\Facades\Cache::put(
+                    'shopee-ads-cooldown:' . $store->id,
+                    now()->addSeconds($retryAfter)->timestamp,
+                    $retryAfter
+                );
 
                 Log::warning("[ShopeeAdsApiService] Rate limit (429) {$endpoint} untuk toko {$store->id}. Delay: {$retryAfter}s.");
                 throw new \App\Exceptions\ShopeeAdsRateLimitException($retryAfter, "Shopee Ads API rate limit reached pada endpoint {$endpoint}");

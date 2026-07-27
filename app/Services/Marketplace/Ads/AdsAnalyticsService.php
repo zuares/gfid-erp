@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class AdsAnalyticsService
 {
-    public function getKpiSummary(int $storeId, string $dateFrom, string $dateTo)
+    public function getKpiSummary(int|array $storeId, string $dateFrom, string $dateTo)
     {
         $current = $this->aggregateDaily($storeId, $dateFrom, $dateTo);
         
@@ -28,9 +28,9 @@ class AdsAnalyticsService
         ];
     }
 
-    protected function aggregateDaily(int $storeId, string $dateFrom, string $dateTo)
+    protected function aggregateDaily(int|array $storeId, string $dateFrom, string $dateTo)
     {
-        return MarketplaceAdsDaily::where('store_id', $storeId)
+        return MarketplaceAdsDaily::whereIn('store_id', (array) $storeId)
             ->whereBetween('date', [$dateFrom, $dateTo])
             ->select(
                 DB::raw('SUM(spend) as spend'),
@@ -63,9 +63,9 @@ class AdsAnalyticsService
         return $changes;
     }
 
-    public function getHourlyHeatmap(int $storeId, string $dateFrom, string $dateTo)
+    public function getHourlyHeatmap(int|array $storeId, string $dateFrom, string $dateTo)
     {
-        return MarketplaceAdsHourlyPerformance::where('store_id', $storeId)
+        return MarketplaceAdsHourlyPerformance::whereIn('store_id', (array) $storeId)
             ->whereNull('campaign_id')
             ->whereBetween('performance_date', [$dateFrom, $dateTo])
             ->select('performance_hour', DB::raw('SUM(expense) as expense'), DB::raw('SUM(broad_gmv) as gmv'), DB::raw('SUM(clicks) as clicks'), DB::raw('SUM(broad_order) as orders'))
@@ -74,7 +74,7 @@ class AdsAnalyticsService
             ->get();
     }
 
-    public function getHistoricalComparison(int $storeId, string $dateFrom, string $dateTo, int $periods = 3)
+    public function getHistoricalComparison(int|array $storeId, string $dateFrom, string $dateTo, int $periods = 3)
     {
         $days = Carbon::parse($dateFrom)->diffInDays(Carbon::parse($dateTo)) + 1;
         $results = [];
@@ -83,7 +83,7 @@ class AdsAnalyticsService
             $start = Carbon::parse($dateFrom)->subDays($days * $i)->toDateString();
             $end = Carbon::parse($dateTo)->subDays($days * $i)->toDateString();
             
-            $daily = MarketplaceAdsDaily::where('store_id', $storeId)
+            $daily = MarketplaceAdsDaily::whereIn('store_id', (array) $storeId)
                 ->whereBetween('date', [$start, $end])
                 ->orderBy('date')
                 ->get();

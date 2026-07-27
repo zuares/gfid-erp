@@ -816,6 +816,9 @@ body[data-theme="dark"] .ord-table tbody tr td {
         <button class="ord-tab" data-tab="rrc" onclick="switchTab('rrc',this)">
             🔁 Retur & Batal <span class="ord-badge" id="badge-rrc" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">—</span>
         </button>
+        <button class="ord-tab" data-tab="sync" onclick="switchTab('sync',this)">
+            🔄 Sync <span class="ord-badge" id="badge-sync" style="background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe">—</span>
+        </button>
     </div>
     {{-- Toolbar: Actions & Sub-Tabs --}}
     <div class="process-toolbar" id="processToolbar" style="margin-bottom:1rem; border:1px solid var(--shp-border); background:var(--card); border-radius:8px; padding:6px;">
@@ -990,11 +993,15 @@ body[data-theme="dark"] .ord-table tbody tr td {
                             <button class="qs-range-btn" data-days="14" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">14 Hari</button>
                             <button class="qs-range-btn" data-days="30" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">30 Hari</button>
                             <button class="qs-range-btn" data-days="60" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">60 Hari</button>
+                            <button class="qs-range-btn" data-days="90" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">90 Hari</button>
+                            <button class="qs-range-btn" data-days="180" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">180 Hari</button>
+                            <button class="qs-range-btn" data-days="365" style="padding:.45rem .2rem;font-size:.72rem;font-weight:600;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .2s">1 Tahun</button>
                         </div>
                         <input type="hidden" id="qsSyncRangeDays" value="3">
                         <div id="qsRangeHint" style="display:none;margin-top:.5rem;padding:.5rem .6rem;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.68rem;color:#92400e;line-height:1.4">
                             ⏳ Rentang panjang butuh waktu lebih lama & ditarik bertahap (jendela 14 hari).
                             Disarankan pakai <b>Sync di Latar Belakang</b> agar tidak menunggu di layar.
+                            Rentang ≥ 90 hari otomatis dijalankan di latar belakang.
                         </div>
                     </div>
 
@@ -1299,7 +1306,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         event.target.closest('.hdr-dropdown-item').classList.add('selected');
         $('ddDate').classList.remove('open');
         history.replaceState(null, '', location.pathname + '?date_from=' + fmt(from) + '&date_to=' + fmt(to));
-        render();
+        loadOrders(); // muat ulang dari server agar order lama (backfill) ikut terambil
     };
 
     // ── Flatpickr (manual date) ───────────────────────────────────────────
@@ -1317,7 +1324,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     $('btnDateLabel').textContent = fmtS(dates[0]) + '–' + fmtS(dates[1]);
                     history.replaceState(null, '', location.pathname + '?date_from=' + getFrom() + '&date_to=' + getTo());
                     $('ddDate').classList.remove('open');
-                    render();
+                    loadOrders(); // muat ulang dari server agar order lama (backfill) ikut terambil
                 }
             }
         });
@@ -1566,6 +1573,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             return;
         }
 
+        // Tab Sync: status sinkronisasi per toko + riwayat (data live, bukan array orders)
+        if (tab === 'sync') {
+            updateToolbar();
+            loadSyncTab();
+            return;
+        }
+
         renderTable();
         updateToolbar();
         updatePickingPrintStrip();
@@ -1712,6 +1726,190 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         body.innerHTML = warn + cards;
     }
 
+    // ── Tab Sync: status sinkronisasi per toko + riwayat sync ─────────────
+    let syncTabTimer = null;
+    let syncTabSeq = 0;
+
+    async function loadSyncTab(silent) {
+        if (activeTab !== 'sync') return;
+        const seq = ++syncTabSeq;
+        const body = $('ordersBody');
+        if (!silent) {
+            body.innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat status sinkronisasi…</div>';
+        }
+
+        let stores = [], logs = [];
+        try {
+            [stores, logs] = await Promise.all([
+                api('/api/marketplace/stores'),
+                api('/api/marketplace/sync-logs').catch(() => []),
+            ]);
+        } catch (e) {
+            if (seq !== syncTabSeq || activeTab !== 'sync') return;
+            body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal memuat status sync: ${esc(e.message || 'error')}</div>`;
+            return;
+        }
+        if (seq !== syncTabSeq || activeTab !== 'sync') return;
+
+        // Progres live per toko (dibaca dari cache backend, di-set oleh proses sync)
+        const progress = {};
+        await Promise.all((stores || []).map(async s => {
+            try { progress[s.id] = await api('/api/marketplace/stores/' + s.id + '/sync-progress'); } catch (e) {}
+        }));
+        if (seq !== syncTabSeq || activeTab !== 'sync') return;
+
+        renderSyncTab(stores || [], progress, logs || []);
+
+        const running = Object.values(progress).filter(p => p && (p.status === 'running' || p.status === 'queued')).length;
+        const badge = document.getElementById('badge-sync');
+        if (badge) badge.textContent = running > 0 ? running : '—';
+
+        // Auto-refresh selama masih ada proses berjalan & tab masih dibuka
+        clearTimeout(syncTabTimer);
+        if (running > 0) {
+            syncTabTimer = setTimeout(() => loadSyncTab(true), 4000);
+        }
+    }
+    window.loadSyncTab = loadSyncTab;
+
+    function syncStatusDot(s) {
+        if (s.connection_status === 'CONNECTED') return '<span style="color:#16a34a">●</span> Terhubung';
+        if (s.connection_status === 'TOKEN_EXPIRED') return '<span style="color:#d97706">●</span> Token kedaluwarsa';
+        return '<span style="color:#dc2626">●</span> Perlu login ulang';
+    }
+
+    function renderSyncTab(stores, progress, logs) {
+        const body = $('ordersBody');
+        const thisYear = new Date().getFullYear();
+
+        const shopeeStores = stores.filter(s => s.is_active !== false);
+        const cards = shopeeStores.map(s => {
+            const p = progress[s.id];
+            const isRunning = p && (p.status === 'running' || p.status === 'queued');
+            const pct = isRunning ? Math.max(0, Math.min(100, p.percent || 0)) : 0;
+            const lastSync = s.last_synced_at ? fmt(s.last_synced_at) : 'Belum pernah';
+
+            let progressHtml = '';
+            if (isRunning) {
+                progressHtml = `
+                <div style="margin-top:8px">
+                    <div style="display:flex;justify-content:space-between;font-size:.68rem;color:#475569;margin-bottom:3px">
+                        <span>${esc(p.label || 'Sedang berjalan…')}</span><span style="font-weight:700">${pct}%</span>
+                    </div>
+                    <div style="height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden">
+                        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:99px;transition:width .5s"></div>
+                    </div>
+                </div>`;
+            } else if (p && p.status === 'done') {
+                progressHtml = `<div style="margin-top:8px;font-size:.7rem;color:#16a34a;font-weight:700">✅ ${esc(p.label || 'Selesai')}</div>`;
+            } else if (p && p.status === 'error') {
+                progressHtml = `<div style="margin-top:8px;font-size:.7rem;color:#dc2626;font-weight:700">⚠️ ${esc(p.label || 'Gagal')}</div>`;
+            }
+
+            const yearOpts = [];
+            for (let y = thisYear - 1; y >= 2020; y--) yearOpts.push(`<option value="${y}">s/d ${y}</option>`);
+
+            const disabled = isRunning ? 'disabled style="opacity:.5;pointer-events:none"' : '';
+
+            return `
+            <div class="ord-card" style="padding:14px;margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+                    <div>
+                        <div style="font-weight:800;font-size:.9rem">${esc(s.name)}</div>
+                        <div style="font-size:.7rem;color:#64748b;margin-top:2px">${syncStatusDot(s)} · Sync terakhir: ${esc(lastSync)}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                        <select id="syncRange-${s.id}" class="form-select form-select-sm" style="width:auto;font-size:.72rem;padding:.25rem 1.6rem .25rem .5rem" ${disabled}>
+                            <option value="3">3 hari</option>
+                            <option value="7">7 hari</option>
+                            <option value="30">30 hari</option>
+                            <option value="90">90 hari</option>
+                            <option value="180">180 hari</option>
+                            <option value="365">1 tahun</option>
+                        </select>
+                        <button id="btnSyncRun-${s.id}" class="btn btn-sm btn-primary" style="font-size:.72rem;padding:.25rem .6rem" onclick="syncTabRun(${s.id})" ${disabled}>⬇️ Tarik</button>
+                        <select id="syncYear-${s.id}" class="form-select form-select-sm" style="width:auto;font-size:.72rem;padding:.25rem 1.6rem .25rem .5rem" ${disabled}>
+                            ${yearOpts.join('')}
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.25rem .6rem" onclick="syncTabHistorical(${s.id})" title="Tarik seluruh histori order (per 14 hari, create_time) sampai tahun terpilih — berjalan di latar belakang" ${disabled}>🕰️ Histori</button>
+                    </div>
+                </div>
+                ${progressHtml}
+            </div>`;
+        }).join('');
+
+        // Riwayat sync terakhir (dari marketplace_sync_logs)
+        const logRows = (logs || []).slice(0, 30).map(l => {
+            const ok = l.status === 'success';
+            const badgeHtml = `<span style="font-size:.62rem;font-weight:800;border-radius:99px;padding:2px 8px;${ok ? 'background:#dcfce7;color:#166534' : 'background:#fee2e2;color:#991b1b'}">${ok ? '✓ sukses' : '✕ gagal'}</span>`;
+            return `
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:.72rem">
+                <div style="min-width:110px;color:#94a3b8">${l.created_at ? fmt(l.created_at) : '—'}</div>
+                <div style="min-width:110px;font-weight:700;color:#334155">${esc(l.store_name || '—')}</div>
+                <div style="min-width:100px;color:#64748b">${esc(l.action || '—')}</div>
+                <div>${badgeHtml}</div>
+                <div style="flex:1;color:#475569">${esc(l.message || '')}</div>
+            </div>`;
+        }).join('');
+
+        body.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div style="font-weight:800;font-size:.85rem;color:#334155">Status Sinkronisasi per Toko</div>
+            <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:.25rem .6rem" onclick="loadSyncTab()">🔄 Segarkan</button>
+        </div>
+        ${cards || '<div class="ord-empty"><div class="ord-empty-icon">🏪</div>Belum ada toko. Hubungkan toko dulu di halaman Toko.</div>'}
+        <div style="margin-top:18px">
+            <div style="font-weight:800;font-size:.85rem;color:#334155;margin-bottom:6px">Riwayat Sync Terakhir</div>
+            <div class="ord-card" style="padding:6px 10px">${logRows || '<div style="padding:10px;font-size:.75rem;color:#94a3b8">Belum ada riwayat sync.</div>'}</div>
+        </div>`;
+    }
+
+    // Tarik pesanan N hari ke belakang (jalan di latar belakang via queue)
+    window.syncTabRun = async function (storeId) {
+        const sel = document.getElementById('syncRange-' + storeId);
+        const days = parseInt(sel && sel.value) || 3;
+        const btn = document.getElementById('btnSyncRun-' + storeId);
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳…'; }
+        try {
+            await api('/api/marketplace/stores/' + storeId + '/sync-orders-background', {
+                method: 'POST',
+                body: JSON.stringify({ days }),
+            });
+        } catch (e) {
+            if (e && e.data && e.data.action && e.data.action.url) {
+                if (confirm((e.message || 'Toko perlu login ulang.') + '\n\nBuka halaman koneksi sekarang?')) {
+                    window.location = e.data.action.url;
+                }
+            } else {
+                alert('Gagal memulai sync: ' + (e.message || 'error'));
+            }
+        }
+        setTimeout(() => loadSyncTab(true), 800);
+    };
+
+    // Backfill histori penuh sampai tahun target (Mesin Waktu — background)
+    window.syncTabHistorical = async function (storeId) {
+        const sel = document.getElementById('syncYear-' + storeId);
+        const year = parseInt(sel && sel.value) || (new Date().getFullYear() - 1);
+        if (!confirm('Tarik SEMUA histori order sampai tahun ' + year + '?\n\nProses berjalan di latar belakang (per 14 hari) dan bisa memakan waktu lama. Data masuk bertahap.')) return;
+        try {
+            await api('/api/marketplace/stores/' + storeId + '/sync-historical', {
+                method: 'POST',
+                body: JSON.stringify({ year }),
+            });
+        } catch (e) {
+            if (e && e.data && e.data.action && e.data.action.url) {
+                if (confirm((e.message || 'Toko perlu login ulang.') + '\n\nBuka halaman koneksi sekarang?')) {
+                    window.location = e.data.action.url;
+                }
+                return;
+            }
+            alert('Gagal memulai backfill histori: ' + (e.message || 'error'));
+            return;
+        }
+        setTimeout(() => loadSyncTab(true), 800);
+    };
+
     async function autoFetchMissingAwbs() {
         const rows = orders.filter(o => (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') && !o.shipping_awb_no);
         if (rows.length === 0) return;
@@ -1767,6 +1965,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (saved === 'rrc') {
                 setTimeout(() => loadRrc(), 0);
             }
+            if (saved === 'sync') {
+                setTimeout(() => loadSyncTab(), 0);
+            }
         }
         
         // Restore sub-tabs
@@ -1811,7 +2012,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     // ── Load ──────────────────────────────────────────────────────────────
     async function loadOrders() {
         $('ordersBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
-        const url = (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) ? '/api/marketplace/local-orders?dummy=1' : '/api/marketplace/local-orders';
+        // Kirim rentang tanggal aktif ke backend supaya order lama hasil backfill
+        // ikut terambil (backend tidak lagi terpaku 200 order terbaru saja).
+        const lp = new URLSearchParams();
+        if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
+        if (getFrom()) lp.set('date_from', getFrom());
+        if (getTo())   lp.set('date_to', getTo());
+        const url = '/api/marketplace/local-orders' + (lp.toString() ? ('?' + lp.toString()) : '');
         orders = await api(url).catch(() => []);
 
         if (activeStore && !isNaN(activeStore)) {
@@ -2253,8 +2460,15 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     let params = {};
                     if (method === 'dropoff') params = { dropoff: {} };
                     else if (method === 'pickup') params = { pickup: {} };
-                    
-                    await api(`/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/ship`, {
+
+                    // Pesanan Kilat harus lewat endpoint booking (ship_booking) —
+                    // channel_order_id barisnya masih booking_sn sebelum MATCHED,
+                    // dan endpoint order akan error "The order_sn is not exist".
+                    const bulkShipUrl = o.is_kilat
+                        ? `/api/marketplace/stores/${o.store_id}/bookings/${o.booking_sn || o.channel_order_id}/ship`
+                        : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/ship`;
+
+                    await api(bulkShipUrl, {
                         method: 'POST',
                         body: JSON.stringify(params)
                     });
@@ -3046,8 +3260,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
     function renderTable() {
         // Tab Retur/Refund/Batal dikelola terpisah oleh loadRrc() (data live API).
-        // Jangan timpa isinya dengan data order lokal.
-        if (activeTab === 'rrc') return;
+        // Tab Sync dikelola loadSyncTab(). Jangan timpa isinya dengan data order lokal.
+        if (activeTab === 'rrc' || activeTab === 'sync') return;
         const body = $('ordersBody');
         let rows = applyFilters(orders.filter(inRange));
         rows = filterByTab(rows, activeTab);
@@ -3574,6 +3788,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             return;
         }
 
+        // Rentang sangat panjang (>= 90 hari) rawan timeout bila dijalankan langsung —
+        // otomatis dialihkan ke antrean latar belakang (tetap masuk bertahap ke DB).
+        if (days >= 90 && !dryRun && doOrders) {
+            return runBackgroundSync();
+        }
+
         // Switch panel ke progress
         document.getElementById('qsConfigPanel').style.display = 'none';
         document.getElementById('qsProgressPanel').style.display = '';
@@ -3787,7 +4007,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (!shippingParamCache.has(o.channel_order_id)) {
                 try {
                     const endpoint = o.is_kilat
-                        ? `/api/marketplace/stores/${o.store_id}/bookings/${o.channel_order_id}/shipping-parameter`
+                        ? `/api/marketplace/stores/${o.store_id}/bookings/${o.booking_sn || o.channel_order_id}/shipping-parameter`
                         : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/shipping-parameter`;
                     
                     const res = await api(endpoint);
@@ -3811,6 +4031,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     // bookingSn diisi hanya untuk Pesanan Kilat murni (booking belum MATCHED ke
     // order lokal) — pengiriman diatur lewat endpoint booking, bukan order.
     window.openArrangeShipment = async function (storeId, orderSn, bookingSn = null) {
+        // Beberapa tombol (tab Instan/Bermasalah/daftar lain) tidak meneruskan
+        // bookingSn — derive dari data baris supaya Pesanan Kilat SELALU lewat
+        // endpoint booking (endpoint order akan error "order_sn is not exist").
+        if (!bookingSn && typeof orders !== 'undefined') {
+            const row = orders.find(x => x.channel_order_id === orderSn || x.booking_sn === orderSn);
+            if (row && row.is_kilat) bookingSn = row.booking_sn || orderSn;
+        }
         $('asLoading').style.display = 'block';
         $('asContent').style.display = 'none';
         $('asStoreId').value = storeId;

@@ -15,7 +15,7 @@ class SyncOrdersCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'marketplace:sync-orders {--store= : ID toko spesifik yang ingin diproses} {--days=3 : Rentang hari ke belakang yang ditarik (1-60)} {--dry-run : Hanya simulasi, tidak panggil API atau ubah DB}';
+    protected $signature = 'marketplace:sync-orders {--store= : ID toko spesifik yang ingin diproses} {--days=3 : Rentang hari ke belakang yang ditarik (1-365)} {--dry-run : Hanya simulasi, tidak panggil API atau ubah DB}';
 
     /**
      * The console command description.
@@ -60,7 +60,7 @@ class SyncOrdersCommand extends Command
         $skippedCount = 0;
         $failedCount = 0;
 
-        $days = max(1, min(60, (int) $this->option('days'))); // clamp 1-60 hari
+        $days = max(1, min(365, (int) $this->option('days'))); // clamp 1-365 hari (dipecah per 14 hari di service)
         $timeTo = now()->timestamp;
         $timeFrom = now()->subDays($days)->timestamp;
         $isDryRun = $this->option('dry-run');
@@ -75,29 +75,12 @@ class SyncOrdersCommand extends Command
             $totalStore = $stores->count();
             $this->info("[{$orderNum}/{$totalStore}] {$store->name}");
 
-            // Validasi koneksi
-            $status = $store->connection_status;
-
-            if ($status === 'TOKEN_EXPIRED') {
-                if (! $isDryRun) {
-                    try {
-                        $manager = app(\App\Services\Channels\ChannelManager::class);
-                        $driver = $manager->driver($store);
-                        if (method_exists($driver, 'refreshToken')) {
-                            $driver->refreshToken($store);
-                            $store->refresh();
-                            $status = $store->connection_status;
-                        }
-                    } catch (\Throwable $e) {
-                        $status = 'AUTH_REQUIRED';
-                        Log::warning('Token refresh failed during auto sync', [
-                            'store_id'   => $store->id,
-                            'store_name' => $store->name,
-                            'error'      => $e->getMessage(),
-                        ]);
-                    }
-                }
+            // Validasi koneksi — refresh token bila kedaluwarsa lewat helper terpusat
+            // di service (dulu blok refresh yang sama terduplikasi di command ini).
+            if (! $isDryRun && $store->connection_status === 'TOKEN_EXPIRED') {
+                $syncService->ensureStoreConnected($store);
             }
+            $status = $store->connection_status;
 
             if ($status === 'NOT_CONNECTED') {
                 $this->line('Status koneksi: Belum terhubung');
@@ -124,7 +107,63 @@ class SyncOrdersCommand extends Command
                 continue;
             }
 
-            // Lock per toko
+            $progressKey = "marketplace:sync_progress:{$store->id}";
+
+            // ── Rentang panjang (>14 hari): per-jendela lewat service ─────────
+            // Lock diambil-dilepas PER JENDELA di syncOrdersWindowed() — satu lock
+            // TTL 240 dtk akan kedaluwarsa di tengah rentang panjang dan membuka
+            // celah tabrakan dengan sync 5-menit.
+            if ($days > 14) {
+                try {
+                    Cache::put($progressKey, [
+                        'percent' => 2, 'label' => 'Memulai…', 'status' => 'running',
+                        'store' => $store->name, 'ts' => now()->timestamp,
+                    ], 1800);
+
+                    $totals = $syncService->syncOrdersWindowed(
+                        $store, $timeFrom, $timeTo, 50, 'update_time', false,
+                        function (int $i, int $total, int $wFrom, int $wTo, ?array $result, ?\Throwable $error) use ($progressKey, $store) {
+                            Cache::put($progressKey, [
+                                'percent' => (int) round(($i / max(1, $total)) * 98),
+                                'label'   => 'Periode ' . $i . '/' . $total . ' (' . date('d M', $wFrom) . ' – ' . date('d M Y', $wTo) . ')' . ($error ? ' — gagal, lanjut' : ''),
+                                'status'  => 'running', 'store' => $store->name, 'ts' => now()->timestamp,
+                            ], 1800);
+                        }
+                    );
+
+                    Cache::put($progressKey, [
+                        'percent' => 100,
+                        'label'   => "Selesai · {$totals['new']} baru, {$totals['updated']} update",
+                        'status'  => 'done', 'store' => $store->name,
+                        'new' => $totals['new'], 'updated' => $totals['updated'], 'ts' => now()->timestamp,
+                    ], 300);
+
+                    $this->info("Hasil: {$totals['new']} order baru, {$totals['updated']} diperbarui"
+                        . ($totals['failed'] ? ", {$totals['failed']} periode gagal" : '')
+                        . ($totals['skipped_locked'] ? ", {$totals['skipped_locked']} periode dilewati (lock)" : ''));
+
+                    Log::info('Marketplace long-range sync done', [
+                        'store_id' => $store->id, 'store_name' => $store->name, 'days' => $days,
+                    ] + $totals);
+
+                    $successCount++;
+                } catch (\Throwable $e) {
+                    Log::error('Marketplace long-range sync failed', [
+                        'store_id' => $store->id, 'store_name' => $store->name, 'error' => $e->getMessage(),
+                    ]);
+                    Cache::put($progressKey, [
+                        'percent' => 100, 'label' => 'Gagal: ' . $e->getMessage(),
+                        'status' => 'error', 'store' => $store->name, 'ts' => now()->timestamp,
+                    ], 300);
+                    $this->error("Hasil: Gagal ({$e->getMessage()})");
+                    $failedCount++;
+                }
+
+                $this->line('');
+                continue;
+            }
+
+            // ── Rentang pendek (<=14 hari): sekali jalan dengan satu lock ─────
             $lockKey = "sync_store_{$store->id}";
             $lock = Cache::lock($lockKey, 240);
 
@@ -134,8 +173,6 @@ class SyncOrdersCommand extends Command
                 $skippedCount++;
                 continue;
             }
-
-            $progressKey = "marketplace:sync_progress:{$store->id}";
 
             try {
                 $start = microtime(true);

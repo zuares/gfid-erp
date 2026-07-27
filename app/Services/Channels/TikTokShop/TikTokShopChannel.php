@@ -147,11 +147,13 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['error' => 'not_implemented', 'message' => 'Fitur Cetak Resi untuk TikTok Shop belum tersedia.'];
     }
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array
     {
+        // TikTok Shop: pakai create_time_* saat backfill histori, selain itu update_time_*.
+        $prefix = $timeRangeField === 'create_time' ? 'create_time' : 'update_time';
         $params = [
-            'update_time_ge' => $timeFrom,
-            'update_time_lt' => $timeTo,
+            $prefix . '_ge' => $timeFrom,
+            $prefix . '_lt' => $timeTo,
             'page_size'      => $pageSize,
         ];
         if ($cursor) {

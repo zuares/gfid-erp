@@ -66,8 +66,23 @@ class ShopeeAdsSyncService
 
         $run->total_received += count($campaignIds);
 
-        // 2. Ambil Settings per chunk (API max 100)
-        $chunks = array_chunk($campaignIds, 100);
+        // Hemat kuota: kampanye yang SUDAH tutup/berakhir dan settingnya pernah
+        // tersimpan tidak perlu di-fetch ulang — settingnya tidak akan berubah.
+        // (Toko dengan ratusan kampanye lama turun dari ~5 call jadi ~1 call.)
+        $knownClosed = MarketplaceAdCampaign::where('store_id', $store->id)
+            ->whereIn('campaign_status', ['closed', 'ended', 'deleted'])
+            ->whereNotNull('setting_synced_at')
+            ->pluck('channel_campaign_id')
+            ->map(fn ($v) => (string) $v)
+            ->all();
+
+        $idsToFetch = array_values(array_diff(
+            array_map('strval', $campaignIds),
+            $knownClosed
+        ));
+
+        // 2. Ambil Settings per chunk (API max 100) — kembalikan ke int untuk API
+        $chunks = array_chunk(array_map('intval', $idsToFetch), 100);
         foreach ($chunks as $chunk) {
             $retry = 0;
             $res = null;
@@ -205,7 +220,15 @@ class ShopeeAdsSyncService
 
     public function syncCampaignDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
     {
-        $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)->pluck('channel_campaign_id')->toArray();
+        // PENTING: buang pseudo-ID non-numerik (mis. 'GMS-5' milik GMV Max).
+        // Satu ID non-numerik membuat Shopee menolak SELURUH request
+        // ("campaign_id_list is invalid") sehingga data CPC tidak pernah tersimpan.
+        $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)
+            ->pluck('channel_campaign_id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->toArray();
         if (empty($campaigns)) return;
         
         $chunks = array_chunk($campaigns, 100);
@@ -245,9 +268,12 @@ class ShopeeAdsSyncService
                             'clicks'       => $d['clicks'] ?? $d['click'] ?? 0,
                             'expense'      => $d['expense'] ?? 0,
                             'broad_order'  => $d['broad_order'] ?? 0,
-                            'broad_gmv'    => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? 0,
+                            // broad_order_amount = JUMLAH ITEM TERJUAL (pcs), bukan rupiah
+                            'broad_order_amount'  => $d['broad_order_amount'] ?? 0,
+                            'direct_order_amount' => $d['direct_order_amount'] ?? 0,
+                            'broad_gmv'    => $d['broad_gmv'] ?? 0,
                             'direct_order' => $d['direct_order'] ?? 0,
-                            'direct_gmv'   => $d['direct_gmv'] ?? (isset($d['expense'], $d['direct_roi']) ? $d['expense'] * $d['direct_roi'] : ($d['direct_order_amount'] ?? 0)),
+                            'direct_gmv'   => $d['direct_gmv'] ?? (isset($d['expense'], $d['direct_roi']) ? $d['expense'] * $d['direct_roi'] : 0),
                             'cpc'          => $d['cpc'] ?? null,
                             'raw_json'     => $d,
                         ]
@@ -337,8 +363,22 @@ class ShopeeAdsSyncService
             $currentCarbon = $start->copy()->addDays($i);
             $dCurrent = $currentCarbon->format('d-m-Y');
             $dbCurrent = $currentCarbon->format('Y-m-d');
-            
-            usleep(300000); // 3 req/sec pace
+
+            // Resume-aware: hari historis yang BARU SAJA ditarik (≤2 jam lalu)
+            // dilewati — retry setelah rate limit tidak mengulang dari nol.
+            // 7 hari terakhir selalu ditarik (jendela revisi atribusi Shopee).
+            if ($currentCarbon->lt(now()->subDays(7)->startOfDay())) {
+                $freshGms = MarketplaceAdCampaignDaily::where('store_id', $store->id)
+                    ->where('channel_campaign_id', 'GMS-' . $store->id)
+                    ->where('date', $dbCurrent)
+                    ->where('updated_at', '>=', now()->subHours(2))
+                    ->exists();
+                if ($freshGms) {
+                    continue;
+                }
+            }
+
+            usleep(120000); // jeda kecil antar hari (pace utama sudah di ShopeeAdsApiService)
             
             // 1. Campaign Performance (1 API call per day for global GMS)
             try {
@@ -371,9 +411,11 @@ class ShopeeAdsSyncService
                             'clicks'       => $report['clicks'] ?? $report['click'] ?? 0,
                             'expense'      => $report['expense'] ?? 0,
                             'broad_order'  => $report['broad_order'] ?? 0,
-                            'broad_gmv'    => $report['broad_gmv'] ?? $report['broad_order_amount'] ?? 0,
+                            'broad_order_amount'  => $report['broad_order_amount'] ?? 0,
+                            'direct_order_amount' => $report['direct_order_amount'] ?? 0,
+                            'broad_gmv'    => $report['broad_gmv'] ?? 0,
                             'direct_order' => $report['direct_order'] ?? 0,
-                            'direct_gmv'   => $report['direct_gmv'] ?? (isset($report['expense'], $report['direct_roi']) ? $report['expense'] * $report['direct_roi'] : ($report['direct_order_amount'] ?? 0)),
+                            'direct_gmv'   => $report['direct_gmv'] ?? (isset($report['expense'], $report['direct_roi']) ? $report['expense'] * $report['direct_roi'] : 0),
                             'cpc'          => $report['cpc'] ?? null,
                             'raw_json'     => $report,
                         ]
@@ -384,7 +426,7 @@ class ShopeeAdsSyncService
             }
 
             // 2. Item Performance
-            usleep(300000);
+            usleep(120000);
             try {
                 $resItem = $this->api->getGmsItemPerformance($store, [], $dCurrent, $dCurrent);
                 $run->total_requests++;

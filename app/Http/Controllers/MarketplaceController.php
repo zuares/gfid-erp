@@ -602,15 +602,17 @@ class MarketplaceController extends Controller
         $year = $request->input('year', 2022);
 
         // Lempar pekerjaan berat ini ke antrean (Queue) di latar belakang
+        // Queue 'heavy': job backfill berjam-jam tidak boleh menyumbat queue default
+        // (webhook order real-time, download resi) — lihat routes/console.php.
         \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-orders', [
             'year' => $year,
             '--store' => $store->id
-        ]);
+        ])->onQueue('heavy');
 
         \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-returns', [
             'year' => $year,
             '--store' => $store->id
-        ]);
+        ])->onQueue('heavy');
 
         return response()->json([
             'status' => 'success',
@@ -624,16 +626,45 @@ class MarketplaceController extends Controller
             return $resp;
         }
 
-        // Jalankan sinkronisasi secara asinkron di queue
-        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $store->id]);
+        // Jalur antre yang SAMA dengan syncOrdersBackground() (queueOrderSync) —
+        // sebelumnya dua endpoint ini menduplikasi logika queue masing-masing.
+        $this->queueOrderSync($store, 3);
         \App\Jobs\SyncMarketplaceReturns::dispatch($store, null, null, true);
-
-        $store->update(['last_synced_at' => now()]);
 
         return response()->json([
             'message' => 'Perintah tarik data pesanan (3 hari terakhir, default command) dan retur terbaru telah dikirim ke latar belakang.',
             'status' => 'queued'
         ]);
+    }
+
+    /**
+     * SATU-SATUNYA jalur antre sync order latar belakang — dipakai
+     * forceSyncBackground() (3 hari + retur) dan syncOrdersBackground() (N hari).
+     * Set progres "queued" untuk UI, pilih queue berdasarkan bobot pekerjaan,
+     * dan catat last_synced_at.
+     */
+    private function queueOrderSync(Store $store, int $days): void
+    {
+        // Set state awal supaya UI langsung menampilkan progres "antre" sebelum worker jalan.
+        \Illuminate\Support\Facades\Cache::put("marketplace:sync_progress:{$store->id}", [
+            'percent' => 0,
+            'label'   => 'Menunggu antrean worker…',
+            'status'  => 'queued',
+            'store'   => $store->name,
+            'ts'      => now()->timestamp,
+        ], 1800);
+
+        $pending = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', [
+            '--store' => $store->id,
+            '--days'  => $days,
+        ]);
+        if ($days > 7) {
+            // Rentang panjang = pekerjaan lama → queue 'heavy' agar webhook real-time
+            // di queue default tidak tertahan. Worker heavy jalan tiap 5 menit.
+            $pending->onQueue('heavy');
+        }
+
+        $store->update(['last_synced_at' => now()]);
     }
 
     /**
@@ -646,23 +677,9 @@ class MarketplaceController extends Controller
             return $resp;
         }
 
-        $days = max(1, min(60, (int) $request->input('days', 30)));
+        $days = max(1, min(365, (int) $request->input('days', 30)));
 
-        // Set state awal supaya UI langsung menampilkan progres "antre" sebelum worker jalan.
-        \Illuminate\Support\Facades\Cache::put("marketplace:sync_progress:{$store->id}", [
-            'percent' => 0,
-            'label'   => 'Menunggu antrean worker…',
-            'status'  => 'queued',
-            'store'   => $store->name,
-            'ts'      => now()->timestamp,
-        ], 1800);
-
-        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', [
-            '--store' => $store->id,
-            '--days'  => $days,
-        ]);
-
-        $store->update(['last_synced_at' => now()]);
+        $this->queueOrderSync($store, $days);
 
         return response()->json([
             'message' => "Sync pesanan {$days} hari untuk toko ini dikirim ke latar belakang. Data akan masuk bertahap.",
@@ -698,61 +715,12 @@ class MarketplaceController extends Controller
             return response()->json(['message' => 'Sync sedang berjalan untuk toko ini. Mohon tunggu.'], 429);
         }
 
-        $status = $store->connection_status;
-
-        if ($status === 'TOKEN_EXPIRED') {
-            try {
-                if ($store->channel->code === 'shopee') {
-                    /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
-                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
-                    $shopee->refreshToken($store);
-                    $store->refresh();
-                    $status = $store->connection_status;
-                } else if ($store->channel->code === 'tiktok') {
-                    /** @var \App\Services\Channels\TikTokShop\TikTokShopChannel $tiktok */
-                    $tiktok = app(\App\Services\Channels\TikTokShop\TikTokShopChannel::class);
-                    $tiktok->refreshToken($store);
-                    $store->refresh();
-                    $status = $store->connection_status;
-                }
-            } catch (\Throwable $e) {
-                $status = 'AUTH_REQUIRED';
-                \Illuminate\Support\Facades\Log::warning('Token refresh failed during sync', [
-                    'store_id' => $store->id,
-                    'store_name' => $store->name,
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-
-        if ($status === 'NOT_CONNECTED') {
+        // Pre-check koneksi memakai helper terpusat yang sama dengan semua endpoint
+        // background — sebelumnya blok TOKEN_EXPIRED/NOT_CONNECTED/AUTH_REQUIRED
+        // yang sama persis (±60 baris) terduplikasi inline di sini.
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
             $lock->release();
-            $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
-            return response()->json([
-                'success' => false,
-                'code'    => 'STORE_NOT_CONNECTED',
-                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Hubungkan ' . $store->channel->name,
-                    'url'   => url('/marketplace/' . $urlSegment . '/connect')
-                ]
-            ], 422);
-        }
-
-        if ($status !== 'CONNECTED') {
-            $lock->release();
-            $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
-            return response()->json([
-                'success' => false,
-                'code'    => 'SHOPEE_AUTH_REQUIRED',
-                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Login Ulang ' . $store->channel->name,
-                    'url'   => url('/marketplace/' . $urlSegment . '/connect')
-                ]
-            ], 401);
+            return $resp;
         }
 
         try {
@@ -850,7 +818,24 @@ class MarketplaceController extends Controller
             $kilatOrderSns = array_keys($kilatMap);
         }
 
-        $orders = MarketplaceOrder::with($with)->latest('ordered_at')->limit(200)->get();
+        // Filter tanggal opsional dari UI (halaman Orders mengirim rentang aktif).
+        // Tanpa ini, halaman selalu terpaku pada 200 order terbaru sehingga hasil
+        // sync data masa lalu (backfill) tidak pernah muncul / jumlah tidak bertambah.
+        $dateFrom = request()->query('date_from');
+        $dateTo   = request()->query('date_to');
+        $limit    = max(1, min(2000, (int) request()->query('limit', 500)));
+
+        $ordersQuery = MarketplaceOrder::with($with);
+        if ($dateFrom || $dateTo) {
+            $ordersQuery->where(function ($q) use ($dateFrom, $dateTo) {
+                $q->whereNull('ordered_at'); // order tanpa tanggal tetap tampil (difilter longgar di frontend)
+                $q->orWhere(function ($range) use ($dateFrom, $dateTo) {
+                    if ($dateFrom) $range->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
+                    if ($dateTo)   $range->where('ordered_at', '<=', $dateTo . ' 23:59:59');
+                });
+            });
+        }
+        $orders = $ordersQuery->latest('ordered_at')->limit($limit)->get();
 
         // Sertakan order kilat yang TIDAK masuk 200 terbaru (mis. booking MATCHED yang lama).
         // Cocokkan channel_order_id ATAU external_order_id (sebagian toko simpan order_sn di sana).
@@ -1029,18 +1014,32 @@ class MarketplaceController extends Controller
                     }
                 }
             }
-            $mappedItems = \App\Models\Item::whereIn('code', array_unique($allSkus))
+            $allSkus = array_unique($allSkus);
+            $mappedItems = \App\Models\Item::whereIn('code', $allSkus)
                 ->select('id', 'code', 'item_category_id', 'name')
                 ->with('category:id,code,name')
                 ->get()
                 ->keyBy('code');
 
-            $bookingRows = $pureBookings->map(function ($b) use ($mappedItems) {
-                $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) use ($mappedItems) {
+            // PENTING: konsultasikan juga tabel sku_mappings (hasil halaman SKU Mapping).
+            // Sebelumnya baris booking HANYA dicocokkan langsung ke Item.code, sehingga
+            // SKU yang sudah di-map user tetap tampil "Belum Mapping" di tab ⚡ Kilat.
+            $skuMapped = \App\Models\SkuMapping::with(['item' => fn ($q) => $q
+                    ->select('id', 'code', 'item_category_id', 'name')
+                    ->with('category:id,code,name')])
+                ->whereIn('marketplace_sku', $allSkus)
+                ->get()
+                ->sortBy(fn ($m) => $m->channel_code === null ? 1 : 0) // spesifik channel menang atas global
+                ->unique('marketplace_sku')
+                ->keyBy('marketplace_sku');
+
+            $bookingRows = $pureBookings->map(function ($b) use ($mappedItems, $skuMapped) {
+                $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) use ($mappedItems, $skuMapped) {
                     // Tampilkan SKU marketplace (bukan judul produk); judul hanya fallback.
                     $sku = $i['model_sku'] ?? $i['item_sku'] ?? null;
                     $title = trim(($i['item_name'] ?? '') . (! empty($i['model_name']) ? ' - ' . $i['model_name'] : '')) ?: null;
-                    $mapped = $sku ? $mappedItems->get($sku) : null;
+                    // Urutan: kecocokan langsung ke Item.code → tabel sku_mappings.
+                    $mapped = $sku ? ($mappedItems->get($sku) ?? $skuMapped->get($sku)?->item) : null;
                     return [
                         'qty'           => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
                         'variant_name'  => $sku ?: $title,
@@ -1214,54 +1213,11 @@ class MarketplaceController extends Controller
      */
     public function syncSettlementsBackground(Request $request, Store $store): JsonResponse
     {
-        // Cek connection_status DULU (sama seperti syncSettlements()) — supaya tidak
-        // meng-queue job yang sudah pasti gagal tanpa memberi tahu user sama sekali
-        // (job latar belakang tidak punya jalur feedback real-time ke UI).
-        $status = $store->connection_status;
-
-        if ($status === 'TOKEN_EXPIRED') {
-            try {
-                if ($store->channel->code === 'shopee') {
-                    /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
-                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
-                    $shopee->refreshToken($store);
-                    $store->refresh();
-                    $status = $store->connection_status;
-                }
-            } catch (\Throwable $e) {
-                $status = 'AUTH_REQUIRED';
-                \Illuminate\Support\Facades\Log::warning('Token refresh failed before queueing background settlement sync', [
-                    'store_id' => $store->id,
-                    'store_name' => $store->name,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        if ($status === 'NOT_CONNECTED') {
-            return response()->json([
-                'success' => false,
-                'code'    => 'STORE_NOT_CONNECTED',
-                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Hubungkan ' . $store->channel->name,
-                    'url'   => url('/marketplace/shopee/connect'),
-                ],
-            ], 422);
-        }
-
-        if ($status !== 'CONNECTED') {
-            return response()->json([
-                'success' => false,
-                'code'    => 'SHOPEE_AUTH_REQUIRED',
-                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum settlement bisa ditarik.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Login Ulang ' . $store->channel->name,
-                    'url'   => url('/marketplace/shopee/connect'),
-                ],
-            ], 401);
+        // Pre-check koneksi memakai helper terpusat ensureStoreReadyForBackgroundSync()
+        // — sebelumnya blok TOKEN_EXPIRED/NOT_CONNECTED/AUTH_REQUIRED yang sama persis
+        // terduplikasi inline di sini.
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+            return $resp;
         }
 
         // Dispatch ke queue — TIDAK dieksekusi sekarang. Lock per toko
@@ -1272,7 +1228,7 @@ class MarketplaceController extends Controller
         \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', [
             '--store' => $store->id,
             '--all'   => true,
-        ]);
+        ])->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
 
         return response()->json([
             'success' => true,
@@ -1614,7 +1570,45 @@ class MarketplaceController extends Controller
         }
         $kpiMargin = $kpiOmzet > 0 ? round(($kpiProfit / $kpiOmzet) * 100, 1) : null;
         $avgProfit = $kpiCount > 0 ? round($kpiProfit / $kpiCount) : 0;
-        
+
+        /*
+        | Biaya iklan — ditarik dari marketplace_ads_dailies (sumber yang sama
+        | dengan Ads Dashboard). Basis rentang = TANGGAL PESANAN DIBUAT.
+        | Dikali 1.11 karena topup iklan kena PPN 11%. Profit final = profit +
+        | ad_cost manual per-order (di-nol-kan dulu agar tidak dobel) - iklan+PPN.
+        */
+        $adsFrom = $request->input('order_date_from');
+        $adsTo   = $request->input('order_date_to');
+
+        // Tanpa filter tanggal order eksplisit, ikuti min-max tanggal pesanan
+        // dari baris HASIL filter, dikonversi ke timezone aplikasi.
+        if (!$adsFrom || !$adsTo) {
+            $orderDates = $rows->pluck('order.ordered_at')
+                ->filter()
+                ->map(fn ($iso) => \Carbon\Carbon::parse($iso)
+                    ->timezone(config('app.timezone'))
+                    ->toDateString());
+            if ($orderDates->isNotEmpty()) {
+                $adsFrom = $adsFrom ?: $orderDates->min();
+                $adsTo   = $adsTo   ?: $orderDates->max();
+            }
+        }
+
+        $kpiAdsSpend = 0.0;
+        if ($adsFrom && $adsTo) {
+            $kpiAdsSpend = (float) \App\Models\MarketplaceAdsDaily::query()
+                ->when($request->filled('store_id'), fn ($q) => $q->where('store_id', $request->store_id))
+                ->whereDate('date', '>=', $adsFrom)
+                ->whereDate('date', '<=', $adsTo)
+                ->sum('spend');
+        }
+        $kpiAdsTotal = round($kpiAdsSpend * 1.11, 2); // + PPN 11%
+
+        $kpiAdCostManual = (float) $rows->sum(fn ($r) => (float) $r['ad_cost']);
+        $kpiProfitFinal  = $kpiProfit + $kpiAdCostManual - $kpiAdsTotal;
+        $kpiMarginFinal  = $kpiOmzet > 0 ? round(($kpiProfitFinal / $kpiOmzet) * 100, 1) : null;
+        $avgProfitFinal  = $kpiCount > 0 ? round($kpiProfitFinal / $kpiCount) : 0;
+
         // 2. Sort the Collection
         if ($request->filled('sort')) {
             $sort = $request->sort;
@@ -1679,14 +1673,19 @@ class MarketplaceController extends Controller
         return response()->json([
             'paginator' => $paginator,
             'meta'      => [
-                'kpi_omzet'   => $kpiOmzet,
-                'kpi_hpp'     => $kpiHpp,
-                'kpi_net'     => $kpiNet,
-                'kpi_profit'  => $kpiProfit,
-                'kpi_margin'  => $kpiMargin,
-                'avg_profit'  => $avgProfit,
-                'kpi_count'   => $kpiCount,
-                'last_sync'   => $lastSync ? $lastSync->toISOString() : null
+                'kpi_omzet'        => $kpiOmzet,
+                'kpi_hpp'          => $kpiHpp,
+                'kpi_net'          => $kpiNet,
+                'kpi_profit'       => $kpiProfit,
+                'kpi_margin'       => $kpiMargin,
+                'avg_profit'       => $avgProfit,
+                'kpi_ads_spend'    => $kpiAdsSpend,
+                'kpi_ads_total'    => $kpiAdsTotal,
+                'kpi_profit_final' => $kpiProfitFinal,
+                'kpi_margin_final' => $kpiMarginFinal,
+                'avg_profit_final' => $avgProfitFinal,
+                'kpi_count'        => $kpiCount,
+                'last_sync'        => $lastSync ? $lastSync->toISOString() : null
             ]
         ]);
     }
@@ -1818,6 +1817,9 @@ class MarketplaceController extends Controller
     public function syncAdsDaily(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         set_time_limit(300);
+        // Jangan hentikan proses di tengah jalan kalau user menutup modal/tab —
+        // run yang terputus akan tertinggal berstatus 'processing' selamanya.
+        ignore_user_abort(true);
         \Log::info('SYNC_ADS_DAILY CALLED', $request->all());
 
         $syncType = $request->input('sync_type', '1_week');
@@ -1833,6 +1835,8 @@ class MarketplaceController extends Controller
             $dateFrom = now()->subDays(7)->toDateString();
         } elseif ($syncType === '1_month') {
             $dateFrom = now()->subDays(30)->toDateString();
+        } elseif ($syncType === '2_months') {
+            $dateFrom = now()->subDays(60)->toDateString();
         } elseif ($syncType === '3_months') {
             $dateFrom = now()->subDays(90)->toDateString();
         } else {
@@ -1844,10 +1848,13 @@ class MarketplaceController extends Controller
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
             ->where('is_active', true)
-            ->when($request->filled('store_id'), fn ($q) => $q->where('id', $request->integer('store_id')))
+            ->when($request->filled('store_id') && $request->input('store_id') !== 'all', fn ($q) => $q->where('id', $request->integer('store_id')))
             ->get();
 
-        return response()->stream(function () use ($stores, $dateFrom, $dateTo) {
+        // Rentang hari yang diminta — dipakai untuk memutuskan inline vs backfill queue.
+        $rangeDays = \Carbon\Carbon::parse($dateFrom)->diffInDays(\Carbon\Carbon::parse($dateTo));
+
+        return response()->stream(function () use ($stores, $dateFrom, $dateTo, $rangeDays) {
             $sendEvent = function ($type, $message, $progress = null, $extra = []) {
                 echo json_encode(array_merge(['type' => $type, 'message' => $message, 'progress' => $progress], $extra)) . "\n";
                 if (ob_get_level() > 0) ob_flush();
@@ -1864,6 +1871,34 @@ class MarketplaceController extends Controller
                 return;
             }
 
+            // Rentang panjang (>65 hari) JANGAN di-sync inline: kuota API Shopee
+            // tidak cukup untuk sekali jalan (429 rate limit) dan proses HTTP
+            // dibatasi 300 detik. Sampai 2 bulan (±140 call, ±2-3 menit) masih
+            // aman inline dengan progress live; lebih dari itu lewat antrean
+            // backfill yang otomatis retry + backoff mengikuti Retry-After.
+            if ($rangeDays > 65) {
+                foreach ($stores as $store) {
+                    if (\Illuminate\Support\Facades\Cache::has('shopee-ads-backfill-queued:' . $store->id)) {
+                        $sendEvent('log', "[{$store->name}] Backfill sudah ada di antrean — tidak ditambah lagi.", 60);
+                        continue;
+                    }
+                    $sendEvent('log', "[{$store->name}] Rentang {$rangeDays} hari — dialihkan ke backfill background...", 20);
+                    \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
+                        '--store'    => $store->id,
+                        '--backfill' => true,
+                        '--from'     => $dateFrom,
+                        '--to'       => $dateTo,
+                    ]);
+                    $sendEvent('log', "[{$store->name}] Backfill dimasukkan ke antrean.", 60);
+                }
+                $sendEvent('done', 'Rentang panjang diproses di background dengan auto-retry saat rate limit. Pantau progres di Riwayat Sync — jendela ini boleh ditutup.', 100, [
+                    'saved'  => 0,
+                    'errors' => [],
+                    'status' => 'queued',
+                ]);
+                return;
+            }
+
             foreach ($stores as $index => $store) {
                 $baseProgress = 5 + (($index / $totalStores) * 90);
                 $sendEvent('log', "Mempersiapkan koneksi toko {$store->name}...", $baseProgress + 2);
@@ -1875,6 +1910,46 @@ class MarketplaceController extends Controller
                     $sendEvent('log', "Gagal menghubungi {$store->name}: " . $e->getMessage(), $baseProgress + 5);
                     continue;
                 }
+
+                // Hindari tabrakan dengan sync terjadwal: pakai kunci yang SAMA
+                // dengan WithoutOverlapping di ShopeeAdsSyncJob
+                // (prefix 'laravel-queue-overlap:' + key 'shopee-ads-store:{id}').
+                $lock = \Illuminate\Support\Facades\Cache::lock(
+                    'laravel-queue-overlap:shopee-ads-store:' . $store->id,
+                    1800
+                );
+
+                if (! $lock->get()) {
+                    $errors[] = "[{$store->name}] Sync otomatis sedang berjalan untuk toko ini. Coba lagi beberapa menit.";
+                    $sendEvent('log', "[{$store->name}] Dilewati: sync otomatis sedang berjalan.", $baseProgress + 5);
+                    continue;
+                }
+
+                // Shopee masih dalam jendela rate limit? Beri tahu user dengan
+                // estimasi tunggu, jangan buang 1 call untuk gagal.
+                $cooldownUntil = (int) \Illuminate\Support\Facades\Cache::get('shopee-ads-cooldown:' . $store->id, 0);
+                if ($cooldownUntil > time()) {
+                    $waitMin = (int) ceil(($cooldownUntil - time()) / 60);
+                    $errors[] = "[{$store->name}] Shopee masih membatasi permintaan (rate limit). Coba lagi dalam ±{$waitMin} menit.";
+                    $sendEvent('log', "[{$store->name}] Dilewati: menunggu cooldown rate limit (±{$waitMin} menit).", $baseProgress + 5);
+                    $lock->release();
+                    continue;
+                }
+
+                // Auto-heal: run lama yang macet 'processing' (>2 jam) ditandai error
+                // supaya riwayat sync di dashboard tidak menampilkan proses hantu.
+                \App\Models\MarketplaceAdsSyncRun::where('store_id', $store->id)
+                    ->where('status', 'processing')
+                    ->where('started_at', '<', now()->subHours(2))
+                    ->update([
+                        'status'        => 'error',
+                        'error_message' => 'Terputus (stale) — ditandai otomatis oleh sync berikutnya',
+                        'finished_at'   => now(),
+                    ]);
+
+                $run = null;
+
+                try {
 
                 // 1. Snapshot saldo
                 $sendEvent('log', "[{$store->name}] Sinkronisasi saldo iklan...", $baseProgress + 5);
@@ -1899,6 +1974,7 @@ class MarketplaceController extends Controller
                 ]);
 
                 $isRateLimited = false;
+                $rateWaited = false; // tunggu-otomatis rate limit hanya sekali per toko
                 $sendEvent('log', "[{$store->name}] Sinkronisasi Daftar Kampanye...", $baseProgress + 12);
                 try {
                     $syncService->syncCampaignsAndSettings($store, $run);
@@ -1948,7 +2024,25 @@ class MarketplaceController extends Controller
                         }
                         $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 30);
                     } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
-                        $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu " . ceil($e->retryAfter / 60) . " menit). Sinkronisasi dihentikan sementara.";
+                        // Jeda pendek (≤150 dtk): tunggu otomatis di sini SEKALI,
+                        // lalu ulangi chunk yang sama — user tidak perlu klik ulang.
+                        if (! $rateWaited && $e->retryAfter <= 150) {
+                            $rateWaited = true;
+                            $waitS = (int) $e->retryAfter + 5;
+                            set_time_limit(300 + $waitS);
+                            $sendEvent('log', "[{$store->name}] Rate limit Shopee — menunggu {$waitS} detik lalu lanjut otomatis…");
+                            $slept = 0;
+                            while ($slept < $waitS) {
+                                sleep(10);
+                                $slept += 10;
+                                $sendEvent('log', "[{$store->name}] …menunggu " . max(0, $waitS - $slept) . " detik lagi");
+                            }
+                            $sendEvent('log', "[{$store->name}] Lanjut — mengulang periode yang terpotong…");
+                            continue; // ulangi chunk yang sama (advance tanggal dilewati)
+                        }
+
+                        $isRateLimited = true;
+                        $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu " . ceil($e->retryAfter / 60) . " menit). Sinkronisasi dihentikan sementara — klik ulang nanti, proses lanjut dari yang belum tertarik.";
                         $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai. Silakan coba lagi nanti.");
                         break; // Stop syncing this store for now
                     } catch (\Throwable $e) {
@@ -1960,10 +2054,30 @@ class MarketplaceController extends Controller
                     usleep(500000); // 0.5 sec delay between chunks
                 }
                 } // End if (!$isRateLimited)
-                
-                $run->update(['status' => 'success', 'finished_at' => now()]);
+
+                // Rate-limit BUKAN sukses — jangan tandai success supaya
+                // riwayat sync jujur dan bisa di-retry.
+                $run->update([
+                    'status'      => $isRateLimited ? 'rate_limited' : 'success',
+                    'finished_at' => now(),
+                ]);
                 $saved += $run->total_updated;
                 $sendEvent('log', "[{$store->name}] Berhasil memperbarui {$run->total_updated} baris data.", $baseProgress + (90 / $totalStores));
+
+                } catch (\Throwable $e) {
+                    // Jangan biarkan run tertinggal 'processing' kalau ada error tak terduga.
+                    if ($run && $run->status === 'processing') {
+                        $run->update([
+                            'status'        => 'error',
+                            'error_message' => substr($e->getMessage(), 0, 1000),
+                            'finished_at'   => now(),
+                        ]);
+                    }
+                    $errors[] = "[{$store->name}] " . $e->getMessage();
+                    $sendEvent('log', "[{$store->name}] Error: " . $e->getMessage());
+                } finally {
+                    $lock->release();
+                }
             }
 
             $sendEvent('done', 'Sinkronisasi selesai!', 100, [

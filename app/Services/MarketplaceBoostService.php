@@ -141,10 +141,21 @@ class MarketplaceBoostService
     public function run(): array
     {
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->where('status', 'active')->get()
+            ->where('status', 'active')
+            ->where('is_active', true) // toko nonaktif dilewati
+            ->get()
             // Lewati toko yang belum terhubung (tanpa access_token) — kalau tidak,
             // tiap run akan gagal "invalid token" dan mengotori log.
-            ->filter(fn ($s) => filled($s->credential('access_token')));
+            // Kredensial yang tidak bisa didekripsi (mis. APP_KEY berubah)
+            // juga dilewati, bukan melempar "The MAC is invalid" tiap 5 menit.
+            ->filter(function ($s) {
+                try {
+                    return filled($s->credential('access_token'));
+                } catch (\Throwable) {
+                    \Illuminate\Support\Facades\Log::warning("[Boost] Kredensial toko {$s->name} tidak bisa dibaca — dilewati.");
+                    return false;
+                }
+            });
 
         $summary = [];
         foreach ($stores as $store) {

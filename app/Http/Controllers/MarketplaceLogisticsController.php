@@ -92,12 +92,42 @@ class MarketplaceLogisticsController extends Controller
     {
         try {
             $driver = $this->manager->driver($store);
-            $result = $this->ensureSuccess($driver->getShippingParameter($store, $orderSn));
+            $raw = $driver->getShippingParameter($store, $orderSn);
+
+            // Jaring pengaman Pesanan Kilat: bila $orderSn ternyata booking_sn
+            // (baris kilat belum MATCHED), Shopee menjawab "order_sn ... not exist".
+            // Alihkan otomatis ke get_booking_shipping_parameter supaya modal
+            // Atur Pengiriman tetap bekerja dari halaman/alur mana pun.
+            if ($this->looksLikeMissingOrderSn($raw)
+                && method_exists($driver, 'getBookingShippingParameter')) {
+                // Tanpa filter store_id: record booking bisa tersimpan di store lokal
+                // berbeda (booking_sn unik global), dan bisa juga belum tersinkron sama
+                // sekali — coba saja endpoint booking; kalau sn memang tidak valid,
+                // jawaban error Shopee yang baru yang dikembalikan.
+                $raw = $driver->getBookingShippingParameter($store, $orderSn);
+            }
+
+            $result = $this->ensureSuccess($raw);
             
             return response()->json($result);
         } catch (\Exception $e) {
             return $this->errorResponse($e);
         }
+    }
+
+    /**
+     * Deteksi jawaban Shopee "The order_sn {order_sn} is not exist." (dan varian
+     * error_param/error_not_exist) — penanda sn yang dikirim bukan order_sn valid,
+     * kemungkinan besar booking_sn Pesanan Kilat.
+     */
+    private function looksLikeMissingOrderSn(array $raw): bool
+    {
+        if (empty($raw['error'])) {
+            return false;
+        }
+        $msg = strtolower((string) ($raw['message'] ?? ''));
+        return str_contains($msg, 'not exist') || str_contains($msg, 'not_exist')
+            || str_contains((string) $raw['error'], 'not_exist');
     }
 
     /**
@@ -273,6 +303,28 @@ class MarketplaceLogisticsController extends Controller
                 $rawResult = ['error' => 'logistics.already_arranged'];
             } else {
                 $rawResult = $driver->shipOrder($store, $orderSn, $params);
+
+                // Jaring pengaman Pesanan Kilat: sn ini ternyata booking_sn (belum
+                // MATCHED ke order). ship_order menjawab "order_sn is not exist" —
+                // alihkan otomatis ke ship_booking, lalu polling promosi order_sn
+                // (PromoteBookingToOrderJob) supaya nomor pesanan menyusul.
+                // Ini juga menutup kasus proses massal yang memanggil endpoint order
+                // untuk semua baris.
+                if ($this->looksLikeMissingOrderSn($rawResult)
+                    && method_exists($driver, 'shipBooking')) {
+
+                    // Tanpa cek/filter store_id: record booking bisa tersimpan di store
+                    // lokal berbeda atau belum tersinkron — booking_sn unik global.
+                    $rawResult = $driver->shipBooking($store, $orderSn, $params);
+
+                    $bErr = (string) ($rawResult['error'] ?? '');
+                    if ($bErr === '' || str_contains($bErr, 'already') || str_contains($bErr, 'unsupported') || str_contains($bErr, 'status_invalid')) {
+                        \App\Models\MarketplaceBooking::where('booking_sn', $orderSn)
+                            ->update(['booking_status' => 'PROCESSED']);
+                        \App\Jobs\PromoteBookingToOrderJob::dispatch($store->id, $orderSn)
+                            ->delay(now()->addSeconds(15));
+                    }
+                }
             }
             
             // Allow if it's already arranged by marketplace (e.g. Instant/Sameday orders)
@@ -604,6 +656,10 @@ class MarketplaceLogisticsController extends Controller
             return response()->json(['error' => 'No orders provided'], 400);
         }
 
+        // Batas waktu dinamis: unduhan per-item + retry butuh waktu; default 30-60
+        // detik PHP bisa memutus batch besar di tengah jalan.
+        set_time_limit(min(600, 60 + 15 * count($payloadOrders)));
+
         $results = [];
         $pdfContents = [];
         $successfulOrderSns = [];
@@ -647,10 +703,14 @@ class MarketplaceLogisticsController extends Controller
                 ->keyBy('channel_order_id');
                 
             $bookingSns = array_filter(array_column($items, 'booking_sn'));
-            $bookings = \App\Models\MarketplaceBooking::where('store_id', $storeId)
-                ->whereIn('booking_sn', $bookingSns)
-                ->get()
-                ->keyBy('booking_sn');
+            // Tanpa filter store_id: record booking bisa tersimpan di store lokal
+            // berbeda dari order-nya (booking_sn unik global) — dengan filter,
+            // item kilat bisa salah dinyatakan "Order not found in database".
+            $bookings = empty($bookingSns)
+                ? collect()
+                : \App\Models\MarketplaceBooking::whereIn('booking_sn', $bookingSns)
+                    ->get()
+                    ->keyBy('booking_sn');
                 
             try {
                 $driver = app(\App\Services\Channels\ChannelManager::class)->driver($store);
@@ -691,6 +751,17 @@ class MarketplaceLogisticsController extends Controller
                 }
                 
                 if ($booking) {
+                    // Resi booking sering menyusul asinkron — bila belum ada, coba tarik
+                    // dulu supaya create/download dokumen tidak gagal karena resi kosong.
+                    if (! $booking->tracking_number && method_exists($driver, 'getBookingTrackingNumber')) {
+                        try {
+                            $trk = $driver->getBookingTrackingNumber($store, $bookingSn);
+                            $trkNum = $trk['response']['tracking_number'] ?? null;
+                            if ($trkNum) {
+                                $booking->update(['tracking_number' => $trkNum]);
+                            }
+                        } catch (\Throwable $e) { /* lanjut tanpa resi */ }
+                    }
                     if ($booking->tracking_number) {
                         $payload['tracking_number'] = $booking->tracking_number;
                     }
@@ -729,56 +800,68 @@ class MarketplaceLogisticsController extends Controller
                 } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error("FPDI Error: " . $e->getMessage()); }
             }
 
-            // Sleep a bit to allow Shopee to generate documents
-            usleep(500000); // 0.5 sec
+            // Beri waktu Shopee membuat dokumen (asinkron) sebelum unduhan pertama.
+            sleep(1);
 
             // Download INDIVIDUALLY to guarantee order sorting
             foreach ($items as $item) {
                 $orderSn = $item['order_sn'];
                 $pos = $item['position'];
-                
+
                 if (!isset($payloadListAll[$orderSn])) continue;
                 $payload = $payloadListAll[$orderSn];
-                
+
                 try {
-                    $downloadRes = [];
-                    if (isset($payload['is_booking']) && method_exists($driver, 'downloadBookingShippingDocument')) {
-                        $cleanedPayload = ['booking_sn' => $payload['booking_sn'] ?? '', 'tracking_number' => $payload['tracking_number'] ?? ''];
-                        $bookingRes = $driver->downloadBookingShippingDocument($store, [$cleanedPayload]);
-                        if (is_array($bookingRes)) {
-                            $downloadRes = $bookingRes; // Contains error/message
-                        } elseif (str_starts_with($bookingRes, '%PDF')) {
-                            $downloadRes = ['error' => 'invalid_response', 'message' => $bookingRes];
-                        }
-                    } else {
-                        $downloadRes = $driver->getShippingDocument($store, [$payload]);
-                    }
-                    
-                    if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
-                        $content = $downloadRes['message']; 
-                        if (str_starts_with($content, '%PDF')) {
-                            $pdfContents[] = [
-                                'position' => $pos,
-                                'content' => $content,
-                                'order_sn' => $orderSn,
-                                'store_id' => $store->id,
-                            ];
-                            $successCount++;
-                            $successfulOrderSns[$store->id][] = $orderSn;
+                    // Dokumen Shopee dibuat ASINKRON — sekali coba sering kena
+                    // "document not ready". Retry ringan per item (maks 3x, jeda naik);
+                    // error permanen ("not exist" dsb.) tidak diulang.
+                    $content = null;
+                    $lastReason = 'Document not ready';
+
+                    for ($attempt = 1; $attempt <= 3; $attempt++) {
+                        $downloadRes = [];
+                        if (isset($payload['is_booking']) && method_exists($driver, 'downloadBookingShippingDocument')) {
+                            $cleanedPayload = ['booking_sn' => $payload['booking_sn'] ?? '', 'tracking_number' => $payload['tracking_number'] ?? ''];
+                            $bookingRes = $driver->downloadBookingShippingDocument($store, [$cleanedPayload]);
+                            if (is_array($bookingRes)) {
+                                $downloadRes = $bookingRes; // Contains error/message
+                            } elseif (is_string($bookingRes) && str_starts_with($bookingRes, '%PDF')) {
+                                $downloadRes = ['error' => 'invalid_response', 'message' => $bookingRes];
+                            }
                         } else {
-                            $failedOrders[] = [
-                                'store_id' => $store->id,
-                                'store_name' => $store->name,
-                                'channel_order_id' => $orderSn,
-                                'reason' => 'Document not ready or not a PDF'
-                            ];
+                            $downloadRes = $driver->getShippingDocument($store, [$payload]);
                         }
+
+                        if (($downloadRes['error'] ?? null) === 'invalid_response'
+                            && str_starts_with((string) ($downloadRes['message'] ?? ''), '%PDF')) {
+                            $content = $downloadRes['message'];
+                            break;
+                        }
+
+                        $lastReason = (string) ($downloadRes['message'] ?? ($downloadRes['error'] ?? 'Document not ready'));
+                        if (str_contains(strtolower($lastReason), 'not exist')) {
+                            break; // permanen — retry hanya buang waktu
+                        }
+                        if ($attempt < 3) {
+                            sleep($attempt === 1 ? 2 : 4);
+                        }
+                    }
+
+                    if ($content !== null) {
+                        $pdfContents[] = [
+                            'position' => $pos,
+                            'content' => $content,
+                            'order_sn' => $orderSn,
+                            'store_id' => $store->id,
+                            'booking_sn' => $payload['booking_sn'] ?? null,
+                        ];
+                        $successCount++;
                     } else {
                         $failedOrders[] = [
                             'store_id' => $store->id,
                             'store_name' => $store->name,
                             'channel_order_id' => $orderSn,
-                            'reason' => $downloadRes['message'] ?? 'Document not ready'
+                            'reason' => $lastReason,
                         ];
                     }
                 } catch (\Exception $e) {
@@ -791,7 +874,7 @@ class MarketplaceLogisticsController extends Controller
                 }
             }
         }
-        
+
         if ($successCount === 0) {
             return response()->json([
                 'error' => 'Gagal mendapatkan semua dokumen PDF.',
@@ -799,33 +882,6 @@ class MarketplaceLogisticsController extends Controller
                 'success_count' => 0,
                 'failed_count' => count($failedOrders)
             ], 400);
-        }
-
-        // Increment print_count
-        foreach ($successfulOrderSns as $storeId => $sns) {
-            MarketplaceOrder::where('store_id', $storeId)
-                ->whereIn('channel_order_id', $sns)
-                ->get()
-                ->each(function($order) use ($mode) {
-                    if ($mode === 'reprint') {
-                        $order->increment('print_count');
-                    } else {
-                        $order->increment('print_count');
-                        if (!$order->printed_at) $order->update(['printed_at' => now()]);
-                    }
-                });
-                
-            \App\Models\MarketplaceBooking::where('store_id', $storeId)
-                ->whereIn('booking_sn', $sns)
-                ->get()
-                ->each(function($booking) use ($mode) {
-                    if ($mode === 'reprint') {
-                        $booking->increment('print_count');
-                    } else {
-                        $booking->increment('print_count');
-                        if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
-                    }
-                });
         }
 
         // Sort PDFs by store_id first, then by position to group by store
@@ -840,23 +896,35 @@ class MarketplaceLogisticsController extends Controller
         $config['marketplace_print_greeting_card'] = $withGreeting == 1 ? '1' : '0';
         $overlayService = new \App\Services\ShippingLabelOverlayService();
 
-        // Merge PDFs
+        // ── Merge PDFs ────────────────────────────────────────────────────────
+        // Prinsip tahan banting: (1) overlay kartu ucapan gagal → pakai PDF asli
+        // (lebih baik tercetak tanpa kartu daripada gagal); (2) satu PDF korup
+        // gagal digabung → order itu MASUK daftar gagal (dulu: dilewati diam-diam
+        // tapi tetap dihitung sukses, resinya hilang dari hasil cetak tanpa jejak).
+        $mergedOk = []; // entri pdfContents yang benar-benar masuk hasil akhir
         $finalPdfContent = null;
+
+        $overlaySafe = function (string $content) use ($overlayService, $config): string {
+            try {
+                return $overlayService->overlayPdfContent($content, $config);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Bulk print: overlay gagal, pakai PDF asli — ' . $e->getMessage());
+                return $content;
+            }
+        };
+
         if (count($pdfContents) === 1) {
-            $finalPdfContent = $overlayService->overlayPdfContent($pdfContents[0]['content'], $config);
+            $finalPdfContent = $overlaySafe($pdfContents[0]['content']);
+            $mergedOk[] = $pdfContents[0];
         } else {
             $pdf = new \setasign\Fpdi\Fpdi();
             $tempFiles = [];
-            $currentStoreId = null;
-            
-            foreach ($pdfContents as $item) {
-                $currentStoreId = $item['store_id'];
 
+            foreach ($pdfContents as $item) {
                 $tmpPath = storage_path('app/temp_pdf_' . uniqid() . '.pdf');
-                $uncompressedContent = $overlayService->overlayPdfContent($item['content'], $config);
-                file_put_contents($tmpPath, $uncompressedContent);
+                file_put_contents($tmpPath, $overlaySafe($item['content']));
                 $tempFiles[] = $tmpPath;
-                
+
                 try {
                     $pageCount = $pdf->setSourceFile($tmpPath);
                     for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
@@ -865,14 +933,69 @@ class MarketplaceLogisticsController extends Controller
                         $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
                         $pdf->useTemplate($templateId);
                     }
-                } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error("FPDI Error: " . $e->getMessage()); }
+                    $mergedOk[] = $item;
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("FPDI Error ({$item['order_sn']}): " . $e->getMessage());
+                    $failedOrders[] = [
+                        'store_id' => $item['store_id'],
+                        'store_name' => optional(Store::find($item['store_id']))->name ?? '-',
+                        'channel_order_id' => $item['order_sn'],
+                        'reason' => 'PDF tidak bisa digabung: ' . $e->getMessage(),
+                    ];
+                    $successCount--;
+                }
             }
-            
+
             foreach ($tempFiles as $f) {
                 if (file_exists($f)) unlink($f);
             }
-            
+
+            if (empty($mergedOk)) {
+                return response()->json([
+                    'error' => 'Semua dokumen PDF gagal digabung.',
+                    'failed_orders' => $failedOrders,
+                    'success_count' => 0,
+                    'failed_count' => count($failedOrders)
+                ], 400);
+            }
+
             $finalPdfContent = $pdf->Output('S');
+        }
+
+        // ── Statistik cetak: hanya untuk yang BENAR-BENAR masuk PDF akhir ─────
+        // Dibungkus try/catch: statistik tidak boleh menggagalkan batch yang
+        // PDF-nya sudah di tangan. Booking dicocokkan via booking_sn tanpa filter
+        // store_id (record bisa tersimpan di store lokal berbeda).
+        try {
+            $orderSnsByStore = [];
+            $bookingSns = [];
+            foreach ($mergedOk as $item) {
+                $orderSnsByStore[$item['store_id']][] = $item['order_sn'];
+                if (! empty($item['booking_sn'])) {
+                    $bookingSns[] = $item['booking_sn'];
+                }
+            }
+
+            foreach ($orderSnsByStore as $sid => $sns) {
+                MarketplaceOrder::where('store_id', $sid)
+                    ->whereIn('channel_order_id', array_unique($sns))
+                    ->get()
+                    ->each(function ($order) {
+                        $order->increment('print_count');
+                        if (! $order->printed_at) $order->update(['printed_at' => now()]);
+                    });
+            }
+
+            if (! empty($bookingSns)) {
+                \App\Models\MarketplaceBooking::whereIn('booking_sn', array_unique($bookingSns))
+                    ->get()
+                    ->each(function ($booking) {
+                        $booking->increment('print_count');
+                        if (! $booking->printed_at) $booking->update(['printed_at' => now()]);
+                    });
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Bulk print: gagal mencatat statistik cetak — ' . $e->getMessage());
         }
 
         $uuid = (string) Str::uuid();

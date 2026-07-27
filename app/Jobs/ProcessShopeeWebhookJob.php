@@ -338,6 +338,14 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             } catch (\Throwable $e) {}
         }
 
+        // Booking berstatus lanjut tapi belum punya order_sn → promosi via job idempotent
+        // (get_booking_detail → order_sn → tarik order → tautkan). Satu implementasi
+        // dengan tombol Atur Pengiriman; polling mundur menangani matching asinkron Shopee.
+        if (blank($bModel->order_sn)
+            && in_array(strtoupper((string) $bookingStatus), ['MATCHED', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED'])) {
+            \App\Jobs\PromoteBookingToOrderJob::dispatch($store->id, $bookingSn);
+        }
+
         // Cari order berdasarkan channel_order_id ATAU booking_sn
         $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
                 $q->where('channel_order_id', $bookingSn)

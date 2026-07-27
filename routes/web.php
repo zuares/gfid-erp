@@ -374,9 +374,102 @@ if (app()->environment(['local', 'testing'])) {
 
 // API endpoint for tracking
 Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'store'])->name('activity-logs.store')->middleware('auth')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-Route::post('/api/marketplace/sync-finance-all', function () {
-    \App\Jobs\SyncFinanceJob::dispatch();
-    return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+Route::post('/api/marketplace/sync-finance-all', function (\Illuminate\Http\Request $request) {
+    // Dedupe: kalau masih ada run 'processing' yang belum 15 menit, jangan antre lagi.
+    $active = \App\Models\MarketplaceFinanceSyncRun::where('status', 'processing')
+        ->where('started_at', '>=', now()->subMinutes(15))
+        ->exists();
+    if ($active) {
+        return response()->json(['status' => 'busy', 'message' => 'Sync finance masih berjalan — tunggu sampai selesai.'], 409);
+    }
+
+    // Rentang: days (1-183 hari) ATAU months (1/3/6). Mode: missing = cek DB
+    // dulu, ambil yang belum ada saja; full = tarik ulang semua.
+    $days = $request->filled('days') ? max(1, min(183, (int) $request->input('days'))) : null;
+    $months = (int) $request->input('months', 1);
+    if (!in_array($months, [1, 3, 6], true)) $months = 1;
+    $mode = $request->input('mode') === 'full' ? 'full' : 'missing';
+
+    $label = $days !== null ? "{$days} hr" : "{$months} bln";
+    $trigger = "manual {$label}" . ($mode === 'missing' ? ' · cek dulu' : ' · full');
+
+    /*
+    | Pre-check untuk rentang pendek (≤ 2 bulan) mode "cek dulu": kalau tidak
+    | ada satu pun order COMPLETED di rentang itu yang settlement-nya masih
+    | bolong / pending lewat cooldown, TIDAK usah antre job background sama
+    | sekali — langsung jawab "sudah lengkap". Kriteria bolong = persis
+    | eligibility syncSettlements (cooldown 60 mnt, ikut
+    | MarketplaceSyncService::PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES).
+    */
+    $rangeDays = $days ?? ($months * 31);
+    if ($mode === 'missing' && $rangeDays <= 62) {
+        $from     = now()->subDays($rangeDays - 1)->startOfDay();
+        $cooldown = now()->subMinutes(60);
+
+        $needsSync = \App\Models\MarketplaceOrder::query()
+            ->where('order_status', 'COMPLETED')
+            ->whereNull('settlement_sync_error_code')
+            ->where('ordered_at', '>=', $from)
+            ->where(function ($q) use ($cooldown) {
+                $q->whereNotExists(function ($s) {
+                    $s->select(\Illuminate\Support\Facades\DB::raw(1))
+                      ->from('marketplace_order_settlements')
+                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                      ->whereColumn('marketplace_order_settlements.store_id', 'marketplace_orders.store_id');
+                })->orWhereExists(function ($s) use ($cooldown) {
+                    $s->select(\Illuminate\Support\Facades\DB::raw(1))
+                      ->from('marketplace_order_settlements')
+                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                      ->whereColumn('marketplace_order_settlements.store_id', 'marketplace_orders.store_id')
+                      ->whereNull('marketplace_order_settlements.settlement_time')
+                      ->where('marketplace_order_settlements.synced_at', '<=', $cooldown);
+                });
+            })
+            ->exists();
+
+        if (!$needsSync) {
+            return response()->json([
+                'status'  => 'no_change',
+                'message' => "Data {$label} sudah lengkap — tidak ada yang perlu di-sync.",
+            ]);
+        }
+    }
+
+    \App\Jobs\SyncFinanceJob::dispatch($trigger, $months, $days, $mode);
+    return response()->json([
+        'status'  => 'success',
+        'message' => "Sync finance {$label} (" . ($mode === 'missing' ? 'hanya yang belum ada' : 'tarik ulang semua') . ") berjalan di background.",
+        'days'    => $days,
+        'months'  => $months,
+        'mode'    => $mode,
+    ]);
+})->middleware(['auth', 'access:marketplace']) // tanpa ini endpoint bisa dipicu siapa pun (URL ngrok publik!)
+  ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+Route::get('/api/marketplace/sync-finance-status', function () {
+    // Run yang masih berjalan: baca tail file log live per-run supaya detail
+    // progres tampil di UI secara real-time, tidak menunggu selesai.
+    $liveTail = function (int $runId): ?string {
+        $p = storage_path("logs/sync-finance-run-{$runId}.log");
+        if (!is_file($p)) return null;
+        $c = @file_get_contents($p);
+        return $c !== false && $c !== '' ? mb_substr($c, -4000) : null;
+    };
+
+    $runs = \App\Models\MarketplaceFinanceSyncRun::orderByDesc('id')->limit(15)->get()
+        ->map(fn ($r) => [
+            'id'          => $r->id,
+            'trigger'     => $r->trigger,
+            'status'      => $r->status,
+            'error'       => $r->error_message,
+            'started_at'  => optional($r->started_at)->format('d/m H:i:s'),
+            'finished_at' => optional($r->finished_at)->format('d/m H:i:s'),
+            'duration'    => ($r->started_at && $r->finished_at) ? abs($r->finished_at->diffInSeconds($r->started_at)) : null,
+            'output'      => $r->status === 'processing'
+                ? ($liveTail($r->id) ?? ($r->output ? mb_substr($r->output, -4000) : null))
+                : ($r->output ? mb_substr($r->output, -4000) : $liveTail($r->id)),
+        ]);
+    return response()->json(['runs' => $runs, 'server_time' => now()->format('H:i:s')]);
+})->middleware(['auth', 'access:marketplace']);
 
 

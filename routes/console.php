@@ -53,67 +53,97 @@ Artisan::command('production:seed-boms {--force : Jalankan tanpa konfirmasi saat
     return 0;
 })->purpose('Generate BOM finished goods produksi sendiri kecuali kategori SHT.');
 
+// ─────────────────────────────────────────────────────────────────────────
+// CATATAN: name() harus statis (jangan uniqid) — withoutOverlapping() memakai
+// nama event sebagai kunci mutex; nama yang berubah tiap proses membuat
+// pencegahan overlap tidak pernah bekerja.
+//
+// Jadwal sales:rebuild-daily-item-sales & inventory:recalc-ads-from-daily
+// didefinisikan SEKALI di bootstrap/app.php (01:00 / 01:10) — jangan
+// diduplikasi di sini.
+//
+// Jadwal ads (marketplace:sync-ads / --hourly) juga ada di bootstrap/app.php.
+// ─────────────────────────────────────────────────────────────────────────
+
 // ── Storefront product ranking (setiap jam) ───────────────────────────────
 Schedule::call(fn () => Artisan::call('storefront:rank-products'))
     ->hourly()
     ->name('storefront-rank')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
-// Update harian setelah ganti hari
-Schedule::call(fn () => Artisan::call('sales:rebuild-daily-item-sales', ['--days' => 90]))
-    ->dailyAt('00:05');
-
-Schedule::call(fn () => Artisan::call('inventory:recalc-ads-from-daily', ['--days' => 30]))
-    ->dailyAt('00:10');
-
-// Auto-cleanup file resi (.pdf.gz) setiap malam pukul 01:00
+// Order: tarik data order terbaru tiap 5 menit
 Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->everyFiveMinutes()
     ->name('sync-orders')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
+
+// Pesanan Kilat (booking) + enrichment order_sn tiap jam
+// (dipindahkan dari app/Console/Kernel.php yang tidak dipakai Laravel 12)
+Schedule::call(fn () => Artisan::call('marketplace:sync-bookings'))
+    ->hourlyAt(17) // digeser dari :00 agar tidak tabrakan dengan sync lain
+    ->name('sync-bookings')
+    ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
-    ->hourly()
+    ->hourlyAt(37) // digeser dari :00 agar tidak tabrakan dengan sync lain
     ->name('sync-returns')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements'))
-    ->everyFourHours()
+    ->cron('7 */4 * * *') // tiap 4 jam di menit :07 (sebelumnya :00, tabrakan dengan sync-finance)
     ->name('sync-settlements')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
 // Finance: sync order → settlement → COGS setiap 4 jam (profit per order)
 Schedule::call(fn () => Artisan::call('marketplace:sync-finance', ['--months' => 1]))
-    ->everyFourHours()
+    ->cron('37 */4 * * *') // tiap 4 jam di menit :37 (sebelumnya :00, tabrakan dengan sync-settlements)
     ->name('sync-finance')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->everyMinute()
     ->name('sync-chats')
-    ->name("task_" . uniqid())->withoutOverlapping();
-
-// Ads: jadwal sync sudah dipindahkan ke app/Console/Kernel.php
-// agar tidak bergantung pada env flag dan pasti ter-load oleh Laravel.
+    ->withoutOverlapping();
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
 Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync' => true]))
     ->dailyAt('23:45')
     ->name('snapshot-products')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
 // Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
 Schedule::call(fn () => Artisan::call('marketplace:run-boosts'))
     ->everyFiveMinutes()
     ->name('run-boosts')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
-// Proses antrean job (order webhook, download resi, sync historis) lewat cron —
+// Proses antrean job CEPAT (order webhook, download resi) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
-Schedule::call(fn () => Artisan::call('queue:work', ['--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
+// --queue=default,labels: queue default (webhook, promosi kilat) SELALU didahulukan;
+// unduhan resi (queue 'labels') hanya diproses saat default kosong — resi tidak
+// pernah lagi menyumbat pekerjaan real-time.
+Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'default,labels', '--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
     ->everyMinute()
     ->name('queue-work')
-    ->name("task_" . uniqid())->withoutOverlapping();
+    ->withoutOverlapping();
 
+// Antrean 'heavy' KHUSUS pekerjaan lama (backfill histori, sync rentang >7 hari).
+// Dipisah supaya job berat berjam-jam TIDAK menyumbat webhook/resi di queue default.
+// withoutOverlapping: hanya satu worker heavy pada satu waktu.
+Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'heavy', '--stop-when-empty' => true, '--max-time' => 280, '--tries' => 1, '--sleep' => 2]))
+    ->everyFiveMinutes()
+    ->name('queue-work-heavy')
+    ->withoutOverlapping();
+
+// Audit alokasi inventory harian
+// (dipindahkan dari app/Console/Kernel.php yang tidak dipakai Laravel 12)
+Schedule::call(fn () => Artisan::call('inventory:audit-allocated'))
+    ->dailyAt('00:45')
+    ->name('audit-inventory-allocated')
+    ->withoutOverlapping();
+
+// Auto-cleanup file resi (.pdf.gz) setiap malam pukul 01:00
 Schedule::call(fn () => Artisan::call('marketplace:cleanup-labels'))
-    ->dailyAt('01:00');
+    ->dailyAt('01:00')
+    ->name('cleanup-labels')
+    ->withoutOverlapping();
