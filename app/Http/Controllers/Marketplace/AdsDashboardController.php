@@ -30,8 +30,12 @@ class AdsDashboardController extends Controller
         $isAllStores = $storeId === 'all';
         $storeIds = $isAllStores ? $stores->pluck('id')->all() : [$storeId];
         
-        $dateFrom = $request->input('date_from', now()->subDays(6)->toDateString());
-        $dateTo = $request->input('date_to', now()->toDateString());
+        // SATSET: input tanggal WAJIB disanitasi — di bawah dipakai lewat
+        // interpolasi string di selectRaw (query gmsItems), jadi nilai bebas
+        // dari user = celah SQL injection. Carbon::parse + toDateString
+        // menjamin hanya format Y-m-d yang lolos.
+        $dateFrom = $this->safeDate($request->input('date_from'), now()->subDays(6));
+        $dateTo = $this->safeDate($request->input('date_to'), now());
         $compareMode = $request->input('compare_mode', 'prev_period');
 
         if (!$storeId) {
@@ -893,23 +897,23 @@ class AdsDashboardController extends Controller
     private function computeNetRevenueRatio(string $channelItemId): array
     {
         if ($channelItemId) {
-            $orderIds = \App\Models\MarketplaceOrderItem::where('external_item_id', $channelItemId)
-                ->pluck('order_id')
-                ->filter()
-                ->unique();
+            // SATSET: subquery, bukan pluck — id order tidak perlu ditarik ke PHP
+            // (bisa ribuan) lalu dikirim balik sebagai whereIn raksasa.
+            $settlements = \App\Models\MarketplaceOrderSettlement::whereIn(
+                    'order_id',
+                    \App\Models\MarketplaceOrderItem::where('external_item_id', $channelItemId)
+                        ->whereNotNull('order_id')
+                        ->select('order_id')
+                )
+                ->where('final_income', '>', 0)
+                ->get(['final_income', 'buyer_payment_amount']);
 
-            if ($orderIds->isNotEmpty()) {
-                $settlements = \App\Models\MarketplaceOrderSettlement::whereIn('order_id', $orderIds)
-                    ->where('final_income', '>', 0)
-                    ->get(['final_income', 'buyer_payment_amount']);
+            $totalFinalIncome = (float) $settlements->sum('final_income');
+            $totalItemValue   = (float) $settlements->sum('buyer_payment_amount');
 
-                $totalFinalIncome = (float) $settlements->sum('final_income');
-                $totalItemValue   = (float) $settlements->sum('buyer_payment_amount');
-
-                if ($totalItemValue > 0) {
-                    // Cair tidak mungkin melebihi nilai barang untuk keperluan estimasi
-                    return [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
-                }
+            if ($totalItemValue > 0) {
+                // Cair tidak mungkin melebihi nilai barang untuk keperluan estimasi
+                return [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
             }
         }
 
@@ -965,22 +969,38 @@ class AdsDashboardController extends Controller
         return $count > 0 ? $totalPrice / $count : null;
     }
 
+    /** Memo hasil rata-rata HPP per (item|channel|store) — sekali hitung per request. */
+    private array $avgHppMemo = [];
+
     private function deriveAverageHpp(?string $channelItemId, ?string $channelCode = null, ?int $storeId = null): ?float
     {
+        $memoKey = ($channelItemId ?? '-') . '|' . ($channelCode ?? '-') . '|' . ($storeId ?? '-');
+        if (array_key_exists($memoKey, $this->avgHppMemo)) {
+            return $this->avgHppMemo[$memoKey];
+        }
+
         $models = $this->productModelsFor($channelItemId, $storeId);
-        if ($models->isEmpty()) return null;
-        
+        if ($models->isEmpty()) return $this->avgHppMemo[$memoKey] = null;
+
+        // SATSET: dulu SETIAP model menembak 1 query SkuMapping::first() + 1 lazy
+        // load ->item — dikali jumlah kampanye = ratusan/ribuan query per load.
+        // Sekarang: 1 query whereIn + eager load item untuk semua model sekaligus.
+        $skus = $models->pluck('model_sku')->filter()->unique()->values();
+        if ($skus->isEmpty()) return $this->avgHppMemo[$memoKey] = null;
+
+        $mappingQuery = \App\Models\SkuMapping::with('item')->whereIn('marketplace_sku', $skus);
+        if ($channelCode) {
+            $mappingQuery->where('channel_code', $channelCode);
+        }
+        $mappings = $mappingQuery->get()->keyBy('marketplace_sku');
+
         $totalHpp = 0;
         $count = 0;
-        
+
         foreach ($models as $model) {
             if ($model->model_sku) {
-                $query = \App\Models\SkuMapping::where('marketplace_sku', $model->model_sku);
-                if ($channelCode) {
-                    $query->where('channel_code', $channelCode);
-                }
-                $mapping = $query->first();
-                
+                $mapping = $mappings->get($model->model_sku);
+
                 if ($mapping && $mapping->item) {
                     $hpp = (float) ($mapping->item->hpp ?? $mapping->item->base_unit_cost ?? 0);
                     if ($hpp > 0) {
@@ -990,32 +1010,51 @@ class AdsDashboardController extends Controller
                 }
             }
         }
-        
-        if ($count === 0) return null;
-        return $totalHpp / $count;
+
+        return $this->avgHppMemo[$memoKey] = ($count > 0 ? $totalHpp / $count : null);
     }
 
-    private function deriveAverageBreakEvenAcos(?string $channelItemId, float $gmv, int $units, ?string $channelCode = null): ?float
+    /**
+     * SATSET: signature dibetulkan — sebelumnya index() memanggil dengan 6 argumen
+     * ($netRevRatio ikut terkirim) sementara parameter cuma 4, sehingga $netRevRatio
+     * (float) nyasar jadi $channelCode dan filter channel_code tidak pernah match
+     * → fungsi ini selalu return null. Sekarang netRevRatio juga dipakai di formula:
+     * break-even saat dana cair per unit (harga × rasio) habis untuk HPP.
+     */
+    private function deriveAverageBreakEvenAcos(?string $channelItemId, float $gmv, int $units, ?float $netRevRatio = null, ?string $channelCode = null, ?int $storeId = null): ?float
     {
         if (! $channelItemId || $units <= 0 || $gmv <= 0) return null;
-        
-        $avgHpp = $this->deriveAverageHpp($channelItemId, $channelCode);
+
+        $avgHpp = $this->deriveAverageHpp($channelItemId, $channelCode, $storeId);
         if ($avgHpp === null) return null;
-        
+
         $avgPrice = $gmv / $units;
-        if ($avgHpp >= $avgPrice) return null;
-        
-        return round(($avgPrice - $avgHpp) / $avgPrice, 6);
+        $netPerUnit = $avgPrice * ($netRevRatio ?? 1.0);
+        if ($avgHpp >= $netPerUnit) return null;
+
+        return round(($netPerUnit - $avgHpp) / $avgPrice, 6);
     }
-    
-    private function deriveBreakEvenAcos(?\App\Models\Item $item, float $gmv, int $units): ?float
+
+    private function deriveBreakEvenAcos(?\App\Models\Item $item, float $gmv, int $units, ?float $netRevRatio = null): ?float
     {
         if (! $item || $units <= 0 || $gmv <= 0) return null;
         $hpp = (float) ($item->hpp ?? $item->base_unit_cost ?? 0);
         if ($hpp <= 0) return null;
         $avgPrice = $gmv / $units;
-        if ($hpp >= $avgPrice) return null;
-        return round(($avgPrice - $hpp) / $avgPrice, 6);
+        $netPerUnit = $avgPrice * ($netRevRatio ?? 1.0);
+        if ($hpp >= $netPerUnit) return null;
+        return round(($netPerUnit - $hpp) / $avgPrice, 6);
+    }
+
+    /** Validasi tanggal dari request — hanya Y-m-d hasil Carbon::parse yang dipakai. */
+    private function safeDate(?string $value, \Carbon\Carbon $fallback): string
+    {
+        if (! $value) return $fallback->toDateString();
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return $fallback->toDateString();
+        }
     }
     
     private function adsRecommendation(float $spend, ?float $acos, ?float $breakEvenAcos, int $orders): array
