@@ -10,25 +10,49 @@
         (float) ($totals['sumOut'] ??
             $rows->sum(fn($m) => ($m->direction ?? null) === 'out' ? abs((float) $m->qty_change) : 0));
     $netQty = $sumIn - $sumOut;
-    $sumValue = (float) ($totals['sumValue'] ?? 0);
 @endphp
 
-<div class="kpis mb-3" id="sc_kpi_strip">
+<div class="summary-grid mb-3" id="sc_kpi_strip">
     @if ($itemId)
-        <span class="kpi"><span class="lbl">Open</span> <span class="val mono">{{ number_format($openingQty, 2, ',', '.') }}</span></span>
-        <span class="kpi"><span class="lbl">Close</span> <span class="val mono">{{ number_format($closingQty, 2, ',', '.') }}</span></span>
+        <div class="summary-card summary-card--soft">
+            <div class="summary-label">Stok Awal</div>
+            <div class="summary-value mono">{{ number_format($openingQty, 2, ',', '.') }}</div>
+        </div>
+
+        <div class="summary-card summary-card--in">
+            <div class="summary-label">Masuk</div>
+            <div class="summary-value mono">{{ number_format($sumIn, 2, ',', '.') }}</div>
+        </div>
+
+        <div class="summary-card summary-card--out">
+            <div class="summary-label">Keluar</div>
+            <div class="summary-value mono">{{ number_format($sumOut, 2, ',', '.') }}</div>
+        </div>
+
+        <div class="summary-card summary-card--final">
+            <div class="summary-label">Stok Akhir</div>
+            <div class="summary-value mono">{{ number_format($closingQty, 2, ',', '.') }}</div>
+        </div>
+
     @else
-        <span class="kpi"><span class="lbl">Rows</span> <span class="val mono">{{ $rows->count() }}</span></span>
-        @if ($canViewCost ?? false)
-            <span class="kpi"><span class="lbl">Value</span> <span class="val mono">{{ number_format($sumValue, 0, ',', '.') }}</span></span>
-        @endif
-    @endif
+        <div class="summary-card summary-card--soft">
+            <div class="summary-label">Transaksi</div>
+            <div class="summary-value mono">{{ $rows->count() }}</div>
+        </div>
 
-    <span class="kpi"><span class="lbl" style="color:var(--in, var(--bs-teal))">IN</span> <span class="val mono">{{ number_format($sumIn, 2, ',', '.') }}</span></span>
-    <span class="kpi"><span class="lbl" style="color:var(--out, var(--bs-orange))">OUT</span> <span class="val mono">{{ number_format($sumOut, 2, ',', '.') }}</span></span>
-    <span class="kpi"><span class="lbl">Net</span> <span class="val mono">{{ $netQty >= 0 ? '+' : '' }}{{ number_format($netQty, 2, ',', '.') }}</span></span>
+        <div class="summary-card summary-card--in">
+            <div class="summary-label">Masuk</div>
+            <div class="summary-value mono">{{ number_format($sumIn, 2, ',', '.') }}</div>
+        </div>
 
-    @if ($itemId && ($canViewCost ?? false))
-        <span class="kpi"><span class="lbl">Val</span> <span class="val mono">{{ number_format($openingValue, 0, ',', '.') }} &rarr; {{ number_format($closingValue, 0, ',', '.') }}</span></span>
+        <div class="summary-card summary-card--out">
+            <div class="summary-label">Keluar</div>
+            <div class="summary-value mono">{{ number_format($sumOut, 2, ',', '.') }}</div>
+        </div>
+
+        <div class="summary-card summary-card--final">
+            <div class="summary-label">Net</div>
+            <div class="summary-value mono">{{ $netQty >= 0 ? '+' : '' }}{{ number_format($netQty, 2, ',', '.') }}</div>
+        </div>
     @endif
 </div>

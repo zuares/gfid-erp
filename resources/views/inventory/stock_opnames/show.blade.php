@@ -389,7 +389,7 @@
                 </form>
             @elseif($opname->status === StockOpname::STATUS_FINALIZED)
                 @if($adjustment && $canSeeAdjustmentLink)
-                    <a href="{{ route('inventory.adjustments.show', $adjustment) }}" class="btn btn-sm btn-outline-secondary mt-1">Adjustment →</a>
+                    <a href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adjustment->getKey()]) }}" class="btn btn-sm btn-outline-secondary mt-1">Adjustment →</a>
                 @endif
             @endif
 

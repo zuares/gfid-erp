@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryMutation;
 use App\Models\Item;
-use App\Models\Lot;
 use App\Models\SystemSetting;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StockCardController extends Controller
@@ -57,15 +57,22 @@ class StockCardController extends Controller
 
         $availableSourceTypes = [
             '' => 'Semua sumber',
-            'purchase_receipt' => 'Goods Receipt (GRN)',
-            'purchase_receipt_reverse' => 'Reverse GRN',
-            'transfer_out' => 'Transfer Keluar',
-            'transfer_in' => 'Transfer Masuk',
-            'adjustment' => 'Penyesuaian (Opname)',
-            'cutting_issue' => 'Issue ke Cutting',
-            'cutting_receive' => 'Receive dari Cutting',
-            'sewing_issue' => 'Issue ke Sewing',
-            'sewing_receive' => 'Receive dari Sewing',
+            'purchase_receipt' => 'Penerimaan barang (GRN)',
+            'purchase_receipt_reverse' => 'Pembatalan GRN',
+            'purchase_receipt_void' => 'GRN dibatalkan',
+            'transfer_out' => 'Transfer keluar',
+            'transfer_in' => 'Transfer masuk',
+            'adjustment' => 'Koreksi stok',
+            'cutting_issue' => 'Keluar ke Cutting',
+            'cutting_receive' => 'Masuk dari Cutting',
+            'sewing_issue' => 'Keluar ke Jahit',
+            'sewing_receive' => 'Masuk dari Jahit',
+            'stock_request' => 'Permintaan stok',
+            'shipment' => 'Pengiriman pesanan',
+            'auto_sr_ok_rts' => 'Penerimaan otomatis RTS',
+            'sewing_qc_in' => 'QC Jahit masuk',
+            'sewing_qc_out' => 'QC Jahit keluar',
+            'sewing_qc_reject' => 'QC Jahit reject',
         ];
 
         $role = strtolower(trim((string) (auth()->user()->role ?? '')));
@@ -114,6 +121,22 @@ class StockCardController extends Controller
                     });
                 });
 
+            // Running saldo untuk mode semua transaksi.
+            // Ini saldo kumulatif dari seluruh mutasi yang sedang difilter,
+            // jadi kolom "Stok Akhir" tetap muncul walau item belum dipilih.
+            $calcRows = (clone $q)
+                ->orderBy('date')
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get(['id', 'qty_change']);
+
+            $runningQty = 0.0;
+            $runningById = [];
+            foreach ($calcRows as $m) {
+                $runningQty += (float) $m->qty_change;
+                $runningById[$m->id] = $runningQty;
+            }
+
             // KPI totals
             $totalsRows = (clone $q)->get(['direction', 'qty_change', 'unit_cost', 'total_cost']);
             $sumIn = (float) $totalsRows->sum(fn($m) => ($m->direction === 'in') ? abs((float) $m->qty_change) : 0);
@@ -152,6 +175,10 @@ class StockCardController extends Controller
 
                 }
                 $m->line_value = (float) $lineValue;
+                $m->running_qty = $runningById[$m->id] ?? null;
+                $sourceMeta = $this->stockCardSourceMeta((string) ($m->source_type ?? ''), $m->source_id ? (int) $m->source_id : null);
+                $m->source_label = $sourceMeta['label'];
+                $m->source_detail = $sourceMeta['detail'];
             }
 
             return $respond([
@@ -160,7 +187,7 @@ class StockCardController extends Controller
                 'mutations' => $mutations, // paginator
                 'openingQty' => 0,
                 'openingValue' => 0,
-                'closingQty' => 0,
+                'closingQty' => $runningQty,
                 'closingValue' => 0,
                 'selectedItem' => null,
                 'availableSourceTypes' => $availableSourceTypes,
@@ -214,8 +241,6 @@ class StockCardController extends Controller
                 ],
             ]);
         }
-
-        $lots = Lot::where('item_id', $itemId)->orderByDesc('created_at')->get();
 
         if (!$fromDate && !$toDate) {
             $toDate = now()->toDateString();
@@ -303,6 +328,9 @@ class StockCardController extends Controller
             $m->running_qty = $runningById[$m->id]['qty'] ?? null;
             $m->running_value = $runningById[$m->id]['value'] ?? null;
             $m->line_value = $runningById[$m->id]['line_value'] ?? (float) ($m->total_cost ?? 0);
+            $sourceMeta = $this->stockCardSourceMeta((string) ($m->source_type ?? ''), $m->source_id ? (int) $m->source_id : null);
+            $m->source_label = $sourceMeta['label'];
+            $m->source_detail = $sourceMeta['detail'];
         }
 
         // KPI item-mode totals
@@ -311,7 +339,7 @@ class StockCardController extends Controller
 
         return $respond([
             'warehouses' => $warehouses,
-            'lots' => $lots,
+            'lots' => collect(),
             'mutations' => $mutations, // collection
             'openingQty' => $openingQty,
             'openingValue' => $openingValue,
@@ -507,5 +535,73 @@ class StockCardController extends Controller
 
             fclose($handle);
         }, $fileName, ['Content-Type' => 'text/csv']);
+    }
+
+    protected function stockCardSourceMeta(string $sourceType, ?int $sourceId = null): array
+    {
+        $rawType = trim($sourceType);
+        $type = strtolower($rawType);
+
+        $label = match ($type) {
+            'purchase_receipt' => 'Penerimaan barang',
+            'purchase_receipt_reverse', 'purchase_receipt_void' => 'Pembatalan penerimaan barang',
+            'transfer_out' => 'Transfer keluar',
+            'transfer_in' => 'Transfer masuk',
+            'adjustment', 'inventoryadjustment', 'app\\models\\inventoryadjustment' => 'Koreksi stok',
+            'cutting_issue' => 'Keluar ke Cutting',
+            'cutting_receive' => 'Masuk dari Cutting',
+            'sewing_issue' => 'Keluar ke Jahit',
+            'sewing_receive' => 'Masuk dari Jahit',
+            'stock_request' => 'Permintaan stok',
+            'shipment' => 'Pengiriman pesanan',
+            'auto_sr_ok_rts' => 'Penerimaan otomatis RTS',
+            'sewing_qc_in' => 'QC Jahit masuk',
+            'sewing_qc_out' => 'QC Jahit keluar',
+            'sewing_qc_reject' => 'QC Jahit reject',
+            default => $this->humanizeStockCardSource($sourceType),
+        };
+
+        $detail = match ($type) {
+            'purchase_receipt' => 'Masuk dari pembelian',
+            'purchase_receipt_reverse', 'purchase_receipt_void' => 'Revisi penerimaan pembelian',
+            'transfer_out' => 'Keluar antar gudang',
+            'transfer_in' => 'Masuk antar gudang',
+            'adjustment', 'inventoryadjustment', 'app\\models\\inventoryadjustment' => 'Hasil koreksi stok',
+            'cutting_issue' => 'Dipakai ke proses Cutting',
+            'cutting_receive' => 'Kembali dari proses Cutting',
+            'sewing_issue' => 'Dipakai ke proses Jahit',
+            'sewing_receive' => 'Kembali dari proses Jahit',
+            'stock_request' => 'Permintaan dari produksi',
+            'shipment' => 'Keluar ke pelanggan',
+            'auto_sr_ok_rts' => 'Otomatis dari WIP-FIN ke RTS',
+            'sewing_qc_in' => 'Masuk hasil QC Jahit',
+            'sewing_qc_out' => 'Keluar hasil QC Jahit',
+            'sewing_qc_reject' => 'Barang reject dari QC Jahit',
+            default => null,
+        };
+
+        if ($sourceId !== null) {
+            $detail = trim(($detail ? $detail . ' · ' : '') . 'Ref #' . $sourceId);
+        }
+
+        return [
+            'label' => $label,
+            'detail' => $detail,
+        ];
+    }
+
+    protected function humanizeStockCardSource(string $sourceType): string
+    {
+        $sourceType = trim($sourceType);
+        if ($sourceType === '') {
+            return 'Mutasi stok';
+        }
+
+        $display = str_contains($sourceType, '\\') ? class_basename($sourceType) : $sourceType;
+        $display = preg_replace('/([a-z])([A-Z])/', '$1 $2', $display) ?? $display;
+        $display = str_replace(['_', '-'], ' ', $display);
+        $display = trim(preg_replace('/\s+/', ' ', $display) ?? $display);
+
+        return Str::headline($display);
     }
 }

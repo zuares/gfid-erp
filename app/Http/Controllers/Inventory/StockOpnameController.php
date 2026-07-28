@@ -633,7 +633,7 @@ class StockOpnameController extends Controller
         // SELALU redirect ke adjustment kalau ada
         if ($adjustment) {
             return redirect()
-                ->route('inventory.adjustments.show', $adjustment)
+                ->route('inventory.adjustments.show', ['inventoryAdjustment' => $adjustment->getKey()])
                 ->with('status', 'success')
                 ->with('message', 'Stock opname difinalkan. Adjustment: ' . $adjustment->code);
         }

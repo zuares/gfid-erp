@@ -1105,8 +1105,23 @@ class MarketplaceController extends Controller
 
     public function syncSettlements(Request $request, Store $store): JsonResponse
     {
-        // Beri waktu lebih untuk batch settlement (retry + panggilan per-order ke Shopee).
-        set_time_limit(180);
+        $backfillMonths = (int) $request->input('backfill_months', 0);
+        if ($backfillMonths < 0 || $backfillMonths > 3) {
+            return response()->json([
+                'success' => false,
+                'message' => 'backfill_months hanya boleh 1, 2, atau 3.',
+            ], 422);
+        }
+
+        $isBackfill = $backfillMonths > 0;
+        set_time_limit($isBackfill ? 0 : 180);
+        $store->loadMissing('channel');
+
+        $channelName = $store->channel?->name ?? 'channel marketplace';
+        $channelCode = $store->channel?->code;
+        $connectUrl = $channelCode === 'shopee'
+            ? url('/marketplace/shopee/connect')
+            : url('/marketplace/settings');
 
         // Kunci yang SAMA dengan yang dipakai `marketplace:sync-settlements` (lihat
         // SyncSettlementsCommand::LOCK_TTL_SECONDS) supaya sync manual dari tombol UI dan
@@ -1123,11 +1138,17 @@ class MarketplaceController extends Controller
 
         if ($status === 'TOKEN_EXPIRED') {
             try {
-                if ($store->channel->code === 'shopee') {
+                if ($channelCode === 'shopee') {
                     /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
                     $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
                     $shopee->refreshToken($store);
                     $store->refresh();
+                    $store->loadMissing('channel');
+                    $channelName = $store->channel?->name ?? $channelName;
+                    $channelCode = $store->channel?->code ?? $channelCode;
+                    $connectUrl = $channelCode === 'shopee'
+                        ? url('/marketplace/shopee/connect')
+                        : url('/marketplace/settings');
                     $status = $store->connection_status;
                 }
             } catch (\Throwable $e) {
@@ -1145,11 +1166,11 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => false,
                 'code'    => 'STORE_NOT_CONNECTED',
-                'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
+                'message' => "Toko {$store->name} belum terhubung ke {$channelName}.",
                 'action'  => [
                     'type'  => 'redirect',
-                    'label' => 'Hubungkan ' . $store->channel->name,
-                    'url'   => url('/marketplace/shopee/connect'),
+                    'label' => 'Hubungkan ' . $channelName,
+                    'url'   => $connectUrl,
                 ],
             ], 422);
         }
@@ -1159,21 +1180,37 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => false,
                 'code'    => 'SHOPEE_AUTH_REQUIRED',
-                'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum settlement bisa ditarik.",
+                'message' => "Koneksi {$channelName} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum settlement bisa ditarik.",
                 'action'  => [
                     'type'  => 'redirect',
-                    'label' => 'Login Ulang ' . $store->channel->name,
-                    'url'   => url('/marketplace/shopee/connect'),
+                    'label' => 'Login Ulang ' . $channelName,
+                    'url'   => $connectUrl,
                 ],
             ], 401);
         }
 
+        $timeFrom = $request->input('time_from') ? (int) $request->input('time_from') : null;
+        $timeTo   = $request->input('time_to') ? (int) $request->input('time_to') : null;
+
+        if ($isBackfill) {
+            $timeTo = $timeTo ?: now()->endOfDay()->timestamp;
+            $timeFrom = $timeFrom ?: now()->subMonthsNoOverflow($backfillMonths)->startOfDay()->timestamp;
+        }
+
         try {
-            $result = $this->sync->syncSettlements(
-                $store,
-                $request->input('time_from') ? (int) $request->input('time_from') : null,
-                $request->input('time_to')   ? (int) $request->input('time_to')   : null,
-            );
+            if ($isBackfill) {
+                $result = $this->sync->syncSettlementsBackfill(
+                    $store,
+                    $timeFrom,
+                    $timeTo,
+                );
+            } else {
+                $result = $this->sync->syncSettlements(
+                    $store,
+                    $timeFrom,
+                    $timeTo,
+                );
+            }
         } catch (\Throwable $e) {
             // Detail exception (bisa memuat pesan driver HTTP, query, dsb) HANYA masuk log —
             // TIDAK dikirim ke client. Response ke UI selalu pesan generik yang ramah,
@@ -1194,7 +1231,10 @@ class MarketplaceController extends Controller
             $lock->release();
         }
 
-        return response()->json($result);
+        return response()->json(array_merge($result, [
+            'mode' => $isBackfill ? 'backfill' : 'regular',
+            'backfill_months' => $backfillMonths ?: null,
+        ]));
     }
 
     /**

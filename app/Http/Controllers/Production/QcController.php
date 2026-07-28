@@ -883,7 +883,7 @@ class QcController extends Controller
             // $this->inventoryAdjustmentService->post($adj);
 
             return redirect()
-                ->route('inventory.adjustments.show', $adj) // sesuaikan route show kamu
+                ->route('inventory.adjustments.show', ['inventoryAdjustment' => $adj->getKey()]) // sesuaikan route show kamu
                 ->with('success', 'Draft Cutting Overproduction dibuat. Silakan POST untuk masuk audit trail stok.');
         });
     }

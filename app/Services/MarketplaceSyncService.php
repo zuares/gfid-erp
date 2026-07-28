@@ -485,6 +485,7 @@ class MarketplaceSyncService
         bool $resync = false,
         int $limit = 200,
         int $afterId = 0,
+        bool $waitForRateLimit = false,
     ): array {
         $driver = $this->manager->driver($store);
 
@@ -565,7 +566,7 @@ class MarketplaceSyncService
                 // 1) Panggil API dulu (di luar transaction — request jaringan tidak boleh
                 //    menahan transaction database, apalagi di SQLite yang rawan "database
                 //    is locked" kalau transaction dibiarkan terbuka lama).
-                $retryResult = $this->getEscrowDetailWithRetry($driver, $store, $order->channel_order_id);
+                $retryResult = $this->getEscrowDetailWithRetry($driver, $store, $order->channel_order_id, $waitForRateLimit);
                 $response = $retryResult['payload'];
                 $lastCallMeta = $retryResult['meta'];
 
@@ -692,6 +693,120 @@ class MarketplaceSyncService
     }
 
     /**
+     * Backfill settlement secara synchronous untuk rentang panjang.
+     *
+     * Dipakai controller UI agar 1-3 bulan ke belakang bisa dijalankan langsung
+     * di request biasa, tanpa queue/background, sambil tetap menghormati cooldown
+     * rate limit Shopee dan melanjutkan dari cursor batch berikutnya.
+     *
+     * @return array{
+     *   found:int, processed:int, synced:int, new:int, updated:int, skipped:int, errors:int,
+     *   batches:int, last_processed_id:int|null, failed_order_ids:array<int,string>,
+     *   duration_ms:float, message:string, status:string
+     * }
+     */
+    public function syncSettlementsBackfill(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        ?string $orderSn = null,
+        bool $resync = false,
+        int $limit = 200,
+        int $maxBatches = 20,
+        int $pauseSeconds = 1,
+    ): array {
+        $totals = [
+            'found'           => 0,
+            'processed'       => 0,
+            'synced'          => 0,
+            'new'             => 0,
+            'updated'         => 0,
+            'skipped'         => 0,
+            'errors'          => 0,
+            'batches'         => 0,
+            'last_processed_id' => null,
+            'failed_order_ids'=> [],
+        ];
+
+        $afterId = 0;
+        $noProgressStreak = 0;
+        $startedAt = microtime(true);
+        $maxRuntimeSeconds = max(900, (int) config('shopee.settlement_backfill_max_runtime_seconds', 7200));
+        $orderMode = $orderSn !== null && $orderSn !== '';
+
+        for ($batch = 1; $batch <= $maxBatches; $batch++) {
+            $result = $this->syncSettlements(
+                $store,
+                $timeFrom,
+                $timeTo,
+                $orderSn,
+                $resync,
+                $limit,
+                $afterId,
+                true, // backfill harus menunggu cooldown rate limit, bukan gagal cepat
+            );
+
+            $totals['batches'] = $batch;
+            $totals['found']     += (int) ($result['found'] ?? 0);
+            $totals['processed'] += (int) ($result['processed'] ?? 0);
+            $totals['synced']    += (int) ($result['synced'] ?? 0);
+            $totals['new']       += (int) ($result['new'] ?? 0);
+            $totals['updated']   += (int) ($result['updated'] ?? 0);
+            $totals['skipped']   += (int) ($result['skipped'] ?? 0);
+            $totals['errors']    += (int) ($result['errors'] ?? 0);
+            $totals['failed_order_ids'] = array_values(array_unique(array_merge(
+                $totals['failed_order_ids'],
+                $result['failed_order_ids'] ?? []
+            )));
+            $totals['last_processed_id'] = $result['last_processed_id'] ?? $totals['last_processed_id'];
+
+            if (($result['processed'] ?? 0) === 0) {
+                break;
+            }
+
+            if ($orderMode) {
+                break;
+            }
+
+            $madeProgress = (($result['synced'] ?? 0) > 0) || (($result['last_processed_id'] ?? 0) > $afterId);
+            $noProgressStreak = $madeProgress ? 0 : ($noProgressStreak + 1);
+            $afterId = max($afterId, (int) ($result['last_processed_id'] ?? $afterId));
+
+            if ($noProgressStreak >= 2) {
+                break;
+            }
+
+            if ((microtime(true) - $startedAt) >= $maxRuntimeSeconds) {
+                break;
+            }
+
+            if ($batch < $maxBatches && $pauseSeconds > 0) {
+                sleep($pauseSeconds);
+            }
+        }
+
+        $durationMs = (microtime(true) - $startedAt) * 1000;
+        $message = "Settlement backfill — found: {$totals['found']}, processed: {$totals['processed']}, synced: {$totals['synced']} (new: {$totals['new']}, updated: {$totals['updated']}), skipped: {$totals['skipped']}, errors: {$totals['errors']}, batches: {$totals['batches']}.";
+        $status = $totals['errors'] > 0 ? ($totals['synced'] > 0 ? 'partial_success' : 'failed') : 'success';
+
+        return [
+            'found'              => $totals['found'],
+            'processed'          => $totals['processed'],
+            'synced'             => $totals['synced'],
+            'new'                => $totals['new'],
+            'updated'            => $totals['updated'],
+            'skipped'            => $totals['skipped'],
+            'errors'             => $totals['errors'],
+            'batches'            => $totals['batches'],
+            'last_processed_id'  => $totals['last_processed_id'],
+            'failed_order_ids'   => array_slice($totals['failed_order_ids'], 0, 20),
+            'duration_ms'        => round($durationMs, 2),
+            'status'             => $status,
+            'message'            => $message,
+        ];
+    }
+
+    /**
      * Panggil getEscrowDetail() dengan retry terbatas — HANYA untuk kegagalan
      * transient (ConnectionException, HTTP 429, HTTP 5xx). Tidak retry untuk error
      * 4xx lain (dianggap permanen: validasi/permission/order tidak valid).
@@ -705,7 +820,7 @@ class MarketplaceSyncService
     /**
      * @return array{payload:array, meta:array{attempts:int, http_status:mixed, retry_after:mixed, token_refreshed:null, duration_ms:float}}
      */
-    private function getEscrowDetailWithRetry(MarketplaceChannel $driver, Store $store, string $orderSn): array
+    private function getEscrowDetailWithRetry(MarketplaceChannel $driver, Store $store, string $orderSn, bool $waitForRateLimit = false): array
     {
         // CATATAN KONSOLIDASI: loop retry transien (429/5xx/koneksi putus) yang dulu
         // ada di sini DIHAPUS — sekarang ditangani SATU kali di lapisan channel
@@ -715,18 +830,52 @@ class MarketplaceSyncService
         // dengan BENTUK RETURN yang sama persis (payload + meta) supaya
         // validateEscrowIncome()/mapEscrowSettlement()/laporan --inspect tidak berubah.
         $startedAt = hrtime(true);
+        $attempts = 0;
+        $maxAttempts = $waitForRateLimit ? 13 : 2;
+        $maxCooldownWaits = $waitForRateLimit ? 12 : 0;
+        $cooldownWaits = 0;
+        $response = [];
 
-        try {
-            $response = $driver->getEscrowDetail($store, $orderSn);
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            $response = [
-                'error'   => 'connection_exception',
-                'message' => $e->getMessage(),
-                '_meta'   => ['http_status' => null, 'retry_after' => null],
-            ];
-        }
+        do {
+            $attempts++;
 
-        $attempt = 1; // retry sesungguhnya terjadi di dalam channel (transparan di sini)
+            try {
+                $response = $driver->getEscrowDetail($store, $orderSn);
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                $response = [
+                    'error'   => 'connection_exception',
+                    'message' => $e->getMessage(),
+                    '_meta'   => ['http_status' => null, 'retry_after' => null],
+                ];
+            }
+
+            $status = $response['_meta']['http_status'] ?? null;
+            $error  = (string) ($response['error'] ?? '');
+            $msg    = strtolower((string) ($response['message'] ?? ''));
+            $isRateLimited = $status === 429
+                || str_contains(strtolower($error), 'rate_limit')
+                || str_contains($msg, 'rate limit');
+            $isConnectionException = $error === 'connection_exception';
+            $isServerError = is_int($status) && $status >= 500;
+            $shouldRetry = ($isRateLimited || $isConnectionException || $isServerError) && $attempts < $maxAttempts;
+
+            if (! $shouldRetry) {
+                break;
+            }
+
+            if ($isRateLimited && $waitForRateLimit && $cooldownWaits < $maxCooldownWaits) {
+                $retryAfter = (int) ($response['_meta']['retry_after'] ?? 0);
+                if ($retryAfter <= 0) {
+                    $retryAfter = (int) config('shopee.rate_limit_cooldown', 30);
+                }
+
+                $sleepSeconds = max(1, $retryAfter + random_int(1, 3));
+                $cooldownWaits++;
+                Log::warning("[sync-settlements] Rate limit cooldown untuk order {$orderSn} di toko {$store->id}; menunggu {$sleepSeconds}s lalu retry (attempt {$attempts}).");
+                set_time_limit(max(180, $sleepSeconds + 60));
+                sleep($sleepSeconds);
+            }
+        } while (true);
 
         $durationMs = (hrtime(true) - $startedAt) / 1_000_000;
 
@@ -737,7 +886,7 @@ class MarketplaceSyncService
             // ke raw_json (mapEscrowSettlement() hanya mengambil node order_income).
             'payload' => $response,
             'meta'    => [
-                'attempts'    => $attempt,
+                'attempts'    => $attempts,
                 'http_status' => $response['_meta']['http_status'] ?? null,
                 'retry_after' => $response['_meta']['retry_after'] ?? null,
                 // SENGAJA null ("tidak diketahui"), BUKAN false. ShopeeChannel belum
