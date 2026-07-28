@@ -250,11 +250,19 @@
             <div class="sub">Dana cair per order — breakdown fee, voucher, subsidi ongkir, dan net payout dari marketplace.</div>
         </div>
         <div class="controls">
+            <a href="{{ route('marketplace.income-detail') }}" class="btn btn-sm btn-ship-outline btn-pill">
+                <i class="bi bi-journal-text"></i> Rincian Penghasilan
+            </a>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="switchSettlementTab('sync')" title="Buka tab sync settlement">
                 <i class="bi bi-arrow-repeat"></i> Tab Sync
             </button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="loadSettlements()">Refresh</button>
+            @if(auth()->user()?->role === 'owner')
+                <button class="btn btn-sm btn-outline-danger btn-pill" onclick="purgeAllMarketplaceData()" title="Hapus semua data marketplace untuk toko ini">
+                    <i class="bi bi-trash3"></i> Hapus Semua Data Marketplace
+                </button>
+            @endif
         </div>
     </div>
 
@@ -328,6 +336,7 @@
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
                 <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Fee Marketplace">Fee Marketplace</div>
                 <div class="oc-kpi-value" id="kpiFeeTotal" style="font-size: 1.05rem; color:#b91c1c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+                <div id="kpiFeePercent" style="font-size:.72rem; color:var(--shp-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
             </div>
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
                 <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Dana Cair (Net)">Dana Cair (Net)</div>
@@ -362,6 +371,17 @@
 
             <div id="settlementSyncFeedback" class="settlement-sync-feedback d-none"></div>
 
+            <div id="settlementSyncProgressWrap" class="d-none" style="margin-top:1rem;">
+                <div style="display:flex; justify-content:space-between; gap:.75rem; align-items:center; margin-bottom:.35rem;">
+                    <div id="settlementSyncProgressLabel" style="font-size:.74rem; font-weight:800; color:var(--shp-text);">Menunggu proses…</div>
+                    <div id="settlementSyncProgressPct" style="font-size:.72rem; font-weight:800; color:#1d4ed8;">0%</div>
+                </div>
+                <div class="progress" style="height:10px; border-radius:999px; background:rgba(148,163,184,.18); overflow:hidden;">
+                    <div id="settlementSyncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%; background:#3b82f6; transition:width .35s ease;"></div>
+                </div>
+                <div id="settlementSyncProgressMeta" style="display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.45rem; font-size:.68rem; color:var(--shp-muted);"></div>
+            </div>
+
             <div class="settlement-sync-status-grid">
                 <span id="settlementSyncStateChip" class="settlement-sync-chip">
                     <i class="bi bi-shield-check" style="color:#64748b;"></i>
@@ -387,13 +407,18 @@
                         <i class="bi bi-shop" style="position:absolute;left:8px;top:50%;transform:translateY(8px);color:#94a3b8;font-size:.75rem"></i>
                     </div>
 
-                    <div class="settlement-sync-field" style="max-width:170px; min-width:170px;">
-                        <label for="syncBackfillMonths">Backfill</label>
-                        <select class="form-select form-select-sm w-100" id="syncBackfillMonths">
+                    <div class="settlement-sync-field" style="min-width:220px;">
+                        <label for="syncBackfillMonths">Backfill cepat</label>
+                        <select class="form-select form-select-sm w-100 mb-2" id="syncBackfillMonths">
                             <option value="1">1 bulan</option>
                             <option value="2">2 bulan</option>
                             <option value="3" selected>3 bulan</option>
                         </select>
+                        <div class="btn-group btn-group-sm w-100" role="group" aria-label="Quick backfill">
+                            <button type="button" class="btn btn-outline-secondary" id="runSettlementBackfill1Btn" onclick="runSettlementBackfill(1, 'runSettlementBackfill1Btn')">1 bln</button>
+                            <button type="button" class="btn btn-outline-secondary" id="runSettlementBackfill2Btn" onclick="runSettlementBackfill(2, 'runSettlementBackfill2Btn')">2 bln</button>
+                            <button type="button" class="btn btn-outline-secondary" id="runSettlementBackfill3Btn" onclick="runSettlementBackfill(3, 'runSettlementBackfill3Btn')">3 bln</button>
+                        </div>
                     </div>
 
                     <div class="settlement-sync-actions-row" style="margin-left:auto;">
@@ -466,13 +491,77 @@
 <script>
 (function () {
     const { api, fmtDate, fmtRp, esc } = window.mpHelpers;
+    const IS_OWNER = @json(auth()->user()?->role === 'owner');
     let settlements = [], stores = [], syncLogs = [];
     let fpOrderDate = null, fpSettlementDate = null;
     let currentPage = 1;
     let paginationData = null;
     let activeTab = sessionStorage.getItem('settlementActiveTab') || 'data';
     let syncPollTimer = null;
+    let lastSettlementProgressStatus = 'idle';
+    let settlementSyncLastPercent = 0;
+    let settlementSyncRefreshInFlight = false;
+    const settlementFiltersStorageKey = 'marketplace:settlement_filters:v1';
     const $ = id => document.getElementById(id);
+
+    function getSettlementFilterState() {
+        const orderDates = fpOrderDate?.selectedDates || [];
+        const settlementDates = fpSettlementDate?.selectedDates || [];
+
+        return {
+            store_id: $('filterStore')?.value || '',
+            status: $('filterStatus')?.value || '',
+            settlement_status: $('filterSettlementStatus')?.value || '',
+            search: $('filterSearch')?.value || '',
+            order_date_from: orderDates[0] ? fpOrderDate.formatDate(orderDates[0], 'Y-m-d') : '',
+            order_date_to: orderDates[1] ? fpOrderDate.formatDate(orderDates[1], 'Y-m-d') : '',
+            settlement_date_from: settlementDates[0] ? fpSettlementDate.formatDate(settlementDates[0], 'Y-m-d') : '',
+            settlement_date_to: settlementDates[1] ? fpSettlementDate.formatDate(settlementDates[1], 'Y-m-d') : '',
+        };
+    }
+
+    function saveSettlementFilterState() {
+        try {
+            localStorage.setItem(settlementFiltersStorageKey, JSON.stringify(getSettlementFilterState()));
+        } catch (_) {}
+    }
+
+    function restoreSettlementFilterState() {
+        let state = null;
+        try {
+            state = JSON.parse(localStorage.getItem(settlementFiltersStorageKey) || 'null');
+        } catch (_) {
+            state = null;
+        }
+
+        if (!state) return;
+
+        if ($('filterStore')) $('filterStore').value = state.store_id || '';
+        if ($('filterStatus')) $('filterStatus').value = state.status || '';
+        if ($('filterSettlementStatus')) $('filterSettlementStatus').value = state.settlement_status || '';
+        if ($('filterSearch')) $('filterSearch').value = state.search || '';
+
+        if (fpOrderDate) {
+            if (state.order_date_from && state.order_date_to) {
+                fpOrderDate.setDate([state.order_date_from, state.order_date_to], false);
+            } else {
+                fpOrderDate.clear(false);
+            }
+        }
+
+        if (fpSettlementDate) {
+            if (state.settlement_date_from && state.settlement_date_to) {
+                fpSettlementDate.setDate([state.settlement_date_from, state.settlement_date_to], false);
+            } else {
+                fpSettlementDate.clear(false);
+            }
+        }
+
+        const syncStore = $('syncStore');
+        if (syncStore && syncStore.dataset.manual !== '1') {
+            syncStore.value = state.store_id || '';
+        }
+    }
 
     function fmtDateTime(value) {
         if (!value) return '—';
@@ -509,6 +598,66 @@
         const dot = $('settlementSyncDot');
         if (!dot) return;
         dot.style.display = visible ? 'inline-block' : 'none';
+    }
+
+    function renderSettlementProgress(progress) {
+        const wrap = $('settlementSyncProgressWrap');
+        const bar = $('settlementSyncProgressBar');
+        const label = $('settlementSyncProgressLabel');
+        const pct = $('settlementSyncProgressPct');
+        const meta = $('settlementSyncProgressMeta');
+        if (!wrap || !bar || !label || !pct || !meta) return null;
+
+        const status = String(progress?.status || 'idle').toLowerCase();
+        const isActive = ['queued', 'running'].includes(status);
+
+        if (status === 'idle' || progress === null) {
+            wrap.classList.add('d-none');
+            bar.style.width = '0%';
+            bar.style.background = '#3b82f6';
+            bar.classList.add('progress-bar-striped', 'progress-bar-animated');
+            label.textContent = 'Menunggu proses…';
+            pct.textContent = '0%';
+            meta.innerHTML = '';
+            return { status: 'idle', terminal: false };
+        }
+
+        const rawPercent = progress.percent ?? (isActive ? settlementSyncLastPercent || 5 : 100);
+        const percent = Math.max(0, Math.min(100, Number(rawPercent)));
+        settlementSyncLastPercent = percent;
+        const statusLabel = progress.label || (status === 'queued' ? 'Mengantre…' : (status === 'running' ? 'Berjalan…' : 'Selesai'));
+        const color = status === 'success' ? '#16a34a'
+            : (status === 'warn' ? '#d97706'
+            : (status === 'error' ? '#dc2626'
+            : (status === 'queued' ? '#2563eb' : '#3b82f6')));
+
+        wrap.classList.remove('d-none');
+        bar.style.width = percent + '%';
+        bar.style.background = color;
+        bar.classList.toggle('progress-bar-striped', isActive);
+        bar.classList.toggle('progress-bar-animated', isActive);
+        label.textContent = statusLabel;
+        pct.textContent = percent + '%';
+
+        const metaBits = [];
+        if (progress.batch !== undefined && progress.max_batches !== undefined && progress.max_batches !== null) {
+            metaBits.push(`Batch ${progress.batch}/${progress.max_batches}`);
+        }
+        if (progress.found !== undefined) metaBits.push(`Found ${progress.found}`);
+        if (progress.processed !== undefined) metaBits.push(`Processed ${progress.processed}`);
+        if (progress.synced !== undefined) metaBits.push(`Synced ${progress.synced}`);
+        if (progress.errors !== undefined) metaBits.push(`Errors ${progress.errors}`);
+        if (progress.skipped !== undefined) metaBits.push(`Skipped ${progress.skipped}`);
+        if (progress.current_order) metaBits.push(`Order ${progress.current_order}`);
+        if (progress.retry_after !== undefined && progress.retry_after !== null) metaBits.push(`Tunggu ${progress.retry_after}s`);
+        meta.innerHTML = metaBits.map(item => `<span style="display:inline-flex; align-items:center; gap:.25rem; padding:.12rem .45rem; border-radius:999px; background:rgba(148,163,184,.12); color:var(--shp-muted);">${esc(item)}</span>`).join('');
+
+        return {
+            status,
+            terminal: ['success', 'warn', 'error'].includes(status),
+            percent,
+            label: statusLabel,
+        };
     }
 
     function showSyncFeedback(level, title, message, metaLines = [], action = null) {
@@ -582,7 +731,7 @@
             if (activeTab === 'sync') {
                 refreshSettlementSyncLogs();
             }
-        }, 15000);
+        }, 5000);
     }
 
     function stopSyncPolling() {
@@ -658,38 +807,75 @@
     }
 
     async function refreshSettlementSyncLogs() {
+        if (settlementSyncRefreshInFlight) return syncLogs;
+        settlementSyncRefreshInFlight = true;
+
         const lastCheck = $('settlementSyncLastCheck');
         if (lastCheck) lastCheck.textContent = fmtDateTime(new Date().toISOString());
 
-        const logs = await api('/api/marketplace/sync-logs').catch(() => []);
-        syncLogs = (logs || []).filter(log => log.action === 'sync_settlements');
+        try {
+            const storeId = getSyncStoreId() || $('filterStore').value;
+            const [logs, progress] = await Promise.all([
+                api('/api/marketplace/sync-logs').catch(() => []),
+                storeId ? api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress').catch(() => null) : Promise.resolve(null),
+            ]);
 
-        const latest = syncLogs[0] || null;
-        const lastSuccess = syncLogs.find(log => log.status === 'success') || null;
-        const running = syncLogs.some(log => log.status === 'processing');
+            syncLogs = (logs || []).filter(log => log.action === 'sync_settlements');
 
-        if (!latest) {
-            setSyncState('warn', 'Kosong');
-            updateSyncDot(false);
-            if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = '—';
-        } else if (running) {
-            setSyncState('running', 'Berjalan');
-            updateSyncDot(true);
-            if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
-        } else if (latest.status === 'success' || latest.status === 'partial_success') {
-            setSyncState('success', latest.status === 'success' ? 'Siap' : 'Parsial');
-            updateSyncDot(false);
-            if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
-        } else {
-            setSyncState('error', 'Gagal');
-            updateSyncDot(false);
-            if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+            const latest = syncLogs[0] || null;
+            const lastSuccess = syncLogs.find(log => log.status === 'success') || null;
+            const progressState = renderSettlementProgress(progress);
+            const progressStatus = String(progress?.status || 'idle').toLowerCase();
+            const progressActive = ['queued', 'running'].includes(progressStatus);
+
+            if (progressActive) {
+                setSyncState('running', progressStatus === 'queued' ? 'Antre' : 'Berjalan');
+                updateSyncDot(true);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+            } else if (progressState?.terminal) {
+                setSyncState(progressStatus === 'success' ? 'success' : (progressStatus === 'warn' ? 'warn' : 'error'),
+                    progressStatus === 'success' ? 'Siap' : (progressStatus === 'warn' ? 'Parsial' : 'Gagal'));
+                updateSyncDot(false);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+            } else if (!latest) {
+                setSyncState('warn', 'Kosong');
+                updateSyncDot(false);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = '—';
+            } else if (latest.status === 'success' || latest.status === 'partial_success') {
+                setSyncState('success', latest.status === 'success' ? 'Siap' : 'Parsial');
+                updateSyncDot(false);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+            } else if (syncLogs.some(log => log.status === 'processing')) {
+                setSyncState('running', 'Berjalan');
+                updateSyncDot(true);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+            } else {
+                setSyncState('error', 'Gagal');
+                updateSyncDot(false);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+            }
+
+            if (progressState && progressState.terminal && lastSettlementProgressStatus !== progressStatus) {
+                loadSettlements();
+                const finalVariant = progressStatus === 'success' ? 'success' : (progressStatus === 'warn' ? 'warn' : 'error');
+                showSyncFeedback(finalVariant, progressStatus === 'success' ? 'Sync selesai' : 'Sync selesai dengan catatan', progress?.label || 'Settlement sync selesai.', [
+                    progress?.batch !== undefined && progress?.max_batches !== undefined ? `Batch: ${progress.batch}/${progress.max_batches}` : null,
+                    progress?.found !== undefined ? `Found: ${progress.found}` : null,
+                    progress?.processed !== undefined ? `Processed: ${progress.processed}` : null,
+                    progress?.synced !== undefined ? `Synced: ${progress.synced}` : null,
+                    progress?.errors !== undefined ? `Errors: ${progress.errors}` : null,
+                ].filter(Boolean));
+            }
+
+            lastSettlementProgressStatus = progressStatus;
+
+            renderSyncConsole();
+            renderSyncLogs();
+
+            return syncLogs;
+        } finally {
+            settlementSyncRefreshInFlight = false;
         }
-
-        renderSyncConsole();
-        renderSyncLogs();
-
-        return syncLogs;
     }
 
     window.refreshSettlementSyncLogs = refreshSettlementSyncLogs;
@@ -756,9 +942,15 @@
             });
         }
 
-        document.querySelectorAll('.filter-select').forEach(el => el.value = '');
         if (syncStore) {
             syncStore.value = stores.length === 1 ? String(stores[0].id) : '';
+        }
+
+        restoreSettlementFilterState();
+
+        const filterSearch = $('filterSearch');
+        if (filterSearch) {
+            filterSearch.addEventListener('input', () => saveSettlementFilterState());
         }
 
         switchSettlementTab(activeTab, true);
@@ -769,6 +961,9 @@
         document.querySelectorAll('.filter-select').forEach(el => el.value = '');
         if (fpOrderDate) fpOrderDate.clear();
         if (fpSettlementDate) fpSettlementDate.clear();
+        try {
+            localStorage.removeItem(settlementFiltersStorageKey);
+        } catch (_) {}
         const syncStore = $('syncStore');
         if (syncStore && syncStore.dataset.manual !== '1') {
             syncStore.value = '';
@@ -782,7 +977,58 @@
         loadSettlements();
     };
 
+    window.purgeAllMarketplaceData = async function () {
+        if (!IS_OWNER) {
+            alert('Aksi ini hanya tersedia untuk owner.');
+            return;
+        }
+
+        const storeId = getSyncStoreId() || $('filterStore').value;
+        if (!storeId) {
+            alert('Pilih toko dulu sebelum menghapus data marketplace.');
+            return;
+        }
+
+        const storeName = $('syncStore')?.selectedOptions[0]?.textContent || $('filterStore')?.selectedOptions[0]?.textContent || 'toko ini';
+        const typed = prompt('Untuk menghapus semua data marketplace toko ' + storeName + ', ketik: HAPUS SEMUA DATA MARKETPLACE');
+        if (typed === null) return;
+        if (typed.trim().toUpperCase() !== 'HAPUS SEMUA DATA MARKETPLACE') {
+            alert('Konfirmasi tidak cocok. Penghapusan dibatalkan.');
+            return;
+        }
+
+        if (!confirm('Yakin mau hapus semua data marketplace untuk ' + storeName + '? Aksi ini tidak bisa dibatalkan.')) {
+            return;
+        }
+
+        const btn = document.querySelector('button[onclick="purgeAllMarketplaceData()"]');
+        if (!btn || btn.disabled) return;
+
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menghapus...';
+
+        try {
+            const res = await api('/api/marketplace/stores/' + storeId + '/purge-marketplace-data', {
+                method: 'POST',
+                body: JSON.stringify({ confirm: typed.trim() }),
+            });
+            currentPage = 1;
+            await loadSettlements();
+            await refreshSettlementSyncLogs();
+            alert(res.message || 'Semua data marketplace berhasil dihapus.');
+        } catch (e) {
+            alert(e.data?.message || e.message || 'Gagal menghapus data marketplace.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
+    };
+
+    window.purgeAllSettlements = window.purgeAllMarketplaceData;
+
     window.loadSettlements = async function () {
+        saveSettlementFilterState();
         $('settlementBody').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--shp-muted);font-size:.85rem;"><span class="spinner-border spinner-border-sm"></span> Memuat data...</div>';
 
         const params = new URLSearchParams();
@@ -816,6 +1062,9 @@
                 $('kpiCount').textContent = res.meta.kpi_count;
                 $('kpiBuyerTotal').textContent = fmtRp(res.meta.kpi_gross);
                 $('kpiFeeTotal').textContent = fmtRp(res.meta.kpi_fees);
+                $('kpiFeePercent').textContent = Number.isFinite(Number(res.meta.kpi_fee_pct))
+                    ? `${Number(res.meta.kpi_fee_pct).toFixed(1)}% dari gross setelah voucher`
+                    : '—';
                 $('kpiNetPayout').textContent = fmtRp(res.meta.kpi_net);
             }
 
@@ -856,11 +1105,11 @@
                         <div style="font-size:.75rem; font-weight:600; margin-top:4px; color:var(--shp-muted);">${esc(s.store?.name || '—')}</div>
                     </td>
                     <td style="font-size:.78rem;">
-                        ${s.order?.ordered_at ? fmtDate(s.order.ordered_at) : '<span style="color:#94a3b8">—</span>'}
+                        ${s.order?.ordered_at ? fmtDateTime(s.order.ordered_at) : '<span style="color:#94a3b8">—</span>'}
                     </td>
 
                     <td style="font-size:.75rem;color:var(--shp-muted);">
-                        ${s.settlement_time ? fmtDate(s.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem">Belum Cair</span>'}
+                        ${s.settlement_time ? fmtDateTime(s.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem">Belum Cair</span>'}
                     </td>
 
                     <td class="text-end">
@@ -873,22 +1122,61 @@
                         <ul class="fee-list">
                             ${(() => {
                                 let html = '';
+                                const renderFeeLine = (label, rawValue, force = false, percent = null) => {
+                                    const numeric = Number(rawValue || 0);
+                                    if (!force && !numeric) return '';
+                                    const sign = numeric < 0 ? '−' : '';
+                                    const pct = percent !== null && percent !== undefined
+                                        ? ` <span style="font-size:.68rem; color:var(--shp-muted);">(${Number(percent).toFixed(1)}%)</span>`
+                                        : '';
+                                    return `<li><span>${label}:</span> <span class="fee-val">${sign}${fmtRp(Math.abs(numeric))}${pct}</span></li>`;
+                                };
+                                const sectionLabel = (label) => `<li style="margin-top:.45rem; padding-top:.35rem; border-top:1px dashed rgba(148,163,184,.22); font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#64748b;">${label}</li>`;
+                                const feeTotal = Number(s.fee_total || 0);
+                                const feePercent = s.fee_percent !== undefined && s.fee_percent !== null ? Number(s.fee_percent) : null;
+                                const feeBase = Number(s.gross_after_voucher || 0);
                                 if (s.raw_json) {
                                     const r = s.raw_json;
-                                    if (r.commission_fee) html += `<li><span>Biaya Administrasi:</span> <span class="fee-val">−${fmtRp(r.commission_fee)}</span></li>`;
-                                    if (r.service_fee) html += `<li><span>Biaya Layanan:</span> <span class="fee-val">−${fmtRp(r.service_fee)}</span></li>`;
-                                    if (r.seller_transaction_fee) html += `<li><span>Biaya Transaksi:</span> <span class="fee-val">−${fmtRp(r.seller_transaction_fee)}</span></li>`;
-                                    if (r.seller_order_processing_fee) html += `<li><span>Biaya Proses Pesanan:</span> <span class="fee-val">−${fmtRp(r.seller_order_processing_fee)}</span></li>`;
-                                    if (r.campaign_fee) html += `<li><span>Biaya Kampanye:</span> <span class="fee-val">−${fmtRp(r.campaign_fee)}</span></li>`;
-                                    if (r.escrow_tax) html += `<li><span>Pajak (Escrow):</span> <span class="fee-val">−${fmtRp(r.escrow_tax)}</span></li>`;
+                                    const premi = r.premi ?? r.shipping_insurance ?? r.insurance_fee ?? s.premi ?? 0;
+                                    const shippingInsuranceFee = r.shipping_insurance_fee ?? r.shipping_insurance ?? r.insurance_fee ?? s.shipping_insurance_fee ?? 0;
+                                    const biayaAffiliate = r.biaya_affiliate ?? r.affiliate_fee ?? r.affiliate_commission_fee ?? s.biaya_affiliate ?? s.affiliate_fee ?? 0;
+                                    const affiliate = r.affiliate ?? r.affiliate_commission ?? r.affiliate_commission_amount ?? r.seller_affiliate_fee ?? s.affiliate ?? 0;
+                                    html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
+                                    html += sectionLabel('Komisi & Admin');
+                                    html += renderFeeLine('Biaya Administrasi', r.commission_fee);
+                                    html += renderFeeLine('Biaya Layanan', r.service_fee);
+                                    html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee);
+                                    html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee);
+
+                                    html += sectionLabel('Promo & Affiliate');
+                                    html += renderFeeLine('Premi', premi, true);
+                                    html += renderFeeLine('Biaya Kampanye', r.campaign_fee);
+                                    html += renderFeeLine('Biaya Affiliate', biayaAffiliate, true);
+                                    html += renderFeeLine('Affiliate', affiliate, true);
+
+                                    html += sectionLabel('Asuransi & Pajak');
+                                    html += renderFeeLine('Biaya Asuransi Pengiriman', shippingInsuranceFee, true);
+                                    html += renderFeeLine('Pajak (Escrow)', r.escrow_tax);
                                 } else {
-                                    if (s.commission_fee) html += `<li><span>Biaya Administrasi:</span> <span class="fee-val">−${fmtRp(s.commission_fee)}</span></li>`;
-                                    if (s.service_fee) html += `<li><span>Biaya Layanan:</span> <span class="fee-val">−${fmtRp(s.service_fee)}</span></li>`;
-                                    if (s.transaction_fee) html += `<li><span>Biaya Transaksi:</span> <span class="fee-val">−${fmtRp(s.transaction_fee)}</span></li>`;
-                                    if (s.activity_fee) html += `<li><span>Biaya Kampanye:</span> <span class="fee-val">−${fmtRp(s.activity_fee)}</span></li>`;
-                                    if (s.escrow_tax) html += `<li><span>Pajak (Escrow):</span> <span class="fee-val">−${fmtRp(s.escrow_tax)}</span></li>`;
+                                    html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
+                                    html += sectionLabel('Komisi & Admin');
+                                    html += renderFeeLine('Biaya Administrasi', s.commission_fee);
+                                    html += renderFeeLine('Biaya Layanan', s.service_fee);
+                                    html += renderFeeLine('Biaya Transaksi', s.transaction_fee);
+                                    html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
+
+                                    html += sectionLabel('Promo & Affiliate');
+                                    html += renderFeeLine('Premi', s.premi, true);
+                                    html += renderFeeLine('Biaya Kampanye', s.activity_fee);
+                                    html += renderFeeLine('Biaya Affiliate', s.biaya_affiliate ?? s.affiliate_fee, true);
+                                    html += renderFeeLine('Affiliate', s.affiliate, true);
+
+                                    html += sectionLabel('Asuransi & Pajak');
+                                    html += renderFeeLine('Biaya Asuransi Pengiriman', s.shipping_insurance_fee, true);
+                                    html += renderFeeLine('Pajak (Escrow)', s.escrow_tax);
                                 }
-                                if (s.ad_cost) html += `<li><span>Biaya Iklan:</span> <span class="fee-val">−${fmtRp(s.ad_cost)}</span></li>`;
+                                html += sectionLabel('Biaya Iklan');
+                                html += renderFeeLine('Biaya Iklan', s.ad_cost);
                                 return html || '<li><span style="color:var(--shp-muted)">Tidak ada potongan</span></li>';
                             })()}
                         </ul>
@@ -955,126 +1243,138 @@
         body.innerHTML = html;
     }
 
-    window.runSettlementSync = async function () {
+    async function queueSettlementSyncRequest({ btnId, payload, busyText, idleText, confirmText = null, confirmTitle = 'Konfirmasi', ackTitle = 'Dikirim ke antrian' }) {
         const storeId = getSyncStoreId() || $('filterStore').value;
-        if (!storeId) { alert('Pilih toko dulu di tab Sync sebelum tarik settlement.'); return; }
+        if (!storeId) {
+            alert('Pilih toko dulu di tab Sync sebelum memulai settlement sync.');
+            return;
+        }
 
-        await runSettlementSyncRequest({
+        const storeName = $('syncStore')?.selectedOptions[0]?.textContent || $('filterStore').selectedOptions[0]?.textContent || 'toko ini';
+        if (confirmText && !confirm(confirmText.split('{store}').join(storeName))) {
+            return;
+        }
+
+        const btn = $(btnId);
+        if (!btn || btn.disabled) return;
+
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + busyText;
+
+        const probeQueueState = async () => {
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const progress = await api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress');
+                    if (progress && ['queued', 'running'].includes(String(progress.status || '').toLowerCase())) {
+                        return progress;
+                    }
+                } catch (_) {}
+                await new Promise(resolve => setTimeout(resolve, 350 * (i + 1)));
+            }
+            return null;
+        };
+
+        hideSyncFeedback();
+        setSyncState('running', 'Antre');
+        updateSyncDot(true);
+        renderSettlementProgress({
+            status: 'queued',
+            percent: 2,
+            label: busyText,
+            store_id: storeId,
+            store_name: storeName,
+        });
+
+        try {
+            const d = await api('/api/marketplace/stores/' + storeId + '/sync-settlements-background', {
+                method: 'POST',
+                body: JSON.stringify(payload || {}),
+            });
+
+            const meta = [
+                d.mode ? `Mode: ${d.mode}` : null,
+                d.progress_key ? `Progress key: ${d.progress_key}` : null,
+            ].filter(Boolean);
+
+            showSyncFeedback('info', ackTitle, d.message || 'Sinkronisasi dikirim ke latar belakang.', meta);
+            await refreshSettlementSyncLogs();
+        } catch (e) {
+            const canRecover = String(e?.message || '').toLowerCase().includes('response tidak valid')
+                || [502, 503, 504, 522].includes(Number(e?.status || 0));
+            if (canRecover) {
+                const progress = await probeQueueState();
+                if (progress) {
+                    const meta = [
+                        progress.mode ? `Mode: ${progress.mode}` : null,
+                        progress.percent !== undefined && progress.percent !== null ? `Progress: ${progress.percent}%` : null,
+                        progress.label ? progress.label : null,
+                    ].filter(Boolean);
+                    showSyncFeedback('warn', ackTitle, 'Request awal sempat gagal dibaca, tapi job sudah masuk antrian dan terus berjalan.', meta);
+                    setSyncState(progress.status === 'running' ? 'running' : 'success', progress.status === 'running' ? 'Berjalan' : 'Antre');
+                    updateSyncDot(true);
+                    renderSettlementProgress(progress);
+                    await refreshSettlementSyncLogs();
+                    return;
+                }
+            }
+
+            const level = e.status === 401 || e.status === 422 ? 'warn' : 'error';
+            const action = e.data?.action && e.data.action.type === 'redirect'
+                ? { url: e.data.action.url, label: e.data.action.label }
+                : null;
+            showSyncFeedback(level, 'Gagal mengirim', e.data?.message || e.message || 'Gagal mengirim settlement sync ke latar belakang.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean), action);
+            setSyncState('error', 'Gagal');
+            updateSyncDot(false);
+            renderSettlementProgress({ status: 'error', percent: 100, label: e.data?.message || e.message || 'Gagal mengirim.' });
+            refreshSettlementSyncLogs();
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
+    }
+
+    window.runSettlementSync = async function () {
+        await queueSettlementSyncRequest({
             btnId: 'runSettlementBtn',
             payload: {},
-            successTitle: 'Settlement sync selesai.',
-            busyText: 'Syncing…',
+            busyText: 'Mengantre sync…',
             idleText: 'Tarik Settlement',
+            ackTitle: 'Settlement dikirim ke antrian',
         });
     };
 
-    window.runSettlementBackfill = async function (months) {
-        const storeId = getSyncStoreId() || $('filterStore').value;
-        if (!storeId) { alert('Pilih toko dulu di tab Sync sebelum backfill settlement.'); return; }
+    window.runSettlementBackfill = async function (months, btnId = 'runSettlementBackfillBtn') {
         const selectedMonths = Number(months || $('syncBackfillMonths')?.value || 3);
         if (![1,2,3].includes(selectedMonths)) {
             alert('Backfill hanya tersedia untuk 1, 2, atau 3 bulan.');
             return;
         }
 
-        await runSettlementSyncRequest({
-            btnId: 'runSettlementBackfillBtn',
+        const selector = $('syncBackfillMonths');
+        if (selector) {
+            selector.value = String(selectedMonths);
+        }
+
+        await queueSettlementSyncRequest({
+            btnId,
             payload: { backfill_months: selectedMonths },
-            successTitle: `Backfill ${selectedMonths} bulan selesai.`,
-            busyText: `Backfill ${selectedMonths} bulan…`,
+            busyText: `Mengantre backfill ${selectedMonths} bulan…`,
             idleText: 'Jalankan Backfill',
+            confirmText: 'Backfill settlement untuk {store} akan dijalankan. Lanjutkan?',
+            ackTitle: `Backfill ${selectedMonths} bulan dikirim ke antrian`,
         });
     };
 
-    async function runSettlementSyncRequest({ btnId, payload, successTitle, busyText, idleText }) {
-        const storeId = getSyncStoreId() || $('filterStore').value;
-        const btn = $(btnId);
-        const state = $('settlementSyncStateValue');
-        if (btn.disabled) return;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + busyText;
-        hideSyncFeedback();
-        setSyncState('running', 'Berjalan');
-        updateSyncDot(true);
-        if (state) state.textContent = 'Berjalan';
-
-        try {
-            const d = await api('/api/marketplace/stores/' + storeId + '/sync-settlements', {
-                method: 'POST',
-                body: JSON.stringify(payload || {}),
-            });
-
-            const summaryBits = [
-                `Diterima: <strong>${d.found ?? 0}</strong>`,
-                `Baru: <strong>${d.new ?? 0}</strong>`,
-                `Diperbarui: <strong>${d.updated ?? 0}</strong>`,
-                `Dilewati: ${d.skipped ?? 0}`,
-                `Gagal: ${d.errors ?? 0}`,
-            ];
-            if (d.batches !== undefined) summaryBits.push(`Batch: ${d.batches}`);
-
-            showSyncFeedback('success', successTitle, d.message || 'Sync settlement selesai.', summaryBits);
-            btn.innerHTML = '✓ Selesai';
-            loadSettlements();
-            refreshSettlementSyncLogs();
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.textContent = idleText;
-                if (state) state.textContent = 'Siap';
-                setSyncState('success', 'Siap');
-            }, 3000);
-        } catch (e) {
-            const level = e.status === 401 || e.status === 422 ? 'warn' : 'error';
-            const code = e.data?.code ? `Kode: ${e.data.code}` : null;
-            const status = e.status ? `HTTP ${e.status}` : null;
-            const action = e.data?.action && e.data.action.type === 'redirect'
-                ? { url: e.data.action.url, label: e.data.action.label }
-                : null;
-            const message = e.data?.message || e.message || 'Sync settlement gagal. Coba lagi beberapa saat lagi.';
-
-            showSyncFeedback(level, 'Sync gagal', message, [code, status].filter(Boolean), action);
-            setSyncState('error', 'Gagal');
-            updateSyncDot(false);
-
-            btn.disabled = false;
-            btn.textContent = idleText;
-            refreshSettlementSyncLogs();
-        }
-    }
-
     window.runSettlementSyncBackground = async function () {
-        const storeId = getSyncStoreId() || $('filterStore').value;
-        if (!storeId) { alert('Pilih toko dulu di tab Sync sebelum sync latar belakang.'); return; }
-
-        const storeName = $('syncStore')?.selectedOptions[0]?.textContent || $('filterStore').selectedOptions[0]?.textContent || 'toko ini';
-        if (!confirm(`Tarik SEMUA settlement yang belum tersinkron untuk ${storeName} di latar belakang?\n\nProses ini bisa berjalan beberapa menit dan TIDAK bisa dibatalkan dari sini. Anda tetap bisa menutup/pindah halaman.`)) {
-            return;
-        }
-
-        const btn = $('runSettlementBgBtn');
-        const state = $('settlementSyncStateValue');
-        if (btn.disabled) return;
-        btn.disabled = true;
-        btn.textContent = 'Mengirim ke antrian…';
-        hideSyncFeedback();
-
-        try {
-            const d = await api('/api/marketplace/stores/' + storeId + '/sync-settlements-background', { method: 'POST' });
-            showSyncFeedback('info', 'Dikirim ke antrian', d.message || 'Sinkronisasi dikirim ke latar belakang.', ['Latar belakang']);
-            if (state) state.textContent = 'Dikirim';
-            refreshSettlementSyncLogs();
-        } catch (e) {
-            const level = e.status === 401 || e.status === 422 ? 'warn' : 'error';
-            const action = e.data?.action && e.data.action.type === 'redirect'
-                ? { url: e.data.action.url, label: e.data.action.label }
-                : null;
-            showSyncFeedback(level, 'Gagal mengirim', e.data?.message || e.message || 'Gagal mengirim sinkronisasi ke latar belakang.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean), action);
-            setSyncState('error', 'Gagal');
-            refreshSettlementSyncLogs();
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Sync Latar Belakang (Semua Order)';
-        }
+        await queueSettlementSyncRequest({
+            btnId: 'runSettlementBgBtn',
+            payload: { all: 1 },
+            busyText: 'Mengantre sync semua batch…',
+            idleText: 'Sync Latar Belakang (Semua Order)',
+            confirmText: 'Tarik SEMUA settlement yang belum tersinkron untuk {store} di latar belakang?\n\nProses ini bisa berjalan beberapa menit dan TIDAK bisa dibatalkan dari sini. Anda tetap bisa menutup/pindah halaman.',
+            ackTitle: 'Settlement background sync dikirim ke antrian',
+        });
     };
 
     init();

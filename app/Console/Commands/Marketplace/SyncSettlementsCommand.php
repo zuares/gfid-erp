@@ -54,6 +54,7 @@ class SyncSettlementsCommand extends Command
      */
     private const ALL_MAX_BATCHES = 20;
     private const ALL_MAX_RUNTIME_SECONDS = 12 * 60; // 12 menit
+    private const PROGRESS_CACHE_TTL_SECONDS = 1800;
 
     protected $signature = 'marketplace:sync-settlements
         {--store= : ID toko spesifik (stores.id)}
@@ -67,8 +68,23 @@ class SyncSettlementsCommand extends Command
 
     protected $description = 'Sinkronisasi settlement/escrow Shopee (get_escrow_detail). Tidak membuat jurnal accounting. Dijalankan manual — belum dijadwalkan.';
 
+    private function progressKey(Store $store): string
+    {
+        return "marketplace:settlement_sync_progress:{$store->id}";
+    }
+
+    private function writeProgress(Store $store, array $payload): void
+    {
+        Cache::put($this->progressKey($store), array_merge([
+            'store_id'    => $store->id,
+            'store_name'  => $store->name,
+            'updated_at'  => now()->toISOString(),
+        ], $payload), self::PROGRESS_CACHE_TTL_SECONDS);
+    }
+
     public function handle(MarketplaceSyncService $syncService): int
     {
+        @set_time_limit(0);
         $commandStartedAt = hrtime(true);
 
         // ── Validasi opsi (sebelum proses apa pun) ─────────────────────────────
@@ -179,13 +195,29 @@ class SyncSettlementsCommand extends Command
                 $store->credentials;
             } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
                 $this->reportDecryptException($store, $e);
+                $this->writeProgress($store, [
+                    'status'  => 'error',
+                    'phase'   => 'error',
+                    'percent' => 100,
+                    'label'   => 'Gagal dekripsi kredensial toko.',
+                ]);
                 Log::error("[marketplace:sync-settlements] Store #{$store->id} DecryptException (preflight): " . $e->getMessage());
                 $storesFailed++;
                 $lock->release();
                 continue;
             }
 
+            $storeResult = null;
             try {
+                $this->writeProgress($store, [
+                    'status'  => 'running',
+                    'phase'   => 'store_start',
+                    'percent' => 2,
+                    'label'   => $all
+                        ? "Memulai sync settlement semua batch untuk {$store->name}…"
+                        : "Memulai sync settlement untuk {$store->name}…",
+                ]);
+
                 $storeResult = $this->syncOneStore(
                     $syncService,
                     $store,
@@ -195,6 +227,9 @@ class SyncSettlementsCommand extends Command
                     $resync,
                     $limit,
                     $all,
+                    function (array $payload) use ($store): void {
+                        $this->writeProgress($store, $payload);
+                    },
                 );
 
                 $totalFound     += $storeResult['found'];
@@ -215,13 +250,40 @@ class SyncSettlementsCommand extends Command
                 // tetap diproses — dan pesan ke user jelas menunjukkan kemungkinan
                 // penyebab & langkah perbaikannya, bukan pesan generik.
                 $this->reportDecryptException($store, $e);
+                $this->writeProgress($store, [
+                    'status'  => 'error',
+                    'phase'   => 'error',
+                    'percent' => 100,
+                    'label'   => 'Gagal dekripsi kredensial toko.',
+                ]);
                 Log::error("[marketplace:sync-settlements] Store #{$store->id} DecryptException: " . $e->getMessage());
                 $storesFailed++;
             } catch (\Throwable $e) {
                 $this->error("Hasil: Gagal ({$e->getMessage()})");
+                $this->writeProgress($store, [
+                    'status'  => 'error',
+                    'phase'   => 'error',
+                    'percent' => 100,
+                    'label'   => $e->getMessage(),
+                ]);
                 Log::error("[marketplace:sync-settlements] Store #{$store->id} gagal: " . $e->getMessage());
                 $storesFailed++;
             } finally {
+                if (isset($storeResult) && is_array($storeResult)) {
+                    $this->writeProgress($store, [
+                        'status'   => ($storeResult['errors'] ?? 0) > 0
+                            ? (($storeResult['synced'] ?? 0) > 0 ? 'warn' : 'error')
+                            : 'success',
+                        'phase'    => 'store_done',
+                        'percent'  => 100,
+                        'label'    => isset($storeResult['message']) ? (string) $storeResult['message'] : 'Selesai',
+                        'found'    => (int) ($storeResult['found'] ?? 0),
+                        'processed'=> (int) ($storeResult['processed'] ?? 0),
+                        'synced'   => (int) ($storeResult['synced'] ?? 0),
+                        'skipped'  => (int) ($storeResult['skipped'] ?? 0),
+                        'errors'   => (int) ($storeResult['errors'] ?? 0),
+                    ]);
+                }
                 $lock->release();
             }
         }
@@ -262,6 +324,7 @@ class SyncSettlementsCommand extends Command
         bool $resync,
         int $limit,
         bool $all,
+        ?callable $progressCallback = null,
     ): array {
         $totals = ['found' => 0, 'processed' => 0, 'synced' => 0, 'skipped' => 0, 'errors' => 0, 'last_call_meta' => null];
 
@@ -270,6 +333,25 @@ class SyncSettlementsCommand extends Command
         $startedAt = microtime(true);
 
         for ($batch = 1; $batch <= self::ALL_MAX_BATCHES; $batch++) {
+            $batchProgress = null;
+            if ($progressCallback) {
+                $batchProgress = function (array $payload) use ($progressCallback, $batch, $all): void {
+                    $payload['batch'] = $batch;
+                    $payload['max_batches'] = $all ? self::ALL_MAX_BATCHES : 1;
+                    $payload['mode'] = $all ? 'all' : 'single';
+                    if ($all) {
+                        $percent = (float) ($payload['percent'] ?? 0);
+                        $overall = (($batch - 1) / max(1, self::ALL_MAX_BATCHES)) * 100 + ($percent / max(1, self::ALL_MAX_BATCHES));
+                        $payload['percent'] = (int) min(99, round($overall));
+                    }
+                    try {
+                        $progressCallback($payload);
+                    } catch (\Throwable) {
+                        // progress hanya observasi
+                    }
+                };
+            }
+
             $result = $syncService->syncSettlements(
                 store: $store,
                 timeFrom: $timeFrom,
@@ -278,6 +360,7 @@ class SyncSettlementsCommand extends Command
                 resync: $resync,
                 limit: $limit,
                 afterId: $afterId,
+                progress: $batchProgress,
             );
 
             $totals['found']     += $result['found'];
@@ -327,6 +410,24 @@ class SyncSettlementsCommand extends Command
                     'Berhenti: batas pengaman %d batch tercapai. Cursor terakhir: id=%d. Jalankan ulang command ini untuk melanjutkan.',
                     self::ALL_MAX_BATCHES, $afterId
                 ));
+            }
+        }
+
+        if ($progressCallback) {
+            try {
+                $progressCallback([
+                    'status'  => $totals['errors'] > 0 ? ($totals['synced'] > 0 ? 'warn' : 'error') : 'success',
+                    'phase'   => 'store_done',
+                    'percent' => 100,
+                    'label'   => 'Selesai',
+                    'found'   => $totals['found'],
+                    'processed' => $totals['processed'],
+                    'synced'  => $totals['synced'],
+                    'skipped' => $totals['skipped'],
+                    'errors'  => $totals['errors'],
+                ]);
+            } catch (\Throwable) {
+                // abaikan
             }
         }
 

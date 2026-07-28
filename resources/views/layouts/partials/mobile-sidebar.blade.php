@@ -306,6 +306,7 @@
     $hasMarketplaceSkuMapping = $router->has('marketplace.sku-mapping');
     $hasMarketplaceSync = $router->has('marketplace.sync');
     $hasMarketplacePencairanDana = $router->has('marketplace.settlement');
+    $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
@@ -498,6 +499,7 @@
         request()->routeIs('marketplace.sku-mapping') ||
         request()->routeIs('marketplace.sync') ||
         request()->routeIs('marketplace.settlement') ||
+        request()->routeIs('marketplace.income-detail') ||
         request()->routeIs('marketplace.profit') ||
         request()->routeIs('marketplace.ads') ||
         request()->routeIs('marketplace.analytics') ||
@@ -1454,6 +1456,13 @@
                                 <a href="{{ route('marketplace.settlement') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.settlement') ? 'active' : '' }}">
                                     <span class="icon">💰</span><span>Pencairan Dana</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceIncomeDetail)
+                                <a href="{{ route('marketplace.income-detail') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.income-detail') ? 'active' : '' }}">
+                                    <span class="icon">🧾</span><span>Rincian Penghasilan</span>
                                 </a>
                             @endif
 

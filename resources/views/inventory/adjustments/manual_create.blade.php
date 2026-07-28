@@ -60,6 +60,12 @@
         border:1px solid var(--adj-border);
         box-shadow:none;
     }
+    .adj-card.is-sticky-step{
+        position:sticky;
+        top:118px;
+        z-index:285;
+        scroll-margin-top:132px;
+    }
     body[data-theme="dark"] .adj-card{ border-color:rgba(51,65,85,.85); box-shadow:none; }
     .adj-card-body{ padding:.85rem; }
     .adj-section-label{
@@ -333,6 +339,10 @@
         color:#dc2626;
     }
 
+    #workflow-sections{
+        scroll-margin-top:132px;
+    }
+
     @media(max-width:768px){
         .adj-topbar{ padding:.5rem; }
         .adj-topbar-title{ font-size:1rem; }
@@ -363,6 +373,15 @@
             font-weight:800;
         }
         .adj-table-scroll{ max-height:none; overflow:visible; }
+        .adj-card.is-sticky-step{
+            position:static;
+            top:auto;
+            z-index:auto;
+            scroll-margin-top:100px;
+        }
+        #workflow-sections{
+            scroll-margin-top:100px;
+        }
         .adj-table thead{ display:none; }
         .adj-table,.adj-table tbody,.adj-table tr,.adj-table td{ display:block; width:100%; }
         .adj-table tbody tr{
@@ -493,7 +512,7 @@
             </div>
 
             {{-- STEP 3: Cari Item --}}
-            <div class="adj-card" style="margin-top:.5rem;">
+            <div class="adj-card is-sticky-step" style="margin-top:.5rem;">
                 <div class="adj-card-body">
                     <div class="adj-section-label">Cari Item</div>
                     <div class="row adj-form-row align-items-end">
@@ -607,6 +626,48 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:10px;border:1px solid var(--adj-border);box-shadow:none;">
+                <div class="modal-header py-2" style="border-bottom-color:rgba(148,163,184,.18);">
+                    <h6 class="modal-title mb-0" style="font-weight:800;font-size:.92rem;">Konfirmasi Simpan Draft</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="font-size:.84rem;">
+                    <div class="alert alert-warning py-2 px-3 mb-3" style="border-radius:8px;">
+                        Pastikan data berikut sudah benar sebelum draft disimpan.
+                    </div>
+                    <div class="d-grid gap-2">
+                        <div class="d-flex justify-content-between gap-3">
+                            <span class="text-muted">Gudang</span>
+                            <strong class="text-end" id="confirm-warehouse-label">-</strong>
+                        </div>
+                        <div class="d-flex justify-content-between gap-3">
+                            <span class="text-muted">Tanggal</span>
+                            <strong class="text-end" id="confirm-date-label">-</strong>
+                        </div>
+                        <div class="d-flex justify-content-between gap-3">
+                            <span class="text-muted">Item berubah</span>
+                            <strong class="text-end" id="confirm-changed-label">0</strong>
+                        </div>
+                        <div class="d-flex justify-content-between gap-3">
+                            <span class="text-muted">Total selisih</span>
+                            <strong class="text-end" id="confirm-total-label">0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between gap-3">
+                            <span class="text-muted">Catatan</span>
+                            <strong class="text-end" id="confirm-notes-label">-</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2" style="border-top-color:rgba(148,163,184,.18);">
+                    <button type="button" class="btn btn-sm btn-adj-outline" data-bs-dismiss="modal">Cek lagi</button>
+                    <button type="button" class="btn btn-sm btn-adj-primary" id="confirm-save-draft">Ya, simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -630,6 +691,13 @@
             const quickCategory = document.getElementById('quick-item-category');
             const quickError = document.getElementById('quick-item-error');
             const quickSave = document.getElementById('quick-item-save');
+            const confirmSaveModalEl = document.getElementById('confirmSaveModal');
+            const confirmWarehouseLabel = document.getElementById('confirm-warehouse-label');
+            const confirmDateLabel = document.getElementById('confirm-date-label');
+            const confirmChangedLabel = document.getElementById('confirm-changed-label');
+            const confirmTotalLabel = document.getElementById('confirm-total-label');
+            const confirmNotesLabel = document.getElementById('confirm-notes-label');
+            const confirmSaveBtn = document.getElementById('confirm-save-draft');
             const workflowBar = document.getElementById('workflow-bar');
             const workflowSections = document.getElementById('workflow-sections');
             const selectedWarehouseLabel = document.getElementById('selected-warehouse-label');
@@ -640,6 +708,7 @@
 
             let warehouseItems = [];
             let searchTimer = null;
+            let allowNativeSubmit = false;
 
             function fmt(n) {
                 const x = parseFloat(n);
@@ -844,6 +913,38 @@
                 }
             }
 
+            function updateConfirmModal() {
+                if (confirmWarehouseLabel) confirmWarehouseLabel.textContent = getWarehouseLabel();
+                if (confirmDateLabel) {
+                    const dateInput = form.querySelector('input[name="date"]');
+                    confirmDateLabel.textContent = dateInput?.value || '-';
+                }
+                if (confirmChangedLabel) {
+                    const changed = tbody.querySelectorAll('tr[data-changed="1"]').length;
+                    confirmChangedLabel.textContent = String(changed);
+                }
+                if (confirmTotalLabel) {
+                    let total = 0;
+                    tbody.querySelectorAll('.qty-change-input').forEach(inp => {
+                        const v = parseFloat(inp.value);
+                        if (!isNaN(v)) total += v;
+                    });
+                    let text = fmt(total);
+                    if (total > 0) text = '+' + text;
+                    confirmTotalLabel.textContent = text;
+                }
+                if (confirmNotesLabel) {
+                    const notesInput = form.querySelector('input[name="notes"]');
+                    const notes = (notesInput?.value || '').trim();
+                    confirmNotesLabel.textContent = notes || '-';
+                }
+            }
+
+            function showConfirmModal() {
+                updateConfirmModal();
+                bootstrap.Modal.getOrCreateInstance(confirmSaveModalEl).show();
+            }
+
             function clearFormError() {
                 if (!formError) return;
                 formError.textContent = '';
@@ -1035,6 +1136,12 @@
                     showFormError('Isi alasan pada baris yang diubah sebelum menyimpan.');
                     firstInvalidRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
                     firstInvalidRow.querySelector('.notes-input')?.focus();
+                    return;
+                }
+
+                if (!allowNativeSubmit) {
+                    e.preventDefault();
+                    showConfirmModal();
                 }
             });
 
@@ -1091,6 +1198,22 @@
             });
             searchBtn?.addEventListener('click', runSearch);
             showChangedOnly.addEventListener('change', applyFilter);
+
+            confirmSaveBtn?.addEventListener('click', () => {
+                allowNativeSubmit = true;
+                bootstrap.Modal.getOrCreateInstance(confirmSaveModalEl).hide();
+                window.setTimeout(() => {
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                }, 120);
+            });
+
+            confirmSaveModalEl?.addEventListener('hidden.bs.modal', () => {
+                allowNativeSubmit = false;
+            });
 
             setWorkflowReady(!!warehouseSelect.value);
             if (warehouseSelect.value) {

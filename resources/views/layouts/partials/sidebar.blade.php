@@ -96,6 +96,7 @@
     $hasMarketplaceSkuMapping  = $router->has('marketplace.sku-mapping');
     $hasMarketplaceSync        = $router->has('marketplace.sync');
     $hasMarketplacePencairanDana  = $router->has('marketplace.settlement');
+    $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -295,6 +296,7 @@
         $open('marketplace.sku-mapping') ||
         $open('marketplace.sync') ||
         $open('marketplace.settlement') ||
+        $open('marketplace.income-detail') ||
         $open('marketplace.profit') ||
         $open('marketplace.ads') ||
         $open('marketplace.analytics') ||
@@ -1421,6 +1423,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.settlement') }}" icon="bi bi-coin"
                                 :active="request()->routeIs('marketplace.settlement')">
                                 Pencairan Dana
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceIncomeDetail)
+                            <x-sidebar.sub-link href="{{ route('marketplace.income-detail') }}" icon="bi bi-journal-text"
+                                :active="request()->routeIs('marketplace.income-detail')">
+                                Rincian Penghasilan
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

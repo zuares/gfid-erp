@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Item;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceStore;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -132,6 +133,15 @@ class MarketplaceOrderController extends Controller
             }
         }
 
+        [$resolvedAwb, $awbSource, $internalPackageNo] = $this->resolveTrackingNumberForDetail($order, $liveData ?? []);
+        if (!empty($resolvedAwb) && $order->shipping_awb_no !== $resolvedAwb) {
+            try {
+                $order->forceFill(['shipping_awb_no' => $resolvedAwb])->save();
+            } catch (\Throwable $e) {
+                // Jangan ganggu rendering halaman jika save gagal
+            }
+        }
+
         // Hitung estimasi rata-rata persentase potongan admin dari settlement historis toko ini
         $estimatedFeeRatio = 0.15; // default 15%
         if ($order->store_id) {
@@ -140,7 +150,7 @@ class MarketplaceOrderController extends Controller
                     ->join('marketplace_orders', 'marketplace_order_settlements.order_id', '=', 'marketplace_orders.id')
                     ->where('marketplace_order_settlements.store_id', $order->store_id)
                     ->where('marketplace_orders.subtotal_items', '>', 0)
-                    ->selectRaw('SUM(commission_fee + service_fee + transaction_fee + activity_fee) as total_fees, SUM(marketplace_orders.subtotal_items) as total_subtotal')
+                    ->selectRaw('SUM(COALESCE(commission_fee, 0) + COALESCE(service_fee, 0) + COALESCE(transaction_fee, 0) + COALESCE(affiliate_fee, 0) + COALESCE(activity_fee, 0) + COALESCE(shipping_insurance_fee, 0)) as total_fees, SUM(marketplace_orders.subtotal_items) as total_subtotal')
                     ->first();
                     
                 if ($avgFees && $avgFees->total_subtotal > 0) {
@@ -156,7 +166,158 @@ class MarketplaceOrderController extends Controller
             }
         }
 
-        return view('marketplace.orders.show', compact('order', 'estimatedFeeRatio'));
+        $estimatedFeePct = round($estimatedFeeRatio * 100, 1);
+
+        return view('marketplace.orders.show', compact(
+            'order',
+            'estimatedFeeRatio',
+            'estimatedFeePct',
+            'awbSource',
+            'internalPackageNo'
+        ));
+    }
+
+    public function updateSettlementTestFields(Request $request, MarketplaceOrder $order)
+    {
+        abort_unless(app()->environment(['local', 'testing']) || $request->user()?->role === 'owner', 403, 'Aksi ini hanya untuk owner/dev testing.');
+
+        $data = $request->validate([
+            'order_ams_commission_fee' => ['nullable', 'numeric', 'min:0'],
+            'voucher_from_shopee'      => ['nullable', 'numeric', 'min:0'],
+            'voucher_from_seller'      => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $settlement = MarketplaceOrderSettlement::query()
+            ->where('order_id', $order->id)
+            ->first();
+
+        abort_unless($settlement instanceof MarketplaceOrderSettlement, 404, 'Settlement untuk order ini belum tersedia.');
+
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $changes = [];
+
+        if (array_key_exists('order_ams_commission_fee', $data) && $data['order_ams_commission_fee'] !== null) {
+            $value = (float) $data['order_ams_commission_fee'];
+            $settlement->activity_fee = $value;
+            $raw['order_ams_commission_fee'] = $value;
+            $raw['ams_commission_fee'] = $value;
+            $changes['order_ams_commission_fee'] = $value;
+        }
+
+        if (array_key_exists('voucher_from_shopee', $data) && $data['voucher_from_shopee'] !== null) {
+            $value = (float) $data['voucher_from_shopee'];
+            $raw['voucher_from_shopee'] = $value;
+            $raw['voucher_from_platform'] = $value;
+            $raw['platform_voucher'] = $value;
+            $changes['voucher_from_shopee'] = $value;
+        }
+
+        if (array_key_exists('voucher_from_seller', $data) && $data['voucher_from_seller'] !== null) {
+            $value = (float) $data['voucher_from_seller'];
+            $settlement->seller_voucher = $value;
+            $raw['voucher_from_seller'] = $value;
+            $raw['seller_voucher_rebate'] = $value;
+            $raw['seller_voucher'] = $value;
+            $changes['voucher_from_seller'] = $value;
+        }
+
+        $settlement->raw_json = $raw;
+        $settlement->save();
+
+        return back()->with('success', 'Data testing settlement berhasil diperbarui: ' . implode(', ', array_map(
+            fn ($key, $value) => $key . '=' . number_format((float) $value, 0, ',', '.'),
+            array_keys($changes),
+            array_values($changes)
+        )));
+    }
+
+    /**
+     * Resolve tracking number for detail page.
+     *
+     * Priority:
+     * 1) valid local/live AWB
+     * 2) Shopee tracking API by booking/order sn
+     * 3) last resort: order detail package tracking number
+     */
+    private function resolveTrackingNumberForDetail(MarketplaceOrder $order, array $liveData = []): array
+    {
+        $statusText = strtolower((string) ($order->order_status ?: $order->status));
+        $trackableStatuses = ['ready_to_ship', 'processed', 'shipped', 'completed', 'to_confirm_receive', 'ready_to_handover'];
+        $canResolveFromApi = in_array($statusText, $trackableStatuses, true);
+
+        $cleanAwb = static function ($value) {
+            $awb = trim((string) $value);
+            if ($awb === '') {
+                return null;
+            }
+
+            if (preg_match('/^OFG/i', $awb)) {
+                return null;
+            }
+
+            return $awb;
+        };
+
+        $awbCandidates = [
+            data_get($liveData, 'tracking_no'),
+            data_get($liveData, 'shipping_document_info.tracking_number'),
+            $order->shipping_awb_no,
+            data_get($liveData, 'package_list.0.tracking_number'),
+            data_get($liveData, 'package_list.0.package_number'),
+        ];
+
+        $awb = null;
+        $awbSource = null;
+        foreach ($awbCandidates as $candidate) {
+            $candidate = $cleanAwb($candidate);
+            if (!empty($candidate)) {
+                $awb = $candidate;
+                $awbSource = 'local';
+                break;
+            }
+        }
+
+        $packageNoCandidate = data_get($liveData, 'package_list.0.package_number');
+        $internalPackageNo = !empty($packageNoCandidate) && preg_match('/^OFG/i', (string) $packageNoCandidate)
+            ? $packageNoCandidate
+            : null;
+
+        if ($awb || ! $canResolveFromApi || !$order->store || strtolower((string) ($order->store->channel?->code ?? '')) !== 'shopee') {
+            return [$awb, $awbSource, $internalPackageNo];
+        }
+
+        try {
+            $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+
+            if (!empty($order->booking_sn) && method_exists($shopee, 'getBookingTrackingNumber')) {
+                $resp = $shopee->getBookingTrackingNumber($order->store, $order->booking_sn);
+                $awb = $cleanAwb($resp['response']['tracking_number'] ?? null);
+                if ($awb) {
+                    $awbSource = 'booking_tracking_number';
+                }
+            }
+
+            if (!$awb && method_exists($shopee, 'getTrackingNumber')) {
+                $resp = $shopee->getTrackingNumber($order->store, $order->channel_order_id);
+                $awb = $cleanAwb($resp['response']['tracking_number'] ?? null);
+                if ($awb) {
+                    $awbSource = 'tracking_number';
+                }
+            }
+
+            if (!$awb && method_exists($shopee, 'getOrderDetail')) {
+                $resp = $shopee->getOrderDetail($order->store, [$order->channel_order_id]);
+                $detail = $resp['response']['order_list'][0] ?? null;
+                $awb = $cleanAwb(data_get($detail, 'package_list.0.tracking_number'));
+                if ($awb) {
+                    $awbSource = 'order_detail';
+                }
+            }
+        } catch (\Throwable $e) {
+            // Tetap render halaman meski tracking API gagal
+        }
+
+        return [$awb, $awbSource, $internalPackageNo];
     }
 
     /**

@@ -83,6 +83,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
     Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
     Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
+    Route::get('/marketplace/penghasilan',  [MarketplaceController::class, 'incomeDetail'])->name('marketplace.income-detail');
     Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
     Route::get('/marketplace/cache-monitor', [MarketplaceController::class, 'cacheMonitor'])->name('marketplace.cache-monitor');
@@ -199,6 +200,13 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
+    Route::get('/stores/{store}/sync-settlements-progress', [MarketplaceController::class, 'syncSettlementsProgress']);
+    Route::post('/settlements/purge',                [MarketplaceController::class, 'purgeSettlements'])
+        ->middleware('role:owner')
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/stores/{store}/purge-marketplace-data', [MarketplaceController::class, 'purgeMarketplaceData'])
+        ->middleware('role:owner')
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-settlements',  [MarketplaceController::class, 'syncSettlements'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground'])
@@ -471,5 +479,3 @@ Route::get('/api/marketplace/sync-finance-status', function () {
         ]);
     return response()->json(['runs' => $runs, 'server_time' => now()->format('H:i:s')]);
 })->middleware(['auth', 'access:marketplace']);
-
-

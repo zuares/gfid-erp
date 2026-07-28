@@ -28,6 +28,22 @@ class MarketplaceSyncService
     ) {}
 
     /**
+     * Kirim update progress ke callback jika tersedia.
+     */
+    private function reportProgress(?callable $progress, array $payload): void
+    {
+        if (! $progress) {
+            return;
+        }
+
+        try {
+            $progress($payload);
+        } catch (\Throwable) {
+            // Observabilitas tidak boleh memutus sinkronisasi inti.
+        }
+    }
+
+    /**
      * Seed channel default (Shopee, TikTok, dst).
      */
     public function bootstrapChannels(): array
@@ -446,8 +462,9 @@ class MarketplaceSyncService
      * lihat AUDIT_FASE1_RANCANGAN_FINAL.md Bagian 10).
      */
     private const MATERIAL_SETTLEMENT_FIELDS = [
-        'commission_fee', 'service_fee', 'transaction_fee', 'seller_voucher',
-        'shipping_fee_subsidy', 'escrow_tax', 'final_income', 'settlement_time',
+        'commission_fee', 'service_fee', 'transaction_fee', 'affiliate_fee',
+        'seller_voucher', 'shipping_fee_subsidy', 'shipping_insurance_fee',
+        'escrow_tax', 'final_income', 'settlement_time',
     ];
 
     /**
@@ -486,6 +503,7 @@ class MarketplaceSyncService
         int $limit = 200,
         int $afterId = 0,
         bool $waitForRateLimit = false,
+        ?callable $progress = null,
     ): array {
         $driver = $this->manager->driver($store);
 
@@ -549,10 +567,50 @@ class MarketplaceSyncService
         // metadata order terakhir (bukan agregat) — cukup untuk kebutuhan --inspect yang
         // memang dibatasi hanya valid bersama --order (satu order).
         $lastCallMeta = null;
+        $safeFound = max(1, $found);
+
+        $this->reportProgress($progress, [
+            'status'            => 'running',
+            'phase'             => 'batch_start',
+            'percent'           => $found > 0 ? 5 : 100,
+            'label'             => $found > 0
+                ? "Menyiapkan batch settlement ({$found} order)…"
+                : 'Tidak ada settlement eligible untuk batch ini.',
+            'store_id'          => $store->id,
+            'store_name'        => $store->name,
+            'found'             => $found,
+            'processed'         => 0,
+            'synced'            => 0,
+            'new'               => 0,
+            'updated'           => 0,
+            'skipped'           => 0,
+            'errors'            => 0,
+            'last_processed_id' => null,
+        ]);
 
         foreach ($orders as $order) {
             $processed++;
             $lastProcessedId = $order->id;
+
+            $this->reportProgress($progress, [
+                'status'            => 'running',
+                'phase'             => 'fetching',
+                'percent'           => $found > 0
+                    ? min(95, 5 + (int) floor((max(0, $processed - 1) / $safeFound) * 90))
+                    : 100,
+                'label'             => "Mengambil detail settlement {$processed}/{$found}…",
+                'store_id'          => $store->id,
+                'store_name'        => $store->name,
+                'found'             => $found,
+                'processed'         => $processed - 1,
+                'synced'            => $synced,
+                'new'               => $new,
+                'updated'           => $updated,
+                'skipped'           => $skipped,
+                'errors'            => $errors,
+                'last_processed_id' => $lastProcessedId,
+                'current_order'     => $order->channel_order_id,
+            ]);
 
             try {
                 // Revalidasi status order tepat sebelum API dipanggil
@@ -566,7 +624,13 @@ class MarketplaceSyncService
                 // 1) Panggil API dulu (di luar transaction — request jaringan tidak boleh
                 //    menahan transaction database, apalagi di SQLite yang rawan "database
                 //    is locked" kalau transaction dibiarkan terbuka lama).
-                $retryResult = $this->getEscrowDetailWithRetry($driver, $store, $order->channel_order_id, $waitForRateLimit);
+                $retryResult = $this->getEscrowDetailWithRetry(
+                    $driver,
+                    $store,
+                    $order->channel_order_id,
+                    $waitForRateLimit,
+                    $progress,
+                );
                 $response = $retryResult['payload'];
                 $lastCallMeta = $retryResult['meta'];
 
@@ -650,6 +714,26 @@ class MarketplaceSyncService
                     $updated++;
                 }
 
+                $this->reportProgress($progress, [
+                    'status'            => 'running',
+                    'phase'             => 'processing',
+                    'percent'           => $found > 0
+                        ? min(95, 5 + (int) floor(($processed / $safeFound) * 90))
+                        : 100,
+                    'label'             => "Memproses settlement {$processed}/{$found}…",
+                    'store_id'          => $store->id,
+                    'store_name'        => $store->name,
+                    'found'             => $found,
+                    'processed'         => $processed,
+                    'synced'            => $synced,
+                    'new'               => $new,
+                    'updated'           => $updated,
+                    'skipped'           => $skipped,
+                    'errors'            => $errors,
+                    'last_processed_id' => $lastProcessedId,
+                    'current_order'     => $order->channel_order_id,
+                ]);
+
             } catch (\Throwable $e) {
                 Log::error("[sync-settlements] Exception order {$order->channel_order_id}: " . $e->getMessage());
                 $errors++;
@@ -663,6 +747,24 @@ class MarketplaceSyncService
         if ($errors > 0) {
             $logStatus = $synced > 0 ? 'partial_success' : 'failed';
         }
+
+        $this->reportProgress($progress, [
+            'status'            => $logStatus === 'success' ? 'success' : ($logStatus === 'partial_success' ? 'warn' : 'error'),
+            'phase'             => 'batch_done',
+            'percent'           => 100,
+            'label'             => $message,
+            'store_id'          => $store->id,
+            'store_name'        => $store->name,
+            'found'             => $found,
+            'processed'         => $processed,
+            'synced'            => $synced,
+            'new'               => $new,
+            'updated'           => $updated,
+            'skipped'           => $skipped,
+            'errors'            => $errors,
+            'last_processed_id' => $lastProcessedId,
+            'failed_order_ids'  => array_slice($failedOrderIds, 0, 20),
+        ]);
 
         $this->log($store, 'sync_settlements', $logStatus, $message, [
             'found'              => $found,
@@ -714,6 +816,7 @@ class MarketplaceSyncService
         int $limit = 200,
         int $maxBatches = 20,
         int $pauseSeconds = 1,
+        ?callable $progress = null,
     ): array {
         $totals = [
             'found'           => 0,
@@ -734,7 +837,32 @@ class MarketplaceSyncService
         $maxRuntimeSeconds = max(900, (int) config('shopee.settlement_backfill_max_runtime_seconds', 7200));
         $orderMode = $orderSn !== null && $orderSn !== '';
 
+        $this->reportProgress($progress, [
+            'status'     => 'running',
+            'phase'      => 'backfill_start',
+            'percent'    => 3,
+            'label'      => 'Menyiapkan backfill settlement…',
+            'store_id'   => $store->id,
+            'store_name' => $store->name,
+            'batches'    => 0,
+            'max_batches'=> $maxBatches,
+        ]);
+
         for ($batch = 1; $batch <= $maxBatches; $batch++) {
+            $batchProgress = function (array $payload) use ($progress, $batch, $maxBatches): void {
+                if (! $progress) {
+                    return;
+                }
+
+                $batchPercent = (float) ($payload['percent'] ?? 0);
+                $overall = (($batch - 1) / max(1, $maxBatches)) * 100 + ($batchPercent / max(1, $maxBatches));
+                $payload['percent'] = (int) min(99, round($overall));
+                $payload['batch'] = $batch;
+                $payload['max_batches'] = $maxBatches;
+                $payload['phase'] = $payload['phase'] ?? 'batch_running';
+                $progress($payload);
+            };
+
             $result = $this->syncSettlements(
                 $store,
                 $timeFrom,
@@ -744,6 +872,7 @@ class MarketplaceSyncService
                 $limit,
                 $afterId,
                 true, // backfill harus menunggu cooldown rate limit, bukan gagal cepat
+                $batchProgress,
             );
 
             $totals['batches'] = $batch;
@@ -789,6 +918,26 @@ class MarketplaceSyncService
         $message = "Settlement backfill — found: {$totals['found']}, processed: {$totals['processed']}, synced: {$totals['synced']} (new: {$totals['new']}, updated: {$totals['updated']}), skipped: {$totals['skipped']}, errors: {$totals['errors']}, batches: {$totals['batches']}.";
         $status = $totals['errors'] > 0 ? ($totals['synced'] > 0 ? 'partial_success' : 'failed') : 'success';
 
+        $this->reportProgress($progress, [
+            'status'            => $status === 'success' ? 'success' : ($status === 'partial_success' ? 'warn' : 'error'),
+            'phase'             => 'backfill_done',
+            'percent'           => 100,
+            'label'             => $message,
+            'store_id'          => $store->id,
+            'store_name'        => $store->name,
+            'found'             => $totals['found'],
+            'processed'         => $totals['processed'],
+            'synced'            => $totals['synced'],
+            'new'               => $totals['new'],
+            'updated'           => $totals['updated'],
+            'skipped'           => $totals['skipped'],
+            'errors'            => $totals['errors'],
+            'batches'           => $totals['batches'],
+            'max_batches'       => $maxBatches,
+            'last_processed_id' => $totals['last_processed_id'],
+            'failed_order_ids'  => array_slice($totals['failed_order_ids'], 0, 20),
+        ]);
+
         return [
             'found'              => $totals['found'],
             'processed'          => $totals['processed'],
@@ -820,7 +969,13 @@ class MarketplaceSyncService
     /**
      * @return array{payload:array, meta:array{attempts:int, http_status:mixed, retry_after:mixed, token_refreshed:null, duration_ms:float}}
      */
-    private function getEscrowDetailWithRetry(MarketplaceChannel $driver, Store $store, string $orderSn, bool $waitForRateLimit = false): array
+    private function getEscrowDetailWithRetry(
+        MarketplaceChannel $driver,
+        Store $store,
+        string $orderSn,
+        bool $waitForRateLimit = false,
+        ?callable $progress = null,
+    ): array
     {
         // CATATAN KONSOLIDASI: loop retry transien (429/5xx/koneksi putus) yang dulu
         // ada di sini DIHAPUS — sekarang ditangani SATU kali di lapisan channel
@@ -872,6 +1027,17 @@ class MarketplaceSyncService
                 $sleepSeconds = max(1, $retryAfter + random_int(1, 3));
                 $cooldownWaits++;
                 Log::warning("[sync-settlements] Rate limit cooldown untuk order {$orderSn} di toko {$store->id}; menunggu {$sleepSeconds}s lalu retry (attempt {$attempts}).");
+                $this->reportProgress($progress, [
+                    'status'        => 'running',
+                    'phase'         => 'retry_wait',
+                    'percent'       => null,
+                    'label'         => "Rate limit, menunggu {$sleepSeconds}s untuk order {$orderSn}…",
+                    'store_id'      => $store->id,
+                    'store_name'    => $store->name,
+                    'current_order' => $orderSn,
+                    'retry_after'   => $sleepSeconds,
+                    'attempts'      => $attempts,
+                ]);
                 set_time_limit(max(180, $sleepSeconds + 60));
                 sleep($sleepSeconds);
             }
@@ -977,6 +1143,9 @@ class MarketplaceSyncService
      *    fase berikutnya (TIDAK dibuat di koreksi ini).
      *  - final_income: `escrow_amount` TERVERIFIKASI ada (68456 di UAT). `final_income`
      *    tidak pernah muncul di response nyata — fallback ini pada dasarnya jadi primary.
+     *  - affiliate_fee & shipping_insurance_fee: disimpan dari field pengganti yang
+     *    umum dipakai API/response mentah bila tersedia, supaya kolom baru tetap terisi
+     *    tanpa merusak backward compatibility kalau field belum ada.
      *  - seller_coin_cash_back: `seller_coin_cash_back` sendiri TERVERIFIKASI ada di UAT
      *    (field asli persis nama kolom lokal) — diprioritaskan di atas fallback lama.
      *  - commission_fee, service_fee, actual_shipping_fee, shopee_shipping_rebate,
@@ -1036,6 +1205,9 @@ class MarketplaceSyncService
             'transaction_fee'       => $val('transaction_fee', $this->decimalValue(
                 ($income['seller_transaction_fee'] ?? 0) + ($income['seller_order_processing_fee'] ?? 0) ?: ($income['transaction_fee'] ?? null)
             )),
+            'affiliate_fee'         => $val('affiliate_fee', $this->decimalValue(
+                $income['affiliate_fee'] ?? $income['affiliate_commission_fee'] ?? $income['affiliate_commission'] ?? $income['seller_affiliate_fee'] ?? null
+            )),
 
             // Voucher & diskon
             'seller_voucher'        => $val('seller_voucher', $this->decimalValue(
@@ -1049,6 +1221,9 @@ class MarketplaceSyncService
             'actual_shipping_fee'   => $val('actual_shipping_fee', $this->decimalValue($income['actual_shipping_fee'] ?? $income['estimated_shipping_fee'] ?? null)),
             'shipping_fee_subsidy'  => $val('shipping_fee_subsidy', $this->decimalValue($income['shopee_shipping_rebate'] ?? $income['shipping_fee_rebate'] ?? null)),
             'reverse_shipping_fee'  => $val('reverse_shipping_fee', $this->decimalValue($income['reverse_shipping_fee'] ?? null)),
+            'shipping_insurance_fee' => $val('shipping_insurance_fee', $this->decimalValue(
+                $income['shipping_insurance_fee'] ?? $income['shipping_insurance'] ?? $income['insurance_fee'] ?? null
+            )),
 
             // Campaign & lainnya — activity_fee = AMS commission SAJA (lihat docblock).
             'activity_fee'          => $val('activity_fee', $this->decimalValue(
@@ -1072,7 +1247,7 @@ class MarketplaceSyncService
     }
 
     /**
-     * "Not-null guard" — SEMUA 13 kolom fee/nominal di marketplace_order_settlements
+     * "Not-null guard" — SEMUA 15 kolom fee/nominal di marketplace_order_settlements
      * (buyer_payment_amount s/d final_income) adalah NOT NULL di skema saat ini
      * (default '0', TANPA ->nullable() — lihat migration
      * 2026_06_09_013006_create_marketplace_order_settlements_table.php). Insert NULL
@@ -1086,7 +1261,7 @@ class MarketplaceSyncService
      *
      * TECHNICAL DEBT (dicatat, bukan diperbaiki di Fase 1 — di luar scope migration
      * yang disetujui): kalau distingsi "field tidak tersedia" vs "fee memang 0"
-     * benar-benar dibutuhkan untuk rekonsiliasi, ke-13 kolom ini perlu migration
+     * benar-benar dibutuhkan untuk rekonsiliasi, ke-15 kolom ini perlu migration
      * terpisah untuk dijadikan nullable, disertai keputusan bisnis dulu.
      */
     private function nn(?string $value): string

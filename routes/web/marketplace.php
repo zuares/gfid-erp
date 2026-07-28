@@ -30,6 +30,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
         // =========================
         Route::resource('orders', MarketplaceOrderController::class)
             ->only(['index', 'show', 'create', 'store']);
+        Route::post('orders/{order}/test-settlement-fields', [MarketplaceOrderController::class, 'updateSettlementTestFields'])
+            ->name('orders.test-settlement-fields');
 
         Route::get('reports/sales', [MarketplaceOrderController::class, 'salesSummary'])
             ->name('reports.sales');

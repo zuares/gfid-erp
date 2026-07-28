@@ -24,6 +24,8 @@ use App\Services\MarketplaceSyncService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
 use Carbon\Carbon;
@@ -103,6 +105,11 @@ class MarketplaceController extends Controller
     public function profit(): \Illuminate\View\View
     {
         return view('marketplace.profit');
+    }
+
+    public function incomeDetail(): \Illuminate\View\View
+    {
+        return view('marketplace.income-detail');
     }
 
     public function analytics(Request $request): \Illuminate\View\View
@@ -533,11 +540,12 @@ class MarketplaceController extends Controller
      * syncOrders() (baris ~594-649) dan syncSettlementsBackground(). Return null kalau toko
      * siap disync, atau JsonResponse redirect (422/401) kalau tidak.
      */
-    private function ensureStoreReadyForBackgroundSync(Store $store): ?JsonResponse
+    private function ensureStoreReadyForBackgroundSync(Store $store, bool $refreshExpiredToken = true): ?JsonResponse
     {
+        $store->loadMissing('channel');
         $status = $store->connection_status;
 
-        if ($status === 'TOKEN_EXPIRED') {
+        if ($status === 'TOKEN_EXPIRED' && $refreshExpiredToken) {
             try {
                 if ($store->channel->code === 'shopee') {
                     /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
@@ -560,6 +568,10 @@ class MarketplaceController extends Controller
                     'error'      => $e->getMessage(),
                 ]);
             }
+        }
+
+        if ($status === 'TOKEN_EXPIRED' && ! $refreshExpiredToken) {
+            return null;
         }
 
         if ($status === 'NOT_CONNECTED') {
@@ -593,9 +605,37 @@ class MarketplaceController extends Controller
         return null;
     }
 
+    private function resolveLegacyMarketplaceStoreIds(Store $store): array
+    {
+        $ids = [$store->id];
+
+        $legacyById = DB::table('marketplace_stores')
+            ->where('id', $store->id)
+            ->pluck('id')
+            ->all();
+
+        $ids = array_merge($ids, $legacyById);
+
+        if (! empty($store->external_shop_id)) {
+            $legacyByExternal = DB::table('marketplace_stores')
+                ->where('external_store_id', (string) $store->external_shop_id)
+                ->pluck('id')
+                ->all();
+
+            $ids = array_merge($ids, $legacyByExternal);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', array_filter(
+            $ids,
+            fn ($value) => $value !== null && $value !== ''
+        ))));
+
+        return $ids ?: [$store->id];
+    }
+
     public function syncHistorical(Request $request, Store $store): JsonResponse
     {
-        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store, false)) {
             return $resp;
         }
 
@@ -622,7 +662,7 @@ class MarketplaceController extends Controller
 
     public function forceSyncBackground(Request $request, Store $store): JsonResponse
     {
-        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store, false)) {
             return $resp;
         }
 
@@ -673,7 +713,7 @@ class MarketplaceController extends Controller
      */
     public function syncOrdersBackground(Request $request, Store $store): JsonResponse
     {
-        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store, false)) {
             return $resp;
         }
 
@@ -1253,11 +1293,54 @@ class MarketplaceController extends Controller
      */
     public function syncSettlementsBackground(Request $request, Store $store): JsonResponse
     {
-        // Pre-check koneksi memakai helper terpusat ensureStoreReadyForBackgroundSync()
-        // — sebelumnya blok TOKEN_EXPIRED/NOT_CONNECTED/AUTH_REQUIRED yang sama persis
-        // terduplikasi inline di sini.
-        if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
+        $data = $request->validate([
+            'backfill_months' => ['nullable', 'integer', 'min:1', 'max:3'],
+        ]);
+
+        @set_time_limit(0);
+
+        $backfillMonths = (int) ($data['backfill_months'] ?? 0);
+        $isBackfill = $backfillMonths > 0;
+        $isAll = ! $isBackfill && $request->boolean('all');
+
+        // Background dispatch tidak melakukan refresh token di request path.
+        // Kalau token expired, worker akan menangani refresh saat job benar-benar jalan.
+        if ($resp = $this->ensureStoreReadyForBackgroundSync($store, false)) {
             return $resp;
+        }
+
+        $progressKey = "marketplace:settlement_sync_progress:{$store->id}";
+        $fromDate = $isBackfill ? now()->subMonthsNoOverflow($backfillMonths)->startOfDay()->toDateString() : null;
+        $toDate   = $isBackfill ? now()->endOfDay()->toDateString() : null;
+
+        \Illuminate\Support\Facades\Cache::put($progressKey, [
+            'status'     => 'queued',
+            'phase'      => 'queued',
+            'percent'    => 2,
+            'label'      => $isBackfill
+                ? "Settlement backfill {$backfillMonths} bulan sedang antre…"
+                : ($isAll
+                    ? "Settlement sync semua batch untuk {$store->name} sedang antre…"
+                    : "Settlement sync untuk {$store->name} sedang antre…"),
+            'store_id'   => $store->id,
+            'store_name' => $store->name,
+            'mode'       => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
+            'backfill_months' => $backfillMonths ?: null,
+            'from'       => $fromDate,
+            'to'         => $toDate,
+            'updated_at' => now()->toISOString(),
+        ], 1800);
+
+        $options = [
+            '--store' => $store->id,
+        ];
+
+        if ($isBackfill) {
+            $options['--from'] = $fromDate;
+            $options['--to'] = $toDate;
+            $options['--all'] = true;
+        } elseif ($isAll) {
+            $options['--all'] = true;
         }
 
         // Dispatch ke queue — TIDAK dieksekusi sekarang. Lock per toko
@@ -1265,16 +1348,41 @@ class MarketplaceController extends Controller
         // benar-benar dijalankan worker, jadi aman kalau di-klik berkali-kali atau
         // bertabrakan dengan scheduler/CLI manual — yang belakangan cuma akan dilewati
         // (bukan dobel proses), bukan gagal.
-        \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', [
-            '--store' => $store->id,
-            '--all'   => true,
-        ])->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
+        $pending = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', $options);
+        if ($isBackfill || $isAll) {
+            $pending->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
+        }
+
+        $queuedMessage = $isBackfill
+            ? "Backfill settlement {$backfillMonths} bulan untuk {$store->name} telah dikirim ke latar belakang. Proses akan berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi."
+            : ($isAll
+                ? "Settlement sync semua batch untuk {$store->name} telah dikirim ke latar belakang. Proses akan berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi."
+                : "Sinkronisasi settlement toko {$store->name} telah dikirim ke latar belakang. Proses berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi.");
 
         return response()->json([
             'success' => true,
             'status'  => 'queued',
-            'message' => "Sinkronisasi settlement toko {$store->name} telah dikirim ke latar belakang. Proses berjalan bertahap (per batch 200 order) — refresh halaman beberapa saat lagi untuk lihat progresnya. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi.",
+            'mode'    => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
+            'message' => $queuedMessage,
+            'progress_key' => $progressKey,
         ]);
+    }
+
+    public function syncSettlementsProgress(Store $store): JsonResponse
+    {
+        $progress = \Illuminate\Support\Facades\Cache::get("marketplace:settlement_sync_progress:{$store->id}");
+
+        if (! $progress) {
+            return response()->json([
+                'status' => 'idle',
+                'percent' => null,
+                'label' => null,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+            ]);
+        }
+
+        return response()->json($progress);
     }
 
     public function settlements(Request $request): JsonResponse
@@ -1325,42 +1433,163 @@ class MarketplaceController extends Controller
             $query->where('channel_order_id', 'like', "%{$search}%");
         }
 
-        $paginator = $query->paginate($request->input('per_page', 50))->through(fn ($s) => [
-            'id'                    => $s->id,
-            'store'                 => $s->store,
-            'order'                 => $s->order,
-            'channel_order_id'      => $s->channel_order_id,
-            'buyer_payment_amount'  => (float) $s->buyer_payment_amount,
-            'commission_fee'        => (float) $s->commission_fee,
-            'service_fee'           => (float) $s->service_fee,
-            'transaction_fee'       => (float) $s->transaction_fee,
-            'seller_voucher'        => (float) $s->seller_voucher,
-            'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
-            'actual_shipping_fee'   => (float) $s->actual_shipping_fee,
-            'shipping_fee_subsidy'  => (float) $s->shipping_fee_subsidy,
-            'reverse_shipping_fee'  => (float) $s->reverse_shipping_fee,
-            'activity_fee'          => (float) $s->activity_fee,
-            'drc_adjustable_refund' => (float) $s->drc_adjustable_refund,
-            'escrow_tax'            => (float) $s->escrow_tax,
-            'ad_cost'               => (float) $s->ad_cost,
-            'final_income'          => (float) $s->final_income,
-            'settlement_time'       => $s->settlement_time?->toISOString(),
-            'synced_at'             => $s->synced_at?->toISOString(),
-            'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
-        ]);
+        $paginator = $query->paginate($request->input('per_page', 50))->through(function ($s) {
+            $breakdown = $s->marketplaceFeeBreakdown();
+            $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
+            $sellerBurdenTotal = (float) ($feeTotals['seller'] ?? 0);
+            $buyerBurdenTotal = (float) ($feeTotals['buyer'] ?? 0);
+            $platformBurdenTotal = (float) ($feeTotals['platform'] ?? 0);
+            $voucherTokoAmount = $this->settlementVoucherTokoAmount($s);
+            $adjustmentTotal = (float) ($feeTotals['adjustment'] ?? 0);
+            $allBurdenTotal = (float) ($feeTotals['total'] ?? 0);
+            $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount);
+            $buyerPaidAmount = $this->settlementBuyerPaidAmount($s);
+            $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
+            $voucherAmount = $voucherTokoAmount + $voucherPlatformAmount;
+            $grossAfterVoucherTotal = max($grossAmount - $voucherAmount, 0);
+            $grossAfterVoucherToko = max($grossAmount - $voucherTokoAmount, 0);
+            $affiliateDisplay = (float) (
+                data_get($s->raw_json, 'affiliate_commission')
+                ?? data_get($s->raw_json, 'affiliate_commission_amount')
+                ?? data_get($s->raw_json, 'affiliate_fee')
+                ?? data_get($s->raw_json, 'affiliate_commission_fee')
+                ?? data_get($s->raw_json, 'seller_affiliate_fee')
+                ?? $s->activity_fee
+                ?? 0
+            );
+            $feePercent = $grossAfterVoucherTotal > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherTotal) * 100, 1) : 0.0;
+            $affiliatePercent = $grossAfterVoucherToko > 0 ? round(($affiliateDisplay / $grossAfterVoucherToko) * 100, 1) : 0.0;
+            $marketplaceFeeAfterAffiliate = max($sellerBurdenTotal - $affiliateDisplay, 0);
+            $marketplaceFeePercent = $grossAfterVoucherToko > 0 ? round(($marketplaceFeeAfterAffiliate / $grossAfterVoucherToko) * 100, 1) : 0.0;
+            $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
+
+            return [
+                'id'                    => $s->id,
+                'store'                 => $s->store,
+                'order'                 => $s->order,
+                'channel_order_id'      => $s->channel_order_id,
+                'buyer_payment_amount'  => (float) $s->buyer_payment_amount,
+                'gross_amount'          => $grossAmount,
+                'buyer_paid_amount'     => $buyerPaidAmount,
+                'commission_fee'        => (float) $s->commission_fee,
+                'service_fee'           => (float) $s->service_fee,
+                'transaction_fee'       => (float) $s->transaction_fee,
+                'affiliate_fee'         => (float) $s->affiliate_fee,
+                'seller_voucher'        => (float) $s->seller_voucher,
+                'voucher_platform_total' => $voucherPlatformAmount,
+                'voucher_toko_total'    => $voucherTokoAmount,
+                'voucher_total'         => $voucherAmount,
+                'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
+                'actual_shipping_fee'   => (float) $s->actual_shipping_fee,
+                'shipping_fee_subsidy'  => (float) $s->shipping_fee_subsidy,
+                'reverse_shipping_fee'  => (float) $s->reverse_shipping_fee,
+                'premi'                 => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
+                'seller_transaction_fee' => (float) (data_get($s->raw_json, 'seller_transaction_fee') ?? data_get($s->raw_json, 'transaction_fee') ?? 0),
+                'seller_order_processing_fee' => (float) (data_get($s->raw_json, 'seller_order_processing_fee') ?? 0),
+                'order_ams_commission_fee' => (float) (data_get($s->raw_json, 'order_ams_commission_fee') ?? data_get($s->raw_json, 'ams_commission_fee') ?? $s->activity_fee ?? 0),
+                'biaya_affiliate'       => (float) (data_get($s->raw_json, 'affiliate_fee') ?? data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
+                'affiliate_commission_fee' => (float) (data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
+                'seller_affiliate_fee'  => (float) (data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
+                'affiliate'             => (float) (data_get($s->raw_json, 'affiliate_commission') ?? data_get($s->raw_json, 'affiliate_commission_amount') ?? 0),
+                'affiliate_display'     => $affiliateDisplay,
+                'affiliate_percent'     => $affiliatePercent,
+                'marketplace_fee_after_affiliate' => $marketplaceFeeAfterAffiliate,
+                'marketplace_fee_percent' => $marketplaceFeePercent,
+                'shipping_insurance_fee' => (float) $s->shipping_insurance_fee,
+                'activity_fee'          => (float) $s->activity_fee,
+                'drc_adjustable_refund' => (float) $s->drc_adjustable_refund,
+                'escrow_tax'            => (float) $s->escrow_tax,
+                'ad_cost'               => (float) $s->ad_cost,
+                'final_income'          => (float) $s->final_income,
+                'gross_after_voucher'   => $grossAfterVoucherTotal,
+                'gross_after_voucher_toko' => $grossAfterVoucherToko,
+                'fee_total'             => $sellerBurdenTotal,
+                'fee_breakdown_total'   => $sellerBurdenTotal,
+                'seller_burden_total'   => $sellerBurdenTotal,
+                'buyer_burden_total'    => $buyerBurdenTotal,
+                'platform_burden_total' => $platformBurdenTotal,
+                'adjustment_total'      => $adjustmentTotal,
+                'total_burden_total'    => $allBurdenTotal,
+                'fee_breakdown'         => $breakdown,
+                'fee_percent'           => $feePercent,
+                'fee_percent_toko'      => $feePercentToko,
+                'settlement_time'       => $s->settlement_time?->toISOString(),
+                'synced_at'             => $s->synced_at?->toISOString(),
+                'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
+            ];
+        });
 
         if ($request->input('page', 1) == 1) {
-            $aggr = (clone $query)->reorder()->selectRaw('
-                COUNT(*) as count,
-                SUM(buyer_payment_amount) as gross,
-                SUM(final_income) as net,
-                SUM(commission_fee + service_fee + transaction_fee + activity_fee + escrow_tax + ad_cost) as fees
-            ')->first();
+            $metaQuery = clone $query;
+            $metaQuery->setEagerLoads([]);
+            $metaRows = $metaQuery->get([
+                'id',
+                'buyer_payment_amount',
+                'order_id',
+                'commission_fee',
+                'service_fee',
+                'transaction_fee',
+                'affiliate_fee',
+                'seller_voucher',
+                'seller_coin_cash_back',
+                'actual_shipping_fee',
+                'shipping_fee_subsidy',
+                'reverse_shipping_fee',
+                'shipping_insurance_fee',
+                'activity_fee',
+                'drc_adjustable_refund',
+                'escrow_tax',
+                'ad_cost',
+                'final_income',
+                'raw_json',
+            ]);
+            $feeTotals = $metaRows->reduce(function (array $carry, MarketplaceOrderSettlement $settlement) {
+                $totals = $settlement->marketplaceFeeCategoryTotals($settlement->marketplaceFeeBreakdown());
+                $carry['seller'] += (float) ($totals['seller'] ?? 0);
+                $carry['buyer'] += (float) ($totals['buyer'] ?? 0);
+                $carry['platform'] += (float) ($totals['platform'] ?? 0);
+                $carry['voucher'] += (float) ($totals['voucher'] ?? 0);
+                $carry['adjustment'] += (float) ($totals['adjustment'] ?? 0);
+                $carry['total'] += (float) ($totals['total'] ?? 0);
+                return $carry;
+            }, ['seller' => 0.0, 'buyer' => 0.0, 'platform' => 0.0, 'voucher' => 0.0, 'adjustment' => 0.0, 'total' => 0.0]);
+            $sellerFeeTotal = (float) ($feeTotals['seller'] ?? 0);
+            $buyerFeeTotal = (float) ($feeTotals['buyer'] ?? 0);
+            $platformFeeTotal = (float) ($feeTotals['platform'] ?? 0);
+            $voucherFeeTotal = (float) ($feeTotals['voucher'] ?? 0);
+            $adjustmentFeeTotal = (float) ($feeTotals['adjustment'] ?? 0);
+            $allFeeTotal = (float) ($feeTotals['total'] ?? 0);
+            $grossTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
+                return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount);
+            });
+            $buyerPaidTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
+                return (float) ($settlement->order?->total_paid_customer ?? $settlement->buyer_payment_amount);
+            });
+            $voucherTokoTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementVoucherTokoAmount($settlement));
+            $voucherPlatformTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementVoucherPlatformAmount($settlement));
+            $buyerPaidTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementBuyerPaidAmount($settlement));
+            $grossAfterVoucher = max($grossTotal - ($voucherTokoTotal + $voucherPlatformTotal), 0);
+            $grossAfterVoucherToko = max($grossTotal - $voucherTokoTotal, 0);
+            $feePercent = $grossAfterVoucher > 0 ? round(($sellerFeeTotal / $grossAfterVoucher) * 100, 1) : 0.0;
+            $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $meta = [
-                'kpi_count' => (int) $aggr->count,
-                'kpi_gross' => (float) $aggr->gross,
-                'kpi_net'   => (float) $aggr->net,
-                'kpi_fees'  => (float) $aggr->fees,
+                'kpi_count'             => (int) $metaRows->count(),
+                'kpi_gross'             => $grossTotal,
+                'kpi_buyer_paid'        => $buyerPaidTotal,
+                'kpi_voucher'           => $voucherFeeTotal,
+                'kpi_voucher_toko'      => $voucherTokoTotal,
+                'kpi_voucher_platform'  => $voucherPlatformTotal,
+                'kpi_gross_after_voucher' => $grossAfterVoucher,
+                'kpi_gross_after_voucher_toko' => $grossAfterVoucherToko,
+                'kpi_net'               => (float) $metaRows->sum('final_income'),
+                'kpi_fees'              => $sellerFeeTotal,
+                'kpi_seller_burden'     => $sellerFeeTotal,
+                'kpi_buyer_burden'      => $buyerFeeTotal,
+                'kpi_platform_burden'   => $platformFeeTotal,
+                'kpi_adjustment_total'  => $adjustmentFeeTotal,
+                'kpi_total_burden'      => $allFeeTotal,
+                'kpi_fee_pct'           => $feePercent,
+                'kpi_fee_pct_toko'      => $feePercentToko,
             ];
         } else {
             $meta = null; // Frontend can preserve previous KPI state on page change
@@ -1369,6 +1598,392 @@ class MarketplaceController extends Controller
         return response()->json([
             'paginator' => $paginator,
             'meta'      => $meta
+        ]);
+    }
+
+    /**
+     * Build a dynamic fee breakdown from synced settlement payload.
+     * Known fee fields are mapped to friendly labels; any new fee-like field
+     * from the platform is surfaced as "Biaya Tambahan (field_name)" so we do
+     * not silently lose money-related detail when the platform adds columns.
+     */
+    private function buildSettlementFeeBreakdown(MarketplaceOrderSettlement $s): array
+    {
+        return $s->marketplaceFeeBreakdown();
+    }
+
+    private function settlementFeeAmount(mixed $value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_bool($value)) {
+            return $value ? 1.0 : 0.0;
+        }
+
+        if (is_numeric($value)) {
+            return abs((float) $value);
+        }
+
+        $normalized = str_replace(['Rp', 'rp', ' '], '', (string) $value);
+        $normalized = preg_replace('/[^0-9,\.\-]/', '', $normalized) ?? '';
+        if ($normalized === '' || $normalized === '-') {
+            return 0.0;
+        }
+
+        $normalized = str_replace(',', '', $normalized);
+
+        return abs((float) $normalized);
+    }
+
+    private function settlementVoucherPlatformAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        foreach (['voucher_from_shopee', 'voucher_from_platform', 'platform_voucher'] as $key) {
+            $value = data_get($raw, $key);
+            if ($value !== null && $value !== '') {
+                return $this->settlementFeeAmount($value);
+            }
+        }
+
+        return 0.0;
+    }
+
+    private function settlementBuyerPaidAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        foreach (['buyer_total_amount', 'buyer_paid_amount', 'total_paid_customer'] as $key) {
+            $value = data_get($raw, $key);
+            if ($value !== null && $value !== '') {
+                return $this->settlementFeeAmount($value);
+            }
+        }
+
+        $orderPaid = $s->order?->total_paid_customer;
+        if ($orderPaid !== null && $orderPaid !== '') {
+            return (float) $orderPaid;
+        }
+
+        return (float) $s->buyer_payment_amount;
+    }
+
+    private function settlementVoucherTokoAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        foreach (['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher'] as $key) {
+            $value = data_get($raw, $key);
+            if ($value !== null && $value !== '') {
+                return $this->settlementFeeAmount($value);
+            }
+        }
+
+        return abs((float) $s->seller_voucher);
+    }
+
+    private function settlementAdjustmentAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        foreach (['drc_adjustable_refund', 'seller_return_refund_amount', 'seller_return_refund'] as $key) {
+            $value = data_get($raw, $key);
+            if ($value !== null && $value !== '') {
+                return $this->settlementFeeAmount($value);
+            }
+        }
+
+        return abs((float) $s->drc_adjustable_refund);
+    }
+
+    private function looksLikeFeeField(string $key): bool
+    {
+        $key = strtolower($key);
+
+        return (bool) preg_match('/(?:fee|commission|tax|insurance|premi|campaign|promo|refund|adjust|surcharge|charge|deduct|potongan|subsidy|ads?|ad_cost)/i', $key)
+            && ! preg_match('/(?:buyer_|voucher|coin|gross|net|payment|amount_paid|buyer_total|order_selling_price|cost_of_goods_sold|escrow_amount|settlement_time|create_time|update_time)/i', $key);
+    }
+
+    /**
+     * Field yang memang ada di payload tetapi bukan potongan seller.
+     * Ini sengaja dikeluarkan dari breakdown agar UI tidak menyesatkan.
+     */
+    private function isExcludedFromSellerFeeBreakdown(string $key): bool
+    {
+        $key = strtolower($key);
+
+        return in_array($key, [
+            'actual_shipping_fee',
+            'estimated_shipping_fee',
+            'credit_card_transaction_fee',
+            'buyer_paid_shipping_fee',
+            'shipping_fee_subsidy',
+        ], true);
+    }
+
+    public function purgeSettlements(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->role === 'owner', 403, 'Hanya owner yang boleh menghapus data settlement.');
+
+        $data = $request->validate([
+            'confirm' => ['required', 'string'],
+        ]);
+
+        $confirmText = trim(strtoupper($data['confirm']));
+        if ($confirmText !== 'HAPUS SEMUA SETTLEMENT') {
+            return response()->json([
+                'message' => 'Konfirmasi tidak cocok. Ketik "HAPUS SEMUA SETTLEMENT" untuk melanjutkan.',
+            ], 422);
+        }
+
+        // Penghapusan ini sengaja dibuat secepat mungkin untuk kebutuhan testing.
+        // Delete langsung lebih ringan daripada count + delete, dan set_time_limit(0)
+        // mencegah request gagal di PHP timeout 30 detik saat data settlement besar.
+        @set_time_limit(0);
+
+        $deleted = 0;
+        $logsDeleted = 0;
+        $ordersReset = 0;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use (&$deleted, &$logsDeleted, &$ordersReset) {
+            $deleted = MarketplaceOrderSettlement::query()->delete();
+
+            $logsDeleted = \App\Models\MarketplaceSyncLog::query()
+                ->where('action', 'sync_settlements')
+                ->delete();
+
+            $ordersReset = \Illuminate\Support\Facades\DB::table('marketplace_orders')
+                ->where(function ($q) {
+                    $q->whereNotNull('settlement_sync_error_code')
+                      ->orWhereNotNull('settlement_sync_failed_at');
+                })
+                ->update([
+                    'settlement_sync_error_code' => null,
+                    'settlement_sync_failed_at' => null,
+                ]);
+        });
+
+        foreach (Store::query()->pluck('id') as $storeId) {
+            Cache::forget("marketplace:settlement_sync_progress:{$storeId}");
+        }
+
+        return response()->json([
+            'message' => $deleted > 0 || $logsDeleted > 0 || $ordersReset > 0
+                ? "Semua data settlement dan data terkait berhasil dihapus. Settlement: {$deleted}, log sync: {$logsDeleted}, flag order di-reset: {$ordersReset}."
+                : 'Tidak ada data settlement atau data terkait untuk dihapus.',
+            'deleted'       => $deleted,
+            'logs_deleted'  => $logsDeleted,
+            'orders_reset'   => $ordersReset,
+        ]);
+    }
+
+    public function purgeMarketplaceData(Request $request, Store $store): JsonResponse
+    {
+        abort_unless($request->user()?->role === 'owner', 403, 'Hanya owner yang boleh menghapus data marketplace.');
+
+        $data = $request->validate([
+            'confirm' => ['required', 'string'],
+        ]);
+
+        $confirmText = trim(strtoupper($data['confirm']));
+        if ($confirmText !== 'HAPUS SEMUA DATA MARKETPLACE') {
+            return response()->json([
+                'message' => 'Konfirmasi tidak cocok. Ketik "HAPUS SEMUA DATA MARKETPLACE" untuk melanjutkan.',
+            ], 422);
+        }
+
+        @set_time_limit(0);
+
+        $legacyStoreIds = $this->resolveLegacyMarketplaceStoreIds($store);
+        $legacyOrderIds = DB::table('marketplace_orders')
+            ->whereIn('store_id', $legacyStoreIds)
+            ->pluck('id')
+            ->all();
+
+        $productIds = DB::table('marketplace_products')
+            ->where('store_id', $store->id)
+            ->pluck('id')
+            ->all();
+
+        $campaignIds = DB::table('marketplace_ad_campaigns')
+            ->where('store_id', $store->id)
+            ->pluck('id')
+            ->all();
+
+        $returnIds = DB::table('marketplace_returns')
+            ->where('store_id', $store->id)
+            ->pluck('id')
+            ->all();
+
+        $deleted = [
+            'settlements'         => 0,
+            'order_items'         => 0,
+            'fulfillments'        => 0,
+            'sync_logs'           => 0,
+            'conversations'       => 0,
+            'chat_messages'       => 0,
+            'returns'             => 0,
+            'return_items'        => 0,
+            'bookings'            => 0,
+            'product_models'      => 0,
+            'product_dailies'     => 0,
+            'products'            => 0,
+            'ads_dailies'         => 0,
+            'ads_balance_logs'    => 0,
+            'ads_item_dailies'    => 0,
+            'ads_hourly'          => 0,
+            'ads_sync_runs'       => 0,
+            'ads_settings'        => 0,
+            'ad_item_maps'        => 0,
+            'ad_campaign_dailies' => 0,
+            'campaign_items'      => 0,
+            'ad_campaigns'        => 0,
+            'boost_logs'          => 0,
+            'boost_schedules'     => 0,
+            'boost_pool'          => 0,
+            'mp_incomes'          => 0,
+        ];
+
+        DB::transaction(function () use ($store, $legacyOrderIds, $productIds, $campaignIds, $returnIds, &$deleted) {
+            $deleted['settlements'] = DB::table('marketplace_order_settlements')
+                ->where(function ($q) use ($store, $legacyOrderIds) {
+                    $q->where('store_id', $store->id);
+                    if (! empty($legacyOrderIds)) {
+                        $q->orWhereIn('order_id', $legacyOrderIds);
+                    }
+                })
+                ->delete();
+
+            if (! empty($legacyOrderIds)) {
+                $deleted['order_items'] = DB::table('marketplace_order_items')
+                    ->whereIn('order_id', $legacyOrderIds)
+                    ->delete();
+
+                $deleted['fulfillments'] = DB::table('order_fulfillments')
+                    ->whereIn('marketplace_order_id', $legacyOrderIds)
+                    ->delete();
+            }
+
+            $deleted['sync_logs'] = DB::table('marketplace_sync_logs')
+                ->where('store_id', $store->id)
+                ->whereNotIn('action', ['sync_orders', 'sync_finance'])
+                ->delete();
+
+            $deleted['chat_messages'] = DB::table('marketplace_chat_messages')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['conversations'] = DB::table('marketplace_conversations')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            if (! empty($returnIds)) {
+                $deleted['return_items'] = DB::table('marketplace_return_items')
+                    ->whereIn('marketplace_return_id', $returnIds)
+                    ->delete();
+            }
+
+            $deleted['returns'] = DB::table('marketplace_returns')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['bookings'] = DB::table('marketplace_bookings')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            if (! empty($productIds)) {
+                $deleted['product_models'] = DB::table('marketplace_product_models')
+                    ->whereIn('marketplace_product_id', $productIds)
+                    ->delete();
+            }
+
+            $deleted['product_dailies'] = DB::table('marketplace_product_dailies')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['products'] = DB::table('marketplace_products')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ads_dailies'] = DB::table('marketplace_ads_dailies')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ads_balance_logs'] = DB::table('marketplace_ads_balance_logs')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ads_item_dailies'] = DB::table('marketplace_ads_item_dailies')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ads_hourly'] = DB::table('marketplace_ads_hourly_performances')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ads_sync_runs'] = DB::table('marketplace_ads_sync_runs')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ads_settings'] = DB::table('marketplace_ads_settings')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ad_item_maps'] = DB::table('marketplace_ad_item_maps')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['ad_campaign_dailies'] = DB::table('marketplace_ad_campaign_dailies')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            if (! empty($campaignIds)) {
+                $deleted['campaign_items'] = DB::table('marketplace_ads_campaign_items')
+                    ->whereIn('campaign_id', $campaignIds)
+                    ->delete();
+            }
+
+            $deleted['ad_campaigns'] = DB::table('marketplace_ad_campaigns')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['boost_logs'] = DB::table('marketplace_boost_logs')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['boost_schedules'] = DB::table('marketplace_boost_schedules')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['boost_pool'] = DB::table('marketplace_boost_pool')
+                ->where('store_id', $store->id)
+                ->delete();
+
+            $deleted['mp_incomes'] = DB::table('mp_incomes')
+                ->where('store_id', $store->id)
+                ->delete();
+        });
+
+        Cache::forget("marketplace:settlement_sync_progress:{$store->id}");
+        Cache::forget("marketplace:sync_progress:{$store->id}");
+
+        $totalDeleted = array_sum($deleted);
+
+        return response()->json([
+            'message' => $totalDeleted > 0
+                ? "Data marketplace untuk {$store->name} berhasil dihapus. Order utama tetap disimpan, log sync_orders/sync_finance juga dipertahankan."
+                : 'Tidak ada data marketplace untuk dihapus.',
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'deleted' => $deleted,
+            'total_deleted' => $totalDeleted,
+            'kept' => [
+                'marketplace_orders' => true,
+                'sync_orders_logs' => true,
+                'sync_finance_logs' => true,
+            ],
         ]);
     }
 

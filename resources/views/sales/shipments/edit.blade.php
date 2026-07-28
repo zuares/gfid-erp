@@ -497,6 +497,89 @@ body[data-theme="dark"] .shp-table-head { border-bottom-color: rgba(51,65,85,.8)
 }
 body[data-theme="dark"] .shp-table-actions { border-bottom-color: rgba(51,65,85,.45); }
 
+.shp-item-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem;
+}
+
+.shp-item-searchbox {
+    flex: 1 1 280px;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+    padding: .4rem .55rem;
+    border: 1px solid rgba(148,163,184,.22);
+    border-radius: 10px;
+    background: var(--card, #fff);
+}
+
+body[data-theme="dark"] .shp-item-searchbox {
+    background: rgba(15,23,42,.92);
+    border-color: rgba(30,64,175,.28);
+}
+
+.shp-item-search-icon {
+    flex-shrink: 0;
+    color: #94a3b8;
+    font-size: .92rem;
+}
+
+.shp-item-search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #0f172a;
+    font-size: .9rem;
+}
+
+body[data-theme="dark"] .shp-item-search-input { color: #e2e8f0; }
+.shp-item-search-input::placeholder { color: #94a3b8; }
+
+.shp-item-search-clear {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(148,163,184,.1);
+    color: #64748b;
+    font-size: .86rem;
+    cursor: pointer;
+}
+
+.shp-item-search-clear:hover { background: rgba(148,163,184,.2); }
+.shp-item-search-clear[hidden] { display: none; }
+
+.shp-item-filter-meta {
+    font-size: .74rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+body[data-theme="dark"] .shp-item-filter-meta { color: #94a3b8; }
+
+.shp-filter-empty {
+    display: none;
+    margin: .45rem .75rem 0;
+    padding: .6rem .75rem;
+    border-radius: 8px;
+    border: 1px dashed rgba(148,163,184,.28);
+    background: rgba(248,250,252,.85);
+    color: #64748b;
+    font-size: .84rem;
+}
+
+body[data-theme="dark"] .shp-filter-empty {
+    background: rgba(15,23,42,.9);
+    border-color: rgba(30,64,175,.28);
+    color: #94a3b8;
+}
+
 /* scrollable area */
 .lines-wrapper {
     max-height: 400px;
@@ -1079,13 +1162,14 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     .shp-table-title {
         display: none;
     }
-    .shp-table-head .input-group {
-        width: 100% !important;
-    }
-    .shp-table-head .input-group-text,
-    .shp-table-head .form-control {
+    .shp-item-filterbar { width: 100%; }
+    .shp-item-searchbox {
+        width: 100%;
+        flex-basis: 100%;
         min-height: 40px;
-        font-size: .9rem;
+    }
+    .shp-item-filter-meta {
+        width: 100%;
     }
     .lines-wrapper {
         max-height: 52vh;
@@ -1363,10 +1447,16 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         <div class="shp-table-head">
             <span class="shp-table-title">Daftar Barang Keluar</span>
             <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
-                <div class="input-group input-group-sm" style="width:210px">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" id="itemFilterInput" class="form-control"
-                           placeholder="Filter kode / nama">
+                <div class="shp-item-filterbar">
+                    <div class="shp-item-searchbox">
+                        <span class="shp-item-search-icon" aria-hidden="true">⌕</span>
+                        <input type="search" id="itemFilterInput" class="shp-item-search-input"
+                               placeholder="Filter kode / nama item"
+                               autocomplete="off" spellcheck="false">
+                        <button type="button" id="itemFilterClear" class="shp-item-search-clear"
+                                aria-label="Hapus filter" hidden>x</button>
+                    </div>
+                    <div class="shp-item-filter-meta" id="itemFilterMeta">Menampilkan semua item</div>
                 </div>
                 @if ($lastScannedLineId)
                     <button type="button" class="btn btn-sm btn-shp-outline" id="btnJumpLast">
@@ -1374,6 +1464,10 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     </button>
                 @endif
             </div>
+        </div>
+
+        <div class="shp-filter-empty" id="itemFilterEmpty">
+            Tidak ada item yang cocok dengan pencarian ini.
         </div>
 
         {{-- action strip --}}
@@ -1610,6 +1704,9 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const linesWrapper      = document.getElementById('linesWrapper');
     const linesTbody        = document.getElementById('linesTbody');
     const itemFilterInput   = document.getElementById('itemFilterInput');
+    const itemFilterClear   = document.getElementById('itemFilterClear');
+    const itemFilterMeta    = document.getElementById('itemFilterMeta');
+    const itemFilterEmpty   = document.getElementById('itemFilterEmpty');
     const btnJumpLast       = document.getElementById('btnJumpLast');
     const rekonBtn          = document.getElementById('rekonBtn');
     const toastEl           = document.getElementById('scanToast');
@@ -1630,9 +1727,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 
     let lastScannedLineId = @json($lastScannedLineId);
     let sessionScanCount  = 0;
+    let itemFilterQuery   = '';
     const pickingLines = new Map(@json($pickingLinesPayload));
 
     const FMT = new Intl.NumberFormat('id-ID');
+
+    function normalizeSearchText(value) {
+        return String(value ?? '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
 
     function syncPickingLine(line) {
         if (!line?.id) return;
@@ -1663,6 +1768,49 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 qty: Number(qtyText.replace(/\./g, '').replace(/,/g, '').trim() || 0),
             };
         }).filter(line => Number(line.qty || 0) > 0);
+    }
+
+    function getItemFilterBlob(row) {
+        const code = row.querySelector('.item-code')?.textContent || '';
+        const name = row.querySelector('.item-name')?.textContent || '';
+        const remarks = row.querySelector('.remarks-wrap')?.textContent || '';
+        return normalizeSearchText([code, name, remarks].join(' '));
+    }
+
+    function applyItemFilter() {
+        if (!linesTbody) return;
+
+        const query = normalizeSearchText(itemFilterQuery);
+        const rows = Array.from(linesTbody.querySelectorAll('tr[data-line-id]'));
+        const hasRows = rows.length > 0;
+        let visible = 0;
+
+        rows.forEach(row => {
+            const match = !query || getItemFilterBlob(row).includes(query);
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+
+        if (itemFilterClear) {
+            itemFilterClear.hidden = !query;
+        }
+
+        if (itemFilterMeta) {
+            if (!hasRows) {
+                itemFilterMeta.textContent = 'Belum ada item shipment';
+            } else if (query) {
+                itemFilterMeta.textContent = `Menampilkan ${visible} dari ${rows.length} item`;
+            } else {
+                itemFilterMeta.textContent = `Menampilkan semua ${rows.length} item`;
+            }
+        }
+
+        if (itemFilterEmpty) {
+            itemFilterEmpty.style.display = hasRows && query && visible === 0 ? 'block' : 'none';
+            itemFilterEmpty.textContent = query
+                ? `Tidak ada item yang cocok dengan "${itemFilterQuery.trim()}".`
+                : 'Tidak ada item yang cocok dengan pencarian ini.';
+        }
     }
 
     /* ── delete url template ── */
@@ -1981,6 +2129,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     }
                     form.classList.add('d-none'); qtyEl.classList.remove('d-none');
                 }
+                applyItemFilter();
                 updateTotals(data.totals);
                 maybeRenderStockPanel(data);
                 showToast('ok', data.message || 'Qty diperbarui.');
@@ -2017,6 +2166,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 removePickingLine(lineId);
                 if (row) row.remove();
                 renumberRows();
+                applyItemFilter();
                 updateTotals(data.totals);
                 maybeRenderStockPanel(data);
                 showToast('ok', data.message || 'Baris dihapus.');
@@ -2214,26 +2364,35 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         linesTbody.querySelectorAll('tr[data-line-id]').forEach(r => bindQtyClick(r));
         linesTbody.querySelectorAll('.js-delete-line-form').forEach(f => bindDelete(f));
     }
+    applyItemFilter();
 
     /* ── filter ── */
     if (itemFilterInput && linesWrapper) {
         itemFilterInput.addEventListener('input', function () {
-            const term = this.value.toLowerCase().trim();
-            linesWrapper.querySelectorAll('tbody tr[data-line-id]').forEach(row => {
-                const code = (row.querySelector('.item-code')?.textContent || '').toLowerCase();
-                const name = (row.querySelector('.item-name')?.textContent || '').toLowerCase();
-                row.style.display = (!term || code.includes(term) || name.includes(term)) ? '' : 'none';
-            });
+            itemFilterQuery = this.value;
+            applyItemFilter();
         });
         itemFilterInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === 'Escape') {
                 e.preventDefault();
+                if (e.key === 'Escape') {
+                    this.value = '';
+                    itemFilterQuery = '';
+                    applyItemFilter();
+                }
                 this.blur();
                 scheduleFocusScan({ force: true });
             }
         });
         itemFilterInput.addEventListener('blur', () => scheduleFocusScan({ force: true }));
     }
+    itemFilterClear?.addEventListener('click', function () {
+        if (!itemFilterInput) return;
+        itemFilterInput.value = '';
+        itemFilterQuery = '';
+        applyItemFilter();
+        itemFilterInput.focus();
+    });
 
     /* ── jump to last ── */
     if (btnJumpLast && linesWrapper) {
@@ -2344,6 +2503,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     bindDelete(row.querySelector('.js-delete-line-form'));
 
                     renumberRows();
+                    applyItemFilter();
                     updateTotals(totals);
 
                     lastScannedLineId = line.id;

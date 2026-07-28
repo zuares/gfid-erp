@@ -329,14 +329,15 @@
         <div class="page-wrap">
 
           @php
-            $hasValidationErrors = $errors instanceof \Illuminate\Support\ViewErrorBag ? $errors->any() : false;
+            $errorBag = $errors ?? null;
+            $hasValidationErrors = $errorBag instanceof \Illuminate\Support\ViewErrorBag ? $errorBag->any() : false;
           @endphp
 
           @if ($hasValidationErrors)
             <div class="alert alert-danger mb-3">
               <strong>Terjadi error:</strong>
               <ul class="mb-0">
-                @foreach ($errors->all() as $error)
+                @foreach ($errorBag->all() as $error)
                   <li>{{ $error }}</li>
                 @endforeach
               </ul>
