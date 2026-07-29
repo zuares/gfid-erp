@@ -112,6 +112,264 @@ class MarketplaceController extends Controller
         return view('marketplace.income-detail');
     }
 
+    public function incomeProducts(Request $request): JsonResponse
+    {
+        $settlementQuery = MarketplaceOrderSettlement::with([
+            'store:id,name,channel_id',
+            'store.channel:id,code,name',
+            'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
+        ]);
+
+        if ($request->filled('store_id')) {
+            $settlementQuery->where('store_id', $request->store_id);
+        }
+        if ($request->filled('order_date_from')) {
+            $settlementQuery->whereHas('order', fn ($q) => $q->whereDate('ordered_at', '>=', $request->order_date_from));
+        }
+        if ($request->filled('order_date_to')) {
+            $settlementQuery->whereHas('order', fn ($q) => $q->whereDate('ordered_at', '<=', $request->order_date_to));
+        }
+        if ($request->filled('settlement_date_from')) {
+            $from = $request->settlement_date_from;
+            $settlementQuery->where(function ($q) use ($from) {
+                $q->whereDate('settlement_time', '>=', $from)
+                  ->orWhere(function ($q2) use ($from) {
+                      $q2->whereNull('settlement_time')
+                         ->whereHas('order', fn ($oq) => $oq->whereDate('ordered_at', '>=', $from));
+                });
+            });
+        }
+        if ($request->filled('settlement_date_to')) {
+            $to = $request->settlement_date_to;
+            $settlementQuery->where(function ($q) use ($to) {
+                $q->whereDate('settlement_time', '<=', $to)
+                  ->orWhere(function ($q2) use ($to) {
+                      $q2->whereNull('settlement_time')
+                         ->whereHas('order', fn ($oq) => $oq->whereDate('ordered_at', '<=', $to));
+                  });
+            });
+        }
+
+        $settlements = $settlementQuery->get();
+        $rows = [];
+        $totalOrderCount = 0;
+        $totalMapped = 0;
+        $totalUnmapped = 0;
+        $totalSettledOrderCount = 0;
+        $totalUnsettledOrderCount = 0;
+
+        foreach ($settlements as $settlement) {
+            $order = $settlement->order;
+            if (! $order) continue;
+            $totalOrderCount++;
+            $isSettled = ! empty($settlement->settlement_time);
+            if ($isSettled) {
+                $totalSettledOrderCount++;
+            } else {
+                $totalUnsettledOrderCount++;
+            }
+
+            $sellerDiscountOrder = (float) data_get($settlement->raw_json, 'seller_discount', 0);
+            $grossOrder = (float) ($order->subtotal_items ?? $settlement->buyer_payment_amount ?? 0) - $sellerDiscountOrder;
+            $finalIncome = (float) ($settlement->final_income ?? 0);
+            $cogsOrder = (float) $order->items->sum(fn ($item) => (float) ($item->hpp_snapshot ?? 0) * (int) ($item->qty ?? 0));
+            $status = strtoupper($order->order_status ?? '');
+            $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+            $isReturning = in_array($status, ['TO_RETURN', 'RETURNING']);
+            $items = $order->items ?? collect();
+            if ($items->isEmpty()) continue;
+
+            foreach ($items as $item) {
+                $qty = max((int) ($item->qty ?? 0), 1);
+                $lineGrossBeforeSellerDiscount = (float) (($item->price ?? 0) * $qty);
+                if ($lineGrossBeforeSellerDiscount <= 0 && $grossOrder > 0) {
+                    $lineGrossBeforeSellerDiscount = $grossOrder / max($items->count(), 1);
+                }
+                $share = $grossOrder > 0 ? ($lineGrossBeforeSellerDiscount / max((float) ($order->subtotal_items ?? $grossOrder), 1)) : (1 / max($items->count(), 1));
+                $voucherTokoOrder = (float) $this->settlementVoucherTokoAmount($settlement);
+                $grossAfterVoucherTokoOrder = max($grossOrder - $voucherTokoOrder, 0);
+                $lineGrossAfterSellerDiscount = $grossOrder * $share;
+                $lineSalesAfterVoucherToko = $grossAfterVoucherTokoOrder * $share;
+                $lineCogs = (float) ($item->hpp_snapshot ?? 0) * $qty;
+                $estimatedNetIncomeOrder = $finalIncome;
+                if ($isCancelledOrReturned || $isReturning) {
+                    $estimatedNetIncomeOrder = 0;
+                } elseif ($estimatedNetIncomeOrder <= 0) {
+                    $estimatedNetIncomeOrder = max($grossAfterVoucherTokoOrder * 0.76, 0);
+                }
+                $lineIncome = $estimatedNetIncomeOrder * $share;
+                $lineProfit = $lineIncome - $lineCogs;
+                $sku = $item->model_sku ?: $item->item_sku ?: $item->marketplace_sku ?: '-';
+                $key = $sku . '|' . ($item->variant_name ?: '-') . '|' . ($item->item_name ?: '-');
+
+                if (! isset($rows[$key])) {
+                $rows[$key] = [
+                    'sku' => $sku,
+                    'name' => $item->item_name ?: $item->variant_name ?: '-',
+                    'variant_name' => $item->variant_name ?: '-',
+                    'image_url' => $item->image_url,
+                        'order_count' => 0,
+                        'qty_total' => 0,
+                        'gross_before_seller_discount_total' => 0,
+                        'gross_after_seller_discount_total' => 0,
+                        'sales_after_voucher_toko_total' => 0,
+                    'buyer_paid_total' => 0,
+                    'cogs_total' => 0,
+                    'cogs_qty_total' => 0,
+                    'income_total' => 0,
+                    'income_cair_total' => 0,
+                    'income_belum_cair_total' => 0,
+                    'profit_total' => 0,
+                    'profit_cair_total' => 0,
+                    'profit_belum_cair_total' => 0,
+                    'qty_cair_total' => 0,
+                    'qty_belum_cair_total' => 0,
+                    'mapped_count' => 0,
+                    'unmapped_count' => 0,
+                ];
+            }
+
+                $rows[$key]['order_count'] += 1;
+                $rows[$key]['qty_total'] += $qty;
+                $rows[$key]['gross_before_seller_discount_total'] += $lineGrossBeforeSellerDiscount;
+                $rows[$key]['gross_after_seller_discount_total'] += $lineGrossAfterSellerDiscount;
+                $rows[$key]['gross_total'] = $rows[$key]['gross_after_seller_discount_total'];
+                $rows[$key]['sales_after_voucher_toko_total'] += $lineSalesAfterVoucherToko;
+                $buyerPaidOrder = (float) ($settlement->order?->total_paid_customer ?? $settlement->buyer_payment_amount ?? 0);
+                $rows[$key]['buyer_paid_total'] += $buyerPaidOrder * $share;
+                $rows[$key]['cogs_total'] += $lineCogs;
+                $rows[$key]['income_total'] += $lineIncome;
+                $rows[$key]['profit_total'] += $lineProfit;
+                $rows[$key]['cogs_qty_total'] += $lineCogs > 0 ? $qty : 0;
+                if ($isSettled) {
+                    $rows[$key]['qty_cair_total'] += $qty;
+                    $rows[$key]['income_cair_total'] += $lineIncome;
+                    $rows[$key]['profit_cair_total'] += $lineProfit;
+                } else {
+                    $rows[$key]['qty_belum_cair_total'] += $qty;
+                    $rows[$key]['income_belum_cair_total'] += $lineIncome;
+                    $rows[$key]['profit_belum_cair_total'] += $lineProfit;
+                }
+                $rows[$key]['settlement_time'] = $settlement->settlement_time?->toISOString();
+                $rows[$key]['avg_selling_price'] = $rows[$key]['qty_total'] > 0
+                    ? ($rows[$key]['gross_before_seller_discount_total'] / $rows[$key]['qty_total'])
+                    : 0;
+                $rows[$key]['avg_selling_price_after_seller_discount'] = $rows[$key]['qty_total'] > 0
+                    ? ($rows[$key]['gross_after_seller_discount_total'] / $rows[$key]['qty_total'])
+                    : 0;
+                $rows[$key]['avg_selling_price_after_voucher_toko'] = $rows[$key]['qty_total'] > 0
+                    ? ($rows[$key]['sales_after_voucher_toko_total'] / $rows[$key]['qty_total'])
+                    : 0;
+                $rows[$key]['buyer_paid_satuan'] = $rows[$key]['qty_total'] > 0
+                    ? ($rows[$key]['buyer_paid_total'] / $rows[$key]['qty_total'])
+                    : 0;
+                $rows[$key]['avg_buyer_paid_satuan'] = $rows[$key]['buyer_paid_satuan'];
+                if (!empty($item->internal_item_id) || ($item->mapping_status ?? null) === 'mapped') {
+                    $rows[$key]['mapped_count'] += 1;
+                    $totalMapped++;
+                } else {
+                    $rows[$key]['unmapped_count'] += 1;
+                    $totalUnmapped++;
+                }
+            }
+        }
+
+        $rows = collect(array_values($rows))
+            ->sortByDesc('qty_total')
+            ->values();
+
+        $topByProfit = $rows->first();
+        $topByQty = $rows->sortByDesc('qty_total')->first();
+        $topByMargin = $rows->sortByDesc(fn ($r) => (($r['sales_after_voucher_toko_total'] ?? 0) > 0 ? (($r['profit_total'] ?? 0) / $r['sales_after_voucher_toko_total']) * 100 : -999))->first();
+        $unmappedOnly = $rows->filter(fn ($r) => (int) ($r['unmapped_count'] ?? 0) > 0)->count();
+        $mappedOnly = $rows->filter(fn ($r) => (int) ($r['unmapped_count'] ?? 0) === 0)->count();
+        $totalGrossBeforeSellerDiscount = (float) $rows->sum('gross_before_seller_discount_total');
+        $totalGrossAfterSellerDiscount = (float) $rows->sum('gross_after_seller_discount_total');
+        $totalSalesAfterVoucherToko = (float) $rows->sum('sales_after_voucher_toko_total');
+        $totalBuyerPaid = (float) $rows->sum('buyer_paid_total');
+        $totalCogs = (float) $rows->sum('cogs_total');
+        $totalCogsQty = (int) $rows->sum('cogs_qty_total');
+        $totalProfit = (float) $rows->sum('profit_total');
+        $totalIncome = (float) $rows->sum('income_total');
+        $totalIncomeCair = (float) $rows->sum('income_cair_total');
+        $totalIncomeBelumCair = (float) $rows->sum('income_belum_cair_total');
+        $totalProfitCair = (float) $rows->sum('profit_cair_total');
+        $totalProfitBelumCair = (float) $rows->sum('profit_belum_cair_total');
+        $totalQtyCair = (int) $rows->sum('qty_cair_total');
+        $totalQtyBelumCair = (int) $rows->sum('qty_belum_cair_total');
+        $totalQty = (int) $rows->sum('qty_total');
+        $coverageBase = $totalMapped + $totalUnmapped;
+        $topProfitList = $rows->take(3)->map(fn ($r) => [
+            'name' => $r['name'] ?? '-',
+            'value' => (float) ($r['profit_total'] ?? 0),
+            'qty' => (int) ($r['qty_total'] ?? 0),
+        ])->values();
+        $topQtyList = $rows->sortByDesc('qty_total')->take(3)->map(fn ($r) => [
+            'name' => $r['name'] ?? '-',
+            'value' => (int) ($r['qty_total'] ?? 0),
+            'profit' => (float) ($r['profit_total'] ?? 0),
+        ])->values();
+        $topMarginList = $rows
+            ->sortByDesc(fn ($r) => (($r['sales_after_voucher_toko_total'] ?? 0) > 0 ? (($r['profit_total'] ?? 0) / $r['sales_after_voucher_toko_total']) * 100 : -999))
+            ->take(3)
+            ->map(fn ($r) => [
+                'name' => $r['name'] ?? '-',
+                'margin' => (($r['sales_after_voucher_toko_total'] ?? 0) > 0 ? (($r['profit_total'] ?? 0) / $r['sales_after_voucher_toko_total']) * 100 : 0),
+                'profit' => (float) ($r['profit_total'] ?? 0),
+            ])->values();
+
+        return response()->json([
+            'rows' => $rows,
+            'meta' => [
+                'total_products' => $rows->count(),
+                'total_qty' => $totalQty,
+                'total_profit' => $totalProfit,
+                'total_income' => $totalIncome,
+                'total_gross_before_seller_discount' => $totalGrossBeforeSellerDiscount,
+                'total_gross_after_seller_discount' => $totalGrossAfterSellerDiscount,
+                'total_gross' => $totalGrossAfterSellerDiscount,
+                'total_sales_after_voucher_toko' => $totalSalesAfterVoucherToko,
+                'total_buyer_paid' => $totalBuyerPaid,
+                'total_cogs' => $totalCogs,
+                'total_cogs_qty' => $totalCogsQty,
+                'total_income_cair' => $totalIncomeCair,
+                'total_income_belum_cair' => $totalIncomeBelumCair,
+                'total_profit_cair' => $totalProfitCair,
+                'total_profit_belum_cair' => $totalProfitBelumCair,
+                'total_settled_order_count' => $totalSettledOrderCount,
+                'total_unsettled_order_count' => $totalUnsettledOrderCount,
+                'total_qty_cair' => $totalQtyCair,
+                'total_qty_belum_cair' => $totalQtyBelumCair,
+                'total_order_count' => $totalOrderCount,
+                'rows_mapped' => $totalMapped,
+                'rows_unmapped' => $totalUnmapped,
+                'unmapped_products' => $unmappedOnly,
+                'mapped_products' => $mappedOnly,
+                'avg_profit_margin' => $totalGrossAfterSellerDiscount > 0 ? (($totalProfit / $totalGrossAfterSellerDiscount) * 100) : 0,
+                'avg_profit_per_order' => $totalOrderCount > 0 ? ($totalProfit / $totalOrderCount) : 0,
+                'avg_sales_after_voucher_toko_satuan' => $totalQty > 0 ? ($totalSalesAfterVoucherToko / $totalQty) : 0,
+                'avg_buyer_paid_satuan' => $totalQty > 0 ? ($totalBuyerPaid / $totalQty) : 0,
+                'avg_cogs_satuan' => $totalQty > 0 ? ($totalCogs / $totalQty) : 0,
+                'avg_income_cair_satuan' => $totalQtyCair > 0 ? ($totalIncomeCair / $totalQtyCair) : 0,
+                'avg_income_belum_cair_satuan' => $totalQtyBelumCair > 0 ? ($totalIncomeBelumCair / $totalQtyBelumCair) : 0,
+                'sku_map_rate' => $rows->count() > 0 ? (($mappedOnly / $rows->count()) * 100) : 0,
+                'sku_coverage_rate' => $coverageBase > 0 ? (($totalMapped / $coverageBase) * 100) : 0,
+                'top_profit_name' => $topByProfit['name'] ?? null,
+                'top_profit_value' => $topByProfit['profit_total'] ?? 0,
+                'top_qty_name' => $topByQty['name'] ?? null,
+                'top_qty_value' => $topByQty['qty_total'] ?? 0,
+                'top_margin_name' => $topByMargin['name'] ?? null,
+                'top_margin_value' => $topByMargin['sales_after_voucher_toko_total'] > 0 ? (($topByMargin['profit_total'] / $topByMargin['sales_after_voucher_toko_total']) * 100) : 0,
+                'top_price_name' => $rows->sortByDesc(fn ($r) => ($r['avg_selling_price_after_voucher_toko'] ?? 0))->first()['name'] ?? null,
+                'top_price_value' => $rows->sortByDesc(fn ($r) => ($r['avg_selling_price_after_voucher_toko'] ?? 0))->first()['avg_selling_price_after_voucher_toko'] ?? 0,
+                'top_profit_list' => $topProfitList,
+                'top_qty_list' => $topQtyList,
+                'top_margin_list' => $topMarginList,
+            ],
+        ]);
+    }
+
     public function analytics(Request $request): \Illuminate\View\View
     {
         $today   = now()->toDateString();
@@ -1387,11 +1645,37 @@ class MarketplaceController extends Controller
 
     public function settlements(Request $request): JsonResponse
     {
-        $query = MarketplaceOrderSettlement::with(['store:id,name', 'order:id,channel_order_id,order_status,ordered_at'])
-            ->latest('settlement_time');
+        $query = MarketplaceOrderSettlement::with(['store:id,name', 'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer', 'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id']);
+
+        $sortBy = $request->input('sort_by', 'settlement_time');
+        $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        if ($sortBy === 'ordered_at') {
+            $query->orderBy(
+                \App\Models\MarketplaceOrder::select('ordered_at')
+                    ->whereColumn('marketplace_orders.id', 'marketplace_order_settlements.order_id')
+                    ->limit(1),
+                $sortDir
+            );
+        } else if (in_array($sortBy, ['settlement_time', 'final_income', 'buyer_payment_amount'])) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->latest('settlement_time');
+        }
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->store_id);
+        }
+
+        if ($request->input('cogs_zero') === '1') {
+            $query->whereHas('order', function ($q) {
+                $q->where(function ($q2) {
+                    $q2->doesntHave('items')
+                       ->orWhereHas('items', function ($q3) {
+                           $q3->whereNull('hpp_snapshot')->orWhere('hpp_snapshot', '<=', 0);
+                       });
+                });
+            });
         }
 
         if ($request->filled('order_date_from')) {
@@ -1406,32 +1690,113 @@ class MarketplaceController extends Controller
             });
         }
 
-        if ($request->filled('settlement_date_from')) {
-            $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
+        if ($request->tab === 'semua') {
+            if ($request->filled('settlement_date_from')) {
+                $from = $request->settlement_date_from;
+                $query->where(function ($q) use ($from) {
+                    $q->whereDate('settlement_time', '>=', $from)
+                      ->orWhere(function ($q2) use ($from) {
+                          $q2->whereNull('settlement_time')
+                             ->whereHas('order', function ($oq) use ($from) {
+                                 $oq->whereDate('ordered_at', '>=', $from);
+                             });
+                      });
+                });
+            }
+
+            if ($request->filled('settlement_date_to')) {
+                $to = $request->settlement_date_to;
+                $query->where(function ($q) use ($to) {
+                    $q->whereDate('settlement_time', '<=', $to)
+                      ->orWhere(function ($q2) use ($to) {
+                          $q2->whereNull('settlement_time')
+                             ->whereHas('order', function ($oq) use ($to) {
+                                 $oq->whereDate('ordered_at', '<=', $to);
+                             });
+                      });
+                });
+            }
+        } elseif ($request->tab !== 'belum_cair') {
+            if ($request->filled('settlement_date_from')) {
+                $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
+            }
+
+            if ($request->filled('settlement_date_to')) {
+                $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
+            }
         }
 
-        if ($request->filled('settlement_date_to')) {
-            $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
-        }
-
-        if ($request->filled('status')) {
-            $query->whereHas('order', function ($q) use ($request) {
-                $q->where('order_status', $request->status);
-            });
-        }
-
-        if ($request->filled('settlement_status')) {
-            if ($request->settlement_status === 'cair') {
-                $query->whereNotNull('settlement_time');
-            } elseif ($request->settlement_status === 'belum_cair') {
-                $query->whereNull('settlement_time');
+        if ($request->filled('tab')) {
+            if ($request->tab === 'cair') {
+                $query->whereNotNull('settlement_time')
+                      ->where(function ($q) {
+                          $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
+                      })
+                      ->whereDoesntHave('order', function ($q) {
+                          $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                      });
+            } elseif ($request->tab === 'belum_cair') {
+                $query->whereNull('settlement_time')
+                      ->where(function ($q) {
+                          $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
+                      });
+                      
+                if ($request->filled('sub_tab')) {
+                    if ($request->sub_tab === 'shipped') {
+                        $query->whereHas('order', function ($q) {
+                            $q->whereIn('order_status', ['SHIPPED', 'DIKIRIM']);
+                        });
+                    } elseif ($request->sub_tab === 'to_confirm') {
+                        $query->whereHas('order', function ($q) {
+                            $q->whereIn('order_status', ['TO_CONFIRM_RECEIVE', 'COMPLETED', 'SELESAI']);
+                        });
+                    } elseif ($request->sub_tab === 'returning') {
+                        $query->whereHas('order', function ($q) {
+                            $q->whereIn('order_status', ['TO_RETURN']);
+                        });
+                    } elseif ($request->sub_tab === 'return') {
+                        $query->whereHas('order', function ($q) {
+                            $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                        });
+                    }
+                } else {
+                    $query->whereDoesntHave('order', function ($q) {
+                        $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                    });
+                }
+            } elseif ($request->tab === 'batal_return') {
+                $query->where(function ($q) {
+                    $q->whereHas('order', function ($q2) {
+                        $q2->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                    })
+                    ->orWhere(function ($q3) {
+                        $q3->whereNotNull('drc_adjustable_refund')->where('drc_adjustable_refund', '!=', 0);
+                    });
+                });
             }
         }
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('channel_order_id', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('channel_order_id', 'like', "%{$search}%")
+                  ->orWhereHas('order', function ($orderQuery) use ($search) {
+                      $orderQuery->where('channel_order_id', 'like', "%{$search}%")
+                          ->orWhereHas('items', function ($itemQuery) use ($search) {
+                              $itemQuery->where(function ($itemFilter) use ($search) {
+                                  $itemFilter->where('item_name', 'like', "%{$search}%")
+                                      ->orWhere('variant_name', 'like', "%{$search}%")
+                                      ->orWhere('model_sku', 'like', "%{$search}%")
+                                      ->orWhere('item_sku', 'like', "%{$search}%")
+                                      ->orWhere('marketplace_sku', 'like', "%{$search}%")
+                                      ->orWhere('external_sku', 'like', "%{$search}%");
+                              });
+                          });
+                  });
+            });
         }
+
+        $metaQuery = clone $query;
 
         $paginator = $query->paginate($request->input('per_page', 50))->through(function ($s) {
             $breakdown = $s->marketplaceFeeBreakdown();
@@ -1442,7 +1807,8 @@ class MarketplaceController extends Controller
             $voucherTokoAmount = $this->settlementVoucherTokoAmount($s);
             $adjustmentTotal = (float) ($feeTotals['adjustment'] ?? 0);
             $allBurdenTotal = (float) ($feeTotals['total'] ?? 0);
-            $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount);
+            $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
+            $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
             $buyerPaidAmount = $this->settlementBuyerPaidAmount($s);
             $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
             $voucherAmount = $voucherTokoAmount + $voucherPlatformAmount;
@@ -1457,18 +1823,43 @@ class MarketplaceController extends Controller
                 ?? $s->activity_fee
                 ?? 0
             );
-            $feePercent = $grossAfterVoucherTotal > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherTotal) * 100, 1) : 0.0;
+            $feePercent = $grossAfterVoucherToko > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $affiliatePercent = $grossAfterVoucherToko > 0 ? round(($affiliateDisplay / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $marketplaceFeeAfterAffiliate = max($sellerBurdenTotal - $affiliateDisplay, 0);
             $marketplaceFeePercent = $grossAfterVoucherToko > 0 ? round(($marketplaceFeeAfterAffiliate / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
+            $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
+            
+            $netIncome = (float) $s->final_income;
+            $isEstimatedIncome = false;
+            $status = strtoupper($s->order?->order_status ?? '');
+            $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+            $isReturning = in_array($status, ['TO_RETURN', 'RETURNING']);
+
+            if ($isCancelledOrReturned) {
+                $netIncome = 0;
+                $cogs = 0;
+            } elseif ($isReturning) {
+                $netIncome = 0;
+                // cogs tetap terisi
+            } elseif ($netIncome <= 0 && $grossAfterVoucherToko > 0) {
+                $estimatedFee = round($grossAfterVoucherToko * 0.24);
+                $netIncome = max($grossAfterVoucherToko - $estimatedFee - $affiliateDisplay, 0);
+                $isEstimatedIncome = true;
+            }
+            $grossProfit = $netIncome - $cogs;
 
             return [
                 'id'                    => $s->id,
+                'channel_order_id'      => $s->channel_order_id,
+                'order_status'          => $s->order?->order_status,
+                'ordered_at'            => $s->order?->ordered_at?->toISOString(),
                 'store'                 => $s->store,
                 'order'                 => $s->order,
-                'channel_order_id'      => $s->channel_order_id,
                 'buyer_payment_amount'  => (float) $s->buyer_payment_amount,
+                'subtotal_items'        => (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount),
+                'total_paid_customer'   => (float) ($s->order?->total_paid_customer ?? $s->buyer_payment_amount),
+                'seller_discount'       => $sellerDiscount,
                 'gross_amount'          => $grossAmount,
                 'buyer_paid_amount'     => $buyerPaidAmount,
                 'commission_fee'        => (float) $s->commission_fee,
@@ -1500,7 +1891,10 @@ class MarketplaceController extends Controller
                 'drc_adjustable_refund' => (float) $s->drc_adjustable_refund,
                 'escrow_tax'            => (float) $s->escrow_tax,
                 'ad_cost'               => (float) $s->ad_cost,
-                'final_income'          => (float) $s->final_income,
+                'final_income'          => (float) $netIncome,
+                'is_estimated_income'   => $isEstimatedIncome,
+                'cogs'                  => (float) $cogs,
+                'gross_profit'          => (float) $grossProfit,
                 'gross_after_voucher'   => $grossAfterVoucherTotal,
                 'gross_after_voucher_toko' => $grossAfterVoucherToko,
                 'fee_total'             => $sellerBurdenTotal,
@@ -1520,12 +1914,12 @@ class MarketplaceController extends Controller
         });
 
         if ($request->input('page', 1) == 1) {
-            $metaQuery = clone $query;
-            $metaQuery->setEagerLoads([]);
+            $metaQuery->with('order.items:id,marketplace_order_id,hpp_snapshot,qty');
             $metaRows = $metaQuery->get([
                 'id',
                 'buyer_payment_amount',
                 'order_id',
+                'store_id',
                 'commission_fee',
                 'service_fee',
                 'transaction_fee',
@@ -1560,7 +1954,8 @@ class MarketplaceController extends Controller
             $adjustmentFeeTotal = (float) ($feeTotals['adjustment'] ?? 0);
             $allFeeTotal = (float) ($feeTotals['total'] ?? 0);
             $grossTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
-                return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount);
+                $sellerDiscount = (float) data_get($settlement->raw_json, 'seller_discount', 0);
+                return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount) - $sellerDiscount;
             });
             $buyerPaidTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
                 return (float) ($settlement->order?->total_paid_customer ?? $settlement->buyer_payment_amount);
@@ -1570,19 +1965,126 @@ class MarketplaceController extends Controller
             $buyerPaidTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementBuyerPaidAmount($settlement));
             $grossAfterVoucher = max($grossTotal - ($voucherTokoTotal + $voucherPlatformTotal), 0);
             $grossAfterVoucherToko = max($grossTotal - $voucherTokoTotal, 0);
-            $feePercent = $grossAfterVoucher > 0 ? round(($sellerFeeTotal / $grossAfterVoucher) * 100, 1) : 0.0;
+            $countSelesai = 0;
+            $countBatal = 0;
+            $countPenyesuaian = 0;
+            $countShipped = 0;
+            $countToConfirm = 0;
+            $countReturning = 0;
+            $countUnsettled = 0;
+            $sellerFeeTotal = 0.0;
+            $kpiNet = 0.0;
+            $kpiCogs = 0.0;
+            $kpiAffiliate = 0.0;
+            $kpiMarketplace = 0.0;
+            foreach ($metaRows as $s) {
+                $st = strtoupper($s->order?->order_status ?? '');
+                $isCompleted = $st === 'COMPLETED';
+                $isShipped = in_array($st, ['SHIPPED', 'DIKIRIM']);
+                $isToConfirm = in_array($st, ['TO_CONFIRM_RECEIVE', 'COMPLETED']);
+                $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
+                if ($st === 'COMPLETED') {
+                    $countSelesai++;
+                }
+                if ($isShipped) {
+                    $countShipped++;
+                }
+                if ($isToConfirm) {
+                    $countToConfirm++;
+                }
+                if ($isReturning) {
+                    $countReturning++;
+                }
+                if (is_null($s->settlement_time) && ! in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND'])) {
+                    $countUnsettled++;
+                }
+                if (in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND'])) {
+                    $countBatal++;
+                }
+                $breakdown = $s->marketplaceFeeBreakdown();
+                $feeTots = $s->marketplaceFeeCategoryTotals($breakdown);
+                if (($feeTots['adjustment'] ?? 0) < 0) {
+                    $countPenyesuaian++;
+                }
+                
+                $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
+                $isCancelledOrReturned = in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
+                
+                if ($isCancelledOrReturned) {
+                    $cogs = 0;
+                }
+                $kpiCogs += $cogs;
+                
+                if ($isCancelledOrReturned || $isReturning) {
+                    // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
+                } elseif ((float) $s->final_income <= 0) {
+                    $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
+                    $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+                    $tokoVoucher = $this->settlementVoucherTokoAmount($s);
+                    $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
+
+                    $affiliateCommission = (float) (
+                        data_get($s->raw_json, 'affiliate_commission')
+                        ?? data_get($s->raw_json, 'affiliate_commission_amount')
+                        ?? data_get($s->raw_json, 'affiliate_fee')
+                        ?? data_get($s->raw_json, 'affiliate_commission_fee')
+                        ?? data_get($s->raw_json, 'seller_affiliate_fee')
+                        ?? $s->activity_fee
+                        ?? 0
+                    );
+
+                    $estimatedFee = round($grossAfterVT * 0.24);
+                    $estimatedNet = max($grossAfterVT - $estimatedFee - $affiliateCommission, 0);
+
+                    $kpiAffiliate += $affiliateCommission;
+                    $kpiMarketplace += $estimatedFee;
+                    $sellerFeeTotal += $estimatedFee + $affiliateCommission;
+                    $kpiNet += $estimatedNet;
+                } else {
+                    $affiliateCommission = (float) (
+                        data_get($s->raw_json, 'affiliate_commission')
+                        ?? data_get($s->raw_json, 'affiliate_commission_amount')
+                        ?? data_get($s->raw_json, 'affiliate_fee')
+                        ?? data_get($s->raw_json, 'affiliate_commission_fee')
+                        ?? data_get($s->raw_json, 'seller_affiliate_fee')
+                        ?? $s->activity_fee
+                        ?? 0
+                    );
+                    $feeSeller = (float) ($feeTots['seller'] ?? 0);
+                    $kpiAffiliate += $affiliateCommission;
+                    $kpiMarketplace += max($feeSeller - $affiliateCommission, 0);
+                    $sellerFeeTotal += $feeSeller;
+                    $kpiNet += (float) $s->final_income;
+                }
+            }
+            
+            $feePercent = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
+
             $meta = [
                 'kpi_count'             => (int) $metaRows->count(),
+                'kpi_count_selesai'     => $countSelesai,
+                'kpi_count_batal'       => $countBatal,
+                'kpi_count_penyesuaian' => $countPenyesuaian,
+                'kpi_count_shipped'     => $countShipped,
+                'kpi_count_to_confirm'  => $countToConfirm,
+                'kpi_count_returning'   => $countReturning,
+                'kpi_count_unsettled'   => $countUnsettled,
                 'kpi_gross'             => $grossTotal,
                 'kpi_buyer_paid'        => $buyerPaidTotal,
-                'kpi_voucher'           => $voucherFeeTotal,
+                'kpi_voucher'           => $voucherTokoTotal + $voucherPlatformTotal,
                 'kpi_voucher_toko'      => $voucherTokoTotal,
                 'kpi_voucher_platform'  => $voucherPlatformTotal,
                 'kpi_gross_after_voucher' => $grossAfterVoucher,
                 'kpi_gross_after_voucher_toko' => $grossAfterVoucherToko,
-                'kpi_net'               => (float) $metaRows->sum('final_income'),
+                'kpi_net'               => $kpiNet,
+                'kpi_cogs'              => $kpiCogs,
+                'kpi_gross_profit'      => $kpiNet - $kpiCogs,
+                'kpi_aov'               => $metaRows->count() > 0 ? round($buyerPaidTotal / $metaRows->count()) : 0,
                 'kpi_fees'              => $sellerFeeTotal,
+                'kpi_affiliate'         => $kpiAffiliate,
+                'kpi_marketplace'       => $kpiMarketplace,
                 'kpi_seller_burden'     => $sellerFeeTotal,
                 'kpi_buyer_burden'      => $buyerFeeTotal,
                 'kpi_platform_burden'   => $platformFeeTotal,

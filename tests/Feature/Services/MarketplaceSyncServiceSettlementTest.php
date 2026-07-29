@@ -891,6 +891,30 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(999999, (int) $settlement->raw_json['campaign_fee']);
     }
 
+    // ── 9. affiliate_fee dan shipping_insurance_fee ikut dipetakan ─────────────
+    public function test_affiliate_fee_dan_shipping_insurance_fee_dipetakan()
+    {
+        $order = $this->createOrder();
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse($this->realisticIncomeFields([
+                    'affiliate_commission_fee' => 425,
+                    'shipping_insurance' => 1200,
+                    'order_sn' => $order->channel_order_id,
+                ])));
+        });
+
+        app(MarketplaceSyncService::class)->syncSettlements($this->store);
+
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'channel_order_id' => $order->channel_order_id,
+            'affiliate_fee' => '425.00',
+            'shipping_insurance_fee' => '1200.00',
+        ]);
+    }
+
     // ── 9. escrow_amount tetap dipetakan ke final_income (regresi, fixture baru) ──
     public function test_escrow_amount_tetap_dipetakan_ke_final_income()
     {

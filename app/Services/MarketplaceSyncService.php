@@ -1130,8 +1130,10 @@ class MarketplaceSyncService
      * pernah diverifikasi) DIPERTAHANKAN sebagai compatibility guard untuk kemungkinan
      * variasi response order/versi API lain — bukan dihapus, hanya diberi prioritas
      * lebih rendah dari field yang sudah terbukti nyata. Ringkasan keputusan:
-     *  - buyer_payment_amount: `buyer_total_amount` TERVERIFIKASI ada (81912 di UAT).
-     *    `buyer_payment_amount`/`buyer_paid_amount` tidak pernah muncul di response.
+     *  - buyer_payment_amount: `buyer_total_amount` TERVERIFIKASI ada (81912 di UAT)
+     *    dan harus jadi prioritas utama. Field lama seperti `buyer_payment_amount`
+     *    / `buyer_paid_amount` hanya fallback kompatibilitas bila response lama
+     *    belum mengirim `buyer_total_amount`.
      *  - seller_voucher: `voucher_from_seller` TERVERIFIKASI ada (200 di UAT).
      *  - transaction_fee: Kombinasi `seller_transaction_fee` (beban seller) dan 
      *    `seller_order_processing_fee` (Biaya Penanganan Pesanan). SENGAJA TIDAK
@@ -1196,7 +1198,7 @@ class MarketplaceSyncService
 
             // Pembayaran customer (Subtotal Pesanan / Harga Produk yg diakui seller sbg gross)
             'buyer_payment_amount'  => $val('buyer_payment_amount', $this->decimalValue(
-                $income['cost_of_goods_sold'] ?? $income['order_selling_price'] ?? $income['buyer_total_amount'] ?? $income['buyer_payment_amount'] ?? null
+                $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? $income['buyer_payment_amount'] ?? $income['order_selling_price'] ?? $income['cost_of_goods_sold'] ?? null
             )),
 
             // Fee marketplace
@@ -1927,6 +1929,32 @@ class MarketplaceSyncService
                     $outerStats['updated']++;
                 }
 
+                // ── [FEATURE] Placeholder Settlement ──────────────────────────
+                // Supaya order yang belum COMPLETED tetap masuk ke tab "Belum Cair" 
+                // dengan estimasi nominal sementara (dan settlement_time = null).
+                if (!in_array($orderStatus, ['CANCELLED', 'BATAL', 'RETURNED'])) {
+                    $calcSellerDiscount = 0;
+                    if (!empty($detail['item_list'])) {
+                        foreach ($detail['item_list'] as $itm) {
+                            $orig = $itm['model_original_price'] ?? $itm['original_price'] ?? 0;
+                            $disc = $itm['model_discounted_price'] ?? $itm['discounted_price'] ?? $orig;
+                            $qty = $itm['model_quantity_purchased'] ?? $itm['quantity_purchased'] ?? 1;
+                            if ($disc > 0 && $orig > $disc) {
+                                $calcSellerDiscount += ($orig - $disc) * $qty;
+                            }
+                        }
+                    }
+
+                    MarketplaceOrderSettlement::updateOrCreate(
+                        ['store_id' => $store->id, 'channel_order_id' => $detail['order_sn'], 'settlement_time' => null],
+                        [
+                            'order_id'             => $order->id,
+                            'buyer_payment_amount' => $totalAmount,
+                            'raw_json'             => ['seller_discount' => $calcSellerDiscount],
+                        ]
+                    );
+                }
+
                 // Pre-download resi: HANYA order segar (≤7 hari — backfill histori tidak
                 // butuh label) dan yang label-nya belum ter-cache. Job-nya sendiri unik
                 // per (store, order_sn), jadi sync berulang tidak menumpuk duplikat.
@@ -1950,6 +1978,24 @@ class MarketplaceSyncService
                 // Channel code untuk SKU Mapping lookup
                 $channelCode = $store->channel?->code;
                 $orderStatus = $detail['order_status'] ?? '';
+                
+                // --- PATCH: Preserve Webhook "TO_RETURN" Status ---
+                // GetOrderDetail API often lags behind the logistics webhook. 
+                // If the webhook already promoted this to TO_RETURN, prevent GetOrderDetail from downgrading it to SHIPPED.
+                $existingOrder = MarketplaceOrder::where('store_id', $store->id)
+                    ->where('channel_order_id', $detail['order_sn'])
+                    ->first(['id', 'order_status']);
+                    
+                if ($existingOrder && $existingOrder->order_status === 'TO_RETURN' && $orderStatus === 'SHIPPED') {
+                    $orderStatus = 'TO_RETURN';
+                }
+                
+                // Jika status dari Shopee adalah READY_TO_SHIP, tetapi order lokal sudah PROCESSED
+                // (biasanya karena Acknowledge manual di GFID), cegah downgrade
+                if ($existingOrder && $existingOrder->order_status === 'PROCESSED' && $orderStatus === 'READY_TO_SHIP') {
+                    $orderStatus = 'PROCESSED';
+                }
+                
                 $orderHasIncomplete = false;
 
                 // Penomoran baris per pasangan item+model: bundle/add-on deal bisa

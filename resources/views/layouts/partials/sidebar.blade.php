@@ -13,6 +13,7 @@
     $isOwner = $role === 'owner' || $isDev;  // developer = akses owner (semua menu)
     $isOperating = $role === 'operating';
     $isAdmin = $role === 'admin' && !$isDev; // developer TIDAK masuk branch admin agar masuk branch owner
+    $canOpenAiAgent = $isOwner || $isAdmin || $isOperating;
 
     // ✅ capability flags
     $canViewRts = $isOwner || $isAdmin || $isOperating;
@@ -24,6 +25,7 @@
     // ROUTE GUARDS (biar tidak error kalau route belum ada)
     // =========================================================
     $hasDashboardRoute = $router->has('dashboard');
+    $hasAiAgentRoute = $router->has('ai.agent');
     $hasOwnerAccessControl = $router->has('owner.access-control.index');
 
     // Persediaan
@@ -375,6 +377,7 @@
         $open('admin.website.*');
 
     $openCrm = $open('admin.crm.*');
+    $openAi = $open('ai.*');
 
     // =========================================================
     // BADGE COUNTERS (dot-only, cached)
@@ -691,6 +694,14 @@
                     Beranda
                 </x-sidebar.simple-link>
             </li>
+            @if ($hasAiAgentRoute && $canOpenAiAgent)
+                <x-sidebar.label text="AI" />
+                <li>
+                    <x-sidebar.simple-link href="{{ route('ai.agent') }}" icon="bi bi-stars" :active="$openAi">
+                        AI Agent
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
             @if ($isOwner && $hasOwnerAccessControl)
                 <li>
                     <x-sidebar.simple-link href="{{ route('owner.access-control.index') }}" icon="bi bi-shield-lock" :active="request()->routeIs('owner.access-control.*')">
@@ -912,7 +923,7 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($router->has('marketplace.chat'))
+                    @if ($router->has('marketplace.chat') && $canModule('marketplace'))
                         <x-sidebar.simple-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
                             :active="request()->routeIs('marketplace.chat')">
                             Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none;"></span>
@@ -1379,7 +1390,7 @@
                                 Naikkan Produk
                             </x-sidebar.sub-link>
                         @endif
-                        @if ($router->has('marketplace.chat'))
+                        @if ($router->has('marketplace.chat') && $canModule('marketplace'))
                             <x-sidebar.sub-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
                                 :active="request()->routeIs('marketplace.chat')">
                                 Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none;"></span>

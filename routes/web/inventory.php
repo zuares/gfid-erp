@@ -49,6 +49,8 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         // ================== WAREHOUSE INTELLIGENCE ==================
         Route::get('warehouse-intelligence', [WarehouseIntelligenceController::class, 'index'])
             ->name('warehouse_intelligence');
+        Route::get('warehouse-intelligence/insights', [WarehouseIntelligenceController::class, 'insights'])
+            ->name('warehouse_intelligence.insights');
         Route::get('warehouse-intelligence/data', [WarehouseIntelligenceController::class, 'tabData'])
             ->name('warehouse_intelligence.data');
         Route::post('warehouse-intelligence/limits', [WarehouseIntelligenceController::class, 'updateLimits'])

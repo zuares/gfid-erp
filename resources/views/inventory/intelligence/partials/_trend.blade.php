@@ -40,10 +40,10 @@
         </select>
 
         <select class="form-select form-select-sm" data-ii-sort aria-label="Urutkan" style="max-width:180px;">
+            <option value="ads-desc" selected>Jual/hari tertinggi</option>
             <option value="trend-desc">Paling naik</option>
             <option value="trend-asc">Paling turun</option>
             <option value="score-desc">Skor evaluasi tertinggi</option>
-            <option value="ads-desc">Jual/hari tertinggi</option>
             <option value="sku-asc">SKU A–Z</option>
         </select>
 
@@ -66,17 +66,17 @@
         </div>
         <script type="application/json" data-ii-trend-data>@json($payload)</script>
 
-        <div class="table-responsive" style="max-height: 50vh;">
-            <table class="table table-hover align-middle table-list" data-ii-table>
-                <thead style="background: rgba(241, 245, 249, 0.5); position: sticky; top: 0; z-index: 10;">
+        <div class="table-responsive ii-table-scroll" style="max-height: 50vh;">
+            <table class="table table-hover align-middle table-list" data-ii-table id="table-trend" data-ii-default-sort="ads30" data-ii-default-dir="desc">
+                <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
-                        <th style="padding-left: 1.25rem;">SKU & Produk</th>
-                        <th>Arah (7hr)</th>
-                        <th class="text-end gf-hide-mobile">ADS 7</th>
-                        <th class="text-end gf-hide-mobile">ADS 14</th>
-                        <th class="text-end">ADS 30</th>
-                        <th class="text-end gf-hide-mobile">Skor</th>
-                        <th class="gf-hide-mobile" style="padding-right: 1.25rem;">Status</th>
+                        <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
+                        <th data-ii-sort-key="delta" data-ii-sort-type="number">Arah (7hr)</th>
+                        <th data-ii-sort-key="ads7" data-ii-sort-type="number" class="text-end gf-hide-mobile">ADS 7</th>
+                        <th data-ii-sort-key="ads14" data-ii-sort-type="number" class="text-end gf-hide-mobile">ADS 14</th>
+                        <th data-ii-sort-key="ads30" data-ii-sort-type="number" class="text-end">ADS 30</th>
+                        <th data-ii-sort-key="score" data-ii-sort-type="number" class="text-end gf-hide-mobile">Skor</th>
+                        <th data-ii-sort-key="status" data-ii-sort-type="status" class="gf-hide-mobile" style="padding-right: 1.25rem;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -86,9 +86,13 @@
                             data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                             data-status="{{ $r->status }}"
                             data-sku="{{ $r->sku }}"
-                            data-ads="{{ $r->ads }}"
+                            data-ads7="{{ $r->ads7 }}"
+                            data-ads14="{{ $r->ads14 }}"
+                            data-ads30="{{ $r->ads30 }}"
+                            data-ads="{{ $r->ads30 }}"
                             data-score="{{ $r->eval_score }}"
-                            data-delta="{{ $r->direction === 'new' ? 999999 : ($r->delta_pct ?? 0) }}">
+                            data-delta="{{ $r->direction === 'new' ? 999999 : ($r->delta_pct ?? 0) }}"
+                            data-direction="{{ $r->direction }}">
                             
                             <td style="padding-left: 1.25rem;">
                                 <span class="fw-semibold">{{ $r->sku }}</span>

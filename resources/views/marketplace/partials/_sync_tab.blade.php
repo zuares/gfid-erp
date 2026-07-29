@@ -398,6 +398,21 @@
 
             renderCoverage();
 
+            // Progress eksplisit dari endpoint background sync
+            const bg = data.progress;
+            if (bg && bg.status === 'queued') {
+                const wrap  = document.getElementById('backfillProgressWrap');
+                const label = document.getElementById('backfillProgressLabel');
+                const pctEl = document.getElementById('backfillProgressPct');
+                const barEl = document.getElementById('backfillProgressBar');
+                wrap.style.display = 'block';
+                label.innerText = bg.label || 'Sync sedang antre…';
+                pctEl.innerText = bg.percent ? bg.percent + '%' : '';
+                barEl.style.width = Math.max(4, bg.percent || 3) + '%';
+                barEl.classList.add('progress-bar-animated');
+                barEl.style.background = '#3b82f6';
+            }
+
             // Progress bar
             const wrap  = document.getElementById('backfillProgressWrap');
             const label = document.getElementById('backfillProgressLabel');
@@ -496,6 +511,7 @@
             const data = await res.json().catch(() => ({}));
             if (res.status === 409) consoleLog(data.message || 'Sync otomatis sedang berjalan — coba lagi beberapa menit.', '#facc15');
             else if (!res.ok) consoleLog('Gagal (' + res.status + '): ' + (data.message || 'error tak dikenal'), '#f87171');
+            else if (data.status === 'queued') consoleLog('sync "' + type + '" diantrekan — ' + (data.message || 'OK'), '#4ade80');
             else consoleLog('sync "' + type + '" selesai — ' + (data.message || 'OK'), '#4ade80');
         } catch (e) {
             consoleLog('Gagal terhubung: ' + e.message, '#f87171');

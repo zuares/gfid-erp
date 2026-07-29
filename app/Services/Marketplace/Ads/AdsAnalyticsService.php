@@ -71,7 +71,15 @@ class AdsAnalyticsService
             ->select('performance_hour', DB::raw('SUM(expense) as expense'), DB::raw('SUM(broad_gmv) as gmv'), DB::raw('SUM(clicks) as clicks'), DB::raw('SUM(broad_order) as orders'))
             ->groupBy('performance_hour')
             ->orderBy('performance_hour')
-            ->get();
+            ->get()
+            ->map(fn ($row) => [
+                'performance_hour' => (int) $row->performance_hour,
+                'expense'          => (float) $row->expense,
+                'gmv'              => (float) $row->gmv,
+                'clicks'           => (int) $row->clicks,
+                'orders'           => (int) $row->orders,
+            ])
+            ->values();
     }
 
     public function getHistoricalComparison(int|array $storeId, string $dateFrom, string $dateTo, int $periods = 3)
@@ -84,9 +92,19 @@ class AdsAnalyticsService
             $end = Carbon::parse($dateTo)->subDays($days * $i)->toDateString();
             
             $daily = MarketplaceAdsDaily::whereIn('store_id', (array) $storeId)
+                ->select('date', 'spend', 'gmv', 'impressions', 'clicks', 'orders')
                 ->whereBetween('date', [$start, $end])
                 ->orderBy('date')
-                ->get();
+                ->get()
+                ->map(fn ($row) => [
+                    'date'        => substr((string) $row->date, 0, 10),
+                    'spend'       => (float) $row->spend,
+                    'gmv'         => (float) $row->gmv,
+                    'impressions' => (int) $row->impressions,
+                    'clicks'      => (int) $row->clicks,
+                    'orders'      => (int) $row->orders,
+                ])
+                ->values();
                 
             $results[] = [
                 'period_index' => $i,

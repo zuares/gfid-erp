@@ -55,6 +55,7 @@ class MarketplaceOrder extends Model
         'customer_id',
         'remarks',
         'raw_payload_json',
+        'meta',
     ];
 
     protected $casts = [
@@ -64,6 +65,7 @@ class MarketplaceOrder extends Model
         'shipping_arranged_at' => 'datetime',
         'settlement_sync_failed_at' => 'datetime',
         'raw_json'      => 'array',
+        'meta'          => 'array',
         'payment_date'  => 'datetime',
         'completed_at'  => 'datetime',
         'cancelled_at'  => 'datetime',

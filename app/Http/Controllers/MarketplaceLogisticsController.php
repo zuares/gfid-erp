@@ -1112,6 +1112,36 @@ class MarketplaceLogisticsController extends Controller
                 ]);
             }
 
+            // AUTO-HEALING: Jika di riwayat resi ada kata pengembalian, paksa status order jadi TO_RETURN
+            $trackingList = $result['response']['tracking_info'] ?? $result['tracking_info'] ?? [];
+            if (!empty($trackingList)) {
+                $isReturning = false;
+                foreach ($trackingList as $t) {
+                    $status = $t['logistics_status'] ?? '';
+                    $desc = strtolower($t['description'] ?? '');
+                    if (
+                        $status === 'RETURN_INITIATED' || 
+                        strpos($desc, 'pengembalian') !== false || 
+                        strpos($desc, 'dikembalikan') !== false ||
+                        strpos($desc, 'ditolak pembeli') !== false
+                    ) {
+                        $isReturning = true;
+                        break;
+                    }
+                }
+
+                if ($isReturning) {
+                    $localOrder = \App\Models\MarketplaceOrder::where('store_id', $store->id)
+                        ->where('channel_order_id', $orderSn)
+                        ->first();
+                        
+                    if ($localOrder && !in_array($localOrder->order_status, ['TO_RETURN', 'CANCELLED', 'RETURNED'])) {
+                        $localOrder->update(['order_status' => 'TO_RETURN']);
+                        \Illuminate\Support\Facades\Log::info("Auto-upgraded order {$orderSn} to TO_RETURN via tracking info check.");
+                    }
+                }
+            }
+
             return response()->json($result['response'] ?? $result);
         } catch (\Exception $e) {
             return $this->errorResponse($e);

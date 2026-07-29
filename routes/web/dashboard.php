@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AiAgentController;
 use App\Http\Controllers\Admin\StorefrontCrmController;
 use App\Http\Controllers\Admin\StorefrontCustomerController;
 use App\Http\Controllers\Admin\StorefrontProductCatalogController;
@@ -104,6 +105,16 @@ Route::middleware(['track.storefront'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+
+    Route::get('/ai', function () {
+        return redirect()->route('ai.agent');
+    })->name('ai.index');
+
+    Route::middleware(['role:owner,admin,operating', 'throttle:10,1'])->group(function () {
+        Route::get('/ai/agent', [AiAgentController::class, 'index'])->name('ai.agent');
+        Route::post('/ai/agent/chat', [AiAgentController::class, 'chat'])->name('ai.agent.chat');
+        Route::post('/ai/agent/task', [AiAgentController::class, 'task'])->name('ai.agent.task');
+    });
 
     Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
         $user = auth()->user();

@@ -168,6 +168,10 @@
         @endforeach
     </div>
 
+    <div id="ai-insights-container">
+        @include('inventory.warehouse_intelligence.partials._insights', ['insights' => $aiInsights])
+    </div>
+
     <!-- General Filters -->
     <div class="filter-bar" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem;">
         <div style="flex: 1; min-width: 200px;">
@@ -259,6 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const topDesc = document.getElementById('top-desc');
 
     const cache = {};
+    const insightsContainer = document.getElementById('ai-insights-container');
 
     function fetchTab(tabKey, force = false) {
         if (!force && cache[tabKey]) {
@@ -298,6 +303,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    function fetchInsights(tabKey, force = false) {
+        let url = `{{ route('inventory.warehouse_intelligence.insights') }}?tab=${tabKey}`;
+
+        const filterItem = document.querySelector('input[name="filter-item-id"]');
+        const filterCat = document.getElementById('filter-cat');
+        if (filterItem && filterItem.value) url += `&item_id=${filterItem.value}`;
+        if (filterCat && filterCat.value) url += `&category_id=${filterCat.value}`;
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(res => res.json())
+            .then(payload => {
+                if (payload && payload.html && insightsContainer) {
+                    insightsContainer.innerHTML = payload.html;
+                }
+            })
+            .catch(() => {
+                // Insights are optional; don't block main data loading.
+            });
+    }
+
     tabs.forEach(btn => {
         btn.addEventListener('click', function() {
             tabs.forEach(t => t.classList.remove('is-active'));
@@ -311,12 +336,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             topDesc.textContent = this.getAttribute('data-desc');
             fetchTab(currentTab);
+            fetchInsights(currentTab);
         });
     });
 
     window.refreshIntel = function() {
         Object.keys(cache).forEach(k => delete cache[k]); // clear cache
         fetchTab(currentTab, true);
+        fetchInsights(currentTab, true);
     };
 
     function initTabScripts() {
@@ -433,6 +460,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial load
     fetchTab(currentTab);
+    fetchInsights(currentTab);
 });
 </script>
 @endpush

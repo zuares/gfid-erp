@@ -37,14 +37,14 @@ body[data-theme="dark"] {
 .dpanel {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
-    box-shadow: var(--card-shadow);
-    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(15,23,42,.05);
+    border-radius: 18px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .dpanel:hover {
     transform: translateY(-2px);
-    box-shadow: var(--card-hover-shadow);
+    box-shadow: 0 16px 34px rgba(15,23,42,.08);
 }
 
 .dash-tabs {
@@ -81,6 +81,269 @@ body[data-theme="dark"] {
     background: var(--dsh-accent);
     color: #fff;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.ads-shell{
+    position:relative;
+}
+
+.ads-hero{
+    position:sticky;
+    top:.5rem;
+    z-index:320;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:1rem;
+    flex-wrap:wrap;
+    margin-bottom:.85rem;
+    padding:1rem 1.05rem;
+    border-radius:20px;
+    border:1px solid rgba(148,163,184,.14);
+    background:
+        radial-gradient(circle at top right, rgba(96,165,250,.28), transparent 30%),
+        radial-gradient(circle at bottom left, rgba(16,185,129,.16), transparent 28%),
+        linear-gradient(135deg, #0f172a 0%, #111827 45%, #1d4ed8 135%);
+    box-shadow:0 18px 50px rgba(15,23,42,.16);
+    overflow:hidden;
+}
+
+.ads-hero::before,
+.ads-hero::after{
+    content:'';
+    position:absolute;
+    border-radius:999px;
+    pointer-events:none;
+    opacity:.35;
+    filter:blur(2px);
+}
+
+.ads-hero::before{
+    width:180px;
+    height:180px;
+    right:-60px;
+    top:-80px;
+    background:rgba(59,130,246,.28);
+}
+
+.ads-hero::after{
+    width:220px;
+    height:220px;
+    left:-90px;
+    bottom:-130px;
+    background:rgba(16,185,129,.18);
+}
+
+.ads-hero > *{
+    position:relative;
+    z-index:1;
+}
+
+.ads-eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    margin-bottom:.35rem;
+    font-size:.66rem;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.72);
+}
+
+.ads-hero .title{
+    color:#fff;
+    font-size:1.2rem;
+    letter-spacing:-0.04em;
+    margin:0;
+}
+
+.ads-hero .sub{
+    color:rgba(226,232,240,.8);
+    max-width:48rem;
+}
+
+.ads-hero-badges{
+    display:flex;
+    flex-wrap:wrap;
+    gap:.4rem;
+    margin-top:.75rem;
+}
+
+.ads-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    padding:.34rem .6rem;
+    border-radius:999px;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+    color:rgba(255,255,255,.92);
+    font-size:.72rem;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+.ads-hero-meta{
+    font-size:.72rem;
+    color:rgba(226,232,240,.8);
+    text-align:right;
+    margin-bottom:.35rem;
+    font-weight:500;
+}
+
+.ads-hero-error{
+    color:#fecaca;
+    font-weight:700;
+    margin-bottom:.25rem;
+}
+
+.ads-hero .controls{
+    justify-content:flex-end;
+    gap:.45rem;
+}
+
+.ads-hero .role-chip{
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12)!important;
+    color:rgba(255,255,255,.92)!important;
+    border-radius:999px!important;
+    box-shadow:none!important;
+}
+
+.ads-hero .btn-pill{
+    border-radius:999px!important;
+    padding-inline:.82rem!important;
+    font-size:.78rem!important;
+    font-weight:800!important;
+}
+
+.ads-hero .btn-ship-outline{
+    background:rgba(255,255,255,.06)!important;
+    border-color:rgba(255,255,255,.18)!important;
+    color:#fff!important;
+    box-shadow:none!important;
+}
+
+.ads-hero .btn-ship-outline:hover{
+    background:rgba(255,255,255,.14)!important;
+    border-color:rgba(255,255,255,.26)!important;
+    color:#fff!important;
+}
+
+body[data-theme="dark"] .ads-hero{
+    background:
+        radial-gradient(circle at top right, rgba(59,130,246,.22), transparent 30%),
+        radial-gradient(circle at bottom left, rgba(16,185,129,.12), transparent 28%),
+        linear-gradient(135deg, rgba(15,23,42,.98) 0%, rgba(30,41,59,.94) 46%, rgba(30,64,175,.88) 135%);
+}
+
+.ads-tabs-wrap{
+    margin:0 0 1rem;
+    position:relative;
+}
+
+.ads-tabs-wrap::before{
+    content:'';
+    position:absolute;
+    left:.9rem;
+    right:.9rem;
+    top:50%;
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(148,163,184,.18), transparent);
+    transform:translateY(-50%);
+    pointer-events:none;
+}
+
+.dash-filter{
+    border-radius:20px;
+    padding:1rem 1rem .95rem;
+    background:var(--card-bg);
+    border:1px solid rgba(148,163,184,.16);
+    box-shadow:0 12px 28px rgba(15,23,42,.05);
+}
+
+.filter-item label{
+    text-transform:none;
+    letter-spacing:0;
+    font-size:.66rem;
+    font-weight:900;
+    color:#334155;
+}
+
+.filter-item input,
+.filter-item select{
+    height:42px;
+    border-radius:14px;
+    border:1px solid rgba(148,163,184,.22);
+    background:var(--card-bg);
+    color:var(--text, #0f172a);
+}
+
+body[data-theme="dark"] .filter-item label{
+    color:#cbd5e1;
+}
+
+body[data-theme="dark"] .filter-item input,
+body[data-theme="dark"] .filter-item select{
+    background:rgba(15,23,42,.72);
+    border-color:rgba(255,255,255,.12);
+    color:#e2e8f0;
+}
+
+.ads-surface{
+    border-radius:20px;
+    border:1px solid rgba(148,163,184,.16);
+    background:var(--card-bg);
+    box-shadow:0 12px 28px rgba(15,23,42,.05);
+    overflow:hidden;
+}
+
+body[data-theme="dark"] .ads-surface{
+    background:var(--card-bg);
+    border-color:rgba(51,65,85,.85);
+    box-shadow:none;
+}
+
+.ads-panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:1rem;
+    flex-wrap:wrap;
+    padding:1rem 1rem .95rem;
+    border-bottom:1px solid rgba(148,163,184,.16);
+    background:linear-gradient(180deg, rgba(248,250,252,.95), rgba(255,255,255,.98));
+}
+
+body[data-theme="dark"] .ads-panel-head{
+    background:linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.88));
+    border-bottom-color:rgba(51,65,85,.9);
+}
+
+.ads-panel-title{
+    margin:.08rem 0 0;
+    font-size:1.02rem;
+    font-weight:900;
+    letter-spacing:-0.04em;
+    color:var(--text);
+}
+
+.ads-panel-note{
+    font-size:.76rem;
+    color:var(--dsh-muted);
+    padding:.38rem .68rem;
+    border-radius:999px;
+    background:rgba(148,163,184,.12);
+    border:1px solid rgba(148,163,184,.22);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.42);
+}
+
+body[data-theme="dark"] .ads-panel-note{
+    background:rgba(30,41,59,.82);
+    border-color:rgba(51,65,85,.92);
+    color:#cbd5e1;
+    box-shadow:none;
 }
 
 .dash-hero {
@@ -151,29 +414,31 @@ body[data-theme="dark"] .dash-tab.active {
 /* Filter Container */
 .dash-filter {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
+    border: 1px solid rgba(148,163,184,.16);
+    border-radius: 20px;
+    padding: 1rem 1rem .95rem;
     display: flex;
     gap: 1rem;
     align-items: flex-end;
     flex-wrap: wrap;
     margin-bottom: 1.5rem;
+    box-shadow: 0 12px 28px rgba(15,23,42,.05);
 }
 .filter-item { flex: 1; min-width: 180px; }
-.filter-item label { font-size: .75rem; font-weight: 600; color: var(--dsh-muted); margin-bottom: .35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;}
+.filter-item label { font-size: .66rem; font-weight: 900; color: #334155; margin-bottom: .35rem; display: block; text-transform: none; letter-spacing: 0; }
 .filter-item input, .filter-item select {
-    width: 100%; font-size: .85rem; padding: .5rem .75rem; border-radius: 8px;
-    border: 1px solid var(--dsh-border); background: var(--bg, #f8fafc); color: var(--text, #0f172a);
-    transition: all 0.2s ease; font-weight: 500;
+    width: 100%; font-size: .84rem; padding: .55rem .85rem; border-radius: 14px;
+    border: 1px solid rgba(148,163,184,.22); background: var(--card-bg); color: var(--text, #0f172a);
+    transition: all 0.2s ease; font-weight: 600;
 }
 .filter-item input:focus, .filter-item select:focus {
     outline: none;
     border-color: var(--dsh-accent);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
+body[data-theme="dark"] .filter-item label { color:#cbd5e1; }
 body[data-theme="dark"] .filter-item input, body[data-theme="dark"] .filter-item select {
-    background: rgba(15, 23, 42, 0.6); border-color: rgba(255,255,255,.1); color: #e2e8f0;
+    background: rgba(15, 23, 42, 0.72); border-color: rgba(255,255,255,.12); color: #e2e8f0;
 }
 
 /* Tabel di dalam dpanel */
@@ -207,8 +472,8 @@ body[data-theme="dark"] .dpanel-table tbody tr:hover td { background: rgba(51, 6
 .period-bar { display: flex; gap: .75rem; align-items: center; }
 .range-pill {
     display: inline-flex; align-items: center; justify-content: space-between; gap: .75rem;
-    border: 1px solid var(--card-border); background: var(--bg); padding: .5rem 1rem; border-radius: 8px;
-    cursor: pointer; font-size: .85rem; color: var(--text, #0f172a); font-weight: 600;
+    border: 1px solid var(--card-border); background: rgba(148,163,184,.06); padding: .5rem 1rem; border-radius: 14px;
+    cursor: pointer; font-size: .85rem; color: var(--text, #0f172a); font-weight: 650;
     transition: all 0.25s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 body[data-theme="dark"] .range-pill { color: #f8fafc; background: rgba(30, 41, 59, 0.6); }
@@ -221,42 +486,128 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
 /* Kpi Cards Upgrade */
 .dash-tabs-modern {
     display: inline-flex;
-    background: rgba(148, 163, 184, 0.1);
-    padding: 0.35rem;
-    border-radius: 12px;
-    gap: 0.25rem;
+    background: linear-gradient(180deg, rgba(248,250,252,.96), rgba(241,245,249,.92));
+    padding: .45rem;
+    border-radius: 999px;
+    gap: .35rem;
+    border:1px solid rgba(148,163,184,.18);
+    box-shadow:0 12px 28px rgba(15,23,42,.06);
 }
-body[data-theme="dark"] .dash-tabs-modern { background: rgba(30, 41, 59, 0.5); }
+body[data-theme="dark"] .dash-tabs-modern { background: linear-gradient(180deg, rgba(15,23,42,.96), rgba(30,41,59,.92)); border-color:rgba(51,65,85,.85); box-shadow:none; }
 .dash-tab-m {
-    border: none; background: transparent; padding: 0.6rem 1.25rem; border-radius: 8px;
-    font-weight: 600; font-size: 0.85rem; color: var(--dsh-muted); cursor: pointer;
-    transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+    border: none; background: transparent; padding: .72rem 1rem; border-radius: 999px;
+    font-weight: 900; font-size: .8rem; color: var(--dsh-muted); cursor: pointer;
+    transition: all .2s ease; display: flex; align-items: center; gap: .5rem; white-space: nowrap;
 }
-.dash-tab-m:hover { color: var(--text); }
+.dash-tab-m:hover { color: #0f172a; background: rgba(255,255,255,.82); }
 .dash-tab-m.active {
-    background: var(--card-bg); color: var(--text);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
+    background: #0f172a; color: #fff;
+    box-shadow: 0 10px 20px rgba(15,23,42,.18);
 }
+body[data-theme="dark"] .dash-tab-m{ color:#94a3b8; }
+body[data-theme="dark"] .dash-tab-m:hover{ color:#e2e8f0; background:rgba(255,255,255,.06); }
+body[data-theme="dark"] .dash-tab-m.active{ background:#1d4ed8; color:#fff; box-shadow:none; }
 
 .dash-tab-sm {
-    border: none; background: transparent; padding: 0.4rem 0.8rem; border-radius: 8px;
-    font-weight: 600; font-size: 0.75rem; color: var(--dsh-muted); cursor: pointer;
-    transition: all 0.2s ease; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;
+    border: none; background: transparent; padding: .36rem .72rem; border-radius: 999px;
+    font-weight: 800; font-size: .72rem; color: var(--dsh-muted); cursor: pointer;
+    transition: all .2s ease; display: flex; align-items: center; gap: .35rem; white-space: nowrap;
 }
-.dash-tab-sm:hover { color: var(--text); }
+.dash-tab-sm:hover { color: #0f172a; background: rgba(255,255,255,.7); }
 .dash-tab-sm.active {
     background: var(--card-bg); color: var(--text);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 10px rgba(15,23,42,.08);
 }
 body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
+
+.ads-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:.75rem;
+    margin-bottom:.95rem;
+}
+
+.ads-kpi{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    min-height:172px;
+    border:1px solid rgba(148,163,184,.16);
+    border-radius:18px;
+    padding:1rem 1rem .95rem;
+    background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
+    box-shadow:0 12px 28px rgba(15,23,42,0.05);
+    overflow:hidden;
+}
+
+body[data-theme="dark"] .ads-kpi{
+    background:rgba(15,23,42,.92);
+    border-color:rgba(51,65,85,.85);
+    box-shadow:none;
+}
+
+.ads-kpi::before{
+    content:'';
+    position:absolute;
+    inset:0 auto auto 0;
+    width:100%;
+    height:3px;
+    background:linear-gradient(90deg,var(--kpi-accent-start,#334155),var(--kpi-accent-end,#94a3b8));
+}
+
+.ads-kpi.kpi-profit{ --kpi-accent-start:#16a34a; --kpi-accent-end:#22c55e; }
+.ads-kpi.kpi-revenue{ --kpi-accent-start:#2563eb; --kpi-accent-end:#38bdf8; }
+.ads-kpi.kpi-cogs{ --kpi-accent-start:#64748b; --kpi-accent-end:#94a3b8; }
+.ads-kpi.kpi-spend{ --kpi-accent-start:#b45309; --kpi-accent-end:#f59e0b; }
+.ads-kpi.kpi-roas{ --kpi-accent-start:#1d4ed8; --kpi-accent-end:#60a5fa; }
+
+.ads-kpi-label{
+    font-size:.62rem;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#334155;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    line-height:1.05;
+}
+
+.ads-kpi-value{
+    font-size:1.28rem;
+    font-weight:950;
+    line-height:1;
+    letter-spacing:-0.03em;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    color:var(--shp-text);
+    margin-top:.34rem;
+    margin-bottom:0;
+}
+
+.ads-kpi-sub{
+    margin-top:auto;
+    padding-top:.6rem;
+    border-top:1px dashed rgba(148,163,184,.22);
+    font-size:.62rem;
+    font-weight:900;
+    text-transform:none;
+    letter-spacing:0;
+    color:#64748b;
+}
+
+body[data-theme="dark"] .ads-kpi-label{ color:#cbd5e1; }
+body[data-theme="dark"] .ads-kpi-value{ color:#e2e8f0; }
+body[data-theme="dark"] .ads-kpi-sub{ color:#94a3b8; border-top-color:rgba(148,163,184,.18); }
 
 .kpi {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
     border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 1.25rem;
-    box-shadow: var(--card-shadow);
+    border-radius: 16px;
+    padding: 1rem 1rem .95rem;
+    box-shadow: 0 12px 28px rgba(15,23,42,.05);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
@@ -266,11 +617,11 @@ body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
     background: currentColor; opacity: 0.7;
 }
 .kpi:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 18px 34px rgba(15,23,42,.08);
 }
-.kpi-label { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display:flex; align-items:center; gap:0.5rem; opacity:0.8;}
-.kpi-value { font-size: 1.75rem; font-weight: 800; margin: 0.5rem 0; letter-spacing: -0.02em; }
+.kpi-label { font-size: .66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; display:flex; align-items:center; gap:0.5rem; opacity:0.82;}
+.kpi-value { font-size: 1.35rem; font-weight: 900; margin: 0.45rem 0 0.35rem; letter-spacing: -0.03em; }
 .kpi-sub { font-size: .75rem; opacity: 0.85; }
 
 /* ─── Mini Sync Log ─── */
@@ -395,6 +746,10 @@ body[data-theme="dark"] .dpanel-table-sm tbody td {
     .dpanel-table {
         min-width: 1000px; /* force horizontal scroll on mobile */
     }
+    .ads-hero .controls{
+        justify-content:flex-start;
+        width:100%;
+    }
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
@@ -405,40 +760,40 @@ body[data-theme="dark"] .dpanel-table-sm tbody td {
 
 /* Hero → topbar kompak ala ship-topbar */
 .dash-hero {
-    border-radius: 10px;
-    padding: .8rem 1rem;
-    margin-bottom: .9rem;
-    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 1rem 1.05rem;
+    margin-bottom: .85rem;
+    background: var(--hero-bg);
 }
-.dash-hero::before { display: none; }
-.dash-hero h1 { font-size: 1rem; font-weight: 750; letter-spacing: 0; }
-.dash-hero .sub { font-size: .78rem; margin-top: .15rem; }
+.dash-hero::before { width:180px; height:180px; right:-60px; top:-80px; background:rgba(59,130,246,.18); }
+.dash-hero h1 { font-size: 1.2rem; font-weight: 900; letter-spacing: -0.04em; color:#fff; }
+.dash-hero .sub { font-size: .78rem; margin-top: .25rem; color:rgba(226,232,240,.8); }
 .dash-hero .btn { margin-right: 0 !important; } /* gap parent sudah cukup */
 
 /* Kartu: flat seperti shipments — tanpa bayangan & hover-lift */
 .dpanel {
-    border-radius: 10px;
-    box-shadow: none;
+    border-radius: 14px;
+    box-shadow: 0 10px 22px rgba(15,23,42,.05);
 }
 .dpanel:hover {
     transform: none;
-    box-shadow: none;
+    box-shadow: 0 12px 26px rgba(15,23,42,.06);
 }
 
 /* Tab bar: rapat + sticky seperti topbar shipments */
 .dash-tabs-modern {
-    border-radius: 9px;
-    padding: .25rem;
-    box-shadow: none;
+    border-radius: 999px;
+    padding: .3rem;
+    box-shadow: 0 12px 28px rgba(15,23,42,.06);
     position: sticky;
     top: 0;
     z-index: 250;
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    background: linear-gradient(180deg, rgba(248,250,252,.96), rgba(241,245,249,.92));
+    border: 1px solid rgba(148,163,184,.18);
 }
-body[data-theme="dark"] .dash-tabs-modern { background: var(--card-bg); }
-.dash-tab-m { border-radius: 7px; font-size: .8rem; }
-.dash-tab-m.active { box-shadow: none; }
+body[data-theme="dark"] .dash-tabs-modern { background: linear-gradient(180deg, rgba(15,23,42,.96), rgba(30,41,59,.92)); border-color:rgba(51,65,85,.85); box-shadow:none; }
+.dash-tab-m { border-radius: 999px; font-size: .78rem; }
+.dash-tab-m.active { box-shadow: 0 10px 20px rgba(15,23,42,.18); }
 
 /* Tombol & chip: radius 7px konsisten, tanpa bayangan */
 .btn-pill, .role-chip, .mini-log-toggle { border-radius: 7px !important; box-shadow: none !important; }
@@ -469,7 +824,7 @@ body[data-theme="dark"] .dpanel-table thead th { color: #9ca3af; }
     background: rgba(148,163,184,.06);
     border: 1px solid var(--dsh-border);
     padding: .4rem .85rem .4rem 2.1rem;
-    border-radius: 7px;
+    border-radius: 12px;
     color: var(--text, #0f172a);
     font-weight: 650;
     font-size: .82rem;
@@ -530,6 +885,271 @@ body[data-theme="dark"] .dpanel-table thead th { color: #9ca3af; }
 body[data-theme="dark"] .ads-fp { background: #1e293b !important; }
 body[data-theme="dark"] .ads-fp .flatpickr-day { color: #e2e8f0; }
 body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
+
+/* Final UI pass: flat header + cleaner tabs, aligned with shipments/income */
+.ads-shell{
+    max-width:1040px;
+    margin-inline:auto;
+}
+
+.ads-hero{
+    top:0;
+    align-items:center;
+    padding:.45rem .75rem;
+    margin-bottom:.65rem;
+    margin-inline:-.75rem;
+    border-radius:0;
+    background:var(--card,#fff);
+    border:0;
+    border-bottom:1px solid var(--shp-border, rgba(148,163,184,.18));
+    box-shadow:none;
+    overflow:visible;
+}
+
+.ads-hero::before,
+.ads-hero::after{
+    display:none;
+}
+
+body[data-theme="dark"] .ads-hero{
+    background:var(--card,#0f172a);
+    border-bottom-color:rgba(51,65,85,.85);
+}
+
+.ads-eyebrow{
+    color:var(--shp-muted,#64748b);
+    letter-spacing:0;
+    margin-bottom:.12rem;
+}
+
+.ads-hero .title{
+    color:var(--text,#0f172a);
+    font-size:1rem;
+    font-weight:750;
+    letter-spacing:-0.03em;
+}
+
+.ads-hero .sub{
+    color:var(--shp-muted,#64748b);
+    font-size:.78rem;
+    max-width:44rem;
+}
+
+.ads-hero-badges{
+    margin-top:.45rem;
+    gap:.3rem;
+}
+
+.ads-chip{
+    padding:.28rem .55rem;
+    border-radius:7px;
+    border:1px solid rgba(148,163,184,.28);
+    background:transparent;
+    color:var(--text,#0f172a);
+    font-size:.68rem;
+    font-weight:700;
+}
+
+body[data-theme="dark"] .ads-chip{
+    background:rgba(15,23,42,.6);
+    border-color:rgba(51,65,85,.9);
+    color:#e2e8f0;
+}
+
+.ads-hero .controls{
+    gap:.35rem;
+}
+
+.ads-hero .role-chip,
+.ads-hero .btn-pill{
+    border-radius:7px!important;
+    padding-inline:.72rem!important;
+    font-size:.72rem!important;
+    font-weight:700!important;
+}
+
+.ads-hero .btn-ship-outline{
+    background:transparent!important;
+    color:var(--text,#0f172a)!important;
+    border-color:rgba(148,163,184,.35)!important;
+}
+
+.ads-tabs-wrap{
+    margin:0 0 .85rem;
+}
+
+.ads-tabs-wrap::before{
+    display:none;
+}
+
+.dash-tabs-modern{
+    display:inline-flex;
+    gap:.3rem;
+    padding:.3rem;
+    border-radius:999px;
+    background:linear-gradient(180deg, rgba(248,250,252,.96), rgba(241,245,249,.92));
+    border:1px solid rgba(148,163,184,.18);
+    box-shadow:0 12px 28px rgba(15,23,42,.06);
+    position:static;
+    top:auto;
+}
+
+body[data-theme="dark"] .dash-tabs-modern{
+    background:linear-gradient(180deg, rgba(15,23,42,.96), rgba(30,41,59,.92));
+    border-color:rgba(51,65,85,.85);
+    box-shadow:none;
+}
+
+.dash-tab-m{
+    border:none;
+    background:transparent;
+    color:#64748b;
+    border-radius:999px;
+    padding:.62rem .9rem;
+    font-size:.78rem;
+    font-weight:900;
+    letter-spacing:-0.01em;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:all .18s ease;
+}
+
+.dash-tab-m:hover{
+    color:#0f172a;
+    background:rgba(255,255,255,.82);
+}
+
+.dash-tab-m.active{
+    background:#0f172a;
+    color:#fff;
+    box-shadow:0 10px 20px rgba(15,23,42,.18);
+}
+
+body[data-theme="dark"] .dash-tab-m{
+    color:#94a3b8;
+}
+
+body[data-theme="dark"] .dash-tab-m:hover{
+    color:#e2e8f0;
+    background:rgba(255,255,255,.06);
+}
+
+body[data-theme="dark"] .dash-tab-m.active{
+    background:#1d4ed8;
+    color:#fff;
+    box-shadow:none;
+}
+
+.dash-tab-sm{
+    border:none;
+    background:transparent;
+    color:#64748b;
+    border-radius:999px;
+    padding:.34rem .68rem;
+    font-size:.7rem;
+    font-weight:800;
+    white-space:nowrap;
+    transition:all .15s ease;
+}
+
+.dash-tab-sm:hover{
+    color:#0f172a;
+    background:rgba(255,255,255,.7);
+}
+
+.dash-tab-sm.active{
+    background:var(--card-bg);
+    color:var(--text);
+    box-shadow:0 4px 10px rgba(15,23,42,.08);
+}
+
+body[data-theme="dark"] .dash-tab-sm{
+    color:#94a3b8;
+}
+
+body[data-theme="dark"] .dash-tab-sm:hover{
+    color:#e2e8f0;
+    background:rgba(255,255,255,.06);
+}
+
+body[data-theme="dark"] .dash-tab-sm.active{
+    background:var(--card-bg);
+    color:#e2e8f0;
+}
+
+.ads-surface{
+    border-radius:18px;
+}
+
+.ads-panel-head{
+    padding:.9rem 1rem;
+    margin-bottom:.85rem;
+    border-bottom:1px solid rgba(148,163,184,.16);
+}
+
+.ads-panel-title{
+    font-size:.98rem;
+    font-weight:900;
+    letter-spacing:-0.03em;
+}
+
+.ads-panel-note{
+    font-size:.74rem;
+}
+
+.dash-sec{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.75rem;
+    padding:.2rem 0 .45rem;
+    margin:0 0 .75rem;
+    border-bottom:1px solid rgba(148,163,184,.12);
+    font-size:.72rem;
+    font-weight:900;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:#334155;
+}
+
+body[data-theme="dark"] .dash-sec{
+    color:#cbd5e1;
+    border-bottom-color:rgba(51,65,85,.85);
+}
+
+.dash-sec i{
+    font-size:.9rem;
+}
+
+@media (max-width: 768px) {
+    .ads-hero{
+        padding:.5rem .65rem;
+        margin-bottom:.55rem;
+    }
+    .ads-hero .title{
+        font-size:.98rem;
+    }
+    .ads-hero .sub{
+        display:none;
+    }
+    .ads-hero-badges{
+        display:none;
+    }
+    .ads-hero .controls{
+        width:100%;
+        justify-content:flex-start;
+    }
+    .dash-tabs-modern{
+        width:max-content;
+        min-width:100%;
+    }
+    .dash-tab-m{
+        padding:.56rem .82rem;
+    }
+    .dash-sec{
+        font-size:.68rem;
+    }
+}
 
 @keyframes adsToastIn { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 </style>
@@ -595,12 +1215,38 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterForm = document.getElementById('filterForm');
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+    function canonicalQuery(params) {
+        return [...params.entries()]
+            .filter(([, value]) => value !== null && value !== undefined && String(value).length > 0)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+            .join('&');
+    }
+
+    window.submitAdsFilters = function (form) {
+        const targetForm = form || filterForm;
+        if (!targetForm) return false;
+
+        const currentQuery = canonicalQuery(new URLSearchParams(window.location.search));
+        const nextQuery = canonicalQuery(new FormData(targetForm));
+        if (currentQuery === nextQuery) return false;
+
+        if (window.__dashLoading) window.__dashLoading();
+        requestAnimationFrame(() => {
+            if (typeof targetForm.requestSubmit === 'function') {
+                targetForm.requestSubmit();
+            } else {
+                targetForm.submit();
+            }
+        });
+        return true;
+    };
     
     function applyRange(from, to) {
         fromEl.value = ymd(from);
         toEl.value = ymd(to);
-        if (window.__dashLoading) window.__dashLoading();
-        filterForm.submit();
+        window.submitAdsFilters(filterForm);
     }
 
     if(typeof flatpickr !== 'undefined' && rangePicker) {
@@ -698,7 +1344,6 @@ function fetchRealtimeStatus() {
             if (data.status === 'success') {
                 const bal = data.data.balance || {};
                 const toggle = data.data.toggle_info || {};
-                const facil = data.data.facil_rate || {};
                 
                 const formatRp = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
                 
@@ -713,14 +1358,6 @@ function fetchRealtimeStatus() {
                     topupHtml = `<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-x-circle-fill"></i> NON-AKTIF</span>`;
                 }
                 
-                // Ads Facil Status
-                let facilHtml = '';
-                if (facil.shop_rate && facil.shop_rate > 0) {
-                     facilHtml = `<span style="color: #2563eb; font-weight: 700;"><i class="bi bi-info-circle-fill"></i> TERSEDIA (${facil.shop_rate}%)</span>`;
-                } else {
-                     facilHtml = `<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-dash-circle-fill"></i> TIDAK TERSEDIA</span>`;
-                }
-
                 container.innerHTML = `
                     <div class="dpanel" style="padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05); animation: fadeIn 0.4s ease-out; display: flex; align-items: center; justify-content: space-between;">
                         <div>
@@ -733,13 +1370,6 @@ function fetchRealtimeStatus() {
                         <div>
                             <div style="font-size: 0.65rem; color: #15803d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;"><i class="bi bi-arrow-repeat"></i> Auto Top-Up</div>
                             <div style="font-size: 0.95rem; margin-top: 4px;">${topupHtml}</div>
-                        </div>
-                    </div>
-
-                    <div class="dpanel" style="padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(37, 99, 235, 0.2); background: rgba(37, 99, 235, 0.05); animation: fadeIn 0.4s ease-out; animation-delay: 0.2s; animation-fill-mode: both; display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <div style="font-size: 0.65rem; color: #1d4ed8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;"><i class="bi bi-globe"></i> Ads Fácil</div>
-                            <div style="font-size: 0.95rem; margin-top: 4px;">${facilHtml}</div>
                         </div>
                     </div>
                 `;
@@ -805,6 +1435,7 @@ function toggleCampaignStatus(el, campId, action) {
 
 @section('content')
 <div class="dash py-3">
+<div class="page-wrap ads-shell">
 
     {{-- Toast ringan pengganti alert() — tipe otomatis dari isi pesan --}}
     <div id="adsToastWrap" style="position:fixed; top:14px; right:14px; z-index:4000; display:flex; flex-direction:column; gap:.4rem; max-width:340px;"></div>
@@ -841,33 +1472,39 @@ function toggleCampaignStatus(el, campId, action) {
     {{-- ==============================================
          HERO SECTION (Header)
     ============================================== --}}
-    <div class="dash-hero">
+    <div class="ads-hero">
         <div>
-            <h1>Analisis Iklan Shopee</h1>
+            <div class="ads-eyebrow"><i class="bi bi-megaphone-fill"></i> Marketplace Ads</div>
+            <h1 class="title">Analisis Iklan Shopee</h1>
             <div class="sub">Pemantauan biaya, GMV, dan kontrol ROAS harian.</div>
+            <div class="ads-hero-badges">
+                <span class="ads-chip"><i class="bi bi-lightning-charge-fill"></i> ROAS Harian</span>
+                <span class="ads-chip"><i class="bi bi-wallet2"></i> Kontrol Biaya</span>
+                <span class="ads-chip"><i class="bi bi-graph-up-arrow"></i> Optimasi Kampanye</span>
+            </div>
         </div>
-        <div style="position: relative; text-align: right;">
+        <div class="controls" style="position: relative; text-align: right; display:flex; flex-wrap:wrap;">
             @if(isset($syncRuns) && $syncRuns->isNotEmpty())
                 @php
                     $latestRun = $syncRuns->first();
                     $lastSuccess = $lastSuccessRun ?? null;
                 @endphp
                 @if($latestRun->status === 'error')
-                    <div style="font-size: 0.7rem; color: #dc2626; text-align: right; margin-bottom: 0.25rem; font-weight: 600;">
+                    <div class="ads-hero-meta ads-hero-error">
                         <i class="bi bi-exclamation-triangle-fill"></i> Sync Gagal: {{ Str::limit($latestRun->error_message, 60) }}
                     </div>
                 @endif
-                <div style="font-size: 0.72rem; color: var(--dsh-muted); text-align: right; margin-bottom: 0.35rem; font-weight: 500;">
+                <div class="ads-hero-meta">
                     @if($lastSuccess)
                         <span style="color: #16a34a;"><i class="bi bi-check-circle-fill"></i></span>
-                        Terakhir Sync: {{ $lastSuccess->updated_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }}
+                        Terakhir Sync: {{ $lastSuccess->updated_at?->timezone('Asia/Jakarta')?->format('d M Y, H:i') ?? 'waktu tidak tersedia' }}
                     @else
                         <span style="color: #eab308;"><i class="bi bi-clock"></i></span>
                         Belum pernah sync berhasil
                     @endif
                 </div>
             @endif
-            <div style="display: flex; gap: .5rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+            <div class="ads-hero-actions" style="display: flex; gap: .5rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
                 <div id="syncCountdown" class="role-chip live-btn live-off">
                     <i class="bi bi-clock-history"></i> Menghitung...
                 </div>
@@ -907,7 +1544,7 @@ function toggleCampaignStatus(el, campId, action) {
     <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="dash-filter" id="filterForm">
         <div class="filter-item">
             <label>Toko Shopee</label>
-            <select name="store_id" onchange="__dashLoading(); this.form.submit()">
+            <select name="store_id" onchange="submitAdsFilters(this.form)">
                 <option value="all" {{ $storeId == 'all' ? 'selected' : '' }}>&#127970; Semua Toko</option>
                 @foreach($stores as $s)
                     <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
@@ -925,7 +1562,7 @@ function toggleCampaignStatus(el, campId, action) {
         </div>
         <div class="filter-item">
             <label>Bandingkan:</label>
-            <select name="compare_mode" onchange="__dashLoading(); this.form.submit()" style="background: rgba(148,163,184,.06); border: 1px solid var(--dsh-border); padding: .4rem .85rem; border-radius: 8px; color: var(--text, #0f172a); font-weight: 600; font-size: .85rem;">
+            <select name="compare_mode" onchange="submitAdsFilters(this.form)">
                 <option value="prev_period" {{ (isset($compareMode) && $compareMode == 'prev_period') ? 'selected' : '' }}>Durasi Sama (Sblmnya)</option>
                 <option value="prev_month" {{ (isset($compareMode) && $compareMode == 'prev_month') ? 'selected' : '' }}>Bulan Lalu (Tgl Sama)</option>
                 <option value="prev_year" {{ (isset($compareMode) && $compareMode == 'prev_year') ? 'selected' : '' }}>Tahun Lalu (Tgl Sama)</option>
@@ -942,12 +1579,12 @@ function toggleCampaignStatus(el, campId, action) {
         {{-- ==============================================
              TABS (SEGMENTED CONTROL)
         ============================================== --}}
-        <div style="margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
+        <div class="ads-tabs-wrap" style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
             <div class="dash-tabs-modern">
-                <button class="dash-tab-m active" data-target="tab-dashboard"><i class="bi bi-grid-1x2"></i> Ringkasan Utama</button>
+                <button class="dash-tab-m active" data-target="tab-dashboard"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
                 <button class="dash-tab-m" data-target="tab-campaigns"><i class="bi bi-megaphone"></i> Kampanye</button>
-                <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Performa Produk</button>
-                <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profitabilitas</button>
+                <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Produk</button>
+                <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profit</button>
                 <button class="dash-tab-m" data-target="tab-sync"><i class="bi bi-arrow-repeat"></i> Sync <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
         </div>
@@ -960,7 +1597,7 @@ function toggleCampaignStatus(el, campId, action) {
         <div class="tab-pane active" id="tab-dashboard">
             
             <!-- Live Progress Bar (Hidden by default) -->
-            <div id="liveSyncProgress" class="dpanel mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
+            <div id="liveSyncProgress" class="dpanel ads-surface mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi Sedang Berjalan...</span>
                     <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
@@ -1003,37 +1640,37 @@ function toggleCampaignStatus(el, campId, action) {
                 <span><i class="bi bi-piggy-bank text-success"></i> Profitabilitas Periode Ini</span>
                 <a href="javascript:void(0)" onclick="document.querySelector('.dash-tab-m[data-target=&quot;tab-profit&quot;]').click()" style="font-size:.7rem; font-weight:700; color:var(--dsh-accent); text-decoration:none;">Lihat rincian &rarr;</a>
             </div>
-            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: .75rem;">
-                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.3); background:rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.06);">
-                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }};"><i class="bi bi-piggy-bank"></i> Net Profit</div>
-                    <div style="font-size:1.25rem; font-weight:800; color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }}; font-variant-numeric:tabular-nums;">{{ $rProfit < 0 ? '-' : '' }}{{ $rfmt($rProfit) }}</div>
-                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">{{ $rUntung }} untung &bull; {{ $rRugi }} rugi &bull; <span style="font-weight:700; color:{{ $dProfit >= 0 ? '#16a34a' : '#dc2626' }};"><i class="bi bi-arrow-{{ $dProfit >= 0 ? 'up' : 'down' }}-right"></i> {{ number_format(abs($dProfit), 1, ',', '.') }}%</span> vs lalu</div>
+            <div class="ads-kpi-grid mb-4">
+                <div class="dpanel ads-kpi kpi-profit" style="border-color:rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.28); background:linear-gradient(180deg, rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.08), rgba(248,250,252,1));">
+                    <div class="ads-kpi-label" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }};"><i class="bi bi-piggy-bank"></i> Net Profit</div>
+                    <div class="ads-kpi-value" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }}; font-variant-numeric:tabular-nums;">{{ $rProfit < 0 ? '-' : '' }}{{ $rfmt($rProfit) }}</div>
+                    <div class="ads-kpi-sub">{{ $rUntung }} untung &bull; {{ $rRugi }} rugi &bull; <span style="font-weight:900; color:{{ $dProfit >= 0 ? '#16a34a' : '#dc2626' }};"><i class="bi bi-arrow-{{ $dProfit >= 0 ? 'up' : 'down' }}-right"></i> {{ number_format(abs($dProfit), 1, ',', '.') }}%</span> vs lalu</div>
                 </div>
-                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(3,105,161,.25); background:rgba(3,105,161,.05);">
-                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#0369a1;"><i class="bi bi-cash-coin"></i> Pendapatan Bersih</div>
-                    <div style="font-size:1.25rem; font-weight:800; color:#0369a1; font-variant-numeric:tabular-nums;">{{ $rfmt($rNetRevenue) }}</div>
-                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">Omzet (GMV): {{ $rfmt($rGmv) }}</div>
+                <div class="dpanel ads-kpi kpi-revenue" style="border-color:rgba(3,105,161,.25); background:linear-gradient(180deg, rgba(3,105,161,.07), rgba(248,250,252,1));">
+                    <div class="ads-kpi-label" style="color:#0369a1;"><i class="bi bi-cash-coin"></i> Pendapatan Bersih</div>
+                    <div class="ads-kpi-value" style="color:#0369a1; font-variant-numeric:tabular-nums;">{{ $rfmt($rNetRevenue) }}</div>
+                    <div class="ads-kpi-sub">Omzet (GMV): {{ $rfmt($rGmv) }}</div>
                 </div>
-                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(148,163,184,.3); background:rgba(148,163,184,.06);">
-                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--dsh-muted);"><i class="bi bi-box-seam"></i> Modal (HPP)</div>
-                    <div style="font-size:1.25rem; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rCogs) }}</div>
-                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">dari pcs terjual &times; HPP</div>
+                <div class="dpanel ads-kpi kpi-cogs" style="border-color:rgba(148,163,184,.3); background:linear-gradient(180deg, rgba(148,163,184,.08), rgba(248,250,252,1));">
+                    <div class="ads-kpi-label" style="color:var(--dsh-muted);"><i class="bi bi-box-seam"></i> Modal (HPP)</div>
+                    <div class="ads-kpi-value" style="color:var(--text); font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rCogs) }}</div>
+                    <div class="ads-kpi-sub">dari pcs terjual &times; HPP</div>
                 </div>
-                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(245,158,11,.3); background:rgba(245,158,11,.06);">
-                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#b45309;"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
-                    <div style="font-size:1.25rem; font-weight:800; color:#92400e; font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rSpend * 1.11) }}</div>
-                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">nyata {{ $rfmt($rSpend) }} + PPN 11%</div>
+                <div class="dpanel ads-kpi kpi-spend" style="border-color:rgba(245,158,11,.3); background:linear-gradient(180deg, rgba(245,158,11,.08), rgba(248,250,252,1));">
+                    <div class="ads-kpi-label" style="color:#b45309;"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
+                    <div class="ads-kpi-value" style="color:#92400e; font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rSpend * 1.11) }}</div>
+                    <div class="ads-kpi-sub">nyata {{ $rfmt($rSpend) }} + PPN 11%</div>
                 </div>
-                <div class="dpanel" style="padding:.85rem 1rem; border:1px solid rgba(37,99,235,.25); background:rgba(37,99,235,.05);">
-                    <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#1d4ed8;"><i class="bi bi-lightning-charge"></i> ROAS &bull; Pesanan</div>
-                    <div style="font-size:1.25rem; font-weight:800; color:#1d4ed8; font-variant-numeric:tabular-nums;">{{ number_format($rRoas, 2, ',', '.') }}x <span style="font-size:.85rem; color:var(--text);">&bull; {{ number_format($rOrders, 0, ',', '.') }}</span></div>
-                    <div style="font-size:.62rem; color:var(--dsh-muted); margin-top:2px;">omzet per rupiah iklan &bull; total order</div>
+                <div class="dpanel ads-kpi kpi-roas" style="border-color:rgba(37,99,235,.25); background:linear-gradient(180deg, rgba(37,99,235,.07), rgba(248,250,252,1));">
+                    <div class="ads-kpi-label" style="color:#1d4ed8;"><i class="bi bi-lightning-charge"></i> ROAS &bull; Pesanan</div>
+                    <div class="ads-kpi-value" style="color:#1d4ed8; font-variant-numeric:tabular-nums;">{{ number_format($rRoas, 2, ',', '.') }}x <span style="font-size:.85rem; color:var(--text);">&bull; {{ number_format($rOrders, 0, ',', '.') }}</span></div>
+                    <div class="ads-kpi-sub">omzet per rupiah iklan &bull; total order</div>
                 </div>
             </div>
 
             {{-- INFORMASI SALDO & STATUS TOKO (REAL-TIME) --}}
             <div class="dash-sec"><i class="bi bi-wallet2 text-primary"></i> Informasi Saldo & Status Toko (Real-time)</div>
-            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;" id="realtimeStatusContainer">
+            <div class="ads-surface mb-4 p-3" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;" id="realtimeStatusContainer">
                 {{-- Skeleton Loaders --}}
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
                     <div class="placeholder-glow">
@@ -1059,7 +1696,7 @@ function toggleCampaignStatus(el, campId, action) {
 
             <hr class="my-4" style="border-color: var(--dsh-border);">
             
-            <div class="dash-sec-focal mt-4 mb-3 p-3 p-md-4" style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+            <div class="ads-surface mt-4 mb-3 p-3 p-md-4">
                 <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
                     <div>
                         <div class="dash-sec mb-1" style="font-size: 0.95rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis</div>
@@ -1671,6 +2308,7 @@ function toggleCampaignStatus(el, campId, action) {
 
         <!-- SINKRONISASI LOG (MODAL) -->
     @endif
+</div>
 </div>
 
 <!-- Modal GMS Settings -->

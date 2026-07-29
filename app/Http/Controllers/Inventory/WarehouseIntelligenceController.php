@@ -40,8 +40,10 @@ class WarehouseIntelligenceController extends Controller
         // We need all items for the basic filter placeholders
         $items = \App\Models\Item::with('category:id,name')->select('id', 'code', 'name', 'item_category_id')->get();
         $categories = $items->pluck('category')->filter()->unique('id')->sortBy('name')->values();
+        $filters = $request->only(['item_id', 'category_id']);
+        $aiInsights = $this->buildInsights($tab, $filters);
 
-        return view('inventory.warehouse_intelligence.index', compact('tab', 'categories', 'items'));
+        return view('inventory.warehouse_intelligence.index', compact('tab', 'categories', 'items', 'filters', 'aiInsights'));
     }
 
     public function tabData(Request $request)
@@ -203,6 +205,136 @@ class WarehouseIntelligenceController extends Controller
         }
 
         return '';
+    }
+
+    public function insights(Request $request)
+    {
+        $role = strtolower((string)(auth()->user()?->role ?? 'owner'));
+
+        $allowedTabs = self::TABS;
+        if ($role === 'admin') {
+            $allowedTabs = ['rts'];
+        } elseif ($role === 'operating') {
+            $allowedTabs = ['prd'];
+        }
+
+        $tab = $request->input('tab');
+        if (!$tab || !in_array($tab, $allowedTabs, true)) {
+            $tab = $allowedTabs[0] ?? 'rts';
+        }
+
+        $filters = $request->only(['item_id', 'category_id']);
+
+        return response()->json([
+            'html' => view('inventory.warehouse_intelligence.partials._insights', [
+                'insights' => $this->buildInsights($tab, $filters),
+            ])->render(),
+        ]);
+    }
+
+    private function buildInsights(string $tab, array $filters): array
+    {
+        $rows = $this->intelligenceService->rows($filters);
+
+        $critical = $rows->filter(fn ($r) => ($r->ads ?? 0) > 0 && (($r->ready ?? 0) + ($r->wh_prd ?? 0) + ($r->wip ?? 0)) <= (($r->ads ?? 0) * 7));
+        $topRestock = $rows->filter(fn ($r) => ($r->suggested_qty ?? 0) > 0)->sortByDesc('suggested_qty')->take(5)->values();
+
+        $actions = collect();
+
+        if ($tab === 'rts') {
+            $actions = $rows
+                ->filter(fn ($r) => ($r->ads ?? 0) > 0)
+                ->map(function ($r) {
+                    $available = max(0, (float) (($r->ready ?? 0) - ($r->ready_allocated ?? 0)));
+                    $minThreshold = $r->rts_min_display ?? max(5, ceil(($r->ads ?? 0) * 7));
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) > 0) {
+                        return [
+                            'title' => 'Tarik dari PRD',
+                            'sku' => $r->sku,
+                            'label' => 'Kirim ' . number_format((float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0), 0, ',', '.') . ' pcs',
+                            'reason' => 'Stok RTS di bawah batas aman dan PRD masih tersedia.',
+                            'tone' => 'success',
+                        ];
+                    }
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0 && ($r->production_source ?? '') === 'buy') {
+                        return [
+                            'title' => 'Buat Purchase Request',
+                            'sku' => $r->sku,
+                            'label' => 'Perlu beli',
+                            'reason' => 'Stok kritis, tidak ada pasokan PRD, dan item ini berasal dari pembelian.',
+                            'tone' => 'warning',
+                        ];
+                    }
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0) {
+                        return [
+                            'title' => 'Prioritaskan Produksi',
+                            'sku' => $r->sku,
+                            'label' => 'Cek cutting / jahit',
+                            'reason' => 'Stok mendekati habis dan perlu dipenuhi dari proses produksi.',
+                            'tone' => 'danger',
+                        ];
+                    }
+
+                    return null;
+                })
+                ->filter()
+                ->take(4)
+                ->values();
+        } else {
+            $actions = $rows
+                ->filter(fn ($r) => ($r->ads ?? 0) > 0)
+                ->map(function ($r) {
+                    $total = (float) (($r->ready ?? 0) + ($r->wh_prd ?? 0) + ($r->wip ?? 0));
+                    $target60d = (float) (($r->ads ?? 0) * 60);
+
+                    if (($r->wh_prd ?? 0) > 0 && (($r->ready ?? 0) <= (($r->rts_min_display ?? max(5, ceil(($r->ads ?? 0) * 7)))))) {
+                        return [
+                            'title' => 'Siapkan Transfer ke RTS',
+                            'sku' => $r->sku,
+                            'label' => 'Kirim ' . number_format((float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0), 0, ',', '.') . ' pcs',
+                            'reason' => 'Barang tersedia di PRD dan RTS sudah masuk zona kritis.',
+                            'tone' => 'success',
+                        ];
+                    }
+
+                    if (($r->wh_prd ?? 0) <= 0 && ($r->wip ?? 0) > 0 && (($r->ready ?? 0) + ($r->wh_prd ?? 0)) <= (($r->rts_min_display ?? max(5, ceil(($r->ads ?? 0) * 7))))) {
+                        return [
+                            'title' => 'Prioritaskan Jahit',
+                            'sku' => $r->sku,
+                            'label' => 'Ambil WIP',
+                            'reason' => 'RTS kosong, PRD kosong, tetapi masih ada stok WIP yang bisa diselesaikan.',
+                            'tone' => 'warning',
+                        ];
+                    }
+
+                    if ($total < $target60d && ($r->production_source ?? '') !== 'buy') {
+                        return [
+                            'title' => 'Jadwalkan Cutting',
+                            'sku' => $r->sku,
+                            'label' => 'Kejar 60 hari cover',
+                            'reason' => 'Total stok global masih di bawah target 60 hari penjualan.',
+                            'tone' => 'danger',
+                        ];
+                    }
+
+                    return null;
+                })
+                ->filter()
+                ->take(4)
+                ->values();
+        }
+
+        return [
+            'criticalCount' => $critical->count(),
+            'topRestockCount' => $topRestock->count(),
+            'topRestock' => $topRestock,
+            'actions' => $actions,
+            'generatedAt' => now(),
+            'tab' => $tab,
+        ];
     }
 
     public function updateLimits(Request $request)
