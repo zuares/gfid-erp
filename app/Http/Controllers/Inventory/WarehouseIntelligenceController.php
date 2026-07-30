@@ -1345,7 +1345,7 @@ class WarehouseIntelligenceController extends Controller
             'rows' => $payloadRows,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($apiKey, $tab, $summary, $payloadRows, $signals, $actions, $watchlist) {
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($apiKey, $tab, $summary, $payloadRows, $signals, $actions, $watchlist, $priorityCandidates) {
             $system = <<<'TXT'
 Kamu adalah analis inventory untuk GreatFit.
 Tugasmu membaca data gudang yang diberikan dan menulis rekomendasi yang benar-benar berbasis angka.
