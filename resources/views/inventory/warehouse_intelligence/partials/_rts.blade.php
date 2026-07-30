@@ -4,53 +4,70 @@
         <div>Semua stok di WH-RTS dalam kondisi aman! Tidak ada item mendesak.</div>
     </div>
 @else
+    @php
+        $activePrDraft = $rows->firstWhere('pr_draft_id');
+        $activePoDraft = $rows->firstWhere('po_draft_id');
+    @endphp
 
     <div class="card-main mb-3 p-3">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span style="font-size: .82rem; font-weight: 800; color: #111827; margin-right: .25rem;">Filter Operasional:</span>
-            <button class="btn-filter-rts active sd-btn sd-primary" data-filter="all"><i class="bi bi-grid"></i> Semua Item</button>
-            <button class="btn-filter-rts sd-btn" data-filter="kritis" style="color: #d97706;"><i class="bi bi-exclamation-triangle"></i> Stok Kritis</button>
-            <button class="btn-filter-rts sd-btn" data-filter="tarik_prd" style="color: #059669;"><i class="bi bi-box-seam"></i> Tersedia di PRD</button>
-            <button class="btn-filter-rts sd-btn" data-filter="beli_jadi" style="color: #dc2626;"><i class="bi bi-cart-plus"></i> Perlu Beli (PR)</button>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div style="min-width:0; flex:1 1 340px;">
+                <div style="font-size:.82rem;font-weight:800;color:#111827;">Filter Operasional</div>
+                <div class="text-muted-ii" style="font-size:.72rem; line-height:1.45;">
+                    Pilih biar daftar lebih fokus. Di desktop, kamu bisa langsung lihat item yang butuh ditarik, dibeli, atau dijahit.
+                    Kalau PR draft sudah ada, lanjut pilih supplier untuk bikin PO draft.
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 justify-content-start justify-content-md-end">
+                <button class="btn-filter-rts active sd-btn sd-primary" data-filter="all"><i class="bi bi-grid"></i> Semua item</button>
+                <button class="btn-filter-rts sd-btn" data-filter="kritis" style="color: #d97706;"><i class="bi bi-exclamation-triangle"></i> Stok tipis</button>
+                <button class="btn-filter-rts sd-btn" data-filter="tarik_prd" style="color: #059669;"><i class="bi bi-box-seam"></i> Siap dipindah</button>
+                <button class="btn-filter-rts sd-btn" data-filter="beli_jadi" style="color: #dc2626;"><i class="bi bi-cart-plus"></i> Perlu beli</button>
+            </div>
             
             <div class="ms-auto d-flex gap-2" id="bulk-action-container" style="display: none;">
                 <button class="sd-btn sd-primary" id="btn-bulk-minta" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
-                    Tarik PRD Masal (<span id="bulk-count">0</span>)
+                    Pindah dari PRD Masal (<span id="bulk-count">0</span>)
                 </button>
                 <button class="sd-btn sd-primary" id="btn-bulk-pr" style="display: none;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                     Buat PR Masal (<span id="bulk-pr-count">0</span>)
                 </button>
             </div>
+            @if($activePoDraft)
+                <a href="{{ route('purchasing.purchase_orders.show', data_get($activePoDraft, 'po_draft_id')) }}" class="sd-btn rts-scope-beli" style="background:#ecfdf5;color:#166534;border-color:rgba(34,197,94,.25);font-weight:800;">
+                    Lihat PO draft
+                </a>
+            @elseif($activePrDraft)
+                <a href="{{ route('purchasing.purchase_requests.allocate_suppliers', data_get($activePrDraft, 'pr_draft_id')) }}" class="sd-btn rts-scope-beli" style="background:#f8fafc;color:#7c3aed;border-color:rgba(124,58,237,.25);font-weight:800;">
+                    Pilih supplier
+                </a>
+            @endif
         </div>
     </div>
 
     <div class="card-main">
-        <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
-            <table class="table table-hover table-sm align-middle table-list m-0 sortable-table">
-                <thead style="background: rgba(248, 250, 252, 0.9); position: sticky; top: 0; z-index: 10; font-size: .8rem;">
+        <div class="table-responsive" style="max-height: 72vh; overflow-y: auto;">
+            <table class="table table-hover table-sm align-middle table-list m-0 sortable-table" style="min-width: 960px;">
+                <thead style="background: rgba(248, 250, 252, 0.95); position: sticky; top: 0; z-index: 10; font-size: .8rem;">
                     <tr>
                         <th style="padding-left: 1rem; cursor: pointer;" class="sortable" data-sort="string">SKU & Produk <span class="sort-icon"></span></th>
-                        <th class="text-end sortable" style="cursor: pointer;" data-sort="float" title="Laju penjualan harian (ADS)">Jual/Hr <span class="sort-icon"></span></th>
-                        <th class="text-center" style="width: 130px;">Min-Max Disp</th>
-                        <th class="text-end sortable" style="cursor: pointer;" data-sort="int">
-                            {{ auth()->user()?->role === 'admin' || auth()->user()?->isOwner() ? 'Stok Gudang' : 'Stok RTS' }} 
-                            <span class="sort-icon"></span>
+                        <th class="text-end sortable" style="cursor: pointer;" data-sort="float" title="Rata-rata penjualan harian">Jual / hari <span class="sort-icon"></span></th>
+                        <th class="text-start" style="min-width: 290px;" title="Ringkasan stok dan batas aman">
+                            Ringkasan stok
                         </th>
-                        <th class="text-end sortable" style="cursor: pointer;" data-sort="float" title="Estimasi hari stok">
-                            Cover 
-                            <span class="sort-icon"></span>
+                        <th class="text-start" style="min-width: 240px;" title="Status tindakan dan draft">
+                            Tindak lanjut
                         </th>
-                        <th class="text-end sortable" style="cursor: pointer;" data-sort="int">Stok Produksi <span class="sort-icon"></span></th>
-                        <th class="text-center">Saran</th>
-                        <th class="text-end sortable" style="padding-right: 1rem; cursor: pointer;" data-sort="int">Aksi <span class="sort-icon"></span></th>
                     </tr>
                 </thead>
                 <tbody id="rts-tbody">
                     @foreach ($rows as $r)
                         @php
-                            $isKritis = max(0, $r->ready - $r->ready_allocated) <= ($r->rts_min_display ?? max(5, ceil($r->ads * 7)));
+                            $effectiveMin = $r->rts_min_effective ?? max(5, ceil($r->ads * 7));
+                            $effectiveMax = $r->rts_max_effective ?? ceil($r->ads * 14);
+                            $isKritis = max(0, $r->ready - $r->ready_allocated) <= $effectiveMin;
                         @endphp
                         <tr class="rts-row" 
                             data-kritis="{{ $isKritis ? '1' : '0' }}" 
@@ -62,85 +79,95 @@
                                 <div class="text-muted-ii" style="font-size: .7rem;">{{ $r->product }}</div>
                                 <div class="d-flex align-items-center gap-2 mt-1">
                                     <span class="text-muted-ii" style="font-size: .65rem;">{{ $r->category }}</span>
-                                </div>
-                            </td>
-                            <td class="text-end text-muted">{{ $fmt($r->ads, 1) }}</td>
-                            <td class="text-center">
-                                <div class="rts-limit-view" id="limit-view-{{ $r->item_id }}">
-                                    @if($r->rts_min_display !== null || $r->rts_max_display !== null)
-                                        <span class="fw-semibold">{{ $r->rts_min_display ?? '-' }} - {{ $r->rts_max_display ?? '-' }}</span>
-                                    @else
-                                        <span class="text-muted-ii fst-italic">Auto</span>
-                                    @endif
-                                    <button class="btn btn-sm btn-link text-muted p-0 ms-1 btn-edit-limit" 
+                                    <button class="btn btn-sm btn-link text-muted p-0 btn-edit-limit"
                                         data-id="{{ $r->item_id }}" 
                                         data-sku="{{ $r->sku }}"
-                                        data-min="{{ $r->rts_min_display ?? '' }}"
-                                        data-max="{{ $r->rts_max_display ?? '' }}"
-                                        data-def-min="{{ max(5, ceil($r->ads * 7)) }}"
-                                        data-def-max="{{ ceil($r->ads * 14) }}"
+                                        data-min="{{ ($r->rts_min_display ?? 0) > 0 ? $r->rts_min_display : '' }}"
+                                        data-max="{{ ($r->rts_max_display ?? 0) > 0 ? $r->rts_max_display : '' }}"
+                                        data-def-min="{{ $effectiveMin }}"
+                                        data-def-max="{{ $effectiveMax }}"
                                         title="Edit Limit">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                     </button>
                                 </div>
                             </td>
-                            <td class="text-end fw-bold {{ $isKritis ? 'text-danger' : 'text-warning' }}">
-                                {{ $fmt(max(0, $r->ready - $r->ready_allocated)) }}
-                                <div class="text-muted-ii" style="font-size: .65rem; font-weight: normal;">
-                                    Fisik: {{ $fmt($r->ready) }}
+                            <td class="text-end text-muted">{{ $fmt($r->ads, 1) }}</td>
+                            <td>
+                                <div class="rts-stock-grid">
+                                    <div class="rts-stock-metric">
+                                        <div class="rts-stock-label">{{ auth()->user()?->role === 'admin' || auth()->user()?->isOwner() ? 'Stok RTS' : 'Stok di RTS' }}</div>
+                                        <div class="rts-stock-value {{ $isKritis ? 'text-danger' : 'text-warning' }}">{{ $fmt(max(0, $r->ready - $r->ready_allocated)) }}</div>
+                                        <div class="rts-stock-note">fisik {{ $fmt($r->ready) }}</div>
+                                    </div>
+                                    <div class="rts-stock-metric">
+                                        <div class="rts-stock-label">Cukup untuk</div>
+                                        <div class="rts-stock-value">{{ $fmt($r->rts_cover, 1) }} hari</div>
+                                        <div class="rts-stock-note">perkiraan stok aman</div>
+                                    </div>
+                                    <div class="rts-stock-metric">
+                                        <div class="rts-stock-label">Batas aman</div>
+                                        <div class="rts-stock-value">
+                                            {{ ($r->rts_min_display ?? 0) > 0 || ($r->rts_max_display ?? 0) > 0 ? (($r->rts_min_display ?? 0) > 0 ? $r->rts_min_display : $effectiveMin) . ' - ' . (($r->rts_max_display ?? 0) > 0 ? $r->rts_max_display : $effectiveMax) : 'Otomatis' }}
+                                        </div>
+                                        <div class="rts-stock-note">limit display</div>
+                                    </div>
+                                    <div class="rts-stock-metric">
+                                        <div class="rts-stock-label">Stok produksi</div>
+                                        <div class="rts-stock-value">{{ $r->wh_prd > 0 ? $fmt($r->wh_prd) : '0' }}</div>
+                                        <div class="rts-stock-note">siap dipindah</div>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="text-end fw-semibold">
-                                @if($r->rts_cover < 3)
-                                    <span class="text-danger">{{ $fmt($r->rts_cover, 1) }} hr</span>
-                                @elseif($r->rts_cover < 7)
-                                    <span class="text-warning" style="color: #d97706 !important;">{{ $fmt($r->rts_cover, 1) }} hr</span>
-                                @else
-                                    <span class="text-muted-ii">{{ $fmt($r->rts_cover, 1) }} hr</span>
-                                @endif
-                            </td>
-                            <td class="text-end">
-                                @if($r->wh_prd > 0)
-                                    <span class="fw-bold" style="color: #059669;">{{ $fmt($r->wh_prd) }}</span>
-                                @else
-                                    <span class="text-muted-ii">0</span>
-                                @endif
-                            </td>
-                            <td class="text-center" style="font-size: .75rem;">
-                                @if($isKritis && $r->wh_prd > 0)
-                                    <span style="color: #059669; font-weight: 600;"><i class="bi bi-box-seam me-1"></i>Tarik PRD ({{ $fmt($r->minta_prd) }})</span>
-                                @elseif($isKritis && $r->wh_prd == 0 && $r->production_source === 'buy')
-                                    <span style="color: #d97706; font-weight: 600;"><i class="bi bi-cart-plus me-1"></i>Beli ({{ $fmt(max(1, $r->rts_deficit)) }})</span>
-                                @elseif($isKritis && $r->wh_prd == 0 && $r->production_source !== 'buy')
-                                    <span style="color: #dc2626; font-weight: 600;"><i class="bi bi-scissors me-1"></i>Jahit ({{ $fmt(max(1, $r->rts_deficit)) }})</span>
-                                @elseif(!$isKritis)
-                                    <span style="color: #94a3b8; font-weight: 600;"><i class="bi bi-check-circle me-1"></i>Aman</span>
-                                @else
-                                    <span style="color: #94a3b8; font-weight: 600;">-</span>
-                                @endif
-                            </td>
-                            <td class="text-end" style="padding-right: 1rem;">
-                                @if($r->draft_id)
-                                    <a href="{{ route('rts.stock-requests.show', $r->draft_id) }}" class="btn btn-sm" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat draft">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                        Lihat Draft
-                                    </a>
-                                @elseif($r->wh_prd > 0 && $r->minta_prd > 0)
-                                    <button type="button" class="btn btn-sm btn-minta-stok" data-item="{{ $r->item_id }}" data-qty="{{ $r->minta_prd }}" style="background: #10b981; color: #fff; border: 1px solid #059669; font-weight: 600; font-size: .75rem; border-radius: 7px; padding: .25rem .6rem; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(16,185,129,0.2);" title="Tarik Stok dari PRD">
-                                        <i class="bi bi-box-seam"></i>
-                                        Tarik PRD ({{ $fmt($r->minta_prd) }})
-                                    </button>
-                                @elseif($r->pr_draft_id)
-                                    <a href="{{ route('purchasing.purchase_requests.edit', $r->pr_draft_id) }}" class="btn btn-sm" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat PR Draft">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                        Lihat Draft PR
-                                    </a>
-                                @elseif($r->wh_prd == 0 && $r->production_source === 'buy')
-                                    <button type="button" class="btn btn-sm btn-minta-pr" data-item="{{ $r->item_id }}" data-qty="{{ max(1, $r->rts_deficit) }}" style="background: #fffbeb; color: #d97706; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Buat Purchase Request">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-                                        Buat PR (Beli)
-                                    </button>
-                                @endif
+                            <td style="padding-right: 1rem;">
+                                <div class="rts-action-stack" style="font-size: .75rem;">
+                                    <div class="rts-action-line">
+                                        @if($r->pr_draft_id)
+                                            <a href="{{ route('purchasing.purchase_requests.allocate_suppliers', $r->pr_draft_id) }}" class="rts-draft-note rts-scope-beli" title="Pilih supplier">
+                                                PR draft siap pilih supplier
+                                            </a>
+                                        @elseif($isKritis && $r->wh_prd > 0)
+                                            <span class="rts-action-chip rts-scope-tarik" style="color: #059669; background: #ecfdf5; border-color: #bbf7d0;">
+                                                <i class="bi bi-box-seam me-1"></i>Siap dipindah
+                                            </span>
+                                        @elseif($isKritis && $r->wh_prd == 0 && $r->production_source !== 'buy')
+                                            <span class="rts-action-chip" style="color: #dc2626; background: #fef2f2; border-color: #fecaca;">
+                                                <i class="bi bi-scissors me-1"></i>Perlu jahit
+                                            </span>
+                                        @elseif(!$isKritis)
+                                            <span class="rts-action-chip" style="color: #475569; background: #f8fafc; border-color: #e2e8f0;">
+                                                <i class="bi bi-check-circle me-1"></i>Aman
+                                            </span>
+                                        @elseif($r->wh_prd == 0 && $r->production_source === 'buy')
+                                            <span class="rts-action-chip" style="color: #b45309; background: #fffbeb; border-color: #fde68a;">
+                                                {{ $r->buy_pr_qty_label ?? $fmt(max(1, $r->buy_pr_qty ?? $r->rts_deficit)) }} · 30 hari
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    <div class="rts-action-line">
+                                        @if($r->po_draft_id)
+                                            <a href="{{ route('purchasing.purchase_orders.show', $r->po_draft_id) }}" class="rts-draft-note rts-scope-beli" title="Lihat PO draft">
+                                                PO draft siap{{ $r->po_draft_code ? ' · ' . $r->po_draft_code : '' }}
+                                            </a>
+                                        @elseif($r->draft_id)
+                                            <a href="{{ route('rts.stock-requests.show', $r->draft_id) }}" class="btn btn-sm rts-action-btn rts-scope-tarik" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;" title="Lihat draft">
+                                                Lihat draft
+                                            </a>
+                                        @elseif($r->wh_prd > 0 && $r->minta_prd > 0)
+                                            <button type="button" class="btn btn-sm btn-minta-stok rts-action-btn rts-scope-tarik" data-item="{{ $r->item_id }}" data-qty="{{ $r->minta_prd }}" style="background: #10b981; color: #fff; border: 1px solid #059669;" title="Tarik Stok dari PRD">
+                                                Pindah PRD ({{ $fmt($r->minta_prd) }})
+                                            </button>
+                                        @elseif($r->pr_draft_id)
+                                            <a href="{{ route('purchasing.purchase_requests.allocate_suppliers', $r->pr_draft_id) }}" class="btn btn-sm rts-action-btn rts-scope-beli" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;" title="Pilih supplier">
+                                                Pilih supplier
+                                            </a>
+                                        @elseif($r->wh_prd == 0 && $r->production_source === 'buy')
+                                            <button type="button" class="btn btn-sm btn-minta-pr rts-action-btn rts-scope-beli" data-item="{{ $r->item_id }}" data-qty="{{ max(1, $r->buy_pr_qty ?? $r->rts_deficit) }}" style="background: #fffbeb; color: #d97706; border: 1px solid #fde68a;" title="Buat Purchase Request untuk 1 bulan">
+                                                Buat PR beli
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -150,6 +177,27 @@
     </div>
     
     <script>
+        let currentRtsFilter = 'all';
+
+        function updateRtsScopedActions(filter) {
+            currentRtsFilter = filter;
+            const showBeli = filter === 'beli_jadi';
+            const showTarik = filter === 'tarik_prd';
+
+            document.querySelectorAll('.rts-scope-beli').forEach(el => {
+                el.style.display = showBeli ? '' : 'none';
+            });
+
+            document.querySelectorAll('.rts-scope-tarik').forEach(el => {
+                el.style.display = showTarik ? '' : 'none';
+            });
+
+            document.querySelectorAll('.rts-action-line').forEach(line => {
+                const visibleChild = Array.from(line.children).some(child => child.style.display !== 'none');
+                line.style.display = visibleChild ? 'flex' : 'none';
+            });
+        }
+
         document.querySelectorAll('.btn-filter-rts').forEach(btn => {
             btn.addEventListener('click', function() {
                 // Update active class
@@ -159,6 +207,7 @@
                 this.classList.add('active', 'sd-primary');
 
                 const filter = this.dataset.filter;
+                updateRtsScopedActions(filter);
                 let bulkCount = 0;
                 let bulkPrCount = 0;
                 
@@ -178,26 +227,28 @@
                     
                     if (show) {
                         const btnMinta = row.querySelector('.btn-minta-stok');
-                        if (btnMinta) bulkCount++;
+                        if (btnMinta && btnMinta.style.display !== 'none') bulkCount++;
                         
                         const btnPr = row.querySelector('.btn-minta-pr');
-                        if (btnPr) bulkPrCount++;
+                        if (btnPr && btnPr.style.display !== 'none') bulkPrCount++;
                     }
                 });
                 
                 const bulkContainer = document.getElementById('bulk-action-container');
                 const btnBulkMinta = document.getElementById('btn-bulk-minta');
                 const btnBulkPr = document.getElementById('btn-bulk-pr');
-                
-                if (bulkCount > 0 || bulkPrCount > 0) {
+                const showTarikBulk = filter === 'tarik_prd' && bulkCount > 0;
+                const showBeliBulk = filter === 'beli_jadi' && bulkPrCount > 0;
+
+                if (showTarikBulk || showBeliBulk) {
                     bulkContainer.style.display = 'flex';
-                    if (bulkCount > 0) {
+                    if (showTarikBulk) {
                         btnBulkMinta.style.display = 'inline-flex';
                         document.getElementById('bulk-count').innerText = bulkCount;
                     } else {
                         btnBulkMinta.style.display = 'none';
                     }
-                    if (bulkPrCount > 0) {
+                    if (showBeliBulk) {
                         btnBulkPr.style.display = 'inline-flex';
                         document.getElementById('bulk-pr-count').innerText = bulkPrCount;
                     } else {
@@ -285,8 +336,8 @@
                 .then(response => response.json())
                 .then(data => {
                     if(data.success) {
-                        const showUrl = "{{ route('purchasing.purchase_requests.edit', 'DRAFT_ID') }}".replace('DRAFT_ID', data.pr_draft_id);
-                        button.outerHTML = '<a href="'+showUrl+'" class="btn btn-sm" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat PR Draft"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Draft PR</a>';
+                        const showUrl = "{{ route('purchasing.purchase_requests.allocate_suppliers', 'DRAFT_ID') }}".replace('DRAFT_ID', data.pr_draft_id);
+                        button.outerHTML = '<a href="'+showUrl+'" class="btn btn-sm" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Pilih supplier"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Pilih Supplier</a>';
                         if (typeof Toast !== 'undefined') {
                             Toast.fire({ icon: 'success', title: data.message });
                         }
@@ -337,14 +388,16 @@
             .then(data => {
                 if(data.success) {
                     const showUrl = "{{ route('rts.stock-requests.show', 'DRAFT_ID') }}".replace('DRAFT_ID', data.draft_id);
-                    const newHtml = '<a href="'+showUrl+'" class="btn btn-sm" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat draft"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Draft</a>';
+                    const newHtml = '<a href="'+showUrl+'" target="_blank" rel="noopener" class="btn btn-sm" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat draft"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Draft</a>';
                     
                     buttonsToUpdate.forEach(b => b.outerHTML = newHtml);
                     
                     if (typeof Toast !== 'undefined') Toast.fire({ icon: 'success', title: 'Berhasil request ' + lines.length + ' item!' });
+
+                    window.open(showUrl, '_blank', 'noopener');
                     
                     // Update the bulk button to be a link to the draft
-                    this.outerHTML = '<a href="'+showUrl+'" class="sd-btn sd-primary" style="background:#10b981!important;border-color:#10b981!important;color:#fff!important;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Detail</a>';
+                    this.outerHTML = '<a href="'+showUrl+'" target="_blank" rel="noopener" class="sd-btn sd-primary" style="background:#10b981!important;border-color:#10b981!important;color:#fff!important;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Detail</a>';
                     
                     const btnPr = document.getElementById('btn-bulk-pr');
                     if(btnPr) btnPr.style.display = 'none';
@@ -391,15 +444,17 @@
             .then(r => r.json())
             .then(data => {
                 if(data.success) {
-                    const showUrl = "{{ route('purchasing.purchase_requests.edit', 'DRAFT_ID') }}".replace('DRAFT_ID', data.pr_draft_id);
-                    const newHtml = '<a href="'+showUrl+'" class="btn btn-sm" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Lihat PR Draft"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Draft PR</a>';
+                    const showUrl = "{{ route('purchasing.purchase_requests.allocate_suppliers', 'DRAFT_ID') }}".replace('DRAFT_ID', data.pr_draft_id);
+                    const newHtml = '<a href="'+showUrl+'" target="_blank" rel="noopener" class="btn btn-sm" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: .7rem; border-radius: 7px; padding: .2rem .5rem; display: inline-flex; align-items: center; gap: 4px;" title="Pilih supplier"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Pilih Supplier</a>';
                     
                     buttonsToUpdate.forEach(b => b.outerHTML = newHtml);
                     
                     if (typeof Toast !== 'undefined') Toast.fire({ icon: 'success', title: 'Berhasil buat PR untuk ' + lines.length + ' item!' });
+
+                    window.open(showUrl, '_blank', 'noopener');
                     
                     // Update the bulk button to be a link to the draft
-                    this.outerHTML = '<a href="'+showUrl+'" class="sd-btn sd-primary" style="background:#f59e0b!important;border-color:#f59e0b!important;color:#fff!important;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Lihat Detail</a>';
+                    this.outerHTML = '<a href="'+showUrl+'" target="_blank" rel="noopener" class="sd-btn sd-primary" style="background:#f59e0b!important;border-color:#f59e0b!important;color:#fff!important;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Pilih Supplier</a>';
                     
                     const btnMinta = document.getElementById('btn-bulk-minta');
                     if(btnMinta) btnMinta.style.display = 'none';
@@ -414,6 +469,7 @@
             });
         });
         
+        updateRtsScopedActions('all');
         // trigger all on load to set colors correctly
         document.querySelector('.btn-filter-rts[data-filter="all"]').click();
     </script>

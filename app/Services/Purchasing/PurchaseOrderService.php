@@ -23,19 +23,20 @@ class PurchaseOrderService
      */
     public function create(array $payload): PurchaseOrder
     {
-        return DB::transaction(function () use ($payload) {
-            $linesData = $payload['lines'] ?? [];
-            unset($payload['lines']);
+        $linesData = $payload['lines'] ?? [];
+        unset($payload['lines']);
 
-            $payload = $this->onlyHeaderFields($payload);
+        $payload = $this->onlyHeaderFields($payload);
 
-            if (empty($payload['code'] ?? null)) {
-                $suppCode = DB::table('suppliers')
-                    ->where('id', (int) ($payload['supplier_id'] ?? 0))
-                    ->value('code');
-                $prefix = $suppCode ? 'PO-' . strtoupper($suppCode) : 'PO';
-                $payload['code'] = CodeGenerator::make($prefix);
-            }
+        if (empty($payload['code'] ?? null)) {
+            $suppCode = DB::table('suppliers')
+                ->where('id', (int) ($payload['supplier_id'] ?? 0))
+                ->value('code');
+            $prefix = $suppCode ? 'PO-' . strtoupper($suppCode) : 'PO';
+            $payload['code'] = CodeGenerator::make($prefix);
+        }
+
+        return DB::transaction(function () use ($payload, $linesData) {
 
             // normalize numbers
             $payload['subtotal'] = 0;
@@ -55,7 +56,7 @@ class PurchaseOrderService
             $this->recalculateTotals($order, $subtotal);
 
             return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
-        });
+        }, 3);
     }
 
     /**

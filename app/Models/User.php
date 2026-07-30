@@ -124,6 +124,7 @@ class User extends Authenticatable
         return match (strtolower($role)) {
             'owner' => array_keys(UserModuleAccess::MODULES),
             'admin' => ['dashboard', 'inventory', 'sales', 'purchasing', 'production'],
+            'nta' => ['dashboard', 'purchasing'],
             'operating' => ['dashboard', 'inventory', 'production'],
             default => ['dashboard'],
         };
@@ -144,6 +145,9 @@ class User extends Authenticatable
                 'marketplace' => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
                 'accounting'  => ['on' => false, 'reason' => 'Admin tidak diizinkan mengakses modul ini.'],
                 'imports'     => ['on' => false, 'reason' => 'Admin tidak diizinkan mengakses modul ini.'],
+            ],
+            'nta' => [
+                'purchasing' => ['on' => true, 'reason' => 'NTA diberi akses ke modul pembelian.'],
             ],
             default => [],
         };
@@ -207,6 +211,10 @@ class User extends Authenticatable
 
     public function preferredLandingRouteName(): ?string
     {
+        if (strtolower((string) $this->role) === 'nta' && Route::has('purchasing.purchase_requests.index') && $this->canAccessModule('purchasing')) {
+            return 'purchasing.purchase_requests.index';
+        }
+
         $moduleRoutes = [
             'dashboard' => 'dashboard',
             'production' => 'production.dashboard',
@@ -223,6 +231,7 @@ class User extends Authenticatable
 
         $preferredModules = match (strtolower((string) $this->role)) {
             'operating' => ['production', 'inventory', 'dashboard'],
+            'nta' => ['purchasing', 'dashboard'],
             'admin' => ['sales', 'inventory', 'purchasing', 'marketplace', 'imports', 'accounting', 'dashboard'],
             'owner' => ['master'],
             default => ['dashboard'],

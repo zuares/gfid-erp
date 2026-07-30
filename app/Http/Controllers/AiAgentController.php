@@ -62,11 +62,17 @@ class AiAgentController extends Controller
         $data = $request->validate([
             'message' => ['required', 'string', 'min:3', 'max:4000'],
             'mode' => ['nullable', 'in:general,internal,task'],
+            'page_context' => ['nullable', 'array'],
+            'page_context.page_title' => ['nullable', 'string', 'max:200'],
+            'page_context.route' => ['nullable', 'string', 'max:200'],
+            'page_context.path' => ['nullable', 'string', 'max:300'],
+            'page_context.url' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $result = $this->runOpenAi([
             'mode' => $data['mode'] ?? 'internal',
             'message' => $data['message'],
+            'page_context' => $data['page_context'] ?? null,
             'purpose' => 'Answer as a helpful AI assistant for this website. Keep the reply concise, practical, and friendly.',
         ]);
 
@@ -77,11 +83,17 @@ class AiAgentController extends Controller
     {
         $data = $request->validate([
             'message' => ['required', 'string', 'min:3', 'max:4000'],
+            'page_context' => ['nullable', 'array'],
+            'page_context.page_title' => ['nullable', 'string', 'max:200'],
+            'page_context.route' => ['nullable', 'string', 'max:200'],
+            'page_context.path' => ['nullable', 'string', 'max:300'],
+            'page_context.url' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $result = $this->runOpenAi([
             'mode' => 'task',
             'message' => $data['message'],
+            'page_context' => $data['page_context'] ?? null,
             'purpose' => 'Turn the instruction into a Codex-ready work brief for a developer. Output a practical task draft.',
         ]);
 
@@ -124,6 +136,10 @@ TXT;
                 'owner',
             ],
         ];
+
+        if (! empty($input['page_context']) && is_array($input['page_context'])) {
+            $context['page_context'] = $input['page_context'];
+        }
 
         $payload = [
             'model' => config('services.openai.model', 'gpt-5.6-terra'),
@@ -179,11 +195,16 @@ TXT;
             ->post('https://api.openai.com/v1/responses', $payload);
 
         if (! $response->successful()) {
+            $error = $response->json('error');
+            $errorMessage = data_get($error, 'message') ?: trim((string) $response->body());
+
             return [
                 'ok' => false,
-                'message' => 'OpenAI API gagal dipanggil.',
+                'message' => 'OpenAI API gagal dipanggil: ' . ($errorMessage !== '' ? $errorMessage : 'unknown error'),
                 'status' => $response->status(),
-                'error' => $response->json('error.message') ?? $response->body(),
+                'error' => $error ?: $response->body(),
+                'error_type' => data_get($error, 'type'),
+                'error_code' => data_get($error, 'code'),
             ];
         }
 

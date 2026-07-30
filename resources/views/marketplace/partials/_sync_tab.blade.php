@@ -4,37 +4,42 @@
     konsol log langsung, dan riwayat run. Polling adaptif: 5 dtk saat ada
     proses aktif, 15 dtk saat idle; countdown di-update tiap detik.
 --}}
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <h5 class="m-0" style="font-weight: 700; color: var(--text); font-size: 1.05rem;"><i class="bi bi-arrow-repeat" style="color: var(--dsh-accent);"></i> Sinkronisasi</h5>
-</div>
-
-<!-- Aksi cepat -->
-<div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.9rem;">
-    <button type="button" class="btn fw-bold" onclick="window.__syncQuick('incremental', this)" style="background: var(--dsh-accent); color:#fff; border-radius:10px; font-size:.75rem; padding:.45rem .85rem;">
-        <i class="bi bi-lightning-charge"></i> Sync Cepat (3 Hari)
-    </button>
-    <button type="button" class="btn fw-bold" onclick="window.__syncQuick('hourly', this)" style="border:1px solid var(--dsh-border); color:var(--text); border-radius:10px; font-size:.75rem; padding:.45rem .85rem;">
-        <i class="bi bi-clock-history"></i> Sync Heatmap (Hourly)
-    </button>
-    <button type="button" class="btn fw-bold" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border:1px solid var(--dsh-border); color:var(--text); border-radius:10px; font-size:.75rem; padding:.45rem .85rem;">
-        <i class="bi bi-cloud-download"></i> Manual Sync&hellip;
-    </button>
-    <button type="button" class="btn fw-bold" id="btnCancelQueue" onclick="window.__syncCancelQueue(this)" style="display:none; border:1px solid rgba(220,38,38,.4); color:#dc2626; border-radius:10px; font-size:.75rem; padding:.45rem .85rem;">
-        <i class="bi bi-x-circle"></i> Batalkan Antrean
-    </button>
-    <button type="button" class="btn fw-bold" onclick="window.__syncGapFix(this)" style="border:1px solid rgba(22,163,74,.35); color:#15803d; border-radius:10px; font-size:.75rem; padding:.45rem .85rem;" title="Audit 90 hari & perbaiki tanggal yang datanya hilang">
-        <i class="bi bi-bandaid"></i> Periksa Bolong
-    </button>
-    <button type="button" class="btn fw-bold" id="btnSyncNotif" onclick="window.__syncToggleNotif(this)" style="margin-left:auto; border:1px solid var(--dsh-border); color:var(--dsh-muted); border-radius:10px; font-size:.75rem; padding:.45rem .85rem;" title="Notifikasi browser saat proses selesai/gagal (berguna saat tab ditinggal)">
-        <i class="bi bi-bell-slash"></i>
-    </button>
-    <button type="button" class="btn fw-bold" onclick="window.__syncRefresh(this)" style="border:1px solid var(--dsh-border); color:var(--dsh-muted); border-radius:10px; font-size:.75rem; padding:.45rem .85rem;">
-        <i class="bi bi-arrow-clockwise"></i> Refresh
-    </button>
+<div class="ads-tab-panel mb-3">
+    <div class="ads-tab-panel-head">
+        <div>
+            <div class="ads-tab-panel-title"><i class="bi bi-arrow-repeat" style="color: var(--dsh-accent);"></i> Sinkronisasi</div>
+            <div class="ads-tab-panel-note">Aksi cepat, antrean, dan riwayat sync.</div>
+        </div>
+    </div>
+    <div class="p-3">
+        <div style="display:flex; flex-wrap:wrap; gap:.45rem;">
+            <button type="button" class="btn fw-bold" onclick="window.__syncQuick('incremental', this)" style="background: var(--dsh-accent); color:#fff; border-radius:10px; font-size:.75rem; padding:.42rem .8rem;">
+                <i class="bi bi-lightning-charge"></i> Cepat
+            </button>
+            <button type="button" class="btn fw-bold" onclick="window.__syncQuick('hourly', this)" style="border:1px solid var(--dsh-border); color:var(--text); border-radius:10px; font-size:.75rem; padding:.42rem .8rem;">
+                <i class="bi bi-clock-history"></i> Heatmap
+            </button>
+            <button type="button" class="btn fw-bold" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border:1px solid var(--dsh-border); color:var(--text); border-radius:10px; font-size:.75rem; padding:.42rem .8rem;">
+                <i class="bi bi-cloud-download"></i> Manual
+            </button>
+            <button type="button" class="btn fw-bold" id="btnCancelQueue" onclick="window.__syncCancelQueue(this)" style="display:none; border:1px solid rgba(220,38,38,.4); color:#dc2626; border-radius:10px; font-size:.75rem; padding:.42rem .8rem;">
+                <i class="bi bi-x-circle"></i> Batal
+            </button>
+            <button type="button" class="btn fw-bold" onclick="window.__syncGapFix(this)" style="border:1px solid rgba(22,163,74,.35); color:#15803d; border-radius:10px; font-size:.75rem; padding:.42rem .8rem;" title="Audit 90 hari & perbaiki tanggal yang datanya hilang">
+                <i class="bi bi-bandaid"></i> Audit Bolong
+            </button>
+            <button type="button" class="btn fw-bold" id="btnSyncNotif" onclick="window.__syncToggleNotif(this)" style="margin-left:auto; border:1px solid var(--dsh-border); color:var(--dsh-muted); border-radius:10px; font-size:.75rem; padding:.42rem .8rem;" title="Notifikasi browser saat proses selesai/gagal (berguna saat tab ditinggal)">
+                <i class="bi bi-bell-slash"></i>
+            </button>
+            <button type="button" class="btn fw-bold" onclick="window.__syncRefresh(this)" style="border:1px solid var(--dsh-border); color:var(--dsh-muted); border-radius:10px; font-size:.75rem; padding:.42rem .8rem;">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- ═══ PANEL 1: STATUS — semua kondisi sistem dalam satu kartu ═══ -->
-<div class="dpanel mb-3" style="padding:.85rem 1rem; border-radius:12px; border:1px solid var(--dsh-border); background:var(--bg);">
+<div class="dpanel ads-tab-panel mb-3" style="padding:1rem;">
     <div style="display:flex; flex-wrap:wrap; gap:.4rem; align-items:center;">
         <span id="cardCooldown" style="display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .7rem; border-radius:8px; border:1px solid rgba(22,163,74,.25); background:rgba(22,163,74,.05); font-size:.72rem;" title="Status pembatasan API Shopee">
             <i class="bi bi-shield-check" style="color:var(--dsh-muted);"></i>
@@ -83,7 +88,7 @@
 </div>
 
 <!-- ═══ PANEL 2: PROSES — antrean + log dalam satu kartu ═══ -->
-<div class="dpanel mb-3" style="padding:.85rem 1rem; border-radius:12px; border:1px solid var(--dsh-border); background:var(--bg);">
+<div class="dpanel ads-tab-panel mb-3" style="padding:1rem;">
     <div class="d-flex justify-content-between align-items-center" style="margin-bottom:.5rem;">
         <span style="font-size:.72rem; font-weight:700; color:var(--text);"><i class="bi bi-activity"></i> Proses Berjalan</span>
         <button type="button" onclick="window.__syncClearConsole()" style="border:none; background:none; color:var(--dsh-muted); font-size:.64rem; cursor:pointer;"><i class="bi bi-eraser"></i> bersihkan log</button>
@@ -98,7 +103,7 @@
 </div>
 
 <!-- Tabel riwayat + filter status -->
-<div id="runFilterChips" style="display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.5rem;">
+<div id="runFilterChips" style="display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.75rem;">
     <button type="button" class="run-chip active" data-filter="all">Semua</button>
     <button type="button" class="run-chip" data-filter="success">Sukses</button>
     <button type="button" class="run-chip" data-filter="processing">Proses</button>
@@ -119,8 +124,9 @@
 #runFilterChips .run-chip[data-filter="rate_limited"] { color:#b45309; border-color:rgba(245,158,11,.4); }
 #runFilterChips .run-chip[data-filter="error"] { color:#b91c1c; border-color:rgba(220,38,38,.35); }
 </style>
-<div class="table-responsive">
-    <table class="dpanel-table dpanel-table-sm" style="white-space: nowrap;">
+<div class="ads-tab-panel" style="overflow:hidden;">
+    <div class="table-responsive">
+        <table class="dpanel-table dpanel-table-sm" style="white-space: nowrap;">
         <thead>
             <tr>
                 <th>Waktu</th>
@@ -154,7 +160,8 @@
                 <tr><td colspan="7" class="text-center py-4" style="color: var(--dsh-muted); font-size:.8rem;">Belum ada riwayat sinkronisasi.</td></tr>
             @endif
         </tbody>
-    </table>
+        </table>
+    </div>
 </div>
 
 <script>

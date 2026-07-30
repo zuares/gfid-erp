@@ -101,7 +101,7 @@
 @endphp
 
 @if($otherAdsSpend !== null && $shopSpend > 0 && $otherAdsSpend > ($shopSpend * 0.005))
-<div style="display:flex; flex-wrap:wrap; gap:.4rem 1.2rem; align-items:center; font-size:.68rem; color:var(--dsh-muted); margin-bottom:.6rem; padding:.5rem .75rem; border:1px dashed var(--dsh-border); border-radius:10px;">
+<div style="display:flex; flex-wrap:wrap; gap:.4rem 1rem; align-items:center; font-size:.68rem; color:var(--dsh-muted); margin-bottom:.75rem; padding:.6rem .8rem; border:1px dashed var(--dsh-border); border-radius:12px;">
     <span><i class="bi bi-shop"></i> Belanja iklan versi Seller Center: <b style="color:var(--text);">{{ $fmt($shopSpend) }}</b></span>
     <span>Terpetakan ke kampanye di tabel ini: <b style="color:var(--text);">{{ $fmt($totalSpend) }}</b></span>
     <span>Iklan lainnya (tanpa rincian kampanye, mis. Iklan Toko/afiliasi): <b style="color:#b45309;">{{ $fmt($otherAdsSpend) }}</b></span>
@@ -110,13 +110,13 @@
 
 <!-- ── Pengaturan admin fee: otomatis (settlement) / manual ── -->
 @if(($storeId ?? null) !== 'all')
-<div style="display:flex; justify-content:flex-end; margin-bottom:.5rem;">
+<div style="display:flex; justify-content:flex-end; margin-bottom:.75rem;">
     <details style="position:relative;">
-        <summary style="cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; border:1px solid var(--dsh-border); border-radius:8px; font-size:.72rem; font-weight:600; color:var(--text); background:var(--bg);">
+        <summary style="cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:.35rem; padding:.4rem .75rem; border:1px solid var(--dsh-border); border-radius:10px; font-size:.72rem; font-weight:700; color:var(--text); background:var(--bg);">
             <i class="bi bi-gear" style="color:var(--dsh-muted);"></i>
             Adm fee: {{ $feeMode === 'manual' ? 'Manual ' . number_format((float) $feeManualPct, 1, ',', '.') . '%' : 'Otomatis' }}
         </summary>
-        <form method="POST" action="{{ route('marketplace.ads.fee.setting') }}" style="position:absolute; right:0; top:calc(100% + 6px); z-index:30; min-width:250px; padding:.8rem .9rem; border:1px solid var(--dsh-border); border-radius:10px; background:var(--bg); box-shadow:0 8px 24px rgba(0,0,0,.12); font-size:.75rem;">
+        <form method="POST" action="{{ route('marketplace.ads.fee.setting') }}" style="position:absolute; right:0; top:calc(100% + 6px); z-index:30; min-width:250px; padding:1rem; border:1px solid var(--dsh-border); border-radius:12px; background:var(--bg); box-shadow:0 8px 24px rgba(0,0,0,.12); font-size:.75rem;">
             @csrf
             <input type="hidden" name="store_id" value="{{ $storeId }}">
             <label style="display:flex; align-items:center; gap:.45rem; margin-bottom:.5rem; cursor:pointer;">
@@ -142,15 +142,15 @@
     $kSub   = 'font-size:.65rem; color:var(--dsh-muted); margin-top:2px; font-variant-numeric:tabular-nums; white-space:nowrap;';
     $profitMarginPct = $totalGmv > 0 ? ($totalProfit / $totalGmv) * 100 : 0;
 @endphp
-<div class="dash-panels mb-3" style="grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: .6rem;">
+<div class="dash-panels mb-3" style="grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: .75rem;">
 
-    <div class="dpanel" style="padding:.75rem .95rem; border-radius:12px; border:1px solid rgba(3,105,161,.2); background:rgba(3,105,161,.05);">
+    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(3,105,161,.2); background:rgba(3,105,161,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
         <div style="{{ $kLabel }} color:#0369a1;"><i class="bi bi-graph-up-arrow"></i> Omzet</div>
         <div style="{{ $kValue }} color:#0369a1;">{{ $fmt($totalGmv) }}</div>
         <div style="{{ $kSub }}">Cair <b style="color:#0369a1;">{{ $fmt($totalNetRevenue) }}</b> · adm {{ number_format($avgFeePct, 1, ',', '.') }}%</div>
     </div>
 
-    <div class="dpanel" style="padding:.75rem .95rem; border-radius:12px; border:1px solid rgba(100,116,139,.25); background:rgba(100,116,139,.05);">
+    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(100,116,139,.25); background:rgba(100,116,139,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
         <div style="{{ $kLabel }} color:#475569;"><i class="bi bi-box-seam"></i> HPP · Modal</div>
         <div style="{{ $kValue }} color:#334155;">&minus;{{ $fmt($totalCogsAll) }}</div>
         <div style="{{ $kSub }}">{{ number_format($cogsPctOmzet, 1, ',', '.') }}% omzet · margin <b style="color:{{ $grossMargin >= 0 ? '#15803d' : '#b91c1c' }};">{{ $grossMargin < 0 ? '−' : '' }}{{ $fmt($grossMargin) }}</b></div>
@@ -159,25 +159,25 @@
         @endif
     </div>
 
-    <div class="dpanel" style="padding:.75rem .95rem; border-radius:12px; border:1px solid rgba(245,158,11,.25); background:rgba(245,158,11,.05);">
+    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(245,158,11,.25); background:rgba(245,158,11,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
         <div style="{{ $kLabel }} color:#b45309;"><i class="bi bi-wallet2"></i> Iklan</div>
         <div style="{{ $kValue }} color:#92400e;">&minus;{{ $fmt($totalTopup) }}</div>
         <div style="{{ $kSub }}">{{ $fmt($totalSpend) }} + PPN 11%</div>
     </div>
 
-    <div class="dpanel" style="padding:.75rem .95rem; border-radius:12px; border:1px solid rgba({{ $totalProfit >= 0 ? '22,163,74' : '220,38,38' }},.3); background:rgba({{ $totalProfit >= 0 ? '22,163,74' : '220,38,38' }},.07);">
+    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba({{ $totalProfit >= 0 ? '22,163,74' : '220,38,38' }},.3); background:rgba({{ $totalProfit >= 0 ? '22,163,74' : '220,38,38' }},.07); box-shadow:0 12px 28px rgba(15,23,42,.04);">
         <div style="{{ $kLabel }} color:{{ $totalProfit >= 0 ? '#15803d' : '#b91c1c' }};"><i class="bi bi-cash-stack"></i> = Net Profit</div>
         <div style="{{ $kValue }} color:{{ $totalProfit >= 0 ? '#15803d' : '#b91c1c' }};">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</div>
         <div style="{{ $kSub }}">{{ number_format($profitMarginPct, 1, ',', '.') }}% dari omzet</div>
     </div>
 
-    <div class="dpanel" style="padding:.75rem .95rem; border-radius:12px; border:1px solid rgba(124,58,237,.2); background:rgba(124,58,237,.04);">
+    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(124,58,237,.2); background:rgba(124,58,237,.04); box-shadow:0 12px 28px rgba(15,23,42,.04);">
         <div style="{{ $kLabel }} color:#7c3aed;"><i class="bi bi-speedometer2"></i> ROAS · ACOS</div>
         <div style="{{ $kValue }} color:#6d28d9;">{{ number_format($totalRoas, 2, ',', '.') }}x <span style="font-size:.8rem; color:var(--dsh-muted);">· {{ number_format($avgAcos, 1, ',', '.') }}%</span></div>
         <div style="{{ $kSub }}">bersih <b style="color:#6d28d9;">{{ number_format($netRoas, 2, ',', '.') }}x</b></div>
     </div>
 
-    <div class="dpanel" style="padding:.75rem .95rem; border-radius:12px; border:1px solid rgba(148,163,184,.25); background:rgba(148,163,184,.05);">
+    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(148,163,184,.25); background:rgba(148,163,184,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
         <div style="{{ $kLabel }} color:var(--dsh-muted);"><i class="bi bi-bullseye"></i> Kampanye Untung</div>
         <div style="{{ $kValue }} color:var(--text);">{{ $profitableCount }} <span style="font-size:.8rem; color:var(--dsh-muted); font-weight:600;">/ {{ $totalCampaigns }}</span></div>
         <div style="{{ $kSub }} {{ $lossCount > 0 ? 'color:#b91c1c;' : '' }}">{{ $lossCount > 0 ? $lossCount . ' rugi' : 'semua untung' }}</div>
@@ -185,15 +185,16 @@
 </div>
 
 <!-- ── Toggle tampilan: Per Kampanye / Per Kategori ── -->
-<div style="display:flex; gap:.35rem; margin-bottom:.6rem;">
-    <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.3rem .9rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kampanye</button>
-    <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.3rem .9rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kategori</button>
+<div style="display:flex; gap:.35rem; margin-bottom:.75rem;">
+    <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kampanye</button>
+    <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kategori</button>
 </div>
 
 <!-- ── Tabel per KATEGORI ── -->
 <div id="profitViewCategory" style="display:none;">
-    <div class="table-responsive">
-        <table class="dpanel-table dpanel-table-sm" style="white-space: nowrap;">
+    <div class="ads-tab-panel">
+        <div class="table-responsive">
+            <table class="dpanel-table dpanel-table-sm" style="white-space: nowrap;">
             <thead>
                 <tr>
                     <th>Kategori<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">dari mapping SKU</div></th>
@@ -223,11 +224,12 @@
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">&minus;{{ $fmt($cat->cogs) }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; font-size:.95rem; color:{{ $cat->profit >= 0 ? '#16a34a' : '#dc2626' }}; vertical-align:middle;">{{ $cat->profit < 0 ? '-' : '' }}{{ $fmt($cat->profit) }}</td>
                     </tr>
-                @empty
-                    <tr><td colspan="7" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
-                @endforelse
+            @empty
+                <tr><td colspan="7" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
+            @endforelse
             </tbody>
-        </table>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -253,8 +255,9 @@ window.__profitView = function (mode) {
 
 <div id="profitViewCampaign">
 <!-- ── Tabel per kampanye — kolom mengikuti alur hitung: Pendapatan Bersih − HPP − Iklan = Net Profit ── -->
-<div class="table-responsive">
-    <table class="dpanel-table dpanel-table-sm table-hover" style="white-space: nowrap;">
+<div class="ads-tab-panel">
+    <div class="table-responsive">
+        <table class="dpanel-table dpanel-table-sm table-hover" style="white-space: nowrap;">
         <thead>
             <tr>
                 <th>Kampanye</th>
@@ -367,6 +370,7 @@ window.__profitView = function (mode) {
             </tr>
         </tfoot>
         @endif
-    </table>
+        </table>
+    </div>
 </div>
 </div>

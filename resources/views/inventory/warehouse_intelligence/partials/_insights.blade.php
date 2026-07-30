@@ -1,103 +1,329 @@
 @php
     $actions = collect($insights['actions'] ?? []);
     $topRestock = collect($insights['topRestock'] ?? []);
+    $signals = collect($insights['signals'] ?? []);
+    $watchlist = collect($insights['watchlist'] ?? []);
+    $dataBasis = collect($insights['dataBasis'] ?? []);
+    $itemLookup = collect($insights['itemLookup'] ?? []);
+    $summary = $insights['summary'] ?? [];
+    $overview = (string) ($insights['overview'] ?? '');
+    $confidence = (string) ($insights['confidence'] ?? 'medium');
     $generatedAt = $insights['generatedAt'] ?? null;
+    $tab = (string) ($insights['tab'] ?? 'rts');
+    $role = strtolower((string) (auth()->user()?->role ?? ''));
+    $hideAiMeta = in_array($role, ['admin', 'operating'], true);
+
+    $resolveProduct = function (string $sku, string $fallback = '') use ($itemLookup) {
+        $item = $itemLookup->get($sku);
+        return (string) (data_get($item, 'product') ?: $fallback ?: $sku);
+    };
+
+    $criticalCount = (int) ($insights['criticalCount'] ?? 0);
+    $actionsCount = (int) $actions->count();
+    $restockCount = (int) $topRestock->count();
 @endphp
 
-<div class="card-main mb-3" style="border-left: 4px solid #334155;">
-    <div class="p-3 p-md-3">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-            <div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge-status" style="background:#eef2ff;color:#3730a3;border-color:#c7d2fe;font-weight:700;">
-                        AI Rekomendasi
-                    </span>
-                    <span class="text-muted-ii" style="font-size:.72rem;">
-                        Dihitung otomatis dari stok, WIP, dan ADS
-                    </span>
-                </div>
-                <div style="font-size:1rem;font-weight:800;color:#0f172a;margin-top:.45rem;">
-                    Ringkasan keputusan stok
-                </div>
-                @if($generatedAt)
-                    <div class="text-muted-ii" style="font-size:.72rem;">Diperbarui {{ $generatedAt->format('d M Y, H:i') }}</div>
-                @endif
+<details class="card-main mb-3 ai-accordion-shell d-none d-md-block">
+    <summary class="ai-accordion-head">
+        <div class="ai-accordion-title">
+            <div class="ai-accordion-kicker">
+                <span class="badge-status" style="background:#eef2ff;color:#3730a3;border-color:#c7d2fe;font-weight:800;">
+                    AI Rekomendasi
+                </span>
+                <span class="text-muted-ii">Default tertutup. Buka kalau mau lihat detail cepat.</span>
             </div>
-            <div class="d-flex gap-2 flex-wrap">
-                <div class="px-3 py-2" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;min-width:120px;">
-                    <div class="text-muted-ii" style="font-size:.68rem;">Item kritis</div>
-                    <div style="font-size:1.1rem;font-weight:800;color:#dc2626;">{{ (int) ($insights['criticalCount'] ?? 0) }}</div>
-                </div>
-                <div class="px-3 py-2" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;min-width:120px;">
-                    <div class="text-muted-ii" style="font-size:.68rem;">Prioritas utama</div>
-                    <div style="font-size:1.1rem;font-weight:800;color:#059669;">{{ (int) $actions->count() }}</div>
-                </div>
+            <div class="ai-accordion-main">
+                {{ $criticalCount }} item perlu perhatian, {{ $actionsCount }} aksi utama, {{ $restockCount }} saran isi ulang.
+            </div>
+            <div class="ai-accordion-sub">
+                Ringkas dulu. Buka untuk lihat detail.
             </div>
         </div>
-
-        @if($actions->isEmpty() && $topRestock->isEmpty())
-            <div class="ii-empty" style="padding:1.4rem 1rem;">
-                Tidak ada prioritas mendesak saat ini. Stok terlihat aman.
+        <div class="ai-accordion-metrics">
+            <div class="ai-mini-metric">
+                <div class="label">Kritis</div>
+                <div class="value">{{ $criticalCount }}</div>
             </div>
-        @else
-            <div class="row g-3">
-                <div class="col-12 col-lg-7">
-                    <div style="font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.5rem;">Rekomendasi Tindakan</div>
-                    <div class="d-flex flex-column gap-2">
-                        @forelse($actions as $item)
-                            @php
-                                $tone = $item['tone'] ?? 'info';
-                                $styles = match ($tone) {
-                                    'success' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'color' => '#047857'],
-                                    'warning' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'color' => '#b45309'],
-                                    'danger' => ['bg' => '#fef2f2', 'border' => '#fecaca', 'color' => '#dc2626'],
-                                    default => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'color' => '#1d4ed8'],
-                                };
-                            @endphp
-                            <div style="background:{{ $styles['bg'] }};border:1px solid {{ $styles['border'] }};border-radius:12px;padding:.85rem .9rem;">
-                                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-                                    <div>
-                                        <div style="font-weight:800;color:#0f172a;font-size:.92rem;">{{ $item['title'] }}</div>
-                                        <div class="text-muted-ii" style="font-size:.72rem;">{{ $item['sku'] ?? '-' }}</div>
-                                    </div>
-                                    <span class="badge-status" style="background:#fff;color:{{ $styles['color'] }};border-color:{{ $styles['border'] }};font-weight:700;">
-                                        {{ $item['label'] ?? 'Saran' }}
-                                    </span>
-                                </div>
-                                <div style="font-size:.8rem;color:#334155;margin-top:.45rem;line-height:1.45;">
-                                    {{ $item['reason'] ?? '' }}
-                                </div>
-                            </div>
-                        @empty
-                            <div class="ii-empty">Belum ada rekomendasi aksi yang perlu dikerjakan sekarang.</div>
-                        @endforelse
-                    </div>
-                </div>
+            <div class="ai-mini-metric">
+                <div class="label">Aksi</div>
+                <div class="value">{{ $actionsCount }}</div>
+            </div>
+            <div class="ai-mini-metric">
+                <div class="label">Confidence</div>
+                <div class="value" style="text-transform:capitalize;">{{ $confidence }}</div>
+            </div>
+        </div>
+    </summary>
 
-                <div class="col-12 col-lg-5">
-                    <div style="font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.5rem;">SKU Perlu Diperhatikan</div>
-                    <div class="d-flex flex-column gap-2">
-                        @forelse($topRestock as $r)
-                            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:.8rem .85rem;">
-                                <div class="d-flex justify-content-between align-items-start gap-2">
-                                    <div>
-                                        <div style="font-weight:800;color:#0f172a;font-size:.9rem;">{{ $r->sku }}</div>
-                                        <div class="text-muted-ii" style="font-size:.72rem;">{{ $r->product }}</div>
-                                    </div>
-                                    <span class="badge-status" style="background:#f8fafc;color:#475569;border-color:#e2e8f0;font-weight:700;">
-                                        {{ number_format((float) ($r->suggested_qty ?? 0), 0, ',', '.') }} pcs
-                                    </span>
-                                </div>
-                                <div class="text-muted-ii" style="font-size:.72rem;margin-top:.35rem;">
-                                    Status: <strong style="color:#0f172a;">{{ $r->status ?? '-' }}</strong> · Cover {{ number_format((float) ($r->cover_days ?? 0), 1, ',', '.') }} hari
-                                </div>
-                            </div>
-                        @empty
-                            <div class="ii-empty">Tidak ada SKU dengan saran restock saat ini.</div>
-                        @endforelse
-                    </div>
+    <div class="ai-accordion-body">
+        @if (! $hideAiMeta)
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div class="text-muted-ii" style="font-size:.72rem; line-height:1.45;">
+                    Data yang dipakai:
+                    {{ $dataBasis->isNotEmpty() ? $dataBasis->implode(' · ') : 'stok, WIP, ADS, dan estimasi stok aman.' }}
+                    @if($generatedAt)
+                        <span class="d-block mt-1">Diperbarui {{ $generatedAt->format('d M Y, H:i') }}</span>
+                    @endif
                 </div>
+                <span class="badge-status" style="background:#f8fafc;color:#334155;border-color:#e2e8f0;font-weight:700;">
+                    Bahasa awam
+                </span>
             </div>
         @endif
+
+        @if($overview !== '')
+            <div class="ai-overview-box mb-3">
+                <div class="ai-section-label">Ringkasan AI</div>
+                <div class="ai-overview-copy">{{ $overview }}</div>
+            </div>
+        @endif
+
+        @if($signals->isNotEmpty())
+            <div class="ai-section-label">Sinyal cepat</div>
+            <div class="ai-pill-row mb-3">
+                @foreach($signals as $signal)
+                    <span class="ai-pill">
+                        <span>{{ $signal['label'] ?? 'Sinyal' }}:</span>
+                        <strong>{{ $signal['value'] ?? '-' }}</strong>
+                    </span>
+                @endforeach
+            </div>
+        @endif
+
+        @if($actions->isEmpty() && $topRestock->isEmpty() && $watchlist->isEmpty())
+            <div class="ii-empty" style="padding:1rem 0;">
+                Belum ada prioritas mendesak. Stok terlihat aman untuk sekarang.
+            </div>
+        @else
+            @if($tab === 'rts')
+                <div class="row g-3 ai-rts-grid">
+                    <div class="col-12 col-lg-4">
+                        <div class="ai-section-label">Saran cepat</div>
+                        <div class="ai-compact-list">
+                            @forelse($actions as $item)
+                                @php
+                                    $tone = $item['tone'] ?? 'info';
+                                    $styles = match ($tone) {
+                                        'success' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'color' => '#047857'],
+                                        'warning' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'color' => '#b45309'],
+                                        'danger' => ['bg' => '#fef2f2', 'border' => '#fecaca', 'color' => '#dc2626'],
+                                        default => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'color' => '#1d4ed8'],
+                                    };
+                                    $sku = (string) ($item['sku'] ?? '');
+                                    $product = (string) ($item['product'] ?? $resolveProduct($sku));
+                                    $qtyLabel = trim((string) ($item['qty_label'] ?? ''));
+                                    $daysLabel = trim((string) ($item['days_label'] ?? ''));
+                                @endphp
+                                <details class="ai-action-details">
+                                    <summary>
+                                        <div class="ai-action-head">
+                                            <div class="ai-action-title">{{ $item['title'] ?? 'Saran' }}</div>
+                                            <div class="ai-action-product">{{ $product }}</div>
+                                        </div>
+                                        <div class="ai-action-meta">
+                                            <div class="ai-action-chip-row">
+                                                <span class="ai-action-chip" style="background:{{ $styles['bg'] }};color:{{ $styles['color'] }};border-color:{{ $styles['border'] }};">
+                                                    Qty {{ $qtyLabel !== '' ? $qtyLabel : 'belum kebaca' }}
+                                                </span>
+                                                <span class="ai-action-chip" style="background:#f8fafc;color:#475569;border-color:#e2e8f0;">
+                                                    {{ $daysLabel !== '' ? 'Cukup ' . $daysLabel : 'Hari belum kebaca' }}
+                                                </span>
+                                            </div>
+                                            @if($sku !== '')
+                                                <div class="ai-action-code">Kode: {{ $sku }}</div>
+                                            @endif
+                                        </div>
+                                    </summary>
+                                    <div class="ai-action-body">
+                                        <div>{{ $item['reason'] ?? '' }}</div>
+                                    </div>
+                                </details>
+                            @empty
+                                <div class="ii-empty">Belum ada aksi yang perlu dikejar sekarang.</div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <div class="ai-section-label">Yang paling perlu dipantau</div>
+                        <div class="ai-compact-list">
+                            @forelse($topRestock as $row)
+                                @php
+                                    $sku = (string) data_get($row, 'sku', '');
+                                    $product = (string) data_get($row, 'product', $resolveProduct($sku));
+                                    $readyQty = (float) data_get($row, 'ready_qty', 0);
+                                    $readyQtyLabel = (string) data_get($row, 'ready_qty_label', number_format($readyQty, 0, ',', '.') . ' pcs');
+                                    $suggestedQty = (float) data_get($row, 'suggested_qty', 0);
+                                    $suggestedQtyLabel = (string) data_get($row, 'suggested_qty_label', number_format($suggestedQty, 0, ',', '.') . ' pcs');
+                                    $coverDays = data_get($row, 'cover_days');
+                                    $coverDaysLabel = (string) data_get($row, 'cover_days_label', $coverDays !== null ? 'Stok aman bertahan ' . number_format((float) $coverDays, 1, ',', '.') . ' hari' : 'Stok aman belum kebaca');
+                                    $status = (string) data_get($row, 'status', '-');
+                                @endphp
+                                <div class="ai-mini-row">
+                                    <div style="min-width:0;">
+                                        <div class="name">{{ $product }}</div>
+                                        <div class="desc">{{ $coverDaysLabel }}</div>
+                                        <div class="desc">Ready {{ $readyQtyLabel }}</div>
+                                        <div class="desc">Status {{ $status }}</div>
+                                        @if($sku !== '')
+                                            <div class="desc">Kode: {{ $sku }}</div>
+                                        @endif
+                                    </div>
+                                    <span class="badge-status" style="background:#f8fafc;color:#475569;border-color:#e2e8f0;font-weight:800;white-space:nowrap;">
+                                        {{ $suggestedQtyLabel }}
+                                    </span>
+                                </div>
+                            @empty
+                                <div class="ii-empty">Tidak ada saran isi ulang untuk saat ini.</div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <div class="ai-section-label">Watchlist AI</div>
+                        <div class="ai-compact-list">
+                            @forelse($watchlist as $row)
+                                @php
+                                    $sku = (string) ($row['sku'] ?? '');
+                                    $product = $resolveProduct($sku);
+                                    $qtyLabel = trim((string) ($row['qty_label'] ?? ''));
+                                    $daysLabel = trim((string) ($row['days_label'] ?? ''));
+                                @endphp
+                                <div class="ai-mini-row">
+                                    <div style="min-width:0;">
+                                        <div class="name">{{ $product }}</div>
+                                        <div class="desc">
+                                            Saran qty {{ $qtyLabel !== '' ? $qtyLabel : 'belum kebaca' }}
+                                            @if($daysLabel !== '')
+                                                · Cukup {{ $daysLabel }}
+                                            @endif
+                                        </div>
+                                        <div class="desc">{{ $row['reason'] ?? '-' }}</div>
+                                        @if($sku !== '')
+                                            <div class="desc">Kode: {{ $sku }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="ii-empty">Watchlist kosong.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            @else
+                <div class="row g-3">
+                    <div class="col-12 col-lg-7">
+                        <div class="ai-section-label">Saran cepat</div>
+                        <div class="ai-compact-list">
+                            @forelse($actions as $item)
+                                @php
+                                    $tone = $item['tone'] ?? 'info';
+                                    $styles = match ($tone) {
+                                        'success' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'color' => '#047857'],
+                                        'warning' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'color' => '#b45309'],
+                                        'danger' => ['bg' => '#fef2f2', 'border' => '#fecaca', 'color' => '#dc2626'],
+                                        default => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'color' => '#1d4ed8'],
+                                    };
+                                    $sku = (string) ($item['sku'] ?? '');
+                                    $product = (string) ($item['product'] ?? $resolveProduct($sku));
+                                    $qtyLabel = trim((string) ($item['qty_label'] ?? ''));
+                                    $daysLabel = trim((string) ($item['days_label'] ?? ''));
+                                @endphp
+                                <details class="ai-action-details">
+                                    <summary>
+                                        <div class="ai-action-head">
+                                            <div class="ai-action-title">{{ $item['title'] ?? 'Saran' }}</div>
+                                            <div class="ai-action-product">{{ $product }}</div>
+                                        </div>
+                                        <div class="ai-action-meta">
+                                            <div class="ai-action-chip-row">
+                                                <span class="ai-action-chip" style="background:{{ $styles['bg'] }};color:{{ $styles['color'] }};border-color:{{ $styles['border'] }};">
+                                                    Qty {{ $qtyLabel !== '' ? $qtyLabel : 'belum kebaca' }}
+                                                </span>
+                                                <span class="ai-action-chip" style="background:#f8fafc;color:#475569;border-color:#e2e8f0;">
+                                                    {{ $daysLabel !== '' ? 'Cukup ' . $daysLabel : 'Hari belum kebaca' }}
+                                                </span>
+                                            </div>
+                                            @if($sku !== '')
+                                                <div class="ai-action-code">Kode: {{ $sku }}</div>
+                                            @endif
+                                        </div>
+                                    </summary>
+                                    <div class="ai-action-body">
+                                        <div>{{ $item['reason'] ?? '' }}</div>
+                                    </div>
+                                </details>
+                            @empty
+                                <div class="ii-empty">Belum ada aksi yang perlu dikejar sekarang.</div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-5">
+                        <div class="ai-section-label">Yang paling perlu dipantau</div>
+                        <div class="ai-compact-list mb-3">
+                            @forelse($topRestock as $row)
+                                @php
+                                    $sku = (string) data_get($row, 'sku', '');
+                                    $product = (string) data_get($row, 'product', $resolveProduct($sku));
+                                    $readyQty = (float) data_get($row, 'ready_qty', 0);
+                                    $readyQtyLabel = (string) data_get($row, 'ready_qty_label', number_format($readyQty, 0, ',', '.') . ' pcs');
+                                    $suggestedQty = (float) data_get($row, 'suggested_qty', 0);
+                                    $suggestedQtyLabel = (string) data_get($row, 'suggested_qty_label', number_format($suggestedQty, 0, ',', '.') . ' pcs');
+                                    $coverDays = data_get($row, 'cover_days');
+                                    $coverDaysLabel = (string) data_get($row, 'cover_days_label', $coverDays !== null ? 'Stok aman bertahan ' . number_format((float) $coverDays, 1, ',', '.') . ' hari' : 'Stok aman belum kebaca');
+                                    $status = (string) data_get($row, 'status', '-');
+                                @endphp
+                                <div class="ai-mini-row">
+                                    <div style="min-width:0;">
+                                        <div class="name">{{ $product }}</div>
+                                        <div class="desc">
+                                            {{ $coverDaysLabel }} · Ready {{ $readyQtyLabel }} · Status {{ $status }}
+                                        </div>
+                                        @if($sku !== '')
+                                            <div class="desc">Kode: {{ $sku }}</div>
+                                        @endif
+                                    </div>
+                                    <span class="badge-status" style="background:#f8fafc;color:#475569;border-color:#e2e8f0;font-weight:800;white-space:nowrap;">
+                                        {{ $suggestedQtyLabel }}
+                                    </span>
+                                </div>
+                            @empty
+                                <div class="ii-empty">Tidak ada saran isi ulang untuk saat ini.</div>
+                            @endforelse
+                        </div>
+
+                        <div class="ai-section-label">Watchlist AI</div>
+                        <div class="ai-compact-list">
+                            @forelse($watchlist as $row)
+                                @php
+                                    $sku = (string) ($row['sku'] ?? '');
+                                    $product = $resolveProduct($sku);
+                                    $qtyLabel = trim((string) ($row['qty_label'] ?? ''));
+                                    $daysLabel = trim((string) ($row['days_label'] ?? ''));
+                                @endphp
+                                <div class="ai-mini-row">
+                                    <div style="min-width:0;">
+                                        <div class="name">{{ $product }}</div>
+                                        <div class="desc">
+                                            Saran qty {{ $qtyLabel !== '' ? $qtyLabel : 'belum kebaca' }}
+                                            @if($daysLabel !== '')
+                                                · Cukup {{ $daysLabel }}
+                                            @endif
+                                        </div>
+                                        <div class="desc">{{ $row['reason'] ?? '-' }}</div>
+                                        @if($sku !== '')
+                                            <div class="desc">Kode: {{ $sku }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="ii-empty">Watchlist kosong.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @endif
     </div>
-</div>
+</details>

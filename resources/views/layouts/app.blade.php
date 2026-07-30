@@ -789,7 +789,13 @@
                 'ops' => 'OPS',
                 default => 'DB?',
             };
+            $gfShowDevPet = $gfOwnerUser->isDeveloper() || $gfDbMode === 'ops';
         @endphp
+
+        @if ($gfShowDevPet)
+            @include('layouts.partials.dev-ai-pet')
+        @endif
+
         <div class="gf-owner-floating-tools">
             <div class="dropup gf-owner-mode-wrap">
                 <button type="button"

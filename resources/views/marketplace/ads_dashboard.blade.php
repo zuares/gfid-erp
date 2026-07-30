@@ -888,15 +888,15 @@ body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
 
 /* Final UI pass: flat header + cleaner tabs, aligned with shipments/income */
 .ads-shell{
-    max-width:1040px;
+    max-width:1120px;
     margin-inline:auto;
 }
 
 .ads-hero{
     top:0;
     align-items:center;
-    padding:.45rem .75rem;
-    margin-bottom:.65rem;
+    padding:.4rem .7rem;
+    margin-bottom:.55rem;
     margin-inline:-.75rem;
     border-radius:0;
     background:var(--card,#fff);
@@ -919,34 +919,34 @@ body[data-theme="dark"] .ads-hero{
 .ads-eyebrow{
     color:var(--shp-muted,#64748b);
     letter-spacing:0;
-    margin-bottom:.12rem;
+    margin-bottom:.1rem;
 }
 
 .ads-hero .title{
     color:var(--text,#0f172a);
-    font-size:1rem;
+    font-size:.98rem;
     font-weight:750;
     letter-spacing:-0.03em;
 }
 
 .ads-hero .sub{
     color:var(--shp-muted,#64748b);
-    font-size:.78rem;
+    font-size:.75rem;
     max-width:44rem;
 }
 
 .ads-hero-badges{
-    margin-top:.45rem;
-    gap:.3rem;
+    margin-top:.3rem;
+    gap:.28rem;
 }
 
 .ads-chip{
-    padding:.28rem .55rem;
+    padding:.24rem .5rem;
     border-radius:7px;
     border:1px solid rgba(148,163,184,.28);
     background:transparent;
     color:var(--text,#0f172a);
-    font-size:.68rem;
+    font-size:.66rem;
     font-weight:700;
 }
 
@@ -957,14 +957,14 @@ body[data-theme="dark"] .ads-chip{
 }
 
 .ads-hero .controls{
-    gap:.35rem;
+    gap:.3rem;
 }
 
 .ads-hero .role-chip,
 .ads-hero .btn-pill{
     border-radius:7px!important;
-    padding-inline:.72rem!important;
-    font-size:.72rem!important;
+    padding-inline:.68rem!important;
+    font-size:.7rem!important;
     font-weight:700!important;
 }
 
@@ -975,7 +975,7 @@ body[data-theme="dark"] .ads-chip{
 }
 
 .ads-tabs-wrap{
-    margin:0 0 .85rem;
+    margin:0 0 .65rem;
 }
 
 .ads-tabs-wrap::before{
@@ -984,8 +984,8 @@ body[data-theme="dark"] .ads-chip{
 
 .dash-tabs-modern{
     display:inline-flex;
-    gap:.3rem;
-    padding:.3rem;
+    gap:.25rem;
+    padding:.24rem;
     border-radius:999px;
     background:linear-gradient(180deg, rgba(248,250,252,.96), rgba(241,245,249,.92));
     border:1px solid rgba(148,163,184,.18);
@@ -1005,8 +1005,8 @@ body[data-theme="dark"] .dash-tabs-modern{
     background:transparent;
     color:#64748b;
     border-radius:999px;
-    padding:.62rem .9rem;
-    font-size:.78rem;
+    padding:.56rem .82rem;
+    font-size:.76rem;
     font-weight:900;
     letter-spacing:-0.01em;
     cursor:pointer;
@@ -1078,38 +1078,95 @@ body[data-theme="dark"] .dash-tab-sm.active{
 }
 
 .ads-surface{
-    border-radius:18px;
+    border-radius:16px;
 }
 
 .ads-panel-head{
-    padding:.9rem 1rem;
-    margin-bottom:.85rem;
+    padding:.75rem .9rem;
+    margin-bottom:.7rem;
     border-bottom:1px solid rgba(148,163,184,.16);
 }
 
 .ads-panel-title{
-    font-size:.98rem;
+    font-size:.94rem;
     font-weight:900;
     letter-spacing:-0.03em;
 }
 
 .ads-panel-note{
-    font-size:.74rem;
+    font-size:.7rem;
+}
+
+.ads-tab-stack{
+    display:grid;
+    gap:.7rem;
+}
+
+.ads-tab-panel{
+    border-radius:14px;
+    border:1px solid var(--shp-border, rgba(148,163,184,.18));
+    background:var(--card,#fff);
+    box-shadow:none;
+    overflow:hidden;
+}
+
+body[data-theme="dark"] .ads-tab-panel{
+    background:var(--card,#0f172a);
+    border-color:rgba(51,65,85,.85);
+}
+
+.ads-tab-panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:1rem;
+    flex-wrap:wrap;
+    padding:.75rem .9rem .7rem;
+    border-bottom:1px solid var(--shp-border, rgba(148,163,184,.18));
+    background:linear-gradient(180deg, rgba(248,250,252,.95), rgba(255,255,255,.98));
+}
+
+body[data-theme="dark"] .ads-tab-panel-head{
+    background:linear-gradient(180deg, rgba(15,23,42,.96), rgba(15,23,42,.88));
+    border-bottom-color:rgba(51,65,85,.85);
+}
+
+.ads-tab-panel-title{
+    margin:0;
+    font-size:.92rem;
+    font-weight:900;
+    letter-spacing:-0.03em;
+    color:var(--text,#0f172a);
+}
+
+.ads-tab-panel-note{
+    font-size:.7rem;
+    color:var(--shp-muted,#64748b);
+    padding:.34rem .62rem;
+    border-radius:999px;
+    background:rgba(148,163,184,.12);
+    border:1px solid rgba(148,163,184,.22);
+}
+
+body[data-theme="dark"] .ads-tab-panel-note{
+    background:rgba(30,41,59,.82);
+    border-color:rgba(51,65,85,.92);
+    color:#cbd5e1;
 }
 
 .dash-sec{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:.75rem;
-    padding:.2rem 0 .45rem;
-    margin:0 0 .75rem;
-    border-bottom:1px solid rgba(148,163,184,.12);
-    font-size:.72rem;
-    font-weight:900;
-    letter-spacing:.04em;
-    text-transform:uppercase;
-    color:#334155;
+    gap:.55rem;
+    padding:.1rem 0 .3rem;
+    margin:0 0 .55rem;
+    border-bottom:1px solid rgba(148,163,184,.1);
+    font-size:.68rem;
+    font-weight:850;
+    letter-spacing:.02em;
+    text-transform:none;
+    color:#475569;
 }
 
 body[data-theme="dark"] .dash-sec{
@@ -1118,7 +1175,7 @@ body[data-theme="dark"] .dash-sec{
 }
 
 .dash-sec i{
-    font-size:.9rem;
+    font-size:.85rem;
 }
 
 @media (max-width: 768px) {
@@ -1144,10 +1201,10 @@ body[data-theme="dark"] .dash-sec{
         min-width:100%;
     }
     .dash-tab-m{
-        padding:.56rem .82rem;
+        padding:.52rem .78rem;
     }
     .dash-sec{
-        font-size:.68rem;
+        font-size:.66rem;
     }
 }
 
@@ -1476,11 +1533,10 @@ function toggleCampaignStatus(el, campId, action) {
         <div>
             <div class="ads-eyebrow"><i class="bi bi-megaphone-fill"></i> Marketplace Ads</div>
             <h1 class="title">Analisis Iklan Shopee</h1>
-            <div class="sub">Pemantauan biaya, GMV, dan kontrol ROAS harian.</div>
+            <div class="sub">Pantau biaya, GMV, dan profit harian.</div>
             <div class="ads-hero-badges">
-                <span class="ads-chip"><i class="bi bi-lightning-charge-fill"></i> ROAS Harian</span>
-                <span class="ads-chip"><i class="bi bi-wallet2"></i> Kontrol Biaya</span>
-                <span class="ads-chip"><i class="bi bi-graph-up-arrow"></i> Optimasi Kampanye</span>
+                <span class="ads-chip"><i class="bi bi-lightning-charge-fill"></i> ROAS</span>
+                <span class="ads-chip"><i class="bi bi-wallet2"></i> Biaya</span>
             </div>
         </div>
         <div class="controls" style="position: relative; text-align: right; display:flex; flex-wrap:wrap;">
@@ -1491,16 +1547,16 @@ function toggleCampaignStatus(el, campId, action) {
                 @endphp
                 @if($latestRun->status === 'error')
                     <div class="ads-hero-meta ads-hero-error">
-                        <i class="bi bi-exclamation-triangle-fill"></i> Sync Gagal: {{ Str::limit($latestRun->error_message, 60) }}
+                        <i class="bi bi-exclamation-triangle-fill"></i> Sync gagal: {{ Str::limit($latestRun->error_message, 60) }}
                     </div>
                 @endif
                 <div class="ads-hero-meta">
                     @if($lastSuccess)
                         <span style="color: #16a34a;"><i class="bi bi-check-circle-fill"></i></span>
-                        Terakhir Sync: {{ $lastSuccess->updated_at?->timezone('Asia/Jakarta')?->format('d M Y, H:i') ?? 'waktu tidak tersedia' }}
+                        Sync terakhir: {{ $lastSuccess->updated_at?->timezone('Asia/Jakarta')?->format('d M Y, H:i') ?? 'waktu tidak tersedia' }}
                     @else
                         <span style="color: #eab308;"><i class="bi bi-clock"></i></span>
-                        Belum pernah sync berhasil
+                        Belum ada sync
                     @endif
                 </div>
             @endif
@@ -1573,7 +1629,7 @@ function toggleCampaignStatus(el, campId, action) {
     @if(empty($storeId))
         <div class="dash-empty">
             <i class="bi bi-shop"></i>
-            Pilih toko terlebih dahulu untuk melihat analisis.
+            Pilih toko dulu.
         </div>
     @else
         {{-- ==============================================
@@ -1599,7 +1655,7 @@ function toggleCampaignStatus(el, campId, action) {
             <!-- Live Progress Bar (Hidden by default) -->
             <div id="liveSyncProgress" class="dpanel ads-surface mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi Sedang Berjalan...</span>
+                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi...</span>
                     <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
                 </div>
                 <div style="width: 100%; height: 6px; background: var(--dsh-border); border-radius: 4px; overflow: hidden;">
@@ -1636,75 +1692,83 @@ function toggleCampaignStatus(el, campId, action) {
                 $rfmt = fn ($n) => 'Rp ' . number_format(abs($n), 0, ',', '.');
                 $rProfitPos = $rProfit >= 0;
             @endphp
-            <div class="dash-sec" style="display:flex; justify-content:space-between; align-items:center;">
-                <span><i class="bi bi-piggy-bank text-success"></i> Profitabilitas Periode Ini</span>
-                <a href="javascript:void(0)" onclick="document.querySelector('.dash-tab-m[data-target=&quot;tab-profit&quot;]').click()" style="font-size:.7rem; font-weight:700; color:var(--dsh-accent); text-decoration:none;">Lihat rincian &rarr;</a>
-            </div>
-            <div class="ads-kpi-grid mb-4">
-                <div class="dpanel ads-kpi kpi-profit" style="border-color:rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.28); background:linear-gradient(180deg, rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.08), rgba(248,250,252,1));">
-                    <div class="ads-kpi-label" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }};"><i class="bi bi-piggy-bank"></i> Net Profit</div>
-                    <div class="ads-kpi-value" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }}; font-variant-numeric:tabular-nums;">{{ $rProfit < 0 ? '-' : '' }}{{ $rfmt($rProfit) }}</div>
-                    <div class="ads-kpi-sub">{{ $rUntung }} untung &bull; {{ $rRugi }} rugi &bull; <span style="font-weight:900; color:{{ $dProfit >= 0 ? '#16a34a' : '#dc2626' }};"><i class="bi bi-arrow-{{ $dProfit >= 0 ? 'up' : 'down' }}-right"></i> {{ number_format(abs($dProfit), 1, ',', '.') }}%</span> vs lalu</div>
-                </div>
-                <div class="dpanel ads-kpi kpi-revenue" style="border-color:rgba(3,105,161,.25); background:linear-gradient(180deg, rgba(3,105,161,.07), rgba(248,250,252,1));">
-                    <div class="ads-kpi-label" style="color:#0369a1;"><i class="bi bi-cash-coin"></i> Pendapatan Bersih</div>
-                    <div class="ads-kpi-value" style="color:#0369a1; font-variant-numeric:tabular-nums;">{{ $rfmt($rNetRevenue) }}</div>
-                    <div class="ads-kpi-sub">Omzet (GMV): {{ $rfmt($rGmv) }}</div>
-                </div>
-                <div class="dpanel ads-kpi kpi-cogs" style="border-color:rgba(148,163,184,.3); background:linear-gradient(180deg, rgba(148,163,184,.08), rgba(248,250,252,1));">
-                    <div class="ads-kpi-label" style="color:var(--dsh-muted);"><i class="bi bi-box-seam"></i> Modal (HPP)</div>
-                    <div class="ads-kpi-value" style="color:var(--text); font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rCogs) }}</div>
-                    <div class="ads-kpi-sub">dari pcs terjual &times; HPP</div>
-                </div>
-                <div class="dpanel ads-kpi kpi-spend" style="border-color:rgba(245,158,11,.3); background:linear-gradient(180deg, rgba(245,158,11,.08), rgba(248,250,252,1));">
-                    <div class="ads-kpi-label" style="color:#b45309;"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
-                    <div class="ads-kpi-value" style="color:#92400e; font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rSpend * 1.11) }}</div>
-                    <div class="ads-kpi-sub">nyata {{ $rfmt($rSpend) }} + PPN 11%</div>
-                </div>
-                <div class="dpanel ads-kpi kpi-roas" style="border-color:rgba(37,99,235,.25); background:linear-gradient(180deg, rgba(37,99,235,.07), rgba(248,250,252,1));">
-                    <div class="ads-kpi-label" style="color:#1d4ed8;"><i class="bi bi-lightning-charge"></i> ROAS &bull; Pesanan</div>
-                    <div class="ads-kpi-value" style="color:#1d4ed8; font-variant-numeric:tabular-nums;">{{ number_format($rRoas, 2, ',', '.') }}x <span style="font-size:.85rem; color:var(--text);">&bull; {{ number_format($rOrders, 0, ',', '.') }}</span></div>
-                    <div class="ads-kpi-sub">omzet per rupiah iklan &bull; total order</div>
-                </div>
-            </div>
-
-            {{-- INFORMASI SALDO & STATUS TOKO (REAL-TIME) --}}
-            <div class="dash-sec"><i class="bi bi-wallet2 text-primary"></i> Informasi Saldo & Status Toko (Real-time)</div>
-            <div class="ads-surface mb-4 p-3" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;" id="realtimeStatusContainer">
-                {{-- Skeleton Loaders --}}
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
-                    <div class="placeholder-glow">
-                        <span class="placeholder col-6 mb-2"></span>
-                        <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
-                    </div>
-                </div>
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
-                    <div class="placeholder-glow">
-                        <span class="placeholder col-7 mb-2"></span>
-                        <span class="placeholder col-5 d-block" style="height: 2rem;"></span>
-                    </div>
-                </div>
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
-                    <div class="placeholder-glow">
-                        <span class="placeholder col-8 mb-2"></span>
-                        <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
-                    </div>
-                </div>
-            </div>
-
-
-
-            <hr class="my-4" style="border-color: var(--dsh-border);">
-            
-            <div class="ads-surface mt-4 mb-3 p-3 p-md-4">
-                <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
                     <div>
-                        <div class="dash-sec mb-1" style="font-size: 0.95rem; border-bottom: none; padding-bottom: 0;"><i class="bi bi-clock-history text-primary"></i> Komparasi Historis</div>
-                        <div style="font-size: 0.75rem; color: var(--dsh-muted);">Perbandingan performa dengan periode sebelumnya.</div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-piggy-bank text-success"></i> Profit Periode Ini</div>
+                        <div class="ads-tab-panel-note">Snapshot periode aktif vs sebelumnya.</div>
                     </div>
-                    <div style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
+                    <a href="javascript:void(0)" onclick="document.querySelector('.dash-tab-m[data-target=&quot;tab-profit&quot;]').click()" style="font-size:.7rem; font-weight:700; color:var(--dsh-accent); text-decoration:none;">Lihat rincian &rarr;</a>
+                </div>
+                <div class="p-3 p-md-3">
+                    <div class="ads-kpi-grid mb-0">
+                        <div class="dpanel ads-kpi kpi-profit" style="border-color:rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.28); background:linear-gradient(180deg, rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.08), rgba(248,250,252,1));">
+                            <div class="ads-kpi-label" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }};"><i class="bi bi-piggy-bank"></i> Net Profit</div>
+                            <div class="ads-kpi-value" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }}; font-variant-numeric:tabular-nums;">{{ $rProfit < 0 ? '-' : '' }}{{ $rfmt($rProfit) }}</div>
+                            <div class="ads-kpi-sub">{{ $rUntung }} untung &bull; {{ $rRugi }} rugi &bull; <span style="font-weight:900; color:{{ $dProfit >= 0 ? '#16a34a' : '#dc2626' }};"><i class="bi bi-arrow-{{ $dProfit >= 0 ? 'up' : 'down' }}-right"></i> {{ number_format(abs($dProfit), 1, ',', '.') }}%</span> vs lalu</div>
+                        </div>
+                        <div class="dpanel ads-kpi kpi-revenue" style="border-color:rgba(3,105,161,.25); background:linear-gradient(180deg, rgba(3,105,161,.07), rgba(248,250,252,1));">
+                            <div class="ads-kpi-label" style="color:#0369a1;"><i class="bi bi-cash-coin"></i> Pendapatan Bersih</div>
+                            <div class="ads-kpi-value" style="color:#0369a1; font-variant-numeric:tabular-nums;">{{ $rfmt($rNetRevenue) }}</div>
+                            <div class="ads-kpi-sub">Omzet (GMV): {{ $rfmt($rGmv) }}</div>
+                        </div>
+                        <div class="dpanel ads-kpi kpi-cogs" style="border-color:rgba(148,163,184,.3); background:linear-gradient(180deg, rgba(148,163,184,.08), rgba(248,250,252,1));">
+                            <div class="ads-kpi-label" style="color:var(--dsh-muted);"><i class="bi bi-box-seam"></i> Modal (HPP)</div>
+                            <div class="ads-kpi-value" style="color:var(--text); font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rCogs) }}</div>
+                            <div class="ads-kpi-sub">dari pcs terjual &times; HPP</div>
+                        </div>
+                        <div class="dpanel ads-kpi kpi-spend" style="border-color:rgba(245,158,11,.3); background:linear-gradient(180deg, rgba(245,158,11,.08), rgba(248,250,252,1));">
+                            <div class="ads-kpi-label" style="color:#b45309;"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
+                            <div class="ads-kpi-value" style="color:#92400e; font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rSpend * 1.11) }}</div>
+                            <div class="ads-kpi-sub">nyata {{ $rfmt($rSpend) }} + PPN 11%</div>
+                        </div>
+                        <div class="dpanel ads-kpi kpi-roas" style="border-color:rgba(37,99,235,.25); background:linear-gradient(180deg, rgba(37,99,235,.07), rgba(248,250,252,1));">
+                            <div class="ads-kpi-label" style="color:#1d4ed8;"><i class="bi bi-lightning-charge"></i> ROAS &bull; Pesanan</div>
+                            <div class="ads-kpi-value" style="color:#1d4ed8; font-variant-numeric:tabular-nums;">{{ number_format($rRoas, 2, ',', '.') }}x <span style="font-size:.85rem; color:var(--text);">&bull; {{ number_format($rOrders, 0, ',', '.') }}</span></div>
+                            <div class="ads-kpi-sub">omzet per rupiah iklan &bull; total order</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-wallet2 text-primary"></i> Status Toko</div>
+                        <div class="ads-tab-panel-note">Ringkasan real-time saldo dan kondisi toko.</div>
+                    </div>
+                </div>
+                <div class="p-3" id="realtimeStatusContainer" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .65rem;">
+                    <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-6 mb-2"></span>
+                            <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
+                        </div>
+                    </div>
+                    <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-7 mb-2"></span>
+                            <span class="placeholder col-5 d-block" style="height: 2rem;"></span>
+                        </div>
+                    </div>
+                    <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-8 mb-2"></span>
+                            <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-clock-history text-primary"></i> Komparasi</div>
+                        <div class="ads-tab-panel-note">Perbandingan rentang saat ini vs sebelumnya.</div>
+                    </div>
+                    <div style="overflow-x:auto; scrollbar-width:none;">
                         <input type="hidden" id="histMetricSelect" value="roas">
-                        <div class="dash-tabs-modern" id="histMetricChips" style="padding: 0.25rem;">
+                        <div class="dash-tabs-modern" id="histMetricChips" style="padding:.2rem;">
                             <button class="dash-tab-sm active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
                             <button class="dash-tab-sm" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
                             <button class="dash-tab-sm" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
@@ -1715,91 +1779,89 @@ function toggleCampaignStatus(el, campId, action) {
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHistorical">
-                    <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Menganalisis perbandingan periode...
+                <div class="p-3 pt-0">
+                    <div class="dpanel p-3 mb-3" style="border-left: 4px solid var(--dsh-border)" id="insightHistorical">
+                        <div style="color: var(--dsh-muted); font-size: 0.8rem; display:flex; align-items:center; gap:0.5rem;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Memuat data...
+                        </div>
+                    </div>
+                    <div class="dpanel p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div style="font-size: .72rem; color: var(--dsh-muted);">Ringkas perubahan antar periode.</div>
+                            <div id="histSummary" style="font-size: .78rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                        </div>
+                        <div style="position: relative; height: 320px;">
+                            <canvas id="historicalChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="dpanel p-3">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        💡 <b>Info:</b> Membandingkan performa rentang saat ini dengan rentang sebelumnya yang berdurasi sama persis.
+
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-clock text-primary"></i> Heatmap Jam</div>
+                        <div class="ads-tab-panel-note">Jam paling ramai.</div>
                     </div>
-                    <div id="histSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                 </div>
-                <div style="position: relative; height: 350px;">
-                    <canvas id="historicalChart"></canvas>
-                </div>
-            </div>
-        <!-- ANALISIS HARIAN TAB (DIGABUNG KE RINGKASAN UTAMA) -->
-<div class="dash-panels mb-4" style="grid-template-columns: 1fr;">
-                {{-- HEATMAP JAM TAYANG --}}
-                <div class="dpanel p-3">
-                    <div class="dash-sec mt-0 mb-2"><i class="bi bi-clock text-primary"></i> Heatmap Jam Tayang (Golden Hours)</div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 1rem;">
-                        💡 <b>Info:</b> Semakin gelap/pekat warnanya, semakin tinggi metrik pada jam tersebut.
-                    </div>
+                <div class="p-3">
                     <div style="position: relative; height: 250px;">
                         <canvas id="hourlyChart"></canvas>
                     </div>
                 </div>
             </div>
-            
-            
-            <div class="dash-sec mt-4"><i class="bi bi-graph-up"></i> Grafik Performa Harian</div>
-            
-            <div class="dash-panels" style="grid-template-columns: 1fr; gap: 1rem;">
-                <!-- 1. TREN FINANSIAL HARIAN -->
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Finansial Harian</div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Finansial:</b> Selisih <b>GMV & Biaya</b> = Margin. <b>Garis ROAS (Emas)</b> = Profitabilitas.
-                            </div>
-                        </div>
-                        <div id="dailySummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                    </div>
-                    
-                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTrend">
-                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            AI mendeteksi momentum finansial...
-                        </div>
-                    </div>
-                    
-                    <div style="height: 280px;">
-                        <canvas id="dailyChart"></canvas>
+
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-graph-up"></i> Grafik Harian</div>
+                        <div class="ads-tab-panel-note">Finansial dan trafik dalam satu tampilan.</div>
                     </div>
                 </div>
+                <div class="p-3">
+                    <div class="ads-tab-stack" style="grid-template-columns: 1fr; gap: .75rem;">
+                        <div class="dpanel p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div style="font-weight: 650; font-size: 0.82rem; color: var(--dsh-muted);">Finansial</div>
+                                    <div class="mt-1" style="font-size: 0.7rem; color: var(--dsh-muted); opacity: 0.85;">GMV, biaya, dan margin.</div>
+                                </div>
+                                <div id="dailySummary" style="font-size: 0.78rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                            </div>
 
-                <!-- 2. TREN TRAFIK HARIAN -->
-                <div class="dpanel p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <div style="font-weight: 650; font-size: 0.85rem; color: var(--dsh-muted);">Tren Trafik Harian</div>
-                            <div class="mt-1" style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85;">
-                                💡 <b>Trafik (Funnel):</b> <b>Impresi (Kuning)</b> vs <b>Klik (Biru)</b> = Rasio bocor.
+                            <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTrend">
+                                <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    Memuat data...
+                                </div>
+                            </div>
+
+                            <div style="height: 280px;">
+                                <canvas id="dailyChart"></canvas>
                             </div>
                         </div>
-                        <div id="trafficSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--text); text-align: right;"></div>
-                    </div>
-                    
-                    <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTraffic">
-                        <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            AI menganalisis kebocoran funnel...
+
+                        <div class="dpanel p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div style="font-weight: 650; font-size: 0.82rem; color: var(--dsh-muted);">Trafik</div>
+                                    <div class="mt-1" style="font-size: 0.7rem; color: var(--dsh-muted); opacity: 0.85;">Impresi, klik, dan CVR.</div>
+                                </div>
+                                <div id="trafficSummary" style="font-size: 0.78rem; font-weight: 700; color: var(--text); text-align: right;"></div>
+                            </div>
+
+                            <div class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;" id="insightDailyTraffic">
+                                <div style="color: var(--dsh-muted); font-size: 0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    Memuat data...
+                                </div>
+                            </div>
+
+                            <div style="height: 280px;">
+                                <canvas id="trafficChart"></canvas>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div style="height: 280px;">
-                        <canvas id="trafficChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -1807,8 +1869,13 @@ function toggleCampaignStatus(el, campId, action) {
 
         <!-- TAB PROFITABILITAS -->
         <div class="tab-pane" id="tab-profit">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <h5 class="m-0" style="font-weight: 700; color: var(--text); font-size: 1.1rem;"><i class="bi bi-cash-coin text-success"></i> Analisis Profitabilitas</h5>
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-cash-coin text-success"></i> Profitabilitas</div>
+                        <div class="ads-tab-panel-note">Profit, komposisi biaya, dan performa kampanye.</div>
+                    </div>
+                </div>
             </div>
             @include('marketplace.partials._profitability_tab')
         </div>
@@ -1821,7 +1888,7 @@ function toggleCampaignStatus(el, campId, action) {
         <!-- TAB KAMPANYE -->
         <div class="tab-pane" id="tab-campaigns">
             
-            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> Indikator Performa (KPI) Kampanye</div>
+            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> KPI Kampanye</div>
             
             <div class="dash-grid mb-4">
                 @php
@@ -1954,7 +2021,7 @@ function toggleCampaignStatus(el, campId, action) {
             </div>
 
             <div id="inner-campaign-gms" class="inner-tab-pane active" style="display: block;">
-                <div class="dash-sec"><i class="bi bi-gear"></i> Konfigurasi Kampanye Auto (GMV Max)</div>
+                <div class="dash-sec"><i class="bi bi-gear"></i> GMV Max</div>
                 <div class="dpanel p-4 mb-4" style="background: var(--card-bg);">
                     @if($autoCampaign)
                         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
@@ -1984,20 +2051,19 @@ function toggleCampaignStatus(el, campId, action) {
                     @else
                         <div class="text-center py-3" style="color: var(--dsh-muted); font-size: .9rem;">
                             <i class="bi bi-info-circle mb-2" style="font-size: 1.5rem; display: block;"></i>
-                            Data kampanye GMV Max (Auto) belum tersinkronisasi.<br>
-                            Sistem akan menarik pengaturannya dari Shopee pada saat sinkronisasi berikutnya.
+                            Data GMV Max belum tersinkronisasi.
                         </div>
                     @endif
                 </div>
 
-                <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Daftar Produk GMV Max (Otomatis)</div>
+                <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Produk GMV Max</div>
                 <div class="dpanel">
                     @include('marketplace.partials._gms_item_table', ['gmsItems' => $gmsItems, 'globalRoas' => $adsSetting->target_roas ?? null])
                 </div>
             </div>
 
             <div id="inner-campaign-individual" class="inner-tab-pane" style="display: none;">
-                <div class="dash-sec"><i class="bi bi-megaphone"></i> Iklan Individual (Pencarian & Serupa)</div>
+                <div class="dash-sec"><i class="bi bi-megaphone"></i> Iklan Individual</div>
             
             @php
                 $totalBoncos = 0;
@@ -2014,16 +2080,16 @@ function toggleCampaignStatus(el, campId, action) {
             <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
                 <div class="dpanel p-3" style="border-left: 4px solid {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; background: var(--dsh-bg);">
                     <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; font-size: 0.85rem;">
-                        <i class="bi {{ $totalBoncos > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle' }}"></i> Audit Kampanye AI
+                        <i class="bi {{ $totalBoncos > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle' }}"></i> Ringkasan
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted);">
                         @if($totalBoncos > 0)
-                            Ditemukan <b>{{ $totalBoncos }} kampanye berstatus Boncos</b> yang menyedot biaya sebesar <b>Rp {{ number_format($totalSpendBoncos, 0, ',', '.') }}</b>. Matikan atau perbaiki segera! 
+                            <b>{{ $totalBoncos }} kampanye</b> boros biaya sebesar <b>Rp {{ number_format($totalSpendBoncos, 0, ',', '.') }}</b>.
                         @else
-                            Tidak ada kampanye yang terindikasi boncos parah. Kondisi sangat sehat.
+                            Tidak ada kampanye boros.
                         @endif
                         @if($totalHiddenGem > 0)
-                            Terdapat <b>{{ $totalHiddenGem }} produk *Hidden Gem*</b> dengan efisiensi tinggi yang siap untuk diskalakan.
+                            <b>{{ $totalHiddenGem }} produk</b> punya efisiensi tinggi.
                         @endif
                     </div>
                 </div>
@@ -2040,7 +2106,7 @@ function toggleCampaignStatus(el, campId, action) {
         <div class="tab-pane" id="tab-items">
 
 
-            <div class="dash-sec"><i class="bi bi-robot"></i> Asisten Analisis (Berdasarkan Rentang Tanggal)</div>
+            <div class="dash-sec"><i class="bi bi-robot"></i> Insight Produk</div>
             <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHealth"></div>
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTraffic"></div>
@@ -2052,14 +2118,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART IMPRESI --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Top 5 Impresi</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Impresi</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan tayangan terbanyak.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartImpressions"></canvas>
                         @endif
@@ -2069,14 +2135,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART KLIK --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Top 5 Trafik (Klik)</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cursor text-primary"></i> Klik</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan klik terbanyak.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartClicks"></canvas>
                         @endif
@@ -2086,14 +2152,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART CTR --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-hand-index text-warning"></i> Top 5 CTR</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-hand-index text-warning"></i> CTR</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan rasio klik tertinggi.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartCtr"></canvas>
                         @endif
@@ -2104,14 +2170,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART PESANAN --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-box-seam text-success"></i> Top 5 Pesanan</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-box-seam text-success"></i> Pesanan</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan jumlah pesanan terbanyak.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartOrders"></canvas>
                         @endif
@@ -2121,14 +2187,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART CVR --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-funnel" style="color: #a855f7;"></i> Top 5 CVR</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-funnel" style="color: #a855f7;"></i> CVR</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan tingkat konversi tertinggi.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartCvr"></canvas>
                         @endif
@@ -2138,14 +2204,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART CPA --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cash-coin text-danger"></i> Top 5 CPA</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-cash-coin text-danger"></i> CPA</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan biaya per pesanan tertinggi.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartCpa"></canvas>
                         @endif
@@ -2156,14 +2222,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART BIAYA --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-wallet2 text-danger"></i> Top 5 Biaya</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-wallet2 text-danger"></i> Biaya</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk penyerap biaya terbesar.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartSpend"></canvas>
                         @endif
@@ -2173,14 +2239,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART GMV --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bag-check text-success"></i> Top 5 GMV</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-bag-check text-success"></i> GMV</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk penyumbang GMV terbesar.
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartGmv"></canvas>
                         @endif
@@ -2190,14 +2256,14 @@ function toggleCampaignStatus(el, campId, action) {
                 {{-- CHART ROAS --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-lightning-charge text-warning"></i> Top 5 ROAS</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-lightning-charge text-warning"></i> ROAS</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
-                        Produk dengan pengembalian iklan terbaik (x).
+                        Top 5.
                     </div>
                     <div style="position: relative; height: 180px; display: flex; justify-content: center; align-items: center;">
                         @if(empty($itemPerformance) || count($itemPerformance) === 0)
-                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data produk aktif.</div>
+                            <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data.</div>
                         @else
                             <canvas id="chartRoas"></canvas>
                         @endif
@@ -2205,24 +2271,20 @@ function toggleCampaignStatus(el, campId, action) {
                 </div>
             </div>
 
-            <div class="dash-sec mt-2 mb-2"><i class="bi bi-stars text-warning"></i> Kesimpulan Performa Produk</div>
+            <div class="dash-sec mt-2 mb-2"><i class="bi bi-stars text-warning"></i> Ringkasan Produk</div>
             <div class="dpanel p-3 mb-4" id="productInsights" style="border-left: 4px solid #a855f7;">
                 <div class="d-flex align-items-center" style="color: var(--dsh-muted); font-size: 0.8rem;">
                     <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Menganalisis performa produk...
+                    Memuat data...
                 </div>
             </div>
 
-            <div class="dash-sec"><i class="bi bi-box-seam"></i> Rincian Semua Produk (CPC + GMV Max)</div>
+            <div class="dash-sec"><i class="bi bi-box-seam"></i> Semua Produk</div>
             
             <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
                 <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
-                    <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: var(--dsh-accent); font-size: 0.85rem;">
-                        <i class="bi bi-info-circle"></i> Info Data Produk
-                    </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted);">
-                        Tabel ini menampilkan performa per produk dari <b>semua kampanye iklan</b> (CPC + GMV Max).
-                        Metrik diagregasi berdasarkan rentang tanggal yang dipilih.
+                        CPC dan GMV Max.
                     </div>
                 </div>
             </div>
@@ -2514,15 +2576,12 @@ function toggleCampaignStatus(el, campId, action) {
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: var(--btn-close-filter);"></button>
                 </div>
                 <div class="modal-body" style="background: var(--card-bg);">
-                    <div id="campaignHourlySubtitle" style="font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 1rem;">Memuat data...</div>
+                    <div id="campaignHourlySubtitle" style="font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 1rem;">Data 24 jam</div>
                     <div id="campaignHourlyLoader" style="text-align: center; padding: 3rem 0; color: var(--dsh-muted);">
                         <div class="spinner-border text-primary mb-2" role="status"></div>
-                        <div style="font-size: 0.8rem;">Menarik data live dari Shopee API...</div>
+                        <div style="font-size: 0.8rem;">Memuat data...</div>
                     </div>
                     <div id="campaignHourlyContent" style="display: none;">
-                        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 0.5rem;">
-                            💡 <b>Tips:</b> Gunakan grafik ini untuk melihat jam tayang paling optimal bagi kampanye Anda. Sesuaikan budget harian berdasarkan jam-jam ramai.
-                        </div>
                         <div style="position: relative; height: 300px; width: 100%;">
                             <canvas id="campaignHourlyChartCanvas"></canvas>
                         </div>

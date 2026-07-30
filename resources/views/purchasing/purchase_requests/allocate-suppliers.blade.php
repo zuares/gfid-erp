@@ -61,10 +61,7 @@
                         @foreach ($purchase_request->lines as $index => $line)
                             @php
                                 $recommendation = $recommendedSuppliers->get($line->item_id);
-                                $defaultSupplierId = old(
-                                    "suppliers.{$line->id}",
-                                    $recommendation?->supplier_id ?? $purchase_request->supplier_id
-                                );
+                                $defaultSupplierId = old("suppliers.{$line->id}") ?: $recommendation?->supplier_id ?: $purchase_request->supplier_id;
                             @endphp
                             <tr>
                                 <td class="text-center text-muted number-cell">{{ $index + 1 }}</td>
@@ -88,8 +85,12 @@
                                         <div class="small mt-1 {{ $recommendation->is_primary ? 'text-success' : 'text-muted' }}">
                                             @if (($recommendation->source ?? 'item') === 'category')
                                                 {{ $recommendation->is_primary ? 'Pemasok utama' : 'Pemasok alternatif' }} kategori {{ $recommendation->category_name }} terpilih otomatis.
+                                            @elseif (($recommendation->source ?? 'item') === 'history_category')
+                                                Pemasok dari pembelian terakhir kategori ini terpilih otomatis.
                                             @elseif (($recommendation->source ?? 'item') === 'history')
                                                 Pemasok pembelian terakhir terpilih otomatis.
+                                            @elseif (($recommendation->source ?? 'item') === 'fallback')
+                                                Pemasok awal terpilih otomatis supaya tidak ada baris kosong.
                                             @else
                                                 {{ $recommendation->is_primary ? 'Pemasok utama barang terpilih otomatis.' : 'Pemasok alternatif barang terpilih otomatis.' }}
                                             @endif

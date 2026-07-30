@@ -8,9 +8,9 @@
     $isInventory = request()->routeIs('inventory.*');
     $isProfile = request()->routeIs('profile.*') || request()->routeIs('settings.*');
 
-    // Khusus operating: tab Cutting, QC, Sewing, Finishing
+    // Khusus operating: tab Cutting, PRD, Sewing, Finishing
     $isCuttingTab = request()->routeIs('production.cutting_jobs.*');
-    $isQcTab = request()->routeIs('production.qc.*');
+    $isWarehousePrdTab = request()->routeIs('inventory.warehouse_intelligence');
     $isSewingTab =
         request()->routeIs('production.sewing.pickups.*') || request()->routeIs('production.sewing.returns.*');
     // Dashboard tab khusus operating → Dashboard Utama (Home), Finishing → Dashboard Produksi
@@ -227,10 +227,9 @@
                 ? route('production.cutting_jobs.create')
                 : '#';
 
-            $qcIndexHref = Route::has('production.qc.index')
-                ? route('production.qc.index', (auth()->user()?->role ?? null) === 'admin' ? ['stage' => 'sewing'] : [])
+            $warehousePrdHref = Route::has('inventory.warehouse_intelligence')
+                ? route('inventory.warehouse_intelligence', ['tab' => 'prd'])
                 : '#';
-            $qcLabel = $userRole === 'admin' ? 'QC Jahit' : 'QC';
 
             $sewingCreateHref = Route::has('production.sewing.returns.create')
                 ? route('production.sewing.returns.create')
@@ -256,15 +255,16 @@
             <span class="label">Cutting</span>
         </a>
 
-        {{-- QC (Index) --}}
-        <a href="{{ $qcIndexHref }}" class="nav-item {{ $isQcTab ? 'active' : '' }}">
+        {{-- PRD / Warehouse Intelligence --}}
+        <a href="{{ $warehousePrdHref }}" class="nav-item {{ $isWarehousePrdTab ? 'active' : '' }}">
             <span class="icon">
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6z" />
-                    <path d="M9 12.5 11 14.5 15 10.5" />
+                    <path d="M4.5 8.5 12 4l7.5 4.5L12 13z" />
+                    <path d="M4.5 8.5V15L12 19.5 19.5 15V8.5" />
+                    <path d="M12 13v6.5" />
                 </svg>
             </span>
-            <span class="label">{{ $qcLabel }}</span>
+            <span class="label">PRD</span>
         </a>
 
         {{-- HOME (Dashboard / Operator Summary) --}}

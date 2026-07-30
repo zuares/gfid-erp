@@ -3,7 +3,9 @@
 namespace App\Helpers;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class CodeGenerator
 {
@@ -27,60 +29,69 @@ class CodeGenerator
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
-                return DB::transaction(function () use ($prefix, $forDate) {
-                    $now = now();
+                $lockKey = sprintf('code-generator:%s:%s', $prefix, $forDate ?: now()->toDateString());
 
-                    // Jika user kasih tanggal (mis: dari form finishing), pakai itu sebagai "tanggal bisnis"
-                    // tapi tetap pakai $now untuk created_at / updated_at.
-                    if ($forDate) {
-                        $dateCarbon = Carbon::parse($forDate);
-                    } else {
-                        $dateCarbon = $now;
-                    }
+                return Cache::store('file')->lock($lockKey, 15)->block(10, function () use ($prefix, $forDate) {
+                    return DB::transaction(function () use ($prefix, $forDate) {
+                        $now = now();
 
-                    $date = $dateCarbon->toDateString(); // 2025-11-21
-                    $dateYmd = $dateCarbon->format('Ymd'); // 20251121
+                        // Jika user kasih tanggal (mis: dari form finishing), pakai itu sebagai "tanggal bisnis"
+                        // tapi tetap pakai $now untuk created_at / updated_at.
+                        $dateCarbon = $forDate ? Carbon::parse($forDate) : $now;
 
-                    // Lock baris running_numbers untuk prefix+date ini
-                    $row = DB::table('running_numbers')
-                        ->where('prefix', $prefix)
-                        ->where('date', $date)
-                        ->lockForUpdate()
-                        ->first();
+                        $date = $dateCarbon->toDateString(); // 2025-11-21
+                        $dateYmd = $dateCarbon->format('Ymd'); // 20251121
 
-                    if (!$row) {
-                        $number = 1;
+                        // Satu generator satu waktu untuk prefix+date ini.
+                        $row = DB::table('running_numbers')
+                            ->where('prefix', $prefix)
+                            ->where('date', $date)
+                            ->first();
 
-                        DB::table('running_numbers')->insert([
-                            'prefix' => $prefix,
-                            'date' => $date,
-                            'last_number' => $number,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ]);
-                    } else {
-                        $number = $row->last_number + 1;
+                        if (!$row) {
+                            $number = 1;
 
-                        DB::table('running_numbers')
-                            ->where('id', $row->id)
-                            ->update([
+                            DB::table('running_numbers')->insert([
+                                'prefix' => $prefix,
+                                'date' => $date,
                                 'last_number' => $number,
+                                'created_at' => $now,
                                 'updated_at' => $now,
                             ]);
-                    }
+                        } else {
+                            $number = $row->last_number + 1;
 
-                    $numberFormatted = str_pad($number, 3, '0', STR_PAD_LEFT);
+                            DB::table('running_numbers')
+                                ->where('id', $row->id)
+                                ->update([
+                                    'last_number' => $number,
+                                    'updated_at' => $now,
+                                ]);
+                        }
 
-                    return "{$prefix}-{$dateYmd}-{$numberFormatted}";
-                }, 3); // 3x attempt internal transaction (kalau DB error)
-            } catch (\Throwable $e) {
-                // Retry beberapa kali kalau lagi "tabrakan" / deadlock / transient error
+                        $numberFormatted = str_pad($number, 3, '0', STR_PAD_LEFT);
+
+                        return "{$prefix}-{$dateYmd}-{$numberFormatted}";
+                    }, 3);
+                });
+            } catch (Throwable $e) {
+                $message = strtolower($e->getMessage());
+                $isLockedDb = str_contains($message, 'database is locked')
+                    || str_contains($message, 'deadlock')
+                    || str_contains($message, 'lock wait timeout')
+                    || str_contains($message, 'busy');
+
+                // Retry beberapa kali kalau lagi tabrakan / deadlock / transient lock
+                if (!$isLockedDb || $attempt === $maxAttempts) {
+                    throw $e;
+                }
+
+                // Backoff singkat, naik perlahan supaya SQLite sempat lepas lock
                 if ($attempt === $maxAttempts) {
                     throw $e;
                 }
 
-                // Tidur sebentar sebelum coba lagi (50ms)
-                usleep(50_000);
+                usleep(75_000 * $attempt);
             }
         }
 
