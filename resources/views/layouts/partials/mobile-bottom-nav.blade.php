@@ -347,8 +347,13 @@
         </a>
 
         @if (in_array($userRole, ['owner', 'admin', 'operating']))
-            <a href="{{ Route::has('inventory.stock_card.index') ? route('inventory.stock_card.index') : '#' }}"
-                class="nav-item {{ $isInventory ? 'active' : '' }}">
+            @php
+                $stockHref = $userRole === 'owner' && Route::has('inventory.stocks.items')
+                    ? route('inventory.stocks.items')
+                    : (Route::has('inventory.stock_card.index') ? route('inventory.stock_card.index') : '#');
+            @endphp
+
+            <a href="{{ $stockHref }}" class="nav-item {{ $isInventory ? 'active' : '' }}">
                 <span class="icon">
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M4.5 9 12 4.5 19.5 9" />

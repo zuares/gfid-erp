@@ -175,6 +175,12 @@ class InventoryStockController extends Controller
 
         COALESCE(SUM(s.qty),0) AS total_qty,
         COALESCE(SUM(s.allocated_qty),0) AS allocated_qty,
+        COALESCE(SUM(
+            CASE
+                WHEN UPPER(TRIM(s.wh_code)) <> \'RM\' THEN s.qty
+                ELSE 0
+            END
+        ),0) AS value_qty,
 
         COALESCE(SUM(
             CASE
@@ -190,7 +196,12 @@ class InventoryStockController extends Controller
         ),0) AS wip_qty,
 
         COALESCE(items.hpp,0) AS hpp_per_unit,
-        COALESCE(SUM(s.qty),0) * COALESCE(items.hpp,0) AS stock_value,
+        COALESCE(SUM(
+            CASE
+                WHEN UPPER(TRIM(s.wh_code)) <> \'RM\' THEN s.qty
+                ELSE 0
+            END
+        ),0) * COALESCE(items.hpp,0) AS stock_value,
 
         COALESCE(items.avg_daily_sales,0) AS ads,
 
@@ -245,11 +256,13 @@ class InventoryStockController extends Controller
             $summaryRows = (clone $q)->get();
             $totalQty = (float) $summaryRows->sum('total_qty');
             $totalValue = (float) $summaryRows->sum('stock_value');
+            $valueQty = (float) $summaryRows->sum('value_qty');
 
             $hppSummary = [
                 'total_qty' => $totalQty,
                 'total_value' => $totalValue,
-                'avg_hpp_weighted' => $totalQty > 0 ? ($totalValue / $totalQty) : 0.0,
+                'value_qty' => $valueQty,
+                'avg_hpp_weighted' => $valueQty > 0 ? ($totalValue / $valueQty) : 0.0,
                 'avg_ads' => $summaryRows->count() ? (float) $summaryRows->avg(fn($r) => (float) ($r->ads ?? 0)) : 0.0,
             ];
 
@@ -258,11 +271,13 @@ class InventoryStockController extends Controller
                 ->map(function ($grp, $catName) {
                     $qty = (float) $grp->sum('total_qty');
                     $val = (float) $grp->sum('stock_value');
+                    $valueQty = (float) $grp->sum('value_qty');
                     return [
                         'category' => (string) $catName,
                         'total_qty' => $qty,
                         'total_value' => $val,
-                        'avg_hpp_weighted' => $qty > 0 ? ($val / $qty) : 0.0,
+                        'value_qty' => $valueQty,
+                        'avg_hpp_weighted' => $valueQty > 0 ? ($val / $valueQty) : 0.0,
                     ];
                 })
                 ->values()

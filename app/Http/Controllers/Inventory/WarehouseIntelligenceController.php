@@ -104,6 +104,7 @@ class WarehouseIntelligenceController extends Controller
         $rows = $rows->map(function ($r) use ($draftItems, $prDraftItems, $poDraftItems) {
             $effectiveMin = $this->effectiveRtsMinDisplay($r);
             $effectiveMax = $this->effectiveRtsMaxDisplay($r);
+            $productionGroup = $this->normalizeProductionSourceGroup($r);
 
             $rtsCover = $r->ads > 0 ? $r->ready / $r->ads : 9999;
             $r->rts_cover = round($rtsCover, 1);
@@ -122,6 +123,8 @@ class WarehouseIntelligenceController extends Controller
             $r->buy_pr_qty_label = $this->formatSmartQty($r->buy_pr_qty);
             $r->rts_min_effective = $effectiveMin;
             $r->rts_max_effective = $effectiveMax;
+            $r->production_group = $productionGroup;
+            $r->production_group_label = $this->productionSourceGroupLabel($productionGroup);
             
             $r->draft_id = $draftItems[$r->item_id] ?? null;
             $r->pr_draft_id = $prDraftItems[$r->item_id] ?? null;
@@ -167,7 +170,7 @@ class WarehouseIntelligenceController extends Controller
             $cuttingPriority = $rows->filter(function ($r) {
                 $totalStock = $r->ready + $r->wh_prd + $r->wip;
                 $target30d = $r->ads * 30;
-                return $r->ads > 0 && $totalStock < $target30d && (string) ($r->production_source_key ?? '') === 'own';
+                return $r->ads > 0 && $totalStock < $target30d && $this->normalizeProductionSourceGroup($r) === 'in_house';
             })->map(function ($r) {
                 $r->target_30d = $r->ads * 30;
                 $totalStock = $r->ready + $r->wh_prd + $r->wip;
@@ -284,6 +287,7 @@ class WarehouseIntelligenceController extends Controller
         );
 
         $summary = $this->intelligenceService->summary($rows);
+        $sourceSummary = $this->productionSourceSummary($rows);
         $itemLookup = $rows->keyBy('sku')->map(fn ($r) => [
             'sku' => $r->sku,
             'product' => $r->product,
@@ -315,9 +319,12 @@ class WarehouseIntelligenceController extends Controller
             ->values();
 
         $watchlistDefaults = $this->buildWatchlist($rows, $tab);
+        $priorityDefaults = $this->buildPriorityActions($tab, $rows);
         $heuristicActions = $this->buildHeuristicActions($tab, $rows);
         $heuristicActionLookup = $heuristicActions->keyBy('sku');
+        $priorityLookup = $priorityDefaults->keyBy('sku');
         $actions = $heuristicActions;
+        $priorities = $priorityDefaults;
         $watchlist = $watchlistDefaults;
         $watchlistLookup = $watchlistDefaults->keyBy('sku');
         $signals = $this->buildSignals($rows, $summary, $tab);
@@ -357,6 +364,16 @@ class WarehouseIntelligenceController extends Controller
                     return array_merge($base, $item);
                 })->values();
             }
+            $priorities = collect($ai['priorities'] ?? [])->filter()->values();
+            if ($priorities->isEmpty()) {
+                $priorities = $priorityDefaults;
+            } else {
+                $priorities = $priorities->map(function ($item) use ($priorityLookup) {
+                    $sku = (string) ($item['sku'] ?? '');
+                    $base = $priorityLookup->get($sku, []);
+                    return array_merge($base, $item);
+                })->values();
+            }
             $signals = collect($ai['signals'] ?? [])->filter()->values();
             if ($signals->isEmpty()) {
                 $signals = $this->buildSignals($rows, $summary, $tab);
@@ -367,6 +384,11 @@ class WarehouseIntelligenceController extends Controller
         if ($tab === 'prd' && ! empty(data_get($sewingRecommendations, 'best.name'))) {
             $best = data_get($sewingRecommendations, 'best.name');
             $overview = trim($overview . ' Pickup jahit paling cocok sekarang ada di ' . $best . '.');
+        }
+
+        $topPriorityProduct = data_get($priorities->first(), 'product');
+        if ($topPriorityProduct && ! Str::contains($overview, (string) $topPriorityProduct)) {
+            $overview = trim($overview . ' Prioritas utama ada di ' . $topPriorityProduct . '.');
         }
 
         $actions = $actions->map(function ($action) use ($itemLookup, $tab) {
@@ -408,6 +430,23 @@ class WarehouseIntelligenceController extends Controller
             ];
         })->values();
 
+        $priorities = $priorities->map(function ($item) use ($itemLookup) {
+            $sku = (string) ($item['sku'] ?? '');
+            $product = data_get($itemLookup->get($sku), 'product') ?: ($item['product'] ?? $sku);
+
+            return [
+                'rank' => (string) ($item['rank'] ?? ''),
+                'title' => (string) ($item['title'] ?? ''),
+                'sku' => $sku,
+                'product' => $product,
+                'label' => (string) ($item['label'] ?? ''),
+                'qty_label' => (string) ($item['qty_label'] ?? ''),
+                'days_label' => (string) ($item['days_label'] ?? ''),
+                'reason' => $this->humanizeRecommendationText((string) ($item['reason'] ?? '')),
+                'tone' => in_array(($item['tone'] ?? 'info'), ['success', 'warning', 'danger', 'info'], true) ? $item['tone'] : 'info',
+            ];
+        })->values();
+
         $signals = $signals->map(function ($signal) {
             return [
                 'label' => $this->friendlySignalLabel((string) ($signal['label'] ?? '')),
@@ -421,11 +460,13 @@ class WarehouseIntelligenceController extends Controller
             'topRestockCount' => $topRestock->count(),
             'topRestock' => $topRestock,
             'actions' => $actions,
+            'priorities' => $priorities,
             'watchlist' => $watchlist,
             'signals' => $signals,
             'overview' => $overview,
             'confidence' => $confidence,
             'summary' => $summary,
+            'sourceSummary' => $sourceSummary,
             'dataBasis' => $this->dataBasisLabels($tab),
             'itemLookup' => $itemLookup,
             'sewingRecommendations' => $sewingRecommendations,
@@ -446,6 +487,7 @@ class WarehouseIntelligenceController extends Controller
                     $minThreshold = $this->effectiveRtsMinDisplay($r);
                     $pullQty = (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0);
                     $rtsCover = ($r->ads ?? 0) > 0 ? round(($r->ready ?? 0) / max((float) $r->ads, 0.0001), 1) : null;
+                    $productionGroup = $this->normalizeProductionSourceGroup($r);
 
                     if ($available <= $minThreshold && ($r->wh_prd ?? 0) > 0) {
                         $qty = max(1, $pullQty);
@@ -465,7 +507,7 @@ class WarehouseIntelligenceController extends Controller
                         ];
                     }
 
-                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0 && ($r->production_source ?? '') === 'buy') {
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0 && $productionGroup === 'buy') {
                         $qty = $this->purchaseRequestQtyForOneMonth($r);
                         $days = 30;
 
@@ -551,7 +593,7 @@ class WarehouseIntelligenceController extends Controller
                         ];
                     }
 
-                    if ($total < $target30d && ($r->production_source ?? '') !== 'buy') {
+                    if ($total < $target30d && $productionGroup !== 'buy') {
                         $qty = max(1, (int) ceil(max(0, $target30d - $total)));
                         $days = 30;
 
@@ -579,30 +621,217 @@ class WarehouseIntelligenceController extends Controller
         return $actions;
     }
 
+    private function buildPriorityActions(string $tab, Collection $rows): Collection
+    {
+        $priorities = $rows
+            ->filter(fn ($r) => ($r->ads ?? 0) > 0)
+            ->map(function ($r) use ($tab) {
+                $available = max(0, (float) (($r->ready ?? 0) - ($r->ready_allocated ?? 0)));
+                $minThreshold = $this->effectiveRtsMinDisplay($r);
+                $totalStock = (float) (($r->ready ?? 0) + ($r->wh_prd ?? 0) + ($r->wip ?? 0));
+                $target30d = (float) (($r->ads ?? 0) * 30);
+                $productionGroup = $this->normalizeProductionSourceGroup($r);
+                $ads = max(0.0001, (float) ($r->ads ?? 0));
+                $coverDays = round($available / $ads, 1);
+                $shortage30d = max(0, $target30d - $totalStock);
+                $liftBonus = ((float) ($r->ads_lift ?? 0) > 0) ? 3 : 0;
+                $criticalBonus = $available <= 0 ? 5 : ($available <= $minThreshold ? 2 : 0);
+
+                if ($tab === 'rts') {
+                    if ($available <= 0 && ($r->wh_prd ?? 0) > 0) {
+                        return [
+                            'priority_score' => 100 + $liftBonus + $criticalBonus,
+                            'title' => 'Ambil stok dari produksi',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P1 · siap dipindah',
+                            'qty_value' => max(1, (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0)),
+                            'qty_label' => $this->formatSmartQty(max(1, (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0))),
+                            'days_value' => $coverDays,
+                            'days_label' => $this->formatSmartDays($coverDays),
+                            'reason' => 'Stok depan kosong, stok produksi masih ada, dan item ini harus diutamakan supaya penjualan tidak putus.',
+                            'tone' => 'success',
+                        ];
+                    }
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) > 0) {
+                        $qty = max(1, (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0));
+
+                        return [
+                            'priority_score' => 95 + $liftBonus + $criticalBonus,
+                            'title' => 'Ambil stok dari produksi',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P1 · stok tipis',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => $coverDays,
+                            'days_label' => $this->formatSmartDays($coverDays),
+                            'reason' => 'Stok depan sudah tipis dan stok produksi masih tersedia. Item ini paling aman ditarik lebih dulu.',
+                            'tone' => 'success',
+                        ];
+                    }
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0 && $productionGroup === 'buy') {
+                        $qty = max(1, $this->purchaseRequestQtyForOneMonth($r));
+
+                        return [
+                            'priority_score' => 92 + $liftBonus + $criticalBonus,
+                            'title' => 'Bikin pembelian',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P2 · perlu beli',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => 30,
+                            'days_label' => $this->formatSmartDays(30),
+                            'reason' => 'Stok depan menipis, stok produksi kosong, dan item ini memang masuk grup beli jadi.',
+                            'tone' => 'warning',
+                        ];
+                    }
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0 && ($r->wip ?? 0) > 0) {
+                        $qty = max(1, (int) round((float) ($r->wip ?? 0)));
+
+                        return [
+                            'priority_score' => 90 + $liftBonus + $criticalBonus,
+                            'title' => 'Ambil jahit',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P2 · stok proses',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => $coverDays,
+                            'days_label' => $this->formatSmartDays($coverDays),
+                            'reason' => 'Stok depan tipis, stok produksi kosong, tapi masih ada stok proses yang bisa segera dikejar.',
+                            'tone' => 'warning',
+                        ];
+                    }
+
+                    if ($available <= $minThreshold && ($r->wh_prd ?? 0) <= 0) {
+                        $qty = max(1, (int) ceil(max(0, $minThreshold - $available) * max((float) ($r->ads ?? 0), 1)));
+
+                        return [
+                            'priority_score' => 88 + $liftBonus + $criticalBonus,
+                            'title' => $productionGroup === 'outsource' ? 'Follow up makloon' : 'Kejar produksi',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P3 · perlu dikejar',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => $coverDays,
+                            'days_label' => $this->formatSmartDays($coverDays),
+                            'reason' => $productionGroup === 'outsource'
+                                ? 'Stok depan menipis dan item ini bergantung ke proses makloon. Perlu difollow up lebih dulu.'
+                                : 'Stok depan menipis dan belum ada cadangan yang siap. Item ini perlu didahulukan di produksi.',
+                            'tone' => 'danger',
+                        ];
+                    }
+                }
+
+                if ($tab === 'prd') {
+                    if (($r->wh_prd ?? 0) > 0 && $available <= $minThreshold) {
+                        $qty = max(1, (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0));
+
+                        return [
+                            'priority_score' => 96 + $liftBonus + $criticalBonus,
+                            'title' => 'Pindahkan ke stok depan',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P1 · transfer',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => $coverDays,
+                            'days_label' => $this->formatSmartDays($coverDays),
+                            'reason' => 'Stok produksi masih ada dan stok depan sudah menipis. Ini kandidat transfer paling cepat.',
+                            'tone' => 'success',
+                        ];
+                    }
+
+                    if (($r->wh_prd ?? 0) <= 0 && ($r->wip ?? 0) > 0 && $available <= $minThreshold) {
+                        $qty = max(1, (int) round((float) ($r->wip ?? 0)));
+
+                        return [
+                            'priority_score' => 92 + $liftBonus + $criticalBonus,
+                            'title' => 'Ambil jahit',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P2 · jahit',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => $coverDays,
+                            'days_label' => $this->formatSmartDays($coverDays),
+                            'reason' => 'Stok depan kosong dan masih ada stok proses yang bisa dipercepat dulu.',
+                            'tone' => 'warning',
+                        ];
+                    }
+
+                    if ($totalStock < $target30d && $productionGroup === 'in_house') {
+                        $qty = max(1, (int) ceil($shortage30d));
+
+                        return [
+                            'priority_score' => 86 + $liftBonus,
+                            'title' => 'Jadwalkan potong',
+                            'sku' => $r->sku,
+                            'product' => $r->product,
+                            'label' => 'P3 · cutting',
+                            'qty_value' => $qty,
+                            'qty_label' => $this->formatSmartQty($qty),
+                            'days_value' => 30,
+                            'days_label' => $this->formatSmartDays(30),
+                            'reason' => 'Total stok belum cukup untuk menutup 30 hari ke depan, jadi cutting perlu dijadwalkan.',
+                            'tone' => 'danger',
+                        ];
+                    }
+                }
+
+                return null;
+            })
+            ->filter()
+            ->sortByDesc('priority_score')
+            ->values()
+            ->take(3)
+            ->map(function ($item, $index) {
+                $item['rank'] = 'P' . ($index + 1);
+                unset($item['priority_score']);
+
+                return $item;
+            });
+
+        return $priorities;
+    }
+
     private function buildWatchlist(Collection $rows, string $tab): Collection
     {
-        $minify = fn ($r) => [
-            'sku' => $r->sku,
-            'product' => $r->product,
-            'qty_value' => max(0, (float) ($r->suggested_qty ?? 0)),
-            'qty_label' => $this->formatSmartQty((float) ($r->suggested_qty ?? 0)),
-            'days_value' => isset($r->cover_days) ? (float) $r->cover_days : null,
-            'days_label' => isset($r->cover_days)
-                ? $this->formatSmartDays((float) $r->cover_days)
-                : '',
-            'ready_qty' => max(0, (float) (($r->ready ?? 0) - ($r->ready_allocated ?? 0))),
-            'reason' => $tab === 'rts'
-                ? (
-                    (($r->wh_prd ?? 0) > 0)
-                        ? 'Masih ada stok produksi yang bisa dipindahkan.'
-                        : (($r->production_source ?? '') === 'buy' ? 'Perlu dibelikan lagi.' : 'Perlu didahulukan di produksi.')
-                )
-                : (
-                    (($r->wh_prd ?? 0) > 0)
-                        ? 'Perlu dipindah ke stok depan.'
-                        : (($r->wip ?? 0) > 0 ? 'Masih ada stok proses yang bisa dikejar.' : 'Perlu dijadwalkan potong.')
-                ),
-        ];
+        $minify = function ($r) use ($tab) {
+            $productionGroup = $this->normalizeProductionSourceGroup($r);
+            $productionLabel = $this->productionSourceGroupLabel($productionGroup);
+
+            return [
+                'sku' => $r->sku,
+                'product' => $r->product,
+                'qty_value' => max(0, (float) ($r->suggested_qty ?? 0)),
+                'qty_label' => $this->formatSmartQty((float) ($r->suggested_qty ?? 0)),
+                'days_value' => isset($r->cover_days) ? (float) $r->cover_days : null,
+                'days_label' => isset($r->cover_days)
+                    ? $this->formatSmartDays((float) $r->cover_days)
+                    : '',
+                'ready_qty' => max(0, (float) (($r->ready ?? 0) - ($r->ready_allocated ?? 0))),
+                'reason' => $tab === 'rts'
+                    ? (
+                        (($r->wh_prd ?? 0) > 0)
+                            ? 'Masih ada stok produksi yang bisa dipindahkan.'
+                            : ($productionGroup === 'buy'
+                                ? 'Masuk grup ' . $productionLabel . '. Perlu dibelikan lagi.'
+                                : 'Masuk grup ' . $productionLabel . '. Perlu didahulukan di produksi.')
+                    )
+                    : (
+                        (($r->wh_prd ?? 0) > 0)
+                            ? 'Perlu dipindah ke stok depan.'
+                            : (($r->wip ?? 0) > 0 ? 'Masih ada stok proses yang bisa dikejar.' : 'Perlu dijadwalkan potong.')
+                    ),
+            ];
+        };
 
         return $rows
             ->filter(fn ($r) => ($r->ads ?? 0) > 0)
@@ -696,7 +925,7 @@ class WarehouseIntelligenceController extends Controller
         ];
 
         return $tab === 'rts'
-            ? array_merge($common, ['batas display', 'draft permintaan'])
+            ? array_merge($common, ['batas display', 'draft permintaan', 'group produksi in-house vs beli'])
             : array_merge($common, ['produksi sendiri', 'prioritas pindah', 'prioritas jahit', 'prioritas potong', 'operator jahit']);
     }
 
@@ -736,7 +965,7 @@ class WarehouseIntelligenceController extends Controller
                 $minThreshold = $this->effectiveRtsMinDisplay($r);
                 $whPrd = (float) ($r->wh_prd ?? 0);
                 $wip = (float) ($r->wip ?? 0);
-                $productionSource = (string) ($r->production_source ?? '');
+                $productionGroup = $this->normalizeProductionSourceGroup($r);
                 $hasDraft = !empty($r->draft_id) || !empty($r->pr_draft_id);
                 $totalStock = (float) (($r->ready ?? 0) + $whPrd + $wip);
                 $target30d = (float) (($r->ads ?? 0) * 30);
@@ -744,11 +973,11 @@ class WarehouseIntelligenceController extends Controller
                 $operationalPass = match ($operationalFilter) {
                     'critical' => $ready <= $minThreshold,
                     'transfer_ready' => $whPrd > 0 && $ready <= $minThreshold,
-                    'need_buy' => $ready <= $minThreshold && $whPrd <= 0 && $productionSource === 'buy',
-                    'need_production' => $ready <= $minThreshold && $whPrd <= 0 && $productionSource !== 'buy',
+                    'need_buy' => $ready <= $minThreshold && $whPrd <= 0 && $productionGroup === 'buy',
+                    'need_production' => $ready <= $minThreshold && $whPrd <= 0 && $productionGroup !== 'buy',
                     'with_wip' => $wip > 0,
                     'sewing' => $wip > 0 && $whPrd <= 0 && $ready <= $minThreshold,
-                    'cutting' => $tab === 'prd' ? ($totalStock < $target30d && $productionSource !== 'buy') : $totalStock < $target30d,
+                    'cutting' => $tab === 'prd' ? ($totalStock < $target30d && $productionGroup !== 'buy') : $totalStock < $target30d,
                     'ready_to_move' => $whPrd > 0 && $ready <= $minThreshold,
                     default => true,
                 };
@@ -772,8 +1001,7 @@ class WarehouseIntelligenceController extends Controller
 
         return $rows
             ->filter(function ($r) {
-                return (string) ($r->production_source_key ?? '') === 'own'
-                    || (string) ($r->production_source ?? '') === Item::PRODUCTION_IN_HOUSE;
+                return $this->normalizeProductionSourceGroup($r) === 'in_house';
             })
             ->values();
     }
@@ -1012,12 +1240,60 @@ class WarehouseIntelligenceController extends Controller
         return max(1, $target30d - (int) round($available));
     }
 
+    private function normalizeProductionSourceGroup(object $row): string
+    {
+        $source = strtolower(trim((string) ($row->production_source ?? '')));
+        $sourceKey = strtolower(trim((string) ($row->production_source_key ?? '')));
+
+        if ($source === Item::PRODUCTION_BUY) {
+            return 'buy';
+        }
+
+        if ($source === Item::PRODUCTION_OUTSOURCE) {
+            return 'outsource';
+        }
+
+        if ($source === Item::PRODUCTION_IN_HOUSE || $sourceKey === 'own') {
+            return 'in_house';
+        }
+
+        if ($sourceKey === 'external') {
+            return 'outsource';
+        }
+
+        return 'unknown';
+    }
+
+    private function productionSourceGroupLabel(string $group): string
+    {
+        return match ($group) {
+            'in_house' => 'Produksi sendiri',
+            'buy' => 'Perlu beli',
+            'outsource' => 'Makloon / outsource',
+            default => 'Belum jelas',
+        };
+    }
+
+    private function productionSourceSummary(Collection $rows): array
+    {
+        $counts = $rows->countBy(fn ($row) => $this->normalizeProductionSourceGroup($row));
+
+        return [
+            'in_house' => (int) ($counts->get('in_house') ?? 0),
+            'buy' => (int) ($counts->get('buy') ?? 0),
+            'outsource' => (int) ($counts->get('outsource') ?? 0),
+            'unknown' => (int) ($counts->get('unknown') ?? 0),
+        ];
+    }
+
     private function generateAiInsights(string $tab, array $filters, array $summary, Collection $rows, Collection $signals, Collection $actions, Collection $watchlist): ?array
     {
         $apiKey = config('services.openai.key');
         if (! $apiKey) {
             return null;
         }
+
+        $priorityCandidates = $this->buildPriorityActions($tab, $rows);
 
         $payloadRows = $rows
             ->sortByDesc(fn ($r) => (float) (($r->eval_score ?? 0) * 1000 + ($r->suggested_qty ?? 0)))
@@ -1026,6 +1302,7 @@ class WarehouseIntelligenceController extends Controller
                 $available = max(0, (float) (($r->ready ?? 0) - ($r->ready_allocated ?? 0)));
                 $minThreshold = $this->effectiveRtsMinDisplay($r);
                 $target30d = (float) (($r->ads ?? 0) * 30);
+                $productionGroup = $this->normalizeProductionSourceGroup($r);
 
                 return [
                     'sku' => $r->sku,
@@ -1033,6 +1310,7 @@ class WarehouseIntelligenceController extends Controller
                     'category' => $r->category,
                     'status' => $r->status,
                     'production_source' => $r->production_source_label ?? $r->production_source ?? '-',
+                    'production_group' => $productionGroup,
                     'ready' => round((float) ($r->ready ?? 0), 2),
                     'ready_allocated' => round((float) ($r->ready_allocated ?? 0), 2),
                     'available_ready' => round($available, 2),
@@ -1053,7 +1331,7 @@ class WarehouseIntelligenceController extends Controller
                     'min_threshold' => $minThreshold,
                     'target_30d' => $target30d,
                     'focus_hint' => $tab === 'rts'
-                        ? ($r->wh_prd > 0 ? 'transfer' : (($r->production_source ?? '') === 'buy' ? 'purchase_request' : 'production'))
+                        ? ($r->wh_prd > 0 ? 'transfer' : ($productionGroup === 'buy' ? 'purchase_request' : 'production'))
                         : (($r->wh_prd > 0 && $available <= $minThreshold) ? 'transfer' : (($r->wip > 0) ? 'sewing' : 'cutting')),
                 ];
             })
@@ -1092,6 +1370,7 @@ TXT;
                 'signals' => $signals->values()->all(),
                 'heuristic_actions' => $actions->values()->all(),
                 'watchlist' => $watchlist->values()->all(),
+                'priorities' => $priorityCandidates->values()->all(),
                 'rows' => $payloadRows,
                 'response_format' => [
                     'overview' => 'string',
@@ -1196,8 +1475,28 @@ TXT;
                                             'required' => ['sku', 'reason'],
                                         ],
                                     ],
+                                    'priorities' => [
+                                        'type' => 'array',
+                                        'items' => [
+                                            'type' => 'object',
+                                            'additionalProperties' => false,
+                                            'properties' => [
+                                                'title' => ['type' => 'string'],
+                                                'sku' => ['type' => 'string'],
+                                                'label' => ['type' => 'string'],
+                                                'reason' => ['type' => 'string'],
+                                                'tone' => [
+                                                    'type' => 'string',
+                                                    'enum' => ['success', 'warning', 'danger', 'info'],
+                                                ],
+                                                'qty_label' => ['type' => 'string'],
+                                                'days_label' => ['type' => 'string'],
+                                            ],
+                                            'required' => ['title', 'sku', 'label', 'reason', 'tone', 'qty_label', 'days_label'],
+                                        ],
+                                    ],
                                 ],
-                                'required' => ['overview', 'confidence', 'signals', 'actions', 'watchlist'],
+                                'required' => ['overview', 'confidence', 'signals', 'actions', 'watchlist', 'priorities'],
                             ],
                             'strict' => true,
                         ],
@@ -1230,6 +1529,7 @@ TXT;
                 'signals' => collect($parsed['signals'] ?? [])->filter()->values()->all(),
                 'actions' => collect($parsed['actions'] ?? [])->filter()->values()->all(),
                 'watchlist' => collect($parsed['watchlist'] ?? [])->filter()->values()->all(),
+                'priorities' => collect($parsed['priorities'] ?? [])->filter()->values()->all(),
             ];
         });
     }

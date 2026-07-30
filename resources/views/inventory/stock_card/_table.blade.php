@@ -1,7 +1,8 @@
 @php
     $itemId = $filters['item_id'] ?? null;
     $rows = $mutations instanceof \Illuminate\Pagination\AbstractPaginator ? $mutations->getCollection() : $mutations;
-    $unit = $selectedItem->unit ?? '';
+    $fmtMove = fn ($value) => abs((float) $value) < 0.000001 ? '-' : number_format((float) $value, 2, ',', '.');
+    $fmtBalance = fn ($value) => abs((float) $value) < 0.000001 ? '0' : number_format((float) $value, 2, ',', '.');
 @endphp
 
 <div id="sc_table_wrap">
@@ -16,6 +17,7 @@
                             <th style="width:170px">Gudang</th>
                             <th style="width:110px">LOT</th>
                             <th style="width:160px">Sumber</th>
+                            <th style="width:150px">Oleh</th>
                             <th class="text-center" style="width:130px">IN</th>
                             <th class="text-center" style="width:130px">OUT</th>
                             <th class="text-end" style="width:140px">Stok Akhir</th>
@@ -26,6 +28,7 @@
                             <th style="width:180px">Gudang</th>
                             <th style="width:110px">LOT</th>
                             <th style="width:160px">Sumber</th>
+                            <th style="width:150px">Oleh</th>
                             <th class="text-center" style="width:130px">IN</th>
                             <th class="text-center" style="width:130px">OUT</th>
                             <th class="text-end" style="width:140px">Stok Akhir</th>
@@ -45,7 +48,6 @@
                             $wh = $m->warehouse ? $m->warehouse->code : '-';
                             $lot = $m->lot?->code ?? '-';
 
-                            $rowUnit = $itemId ? $unit : $m->item->unit ?? '';
                         @endphp
 
                         <tr>
@@ -65,27 +67,34 @@
                                 @if(!empty($m->source_detail))
                                     <div class="small muted mt-1">{{ $m->source_detail }}</div>
                                 @endif
+                                @if (($m->source_type ?? '') === 'adjustment' && !empty($m->adjustment_reason))
+                                    <div class="small muted mt-1">Alasan: {{ $m->adjustment_reason }}</div>
+                                @endif
                                 @if($m->source_id)
                                     <div class="small muted mt-1">Dokumen #{{ $m->source_id }}</div>
                                 @endif
                             </td>
 
+                            <td>
+                                <div class="small fw-semibold">{{ $m->created_by_name ?? 'Sistem' }}</div>
+                            </td>
+
                             <td class="text-end">
                                 <div class="qty-cell mono">
-                                    <span class="qty-num qty-in-num">{{ number_format($in, 2, ',', '.') }}</span>
-                                    <span class="qty-unit">{{ $rowUnit }}</span>
+                                    <span class="qty-num qty-in-num">{{ $fmtMove($in) }}</span>
                                 </div>
                             </td>
 
                             <td class="text-end">
                                 <div class="qty-cell mono">
-                                    <span class="qty-num qty-out-num">{{ number_format($out, 2, ',', '.') }}</span>
-                                    <span class="qty-unit">{{ $rowUnit }}</span>
+                                    <span class="qty-num qty-out-num">{{ $fmtMove($out) }}</span>
                                 </div>
                             </td>
 
                             <td class="text-end mono fw-semibold {{ (float) ($m->running_qty ?? 0) < 0 ? 'text-danger' : '' }}">
-                                {{ number_format((float) ($m->running_qty ?? 0), 2, ',', '.') }}
+                                <span class="qty-balance {{ abs((float) ($m->running_qty ?? 0)) < 0.000001 ? 'qty-balance-zero' : '' }}">
+                                    {{ $fmtBalance($m->running_qty ?? 0) }}
+                                </span>
                             </td>
 
                             @if ($itemId)
@@ -94,7 +103,7 @@
                         </tr>
                     @empty
                         @php
-                            $colspan = $itemId ? 7 : 8;
+                            $colspan = $itemId ? 8 : 9;
                         @endphp
                         <tr>
                             <td colspan="{{ $colspan }}" class="p-3 text-center muted">Tidak ada data.</td>

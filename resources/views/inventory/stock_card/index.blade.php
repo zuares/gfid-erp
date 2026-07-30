@@ -272,6 +272,18 @@
         }
         .qty-num { min-width: 5.2rem; text-align: right; }
         .qty-unit { color: var(--shp-muted); }
+        .qty-balance {
+            display: inline-block;
+            min-width: 5.2rem;
+            text-align: right;
+        }
+        .qty-balance-zero {
+            color: var(--summary-final);
+            font-weight: 800;
+        }
+        .summary-value--zero {
+            color: var(--summary-final);
+        }
         .qty-in-num { color: var(--in); font-weight: 600; }
         .qty-out-num { color: var(--out); font-weight: 600; }
         .qty-zero { color: var(--shp-muted); }
@@ -297,6 +309,7 @@
             .summary-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
             .qty-cell { grid-template-columns: auto minmax(4.8rem, auto) auto; }
             .qty-num { min-width: 4.8rem; }
+            .qty-balance { min-width: 4.8rem; }
             .stock-footer-summary { padding: .85rem .9rem; }
         }
     </style>

@@ -3,9 +3,11 @@
     $topRestock = collect($insights['topRestock'] ?? []);
     $signals = collect($insights['signals'] ?? []);
     $watchlist = collect($insights['watchlist'] ?? []);
+    $priorities = collect($insights['priorities'] ?? []);
     $dataBasis = collect($insights['dataBasis'] ?? []);
     $itemLookup = collect($insights['itemLookup'] ?? []);
     $summary = $insights['summary'] ?? [];
+    $sourceSummary = collect($insights['sourceSummary'] ?? []);
     $overview = (string) ($insights['overview'] ?? '');
     $confidence = (string) ($insights['confidence'] ?? 'medium');
     $generatedAt = $insights['generatedAt'] ?? null;
@@ -19,6 +21,7 @@
     };
 
     $criticalCount = (int) ($insights['criticalCount'] ?? 0);
+    $priorityCount = (int) $priorities->count();
     $actionsCount = (int) $actions->count();
     $restockCount = (int) $topRestock->count();
 @endphp
@@ -33,7 +36,7 @@
                 <span class="text-muted-ii">Default tertutup. Buka kalau mau lihat detail cepat.</span>
             </div>
             <div class="ai-accordion-main">
-                {{ $criticalCount }} item perlu perhatian, {{ $actionsCount }} aksi utama, {{ $restockCount }} saran isi ulang.
+                {{ $criticalCount }} item perlu perhatian, {{ $priorityCount }} prioritas utama, {{ $actionsCount }} aksi utama, {{ $restockCount }} saran isi ulang.
             </div>
             <div class="ai-accordion-sub">
                 Ringkas dulu. Buka untuk lihat detail.
@@ -47,6 +50,10 @@
             <div class="ai-mini-metric">
                 <div class="label">Aksi</div>
                 <div class="value">{{ $actionsCount }}</div>
+            </div>
+            <div class="ai-mini-metric">
+                <div class="label">Prioritas</div>
+                <div class="value">{{ $priorityCount }}</div>
             </div>
             <div class="ai-mini-metric">
                 <div class="label">Confidence</div>
@@ -90,7 +97,72 @@
             </div>
         @endif
 
-        @if($actions->isEmpty() && $topRestock->isEmpty() && $watchlist->isEmpty())
+        @if($tab === 'rts' && $sourceSummary->isNotEmpty())
+            <div class="ai-section-label">Grouping sumber</div>
+            <div class="ai-pill-row mb-3">
+                <span class="ai-pill">
+                    <span>Produksi sendiri:</span>
+                    <strong>{{ number_format((int) ($sourceSummary->get('in_house') ?? 0), 0, ',', '.') }}</strong>
+                </span>
+                <span class="ai-pill">
+                    <span>Perlu beli:</span>
+                    <strong>{{ number_format((int) ($sourceSummary->get('buy') ?? 0), 0, ',', '.') }}</strong>
+                </span>
+                @if((int) ($sourceSummary->get('outsource') ?? 0) > 0)
+                    <span class="ai-pill">
+                        <span>Makloon:</span>
+                        <strong>{{ number_format((int) ($sourceSummary->get('outsource') ?? 0), 0, ',', '.') }}</strong>
+                    </span>
+                @endif
+            </div>
+        @endif
+
+        @if($priorities->isNotEmpty())
+            <div class="ai-section-label">Prioritas utama</div>
+            <div class="ai-compact-list mb-3">
+                @foreach($priorities->take(3) as $item)
+                    @php
+                        $tone = $item['tone'] ?? 'info';
+                        $styles = match ($tone) {
+                            'success' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'color' => '#047857'],
+                            'warning' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'color' => '#b45309'],
+                            'danger' => ['bg' => '#fef2f2', 'border' => '#fecaca', 'color' => '#dc2626'],
+                            default => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'color' => '#1d4ed8'],
+                        };
+                        $sku = (string) ($item['sku'] ?? '');
+                        $product = (string) ($item['product'] ?? $resolveProduct($sku));
+                        $qtyLabel = trim((string) ($item['qty_label'] ?? ''));
+                        $daysLabel = trim((string) ($item['days_label'] ?? ''));
+                    @endphp
+                    <div class="ai-mini-row">
+                        <div style="min-width:0;">
+                            <div class="name">
+                                <span class="badge-status me-1" style="background:{{ $styles['bg'] }};color:{{ $styles['color'] }};border-color:{{ $styles['border'] }};font-weight:800;">
+                                    {{ $item['rank'] ?? 'P?' }}
+                                </span>
+                                {{ $item['title'] ?? 'Prioritas' }}
+                            </div>
+                            <div class="desc">{{ $product }}</div>
+                            <div class="desc">
+                                {{ $item['label'] ?? '-' }}
+                                @if($qtyLabel !== '')
+                                    · Qty {{ $qtyLabel }}
+                                @endif
+                                @if($daysLabel !== '')
+                                    · Cukup {{ $daysLabel }}
+                                @endif
+                            </div>
+                            <div class="desc">{{ $item['reason'] ?? '-' }}</div>
+                            @if($sku !== '')
+                                <div class="desc">Kode: {{ $sku }}</div>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        @if($actions->isEmpty() && $topRestock->isEmpty() && $watchlist->isEmpty() && $priorities->isEmpty())
             <div class="ii-empty" style="padding:1rem 0;">
                 Belum ada prioritas mendesak. Stok terlihat aman untuk sekarang.
             </div>

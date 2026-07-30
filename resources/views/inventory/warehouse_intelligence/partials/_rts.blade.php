@@ -68,17 +68,31 @@
                             $effectiveMin = $r->rts_min_effective ?? max(5, ceil($r->ads * 7));
                             $effectiveMax = $r->rts_max_effective ?? ceil($r->ads * 14);
                             $isKritis = max(0, $r->ready - $r->ready_allocated) <= $effectiveMin;
+                            $productionGroup = (string) ($r->production_group ?? '');
+                            $productionGroupLabel = (string) ($r->production_group_label ?? '');
+                            $productionBadgeStyle = match ($productionGroup) {
+                                'in_house' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'color' => '#047857'],
+                                'buy' => ['bg' => '#fff7ed', 'border' => '#fed7aa', 'color' => '#c2410c'],
+                                'outsource' => ['bg' => '#f8fafc', 'border' => '#e2e8f0', 'color' => '#475569'],
+                                default => ['bg' => '#f8fafc', 'border' => '#e2e8f0', 'color' => '#475569'],
+                            };
                         @endphp
                         <tr class="rts-row" 
                             data-kritis="{{ $isKritis ? '1' : '0' }}" 
                             data-prd="{{ $r->wh_prd > 0 ? '1' : '0' }}" 
                             data-minta="{{ $r->minta_prd }}"
-                            data-buy="{{ $r->production_source === 'buy' ? '1' : '0' }}">
+                            data-buy="{{ $productionGroup === 'buy' ? '1' : '0' }}"
+                            data-source-group="{{ $productionGroup }}">
                             <td style="padding-left: 1rem;">
                                 <span class="fw-semibold">{{ $r->sku }}</span>
                                 <div class="text-muted-ii" style="font-size: .7rem;">{{ $r->product }}</div>
-                                <div class="d-flex align-items-center gap-2 mt-1">
+                                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                     <span class="text-muted-ii" style="font-size: .65rem;">{{ $r->category }}</span>
+                                    @if($productionGroupLabel !== '')
+                                        <span class="badge-status" style="background:{{ $productionBadgeStyle['bg'] }};color:{{ $productionBadgeStyle['color'] }};border-color:{{ $productionBadgeStyle['border'] }};font-weight:700;">
+                                            {{ $productionGroupLabel }}
+                                        </span>
+                                    @endif
                                     <button class="btn btn-sm btn-link text-muted p-0 btn-edit-limit"
                                         data-id="{{ $r->item_id }}" 
                                         data-sku="{{ $r->sku }}"
