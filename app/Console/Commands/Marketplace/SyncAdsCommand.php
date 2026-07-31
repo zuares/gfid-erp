@@ -29,12 +29,11 @@ class SyncAdsCommand extends Command
 
         if (!$from) {
             // Hourly sync cukup kemarin + hari ini (dipanggil tiap jam, jangan berat).
-            // Sync harian 7 hari ke belakang: Shopee merevisi angka atribusi
-            // (order/GMV) sampai 7 hari — window 3 hari membuat hari ke-4 s/d 7
-            // basi dibanding Seller Center.
+            // Sync harian 14 hari ke belakang: Shopee kadang telat merevisi angka atribusi
+            // (order/GMV) hingga lebih dari seminggu.
             $from = $isHourly
                 ? now()->subDay()->format('Y-m-d')
-                : now()->subDays(7)->format('Y-m-d');
+                : now()->subDays(14)->format('Y-m-d');
         }
         if (!$to) {
             $to = now()->format('Y-m-d');
@@ -91,26 +90,32 @@ class SyncAdsCommand extends Command
                 }
                 
                 if (!empty($jobs)) {
-                    \Illuminate\Support\Facades\Bus::chain($jobs)->dispatch();
+                    \Illuminate\Support\Facades\Bus::chain($jobs)->onQueue('ads')->dispatch();
 
                     // Untuk progress bar di tab Sync: total tahap chain ini.
                     \Illuminate\Support\Facades\Cache::put(
-                        'shopee-ads-backfill-progress:' . $store->id,
-                        ['total' => count($jobs), 'started' => time()],
-                        7200
+                        'marketplace:ads_sync_progress:' . $store->id,
+                        [
+                            'status' => 'queued',
+                            'percent' => 0,
+                            'label' => 'Antre untuk Sinkronisasi Backfill...',
+                            'total_jobs' => count($jobs),
+                            'completed_jobs' => 0,
+                        ],
+                        1800
                     );
 
                     $this->info("Dispatched backfill chain for Store {$store->name}");
                 }
             } else {
-                // Execute synchronously (no queue worker needed)
-                $this->info("Menjalankan sync langsung untuk Store {$store->name}...");
+                // Dispatch secara asinkron ke Queue (agar Retry & Backoff berjalan)
+                $this->info("Memasukkan job sync ke antrean untuk Store {$store->name}...");
                 
                 try {
-                    ShopeeAdsSyncJob::dispatchSync($store, Carbon::parse($from), Carbon::parse($to), $isHourly);
-                    $this->info("Sync selesai untuk Store {$store->name}.");
+                    ShopeeAdsSyncJob::dispatch($store, Carbon::parse($from), Carbon::parse($to), $isHourly);
+                    $this->info("Job sync telah dikirim ke Queue untuk Store {$store->name}.");
                 } catch (\Throwable $e) {
-                    $this->error("Error sync Store {$store->name}: " . $e->getMessage());
+                    $this->error("Gagal memasukkan job ke Queue untuk Store {$store->name}: " . $e->getMessage());
                 }
             }
         }

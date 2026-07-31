@@ -4,29 +4,41 @@ namespace App\Http\Controllers;
 
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceLogisticsService;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class MarketplaceLogisticsController extends Controller
 {
     public function __construct(
-        protected ChannelManager $manager
+        protected MarketplaceApiGateway $gateway,
+        protected MarketplaceLogisticsService $logistics
     ) {}
 
     public function syncAwb(Store $store, string $orderSn): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            $order = MarketplaceOrder::where('store_id', $store->id)
+                        $order = MarketplaceOrder::where('store_id', $store->id)
                 ->where(function ($q) use ($orderSn) {
                     $q->where('channel_order_id', $orderSn)
                       ->orWhere('external_order_id', $orderSn)
                       ->orWhere('booking_sn', $orderSn);
                 })
                 ->first();
+
+            // Cooldown: hindari request berulang untuk order yang sama dalam 30 detik
+            $cooldownKey = "syncAwb:{$store->id}:{$orderSn}";
+            $cached = Cache::get($cooldownKey);
+            if ($cached) {
+                $currentAwb = $order?->shipping_awb_no;
+                return response()->json(['success' => (bool) $currentAwb, 'awb' => $currentAwb, 'cached' => true]);
+            }
+            Cache::put($cooldownKey, true, 30);
 
             $booking = null;
             if (!$order) {
@@ -91,8 +103,7 @@ class MarketplaceLogisticsController extends Controller
     public function getShippingParameter(Store $store, string $orderSn): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            $raw = $driver->getShippingParameter($store, $orderSn);
+                        $raw = $driver->getShippingParameter($store, $orderSn);
 
             // Jaring pengaman Pesanan Kilat: bila $orderSn ternyata booking_sn
             // (baris kilat belum MATCHED), Shopee menjawab "order_sn ... not exist".
@@ -136,8 +147,7 @@ class MarketplaceLogisticsController extends Controller
     public function getBookingDetail(Store $store, string $orderSn): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (method_exists($driver, 'getBookingDetail')) {
+                        if (method_exists($driver, 'getBookingDetail')) {
                 $result = $this->ensureSuccess($driver->getBookingDetail($store, $orderSn));
                 return response()->json($result);
             }
@@ -153,8 +163,7 @@ class MarketplaceLogisticsController extends Controller
     public function getOrderDetailRaw(Store $store, string $orderSn): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (method_exists($driver, 'getOrderDetail')) {
+                        if (method_exists($driver, 'getOrderDetail')) {
                 $result = $this->ensureSuccess($driver->getOrderDetail($store, [$orderSn]));
                 return response()->json($result);
             }
@@ -170,8 +179,7 @@ class MarketplaceLogisticsController extends Controller
     public function getPackageDetailRaw(Store $store, string $packageNumber): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (method_exists($driver, 'getPackageDetail')) {
+                        if (method_exists($driver, 'getPackageDetail')) {
                 $result = $this->ensureSuccess($driver->getPackageDetail($store, $packageNumber));
                 return response()->json($result);
             }
@@ -187,8 +195,7 @@ class MarketplaceLogisticsController extends Controller
     public function getReturnListRaw(Store $store, Request $request): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (method_exists($driver, 'getReturnList')) {
+                        if (method_exists($driver, 'getReturnList')) {
                 $pageNo = (int) $request->input('page_no', 0);
                 $pageSize = (int) $request->input('page_size', 20);
                 $result = $this->ensureSuccess($driver->getReturnList($store, $pageNo, $pageSize));
@@ -206,8 +213,7 @@ class MarketplaceLogisticsController extends Controller
     public function getBookingList(Store $store, Request $request): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (method_exists($driver, 'getBookingList')) {
+                        if (method_exists($driver, 'getBookingList')) {
                 $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
                 $timeTo = $request->input('time_to', time());
                 $status = $request->input('booking_status', '');
@@ -227,8 +233,7 @@ class MarketplaceLogisticsController extends Controller
     public function getOrderList(Store $store, Request $request): JsonResponse
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (method_exists($driver, 'getOrders')) {
+                        if (method_exists($driver, 'getOrders')) {
                 $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
                 $timeTo = $request->input('time_to', time());
                 $status = $request->input('order_status', '');
@@ -270,134 +275,9 @@ class MarketplaceLogisticsController extends Controller
     public function arrangeShipment(Request $request, Store $store, string $orderSn): JsonResponse
     {
         try {
-            // $request->all() typically contains pickup/dropoff details
-            // e.g. ['pickup' => ['address_id' => 123, 'pickup_time_id' => 'abc']]
-            $params = $request->except(['_token', 'store', 'orderSn']);
-            
-            // Shopee hanya mengizinkan SATU metode pengiriman (pickup ATAU dropoff).
-            // Jika frontend tidak mengirim apapun (misal 'auto'), kirim salah satu sebagai pancingan.
-            $hasPickup = isset($params['pickup']);
-            $hasDropoff = isset($params['dropoff']);
-            $hasNonIntegrated = isset($params['non_integrated']);
-
-            if (!$hasPickup && !$hasDropoff && !$hasNonIntegrated) {
-                $params['pickup'] = new \stdClass();
-            } else {
-                // Jika dikirim tapi berupa array kosong, ubah jadi object {}
-                if ($hasDropoff && is_array($params['dropoff']) && empty($params['dropoff'])) {
-                    $params['dropoff'] = new \stdClass();
-                }
-                if ($hasPickup && is_array($params['pickup']) && empty($params['pickup'])) {
-                    $params['pickup'] = new \stdClass();
-                }
-            }
-            // Cek apakah frontend memaksa auto_sync_only
-            $isAutoSync = $request->input('auto_sync_only');
-            
-            $driver = $this->manager->driver($store);
-            
-            if ($isAutoSync) {
-                // Bypass pemanggilan API Shopee shipOrder (yang pasti akan gagal jika sudah dikirim).
-                // Kita langsung simulasikan seolah API mengembalikan error 'already_arranged'
-                // agar sistem otomatis masuk ke blok penarikan resi.
-                $rawResult = ['error' => 'logistics.already_arranged'];
-            } else {
-                $rawResult = $driver->shipOrder($store, $orderSn, $params);
-
-                // Jaring pengaman Pesanan Kilat: sn ini ternyata booking_sn (belum
-                // MATCHED ke order). ship_order menjawab "order_sn is not exist" —
-                // alihkan otomatis ke ship_booking, lalu polling promosi order_sn
-                // (PromoteBookingToOrderJob) supaya nomor pesanan menyusul.
-                // Ini juga menutup kasus proses massal yang memanggil endpoint order
-                // untuk semua baris.
-                if ($this->looksLikeMissingOrderSn($rawResult)
-                    && method_exists($driver, 'shipBooking')) {
-
-                    // Tanpa cek/filter store_id: record booking bisa tersimpan di store
-                    // lokal berbeda atau belum tersinkron — booking_sn unik global.
-                    $rawResult = $driver->shipBooking($store, $orderSn, $params);
-
-                    $bErr = (string) ($rawResult['error'] ?? '');
-                    if ($bErr === '' || str_contains($bErr, 'already') || str_contains($bErr, 'unsupported') || str_contains($bErr, 'status_invalid')) {
-                        \App\Models\MarketplaceBooking::where('booking_sn', $orderSn)
-                            ->update(['booking_status' => 'PROCESSED']);
-                        \App\Jobs\PromoteBookingToOrderJob::dispatch($store->id, $orderSn)
-                            ->delay(now()->addSeconds(15));
-                    }
-                }
-            }
-            
-            // Allow if it's already arranged by marketplace (e.g. Instant/Sameday orders)
-            // or has invalid status due to being already processed
-            if (isset($rawResult['error']) && $rawResult['error']) {
-                $err = $rawResult['error'];
-                $allowedErrors = [
-                    'logistics.already_arranged', 
-                    'logistics.ship_order_already_shipped',
-                    'logistics.pickup_address_unsupported',
-                    'logistics.status_invalid'
-                ];
-                
-                if (in_array($err, $allowedErrors) || str_contains($err, 'already') || str_contains($err, 'unsupported')) {
-                    $rawResult['error'] = ''; 
-                    \Illuminate\Support\Facades\Log::info("shipOrder returned $err for $orderSn, treating as success for local status update.");
-                }
-            }
-            
-            $result = $this->ensureSuccess($rawResult);
-            
-            // Ambil data terbaru langsung dari Shopee untuk mendapatkan package_number atau tracking_number
-            try {
-                // Tunggu 3 detik karena proses AWB Shopee dilakukan secara asynchronous
-                sleep(3);
-                
-                $awb = null;
-                if (method_exists($driver, 'getTrackingNumber')) {
-                    $trackingResp = $driver->getTrackingNumber($store, $orderSn);
-                    $awb = $trackingResp['response']['tracking_number'] ?? null;
-                }
-                
-                if (method_exists($driver, 'getOrderDetail')) {
-                    $details = $driver->getOrderDetail($store, [$orderSn]);
-                    $list = $details['response']['order_list'] ?? [];
-                    if (count($list) > 0) {
-                        $rawJson = $list[0];
-                        if (!$awb && !empty($rawJson['package_list'][0]['tracking_number'])) {
-                            $awb = $rawJson['package_list'][0]['tracking_number'];
-                        }
-                        
-                        MarketplaceOrder::where('store_id', $store->id)
-                            ->where('channel_order_id', $orderSn)
-                            ->update([
-                                'order_status' => 'PROCESSED',
-                                'shipping_awb_no' => $awb,
-                                'shipping_arranged_at' => now(),
-                                'raw_json' => $rawJson
-                            ]);
-                        return response()->json($result);
-                    }
-                } elseif ($awb) {
-                    MarketplaceOrder::where('store_id', $store->id)
-                        ->where('channel_order_id', $orderSn)
-                        ->update([
-                            'order_status' => 'PROCESSED',
-                            'shipping_awb_no' => $awb,
-                            'shipping_arranged_at' => now()
-                        ]);
-                    return response()->json($result);
-                }
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('Gagal fetch order detail setelah arrange shipment: ' . $e->getMessage());
-            }
-            
-            // Fallback: Mark as PROCESSED locally
-            MarketplaceOrder::where('store_id', $store->id)
-                ->where('channel_order_id', $orderSn)
-                ->update([
-                    'order_status' => 'PROCESSED',
-                    'shipping_arranged_at' => now()
-                ]);
-
+            $isAutoSync = $request->input('is_auto_sync', false);
+            $params = $request->input('params', []);
+            $result = $this->logistics->arrangeShipment($store, $orderSn, $params, $isAutoSync);
             return response()->json($result);
         } catch (\Exception $e) {
             return $this->errorResponse($e);
@@ -410,8 +290,7 @@ class MarketplaceLogisticsController extends Controller
     public function printDocument(Store $store, string $orderSn)
     {
         try {
-            $driver = $this->manager->driver($store);
-            
+                        
             $order = MarketplaceOrder::where('store_id', $store->id)
                 ->where('channel_order_id', $orderSn)
                 ->first();
@@ -1097,8 +976,7 @@ class MarketplaceLogisticsController extends Controller
     public function getTrackingInfo(Store $store, $orderSn, Request $request)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (!method_exists($driver, 'getTrackingInfo')) {
+                        if (!method_exists($driver, 'getTrackingInfo')) {
                 return response()->json(['error' => true, 'message' => 'Driver tidak mendukung pelacakan'], 400);
             }
 

@@ -5,12 +5,13 @@ namespace App\Services;
 use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceProductModel;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
 
 class MarketplaceProductService
 {
-    public function __construct(protected ChannelManager $manager) {}
+    public function __construct(protected MarketplaceApiGateway $gateway) {}
 
     /**
      * Sync semua produk sebuah toko (status NORMAL + UNLIST).
@@ -18,7 +19,7 @@ class MarketplaceProductService
      */
     public function syncProducts(Store $store, array $statuses = ['NORMAL', 'UNLIST']): array
     {
-        $driver  = $this->manager->driver($store);
+        $driver  = $this->gateway;
         $itemIds = [];
         $errors  = [];
 
@@ -229,7 +230,7 @@ class MarketplaceProductService
      */
     public function syncSingleItem(Store $store, $itemId): ?MarketplaceProduct
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $res = $driver->getItemBaseInfo($store, [(string) $itemId]);
 
         if (! empty($res['error'])) {
@@ -446,7 +447,7 @@ class MarketplaceProductService
 
     private function syncModels(Store $store, MarketplaceProduct $product): void
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $res = $driver->getProductModelList($store, $product->item_id);
 
         if (! empty($res['error'])) {
@@ -542,7 +543,7 @@ class MarketplaceProductService
         ?int $startTime = null,
         ?int $endTime = null
     ): array {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         return $driver->updateDiscount($store, $discountId, $discountName, $startTime, $endTime);
     }
@@ -552,14 +553,14 @@ class MarketplaceProductService
      */
     public function deleteDiscountItem(Store $store, int $discountId, int $itemId, int $modelId = 0): array
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         return $driver->deleteDiscountItem($store, $discountId, $itemId, $modelId);
     }
 
     private function findDiscountCampaignId(Store $store, string $namePrefix): ?int
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         foreach (['ongoing', 'upcoming'] as $status) {
             $discounts = $driver->getDiscountList($store, $status);

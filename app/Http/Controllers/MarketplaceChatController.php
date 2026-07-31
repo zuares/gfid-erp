@@ -360,7 +360,7 @@ class MarketplaceChatController extends Controller
         }
 
         /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
-        $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+        $shopee = app(\App\Services\Marketplace\MarketplaceApiGateway::class);
 
         return response()->json([
             'store_id' => $store->id,

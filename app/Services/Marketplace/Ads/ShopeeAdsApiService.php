@@ -3,34 +3,45 @@
 namespace App\Services\Marketplace\Ads;
 
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Shopee\ShopeeChannel;
 use Illuminate\Support\Facades\Log;
 
 class ShopeeAdsApiService
 {
-    protected ChannelManager $channelManager;
+    protected MarketplaceApiGateway $gateway;
 
-    public function __construct(ChannelManager $channelManager)
+    public function __construct(MarketplaceApiGateway $gateway)
     {
-        $this->channelManager = $channelManager;
+        $this->gateway = $gateway;
     }
 
-    protected function driver(Store $store): ShopeeChannel
+    protected function driver(Store $store)
     {
-        $driver = $this->channelManager->driver($store);
-        if (!$driver instanceof ShopeeChannel) {
-            throw new \Exception("Toko {$store->name} tidak menggunakan driver Shopee.");
-        }
-        return $driver;
+        // MarketplaceApiGateway handles the routing
+        return $this->gateway;
     }
 
     protected function execute(Store $store, string $endpoint, callable $callable)
     {
         try {
-            usleep(250000); // Centralized pace 0.25s (~4 req/dtk, masih jauh di bawah QPS cap; cooldown 429 jadi jaring pengaman)
-
-            $response = $callable();
+            // Redis Throttle Proaktif (Maksimal 100 request / 60 detik per toko)
+            // Mencegah API Shopee memblokir aplikasi dengan 429 Too Many Requests
+            $response = \Illuminate\Support\Facades\Redis::throttle('shopee_api_store_' . $store->id)
+                ->allow(100)->every(60)
+                ->then(
+                    function () use ($callable) {
+                        return $callable();
+                    },
+                    function () {
+                        // Limit tercapai. Melemparkan exception dengan retry_after 60s
+                        throw new \App\Exceptions\ShopeeAdsRateLimitException(
+                            60, 
+                            "Proactive Rate Limiting (Redis Throttle) reached. Menunda API call untuk menghindari blokir Shopee."
+                        );
+                    }
+                );
 
             // Tangkap 429 Rate Limit
             if (isset($response['_meta']['http_status']) && $response['_meta']['http_status'] == 429) {

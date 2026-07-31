@@ -20,16 +20,34 @@ class AdsDashboardController extends Controller
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
             ->where('is_active', true)
+            ->where('token_expires_at', '>', now())
             ->get();
 
-        $storeId = $request->input('store_id', $stores->first()?->id);
-        if (! $storeId) {
+        $storeId = $request->input('store_id', 'all');
+        if ($stores->isEmpty()) {
             $dateFrom = now()->subDays(6)->toDateString();
             $dateTo = now()->toDateString();
             $compareMode = $request->input('compare_mode', 'prev_period');
 
             return view('marketplace.ads_dashboard', compact('stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode'))
-                ->with('error', 'Tidak ada toko Shopee aktif.');
+                ->with('error', 'Tidak ada toko Shopee aktif dengan token valid.');
+        }
+
+        // Auto-sync data hari ini TANPA ANTRIAN (Synchronous) dengan cooldown 15 menit
+        $autoSyncKey = 'ads_dashboard_autosync_today_' . $storeId;
+        if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {
+            $syncParams = [
+                '--from' => now()->toDateString(),
+                '--to'   => now()->toDateString(),
+            ];
+            if ($storeId !== 'all') {
+                $syncParams['--store'] = $storeId;
+            }
+            
+            // Eksekusi artisan command secara asinkron (dikirim ke queue, page load instan)
+            \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', $syncParams);
+            
+            \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addMinutes(15));
         }
 
         $dashboard = $dashboardService->buildDashboardData(
@@ -40,6 +58,14 @@ class AdsDashboardController extends Controller
             $request->input('compare_mode', 'prev_period'),
             $analytics
         );
+        
+        $lastSync = \App\Models\MarketplaceAdsSyncRun::where('status', 'success')
+            ->when($storeId !== 'all', fn($q) => $q->where('store_id', $storeId))
+            ->latest('finished_at')
+            ->first();
+            
+        $dashboard['lastSyncAt'] = $lastSync && $lastSync->finished_at ? $lastSync->finished_at->diffForHumans() : 'Belum pernah';
+        $dashboard['lastSyncTime'] = $lastSync && $lastSync->finished_at ? $lastSync->finished_at->format('d M Y H:i') : '';
 
         return view('marketplace.ads_dashboard', $dashboard);
     }
@@ -67,7 +93,7 @@ class AdsDashboardController extends Controller
     public function sync(Request $request)
     {
         $request->validate([
-            'sync_type' => 'required|in:today,yesterday',
+            'sync_type' => 'required|in:today,yesterday,last_7_days,custom',
         ]);
 
         $storeId = $request->input('store_id');
@@ -79,14 +105,27 @@ class AdsDashboardController extends Controller
         }
 
         $type = $request->input('sync_type');
-        $date = $type === 'yesterday'
-            ? now()->subDay()->toDateString()
-            : now()->toDateString();
+        $dateFrom = match($type) {
+            'yesterday' => now()->subDay()->toDateString(),
+            'last_7_days' => now()->subDays(7)->toDateString(),
+            'custom' => $request->input('date_from_custom') ?? now()->subMonths(1)->toDateString(),
+            default => now()->toDateString(),
+        };
+        $dateTo = match($type) {
+            'yesterday' => now()->subDay()->toDateString(),
+            'custom' => $request->input('date_to_custom') ?? now()->toDateString(),
+            default => now()->toDateString(),
+        };
 
         $store = $isAllStores ? null : Store::findOrFail($storeId);
         $storeLabel = $isAllStores ? 'Semua toko' : $store->name;
         $progressKey = 'marketplace:ads_sync_progress:' . ($isAllStores ? 'all' : $storeId);
-        $dayLabel = $type === 'yesterday' ? 'kemarin' : 'hari ini';
+        $dayLabel = match($type) {
+            'yesterday' => 'kemarin',
+            'last_7_days' => '1 minggu terakhir',
+            'custom' => "rentang {$dateFrom} s/d {$dateTo}",
+            default => 'hari ini',
+        };
         $label = "Sync {$dayLabel} untuk {$storeLabel} sedang antre…";
 
         \Illuminate\Support\Facades\Cache::put($progressKey, [
@@ -101,17 +140,20 @@ class AdsDashboardController extends Controller
         ], 1800);
 
         $params = [
-            '--from' => $date,
-            '--to'   => $date,
+            '--from' => $dateFrom,
+            '--to'   => $dateTo,
         ];
         if (! $isAllStores) {
             $params['--store'] = $storeId;
+        }
+        if ($type === 'custom') {
+            $params['--backfill'] = true;
         }
 
         $queued = Artisan::queue('marketplace:sync-ads', $params);
         $queued->onQueue('ads');
 
-        $message = "Sync " . ($type === 'yesterday' ? 'kemarin' : 'hari ini') . " untuk {$storeLabel} telah dikirim ke latar belakang. Pantau progress di tab Sinkronisasi.";
+        $message = "Sync {$dayLabel} untuk {$storeLabel} telah dikirim ke latar belakang. Pantau progress di tab Sinkronisasi.";
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -122,6 +164,25 @@ class AdsDashboardController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    public function syncProgress(Request $request)
+    {
+        $storeId = $request->input('store_id', 'all');
+        $progressKey = 'marketplace:ads_sync_progress:' . $storeId;
+        
+        $data = \Illuminate\Support\Facades\Cache::get($progressKey);
+        
+        if (!$data) {
+            return response()->json([
+                'status' => 'idle',
+                'phase' => 'idle',
+                'percent' => 0,
+                'label' => 'Tidak ada proses berjalan',
+            ]);
+        }
+        
+        return response()->json($data);
     }
 
     public function clear(Request $request)
@@ -142,8 +203,7 @@ class AdsDashboardController extends Controller
             'marketplace_ads_item_dailies',
             'marketplace_ads_sync_runs',
             'mp_ads_imports',
-            'mp_ads_rows',
-            'store_ad_spend_dailies'
+            'mp_ads_rows'
         ];
 
         foreach ($tables as $table) {

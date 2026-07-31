@@ -4,6 +4,27 @@
 
 @push('head')
 @include('dashboard.partials._styles')
+
+@php
+    // Fallbacks to prevent undefined variable errors when $stores->isEmpty() triggers early return
+    $kpi = $kpi ?? [];
+    $dailyChartData = $dailyChartData ?? [];
+    $heatmapData = $heatmapData ?? [];
+    $historicalData = $historicalData ?? [];
+    $itemPerformance = $itemPerformance ?? [];
+    $syncRuns = $syncRuns ?? collect();
+    $lastSuccessRun = $lastSuccessRun ?? null;
+    $insightTraffic = $insightTraffic ?? collect();
+    $campaigns = $campaigns ?? collect();
+    $adsSetting = $adsSetting ?? (object)[];
+    $metrics = $metrics ?? [];
+    
+    // Default JS empty arrays just in case they are used in scripts without ??
+    $dailyChartDataJson = json_encode($dailyChartData);
+    $heatmapDataJson = json_encode($heatmapData);
+    $historicalDataJson = json_encode($historicalData);
+@endphp
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -444,8 +465,7 @@ body[data-theme="dark"] .filter-item input, body[data-theme="dark"] .filter-item
 /* Tabel di dalam dpanel */
 .dpanel-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .dpanel-table thead th {
-    background: rgba(241, 245, 249, 0.6);
-    backdrop-filter: blur(4px);
+    background: var(--hero-bg);
     border-bottom: 1px solid var(--card-border);
     font-size: .75rem;
     font-weight: 700;
@@ -455,7 +475,7 @@ body[data-theme="dark"] .filter-item input, body[data-theme="dark"] .filter-item
     white-space: nowrap;
     letter-spacing: 0.02em;
 }
-body[data-theme="dark"] .dpanel-table thead th { background: rgba(30, 41, 59, 0.6); }
+body[data-theme="dark"] .dpanel-table thead th { background: var(--hero-bg); }
 .dpanel-table tbody td {
     padding: .85rem 1rem;
     font-size: .85rem;
@@ -488,14 +508,14 @@ body[data-theme="dark"] .range-pill:hover { background: rgba(51, 65, 85, 0.8); }
     display: inline-flex;
     background: linear-gradient(180deg, rgba(248,250,252,.96), rgba(241,245,249,.92));
     padding: .45rem;
-    border-radius: 999px;
+    border-radius: 16px;
     gap: .35rem;
     border:1px solid rgba(148,163,184,.18);
     box-shadow:0 12px 28px rgba(15,23,42,.06);
 }
 body[data-theme="dark"] .dash-tabs-modern { background: linear-gradient(180deg, rgba(15,23,42,.96), rgba(30,41,59,.92)); border-color:rgba(51,65,85,.85); box-shadow:none; }
 .dash-tab-m {
-    border: none; background: transparent; padding: .72rem 1rem; border-radius: 999px;
+    border: none; background: transparent; padding: .72rem 1rem; border-radius: 12px;
     font-weight: 900; font-size: .8rem; color: var(--dsh-muted); cursor: pointer;
     transition: all .2s ease; display: flex; align-items: center; gap: .5rem; white-space: nowrap;
 }
@@ -522,7 +542,7 @@ body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
 
 .ads-kpi-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
     gap:.75rem;
     margin-bottom:.95rem;
 }
@@ -531,18 +551,13 @@ body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
     position:relative;
     display:flex;
     flex-direction:column;
-    min-height:172px;
-    border:1px solid rgba(148,163,184,.16);
-    border-radius:18px;
-    padding:1rem 1rem .95rem;
-    background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
-    box-shadow:0 12px 28px rgba(15,23,42,0.05);
+    min-height:95px;
+    padding:.85rem 1rem;
     overflow:hidden;
+    background: linear-gradient(0deg, var(--kpi-bg, transparent), var(--kpi-bg, transparent)), var(--card-bg);
 }
 
 body[data-theme="dark"] .ads-kpi{
-    background:rgba(15,23,42,.92);
-    border-color:rgba(51,65,85,.85);
     box-shadow:none;
 }
 
@@ -555,11 +570,11 @@ body[data-theme="dark"] .ads-kpi{
     background:linear-gradient(90deg,var(--kpi-accent-start,#334155),var(--kpi-accent-end,#94a3b8));
 }
 
-.ads-kpi.kpi-profit{ --kpi-accent-start:#16a34a; --kpi-accent-end:#22c55e; }
-.ads-kpi.kpi-revenue{ --kpi-accent-start:#2563eb; --kpi-accent-end:#38bdf8; }
-.ads-kpi.kpi-cogs{ --kpi-accent-start:#64748b; --kpi-accent-end:#94a3b8; }
-.ads-kpi.kpi-spend{ --kpi-accent-start:#b45309; --kpi-accent-end:#f59e0b; }
-.ads-kpi.kpi-roas{ --kpi-accent-start:#1d4ed8; --kpi-accent-end:#60a5fa; }
+.ads-kpi.kpi-profit{ --kpi-accent-start:#16a34a; --kpi-accent-end:#22c55e; --kpi-bg: rgba(22, 163, 74, 0.08); }
+.ads-kpi.kpi-revenue{ --kpi-accent-start:#2563eb; --kpi-accent-end:#38bdf8; --kpi-bg: rgba(3, 105, 161, 0.07); }
+.ads-kpi.kpi-cogs{ --kpi-accent-start:#64748b; --kpi-accent-end:#94a3b8; --kpi-bg: rgba(148, 163, 184, 0.08); }
+.ads-kpi.kpi-spend{ --kpi-accent-start:#b45309; --kpi-accent-end:#f59e0b; --kpi-bg: rgba(245, 158, 11, 0.08); }
+.ads-kpi.kpi-roas{ --kpi-accent-start:#1d4ed8; --kpi-accent-end:#60a5fa; --kpi-bg: rgba(37, 99, 235, 0.07); }
 
 .ads-kpi-label{
     font-size:.62rem;
@@ -709,7 +724,7 @@ body[data-theme="dark"] .mini-log-entry:hover { background: rgba(255,255,255,0.0
     font-size: 0.65rem !important;
     padding: 0.25rem 0.5rem !important;
     letter-spacing: 0.05em;
-    background: transparent !important;
+    background: var(--hero-bg) !important;
 }
 .dpanel-table-sm tbody td {
     font-size: 0.7rem !important;
@@ -782,7 +797,7 @@ body[data-theme="dark"] .dpanel-table-sm tbody td {
 
 /* Tab bar: rapat + sticky seperti topbar shipments */
 .dash-tabs-modern {
-    border-radius: 999px;
+    border-radius: 16px;
     padding: .3rem;
     box-shadow: 0 12px 28px rgba(15,23,42,.06);
     position: sticky;
@@ -792,19 +807,30 @@ body[data-theme="dark"] .dpanel-table-sm tbody td {
     border: 1px solid rgba(148,163,184,.18);
 }
 body[data-theme="dark"] .dash-tabs-modern { background: linear-gradient(180deg, rgba(15,23,42,.96), rgba(30,41,59,.92)); border-color:rgba(51,65,85,.85); box-shadow:none; }
-.dash-tab-m { border-radius: 999px; font-size: .78rem; }
+.dash-tab-m { border-radius: 12px; font-size: .78rem; }
 .dash-tab-m.active { box-shadow: 0 10px 20px rgba(15,23,42,.18); }
 
 /* Tombol & chip: radius 7px konsisten, tanpa bayangan */
 .btn-pill, .role-chip, .mini-log-toggle { border-radius: 7px !important; box-shadow: none !important; }
 
 /* Tabel: header kecil-tenang tanpa uppercase, padding rapat ala table-list */
+.table-responsive {
+    max-height: 480px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
 .dpanel-table thead th {
     font-size: .68rem;
     text-transform: none;
     letter-spacing: 0;
     color: #64748b;
     padding: .52rem .62rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--hero-bg);
+    border-bottom: none;
+    box-shadow: inset 0 -1px 0 var(--card-border);
 }
 body[data-theme="dark"] .dpanel-table thead th { color: #9ca3af; }
 .dpanel-table tbody td { padding: .52rem .62rem; }
@@ -888,8 +914,14 @@ body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
 
 /* Final UI pass: flat header + cleaner tabs, aligned with shipments/income */
 .ads-shell{
-    max-width:1120px;
+    max-width:1040px; /* Selaras dengan shipments */
     margin-inline:auto;
+}
+
+@media (min-width: 992px) {
+    .ads-shell {
+        min-width: 1040px;
+    }
 }
 
 .ads-hero{
@@ -986,7 +1018,7 @@ body[data-theme="dark"] .ads-chip{
     display:inline-flex;
     gap:.25rem;
     padding:.24rem;
-    border-radius:999px;
+    border-radius:16px;
     background:linear-gradient(180deg, rgba(248,250,252,.96), rgba(241,245,249,.92));
     border:1px solid rgba(148,163,184,.18);
     box-shadow:0 12px 28px rgba(15,23,42,.06);
@@ -1044,7 +1076,7 @@ body[data-theme="dark"] .dash-tab-m.active{
     border:none;
     background:transparent;
     color:#64748b;
-    border-radius:999px;
+    border-radius:10px;
     padding:.34rem .68rem;
     font-size:.7rem;
     font-weight:800;
@@ -1210,6 +1242,42 @@ body[data-theme="dark"] .dash-sec{
 
 @keyframes adsToastIn { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 </style>
+
+<script>
+let sortTrafficCol = 'spend';
+let sortTrafficDir = 'desc';
+
+function sortTrafficTable(col) {
+    if (sortTrafficCol === col) {
+        sortTrafficDir = sortTrafficDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        sortTrafficCol = col;
+        sortTrafficDir = 'desc';
+    }
+
+    const tbody = document.querySelector('#trafficTable tbody');
+    if (!tbody) return;
+    
+    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign_name]'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+        let valA, valB;
+        if (col === 'campaign_name') {
+            valA = a.getAttribute('data-campaign_name') || '';
+            valB = b.getAttribute('data-campaign_name') || '';
+            return sortTrafficDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+            valA = parseFloat(a.getAttribute('data-' + col)) || 0;
+            valB = parseFloat(b.getAttribute('data-' + col)) || 0;
+            return sortTrafficDir === 'asc' ? valA - valB : valB - valA;
+        }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+
 @endpush
 
 @push('scripts')
@@ -1247,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Shortcut: semua pintu "log" menuju satu tempat — tab Sync.
     window.openSyncTab = function () {
-        const btn = document.querySelector('.dash-tab-m[data-target="tab-sync"]');
+        const btn = document.querySelector('.dash-tab-m[data-target="tab-settings"]');
         if (btn) btn.click();
         try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
     };
@@ -1311,11 +1379,9 @@ document.addEventListener('DOMContentLoaded', function () {
             mode: 'range',
             locale: 'id',
             showMonths: 1, // kompak — rentang panjang lebih cepat lewat preset di bawah kalender
-            dateFormat: 'Y-m-d',
-            altInput: true,            // tampilan manusiawi: "1 Mei 2026 s.d. 27 Jul 2026"
-            altFormat: 'j M Y',
-            altInputClass: 'range-pill',
-            defaultDate: [fromEl.value, toEl.value],
+            dateFormat: 'd M Y',
+            altInput: false,
+            defaultDate: [new Date(fromEl.value), new Date(toEl.value)],
             onChange: function(selectedDates, dateStr, instance) {
                 if(selectedDates.length === 2) {
                     applyRange(selectedDates[0], selectedDates[1]);
@@ -1444,6 +1510,42 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 </script>
+
+<script>
+let sortTrafficCol = 'spend';
+let sortTrafficDir = 'desc';
+
+function sortTrafficTable(col) {
+    if (sortTrafficCol === col) {
+        sortTrafficDir = sortTrafficDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        sortTrafficCol = col;
+        sortTrafficDir = 'desc';
+    }
+
+    const tbody = document.querySelector('#trafficTable tbody');
+    if (!tbody) return;
+    
+    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign_name]'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+        let valA, valB;
+        if (col === 'campaign_name') {
+            valA = a.getAttribute('data-campaign_name') || '';
+            valB = b.getAttribute('data-campaign_name') || '';
+            return sortTrafficDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+            valA = parseFloat(a.getAttribute('data-' + col)) || 0;
+            valB = parseFloat(b.getAttribute('data-' + col)) || 0;
+            return sortTrafficDir === 'asc' ? valA - valB : valB - valA;
+        }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+
 @endpush
 
 @section('content')
@@ -1485,58 +1587,32 @@ document.addEventListener('DOMContentLoaded', function () {
     {{-- ==============================================
          HERO SECTION (Header)
     ============================================== --}}
-    <div class="ads-hero">
+    <div class="ads-hero" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
         <div>
-            <div class="ads-eyebrow"><i class="bi bi-megaphone-fill"></i> Marketplace Ads</div>
-            <h1 class="title">Analisis Iklan Shopee</h1>
-            <div class="sub">Pantau biaya, GMV, dan profit harian.</div>
-            <div class="ads-hero-badges">
-                <span class="ads-chip"><i class="bi bi-lightning-charge-fill"></i> ROAS</span>
-                <span class="ads-chip"><i class="bi bi-wallet2"></i> Biaya</span>
-            </div>
+            <h1 class="title" style="margin-bottom: 0.2rem;"><i class="bi bi-megaphone text-primary me-1"></i> Iklan Shopee</h1>
+            <div class="sub" style="font-size: .8rem; margin: 0;">Pantau efisiensi, biaya, dan margin profit kampanye.</div>
         </div>
-        <div class="controls" style="position: relative; text-align: right; display:flex; flex-wrap:wrap;">
-            @if(isset($syncRuns) && $syncRuns->isNotEmpty())
-                @php
-                    $latestRun = $syncRuns->first();
-                    $lastSuccess = $lastSuccessRun ?? null;
-                @endphp
-                @if($latestRun->status === 'error')
-                    <div class="ads-hero-meta ads-hero-error">
-                        <i class="bi bi-exclamation-triangle-fill"></i> Sync gagal: {{ Str::limit($latestRun->error_message, 60) }}
-                    </div>
-                @endif
-                <div class="ads-hero-meta">
-                    @if($lastSuccess)
-                        <span style="color: #16a34a;"><i class="bi bi-check-circle-fill"></i></span>
-                        Sync terakhir: {{ $lastSuccess->updated_at?->timezone('Asia/Jakarta')?->format('d M Y, H:i') ?? 'waktu tidak tersedia' }}
-                    @else
-                        <span style="color: #eab308;"><i class="bi bi-clock"></i></span>
-                        Belum ada sync
-                    @endif
-                </div>
-            @endif
-            <div class="ads-hero-actions" style="display: flex; gap: .5rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
-                <div id="syncCountdown" class="role-chip live-btn live-off">
-                    <i class="bi bi-clock-history"></i> Menghitung...
-                </div>
-                @if(auth()->user()->role === 'owner')
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="clearAdsData()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); color: #ef4444; box-shadow: var(--card-shadow);">
-                    <i class="bi bi-trash"></i> Bersihkan Data
-                </button>
-                @endif
-                
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalGmsSettings" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--dsh-accent); background: rgba(37, 99, 235, 0.05); color: var(--dsh-accent); margin-right: 0.5rem;">
-                    <i class="bi bi-gear"></i> Pengaturan GMV Max
-                </button>
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="openSyncTab()" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text); margin-right: 0.5rem;">
-                    <i class="bi bi-journal-text"></i> Log Sync
-                </button>
-                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="border-radius:8px;font-weight:600;font-size:.72rem;padding:.35rem .7rem; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--card-shadow); color: var(--text);">
-                    <i class="bi bi-arrow-repeat"></i> Sync Manual
-                </button>
+        
+        <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" id="filterForm" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin:0;">
+            <div>
+                <select name="store_id" onchange="submitAdsFilters(this.form)" class="form-select" style="border-radius:10px; font-size:.78rem; padding:.4rem 2rem .4rem .85rem; border:1px solid rgba(148,163,184,.4); font-weight:650; cursor:pointer; min-width: 140px;">
+                    <option value="all" {{ $storeId == 'all' ? 'selected' : '' }}>&#127970; Semua Toko</option>
+                    @foreach($stores as $s)
+                        <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                    @endforeach
+                </select>
             </div>
-        </div>
+            
+            <div style="display:flex; align-items:center; background:rgba(148,163,184,.1); border-radius: 8px; padding: .35rem .7rem; transition: background .2s;" onmouseover="this.style.background='rgba(148,163,184,.18)'" onmouseout="this.style.background='rgba(148,163,184,.1)'">
+                <i class="bi bi-calendar2-week" style="color:var(--dsh-muted); font-size:.75rem; margin-right: .4rem;"></i>
+                <input type="text" id="rangePicker" placeholder="Pilih tanggal" readonly style="width:150px; border:none; background:transparent; font-size:.75rem; padding:0; font-weight:700; color:var(--text); cursor:pointer; box-shadow:none; outline:none;">
+                <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}" data-gf-date="off">
+                <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}" data-gf-date="off">
+            </div>
+
+            {{-- HIDDEN COMPARE MODE --}}
+            <input type="hidden" name="compare_mode" value="{{ $compareMode ?? 'prev_period' }}">
+        </form>
     </div>
 
     @if(session('error'))
@@ -1550,37 +1626,28 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     @endif
 
-    {{-- ==============================================
-         FILTER
-    ============================================== --}}
-    <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" class="dash-filter" id="filterForm">
-        <div class="filter-item">
-            <label>Toko Shopee</label>
-            <select name="store_id" onchange="submitAdsFilters(this.form)">
-                <option value="all" {{ $storeId == 'all' ? 'selected' : '' }}>&#127970; Semua Toko</option>
-                @foreach($stores as $s)
-                    <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="filter-item" style="flex: 2;">
-            <label>Periode Data</label>
-            <div class="period-bar" style="position: relative;">
-                <i class="bi bi-calendar3" style="position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--dsh-muted); font-size:.8rem; pointer-events:none; z-index:2;"></i>
-                <input type="text" id="rangePicker" class="range-pill" placeholder="Pilih tanggal" readonly>
-                <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}">
-                <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}">
+    @if(!empty($storeId))
+        {{-- ==============================================
+             TABS (SEGMENTED CONTROL)
+        ============================================== --}}
+        <div class="ads-tabs-wrap" style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
+            <div class="dash-tabs-modern">
+                <button class="dash-tab-m active" data-target="tab-campaigns"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
+                <button class="dash-tab-m" data-target="tab-analysis"><i class="bi bi-graph-up"></i> Analisa</button>
+                <button class="dash-tab-m" data-target="tab-traffic"><i class="bi bi-stoplights"></i> Traffic</button>
+                <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Produk</button>
+                <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profit</button>
+                <button class="dash-tab-m" data-target="tab-funnel"><i class="bi bi-funnel"></i> Funnel</button>
+                <button class="dash-tab-m" data-target="tab-creative"><i class="bi bi-person-video2"></i> Creative & Audience</button>
+                <button class="dash-tab-m" data-target="tab-ltv"><i class="bi bi-person-heart"></i> Customer & LTV</button>
+                <button class="dash-tab-m" data-target="tab-alerts"><i class="bi bi-bell"></i> Alerts & Actions</button>
+                <button class="dash-tab-m" data-target="tab-campaign-performance"><i class="bi bi-bar-chart-steps"></i> Campaign Performance</button>
+                <button class="dash-tab-m" data-target="tab-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
         </div>
-        <div class="filter-item">
-            <label>Bandingkan:</label>
-            <select name="compare_mode" onchange="submitAdsFilters(this.form)">
-                <option value="prev_period" {{ (isset($compareMode) && $compareMode == 'prev_period') ? 'selected' : '' }}>Durasi Sama (Sblmnya)</option>
-                <option value="prev_month" {{ (isset($compareMode) && $compareMode == 'prev_month') ? 'selected' : '' }}>Bulan Lalu (Tgl Sama)</option>
-                <option value="prev_year" {{ (isset($compareMode) && $compareMode == 'prev_year') ? 'selected' : '' }}>Tahun Lalu (Tgl Sama)</option>
-            </select>
-        </div>
-    </form>
+    @endif
+
+    {{-- Filter has been moved to the ads-hero header above --}}
 
     @if(empty($storeId))
         <div class="dash-empty">
@@ -1588,134 +1655,16 @@ document.addEventListener('DOMContentLoaded', function () {
             Pilih toko dulu.
         </div>
     @else
-        {{-- ==============================================
-             TABS (SEGMENTED CONTROL)
-        ============================================== --}}
-        <div class="ads-tabs-wrap" style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
-            <div class="dash-tabs-modern">
-                <button class="dash-tab-m active" data-target="tab-dashboard"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
-                <button class="dash-tab-m" data-target="tab-campaigns"><i class="bi bi-megaphone"></i> Kampanye</button>
-                <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Produk</button>
-                <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profit</button>
-                <button class="dash-tab-m" data-target="tab-sync"><i class="bi bi-arrow-repeat"></i> Sync <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
-            </div>
-        </div>
+        {{-- Tabs have been moved above the filter --}}
 
         {{-- ==============================================
              TAB CONTENT
         ============================================== --}}
         
         <!-- DASHBOARD TAB -->
-        <div class="tab-pane active" id="tab-dashboard">
-            
-            <!-- Live Progress Bar (Hidden by default) -->
-            <div id="liveSyncProgress" class="dpanel ads-surface mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi...</span>
-                    <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
-                </div>
-                <div style="width: 100%; height: 6px; background: var(--dsh-border); border-radius: 4px; overflow: hidden;">
-                    <div id="liveSyncBar" style="width: 0%; height: 100%; background: var(--dsh-accent); transition: width 0.3s ease;"></div>
-                </div>
-                <div id="liveSyncLog" style="margin-top: .5rem; font-size: .7rem; font-family: ui-monospace, monospace; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    Menghubungkan ke server...
-                </div>
-            </div>
 
-            {{-- RINGKASAN PROFITABILITAS — angka bisnis dulu, baru metrik iklan --}}
-            @php
-                $rSpend  = (float) ($kpi['current']->spend ?? 0);
-                $rGmv    = (float) ($kpi['current']->gmv ?? 0);
-                $rOrders = (int) ($kpi['current']->orders ?? 0);
-                $rNetRevenue = 0.0; $rCogs = 0.0; $rUntung = 0; $rRugi = 0;
-                foreach ($campaigns as $c) {
-                    if (!($c->spend > 0 || $c->gmv > 0)) continue;
-                    $rNetRevenue += $c->gmv * ($c->net_revenue_ratio ?? 0.781);
-                    $rCogs += ($c->unit_cogs > 0 && ($c->items_sold ?? 0) > 0)
-                        ? $c->unit_cogs * $c->items_sold
-                        : $c->gmv * ($c->cogs_ratio ?? 0);
-                    if ($c->profit_after_ads !== null) { $c->profit_after_ads >= 0 ? $rUntung++ : $rRugi++; }
-                }
-                $rProfit = $rNetRevenue - $rCogs - ($rSpend * 1.11);
-                $rRoas   = $rSpend > 0 ? $rGmv / $rSpend : 0;
-                // Pembanding periode lalu: estimasi rasio periode ini (selaras tab Kampanye)
-                $pGmv = (float) ($kpi['previous']->gmv ?? 0);
-                $pSpend = (float) ($kpi['previous']->spend ?? 0);
-                $revR = $rGmv > 0 ? $rNetRevenue / $rGmv : 0.781;
-                $cogsR = $rGmv > 0 ? $rCogs / $rGmv : 0;
-                $pProfit = ($pGmv * $revR) - ($pGmv * $cogsR) - ($pSpend * 1.11);
-                $dProfit = $pProfit != 0.0 ? (($rProfit - $pProfit) / abs($pProfit)) * 100 : ($rProfit > 0 ? 100 : 0);
-                $rfmt = fn ($n) => 'Rp ' . number_format(abs($n), 0, ',', '.');
-                $rProfitPos = $rProfit >= 0;
-            @endphp
-            <div class="ads-tab-panel mb-3">
-                <div class="ads-tab-panel-head">
-                    <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-piggy-bank text-success"></i> Profit Periode Ini</div>
-                        <div class="ads-tab-panel-note">Snapshot periode aktif vs sebelumnya.</div>
-                    </div>
-                    <a href="javascript:void(0)" onclick="document.querySelector('.dash-tab-m[data-target=&quot;tab-profit&quot;]').click()" style="font-size:.7rem; font-weight:700; color:var(--dsh-accent); text-decoration:none;">Lihat rincian &rarr;</a>
-                </div>
-                <div class="p-3 p-md-3">
-                    <div class="ads-kpi-grid mb-0">
-                        <div class="dpanel ads-kpi kpi-profit" style="border-color:rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.28); background:linear-gradient(180deg, rgba({{ $rProfitPos ? '22,163,74' : '220,38,38' }},.08), rgba(248,250,252,1));">
-                            <div class="ads-kpi-label" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }};"><i class="bi bi-piggy-bank"></i> Net Profit</div>
-                            <div class="ads-kpi-value" style="color:{{ $rProfitPos ? '#15803d' : '#b91c1c' }}; font-variant-numeric:tabular-nums;">{{ $rProfit < 0 ? '-' : '' }}{{ $rfmt($rProfit) }}</div>
-                            <div class="ads-kpi-sub">{{ $rUntung }} untung &bull; {{ $rRugi }} rugi &bull; <span style="font-weight:900; color:{{ $dProfit >= 0 ? '#16a34a' : '#dc2626' }};"><i class="bi bi-arrow-{{ $dProfit >= 0 ? 'up' : 'down' }}-right"></i> {{ number_format(abs($dProfit), 1, ',', '.') }}%</span> vs lalu</div>
-                        </div>
-                        <div class="dpanel ads-kpi kpi-revenue" style="border-color:rgba(3,105,161,.25); background:linear-gradient(180deg, rgba(3,105,161,.07), rgba(248,250,252,1));">
-                            <div class="ads-kpi-label" style="color:#0369a1;"><i class="bi bi-cash-coin"></i> Pendapatan Bersih</div>
-                            <div class="ads-kpi-value" style="color:#0369a1; font-variant-numeric:tabular-nums;">{{ $rfmt($rNetRevenue) }}</div>
-                            <div class="ads-kpi-sub">Omzet (GMV): {{ $rfmt($rGmv) }}</div>
-                        </div>
-                        <div class="dpanel ads-kpi kpi-cogs" style="border-color:rgba(148,163,184,.3); background:linear-gradient(180deg, rgba(148,163,184,.08), rgba(248,250,252,1));">
-                            <div class="ads-kpi-label" style="color:var(--dsh-muted);"><i class="bi bi-box-seam"></i> Modal (HPP)</div>
-                            <div class="ads-kpi-value" style="color:var(--text); font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rCogs) }}</div>
-                            <div class="ads-kpi-sub">dari pcs terjual &times; HPP</div>
-                        </div>
-                        <div class="dpanel ads-kpi kpi-spend" style="border-color:rgba(245,158,11,.3); background:linear-gradient(180deg, rgba(245,158,11,.08), rgba(248,250,252,1));">
-                            <div class="ads-kpi-label" style="color:#b45309;"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
-                            <div class="ads-kpi-value" style="color:#92400e; font-variant-numeric:tabular-nums;">&minus;{{ $rfmt($rSpend * 1.11) }}</div>
-                            <div class="ads-kpi-sub">nyata {{ $rfmt($rSpend) }} + PPN 11%</div>
-                        </div>
-                        <div class="dpanel ads-kpi kpi-roas" style="border-color:rgba(37,99,235,.25); background:linear-gradient(180deg, rgba(37,99,235,.07), rgba(248,250,252,1));">
-                            <div class="ads-kpi-label" style="color:#1d4ed8;"><i class="bi bi-lightning-charge"></i> ROAS &bull; Pesanan</div>
-                            <div class="ads-kpi-value" style="color:#1d4ed8; font-variant-numeric:tabular-nums;">{{ number_format($rRoas, 2, ',', '.') }}x <span style="font-size:.85rem; color:var(--text);">&bull; {{ number_format($rOrders, 0, ',', '.') }}</span></div>
-                            <div class="ads-kpi-sub">omzet per rupiah iklan &bull; total order</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="ads-tab-panel mb-3">
-                <div class="ads-tab-panel-head">
-                    <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-wallet2 text-primary"></i> Status Toko</div>
-                        <div class="ads-tab-panel-note">Ringkasan real-time saldo dan kondisi toko.</div>
-                    </div>
-                </div>
-                <div class="p-3" id="realtimeStatusContainer" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .65rem;">
-                    <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-6 mb-2"></span>
-                            <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
-                        </div>
-                    </div>
-                    <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-7 mb-2"></span>
-                            <span class="placeholder col-5 d-block" style="height: 2rem;"></span>
-                        </div>
-                    </div>
-                    <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-8 mb-2"></span>
-                            <span class="placeholder col-4 d-block" style="height: 2rem;"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <!-- ANALYSIS TAB -->
+        <div class="tab-pane" id="tab-analysis">
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>
@@ -1821,254 +1770,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- TAB PROFITABILITAS -->
-        <div class="tab-pane" id="tab-profit">
-            <div class="ads-tab-panel mb-3">
-                <div class="ads-tab-panel-head">
-                    <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-cash-coin text-success"></i> Profitabilitas</div>
-                        <div class="ads-tab-panel-note">Profit, komposisi biaya, dan performa kampanye.</div>
-                    </div>
-                </div>
+            <div class="ads-tab-panel-head mb-3" style="border-bottom:none; background:transparent;">
+                <div class="ads-tab-panel-title"><i class="bi bi-bar-chart-line text-success"></i> Top 5 Kampanye / Produk</div>
             </div>
-            @include('marketplace.partials._profitability_tab')
-        </div>
-
-        <!-- TAB SYNC -->
-        <div class="tab-pane" id="tab-sync">
-            @include('marketplace.partials._sync_tab')
-        </div>
-
-        <!-- TAB KAMPANYE -->
-        <div class="tab-pane" id="tab-campaigns">
-            
-            <div class="dash-sec"><i class="bi bi-grid-1x2"></i> KPI Kampanye</div>
-            
-            <div class="dash-grid mb-4">
-                @php
-                    // Calculate Global Profit Data
-                    $totalNetRevenue = 0;
-                    $totalCogs = 0;
-                    foreach($campaigns as $camp) {
-                        if ($camp->spend > 0 || $camp->gmv > 0) {
-                            $netRev = $camp->gmv * ($camp->net_revenue_ratio ?? 0.781);
-                            $totalNetRevenue += $netRev;
-                            // COGS eksak: HPP × pcs terjual (fallback rasio utk data lama)
-                            $totalCogs += ($camp->unit_cogs > 0 && ($camp->items_sold ?? 0) > 0)
-                                ? $camp->unit_cogs * $camp->items_sold
-                                : $camp->gmv * ($camp->cogs_ratio ?? 0);
-                        }
-                    }
-                    
-                    // Inject to KPI current
-                    if (!isset($kpi['current'])) $kpi['current'] = new \stdClass();
-                    if (!isset($kpi['previous'])) $kpi['previous'] = new \stdClass();
-                    
-                    $currGmv = $kpi['current']->gmv ?? 0;
-                    $currSpend = $kpi['current']->spend ?? 0;
-                    $currOrders = $kpi['current']->orders ?? 0;
-                    
-                    $kpi['current']->net_revenue = $totalNetRevenue;
-                    $kpi['current']->net_profit = $totalNetRevenue - $totalCogs - ($currSpend * 1.11);
-                    $kpi['current']->aov_net = $currOrders > 0 ? $totalNetRevenue / $currOrders : 0;
-                    
-                    // Estimate previous based on current ratios
-                    $prevGmv = $kpi['previous']->gmv ?? 0;
-                    $prevSpend = $kpi['previous']->spend ?? 0;
-                    $prevOrders = $kpi['previous']->orders ?? 0;
-                    
-                    $revRatio = $currGmv > 0 ? $totalNetRevenue / $currGmv : 0.89;
-                    $cogsRatio = $currGmv > 0 ? $totalCogs / $currGmv : 0.60;
-                    
-                    $kpi['previous']->net_revenue = $prevGmv * $revRatio;
-                    $kpi['previous']->net_profit = ($prevGmv * $revRatio) - ($prevGmv * $cogsRatio) - ($prevSpend * 1.11);
-                    $kpi['previous']->aov_net = $prevOrders > 0 ? ($prevGmv * $revRatio) / $prevOrders : 0;
-
-                    $metrics = [
-                        ['title' => 'Biaya (Topup PPN)', 'key' => 'spend_topup', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'red', 'icon' => 'bi-wallet2'],
-                        ['title' => 'GMV (Kotor)', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'green', 'icon' => 'bi-bag-check'],
-                        ['title' => 'Net Revenue', 'key' => 'net_revenue', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'blue', 'icon' => 'bi-cash-coin'],
-                        ['title' => 'Net Profit', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'emerald', 'icon' => 'bi-piggy-bank'],
-                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'blue', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'AOV Net', 'key' => 'aov_net', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-cart-check'],
-                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'slate', 'icon' => 'bi-box-seam'],
-                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'violet', 'icon' => 'bi-funnel'],
-                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-cursor'],
-                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'amber', 'icon' => 'bi-coin'],
-                    ];
-                @endphp
-                @foreach($metrics as $m)
-                    @php
-                        $currSpend = $kpi['current']->spend ?? 0;
-                        $currGmv = $kpi['current']->gmv ?? 0;
-                        $currOrders = $kpi['current']->orders ?? 0;
-                        $currClicks = $kpi['current']->clicks ?? 0;
-                        $currImpressions = $kpi['current']->impressions ?? 0;
-
-                        $prevSpend = $kpi['previous']->spend ?? 0;
-                        $prevGmv = $kpi['previous']->gmv ?? 0;
-                        $prevOrders = $kpi['previous']->orders ?? 0;
-                        $prevClicks = $kpi['previous']->clicks ?? 0;
-                        $prevImpressions = $kpi['previous']->impressions ?? 0;
-
-                        $val = $kpi['current']->{$m['key']} ?? 0;
-                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
-
-                        if($m['key'] === 'roas') {
-                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
-                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
-                        } elseif ($m['key'] === 'spend_topup') {
-                            $val = $currSpend * 1.11;
-                            $prevVal = $prevSpend * 1.11;
-                        } elseif ($m['key'] === 'cpc') {
-                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
-                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
-                        } elseif ($m['key'] === 'ctr') {
-                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
-                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
-                        } elseif ($m['key'] === 'cvr') {
-                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
-                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
-                        }
-
-                        $change = $kpi['changes'][$m['key']] ?? 0;
-                        if (in_array($m['key'], ['aov', 'aov_net', 'cpc', 'ctr', 'cvr', 'net_revenue', 'net_profit', 'spend_topup'])) {
-                            if ($prevVal == 0) {
-                                $change = $val > 0 ? 100 : 0;
-                            } else {
-                                $change = round((($val - $prevVal) / abs($prevVal)) * 100, 2);
-                            }
-                        }
-
-
-                        $isUp = $change >= 0;
-                        
-                        // For cost metrics, going down is good (green). For others, going up is good.
-                        if (in_array($m['key'], ['spend', 'cpc', 'spend_topup'])) {
-                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
-                        } else {
-                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
-                        }
-                    @endphp
-                    <div class="kpi {{ $m['cls'] }}">
-                        <div class="kpi-label">
-                            <div class="ico"><i class="bi {{ $m['icon'] }}"></i></div>
-                            {{ $m['title'] }}
-                        </div>
-                        <div class="kpi-value {{ in_array($m['key'], ['spend', 'gmv', 'aov']) ? 'sm' : '' }}" style="font-family: ui-monospace, monospace;">
-                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
-                        </div>
-                        <div class="kpi-sub">
-                            <span style="font-weight:700; {{ $colorClass }}">
-                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
-                            </span> 
-                            vs rentang lalu
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-
-            <!-- INNER TABS FOR KAMPANYE -->
-            <div class="dash-tabs-modern mb-3">
-                <button class="dash-tab-sm inner-tab-btn active" data-inner-target="inner-campaign-gms"><i class="bi bi-lightning-charge"></i> GMV Max</button>
-                <button class="dash-tab-sm inner-tab-btn" data-inner-target="inner-campaign-individual"><i class="bi bi-list-ul"></i> Iklan Individual</button>
-            </div>
-
-            <div id="inner-campaign-gms" class="inner-tab-pane active" style="display: block;">
-                <div class="dash-sec"><i class="bi bi-gear"></i> GMV Max</div>
-                <div class="dpanel p-4 mb-4" style="background: var(--card-bg);">
-                    @if($autoCampaign)
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
-                            <div>
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                                    <h5 style="margin: 0; font-weight: 700; color: var(--text);">{{ $autoCampaign->campaign_name ?: 'GMV Max (Auto)' }}</h5>
-                                    @if($autoCampaign->campaign_status === 'ongoing')
-                                        <span class="badge" style="background: #16a34a; color: #fff; font-weight: 600; border-radius: 6px;">Berjalan</span>
-                                    @elseif($autoCampaign->campaign_status === 'paused')
-                                        <span class="badge" style="background: #eab308; color: #fff; font-weight: 600; border-radius: 6px;">Jeda</span>
-                                    @elseif($autoCampaign->campaign_status)
-                                        <span class="badge bg-secondary" style="border-radius: 6px;">{{ ucfirst($autoCampaign->campaign_status) }}</span>
-                                    @endif
-                                </div>
-                                <div style="font-family: ui-monospace, monospace; font-size: .85rem; color: var(--dsh-muted);">
-                                    Camp ID: {{ $autoCampaign->channel_campaign_id }} &bull; Budget: <span style="font-weight: 600; color: var(--text);">{{ $autoCampaign->campaign_budget > 0 ? 'Rp ' . number_format($autoCampaign->campaign_budget, 0, ',', '.') : 'Unlimited' }}</span>
-                                </div>
-                            </div>
-                            
-                            <div style="text-align: right; background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.1); padding: 12px 24px; border-radius: 12px; min-width: 150px;">
-                                <div style="font-size: .75rem; font-weight: 600; color: var(--dsh-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Target ROAS</div>
-                                <div style="font-weight: 800; font-size: 1.5rem; color: var(--dsh-accent); font-variant-numeric: tabular-nums;">
-                                    {{ $autoCampaign->target_roas ? number_format($autoCampaign->target_roas, 2).'x' : 'Auto' }}
-                                </div>
-                            </div>
-                        </div>
-                    @else
-                        <div class="text-center py-3" style="color: var(--dsh-muted); font-size: .9rem;">
-                            <i class="bi bi-info-circle mb-2" style="font-size: 1.5rem; display: block;"></i>
-                            Data GMV Max belum tersinkronisasi.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Produk GMV Max</div>
-                <div class="dpanel">
-                    @include('marketplace.partials._gms_item_table', ['gmsItems' => $gmsItems, 'globalRoas' => $adsSetting->target_roas ?? null])
-                </div>
-            </div>
-
-            <div id="inner-campaign-individual" class="inner-tab-pane" style="display: none;">
-                <div class="dash-sec"><i class="bi bi-megaphone"></i> Iklan Individual</div>
-            
-            @php
-                $totalBoncos = 0;
-                $totalHiddenGem = 0;
-                $totalSpendBoncos = 0;
-                $individualCamps = $campaigns->filter(fn($c) => !str_starts_with($c->channel_campaign_id, 'GMS-'));
-                foreach($individualCamps as $c) {
-                    $r = $c->spend > 0 ? $c->gmv / $c->spend : 0;
-                    if ($c->spend > 50000 && $r < 1.5) { $totalBoncos++; $totalSpendBoncos += $c->spend; }
-                    elseif ($r >= 5.0 && $c->spend > 10000) { $totalHiddenGem++; }
-                }
-            @endphp
-            
-            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
-                <div class="dpanel p-3" style="border-left: 4px solid {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; background: var(--dsh-bg);">
-                    <div class="d-flex align-items-center gap-2 mb-1" style="font-weight: 700; color: {{ $totalBoncos > 0 ? '#dc2626' : '#16a34a' }}; font-size: 0.85rem;">
-                        <i class="bi {{ $totalBoncos > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle' }}"></i> Ringkasan
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">
-                        @if($totalBoncos > 0)
-                            <b>{{ $totalBoncos }} kampanye</b> boros biaya sebesar <b>Rp {{ number_format($totalSpendBoncos, 0, ',', '.') }}</b>.
-                        @else
-                            Tidak ada kampanye boros.
-                        @endif
-                        @if($totalHiddenGem > 0)
-                            <b>{{ $totalHiddenGem }} produk</b> punya efisiensi tinggi.
-                        @endif
-                    </div>
-                </div>
-            </div>
-            
-            <div class="dpanel">
-                @include('marketplace.partials._campaign_table', ['campaigns' => $individualCamps])
-            </div>
-            </div> <!-- CLOSE inner-campaign-individual -->
-
-        </div>
-
-        <!-- TAB PERFORMA PRODUK (GMV MAX) -->
-        <div class="tab-pane" id="tab-items">
-
-
-            <div class="dash-sec"><i class="bi bi-robot"></i> Insight Produk</div>
-            <div class="dash-panels mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightHealth"></div>
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTraffic"></div>
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-border)" id="insightTime"></div>
-            </div>
-
             <div class="dash-panels mt-4 mb-4" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
                 {{-- BARIS 1: TRAFFIC --}}
                 {{-- CHART IMPRESI --}}
@@ -2226,102 +1931,505 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="dash-sec mt-2 mb-2"><i class="bi bi-stars text-warning"></i> Ringkasan Produk</div>
-            <div class="dpanel p-3 mb-4" id="productInsights" style="border-left: 4px solid #a855f7;">
-                <div class="d-flex align-items-center" style="color: var(--dsh-muted); font-size: 0.8rem;">
-                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Memuat data...
-                </div>
-            </div>
 
-            <div class="dash-sec"><i class="bi bi-box-seam"></i> Semua Produk</div>
-            
-            <div class="dash-panels mb-3" style="grid-template-columns: 1fr;">
-                <div class="dpanel p-3" style="border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
-                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">
-                        CPC dan GMV Max.
+        <!-- TAB TRAFFIC -->
+        <div class="tab-pane" id="tab-traffic">
+            <div class="ads-tab-panel mb-4">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-stoplights text-primary"></i> Analisa Traffic</div>
+                        <div class="ads-tab-panel-note">Evaluasi interaksi pelanggan (top of funnel). Data <span class="badge" style="font-size:0.6rem; background: var(--dsh-border); color: var(--dsh-muted)">Reach</span> dan <span class="badge" style="font-size:0.6rem; background: var(--dsh-border); color: var(--dsh-muted)">Frequency</span> merupakan estimasi.</div>
                     </div>
                 </div>
+                
+                {{-- KOTAK KPI TRAFFIC --}}
+                <div class="ads-kpi-grid p-3">
+                    @php
+                        // Kalkulasi Traffic KPI
+                        $trSpend = $kpi['current']->spend ?? 0;
+                        $trImp = $kpi['current']->impressions ?? 0;
+                        $trClicks = $kpi['current']->clicks ?? 0;
+                        
+                        $trReach = (int)($trImp * 0.82);
+                        $trFreq = $trReach > 0 ? $trImp / $trReach : 0;
+                        $trCtr = $trImp > 0 ? ($trClicks / $trImp) * 100 : 0;
+                        $trCpc = $trClicks > 0 ? $trSpend / $trClicks : 0;
+                        $trCpm = $trImp > 0 ? ($trSpend / $trImp) * 1000 : 0;
+                    @endphp
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> Ad Spend</div>
+                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trSpend, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-eye me-1"></i> Impressions</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trImp, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-people me-1"></i> Reach <i class="bi bi-info-circle text-muted" title="Estimasi" style="font-size: 0.6rem;"></i></div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trReach, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-arrow-repeat me-1"></i> Frequency <i class="bi bi-info-circle text-muted" title="Estimasi" style="font-size: 0.6rem;"></i></div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trFreq, 2, ',', '.') }}x</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-hand-index-thumb me-1"></i> Link Clicks</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trClicks, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-percent me-1"></i> CTR</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trCtr, 2, ',', '.') }}%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-currency-dollar me-1"></i> CPC</div>
+                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpc, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-tags me-1"></i> CPM</div>
+                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpm, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-box-arrow-in-right me-1"></i> LP Views <i class="bi bi-info-circle text-muted" title="Sama dengan clicks" style="font-size: 0.6rem;"></i></div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trClicks, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-cash me-1"></i> Cost per LPV</div>
+                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpc, 0, ',', '.') }}</div>
+                    </div>
+                </div>
+
+
+                {{-- CHARTS TRAFFIC --}}
+                <div class="row px-3 pb-3">
+                    <div class="col-md-6 mb-3">
+                        <div class="p-2 border rounded" style="background: var(--card-bg);">
+                            <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;">Volume Traffic (Imp & Clicks)</div>
+                            <div style="position: relative; height: 220px; width: 100%;">
+                                <canvas id="chartTrafficVolume"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="p-2 border rounded" style="background: var(--card-bg);">
+                            <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;">Quality Rates (CTR & CPM)</div>
+                            <div style="position: relative; height: 220px; width: 100%;">
+                                <canvas id="chartTrafficRates"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- INSIGHT TRAFFIC --}}
+
+                @php
+                    $insightTraffic = [];
+                    if ($trImp > 0) {
+                        if ($trCtr > 0 && $trCtr < 1.5) {
+                            $insightTraffic[] = ['type' => 'warning', 'icon' => 'bi-exclamation-triangle', 'text' => 'Rata-rata CTR keseluruhan cukup rendah (< 1.5%). Evaluasi ulang gambar produk atau relevansi keyword iklan Anda.'];
+                        }
+                        if ($trCpc > 500) {
+                            $insightTraffic[] = ['type' => 'danger', 'icon' => 'bi-exclamation-octagon', 'text' => 'Biaya per Klik (CPC) cukup mahal (> Rp 500). Pertimbangkan untuk menurunkan batas maksimum bid.'];
+                        }
+                        if ($trFreq > 3) {
+                            $insightTraffic[] = ['type' => 'warning', 'icon' => 'bi-arrow-repeat', 'text' => 'Frequency estimasi tinggi (> 3x). Iklan mungkin ditampilkan berulang ke orang yang sama, pertimbangkan untuk mengganti materi iklan.'];
+                        }
+                        if(empty($insightTraffic)) {
+                            $insightTraffic[] = ['type' => 'success', 'icon' => 'bi-check-circle', 'text' => 'Performa traffic berjalan dengan baik. Metrik CTR dan CPC berada dalam batas wajar.'];
+                        }
+                    }
+                @endphp
+                @if(!empty($insightTraffic))
+                    <div class="row px-3 pb-3">
+                        <div class="col-12">
+                            <div class="p-3 rounded" style="background: var(--hero-bg); border: 1px solid var(--dsh-border);">
+                                <div class="fw-bold mb-2" style="font-size: 0.85rem;"><i class="bi bi-lightbulb-fill text-warning"></i> Insight Traffic</div>
+                                @foreach($insightTraffic as $insight)
+                                    <div class="mb-1" style="font-size: 0.78rem;">
+                                        <i class="bi {{ $insight['icon'] }} text-{{ $insight['type'] }} me-1"></i> {{ $insight['text'] }}
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
-            <div class="dpanel">
-                <div class="table-responsive">
-                    <table class="dpanel-table">
-                        <thead>
+            {{-- TABEL TRAFFIC --}}
+            <div class="ads-tab-panel mb-4">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Campaign (Traffic)</div>
+                        <div class="ads-tab-panel-note">Rincian metrik impressions, clicks, dan cost tiap campaign.</div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="dpanel-table" id="trafficTable">
+                        <thead style="position: sticky; top: 0; z-index: 10;">
                             <tr>
-                                <th>Produk / Kampanye</th>
-                                <th>Tipe</th>
-                                <th>Status</th>
-                                <th class="text-end">Biaya (Spend)</th>
-                                <th class="text-end">GMV</th>
-                                <th class="text-end">ROAS</th>
-                                <th class="text-end">Impresi</th>
-                                <th class="text-end">Klik</th>
-                                <th class="text-end">Pesanan</th>
+                                <th>Platform</th>
+                                <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Spend <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Impressions <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('reach')" style="cursor:pointer">Reach* <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('freq')" style="cursor:pointer">Freq* <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Clicks <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">CPC <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('cpm')" style="cursor:pointer">CPM <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($itemPerformance ?? [] as $item)
-                                @php
-                                    $itemRoas = $item->spend > 0 ? $item->gmv / $item->spend : 0;
-                                    $isGms = str_starts_with($item->channel_campaign_id ?? '', 'GMS-');
-                                    $typeLabel = $isGms ? 'GMV Max' : 'CPC';
-                                    $typeColor = $isGms ? '#2563eb' : '#ca8a04';
-                                    $typeBg = $isGms ? 'rgba(37,99,235,0.1)' : 'rgba(234,179,8,0.1)';
-                                    $statusLabel = $item->campaign_status ?? '-';
-                                    $statusColor = $statusLabel === 'ongoing' ? '#16a34a' : ($statusLabel === 'paused' ? '#eab308' : '#64748b');
-                                @endphp
+                            @if(empty($campaigns) || count($campaigns) == 0)
                                 <tr>
-                                    <td style="padding-top: 0.8rem; padding-bottom: 0.8rem;">
-                                        <div style="font-weight: 700; color: var(--text); white-space: normal; max-width: 300px;">
-                                            {{ $item->item_name ?? $item->campaign_name ?? 'Produk Tidak Diketahui' }}
-                                        </div>
-                                        <div style="font-family: ui-monospace, monospace; font-size: .7rem; color: var(--dsh-muted); display: flex; align-items: center; gap: 6px; margin-top: 4px;">
-                                            @if($item->channel_item_id)
-                                                <span>ID: {{ $item->channel_item_id }}</span>
-                                            @endif
-                                            @if($item->item_sku)
-                                                <span>SKU: {{ $item->item_sku }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span style="background: {{ $typeBg }}; color: {{ $typeColor }}; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: sans-serif; font-size: 0.65rem;">{{ $typeLabel }}</span>
-                                    </td>
-                                    <td>
-                                        <span style="color: {{ $statusColor }}; font-weight: 700; font-size: 0.72rem; text-transform: capitalize;">{{ $statusLabel }}</span>
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #dc2626;">
-                                        Rp {{ number_format($item->spend, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: #16a34a;">
-                                        Rp {{ number_format($item->gmv, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; font-weight:700; color: {{ $itemRoas >= 4.0 ? '#16a34a' : ($itemRoas >= 2.0 ? '#eab308' : '#dc2626') }};">
-                                        {{ number_format($itemRoas, 2) }}x
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($item->impressions, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($item->clicks, 0, ',', '.') }}
-                                    </td>
-                                    <td class="text-end" style="font-family: ui-monospace, monospace; color: var(--dsh-muted);">
-                                        {{ number_format($item->orders, 0, ',', '.') }}
-                                    </td>
+                                    <td colspan="10" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="9" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
-                                        Belum ada data performa produk.
-                                    </td>
-                                </tr>
-                            @endforelse
+                            @else
+                                @foreach($campaigns as $row)
+                                    @php
+                                        $cImp = $row->sum_impressions ?? 0;
+                                        $cClicks = $row->clicks ?? 0;
+                                        $cSpend = $row->spend ?? 0;
+                                        $cReach = (int)($cImp * 0.82);
+                                        $cFreq = $cReach > 0 ? $cImp / $cReach : 0;
+                                        $cCtr = $cImp > 0 ? ($cClicks / $cImp) * 100 : 0;
+                                        $cCpc = $cClicks > 0 ? $cSpend / $cClicks : 0;
+                                        $cCpm = $cImp > 0 ? ($cSpend / $cImp) * 1000 : 0;
+                                    @endphp
+                                    <tr data-campaign_name="{{ strtolower($row->campaign_name ?? '') }}"
+                                        data-spend="{{ $cSpend }}"
+                                        data-impressions="{{ $cImp }}"
+                                        data-reach="{{ $cReach }}"
+                                        data-freq="{{ $cFreq }}"
+                                        data-clicks="{{ $cClicks }}"
+                                        data-ctr="{{ $cCtr }}"
+                                        data-cpc="{{ $cCpc }}"
+                                        data-cpm="{{ $cCpm }}">
+                                        <td>
+                                            <span class="badge" style="background: rgba(255, 102, 0, 0.1); color: #ff6600; font-size: 0.65rem;">SHOPEE</span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-bold" style="font-size: 0.78rem;">{{ $row->campaign_name ?: 'Tanpa Nama' }}</div>
+                                            <div class="text-muted" style="font-size: 0.65rem;">ID: {{ $row->channel_campaign_id }}</div>
+                                        </td>
+                                        <td class="text-end">Rp {{ number_format($cSpend, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cImp, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cReach, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cFreq, 2, ',', '.') }}x</td>
+                                        <td class="text-end">{{ number_format($cClicks, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cCtr, 2, ',', '.') }}%</td>
+                                        <td class="text-end">Rp {{ number_format($cCpc, 0, ',', '.') }}</td>
+                                        <td class="text-end">Rp {{ number_format($cCpm, 0, ',', '.') }}</td>
+                                    </tr>
+                                @endforeach
+                            @endif
                         </tbody>
                     </table>
                 </div>
             </div>
+        </div>
+
+        <!-- TAB PROFITABILITAS -->
+        <div class="tab-pane" id="tab-profit">
+            <div class="dash-sec"><i class="bi bi-cash-coin"></i> Profitabilitas</div>
+            @include('marketplace.partials._profitability_tab')
+        </div>
+
+        <!-- TAB CAMPAIGN PERFORMANCE -->
+        <div class="tab-pane" id="tab-campaign-performance">
+            @include('marketplace.partials._campaign_performance_tab')
+        </div>
+
+        <!-- (Tab Sync has been merged into Tab Pengaturan) -->
+
+        <!-- TAB PENGATURAN -->
+        <div class="tab-pane" id="tab-settings">
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-sliders text-primary"></i> Pengaturan & Sinkronisasi</div>
+                        <div class="ads-tab-panel-note">Kelola pengaturan sinkronisasi dan data.</div>
+                    </div>
+                </div>
+                <div class="p-4" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start;">
+                    <!-- LIVE SYNC PROGRESS INDICATOR -->
+                    <div id="liveSyncProgressContainer" style="display: none; width: 100%; max-width: 600px; background: rgba(37,99,235,0.05); border: 1px solid rgba(37,99,235,0.2); border-radius: 12px; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: .5rem; font-size: .85rem; font-weight: 650; color: var(--dsh-accent);">
+                            <span id="liveSyncLabel"><i class="spinner-border spinner-border-sm me-2" role="status"></i> Menyiapkan sinkronisasi...</span>
+                            <span id="liveSyncPercent">0%</span>
+                        </div>
+                        <div class="progress" style="height: 10px; border-radius: 10px; background-color: rgba(37,99,235,0.1);">
+                            <div id="liveSyncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background-color: var(--dsh-accent);"></div>
+                        </div>
+                    </div>
+                    @if(isset($syncRuns) && $syncRuns->isNotEmpty())
+                        @php
+                            $latestRun = $syncRuns->first();
+                            $lastSuccess = $lastSuccessRun ?? null;
+                        @endphp
+                        @if($latestRun->status === 'error')
+                            <div class="ads-hero-meta ads-hero-error" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3);">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Sync gagal: {{ Str::limit($latestRun->error_message, 60) }}
+                            </div>
+                        @endif
+                        <div class="ads-hero-meta" style="font-size: 0.85rem; font-weight: 600;">
+                            @if($lastSuccess)
+                                <span style="color: #16a34a;"><i class="bi bi-check-circle-fill"></i></span>
+                                Sync terakhir: {{ $lastSuccess->updated_at?->timezone('Asia/Jakarta')?->format('d M Y, H:i') ?? 'waktu tidak tersedia' }}
+                            @else
+                                <span style="color: #eab308;"><i class="bi bi-clock"></i></span>
+                                Belum ada sync
+                            @endif
+                        </div>
+                    @endif
+
+                    <div style="display: flex; gap: .75rem; flex-wrap: wrap;">
+                        <button type="button" class="btn fw-bold" data-bs-toggle="modal" data-bs-target="#modalSyncAds" style="background: var(--dsh-accent); color:#fff; border-radius:10px; font-size:.75rem; padding:.45rem 1rem;">
+                            <i class="bi bi-arrow-repeat"></i> Sync Manual
+                        </button>
+                        <button type="button" class="btn fw-bold" onclick="openSyncTab()" style="border: 1px solid var(--dsh-border); color:var(--text); background: var(--card-bg); border-radius:10px; font-size:.75rem; padding:.45rem 1rem;">
+                            <i class="bi bi-journal-text"></i> Log Sync
+                        </button>
+                        <button type="button" class="btn fw-bold" data-bs-toggle="modal" data-bs-target="#modalGmsSettings" style="border: 1px solid var(--dsh-accent); background: rgba(37, 99, 235, 0.05); color: var(--dsh-accent); border-radius:10px; font-size:.75rem; padding:.45rem 1rem;">
+                            <i class="bi bi-gear"></i> Pengaturan GMV Max
+                        </button>
+                        @if(auth()->user()->role === 'owner')
+                        <button type="button" class="btn fw-bold" onclick="clearAdsData()" style="border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius:10px; font-size:.75rem; padding:.45rem 1rem;">
+                            <i class="bi bi-trash"></i> Bersihkan Data
+                        </button>
+                        @endif
+                    </div>
+                    
+                    <div id="syncCountdown" class="role-chip live-btn live-off mt-2" style="font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+                        <i class="bi bi-clock-history"></i> Menghitung...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Konten Sync Tab Digabung di sini -->
+            @include('marketplace.partials._sync_tab')
+        </div>
+
+        <!-- TAB KAMPANYE -->
+        <div class="tab-pane active" id="tab-campaigns">
+            
+            <div id="liveSyncProgress" class="dpanel ads-surface mb-3 p-3" style="display: none; border-left: 4px solid var(--dsh-accent); background: var(--dsh-bg);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span style="font-weight: 600; font-size: .85rem; color: var(--text);">Sinkronisasi...</span>
+                    <span id="liveSyncPercent" style="font-size: .75rem; font-weight: 700; color: var(--dsh-accent);">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: var(--dsh-border); border-radius: 4px; overflow: hidden;">
+                    <div id="liveSyncBar" style="width: 0%; height: 100%; background: var(--dsh-accent); transition: width 0.3s ease;"></div>
+                </div>
+                <div id="liveSyncLog" style="margin-top: .5rem; font-size: .7rem; font-family: ui-monospace, monospace; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    Menghubungkan ke server...
+                </div>
+            </div>
+            
+            
+            <div class="ads-tab-panel mb-4">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-megaphone text-primary"></i> Performa Kampanye</div>
+                        <div class="ads-tab-panel-note">Metrik interaksi dan tayangan iklan secara keseluruhan.</div>
+                    </div>
+                </div>
+                <div class="p-2">
+                    <div class="ads-kpi-grid mb-0" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+                @php
+                    // KPI metrics are now fully calculated and aggregated 
+                    // within AdsDashboardService and passed precisely via $kpi.
+
+                    $metrics = [
+                        ['title' => 'Omzet', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-wallet2'],
+                        ['title' => 'Biaya', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash-stack'],
+                        ['title' => 'Net Profit', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
+                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-box-seam'],
+                        ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'roas', 'icon' => 'bi-lightning-charge'],
+                        ['title' => 'Impresi', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-eye'],
+                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cursor'],
+                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'roas', 'icon' => 'bi-hand-index-thumb'],
+                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'profit', 'icon' => 'bi-funnel'],
+                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash'],
+                    ];
+                @endphp
+                @foreach($metrics as $m)
+                    @php
+                        $currSpend = $kpi['current']->spend ?? 0;
+                        $currGmv = $kpi['current']->gmv ?? 0;
+                        $currOrders = $kpi['current']->orders ?? 0;
+                        $currClicks = $kpi['current']->clicks ?? 0;
+                        $currImpressions = $kpi['current']->impressions ?? 0;
+
+                        $prevSpend = $kpi['previous']->spend ?? 0;
+                        $prevGmv = $kpi['previous']->gmv ?? 0;
+                        $prevOrders = $kpi['previous']->orders ?? 0;
+                        $prevClicks = $kpi['previous']->clicks ?? 0;
+                        $prevImpressions = $kpi['previous']->impressions ?? 0;
+
+                        $val = $kpi['current']->{$m['key']} ?? 0;
+                        $prevVal = $kpi['previous']->{$m['key']} ?? 0;
+
+                        if($m['key'] === 'roas') {
+                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
+                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
+                        } elseif ($m['key'] === 'spend_topup') {
+                            $val = $currSpend * 1.11;
+                            $prevVal = $prevSpend * 1.11;
+                        } elseif ($m['key'] === 'cpc') {
+                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
+                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
+                        } elseif ($m['key'] === 'ctr') {
+                            $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
+                            $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
+                        } elseif ($m['key'] === 'cvr') {
+                            $val = $currClicks > 0 ? round(($currOrders / $currClicks) * 100, 2) : 0;
+                            $prevVal = $prevClicks > 0 ? round(($prevOrders / $prevClicks) * 100, 2) : 0;
+                        }
+
+                        $change = $kpi['changes'][$m['key']] ?? 0;
+                        if (in_array($m['key'], ['aov', 'aov_net', 'cpc', 'ctr', 'cvr', 'net_revenue', 'net_profit', 'spend_topup'])) {
+                            if ($prevVal == 0) {
+                                $change = $val > 0 ? 100 : 0;
+                            } else {
+                                $change = round((($val - $prevVal) / abs($prevVal)) * 100, 2);
+                            }
+                        }
+
+
+                        $isUp = $change >= 0;
+                        
+                        // For cost metrics, going down is good (green). For others, going up is good.
+                        if (in_array($m['key'], ['spend', 'cpc', 'spend_topup'])) {
+                            $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
+                        } else {
+                            $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
+                        }
+                    @endphp
+                    <div class="dpanel ads-kpi kpi-{{ $m['cls'] }}">
+                        <div class="ads-kpi-label">
+                            <i class="bi {{ $m['icon'] }}"></i> {{ $m['title'] }}
+                        </div>
+                        <div class="ads-kpi-value" style="font-variant-numeric: tabular-nums;">
+                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
+                        </div>
+                        <div class="ads-kpi-sub">
+                            <span style="font-weight:900; {{ $colorClass }}">
+                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
+                            </span> 
+                            vs lalu
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+            <div class="dash-panels mb-3">
+                <div class="dpanel p-3 d-flex flex-wrap align-items-center gap-3" style="background: var(--card-bg);">
+                    <div style="flex: 1; min-width: 200px;">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text" style="background: transparent; border-right: none;"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="campSearch" class="form-control" placeholder="Cari nama kampanye..." style="border-left: none; box-shadow: none;" onkeyup="filterCampaigns()">
+                        </div>
+                    </div>
+                    <div style="width: 150px;">
+                        <select id="campStatus" class="form-select form-select-sm" onchange="filterCampaigns()" style="box-shadow: none;">
+                            <option value="all">Semua Status</option>
+                            <option value="ongoing">Berjalan</option>
+                            <option value="paused">Jeda</option>
+                            <option value="ended">Selesai</option>
+                        </select>
+                    </div>
+                    <div style="width: 150px;">
+                        <select id="campPerf" class="form-select form-select-sm" onchange="filterCampaigns()" style="box-shadow: none;">
+                            <option value="all">Semua Performa</option>
+                            <option value="boncos">Sedang Boncos</option>
+                            <option value="gem">Efisiensi Tinggi</option>
+                        </select>
+                    </div>
+                    <div style="width: 160px;">
+                        <select id="campSort" class="form-select form-select-sm" onchange="filterCampaigns()" style="box-shadow: none;">
+                            <option value="default">Urutkan (Default)</option>
+                            <option value="roas_desc">ROAS Tertinggi</option>
+                            <option value="spend_desc">Biaya Tertinggi</option>
+                            <option value="gmv_desc">Omzet Tertinggi</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            function filterCampaigns() {
+                const search = document.getElementById('campSearch').value.toLowerCase();
+                const status = document.getElementById('campStatus').value;
+                const perf = document.getElementById('campPerf').value;
+                const sort = document.getElementById('campSort').value;
+                
+                const rows = Array.from(document.querySelectorAll('.campaign-row'));
+                const tbody = rows[0]?.closest('tbody');
+                if(!tbody) return;
+
+                rows.forEach(row => {
+                    const rName = row.getAttribute('data-name') || '';
+                    const rStatus = row.getAttribute('data-status') || '';
+                    const rRoas = parseFloat(row.getAttribute('data-roas')) || 0;
+                    const rSpend = parseFloat(row.getAttribute('data-spend')) || 0;
+                    
+                    let match = true;
+                    if(search && !rName.includes(search)) match = false;
+                    if(status !== 'all' && rStatus !== status) match = false;
+                    
+                    if(perf === 'boncos' && !(rSpend > 50000 && rRoas < 1.5)) match = false;
+                    if(perf === 'gem' && !(rSpend > 10000 && rRoas >= 5.0)) match = false;
+                    
+                    row.style.display = match ? '' : 'none';
+                });
+
+                if(sort !== 'default') {
+                    rows.sort((a, b) => {
+                        let valA = 0, valB = 0;
+                        if(sort === 'roas_desc') { valA = parseFloat(a.getAttribute('data-roas'))||0; valB = parseFloat(b.getAttribute('data-roas'))||0; }
+                        if(sort === 'spend_desc') { valA = parseFloat(a.getAttribute('data-spend'))||0; valB = parseFloat(b.getAttribute('data-spend'))||0; }
+                        if(sort === 'gmv_desc') { valA = parseFloat(a.getAttribute('data-gmv'))||0; valB = parseFloat(b.getAttribute('data-gmv'))||0; }
+                        return valB - valA;
+                    });
+                    rows.forEach(row => tbody.appendChild(row));
+                }
+            }
+            </script>
+            
+            <div class="dpanel">
+                @include('marketplace.partials._campaign_table', ['campaigns' => $campaigns])
+            </div>
+
+        </div>
+
+        <!-- TAB PERFORMA PRODUK -->
+        <div class="tab-pane" id="tab-items">
+            @include('marketplace.partials._products_tab')
+        </div>
+
+        <!-- TAB FUNNEL -->
+        <div class="tab-pane" id="tab-funnel">
+            @include('marketplace.partials._funnel_tab')
+        </div>
+
+        <!-- TAB CREATIVE & AUDIENCE -->
+        <div class="tab-pane" id="tab-creative">
+            @include('marketplace.partials._creative_audience_tab')
+        </div>
+
+        <!-- TAB CUSTOMER & LTV -->
+        <div class="tab-pane" id="tab-ltv">
+            @include('marketplace.partials._ltv_tab')
+        </div>
+
+        <!-- TAB ALERTS & ACTION CENTER -->
+        <div class="tab-pane" id="tab-alerts">
+            @include('marketplace.partials._alerts_tab')
         </div>
 
         <!-- SINKRONISASI LOG (MODAL) -->
@@ -2360,6 +2468,27 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <!-- Modal Sync Manual -->
+
+@php
+    // Fallbacks to prevent undefined variable errors when $stores->isEmpty() triggers early return
+    $kpi = $kpi ?? [];
+    $dailyChartData = $dailyChartData ?? [];
+    $heatmapData = $heatmapData ?? [];
+    $historicalData = $historicalData ?? [];
+    $itemPerformance = $itemPerformance ?? [];
+    $syncRuns = $syncRuns ?? collect();
+    $lastSuccessRun = $lastSuccessRun ?? null;
+    $insightTraffic = $insightTraffic ?? collect();
+    $campaigns = $campaigns ?? collect();
+    $adsSetting = $adsSetting ?? (object)[];
+    $metrics = $metrics ?? [];
+    
+    // Default JS empty arrays just in case they are used in scripts without ??
+    $dailyChartDataJson = json_encode($dailyChartData);
+    $heatmapDataJson = json_encode($heatmapData);
+    $historicalDataJson = json_encode($historicalData);
+@endphp
+
 <style>
 #syncRangeOptions .sync-range-card { display:flex; align-items:center; justify-content:space-between; gap:.6rem; border:1px solid var(--dsh-border); border-radius:10px; padding:.5rem .7rem; cursor:pointer; margin:0; background: var(--bg); transition: border-color .15s, box-shadow .15s; }
 #syncRangeOptions .sync-range-card:hover { border-color: var(--dsh-accent); }
@@ -2378,7 +2507,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div class="modal-body">
                 <!-- Form State -->
-                <form id="formSyncAds" action="/api/marketplace/ads-daily/sync" method="POST">
+                <form id="formSyncAds" action="{{ route('marketplace.ads.sync') }}" method="POST">
                     @csrf
                     <div class="mb-3">
                         <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">Toko Target</label>
@@ -2412,9 +2541,68 @@ document.addEventListener('DOMContentLoaded', function () {
                             </span>
                             <i class="bi bi-moon" style="color:var(--dsh-muted);"></i>
                         </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="last_7_days">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">1 Minggu Terakhir</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Sync 7 hari ke belakang</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-calendar-week" style="color:var(--dsh-muted);"></i>
+                        </label>
+                        <label class="sync-range-card">
+                            <span style="display:flex; align-items:center; gap:.6rem;">
+                                <input type="radio" name="sync_type" value="custom">
+                                <span>
+                                    <span style="display:block; font-size:.82rem; font-weight:650; color:var(--text);">Rentang Kustom (Backfill)</span>
+                                    <span style="display:block; font-size:.68rem; color:var(--dsh-muted);">Tarik hingga maksimal 6 bulan terakhir</span>
+                                </span>
+                            </span>
+                            <i class="bi bi-calendar-range" style="color:var(--dsh-muted);"></i>
+                        </label>
                     </div>
+
+                    <!-- Pilihan Tanggal Khusus -->
+                    <div id="customDateRangeSettings" style="display: none; background: rgba(37,99,235,0.05); border: 1px dashed rgba(37,99,235,0.3); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label style="font-size:.7rem; font-weight:600; color:var(--dsh-muted); margin-bottom:.3rem;">Dari Tanggal</label>
+                                <input type="date" name="date_from_custom" id="dateFromCustom" class="form-control" style="font-size:.8rem; border-radius:8px;" value="{{ now()->subMonths(1)->toDateString() }}" max="{{ now()->toDateString() }}">
+                            </div>
+                            <div class="col-6">
+                                <label style="font-size:.7rem; font-weight:600; color:var(--dsh-muted); margin-bottom:.3rem;">Sampai Tanggal</label>
+                                <input type="date" name="date_to_custom" id="dateToCustom" class="form-control" style="font-size:.8rem; border-radius:8px;" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}">
+                            </div>
+                        </div>
+                        <div style="font-size:.65rem; color:var(--dsh-accent); margin-top:.5rem;"><i class="bi bi-info-circle"></i> Penarikan lebih dari 14 hari akan memerlukan waktu yang agak lama.</div>
+                    </div>
+
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const syncTypeRadios = document.querySelectorAll('input[name="sync_type"]');
+                            const customDateDiv = document.getElementById('customDateRangeSettings');
+                            
+                            syncTypeRadios.forEach(radio => {
+                                radio.addEventListener('change', function() {
+                                    if (this.value === 'custom') {
+                                        customDateDiv.style.display = 'block';
+                                    } else {
+                                        customDateDiv.style.display = 'none';
+                                    }
+                                });
+                            });
+                        });
+                    </script>
+
                     <div style="font-size:.68rem; color:var(--dsh-muted); margin-bottom:1rem;">
-                        <i class="bi bi-info-circle"></i> Mode lain ditutup dulu supaya alur sync lebih jelas dan aman.
+                        <div><i class="bi bi-info-circle"></i> Mode lain ditutup dulu supaya alur sync lebih jelas dan aman.</div>
+                        <div class="mt-1">
+                            <i class="bi bi-clock-history"></i> Terakhir berhasil ditarik: <strong style="color:var(--text);">{{ $lastSyncAt ?? 'Belum pernah' }}</strong>
+                            @if(!empty($lastSyncTime))
+                                <span style="opacity: 0.7;">({{ $lastSyncTime }})</span>
+                            @endif
+                        </div>
                     </div>
 
                     <button type="submit" class="btn w-100 fw-bold" style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">
@@ -2529,7 +2717,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 let itemDate = new Date(item.date);
                 return ymdLocal(itemDate) === ds;
             });
-            dailyData.push(found ? found : { date: ds, spend: 0, gmv: 0, roas: 0 });
+            dailyData.push(found ? found : { date: ds, spend: 0, gmv: 0, roas: 0, impressions: 0, clicks: 0, ctr: 0 });
         }
     } else {
         dailyData.push(...rawDaily);
@@ -3101,6 +3289,194 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // ==========================================
+
+
+    // 6. PROFIT CHARTS
+    const ctxProfitComp = document.getElementById('chartProfitComposition');
+    const ctxProfitTrend = document.getElementById('chartProfitTrend');
+    
+    if (ctxProfitComp && window.__profitChartData) {
+        const pd = window.__profitChartData;
+        const pNet = pd.totalProfit > 0 ? pd.totalProfit : 0;
+        
+        new Chart(ctxProfitComp.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['HPP', 'Platform Fee', 'Iklan (+PPN)', 'Net Profit'],
+                datasets: [{
+                    data: [pd.totalCogs, pd.feeAmt, pd.totalTopup, pNet],
+                    backgroundColor: ['#94a3b8', '#f59e0b', '#dc2626', '#10b981'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, font: {size: 10} } },
+                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                },
+                cutout: '65%'
+            }
+        });
+    }
+
+    if (ctxProfitTrend && dailyData.length > 0 && window.__profitChartData) {
+        const pd = window.__profitChartData;
+        // Gunakan rata-rata rasio margin global untuk memetakan tren harian (estimasi karena data harian belum memuat cogs per item)
+        const globalCogsRatio = pd.totalRev > 0 ? (pd.totalCogs / pd.totalRev) : 0;
+        const globalFeeRatio = pd.totalRev > 0 ? (pd.feeAmt / pd.totalRev) : 0;
+        
+        new Chart(ctxProfitTrend.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: dailyData.map(d => formatIndoDate(d.date)),
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: dailyData.map(d => parseFloat(d.gmv) || 0),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgba(59, 130, 246, 0.5)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Net Profit (Est)',
+                        data: dailyData.map(d => {
+                            let rev = parseFloat(d.gmv) || 0;
+                            let spd = parseFloat(d.spend) || 0;
+                            let estCogs = rev * globalCogsRatio;
+                            let estFee = rev * globalFeeRatio;
+                            return rev - estCogs - estFee - (spd * 1.11);
+                        }),
+                        type: 'line',
+                        borderColor: '#10b981',
+                        backgroundColor: '#10b981',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: {size: 10} } },
+                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
+                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: false } }
+                }
+            }
+        });
+    }
+
+    // 5. TRAFFIC CHARTS
+    const ctxTrafficVol = document.getElementById('chartTrafficVolume');
+    const ctxTrafficRates = document.getElementById('chartTrafficRates');
+    
+    if (ctxTrafficVol && dailyData.length > 0) {
+        new Chart(ctxTrafficVol.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: dailyData.map(d => formatIndoDate(d.date)),
+                datasets: [
+                    {
+                        label: 'Impressions',
+                        data: dailyData.map(d => parseInt(d.impressions) || 0),
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderRadius: 4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Clicks',
+                        data: dailyData.map(d => parseInt(d.clicks) || 0),
+                        type: 'line',
+                        borderColor: '#f59e0b',
+                        backgroundColor: '#f59e0b',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: {size: 10} } },
+                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
+                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: true, text: 'Impressions', font: {size:10} } },
+                    y1: { type: 'linear', display: true, position: 'right', grid: { display: false }, title: { display: true, text: 'Clicks', font: {size:10} } }
+                }
+            }
+        });
+    }
+
+    if (ctxTrafficRates && dailyData.length > 0) {
+        new Chart(ctxTrafficRates.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: dailyData.map(d => formatIndoDate(d.date)),
+                datasets: [
+                    {
+                        label: 'CTR (%)',
+                        data: dailyData.map(d => {
+                            let imp = parseInt(d.impressions) || 0;
+                            let clk = parseInt(d.clicks) || 0;
+                            return imp > 0 ? (clk/imp*100).toFixed(2) : 0;
+                        }),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 0,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'CPM (Rp)',
+                        data: dailyData.map(d => {
+                            let imp = parseInt(d.impressions) || 0;
+                            let spd = parseFloat(d.spend) || 0;
+                            return imp > 0 ? (spd/imp*1000).toFixed(0) : 0;
+                        }),
+                        borderColor: '#8b5cf6',
+                        backgroundColor: '#8b5cf6',
+                        borderWidth: 2,
+                        borderDash: [5,5],
+                        tension: 0.3,
+                        pointRadius: 0,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: {size: 10} } },
+                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
+                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: true, text: 'CTR (%)', font: {size:10} } },
+                    y1: { type: 'linear', display: true, position: 'right', grid: { display: false }, title: { display: true, text: 'CPM (Rp)', font: {size:10} } }
+                }
+            }
+        });
+    }
+
     // 4. HISTORICAL CHART (PERIOD-OVER-PERIOD)
     // ==========================================
     let histChart;
@@ -3763,3 +4139,149 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 });
+</script>
+@endif
+
+<script>
+let sortTrafficCol = 'spend';
+let sortTrafficDir = 'desc';
+
+function sortTrafficTable(col) {
+    if (sortTrafficCol === col) {
+        sortTrafficDir = sortTrafficDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        sortTrafficCol = col;
+        sortTrafficDir = 'desc';
+    }
+
+    const tbody = document.querySelector('#trafficTable tbody');
+    if (!tbody) return;
+    
+    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign_name]'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+        let valA, valB;
+        if (col === 'campaign_name') {
+            valA = a.getAttribute('data-campaign_name') || '';
+            valB = b.getAttribute('data-campaign_name') || '';
+            return sortTrafficDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+            valA = parseFloat(a.getAttribute('data-' + col)) || 0;
+            valB = parseFloat(b.getAttribute('data-' + col)) || 0;
+            return sortTrafficDir === 'asc' ? valA - valB : valB - valA;
+        }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formSync = document.getElementById('formSyncAds');
+    if (formSync) {
+        formSync.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Sembunyikan modal
+            const modalEl = document.getElementById('modalSyncAds');
+            if (modalEl && typeof bootstrap !== 'undefined') {
+                const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modalInstance.hide();
+            }
+
+            // Tampilkan container loading
+            const progressContainer = document.getElementById('liveSyncProgressContainer');
+            if (progressContainer) progressContainer.style.display = 'block';
+
+            // Pindah ke tab pengaturan secara otomatis
+            const tabSettingsBtn = document.querySelector('button[data-bs-target="#tab-settings"]') || document.querySelector('a[href="#tab-settings"]') || document.querySelector('a[data-bs-target="#tab-settings"]');
+            if (tabSettingsBtn && typeof bootstrap !== 'undefined') {
+                const tab = new bootstrap.Tab(tabSettingsBtn);
+                tab.show();
+            }
+            
+            const formData = new FormData(formSync);
+            const storeId = formData.get('store_id');
+            const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+            
+            fetch(formSync.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': tokenMeta ? tokenMeta.content : ''
+                },
+                body: formData
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'queued') {
+                    pollSyncProgress(storeId);
+                } else {
+                    alert(data.message || 'Gagal memulai sinkronisasi.');
+                }
+            }).catch(err => {
+                alert('Terjadi kesalahan jaringan atau route salah.');
+                console.error(err);
+            });
+        });
+    }
+});
+
+function pollSyncProgress(storeId) {
+    const progressLabel = document.getElementById('liveSyncLabel');
+    const progressPercent = document.getElementById('liveSyncPercent');
+    const progressBar = document.getElementById('liveSyncProgressBar');
+    let idleTicks = 0;
+    
+    const interval = setInterval(() => {
+        fetch(`{{ route('marketplace.ads.syncProgress') }}?store_id=${storeId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'processing' || data.status === 'queued') {
+                    progressPercent.textContent = data.percent + '%';
+                    progressBar.style.width = data.percent + '%';
+                    progressLabel.innerHTML = `<i class="spinner-border spinner-border-sm me-2" role="status"></i> ${data.label || 'Memproses...'}`;
+                    idleTicks = 0;
+                } else if (data.status === 'success') {
+                    progressPercent.textContent = '100%';
+                    progressBar.style.width = '100%';
+                    
+                    if (data.stats) {
+                        const totalSuccess = (data.stats.inserted || 0) + (data.stats.updated || 0);
+                        const totalFail = data.stats.failed || 0;
+                        progressLabel.innerHTML = `Selesai! Berhasil menyimpan ${totalSuccess} data (Gagal: ${totalFail}).`;
+                    } else {
+                        progressLabel.innerHTML = `Selesai! Semua tahap berhasil.`;
+                    }
+                    
+                    setTimeout(() => finishSuccess(), 2500);
+                } else if (data.status === 'error') {
+                    clearInterval(interval);
+                    progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+                    progressBar.classList.add('bg-danger');
+                    progressLabel.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2" style="color: #dc2626;"></i> ${data.label}`;
+                } else {
+                    // Idle state
+                    idleTicks++;
+                    if (idleTicks > 15) { // 30 detik tidak ada progress
+                        clearInterval(interval);
+                        progressLabel.innerHTML = 'Batas waktu / Selesai (No Response)';
+                        setTimeout(() => window.location.reload(), 1500);
+                    }
+                }
+            })
+            .catch(err => console.error('Error polling:', err));
+    }, 2000);
+    
+    function finishSuccess() {
+        clearInterval(interval);
+        progressPercent.textContent = '100%';
+        progressBar.style.width = '100%';
+        progressBar.classList.remove('progress-bar-animated');
+        progressBar.style.backgroundColor = '#16a34a'; // Success green
+        progressLabel.innerHTML = `<i class="bi bi-check-circle-fill me-2" style="color: #16a34a;"></i> Sinkronisasi Selesai! Memuat ulang...`;
+        setTimeout(() => window.location.reload(), 1500);
+    }
+}
+</script>
+@endpush

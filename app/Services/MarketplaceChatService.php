@@ -7,12 +7,13 @@ use App\Models\MarketplaceChatMessage;
 use App\Models\MarketplaceConversation;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
 
 class MarketplaceChatService
 {
-    public function __construct(protected ChannelManager $manager) {}
+    public function __construct(protected MarketplaceApiGateway $gateway) {}
 
     /**
      * Tarik daftar percakapan dari Shopee dan upsert ke DB lokal.
@@ -27,7 +28,7 @@ class MarketplaceChatService
             return 0;
         }
 
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $synced = 0;
         $cursor = '';
 
@@ -72,7 +73,7 @@ class MarketplaceChatService
     ): int
     {
         $store  = $conversation->store;
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $new = 0;
 
         $offset = '';
@@ -228,7 +229,7 @@ class MarketplaceChatService
             }
         }
 
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $toId   = $toId ?: $conversation?->buyer_user_id;
 
         if (! $toId) {

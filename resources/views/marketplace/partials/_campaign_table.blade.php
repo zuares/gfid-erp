@@ -38,16 +38,16 @@
     <table class="dpanel-table dpanel-table-sm table-hover" style="white-space: nowrap;">
         <thead>
             <tr>
-                <th>Kampanye</th>
-                <th class="text-end" title="Total tayangan iklan">Impresi</th>
-                <th class="text-end" title="Total klik iklan">Klik</th>
-                <th class="text-end" title="Biaya Iklan">Pengeluaran</th>
-                <th class="text-end" title="Pesanan Broad">Pesanan (B)</th>
-                <th class="text-end" title="Pendapatan Broad">GMV (B)</th>
-                <th class="text-end" title="Pesanan Direct">Pesanan (D)</th>
-                <th class="text-end" title="Pendapatan Direct">GMV (D)</th>
-                <th class="text-end" title="Biaya per klik">CPC</th>
-                <th class="text-end" title="Return on Ad Spend">ROAS</th>
+                <th style="cursor:pointer;" onclick="sortCampaignTable('name', this)">Kampanye <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Total tayangan iklan" onclick="sortCampaignTable('impressions', this)">Impresi <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Total klik iklan" onclick="sortCampaignTable('clicks', this)">Klik <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Biaya Iklan" onclick="sortCampaignTable('spend', this)">Pengeluaran <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Pesanan Broad" onclick="sortCampaignTable('orders_b', this)">Pesanan (B) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Pendapatan Broad" onclick="sortCampaignTable('gmv_b', this)">GMV (B) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Pesanan Direct" onclick="sortCampaignTable('orders_d', this)">Pesanan (D) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Pendapatan Direct" onclick="sortCampaignTable('gmv_d', this)">GMV (D) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Biaya per klik" onclick="sortCampaignTable('cpc', this)">CPC <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Return on Ad Spend" onclick="sortCampaignTable('roas', this)">ROAS <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
             </tr>
         </thead>
         <tbody>
@@ -65,7 +65,20 @@
                     $dg_growth = $camp->sum_prev_direct_gmv > 0 ? (($camp->sum_direct_gmv - $camp->sum_prev_direct_gmv) / $camp->sum_prev_direct_gmv) * 100 : ($camp->sum_direct_gmv > 0 ? 100 : 0);
                     $roas_growth = $camp->prev_roas > 0 ? (($camp->roas - $camp->prev_roas) / $camp->prev_roas) * 100 : ($camp->roas > 0 ? 100 : 0);
                 @endphp
-                <tr style="border-bottom: 1px solid var(--dsh-border);">
+                <tr class="campaign-row" 
+                    data-name="{{ strtolower($camp->campaign_name ?: '') }}" 
+                    data-status="{{ strtolower($camp->campaign_status) }}"
+                    data-impressions="{{ $camp->sum_impressions }}"
+                    data-clicks="{{ $camp->sum_clicks }}"
+                    data-spend="{{ $camp->sum_expense }}"
+                    data-orders_b="{{ $camp->sum_broad_orders }}"
+                    data-gmv_b="{{ $camp->sum_broad_gmv }}"
+                    data-orders_d="{{ $camp->sum_direct_orders }}"
+                    data-gmv_d="{{ $camp->sum_direct_gmv }}"
+                    data-cpc="{{ $cpc }}"
+                    data-roas="{{ $camp->roas }}"
+                    data-gmv="{{ $camp->sum_broad_gmv + $camp->sum_direct_gmv }}"
+                    style="border-bottom: 1px solid var(--dsh-border);">
                     <td style="padding: 0.75rem 0.5rem; max-width: 250px;">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             @if($camp->campaign_status === 'ongoing')
@@ -220,3 +233,58 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    let currentSortCol = null;
+    let currentSortDir = 'desc';
+
+    function sortCampaignTable(col, thElement) {
+        if(currentSortCol === col) {
+            currentSortDir = currentSortDir === 'desc' ? 'asc' : 'desc';
+        } else {
+            currentSortCol = col;
+            currentSortDir = col === 'name' ? 'asc' : 'desc';
+        }
+
+        const allTh = thElement.parentNode.querySelectorAll('th');
+        allTh.forEach(th => {
+            const icon = th.querySelector('i');
+            if(icon) {
+                icon.className = 'bi bi-arrow-down-up ms-1';
+                icon.style.opacity = '0.3';
+            }
+        });
+
+        const activeIcon = thElement.querySelector('i');
+        if(activeIcon) {
+            if(col === 'name') {
+                activeIcon.className = currentSortDir === 'asc' ? 'bi bi-sort-alpha-down ms-1 text-primary' : 'bi bi-sort-alpha-up-alt ms-1 text-primary';
+            } else {
+                activeIcon.className = currentSortDir === 'desc' ? 'bi bi-sort-down ms-1 text-primary' : 'bi bi-sort-up-alt ms-1 text-primary';
+            }
+            activeIcon.style.opacity = '1';
+        }
+
+        const tbody = thElement.closest('table').querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('.campaign-row'));
+
+        rows.sort((a, b) => {
+            let valA = a.getAttribute('data-' + col);
+            let valB = b.getAttribute('data-' + col);
+            
+            if(col === 'name') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+                if(valA < valB) return currentSortDir === 'asc' ? -1 : 1;
+                if(valA > valB) return currentSortDir === 'asc' ? 1 : -1;
+                return 0;
+            } else {
+                valA = parseFloat(valA) || 0;
+                valB = parseFloat(valB) || 0;
+                return currentSortDir === 'desc' ? valB - valA : valA - valB;
+            }
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+    }
+</script>

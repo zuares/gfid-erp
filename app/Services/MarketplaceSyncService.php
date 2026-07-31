@@ -13,6 +13,7 @@ use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
 use App\Models\SkuMapping;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Log;
 class MarketplaceSyncService
 {
     public function __construct(
-        protected ChannelManager $manager,
+        protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
         protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
     ) {}
@@ -104,7 +105,7 @@ class MarketplaceSyncService
         };
         $report(3, 'Menyiapkan sinkronisasi…');
 
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         $orderSnList = [];
         
@@ -258,7 +259,7 @@ class MarketplaceSyncService
     {
         if ($store->connection_status === 'TOKEN_EXPIRED') {
             try {
-                $driver = $this->manager->driver($store);
+                $driver = $this->gateway;
                 if (method_exists($driver, 'refreshToken')) {
                     $driver->refreshToken($store);
                     $store->refresh();
@@ -365,7 +366,7 @@ class MarketplaceSyncService
 
         // order_sn belum tercatat → ambil dari get_booking_detail (muncul saat MATCHED).
         if (blank($booking->order_sn)) {
-            $driver = $this->manager->driver($store);
+            $driver = $this->gateway;
             if (method_exists($driver, 'getBookingDetail')) {
                 $det  = $driver->getBookingDetail($store, $bookingSn);
                 $list = data_get($det, 'response.booking_list') ?? data_get($det, 'response.order_list', []);
@@ -414,7 +415,7 @@ class MarketplaceSyncService
             return ['found' => 0, 'new' => 0, 'updated' => 0];
         }
 
-        $driver  = $this->manager->driver($store);
+        $driver  = $this->gateway;
         $details = [];
         foreach (array_chunk($orderSnList, 50) as $chunk) {
             try {
@@ -505,7 +506,7 @@ class MarketplaceSyncService
         bool $waitForRateLimit = false,
         ?callable $progress = null,
     ): array {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         $query = MarketplaceOrder::where('store_id', $store->id)
             ->where('id', '>', $afterId)
@@ -970,7 +971,7 @@ class MarketplaceSyncService
      * @return array{payload:array, meta:array{attempts:int, http_status:mixed, retry_after:mixed, token_refreshed:null, duration_ms:float}}
      */
     private function getEscrowDetailWithRetry(
-        MarketplaceChannel $driver,
+        MarketplaceApiGateway $driver,
         Store $store,
         string $orderSn,
         bool $waitForRateLimit = false,
@@ -1393,7 +1394,7 @@ class MarketplaceSyncService
      */
     public function syncAdCampaigns(Store $store, string $dateFrom, string $dateTo): array
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $synced = $skipped = $errors = 0;
 
         // Shopee Ads API pakai format tanggal DD-MM-YYYY

@@ -3,14 +3,7 @@
     Versi ringkas: hanya ada sync hari ini dan kemarin.
 --}}
 <div class="ads-tab-panel mb-3">
-    <div class="ads-tab-panel-head">
-        <div>
-            <div class="ads-tab-panel-title">
-                <i class="bi bi-arrow-repeat" style="color: var(--dsh-accent);"></i> Sinkronisasi
-            </div>
-            <div class="ads-tab-panel-note">Hanya dua mode: hari ini dan kemarin.</div>
-        </div>
-    </div>
+
     <div class="p-3">
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <button type="button" class="btn fw-bold" onclick="window.__syncQuick('today', this)"

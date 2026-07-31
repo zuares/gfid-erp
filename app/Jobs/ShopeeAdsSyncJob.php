@@ -78,10 +78,32 @@ class ShopeeAdsSyncJob implements ShouldQueue
             ]);
         }
 
-        // Helper: simpan counter setelah setiap step agar tidak hilang kalau crash
-        $saveProgress = function () use ($run) {
-            $run->save();
+        // Helper: simpan counter database dan perbarui cache progress UI
+        $updateUIProgress = function ($percent, $label) use ($run) {
+            $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+            
+            $totalJobs = $payload['total_jobs'] ?? 1;
+            $completedJobs = $payload['completed_jobs'] ?? 0;
+            
+            // Kalkulasi persentase absolut (seluruh rangkaian job backfill)
+            $jobWeight = 100 / max(1, $totalJobs);
+            $absolutePercent = ($completedJobs * $jobWeight) + ($percent * $jobWeight / 100);
+            
+            $newPayload = array_merge($payload, [
+                'status'     => 'processing',
+                'percent'    => min(100, round($absolutePercent)),
+                'label'      => "{$label} (Toko: {$this->store->name})" . ($totalJobs > 1 ? " [Tahap " . ($completedJobs + 1) . "/{$totalJobs}]" : ""),
+                'store_id'   => $this->store->id,
+                'store_name' => $this->store->name,
+                'mode'       => $this->isHourly ? 'hourly' : 'daily',
+                'updated_at' => now()->toISOString(),
+            ]);
+            
+            \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:' . $this->store->id, $newPayload, 1800);
+            \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:all', $newPayload, 1800);
         };
+        
+        $updateUIProgress(5, "Memulai koneksi");
 
         try {
             // Hormati cooldown rate-limit toko: jangan buang percobaan selagi
@@ -101,11 +123,11 @@ class ShopeeAdsSyncJob implements ShouldQueue
             if (! $this->isHourly && ! $this->skipMeta) {
                 // 1. Sync Balance
                 $syncService->syncBalance($this->store, $run);
-                $saveProgress();
+                $updateUIProgress(15, "Menyinkronkan Saldo");
 
                 // 2. Sync Campaigns and Settings
                 $syncService->syncCampaignsAndSettings($this->store, $run);
-                $saveProgress();
+                $updateUIProgress(30, "Menyinkronkan Kampanye");
             }
 
             // SAT-SET: chunk historis murni yang datanya sudah LENGKAP tidak
@@ -124,29 +146,55 @@ class ShopeeAdsSyncJob implements ShouldQueue
             if ($this->isHourly) {
                 // Hourly hanya menerima 1 hari, jadi loop per hari
                 $start = clone $this->dateFrom;
+                $totalDays = $start->diffInDays($this->dateTo) + 1;
+                $currentDay = 1;
                 while ($start->lte($this->dateTo)) {
                     $syncService->syncShopHourlyPerformance($this->store, $start->toDateString(), $run);
-                    $saveProgress();
+                    $pct = min(99, 10 + round(($currentDay / $totalDays) * 85));
+                    $updateUIProgress($pct, "Menyinkronkan Performa Per Jam (" . $start->format('d/m') . ")");
                     $start->addDay();
+                    $currentDay++;
                 }
             } else {
                 // 3. Sync Shop Daily
                 $syncService->syncShopDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
-                $saveProgress();
+                $updateUIProgress(50, "Menyinkronkan Performa Harian");
                 
                 // 4. Sync Campaign Daily (CPC)
                 $syncService->syncCampaignDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
-                $saveProgress();
+                $updateUIProgress(80, "Menyinkronkan Performa Iklan CPC");
 
                 // 5. Sync GMS Campaign & Item Daily
                 $syncService->syncGmsDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
-                $saveProgress();
+                $updateUIProgress(95, "Menyinkronkan Performa Iklan Otomatis (GMS)");
             }
 
+            $updateUIProgress(100, "Menyimpan data");
+            
             $run->update([
                 'status' => 'success',
                 'finished_at' => now(),
             ]);
+            
+            $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+            $payload['completed_jobs'] = ($payload['completed_jobs'] ?? 0) + 1;
+            
+            $payload['stats'] = [
+                'inserted' => ($payload['stats']['inserted'] ?? 0) + ($run->total_inserted ?? 0),
+                'updated'  => ($payload['stats']['updated'] ?? 0) + ($run->total_updated ?? 0),
+                'failed'   => ($payload['stats']['failed'] ?? 0) + ($run->total_failed ?? 0),
+            ];
+            
+            if ($payload['completed_jobs'] >= ($payload['total_jobs'] ?? 1)) {
+                $payload['percent'] = 100;
+                $payload['status'] = 'success';
+                $payload['label'] = 'Semua tahap selesai!';
+            } else {
+                $payload['status'] = 'processing';
+                $payload['label'] = 'Tahap selesai, melanjutkan tahap berikutnya...';
+            }
+            \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:' . $this->store->id, $payload, 1800);
+            \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:all', $payload, 1800);
 
         } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
             $run->update([
@@ -154,6 +202,12 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 'error_message' => $e->getMessage(),
                 'finished_at' => null, // Not final
             ]);
+            
+            $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+            $payload['status'] = 'processing'; // Keep it processing so it doesn't fail
+            $payload['label'] = 'Rate Limit: Menunggu ' . $e->retryAfter . ' detik...';
+            \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:' . $this->store->id, $payload, 1800);
+            \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:all', $payload, 1800);
 
             // release() hanya bekerja dalam konteks queue worker.
             // Saat dispatchSync() (tanpa queue), gunakan sleep + retry manual.
@@ -168,6 +222,13 @@ class ShopeeAdsSyncJob implements ShouldQueue
             }
             return;
         } catch (\Throwable $e) {
+            if (isset($updateUIProgress)) {
+                $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+                $payload['status'] = 'error';
+                $payload['label'] = 'Gagal: ' . substr($e->getMessage(), 0, 50);
+                \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:' . $this->store->id, $payload, 1800);
+                \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:all', $payload, 1800);
+            }
             $run->update([
                 'status' => 'error',
                 'error_message' => substr($e->getMessage(), 0, 1000),

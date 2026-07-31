@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceLogisticsService;
+
 use Illuminate\Http\Request;
 use App\Models\Store;
 use App\Models\MarketplaceBooking;
 use App\Services\Channels\ChannelManager;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Modul "Pesanan Kilat" (booking / fulfillment gudang Shopee).
@@ -121,7 +125,7 @@ class MarketplaceBookingController extends Controller
     public function detail(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->manager->driver($store);
+            $driver  = $this->gateway;
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
@@ -181,7 +185,7 @@ class MarketplaceBookingController extends Controller
     public function tracking(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->manager->driver($store);
+            $driver  = $this->gateway;
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
             $orderSn = ($booking && $booking->order_sn) ? $booking->order_sn : null;
@@ -253,8 +257,7 @@ class MarketplaceBookingController extends Controller
             if (! $store->is_active) {
                 return response()->json(['error' => true, 'message' => 'Toko nonaktif — hubungkan ulang untuk memakai fitur ini.'], 422);
             }
-            $driver = $this->manager->driver($store);
-            if (! method_exists($driver, 'getBookingShippingParameter')) {
+                        if (! method_exists($driver, 'getBookingShippingParameter')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
             $res = $driver->getBookingShippingParameter($store, $bookingSn);
@@ -279,8 +282,29 @@ class MarketplaceBookingController extends Controller
     public function ship(Store $store, string $bookingSn, Request $request)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (! method_exists($driver, 'shipBooking')) {
+            // Concurrency guard: cegah double-click / rapid retry memicu API ganda
+            $lockKey = "shipBooking:{$store->id}:{$bookingSn}";
+            $lock = Cache::lock($lockKey, 30);
+            if (! $lock->get()) {
+                return response()->json(['error' => 'Proses pengiriman sedang berjalan, tunggu sebentar.'], 429);
+            }
+
+            try {
+                // Early return jika booking sudah PROCESSED
+                $existingBooking = MarketplaceBooking::where('store_id', $store->id)
+                    ->where('booking_sn', $bookingSn)
+                    ->first();
+                if ($existingBooking && $existingBooking->booking_status === 'PROCESSED') {
+                    $lock->release();
+                    return response()->json([
+                        'success'         => true,
+                        'message'         => 'Pengiriman kilat sudah diatur sebelumnya.',
+                        'tracking_number' => $existingBooking->tracking_number,
+                        'order_sn'        => $existingBooking->order_sn,
+                    ]);
+                }
+
+                        if (! method_exists($driver, 'shipBooking')) {
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 
@@ -353,6 +377,10 @@ class MarketplaceBookingController extends Controller
                 'tracking_number' => $tracking,
                 'order_sn'        => $orderSn,
             ]);
+
+            } finally {
+                $lock->release();
+            }
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -425,7 +453,7 @@ class MarketplaceBookingController extends Controller
     public function printDocument(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->manager->driver($store);
+            $driver  = $this->gateway;
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
@@ -607,8 +635,7 @@ class MarketplaceBookingController extends Controller
                 $store = Store::find($storeId);
                 if (!$store) continue;
 
-                $driver = $this->manager->driver($store);
-                if (!method_exists($driver, 'createBookingShippingDocument')) continue;
+                                if (!method_exists($driver, 'createBookingShippingDocument')) continue;
 
                 foreach ($storeBookings as $item) {
                     $bookingSn = $item['booking_sn'];

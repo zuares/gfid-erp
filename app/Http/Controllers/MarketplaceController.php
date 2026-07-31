@@ -19,6 +19,7 @@ use App\Models\OrderFulfillment;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\Warehouse;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use App\Support\GmvMaxAnalytics;
 use App\Services\MarketplaceIssueService;
@@ -37,7 +38,7 @@ class MarketplaceController extends Controller
 {
     public function __construct(
         protected MarketplaceSyncService $sync,
-        protected ChannelManager $manager,
+        protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
         protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
     ) {}
@@ -839,7 +840,7 @@ class MarketplaceController extends Controller
     public function shopInfo(Store $store): JsonResponse
     {
         return response()->json(
-            $this->manager->driver($store)->getShopInfo($store)
+            $this->gateway->getShopInfo($store)
         );
     }
 
@@ -870,13 +871,12 @@ class MarketplaceController extends Controller
         $updateTimeTo = $data['update_time_to'] ?? null;
 
         try {
-            $driver = $this->manager->driver($store);
-            $responses = [];
+                        $responses = [];
             $promotions = [];
             $statuses = $status === 'all' ? ['ongoing', 'upcoming', 'ended'] : [$status];
 
             foreach ($statuses as $statusItem) {
-                $response = $driver->getDiscountList(
+                $response = $this->gateway->getDiscountList(
                     $store,
                     $statusItem,
                     $pageNo,
@@ -974,11 +974,10 @@ class MarketplaceController extends Controller
 
         try {
             foreach ($stores as $store) {
-                $driver = $this->manager->driver($store);
-                $storeRows = [];
+                                $storeRows = [];
 
                 foreach ($statuses as $statusItem) {
-                    $response = $driver->getDiscountList($store, $statusItem, 1, 100, null, null);
+                    $response = $this->gateway->getDiscountList($store, $statusItem, 1, 100, null, null);
 
                     if (! empty($response['error'])) {
                         $message = $this->promotionAuthErrorMessage($response, 'Gagal memuat ringkasan promosi.');
@@ -1079,7 +1078,7 @@ class MarketplaceController extends Controller
                 }
             }
 
-            $response = $this->manager->driver($store)->getDiscount($store, $discountId, $pageNo, $pageSize);
+            $response = $this->gateway->getDiscount($store, $discountId, $pageNo, $pageSize);
 
             if (! empty($response['error'])) {
                 return response()->json([
@@ -1126,8 +1125,7 @@ class MarketplaceController extends Controller
         $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
 
         try {
-            $driver = $this->manager->driver($store);
-            $createResponse = $driver->addDiscount(
+                        $createResponse = $this->gateway->addDiscount(
                 $store,
                 $data['discount_name'],
                 (int) $data['start_time'],
@@ -1148,7 +1146,7 @@ class MarketplaceController extends Controller
             $recordStatus = $this->inferPromotionStatus((int) $data['start_time'], (int) $data['end_time']);
 
             if ($discountId && ! empty($itemList)) {
-                $itemsResponse = $driver->addDiscountItem($store, $discountId, $itemList);
+                $itemsResponse = $this->gateway->addDiscountItem($store, $discountId, $itemList);
             }
 
             $this->persistPromotionRecord($store, $discountId, [
@@ -1244,12 +1242,11 @@ class MarketplaceController extends Controller
         }
 
         try {
-            $driver = $this->manager->driver($store);
-            $updateResponse = null;
+                        $updateResponse = null;
             $itemsResponse = null;
 
             if ($shouldUpdateMeta) {
-                $updateResponse = $driver->updateDiscount(
+                $updateResponse = $this->gateway->updateDiscount(
                     $store,
                     $discountId,
                     $data['discount_name'] ?? null,
@@ -1268,7 +1265,7 @@ class MarketplaceController extends Controller
             }
 
             if (! empty($itemList)) {
-                $itemsResponse = $driver->updateDiscountItem($store, $discountId, $itemList);
+                $itemsResponse = $this->gateway->updateDiscountItem($store, $discountId, $itemList);
 
                 if (! empty($itemsResponse['error'])) {
                     $this->persistPromotionRecord($store, $discountId, [
@@ -1354,7 +1351,7 @@ class MarketplaceController extends Controller
     {
         $store = $this->resolvePromotionStoreBinding($store);
         try {
-            $response = $this->manager->driver($store)->endDiscount($store, $discountId);
+            $response = $this->gateway->endDiscount($store, $discountId);
 
             if (! empty($response['error'])) {
                 return response()->json([
@@ -1401,7 +1398,7 @@ class MarketplaceController extends Controller
         ]);
 
         try {
-            $response = $this->manager->driver($store)->updateDiscount(
+            $response = $this->gateway->updateDiscount(
                 $store,
                 $discountId,
                 null,
@@ -1467,9 +1464,9 @@ class MarketplaceController extends Controller
 
         try {
             if ($data['current_status'] === 'ongoing') {
-                $response = $this->manager->driver($store)->endDiscount($store, $discountId);
+                $response = $this->gateway->endDiscount($store, $discountId);
             } else {
-                $response = $this->manager->driver($store)->deleteDiscount($store, $discountId);
+                $response = $this->gateway->deleteDiscount($store, $discountId);
             }
 
             if (! empty($response['error'])) {
@@ -1528,7 +1525,7 @@ class MarketplaceController extends Controller
     {
         $store = $this->resolvePromotionStoreBinding($store);
         try {
-            $response = $this->manager->driver($store)->deleteDiscount($store, $discountId);
+            $response = $this->gateway->deleteDiscount($store, $discountId);
 
             if (! empty($response['error'])) {
                 return response()->json([
@@ -1583,7 +1580,7 @@ class MarketplaceController extends Controller
         ]);
 
         try {
-            $response = $this->manager->driver($store)->deleteDiscountItem(
+            $response = $this->gateway->deleteDiscountItem(
                 $store,
                 $discountId,
                 (int) $data['item_id'],
@@ -2429,7 +2426,7 @@ class MarketplaceController extends Controller
             try {
                 if ($store->channel->code === 'shopee') {
                     /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
-                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                    $shopee = app(\App\Services\Marketplace\MarketplaceApiGateway::class);
                     $shopee->refreshToken($store);
                     $store->refresh();
                     $status = $store->connection_status;
@@ -3060,7 +3057,7 @@ class MarketplaceController extends Controller
             try {
                 if ($channelCode === 'shopee') {
                     /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
-                    $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+                    $shopee = app(\App\Services\Marketplace\MarketplaceApiGateway::class);
                     $shopee->refreshToken($store);
                     $store->refresh();
                     $store->loadMissing('channel');
@@ -4510,7 +4507,7 @@ class MarketplaceController extends Controller
      */
     public function adsBalance(Store $store): JsonResponse
     {
-        $res = $this->manager->driver($store)->getAdsTotalBalance($store);
+        $res = $this->gateway->getAdsTotalBalance($store);
 
         if (! empty($res['error'])) {
             return response()->json(['message' => $res['message'] ?? $res['error']], 422);
@@ -4533,7 +4530,7 @@ class MarketplaceController extends Controller
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
         $dateTo   = $request->input('date_to',   now()->toDateString());
 
-        $res = $this->manager->driver($store)->getAdsShopDailyPerformance(
+        $res = $this->gateway->getAdsShopDailyPerformance(
             $store,
             \Carbon\Carbon::parse($dateFrom)->format('d-m-Y'),
             \Carbon\Carbon::parse($dateTo)->format('d-m-Y'),
@@ -4574,7 +4571,7 @@ class MarketplaceController extends Controller
         $total = 0;
         foreach ($stores as $store) {
             try {
-                $res = $this->manager->driver($store)->getAdsTotalBalance($store);
+                $res = $this->gateway->getAdsTotalBalance($store);
                 $bal = data_get($res, 'response.total_balance') ?? data_get($res, 'response.balance');
                 if ($bal !== null) {
                     $total += (float) $bal;
@@ -4677,8 +4674,7 @@ class MarketplaceController extends Controller
                 $sendEvent('log', "Mempersiapkan koneksi toko {$store->name}...", $baseProgress + 2);
 
                 try {
-                    $driver = $this->manager->driver($store);
-                } catch (\Throwable $e) {
+                                    } catch (\Throwable $e) {
                     $errors[] = "[{$store->name}] " . $e->getMessage();
                     $sendEvent('log', "Gagal menghubungi {$store->name}: " . $e->getMessage(), $baseProgress + 5);
                     continue;
@@ -4727,7 +4723,7 @@ class MarketplaceController extends Controller
                 // 1. Snapshot saldo
                 $sendEvent('log', "[{$store->name}] Sinkronisasi saldo iklan...", $baseProgress + 5);
                 try {
-                    $bal = data_get($driver->getAdsTotalBalance($store), 'response.total_balance');
+                    $bal = data_get($this->gateway->getAdsTotalBalance($store), 'response.total_balance');
                     if ($bal !== null) {
                         \App\Models\MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => $bal]);
                         $sendEvent('log', "[{$store->name}] Saldo berhasil disimpan.", $baseProgress + 10);
@@ -4777,15 +4773,9 @@ class MarketplaceController extends Controller
 
                     try {
                         $syncService->syncShopDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa harian toko tersimpan.", $baseProgress + 22);
+                        $sendEvent('log', "[{$store->name}] Performa harian toko tersimpan.", $baseProgress + 20);
 
-                        $syncService->syncCampaignDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa kampanye tersimpan.", $baseProgress + 25);
-
-                        $syncService->syncGmsDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 27);
-
-                        $sendEvent('log', "[{$store->name}] Mengambil data performa per-jam (heatmap)...", $baseProgress + 28);
+                        $sendEvent('log', "[{$store->name}] Mengambil data performa per-jam (heatmap)...", $baseProgress + 21);
                         $hStart = clone $currentStart;
                         while ($hStart->lessThanOrEqualTo($currentEnd)) {
                             // OPTIMIZATION: Only sync hourly data for the last 3 days to save rate limit
@@ -4795,7 +4785,13 @@ class MarketplaceController extends Controller
                             }
                             $hStart->addDay();
                         }
-                        $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 30);
+                        $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 22);
+
+                        $syncService->syncCampaignDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                        $sendEvent('log', "[{$store->name}] Performa kampanye tersimpan.", $baseProgress + 25);
+
+                        $syncService->syncGmsDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                        $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 30);
                     } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
                         // Jeda pendek (≤150 dtk): tunggu otomatis di sini SEKALI,
                         // lalu ulangi chunk yang sama — user tidak perlu klik ulang.
@@ -4940,16 +4936,15 @@ class MarketplaceController extends Controller
     /** Debug: lihat raw response Shopee Ads API (hapus setelah selesai debug) */
     public function debugAdApi(Request $request, Store $store): JsonResponse
     {
-        $driver     = $this->manager->driver($store);
         $sampleIds  = [34741562, 34741571, 65538832]; // 3 campaign pertama
         $today      = now()->format('d-m-Y');
         $monthAgo   = now()->subDays(29)->format('d-m-Y');
 
         return response()->json([
-            'toggle_info'    => $driver->getShopToggleInfo($store),
-            'campaign_ids'   => $driver->getCampaignIdList($store, 1, 5),
-            'setting_info'   => $driver->getCampaignSettingInfo($store, $sampleIds),
-            'daily_perf'     => $driver->getCampaignDailyPerformance($store, $sampleIds, $monthAgo, $today),
+            'toggle_info'    => $this->gateway->getShopToggleInfo($store),
+            'campaign_ids'   => $this->gateway->getCampaignIdList($store, 1, 5),
+            'setting_info'   => $this->gateway->getCampaignSettingInfo($store, $sampleIds),
+            'daily_perf'     => $this->gateway->getCampaignDailyPerformance($store, $sampleIds, $monthAgo, $today),
         ]);
     }
 

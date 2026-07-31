@@ -7,6 +7,7 @@ use App\Models\MarketplaceBoostPool;
 use App\Models\MarketplaceBoostSchedule;
 use App\Models\MarketplaceProduct;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -29,7 +30,7 @@ class MarketplaceBoostService
     public const MAX_SLOTS      = 5;
     public const COOLDOWN_HOURS = 4;
 
-    public function __construct(protected ChannelManager $manager) {}
+    public function __construct(protected MarketplaceApiGateway $gateway) {}
 
     // ─── Manual ───────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ class MarketplaceBoostService
             return ['success' => false, 'boosted' => 0, 'message' => 'Tidak ada produk valid untuk di-boost.'];
         }
 
-        $driver  = $this->manager->driver($store);
+        $driver  = $this->gateway;
         $itemIds = $products->pluck('item_id')->all();
 
         try {
@@ -77,7 +78,7 @@ class MarketplaceBoostService
      */
     public function currentlyBoosted(Store $store): array
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         try {
             $res = $driver->getBoostedList($store);
@@ -200,7 +201,7 @@ class MarketplaceBoostService
         }
 
         // 3. Cek slot terpakai di Shopee.
-        $driver    = $this->manager->driver($store);
+        $driver    = $this->gateway;
         $boostedIds = [];
         try {
             $boostedIds = $this->extractBoostedIds($driver->getBoostedList($store));

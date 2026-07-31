@@ -76,6 +76,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.dashboard');
         Route::post('ads-dashboard/sync', [AdsDashboardController::class, 'sync'])
             ->name('ads.sync');
+        Route::get('ads-dashboard/sync-progress', [AdsDashboardController::class, 'syncProgress'])
+            ->name('ads.syncProgress');
         Route::post('ads-dashboard/clear', [AdsDashboardController::class, 'clear'])
             ->name('ads.clear');
         Route::get('ads-dashboard/realtime-status', [AdsDashboardController::class, 'realtimeStatus'])
@@ -90,4 +92,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.cpc.campaign.edit');
         Route::post('ads-dashboard/fee-setting', [AdsDashboardController::class, 'saveFeeSetting'])
             ->name('ads.fee.setting');
+
+        // Log API Shopee
+        Route::get('shopee-api-logs', [\App\Http\Controllers\Marketplace\ShopeeApiLogController::class, 'index'])
+            ->name('shopee-api-logs');
     });

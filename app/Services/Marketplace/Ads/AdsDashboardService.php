@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 class AdsDashboardService
 {
+    public const DEFAULT_NET_REVENUE_RATIO = 0.781;
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,
@@ -30,7 +32,7 @@ class AdsDashboardService
         $isAllStores = $storeId === 'all';
         $storeIds = $isAllStores ? $stores->pluck('id')->all() : [$storeId];
 
-        $kpi = $analytics->getKpiSummary($storeIds, $dateFrom, $dateTo);
+        // (Removed getKpiSummary)
 
         $dailyChartData = MarketplaceAdsDaily::whereIn('store_id', $storeIds)
             ->whereBetween('date', [$dateFrom, $dateTo])
@@ -156,11 +158,14 @@ class AdsDashboardService
                 $camp->spend = $camp->sum_expense ?? 0;
                 $camp->gmv = $camp->sum_gmv ?? 0;
                 $camp->clicks = $camp->sum_clicks ?? 0;
+                $camp->impressions = $camp->sum_impressions ?? 0;
                 $camp->orders = $camp->sum_orders ?? 0;
                 $camp->items_sold = $camp->sum_broad_order_amount ?? 0;
+                
                 $camp->prev_spend = $camp->sum_prev_expense ?? 0;
                 $camp->prev_gmv = $camp->sum_prev_gmv ?? 0;
                 $camp->prev_clicks = $camp->sum_prev_clicks ?? 0;
+                $camp->prev_impressions = $camp->sum_prev_impressions ?? 0;
                 $camp->prev_orders = $camp->sum_prev_orders ?? 0;
 
                 $acos = $camp->gmv > 0 && $camp->spend > 0 ? round($camp->spend / $camp->gmv, 4) : null;
@@ -206,9 +211,22 @@ class AdsDashboardService
                         : $camp->gmv * ($camp->cogs_ratio ?? 0);
                     $spendAfterTax = $camp->spend * 1.11;
                     $camp->profit_after_ads = round($netRevenue - $totalCogs - $spendAfterTax, 2);
+                    $camp->net_revenue = $netRevenue;
+                    $camp->total_cogs = $totalCogs;
                 } else {
                     $camp->profit_after_ads = null;
+                    $camp->net_revenue = $camp->gmv * $netRevRatio;
+                    $camp->total_cogs = 0;
                 }
+
+                // Kalkulasi Previous Net & Profit
+                $prevNetRevenue = $camp->prev_gmv * $netRevRatio;
+                $prevTotalCogs = ($camp->unit_cogs > 0 && ($camp->sum_prev_broad_orders ?? 0) > 0) // Approximation if previous items sold is missing
+                    ? $camp->unit_cogs * ($camp->sum_prev_broad_orders ?? 0)
+                    : $camp->prev_gmv * ($camp->cogs_ratio ?? 0);
+                $camp->prev_net_revenue = $prevNetRevenue;
+                $camp->prev_total_cogs = $prevTotalCogs;
+                $camp->prev_profit_after_ads = $beAcos !== null ? round($prevNetRevenue - $prevTotalCogs - ($camp->prev_spend * 1.11), 2) : 0;
 
                 $camp->reco = $this->adsRecommendation((float) $camp->spend, $acos, $beAcos, (int) $camp->orders);
 
@@ -236,6 +254,51 @@ class AdsDashboardService
             return $camp;
         });
 
+        // -------------------------------------------------------------
+        // KPI CALCULATION
+        // Directly aggregate from $campaigns so that top KPI 
+        // perfectly matches the sum of table data.
+        // -------------------------------------------------------------
+        $kpi = [
+            'current' => (object) [
+                'spend' => $campaigns->sum('spend'),
+                'gmv' => $campaigns->sum('gmv'),
+                'orders' => $campaigns->sum('orders'),
+                'clicks' => $campaigns->sum('clicks'),
+                'impressions' => $campaigns->sum('impressions'),
+                'net_revenue' => $campaigns->sum('net_revenue'),
+                'total_cogs' => $campaigns->sum('total_cogs'),
+            ],
+            'previous' => (object) [
+                'spend' => $campaigns->sum('prev_spend'),
+                'gmv' => $campaigns->sum('prev_gmv'),
+                'orders' => $campaigns->sum('prev_orders'),
+                'clicks' => $campaigns->sum('prev_clicks'),
+                'impressions' => $campaigns->sum('prev_impressions'),
+                'net_revenue' => $campaigns->sum('prev_net_revenue'),
+                'total_cogs' => $campaigns->sum('prev_total_cogs'),
+            ],
+            'changes' => []
+        ];
+
+        // Hitung Net Profit dari total agregasi agar mencakup campaign tanpa HPP
+        $kpi['current']->net_profit = $kpi['current']->net_revenue - $kpi['current']->total_cogs - ($kpi['current']->spend * 1.11);
+        $kpi['previous']->net_profit = $kpi['previous']->net_revenue - $kpi['previous']->total_cogs - ($kpi['previous']->spend * 1.11);
+
+        // Hitung AOV Net
+        $kpi['current']->aov_net = $kpi['current']->orders > 0 ? $kpi['current']->net_revenue / $kpi['current']->orders : 0;
+        $kpi['previous']->aov_net = $kpi['previous']->orders > 0 ? $kpi['previous']->net_revenue / $kpi['previous']->orders : 0;
+
+        foreach (['spend', 'gmv', 'orders', 'clicks', 'impressions', 'net_revenue', 'total_cogs', 'net_profit'] as $m) {
+            $c = $kpi['current']->$m;
+            $p = $kpi['previous']->$m;
+            if ($p == 0) {
+                $kpi['changes'][$m] = $c > 0 ? 100 : 0;
+            } else {
+                $kpi['changes'][$m] = round((($c - $p) / abs($p)) * 100, 2);
+            }
+        }
+
         $syncRuns = MarketplaceAdsSyncRun::whereIn('store_id', $storeIds)
             ->select([
                 'id',
@@ -249,6 +312,8 @@ class AdsDashboardService
                 'error_message',
                 'started_at',
                 'finished_at',
+                'created_at',
+                'updated_at',
             ])
             ->orderByDesc('id')
             ->limit(20)
@@ -275,7 +340,7 @@ class AdsDashboardService
         $heatmapData = $analytics->getHourlyHeatmap($storeIds, $dateFrom, $dateTo);
         $historicalData = $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3);
 
-        $itemPerformance = DB::table('marketplace_ad_campaign_dailies as cd')
+        $itemPerformanceRaw = DB::table('marketplace_ad_campaign_dailies as cd')
             ->join('marketplace_ad_campaigns as c', function ($join) {
                 $join->on('cd.channel_campaign_id', '=', 'c.channel_campaign_id')
                     ->on('cd.store_id', '=', 'c.store_id');
@@ -288,67 +353,108 @@ class AdsDashboardService
             ->whereNotNull('c.channel_item_id')
             ->whereBetween('cd.date', [$dateFrom, $dateTo])
             ->selectRaw('
+                cd.store_id,
                 c.channel_item_id,
-                c.channel_campaign_id,
-                MAX(c.campaign_name) as campaign_name,
-                MAX(c.campaign_status) as campaign_status,
-                MAX(c.ad_type) as ad_type,
                 MAX(p.item_sku) as item_sku,
                 MAX(p.item_name) as item_name,
+                MAX(p.image_url) as image_url,
+                MAX(p.stock_total) as stock_total,
+                MAX(p.price_min) as price_min,
                 SUM(cd.impressions) as impressions,
                 SUM(cd.clicks) as clicks,
                 SUM(cd.expense) as spend,
                 SUM(cd.broad_gmv) as gmv,
                 SUM(cd.broad_order) as orders,
-                SUM(cd.direct_gmv) as direct_gmv_sum
+                SUM(cd.broad_order_amount) as items_sold,
+                SUM(cd.direct_gmv) as direct_gmv
             ')
-            ->groupBy('c.channel_item_id', 'c.channel_campaign_id')
+            ->groupBy('cd.store_id', 'c.channel_item_id')
             ->orderByDesc('spend')
-            ->limit(50)
             ->get();
 
-        $gmsItems = DB::table('marketplace_ads_item_dailies as id')
-            ->leftJoin('marketplace_products as p', function ($join) {
-                $join->on('id.channel_item_id', '=', 'p.item_id')
-                    ->on('id.store_id', '=', 'p.store_id');
-            })
-            ->leftJoin('marketplace_ad_campaigns as camp', function ($join) {
-                $join->on('id.channel_campaign_id', '=', 'camp.channel_campaign_id')
-                    ->on('id.store_id', '=', 'camp.store_id');
-            })
-            ->whereIn('id.store_id', $storeIds)
-            ->where(function ($q) use ($dateFrom, $dateTo, $prevDateFrom, $prevDateTo) {
-                $q->whereBetween('id.date', [$dateFrom, $dateTo])
-                    ->orWhereBetween('id.date', [$prevDateFrom, $prevDateTo]);
-            })
-            ->selectRaw("
-                id.channel_item_id,
-                MAX(id.channel_campaign_id) as channel_campaign_id,
-                MAX(p.item_sku) as item_sku,
-                MAX(p.item_name) as item_name,
-                MAX(camp.target_roas) as target_roas,
-                MAX(camp.campaign_budget) as campaign_budget,
-                MAX(camp.campaign_status) as campaign_status,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.impressions ELSE 0 END) as impression,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.clicks ELSE 0 END) as click,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.expense ELSE 0 END) as expense,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.broad_order ELSE 0 END) as broad_order,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.broad_gmv ELSE 0 END) as broad_gmv,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.direct_order ELSE 0 END) as direct_order,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.direct_gmv ELSE 0 END) as direct_gmv,
+        $itemPerformance = $itemPerformanceRaw->map(function ($prod) use ($unitCogsByKey, $revenueRatioByKey, $avgPriceByKey, $manualFeeRatio, $catByChan) {
+            $prod->roas = $prod->spend > 0 ? $prod->gmv / $prod->spend : 0;
+            $prod->ctr = $prod->impressions > 0 ? ($prod->clicks / $prod->impressions) * 100 : 0;
+            $prod->cvr = $prod->clicks > 0 ? ($prod->orders / $prod->clicks) * 100 : 0;
+            $prod->cpc = $prod->clicks > 0 ? $prod->spend / $prod->clicks : 0;
+            $prod->cpa = $prod->orders > 0 ? $prod->spend / $prod->orders : 0;
+            
+            $key = $prod->store_id . '|' . $prod->channel_item_id;
+            
+            $prod->unit_cogs = (float) ($unitCogsByKey[$key] ?? 0);
+            
+            $trueAvgPrice = (float) ($avgPriceByKey[$key] ?? 0);
+            if (! $trueAvgPrice || $trueAvgPrice <= 0) {
+                $trueAvgPrice = ($prod->orders > 0 && $prod->gmv > 0) ? ($prod->gmv / $prod->orders) : (float) $prod->price_min;
+            }
+            
+            if ($manualFeeRatio !== null) {
+                $netRevRatio = $manualFeeRatio;
+            } else {
+                $netRevRatio = $revenueRatioByKey[(string) $prod->channel_item_id][0] ?? self::DEFAULT_NET_REVENUE_RATIO;
+            }
+            
+            $prod->net_revenue = $prod->gmv * $netRevRatio;
+            
+            $itemsSold = (float) ($prod->items_sold ?? $prod->orders);
+            
+            if ($prod->unit_cogs > 0 && $trueAvgPrice > 0) {
+                $totalCogs = ($itemsSold > 0)
+                    ? $prod->unit_cogs * $itemsSold
+                    : $prod->gmv * ($prod->unit_cogs / $trueAvgPrice);
+                
+                $prod->gross_profit = $prod->net_revenue - $totalCogs;
+                // Subtract Ad Spend (with 11% Tax)
+                $prod->profit_after_ads = round($prod->gross_profit - ($prod->spend * 1.11), 2);
+                $prod->poas = $prod->spend > 0 ? $prod->profit_after_ads / $prod->spend : 0;
+            } else {
+                $prod->gross_profit = $prod->net_revenue; // Without COGS
+                $prod->profit_after_ads = null;
+                $prod->poas = 0;
+            }
+            
+            $prod->item_category = $catByChan[(string) $prod->channel_item_id] ?? 'Uncategorized';
+            
+            // Product Classification Logic
+            $prod->classification = 'Review';
+            $prod->class_color = 'secondary';
+            
+            if ($prod->profit_after_ads > 0) {
+                if ($prod->poas > 0.3 && $prod->spend > 10000) {
+                    $prod->classification = 'Hero Product';
+                    $prod->class_color = 'success';
+                } elseif ($prod->poas > 0 && $prod->orders >= 3) {
+                    $prod->classification = 'Profit Driver';
+                    $prod->class_color = 'primary';
+                } elseif ($prod->orders >= 5 && $prod->poas <= 0.1) {
+                    $prod->classification = 'Volume Driver';
+                    $prod->class_color = 'info';
+                }
+            } else {
+                if ($prod->spend > 15000 && $prod->gmv > $prod->spend) {
+                    $prod->classification = 'Loss Maker';
+                    $prod->class_color = 'danger';
+                } elseif ($prod->clicks > 100 && $prod->orders == 0) {
+                    $prod->classification = 'Traffic Driver (No Conv)';
+                    $prod->class_color = 'warning';
+                } elseif ($prod->spend > 0 && $prod->orders == 0) {
+                    $prod->classification = 'Low Performer';
+                    $prod->class_color = 'secondary';
+                }
+            }
+            
+            if (($prod->stock_total ?? 0) < 5 && $prod->orders > 0 && !in_array($prod->classification, ['Low Performer', 'Traffic Driver (No Conv)'])) {
+                $prod->classification = 'Stock Risk';
+                $prod->class_color = 'danger';
+            }
+            
+            return $prod;
+        })->sortByDesc('spend')->values();
 
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.impressions ELSE 0 END) as prev_impression,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.clicks ELSE 0 END) as prev_click,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.expense ELSE 0 END) as prev_expense,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.broad_order ELSE 0 END) as prev_broad_order,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.broad_gmv ELSE 0 END) as prev_broad_gmv,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.direct_order ELSE 0 END) as prev_direct_order,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.direct_gmv ELSE 0 END) as prev_direct_gmv
-            ")
-            ->groupBy('id.channel_item_id')
-            ->orderByDesc('expense')
-            ->get()
-            ->map(fn ($item) => $item);
+        // Pass an empty gmsItems so we don't break other parts if they exist
+        $gmsItems = collect();
+
+        $ltvData = $this->getCustomerLtvData($storeIds, $dateFrom, $dateTo, $kpi['current']->spend ?? 0);
 
         $autoCampaign = $isAllStores ? null : MarketplaceAdCampaign::select([
                 'id',
@@ -379,7 +485,8 @@ class AdsDashboardService
             'lastSuccessRun',
             'adsSetting',
             'gmsItems',
-            'autoCampaign'
+            'autoCampaign',
+            'ltvData'
         ) + [
             'storeId' => $storeId,
             'stores' => $stores,
@@ -522,6 +629,60 @@ class AdsDashboardService
         }
 
         return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
+    }
+
+    private function getCustomerLtvData(array $storeIds, string $dateFrom, string $dateTo, float $totalAdSpend): array
+    {
+        // 1. Get unique buyers who purchased in the current period
+        $ordersInPeriod = DB::table('marketplace_orders')
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('order_date', [$dateFrom, $dateTo])
+            ->whereNotIn('status', ['CANCELLED', 'UNPAID', 'cancelled', 'unpaid'])
+            ->whereNotNull('buyer_username')
+            ->select('buyer_username', 'total_amount')
+            ->get();
+
+        $uniqueBuyers = $ordersInPeriod->pluck('buyer_username')->unique()->values()->all();
+        
+        $newCustomersCount = 0;
+        $repeatCustomersCount = 0;
+        $cohorts = [];
+        
+        if (count($uniqueBuyers) > 0) {
+            // 2. Find their globally first order date
+            $firstOrders = DB::table('marketplace_orders')
+                ->whereIn('store_id', $storeIds)
+                ->whereIn('buyer_username', $uniqueBuyers)
+                ->whereNotIn('status', ['CANCELLED', 'UNPAID', 'cancelled', 'unpaid'])
+                ->groupBy('buyer_username')
+                ->selectRaw('buyer_username, MIN(order_date) as first_order_date')
+                ->pluck('first_order_date', 'buyer_username');
+                
+            foreach ($uniqueBuyers as $buyer) {
+                $firstOrderDate = $firstOrders[$buyer] ?? null;
+                if ($firstOrderDate && $firstOrderDate >= $dateFrom) {
+                    $newCustomersCount++;
+                } else {
+                    $repeatCustomersCount++;
+                }
+            }
+        }
+        
+        $totalCustomers = $newCustomersCount + $repeatCustomersCount;
+        $rpr = $totalCustomers > 0 ? ($repeatCustomersCount / $totalCustomers) * 100 : 0;
+        $blendedCac = $newCustomersCount > 0 ? $totalAdSpend / $newCustomersCount : 0;
+        
+        // Simple Average Order Frequency for the period
+        $avgOrderFreq = $totalCustomers > 0 ? count($ordersInPeriod) / $totalCustomers : 0;
+
+        return [
+            'new_customers' => $newCustomersCount,
+            'repeat_customers' => $repeatCustomersCount,
+            'total_customers' => $totalCustomers,
+            'repeat_purchase_rate' => $rpr,
+            'blended_cac' => $blendedCac,
+            'avg_order_freq' => $avgOrderFreq,
+        ];
     }
 
     private function deriveBreakEvenAcos(?Item $item, float $gmv, int $units, ?float $netRevRatio = null): ?float

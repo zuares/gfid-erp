@@ -93,7 +93,19 @@ class TikTokShopChannel implements MarketplaceChannel
 
         $query['sign'] = $this->sign($store, $path, $query, $timestamp);
 
-        $response = Http::timeout(30)
+        $response = Http::connectTimeout(10)
+            ->timeout(30)
+            ->retry(2, function (int $attempt, \Throwable $exception) {
+                // Hanya retry pada error transien (5xx, connection timeout)
+                if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
+                    return $attempt * 1000;
+                }
+                if ($exception instanceof \Illuminate\Http\Client\RequestException
+                    && $exception->response->status() >= 500) {
+                    return $attempt * 1000;
+                }
+                return false; // Jangan retry 4xx (client error)
+            }, throw: false)
             ->withHeaders([
                 'x-tts-access-token' => $this->accessToken($store),
                 'content-type'       => 'application/json',
@@ -286,7 +298,9 @@ class TikTokShopChannel implements MarketplaceChannel
         $appKey    = $this->appKey($store);
         $appSecret = $this->appSecret($store);
 
-        $response = Http::timeout(30)->post($authUrl . '/api/v2/token/refresh', [
+        $response = Http::connectTimeout(10)->timeout(30)
+            ->retry(2, 1000, throw: false)
+            ->post($authUrl . '/api/v2/token/refresh', [
             'app_key'       => $appKey,
             'app_secret'    => $appSecret,
             'refresh_token' => $store->credential('refresh_token'),

@@ -102,8 +102,11 @@ class WaNotificationService
             }
             return $sent;
         } else {
-            // Fallback: log ke Laravel log (dev mode)
-            Log::info("[OTP] Ke +{$phone}: {$otp}");
+            // Fallback: log ke Laravel log (dev mode) — OTP tidak ditulis ke log
+            Log::info('[OTP] Dev fallback — OTP sent', [
+                'target' => $this->maskPhone($phone),
+                'event'  => 'otp_dev_fallback',
+            ]);
             return true;
         }
     }

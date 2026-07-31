@@ -1,4 +1,11 @@
+
 @php
+    // Fallback variables to prevent undefined errors when no active store
+    $campaigns = $campaigns ?? collect();
+    $kpi = $kpi ?? [];
+    $adsSetting = $adsSetting ?? (object) [];
+    $storeId = $storeId ?? 'all';
+
     /*
     |--------------------------------------------------------------------
     | SATU SUMBER KEBENARAN
@@ -89,9 +96,31 @@
     $totalFeeAmt     = max(0, $totalGmv - $totalNetRevenue); // total rupiah potongan platform
     $totalRoas       = $totalSpend > 0 ? $totalGmv / $totalSpend : 0;              // omzet per rupiah iklan
     $netRoas         = $totalTopup > 0 ? $totalNetRevenue / $totalTopup : 0;       // uang cair per rupiah iklan (incl. PPN)
+    
+    // Additional metrics for POAS, Margin, CAC, Break-even ROAS
+    $poas            = $totalTopup > 0 ? $totalProfit / $totalTopup : 0;           // Net Profit / Ad Spend (dengan PPN)
+    $grossMarginPct  = $totalGmv > 0 ? ($grossMargin / $totalGmv) * 100 : 0;       // Gross Margin %
+    $netMarginPct    = $totalGmv > 0 ? ($totalProfit / $totalGmv) * 100 : 0;       // Net Profit Margin %
+    $totalOrders     = $rows->sum(fn ($r) => (int) $r->camp->orders);
+    $cac             = $totalOrders > 0 ? $totalTopup / $totalOrders : 0;          // Cost per Acquisition
+    $beRoas          = $grossMargin > 0 ? $totalGmv / $grossMargin : 0;            // Break-even ROAS
+    
     $feeMode         = $adsSetting->admin_fee_mode ?? 'auto';
     $feeManualPct    = $adsSetting->admin_fee_pct ?? null;
     $fmt = fn ($n) => 'Rp ' . number_format(abs($n), 0, ',', '.');
+@endphp
+<script>
+window.__profitChartData = {
+    totalRev: {{ $totalGmv }},
+    totalNetRev: {{ $totalNetRevenue }},
+    totalCogs: {{ $totalCogsAll }},
+    totalSpend: {{ $totalSpend }},
+    totalTopup: {{ $totalTopup }},
+    totalProfit: {{ $totalProfit }},
+    feeAmt: {{ $totalFeeAmt }}
+};
+</script>
+@php
 
     // Rekonsiliasi dengan Seller Center: belanja level toko (sumber yang sama
     // dengan angka platform) vs total kampanye di tabel ini. Selisihnya =
@@ -154,64 +183,103 @@
 
 <!-- ── KPI — urutan alur hitung: Omzet − HPP − Iklan = Net Profit ── -->
 @php
-    $kLabel = 'font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px;';
-    $kValue = 'font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; margin-top:1px; white-space:nowrap;';
-    $kSub   = 'font-size:.65rem; color:var(--dsh-muted); margin-top:2px; font-variant-numeric:tabular-nums; white-space:nowrap;';
     $profitMarginPct = $totalGmv > 0 ? ($totalProfit / $totalGmv) * 100 : 0;
 @endphp
-<div class="dash-panels mb-3" style="grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: .75rem;">
-
-    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(3,105,161,.2); background:rgba(3,105,161,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
-        <div style="{{ $kLabel }} color:#0369a1;"><i class="bi bi-graph-up-arrow"></i> Omzet</div>
-        <div style="{{ $kValue }} color:#0369a1;">{{ $fmt($totalGmv) }}</div>
-        <div style="{{ $kSub }}">Cair <b style="color:#0369a1;">{{ $fmt($totalNetRevenue) }}</b> · adm {{ number_format($avgFeePct, 1, ',', '.') }}%</div>
+<div class="ads-tab-panel mb-3">
+    <div class="ads-tab-panel-head">
+        <div>
+            <div class="ads-tab-panel-title"><i class="bi bi-cash-stack text-success"></i> Profitabilitas &amp; Margin</div>
+            <div class="ads-tab-panel-note">Rincian efisiensi untung dan rugi iklan.</div>
+        </div>
     </div>
+    <div class="p-3 p-md-3">
+        <div class="ads-kpi-grid mb-3">
+            <div class="dpanel ads-kpi kpi-revenue">
+                <div class="ads-kpi-label"><i class="bi bi-graph-up-arrow"></i> Omzet</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($totalGmv) }}</div>
+                <div class="ads-kpi-sub">Cair <b>{{ $fmt($totalNetRevenue) }}</b> · adm {{ number_format($avgFeePct, 1, ',', '.') }}%</div>
+            </div>
+            
+            <div class="dpanel ads-kpi kpi-cogs">
+                <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> Gross Profit</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $grossMargin < 0 ? '−' : '' }}{{ $fmt($grossMargin) }}</div>
+                <div class="ads-kpi-sub">HPP <b>{{ $fmt($totalCogsAll) }}</b>
+                @if($noHppCount > 0)
+                    · <span class="text-danger"><i class="bi bi-exclamation-triangle"></i> {{ $noHppCount }} item 0 HPP</span>
+                @endif
+                </div>
+            </div>
 
-    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(100,116,139,.25); background:rgba(100,116,139,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
-        <div style="{{ $kLabel }} color:#475569;"><i class="bi bi-box-seam"></i> HPP · Modal</div>
-        <div style="{{ $kValue }} color:#334155;">&minus;{{ $fmt($totalCogsAll) }}</div>
-        <div style="{{ $kSub }}">{{ number_format($cogsPctOmzet, 1, ',', '.') }}% omzet · margin <b style="color:{{ $grossMargin >= 0 ? '#15803d' : '#b91c1c' }};">{{ $grossMargin < 0 ? '−' : '' }}{{ $fmt($grossMargin) }}</b></div>
-        @if($noHppCount > 0)
-            <div style="{{ $kSub }} color:#b45309;"><i class="bi bi-exclamation-triangle"></i> {{ $noHppCount }} tanpa HPP</div>
-        @endif
-    </div>
+            <div class="dpanel ads-kpi kpi-spend">
+                <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Ad Spend</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">&minus;{{ $fmt($totalTopup) }}</div>
+                <div class="ads-kpi-sub">Net spend <b>{{ $fmt($totalSpend) }}</b> + PPN</div>
+            </div>
 
-    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(245,158,11,.25); background:rgba(245,158,11,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
-        <div style="{{ $kLabel }} color:#b45309;"><i class="bi bi-wallet2"></i> Iklan</div>
-        <div style="{{ $kValue }} color:#92400e;">&minus;{{ $fmt($totalTopup) }}</div>
-        <div style="{{ $kSub }}">{{ $fmt($totalSpend) }} + PPN 11%</div>
-    </div>
+            <div class="dpanel ads-kpi kpi-profit" style="border-left-color: {{ $totalProfit >= 0 ? '#16a34a' : '#dc2626' }};">
+                <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit Setelah Iklan</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums; color: {{ $totalProfit >= 0 ? '#16a34a' : '#dc2626' }};">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</div>
+                <div class="ads-kpi-sub">Margin <b>{{ number_format($netMarginPct, 1, ',', '.') }}%</b> &bull; {{ $profitableCount }} untung, {{ $lossCount }} rugi</div>
+            </div>
 
-    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba({{ $totalProfit >= 0 ? '22,163,74' : '220,38,38' }},.3); background:rgba({{ $totalProfit >= 0 ? '22,163,74' : '220,38,38' }},.07); box-shadow:0 12px 28px rgba(15,23,42,.04);">
-        <div style="{{ $kLabel }} color:{{ $totalProfit >= 0 ? '#15803d' : '#b91c1c' }};"><i class="bi bi-cash-stack"></i> = Net Profit</div>
-        <div style="{{ $kValue }} color:{{ $totalProfit >= 0 ? '#15803d' : '#b91c1c' }};">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</div>
-        <div style="{{ $kSub }}">{{ number_format($profitMarginPct, 1, ',', '.') }}% dari omzet</div>
-    </div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label"><i class="bi bi-percent"></i> Margins</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($grossMarginPct, 1, ',', '.') }}%</div>
+                <div class="ads-kpi-sub">Gross. Net Margin <b>{{ number_format($netMarginPct, 1, ',', '.') }}%</b></div>
+            </div>
 
-    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(124,58,237,.2); background:rgba(124,58,237,.04); box-shadow:0 12px 28px rgba(15,23,42,.04);">
-        <div style="{{ $kLabel }} color:#7c3aed;"><i class="bi bi-speedometer2"></i> ROAS · ACOS</div>
-        <div style="{{ $kValue }} color:#6d28d9;">{{ number_format($totalRoas, 2, ',', '.') }}x <span style="font-size:.8rem; color:var(--dsh-muted);">· {{ number_format($avgAcos, 1, ',', '.') }}%</span></div>
-        <div style="{{ $kSub }}">bersih <b style="color:#6d28d9;">{{ number_format($netRoas, 2, ',', '.') }}x</b></div>
-    </div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label"><i class="bi bi-speedometer2"></i> POAS · ROAS</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($poas, 2, ',', '.') }}x</div>
+                <div class="ads-kpi-sub">ROAS <b>{{ number_format($totalRoas, 2, ',', '.') }}x</b> · Net <b>{{ number_format($netRoas, 2, ',', '.') }}x</b></div>
+            </div>
 
-    <div class="dpanel" style="padding:.85rem .95rem; border-radius:16px; border:1px solid rgba(148,163,184,.25); background:rgba(148,163,184,.05); box-shadow:0 12px 28px rgba(15,23,42,.04);">
-        <div style="{{ $kLabel }} color:var(--dsh-muted);"><i class="bi bi-bullseye"></i> Kampanye Untung</div>
-        <div style="{{ $kValue }} color:var(--text);">{{ $profitableCount }} <span style="font-size:.8rem; color:var(--dsh-muted); font-weight:600;">/ {{ $totalCampaigns }}</span></div>
-        <div style="{{ $kSub }} {{ $lossCount > 0 ? 'color:#b91c1c;' : '' }}">{{ $lossCount > 0 ? $lossCount . ' rugi' : 'semua untung' }}</div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label"><i class="bi bi-dash-circle-dotted"></i> Break-even ROAS</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($beRoas, 2, ',', '.') }}x</div>
+                <div class="ads-kpi-sub">Batas ROAS minimum agar untung</div>
+            </div>
+
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label"><i class="bi bi-person-plus"></i> CAC</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($cac) }}</div>
+                <div class="ads-kpi-sub">Cost per Acquisition (per order)</div>
+            </div>
+        </div>
+        
+        {{-- CHARTS PROFITABILITAS --}}
+        <div class="row gx-3">
+            <div class="col-md-5 mb-3">
+                <div class="p-2 border rounded h-100" style="background: var(--card-bg);">
+                    <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;"><i class="bi bi-pie-chart-fill me-1"></i> Cost Composition</div>
+                    <div style="position: relative; height: 180px; width: 100%;">
+                        <canvas id="chartProfitComposition"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-7 mb-3">
+                <div class="p-2 border rounded h-100" style="background: var(--card-bg);">
+                    <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;"><i class="bi bi-graph-up me-1"></i> Trend Harian (Omzet vs Profit)</div>
+                    <div style="position: relative; height: 180px; width: 100%;">
+                        <canvas id="chartProfitTrend"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- ── Toggle tampilan: Per Kampanye / Per Kategori ── -->
 <div style="display:flex; gap:.35rem; margin-bottom:.75rem;">
-    <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kampanye</button>
-    <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kategori</button>
+    <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kategori</button>
+    <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kampanye</button>
 </div>
 
 <!-- ── Tabel per KATEGORI ── -->
-<div id="profitViewCategory" style="display:none;">
+<div id="profitViewCategory" style="display:block;">
     <div class="ads-tab-panel">
         <div class="table-responsive">
-            <table class="dpanel-table dpanel-table-sm" style="white-space: nowrap;">
+            <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space: nowrap;">
             <thead>
                 <tr>
                     <th>Kategori<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">dari mapping SKU</div></th>
@@ -256,8 +324,8 @@ window.__profitView = function (mode) {
     const camp = document.getElementById('profitViewCampaign');
     const bCat = document.getElementById('btnViewCategory');
     const bCamp = document.getElementById('btnViewCampaign');
-    const on  = 'border-radius:999px; font-size:.72rem; padding:.3rem .9rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
-    const off = 'border-radius:999px; font-size:.72rem; padding:.3rem .9rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;';
+    const on  = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
+    const off = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;';
     const isCat = mode === 'category';
     cat.style.display = isCat ? 'block' : 'none';
     camp.style.display = isCat ? 'none' : 'block';
@@ -266,24 +334,30 @@ window.__profitView = function (mode) {
     try { localStorage.setItem('profitViewMode', mode); } catch (e) {}
 };
 (function () {
-    try { if (localStorage.getItem('profitViewMode') === 'category') window.__profitView('category'); } catch (e) {}
+    try { 
+        if (localStorage.getItem('profitViewMode') === 'campaign') {
+            window.__profitView('campaign'); 
+        } else {
+            window.__profitView('category'); 
+        }
+    } catch (e) {}
 })();
 </script>
 
-<div id="profitViewCampaign">
+<div id="profitViewCampaign" style="display:none;">
 <!-- ── Tabel per kampanye — kolom mengikuti alur hitung: Pendapatan Bersih − HPP − Iklan = Net Profit ── -->
 <div class="ads-tab-panel">
     <div class="table-responsive">
-        <table class="dpanel-table dpanel-table-sm table-hover" style="white-space: nowrap;">
+        <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space: nowrap;">
         <thead>
             <tr>
-                <th>Kampanye</th>
-                <th class="text-end">Konversi</th>
-                <th class="text-end">Pendapatan Bersih</th>
-                <th class="text-end"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> HPP</th>
-                <th class="text-end"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <span style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">+PPN 11%</span></th>
-                <th class="text-end" style="border-left: 2px solid var(--dsh-border);"><span style="color:var(--dsh-muted); font-weight:600;">=</span> Net Profit</th>
-                <th class="text-end">ACOS</th>
+                <th onclick="sortProfitTable('campaign')" style="cursor:pointer">Kampanye <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('orders')" style="cursor:pointer">Konversi <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('net_revenue')" style="cursor:pointer">Pendapatan Bersih <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('hpp')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> HPP <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('ad_spend')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <span style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">+PPN 11%</span> <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('net_profit')" style="cursor:pointer; border-left: 2px solid var(--dsh-border);"><span style="color:var(--dsh-muted); font-weight:600;">=</span> Net Profit <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('acos')" style="cursor:pointer">ACOS <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-center">Rekomendasi</th>
             </tr>
         </thead>
@@ -301,7 +375,14 @@ window.__profitView = function (mode) {
                         default => 'rgba(148, 163, 184, 0.15)'
                     };
                 @endphp
-                <tr style="border-bottom: 1px solid var(--dsh-border); {{ $r->isProfitable ? '' : 'background: rgba(220, 38, 38, 0.045);' }}">
+                <tr data-campaign="{{ strtolower($camp->campaign_name ?? '') }}"
+                    data-orders="{{ $camp->orders }}"
+                    data-net_revenue="{{ $r->netRevenue }}"
+                    data-hpp="{{ $r->totalCogs }}"
+                    data-ad_spend="{{ $r->spendAfterTax }}"
+                    data-net_profit="{{ $r->profit }}"
+                    data-acos="{{ $r->acos }}"
+                    style="border-bottom: 1px solid var(--dsh-border); {{ $r->isProfitable ? '' : 'background: rgba(220, 38, 38, 0.045);' }}">
                     <td style="padding: 0.75rem 0.5rem; max-width: 250px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             @if($camp->campaign_status === 'ongoing')
@@ -391,3 +472,38 @@ window.__profitView = function (mode) {
     </div>
 </div>
 </div>
+
+<script>
+let sortProfitCol = 'net_profit';
+let sortProfitDir = 'asc';
+
+function sortProfitTable(col) {
+    if (sortProfitCol === col) {
+        sortProfitDir = sortProfitDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        sortProfitCol = col;
+        sortProfitDir = 'desc';
+    }
+
+    const tbody = document.querySelector('#profitViewCampaign tbody');
+    if (!tbody) return;
+    
+    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign]'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+        let valA, valB;
+        if (col === 'campaign') {
+            valA = a.getAttribute('data-campaign') || '';
+            valB = b.getAttribute('data-campaign') || '';
+            return sortProfitDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else {
+            valA = parseFloat(a.getAttribute('data-' + col)) || 0;
+            valB = parseFloat(b.getAttribute('data-' + col)) || 0;
+            return sortProfitDir === 'asc' ? valA - valB : valB - valA;
+        }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>

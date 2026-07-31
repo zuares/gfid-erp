@@ -57,20 +57,23 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         // ── Shopee Ads: sinkronisasi otomatis ───────────────────────────
-        // Setiap 4 jam (menit 0): sync data harian (Balance + Campaigns + CPC + GMS) 3 hari terakhir
-        $schedule->command('marketplace:sync-ads')
-            ->everyFourHours()
-            ->name('sync-ads-main')
-            ->withoutOverlapping(30)
-            ->runInBackground()
-            ->appendOutputTo(storage_path('logs/sync-ads.log'));
+        
+        // 1. Sinkronisasi data terbaru setiap jam (hari ini & kemarin)
+        $schedule->call(function () {
+            \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
+                '--from' => now()->subDay()->toDateString(),
+                '--to'   => now()->toDateString(),
+            ]);
+        })
+        ->hourly()
+        ->name('sync-ads-hourly-latest')
+        ->withoutOverlapping(30);
 
-        // Setiap jam di menit 30: sync data per jam (untuk heatmap).
-        // Menit 30 dipilih agar tidak tabrakan dengan sync-ads-main yang jalan di menit 0.
-        $schedule->command('marketplace:sync-ads', ['--hourly'])
-            ->hourlyAt(30)
-            ->name('sync-ads-hourly')
-            ->withoutOverlapping(30)
+        // 2. Verifikasi backfill harian (mundur 14 hari untuk update data telat dari Shopee)
+        $schedule->command('marketplace:sync-ads')
+            ->dailyAt('00:00')
+            ->name('sync-ads-midnight-verify')
+            ->withoutOverlapping(60)
             ->runInBackground()
             ->appendOutputTo(storage_path('logs/sync-ads.log'));
 

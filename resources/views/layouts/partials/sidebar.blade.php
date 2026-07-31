@@ -1504,6 +1504,10 @@
                                 Analisa Penjualan
                             </x-sidebar.sub-link>
                         @endif
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee-api-logs') }}" icon="bi bi-hdd-network"
+                                :active="request()->routeIs('marketplace.shopee-api-logs')">
+                                Log API Shopee
+                            </x-sidebar.sub-link>
                     </div>
                 </li>
             @endif

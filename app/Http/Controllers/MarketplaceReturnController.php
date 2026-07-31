@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Models\Channel;
 use App\Models\MarketplaceReturn;
 use App\Models\MarketplaceOrder;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 
 class MarketplaceReturnController extends Controller
@@ -72,8 +73,7 @@ class MarketplaceReturnController extends Controller
 
         foreach ($stores as $store) {
             try {
-                $driver = $this->manager->driver($store);
-
+                
                 if ($type === 'cancel') {
                     // Order dibatalkan → get_order_list status CANCELLED lalu ambil detail item
                     if (! method_exists($driver, 'getOrderList')) {
@@ -572,8 +572,7 @@ class MarketplaceReturnController extends Controller
     public function getReturnDetail(Store $store, string $returnSn)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (!method_exists($driver, 'getReturnDetail')) {
+                        if (!method_exists($driver, 'getReturnDetail')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
 
@@ -591,8 +590,7 @@ class MarketplaceReturnController extends Controller
     public function getTracking(Store $store, $returnSn, Request $request)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (!method_exists($driver, 'getReverseTrackingInfo')) {
+                        if (!method_exists($driver, 'getReverseTrackingInfo')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
 
@@ -618,8 +616,7 @@ class MarketplaceReturnController extends Controller
     public function confirmAndRestock(Store $store, string $returnSn)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (!method_exists($driver, 'confirmReturn')) {
+                        if (!method_exists($driver, 'confirmReturn')) {
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 
