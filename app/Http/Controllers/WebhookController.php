@@ -113,7 +113,7 @@ class WebhookController extends Controller
             }
 
 
-            WebhookLog::create([
+            $webhookLog = WebhookLog::create([
                 'provider' => 'shopee',
                 'event_type' => $eventType,
                 'signature_verified' => $verified,
@@ -130,10 +130,10 @@ class WebhookController extends Controller
                 // Proses LANGSUNG (sync) supaya pesan chat tersimpan & di-broadcast
                 // seketika — realtime tidak bergantung pada queue worker yang jalan.
                 try {
-                    \App\Jobs\ProcessShopeeChatWebhookJob::dispatchSync($payload);
+                    \App\Jobs\ProcessShopeeChatWebhookJob::dispatchSync($payload, $rawBody, $webhookLog->id);
                 } catch (\Throwable $e) {
                     Log::warning('Chat webhook sync gagal, fallback ke antrean: ' . $e->getMessage());
-                    \App\Jobs\ProcessShopeeChatWebhookJob::dispatch($payload);
+                    \App\Jobs\ProcessShopeeChatWebhookJob::dispatch($payload, $rawBody, $webhookLog->id);
                 }
             } elseif ($shouldProcess && $eventType !== 'verify') {
                 \App\Jobs\ProcessShopeeWebhookJob::dispatch($payload, $eventType);
@@ -163,6 +163,44 @@ class WebhookController extends Controller
             ->get();
             
         return response()->json($logs);
+    }
+
+    /**
+     * Detail satu webhook log untuk viewer spesifik.
+     */
+    public function show(WebhookLog $log)
+    {
+        $log->load([
+            'chatMessages:id,store_id,marketplace_conversation_id,external_conversation_id,external_message_id,from_role,source,text,sent_at,webhook_log_id',
+            'chatMessages.store:id,name',
+        ]);
+
+        return response()->json([
+            'id' => $log->id,
+            'provider' => $log->provider,
+            'event_type' => $log->event_type,
+            'signature_verified' => $log->signature_verified,
+            'payload' => $log->payload,
+            'ip_address' => $log->ip_address,
+            'created_at' => $log->created_at,
+            'updated_at' => $log->updated_at,
+            'related_messages' => $log->chatMessages->map(fn ($message) => [
+                'id' => $message->id,
+                'store_id' => $message->store_id,
+                'store_name' => $message->store?->name,
+                'marketplace_conversation_id' => $message->marketplace_conversation_id,
+                'external_conversation_id' => $message->external_conversation_id,
+                'external_message_id' => $message->external_message_id,
+                'from_role' => $message->from_role,
+                'source' => $message->source,
+                'text' => $message->text,
+                'sent_at' => optional($message->sent_at)?->toIso8601String(),
+                'audit_url' => route('marketplace.chat.audit', [
+                    'webhook_log_id' => $log->id,
+                    'message_id' => $message->id,
+                ]) . '#chat-message-row-' . $message->id,
+            ])->values(),
+        ]);
     }
 
     /**

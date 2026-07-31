@@ -783,16 +783,7 @@ class ShipmentController extends Controller
             ]);
         }
 
-        $item = Item::query()
-            ->where('type', 'finished_good')
-            ->where(function ($query) use ($code) {
-                $query->where('barcode', $code)
-                    ->orWhere('code', $code)
-                    ->orWhereHas('barcodes', function ($barcodeQuery) use ($code) {
-                        $barcodeQuery->where('barcode', $code)
-                            ->where('is_active', true);
-                    });
-            })
+        $item = $this->finishedGoodItemQuery($code)
             ->first(['id', 'code', 'name']);
 
         if ($item) {
@@ -802,6 +793,30 @@ class ShipmentController extends Controller
                     'id' => $item->id,
                     'code' => $item->code,
                     'name' => $item->name,
+                ],
+            ]);
+        }
+
+        $marketplaceOrder = $this->marketplaceOrderQuery($code, $shipment)
+            ->with('store:id,code,name')
+            ->first(['id', 'store_id', 'channel_order_id', 'booking_sn', 'external_order_id', 'shipping_awb_no']);
+
+        if ($marketplaceOrder) {
+            $orderCode = $marketplaceOrder->channel_order_id
+                ?: $marketplaceOrder->shipping_awb_no
+                ?: $marketplaceOrder->external_order_id
+                ?: $marketplaceOrder->booking_sn
+                ?: $code;
+
+            return response()->json([
+                'type' => 'order',
+                'order' => [
+                    'id' => $marketplaceOrder->id,
+                    'code' => $orderCode,
+                    'channel_order_id' => $marketplaceOrder->channel_order_id,
+                    'shipping_awb_no' => $marketplaceOrder->shipping_awb_no,
+                    'store_code' => $marketplaceOrder->store?->code,
+                    'store_name' => $marketplaceOrder->store?->name,
                 ],
             ]);
         }
@@ -862,13 +877,25 @@ class ShipmentController extends Controller
         $qty = max(1, (int) ($data['qty'] ?? 1));
         $orderNo = mb_strtoupper(trim((string) ($data['order_no'] ?? '')));
 
-        $item = Item::query()
+        $item = $this->finishedGoodItemQuery($scanCode)
             ->with('category:id,name')
-            ->where('type', 'finished_good')
-            ->where(fn($q) => $q->where('barcode', $scanCode)->orWhere('code', $scanCode))
             ->first();
 
         if (!$item) {
+            $marketplaceOrder = $this->marketplaceOrderQuery($scanCode, $shipment)
+                ->first(['id', 'channel_order_id', 'shipping_awb_no', 'booking_sn', 'external_order_id']);
+
+            if ($marketplaceOrder) {
+                $message = "Kode {$scanCode} terdeteksi sebagai nomor pesanan/resi, bukan item. Gunakan Scan Pesanan.";
+
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json(['status' => 'error', 'message' => $message], 422);
+                }
+
+                return redirect()->route('sales.shipments.edit', $shipment)
+                    ->with('status', 'error')->with('message', $message)->withInput();
+            }
+
             $message = "Item dengan kode/barcode {$scanCode} tidak ditemukan atau bukan finished_good.";
 
             if ($request->expectsJson() || $request->ajax()) {
@@ -1127,6 +1154,40 @@ class ShipmentController extends Controller
 
         $shipment->load('lines.item');
         return $this->checkStockSufficiency($shipment, $warehouse);
+    }
+
+    protected function finishedGoodItemQuery(string $scanCode)
+    {
+        $scanCode = mb_strtoupper(trim($scanCode));
+
+        return Item::query()
+            ->where('type', 'finished_good')
+            ->where(function ($query) use ($scanCode) {
+                $query->where('barcode', $scanCode)
+                    ->orWhere('code', $scanCode)
+                    ->orWhereHas('barcodes', function ($barcodeQuery) use ($scanCode) {
+                        $barcodeQuery->where('barcode', $scanCode)
+                            ->where('is_active', true);
+                    });
+            });
+    }
+
+    protected function marketplaceOrderQuery(string $scanCode, ?Shipment $shipment = null)
+    {
+        $scanCode = mb_strtoupper(trim($scanCode));
+
+        $query = \App\Models\MarketplaceOrder::query();
+
+        if ($shipment && !empty($shipment->store_id)) {
+            $query->where('store_id', $shipment->store_id);
+        }
+
+        return $query->where(function ($query) use ($scanCode) {
+            $query->where('channel_order_id', $scanCode)
+                ->orWhere('shipping_awb_no', $scanCode)
+                ->orWhere('external_order_id', $scanCode)
+                ->orWhere('booking_sn', $scanCode);
+        });
     }
 
     /**

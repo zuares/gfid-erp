@@ -80,12 +80,6 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.clear');
         Route::get('ads-dashboard/realtime-status', [AdsDashboardController::class, 'realtimeStatus'])
             ->name('ads.realtime.status');
-        Route::get('ads-dashboard/sync-status', [AdsDashboardController::class, 'syncStatus'])
-            ->name('ads.sync.status');
-        Route::post('ads-dashboard/queue-cancel', [AdsDashboardController::class, 'queueCancel'])
-            ->name('ads.queue.cancel');
-        Route::post('ads-dashboard/gap-fix', [AdsDashboardController::class, 'gapFix'])
-            ->name('ads.gap.fix');
         Route::get('ads-dashboard/campaign-hourly', [AdsDashboardController::class, 'campaignHourly'])
             ->name('ads.campaign.hourly');
         Route::post('ads-dashboard/gms-item-action', [AdsDashboardController::class, 'actionGmsItem'])

@@ -31,6 +31,11 @@ class StorefrontCustomer extends Model
         return HasMany::make(StorefrontOrder::class, 'customer_phone', 'phone');
     }
 
+    public function oauthIdentities(): HasMany
+    {
+        return $this->hasMany(StorefrontOauthIdentity::class, 'customer_id');
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     /** Phone display: +62 812 3456 7890 */

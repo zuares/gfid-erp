@@ -197,9 +197,80 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['code' => -1, 'message' => 'Not supported for TikTok Shop'];
     }
 
+    public function getDiscountList(
+        Store $store,
+        string $status = 'ongoing',
+        int $pageNo = 1,
+        int $pageSize = 100,
+        ?int $updateTimeFrom = null,
+        ?int $updateTimeTo = null
+    ): array {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function addDiscount(Store $store, string $discountName, int $startTime, int $endTime): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function addDiscountItem(Store $store, int $discountId, array $itemList): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function updateDiscountItem(Store $store, int $discountId, array $itemList): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function endDiscount(Store $store, int $discountId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function getDiscount(Store $store, int $discountId, int $pageNo = 1, int $pageSize = 50): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function updateDiscount(
+        Store $store,
+        int $discountId,
+        ?string $discountName = null,
+        ?int $startTime = null,
+        ?int $endTime = null
+    ): array {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteDiscount(Store $store, int $discountId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteDiscountItem(Store $store, int $discountId, int $itemId, int $modelId = 0): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function getSipDiscounts(Store $store, ?string $region = null): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
+    }
+
+    public function setSipDiscount(Store $store, string $region, int $sipDiscountRate): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteSipDiscount(Store $store, string $region): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
+    }
+
     // ─── Refresh token ────────────────────────────────────────────────────────
 
-    public function refreshToken(Store $store): array
+    public function refreshToken(Store $store, bool $force = false): array
     {
         if (! $store->is_active) {
             // Toko nonaktif: jangan hubungi API auth TikTok sama sekali.

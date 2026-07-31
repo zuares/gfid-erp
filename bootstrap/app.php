@@ -74,6 +74,13 @@ return Application::configure(basePath: dirname(__DIR__))
             ->runInBackground()
             ->appendOutputTo(storage_path('logs/sync-ads.log'));
 
+        // Backfill chat audit lama: isi raw_payload/raw_context dan kaitkan webhook_log_id
+        // untuk message yang sempat terlewat dari jalur webhook lama.
+        $schedule->command('marketplace:repair-chat-raw-payloads', ['--limit' => 1000])
+            ->dailyAt('02:20')
+            ->name('repair-chat-raw-payloads')
+            ->withoutOverlapping();
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

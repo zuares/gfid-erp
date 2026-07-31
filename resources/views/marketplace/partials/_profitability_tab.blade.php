@@ -110,28 +110,45 @@
 
 <!-- ── Pengaturan admin fee: otomatis (settlement) / manual ── -->
 @if(($storeId ?? null) !== 'all')
-<div style="display:flex; justify-content:flex-end; margin-bottom:.75rem;">
-    <details style="position:relative;">
-        <summary style="cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:.35rem; padding:.4rem .75rem; border:1px solid var(--dsh-border); border-radius:10px; font-size:.72rem; font-weight:700; color:var(--text); background:var(--bg);">
-            <i class="bi bi-gear" style="color:var(--dsh-muted);"></i>
-            Adm fee: {{ $feeMode === 'manual' ? 'Manual ' . number_format((float) $feeManualPct, 1, ',', '.') . '%' : 'Otomatis' }}
-        </summary>
-        <form method="POST" action="{{ route('marketplace.ads.fee.setting') }}" style="position:absolute; right:0; top:calc(100% + 6px); z-index:30; min-width:250px; padding:1rem; border:1px solid var(--dsh-border); border-radius:12px; background:var(--bg); box-shadow:0 8px 24px rgba(0,0,0,.12); font-size:.75rem;">
+<div class="ads-tab-panel mb-3">
+    <div class="ads-tab-panel-head">
+        <div>
+            <div class="ads-tab-panel-title">
+                <i class="bi bi-gear" style="color: var(--dsh-accent);"></i> Pengaturan Fee
+            </div>
+            <div class="ads-tab-panel-note">Tersambung langsung ke route `ads.fee.setting`.</div>
+        </div>
+    </div>
+    <div class="p-3">
+        <form method="POST" action="{{ route('marketplace.ads.fee.setting') }}" class="row g-3 align-items-end">
             @csrf
             <input type="hidden" name="store_id" value="{{ $storeId }}">
-            <label style="display:flex; align-items:center; gap:.45rem; margin-bottom:.5rem; cursor:pointer;">
-                <input type="radio" name="admin_fee_mode" value="auto" {{ $feeMode !== 'manual' ? 'checked' : '' }}>
-                <span>Otomatis — dari data pencairan per item</span>
-            </label>
-            <label style="display:flex; align-items:center; gap:.45rem; margin-bottom:.7rem; cursor:pointer;">
-                <input type="radio" name="admin_fee_mode" value="manual" {{ $feeMode === 'manual' ? 'checked' : '' }}>
-                <span>Manual</span>
-                <input type="number" name="admin_fee_pct" step="0.1" min="0" max="99" value="{{ $feeManualPct !== null ? number_format((float) $feeManualPct, 1, '.', '') : '21.9' }}" style="width:64px; padding:.2rem .35rem; border:1px solid var(--dsh-border); border-radius:6px; background:var(--bg); color:var(--text); font-size:.75rem; text-align:right;" onfocus="this.closest('form').querySelector('input[value=manual]').checked = true">
-                <span>%</span>
-            </label>
-            <button type="submit" class="btn btn-sm btn-primary" style="width:100%; font-size:.72rem; font-weight:700;">Simpan</button>
+            <div class="col-lg-5">
+                <label class="form-label" style="font-size:.75rem; font-weight:650; color:var(--dsh-muted);">Mode Admin Fee</label>
+                <div class="d-flex flex-wrap gap-2">
+                    <label class="d-flex align-items-center gap-2 px-3 py-2" style="border:1px solid var(--dsh-border); border-radius:10px; cursor:pointer; background:var(--bg); font-size:.76rem;">
+                        <input type="radio" name="admin_fee_mode" value="auto" {{ $feeMode !== 'manual' ? 'checked' : '' }}>
+                        <span>Otomatis</span>
+                    </label>
+                    <label class="d-flex align-items-center gap-2 px-3 py-2" style="border:1px solid var(--dsh-border); border-radius:10px; cursor:pointer; background:var(--bg); font-size:.76rem;">
+                        <input type="radio" name="admin_fee_mode" value="manual" {{ $feeMode === 'manual' ? 'checked' : '' }}>
+                        <span>Manual</span>
+                    </label>
+                </div>
+                <div style="font-size:.68rem; color:var(--dsh-muted); margin-top:.4rem;">Otomatis pakai data settlement per item, manual pakai persen yang kamu isi.</div>
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label" style="font-size:.75rem; font-weight:650; color:var(--dsh-muted);">Admin Fee %</label>
+                <input type="number" name="admin_fee_pct" step="0.1" min="0" max="99" value="{{ $feeManualPct !== null ? number_format((float) $feeManualPct, 1, '.', '') : '21.9' }}" class="form-control" style="border-radius:10px; font-size:.85rem; background:var(--bg); color:var(--text); border-color:var(--dsh-border);">
+                <div style="font-size:.68rem; color:var(--dsh-muted); margin-top:.35rem;">Contoh: 21.9 untuk fee 21.9%.</div>
+            </div>
+            <div class="col-lg-4">
+                <button type="submit" class="btn fw-bold w-100" style="background: var(--dsh-accent); color:#fff; border-radius:10px; padding:.6rem .9rem;">
+                    <i class="bi bi-save"></i> Simpan Pengaturan
+                </button>
+            </div>
         </form>
-    </details>
+    </div>
 </div>
 @endif
 

@@ -25,7 +25,9 @@
     // ROUTE GUARDS (biar tidak error kalau route belum ada)
     // =========================================================
     $hasDashboardRoute = $router->has('dashboard');
+    $hasAiIndexRoute = $router->has('ai.index');
     $hasAiAgentRoute = $router->has('ai.agent');
+    $hasAiOpenAiRoute = $router->has('ai.openai.index');
     $hasOwnerAccessControl = $router->has('owner.access-control.index');
 
     // Persediaan
@@ -97,6 +99,8 @@
     $hasMarketplacePickingBarang     = $router->has('marketplace.picking');
     $hasMarketplaceSkuMapping  = $router->has('marketplace.sku-mapping');
     $hasMarketplaceSync        = $router->has('marketplace.sync');
+    $hasMarketplacePromotions  = $router->has('marketplace.promotions');
+    $hasMarketplacePromotionsSummary  = $router->has('marketplace.promotions.summary');
     $hasMarketplacePencairanDana  = $router->has('marketplace.settlement');
     $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
@@ -297,6 +301,9 @@
         $open('marketplace.picking') ||
         $open('marketplace.sku-mapping') ||
         $open('marketplace.sync') ||
+        $open('marketplace.promotions') ||
+        $open('marketplace.promotions.*') ||
+        $open('marketplace.promotions.summary') ||
         $open('marketplace.settlement') ||
         $open('marketplace.income-detail') ||
         $open('marketplace.profit') ||
@@ -694,10 +701,22 @@
                     Beranda
                 </x-sidebar.simple-link>
             </li>
-            @if ($hasAiAgentRoute && $canOpenAiAgent)
+            @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
                 <x-sidebar.label text="AI" />
                 <li>
-                    <x-sidebar.simple-link href="{{ route('ai.agent') }}" icon="bi bi-stars" :active="$openAi">
+                    <x-sidebar.simple-link href="{{ route('ai.index') }}" icon="bi bi-stars" :active="request()->routeIs('ai.index')">
+                        AI Studio
+                    </x-sidebar.simple-link>
+                </li>
+                @if ($hasAiOpenAiRoute)
+                    <li>
+                        <x-sidebar.simple-link href="{{ route('ai.openai.index') }}" icon="bi bi-plug" :active="request()->routeIs('ai.openai.*')">
+                            Connect OpenAI
+                        </x-sidebar.simple-link>
+                    </li>
+                @endif
+                <li>
+                    <x-sidebar.simple-link href="{{ route('ai.agent') }}" icon="bi bi-chat-square-dots" :active="$openAi">
                         AI Agent
                     </x-sidebar.simple-link>
                 </li>
@@ -920,6 +939,19 @@
                         <x-sidebar.simple-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
                             :active="request()->routeIs('marketplace.boost')">
                             Naikkan Produk
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($router->has('marketplace.promotions'))
+                        <x-sidebar.simple-link href="{{ route('marketplace.promotions') }}" icon="bi bi-percent"
+                            :active="request()->routeIs('marketplace.promotions')">
+                            Promosi
+                        </x-sidebar.simple-link>
+                    @endif
+                    @if ($hasMarketplacePromotionsSummary)
+                        <x-sidebar.simple-link href="{{ route('marketplace.promotions.summary') }}" icon="bi bi-grid-3x3-gap"
+                            :active="request()->routeIs('marketplace.promotions.summary')">
+                            Summary Promosi
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1388,6 +1420,18 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
                                 :active="request()->routeIs('marketplace.boost')">
                                 Naikkan Produk
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($router->has('marketplace.promotions'))
+                            <x-sidebar.sub-link href="{{ route('marketplace.promotions') }}" icon="bi bi-percent"
+                                :active="request()->routeIs('marketplace.promotions')">
+                                Promosi
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplacePromotionsSummary)
+                            <x-sidebar.sub-link href="{{ route('marketplace.promotions.summary') }}" icon="bi bi-grid-3x3-gap"
+                                :active="request()->routeIs('marketplace.promotions.summary')">
+                                Summary Promosi
                             </x-sidebar.sub-link>
                         @endif
                         @if ($router->has('marketplace.chat') && $canModule('marketplace'))

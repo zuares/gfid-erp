@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\OpenAI\OpenAiService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class AiAgentController extends Controller
 {
@@ -69,12 +69,31 @@ class AiAgentController extends Controller
             'page_context.url' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $result = $this->runOpenAi([
-            'mode' => $data['mode'] ?? 'internal',
-            'message' => $data['message'],
-            'page_context' => $data['page_context'] ?? null,
-            'purpose' => 'Answer as a helpful AI assistant for this website. Keep the reply concise, practical, and friendly.',
-        ]);
+        $result = app(OpenAiService::class)->generateAgentResponse(
+            $data['mode'] ?? 'internal',
+            $data['message'],
+            array_filter([
+                'page' => 'AI Agent',
+                'app_name' => config('app.name', 'GFID'),
+                'route' => request()->route()?->getName(),
+                'user_name' => auth()->user()?->name,
+                'user_role' => auth()->user()?->role,
+                'available_sections' => [
+                    'dashboard',
+                    'marketplace',
+                    'sales',
+                    'inventory',
+                    'production',
+                    'purchasing',
+                    'payroll',
+                    'accounting',
+                    'owner',
+                ],
+                'page_context' => $data['page_context'] ?? null,
+            ], fn ($value) => $value !== null),
+            'Answer as a helpful AI assistant for this website. Keep the reply concise, practical, and friendly.',
+            $request->user()
+        );
 
         return response()->json($result);
     }
@@ -90,157 +109,32 @@ class AiAgentController extends Controller
             'page_context.url' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $result = $this->runOpenAi([
-            'mode' => 'task',
-            'message' => $data['message'],
-            'page_context' => $data['page_context'] ?? null,
-            'purpose' => 'Turn the instruction into a Codex-ready work brief for a developer. Output a practical task draft.',
-        ]);
+        $result = app(OpenAiService::class)->generateAgentResponse(
+            'task',
+            $data['message'],
+            array_filter([
+                'page' => 'AI Agent',
+                'app_name' => config('app.name', 'GFID'),
+                'route' => request()->route()?->getName(),
+                'user_name' => auth()->user()?->name,
+                'user_role' => auth()->user()?->role,
+                'available_sections' => [
+                    'dashboard',
+                    'marketplace',
+                    'sales',
+                    'inventory',
+                    'production',
+                    'purchasing',
+                    'payroll',
+                    'accounting',
+                    'owner',
+                ],
+                'page_context' => $data['page_context'] ?? null,
+            ], fn ($value) => $value !== null),
+            'Turn the instruction into a Codex-ready work brief for a developer. Output a practical task draft.',
+            $request->user()
+        );
 
         return response()->json($result);
-    }
-
-    protected function runOpenAi(array $input): array
-    {
-        $apiKey = config('services.openai.key');
-        if (! $apiKey) {
-            return [
-                'ok' => false,
-                'message' => 'OPENAI_API_KEY belum diset di .env.',
-            ];
-        }
-
-        $system = <<<'TXT'
-Kamu adalah AI assistant untuk website internal GreatFit.
-- Jawab singkat, jelas, ramah, dan konkret.
-- Jika diminta membuat task, ubah permintaan menjadi brief yang siap dikerjakan Codex/developer.
-- Jangan mengarang data yang tidak tersedia.
-- Jika butuh konteks data website, minta rincian atau jelaskan asumsi.
-TXT;
-
-        $context = [
-            'page' => 'AI Agent',
-            'app_name' => config('app.name', 'GFID'),
-            'route' => request()->route()?->getName(),
-            'user_name' => auth()->user()?->name,
-            'user_role' => auth()->user()?->role,
-            'available_sections' => [
-                'dashboard',
-                'marketplace',
-                'sales',
-                'inventory',
-                'production',
-                'purchasing',
-                'payroll',
-                'accounting',
-                'owner',
-            ],
-        ];
-
-        if (! empty($input['page_context']) && is_array($input['page_context'])) {
-            $context['page_context'] = $input['page_context'];
-        }
-
-        $payload = [
-            'model' => config('services.openai.model', 'gpt-5.6-terra'),
-            'input' => [
-                [
-                    'role' => 'system',
-                    'content' => [
-                        ['type' => 'input_text', 'text' => $system],
-                    ],
-                ],
-                [
-                    'role' => 'user',
-                    'content' => [
-                        ['type' => 'input_text', 'text' => json_encode([
-                            'input' => $input,
-                            'context' => $context,
-                            'response_format' => [
-                                'reply' => 'string',
-                                'task_title' => 'string|null',
-                                'task_summary' => 'string|null',
-                                'task_steps' => 'array|null',
-                            ],
-                        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)],
-                    ],
-                ],
-            ],
-            'text' => [
-                'format' => [
-                    'type' => 'json_schema',
-                    'name' => 'ai_agent_response',
-                    'schema' => [
-                        'type' => 'object',
-                        'additionalProperties' => false,
-                        'properties' => [
-                            'reply' => ['type' => 'string'],
-                            'task_title' => ['type' => ['string', 'null']],
-                            'task_summary' => ['type' => ['string', 'null']],
-                            'task_steps' => [
-                                'type' => ['array', 'null'],
-                                'items' => ['type' => 'string'],
-                            ],
-                        ],
-                        'required' => ['reply', 'task_title', 'task_summary', 'task_steps'],
-                    ],
-                    'strict' => true,
-                ],
-            ],
-        ];
-
-        $response = Http::withToken($apiKey)
-            ->acceptJson()
-            ->timeout(45)
-            ->post('https://api.openai.com/v1/responses', $payload);
-
-        if (! $response->successful()) {
-            $error = $response->json('error');
-            $errorMessage = data_get($error, 'message') ?: trim((string) $response->body());
-
-            return [
-                'ok' => false,
-                'message' => 'OpenAI API gagal dipanggil: ' . ($errorMessage !== '' ? $errorMessage : 'unknown error'),
-                'status' => $response->status(),
-                'error' => $error ?: $response->body(),
-                'error_type' => data_get($error, 'type'),
-                'error_code' => data_get($error, 'code'),
-            ];
-        }
-
-        $json = $response->json();
-        $text = data_get($json, 'output_text');
-
-        if (! $text) {
-            $text = collect(data_get($json, 'output', []))
-                ->flatMap(fn ($item) => data_get($item, 'content', []))
-                ->pluck('text')
-                ->filter()
-                ->implode('');
-        }
-
-        $parsed = json_decode((string) $text, true);
-        if (! is_array($parsed)) {
-            $parsed = [
-                'reply' => trim((string) $text),
-                'task_title' => null,
-                'task_summary' => null,
-                'task_steps' => [],
-            ];
-        }
-
-        return [
-            'ok' => true,
-            'reply' => (string) ($parsed['reply'] ?? ''),
-            'task' => [
-                'title' => $parsed['task_title'] ?? null,
-                'summary' => $parsed['task_summary'] ?? null,
-                'steps' => array_values(array_filter((array) ($parsed['task_steps'] ?? []))),
-            ],
-            'meta' => [
-                'model' => data_get($json, 'model'),
-                'id' => data_get($json, 'id'),
-            ],
-        ];
     }
 }

@@ -3,415 +3,45 @@
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
-use App\Models\MarketplaceAdCampaign;
-use App\Models\MarketplaceAdsDaily;
-use App\Models\MarketplaceAdsHourlyPerformance;
-use App\Models\MarketplaceAdsSyncRun;
 use App\Models\Store;
+use App\Services\Marketplace\Ads\AdsActionService;
+use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\Ads\AdsAnalyticsService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use App\Services\Marketplace\Ads\ShopeeAdsApiService;
 
 class AdsDashboardController extends Controller
 {
-    public function index(Request $request, AdsAnalyticsService $analytics)
+    public function index(Request $request, AdsAnalyticsService $analytics, AdsDashboardService $dashboardService)
     {
-        // 1. Dapatkan daftar store milik user (atau semua jika role mencukupi)
         $stores = Store::select('id', 'name')
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
             ->where('is_active', true)
             ->get();
-            
+
         $storeId = $request->input('store_id', $stores->first()?->id);
+        if (! $storeId) {
+            $dateFrom = now()->subDays(6)->toDateString();
+            $dateTo = now()->toDateString();
+            $compareMode = $request->input('compare_mode', 'prev_period');
 
-        // "Semua Toko": agregasi lintas toko — $storeIds dipakai semua query di bawah.
-        $isAllStores = $storeId === 'all';
-        $storeIds = $isAllStores ? $stores->pluck('id')->all() : [$storeId];
-        
-        // SATSET: input tanggal WAJIB disanitasi — di bawah dipakai lewat
-        // interpolasi string di selectRaw (query gmsItems), jadi nilai bebas
-        // dari user = celah SQL injection. Carbon::parse + toDateString
-        // menjamin hanya format Y-m-d yang lolos.
-        $dateFrom = $this->safeDate($request->input('date_from'), now()->subDays(6));
-        $dateTo = $this->safeDate($request->input('date_to'), now());
-        $compareMode = $request->input('compare_mode', 'prev_period');
-
-        if (!$storeId) {
             return view('marketplace.ads_dashboard', compact('stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode'))
                 ->with('error', 'Tidak ada toko Shopee aktif.');
         }
 
-        // Validate ownership
-        // In real app, make sure user can access this storeId
-        
-        // Fetch KPIs
-        $kpi = $analytics->getKpiSummary($storeIds, $dateFrom, $dateTo);
-        
-        // Fetch Daily Chart Data
-        $dailyChartData = MarketplaceAdsDaily::whereIn('store_id', $storeIds)
-            ->whereBetween('date', [$dateFrom, $dateTo])
-            ->orderBy('date')
-            ->get(['date', 'impressions', 'clicks', 'spend', 'orders', 'gmv', 'roas'])
-            ->map(fn (MarketplaceAdsDaily $row) => [
-                'date'        => substr((string) $row->date, 0, 10),
-                'impressions' => (int) $row->impressions,
-                'clicks'      => (int) $row->clicks,
-                'spend'       => (float) $row->spend,
-                'orders'      => (int) $row->orders,
-                'gmv'         => (float) $row->gmv,
-                'roas'        => (float) ($row->roas ?? 0),
-            ])
-            ->values();
-            
-        $dStart = \Carbon\Carbon::parse($dateFrom);
-        $dEnd = \Carbon\Carbon::parse($dateTo);
-        
-        if ($compareMode === 'prev_month') {
-            $prevDateFrom = $dStart->copy()->subMonth()->toDateString();
-            $prevDateTo = $dEnd->copy()->subMonth()->toDateString();
-        } elseif ($compareMode === 'prev_year') {
-            $prevDateFrom = $dStart->copy()->subYear()->toDateString();
-            $prevDateTo = $dEnd->copy()->subYear()->toDateString();
-        } else {
-            $diffDays = $dStart->diffInDays($dEnd);
-            $prevDateFrom = $dStart->copy()->subDays($diffDays + 1)->toDateString();
-            $prevDateTo = $dStart->copy()->subDay()->toDateString();
-        }
-        
-        // Pengaturan per toko (target ROAS + mode admin fee)
-        $adsSetting = $isAllStores ? null : \App\Models\MarketplaceAdsSetting::where('store_id', $storeId)->first();
+        $dashboard = $dashboardService->buildDashboardData(
+            $stores,
+            $storeId,
+            $request->input('date_from'),
+            $request->input('date_to'),
+            $request->input('compare_mode', 'prev_period'),
+            $analytics
+        );
 
-        // Mode manual: satu rasio cair untuk semua kampanye, di-set user.
-        $manualFeeRatio = ($adsSetting && ($adsSetting->admin_fee_mode ?? 'auto') === 'manual' && $adsSetting->admin_fee_pct !== null)
-            ? max(0.0, 1 - ((float) $adsSetting->admin_fee_pct / 100))
-            : null;
-
-        // Fetch Campaigns — hanya ongoing & paused agar tab Kampanye tidak menampilkan yang sudah mati
-        // SATSET: 17 withSum = 17 subquery berkorelasi PER BARIS kampanye
-        // (±6.800 subquery per load di SQLite). Diganti 2 query agregat
-        // GROUP BY (periode ini + pembanding) lalu di-map di PHP.
-        $aggFor = function (string $from, string $to) use ($storeIds) {
-            return \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')
-                ->whereIn('store_id', $storeIds)
-                ->whereBetween('date', [$from, $to])
-                ->groupBy('store_id', 'channel_campaign_id')
-                ->selectRaw('store_id, channel_campaign_id,
-                    SUM(expense) se, SUM(broad_gmv) sbg, SUM(direct_gmv) sdg,
-                    SUM(clicks) sc, SUM(impressions) si,
-                    SUM(broad_order) sbo, SUM(broad_order_amount) sboa,
-                    SUM(direct_order) sdo, SUM(direct_order_amount) sdoa')
-                ->get()
-                ->keyBy(fn ($r) => $r->store_id . '|' . $r->channel_campaign_id);
-        };
-        $aggCur  = $aggFor($dateFrom, $dateTo);
-        $aggPrev = $aggFor($prevDateFrom, $prevDateTo);
-
-        $campaigns = MarketplaceAdCampaign::query()
-            ->select([
-                'id',
-                'store_id',
-                'channel_campaign_id',
-                'channel_item_id',
-                'internal_item_id',
-                'campaign_name',
-                'campaign_status',
-                'ad_type',
-                'target_roas',
-                'campaign_budget',
-                'break_even_acos',
-                'spend',
-                'impressions',
-                'clicks',
-                'orders',
-                'items_sold',
-                'gmv',
-                'direct_gmv',
-                'roas',
-            ])
-            ->with([
-                'internalItem:id,hpp,base_unit_cost,item_category_id',
-                'internalItem.category:id,name',
-                'store:id,name,channel_id',
-                'store.channel:id,code',
-            ])
-            ->whereIn('store_id', $storeIds)
-            ->get();
-
-        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey] = $this->preloadCampaignAnalytics($campaigns);
-
-        $campaigns = $campaigns
-            ->map(function ($camp) use ($manualFeeRatio, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey) {
-                $k = $camp->store_id . '|' . $camp->channel_campaign_id;
-                $a = $aggCur->get($k);
-                $p = $aggPrev->get($k);
-                $camp->sum_expense             = (float) ($a->se ?? 0);
-                $camp->sum_broad_gmv           = (float) ($a->sbg ?? 0);
-                $camp->sum_direct_gmv          = (float) ($a->sdg ?? 0);
-                $camp->sum_clicks              = (int)   ($a->sc ?? 0);
-                $camp->sum_impressions         = (int)   ($a->si ?? 0);
-                $camp->sum_broad_orders        = (int)   ($a->sbo ?? 0);
-                $camp->sum_broad_order_amount  = (float) ($a->sboa ?? 0);
-                $camp->sum_direct_orders       = (int)   ($a->sdo ?? 0);
-                $camp->sum_direct_order_amount = (float) ($a->sdoa ?? 0);
-                $camp->sum_prev_expense        = (float) ($p->se ?? 0);
-                $camp->sum_prev_broad_gmv      = (float) ($p->sbg ?? 0);
-                $camp->sum_prev_direct_gmv     = (float) ($p->sdg ?? 0);
-                $camp->sum_prev_clicks         = (int)   ($p->sc ?? 0);
-                $camp->sum_prev_impressions    = (int)   ($p->si ?? 0);
-                $camp->sum_prev_broad_orders   = (int)   ($p->sbo ?? 0);
-                $camp->sum_prev_direct_orders  = (int)   ($p->sdo ?? 0);
-
-                // Shopee API: broad_gmv dan broad_orders merupakan total keseluruhan (termasuk direct)
-                $camp->sum_gmv = $camp->sum_broad_gmv ?? 0;
-                $camp->sum_orders = $camp->sum_broad_orders ?? 0;
-                $camp->sum_prev_gmv = $camp->sum_prev_broad_gmv ?? 0;
-                $camp->sum_prev_orders = $camp->sum_prev_broad_orders ?? 0;
-                
-                $roas = $camp->sum_expense > 0 ? $camp->sum_gmv / $camp->sum_expense : 0;
-                $prevRoas = $camp->sum_prev_expense > 0 ? $camp->sum_prev_gmv / $camp->sum_prev_expense : 0;
-                
-                $camp->roas = $roas;
-                $camp->prev_roas = $prevRoas;
-                
-                $camp->roas_growth = $prevRoas > 0 ? (($roas - $prevRoas) / $prevRoas) * 100 : 0;
-                $camp->spend_growth = $camp->sum_prev_expense > 0 ? (($camp->sum_expense - $camp->sum_prev_expense) / $camp->sum_prev_expense) * 100 : 0;
-                $camp->gmv_growth = $camp->sum_prev_gmv > 0 ? (($camp->sum_gmv - $camp->sum_prev_gmv) / $camp->sum_prev_gmv) * 100 : 0;
-
-                $camp->spend = $camp->sum_expense ?? 0;
-                $camp->gmv = $camp->sum_gmv ?? 0;
-                $camp->clicks = $camp->sum_clicks ?? 0;
-                $camp->orders = $camp->sum_orders ?? 0;
-                $camp->items_sold = $camp->sum_broad_order_amount ?? 0;
-                $camp->prev_spend = $camp->sum_prev_expense ?? 0;
-                $camp->prev_gmv = $camp->sum_prev_gmv ?? 0;
-                $camp->prev_clicks = $camp->sum_prev_clicks ?? 0;
-                $camp->prev_orders = $camp->sum_prev_orders ?? 0;
-                
-                // Hitung ACOS
-                $acos = $camp->gmv > 0 && $camp->spend > 0 ? round($camp->spend / $camp->gmv, 4) : null;
-                $camp->acos_pct = $acos !== null ? round($acos * 100, 1) : null;
-                
-                $campaignKey = $camp->store_id . '|' . (string) $camp->channel_item_id;
-                $camp->unit_cogs = (float) ($unitCogsByKey[$campaignKey] ?? ($camp->internalItem?->hpp ?? $camp->internalItem?->base_unit_cost ?? 0));
-                
-                $trueAvgPrice = (float) ($avgPriceByKey[$campaignKey] ?? 0);
-                if (!$trueAvgPrice || $trueAvgPrice <= 0) {
-                    $trueAvgPrice = ($camp->orders > 0 && $camp->gmv > 0) ? ($camp->gmv / $camp->orders) : 0;
-                }
-                $camp->cogs_ratio = $trueAvgPrice > 0 ? ($camp->unit_cogs / $trueAvgPrice) : 0;
-                                 
-                if ($manualFeeRatio !== null) {
-                    [$ratio, $ratioSource] = [$manualFeeRatio, 'manual'];
-                } else {
-                    [$ratio, $ratioSource] = $revenueRatioByKey[(string) $camp->channel_item_id]
-                        ?? [self::DEFAULT_NET_REVENUE_RATIO, 'default'];
-                }
-                $camp->net_revenue_ratio = $ratio;
-                $camp->net_revenue_ratio_source = $ratioSource; // 'manual' | 'item' | 'default'
-                                 
-                // Break-even ACOS
-                $netRevRatio = $camp->net_revenue_ratio ?? self::DEFAULT_NET_REVENUE_RATIO;
-                // Break-even ACOS dihitung per UNIT: pakai pcs terjual bila ada
-                // (order bisa berisi >1 barang — pakai order membuat harga/unit melenceng).
-                $beAcos = null;
-                if ($camp->unit_cogs > 0 && $trueAvgPrice > 0) {
-                    $netPerUnit = $trueAvgPrice * $netRevRatio;
-                    if ($camp->unit_cogs < $netPerUnit) {
-                        $beAcos = round(($netPerUnit - $camp->unit_cogs) / $trueAvgPrice, 6);
-                    }
-                }
-                if ($beAcos === null) {
-                    $beAcos = $camp->break_even_acos !== null
-                        ? (float) $camp->break_even_acos
-                        : $this->deriveBreakEvenAcos($camp->internalItem, (float) $camp->gmv, (int) $camp->orders, $netRevRatio);
-                }
-                $camp->break_even_acos_pct = $beAcos !== null ? round($beAcos * 100, 1) : null;
-                
-                // Profit after ads
-                if ($beAcos !== null) {
-                    $netRevenue = $camp->gmv * $netRevRatio;
-                    // COGS eksak: HPP/unit × pcs terjual (broad_order_amount).
-                    // Fallback estimasi rasio harga hanya bila pcs tidak tersedia.
-                    $totalCogs = ($camp->unit_cogs > 0 && ($camp->items_sold ?? 0) > 0)
-                        ? $camp->unit_cogs * $camp->items_sold
-                        : $camp->gmv * ($camp->cogs_ratio ?? 0);
-                    $spendAfterTax = $camp->spend * 1.11;
-                    $camp->profit_after_ads = round($netRevenue - $totalCogs - $spendAfterTax, 2);
-                } else {
-                    $camp->profit_after_ads = null;
-                }
-                
-                // Rekomendasi
-                $camp->reco = $this->adsRecommendation((float)$camp->spend, $acos, $beAcos, (int)$camp->orders);
-                
-                return $camp;
-            })
-            // Tampilkan kampanye yang sedang berjalan ATAU yang memiliki spend
-            ->filter(fn($camp) => in_array($camp->campaign_status, ['ongoing', 'normal']) || $camp->spend > 0 || $camp->prev_spend > 0)
-            ->sortByDesc('spend')
-            ->values();
-            
-        // Kategori internal per kampanye — via mapping SKU di order items
-        // (bulk 1 query; dipakai fitur Group by Kategori di tab Profitabilitas).
-        $chanIds = $campaigns->pluck('channel_item_id')->filter()->unique()->map(fn ($v) => (string) $v)->values();
-        $catByChan = collect();
-        if ($chanIds->isNotEmpty()) {
-            $catByChan = \Illuminate\Support\Facades\DB::table('marketplace_order_items as moi')
-                ->join('items as i', 'i.id', '=', 'moi.internal_item_id')
-                ->leftJoin('item_categories as cat', 'cat.id', '=', 'i.item_category_id')
-                ->whereIn('moi.external_item_id', $chanIds)
-                ->whereNotNull('moi.internal_item_id')
-                ->groupBy('moi.external_item_id')
-                ->selectRaw('moi.external_item_id, MAX(cat.name) as cat_name')
-                ->pluck('cat_name', 'external_item_id');
-        }
-        $campaigns = $campaigns->map(function ($camp) use ($catByChan) {
-            $camp->item_category = $camp->internalItem?->category?->name
-                ?? ($catByChan[(string) $camp->channel_item_id] ?? null);
-            return $camp;
-        });
-
-        // Fetch Sync Runs
-        $syncRuns = MarketplaceAdsSyncRun::whereIn('store_id', $storeIds)
-            ->select([
-                'id',
-                'store_id',
-                'sync_type',
-                'date_from',
-                'date_to',
-                'status',
-                'total_requests',
-                'total_updated',
-                'error_message',
-                'started_at',
-                'finished_at',
-            ])
-            ->orderByDesc('id')
-            ->limit(20)
-            ->get();
-            
-        $lastSuccessRun = MarketplaceAdsSyncRun::whereIn('store_id', $storeIds)
-            ->select([
-                'id',
-                'store_id',
-                'sync_type',
-                'date_from',
-                'date_to',
-                'status',
-                'total_requests',
-                'total_updated',
-                'error_message',
-                'started_at',
-                'finished_at',
-            ])
-            ->where('status', 'success')
-            ->latest('id')
-            ->first();
-
-        $heatmapData = $analytics->getHourlyHeatmap($storeIds, $dateFrom, $dateTo);
-        $historicalData = $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3);
-
-        // Fetch All Product Performance (CPC + GMS gabungan)
-        // Sumber: campaign dailies di-join ke campaigns (untuk channel_item_id) lalu ke marketplace_products
-        $itemPerformance = \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies as cd')
-            ->join('marketplace_ad_campaigns as c', function ($join) {
-                $join->on('cd.channel_campaign_id', '=', 'c.channel_campaign_id')
-                     ->on('cd.store_id', '=', 'c.store_id');
-            })
-            ->leftJoin('marketplace_products as p', function ($join) {
-                $join->on('c.channel_item_id', '=', 'p.item_id')
-                     ->on('c.store_id', '=', 'p.store_id');
-            })
-            ->whereIn('cd.store_id', $storeIds)
-            ->whereNotNull('c.channel_item_id') // Exclude aggregate GMS campaigns tanpa produk spesifik
-            ->whereBetween('cd.date', [$dateFrom, $dateTo])
-            ->selectRaw('
-                c.channel_item_id,
-                c.channel_campaign_id,
-                MAX(c.campaign_name) as campaign_name,
-                MAX(c.campaign_status) as campaign_status,
-                MAX(c.ad_type) as ad_type,
-                MAX(p.item_sku) as item_sku,
-                MAX(p.item_name) as item_name,
-                SUM(cd.impressions) as impressions,
-                SUM(cd.clicks) as clicks,
-                SUM(cd.expense) as spend,
-                SUM(cd.broad_gmv) as gmv,
-                SUM(cd.broad_order) as orders,
-                SUM(cd.direct_gmv) as direct_gmv_sum
-            ')
-            ->groupBy('c.channel_item_id', 'c.channel_campaign_id')
-            ->orderByDesc('spend')
-            ->limit(50)
-            ->get();
-
-        $gmsItems = \Illuminate\Support\Facades\DB::table('marketplace_ads_item_dailies as id')
-            ->leftJoin('marketplace_products as p', function ($join) {
-                $join->on('id.channel_item_id', '=', 'p.item_id')
-                     ->on('id.store_id', '=', 'p.store_id');
-            })
-            ->leftJoin('marketplace_ad_campaigns as camp', function ($join) {
-                $join->on('id.channel_campaign_id', '=', 'camp.channel_campaign_id')
-                     ->on('id.store_id', '=', 'camp.store_id');
-            })
-            ->whereIn('id.store_id', $storeIds)
-            ->where(function ($q) use ($dateFrom, $dateTo, $prevDateFrom, $prevDateTo) {
-                $q->whereBetween('id.date', [$dateFrom, $dateTo])
-                  ->orWhereBetween('id.date', [$prevDateFrom, $prevDateTo]);
-            })
-            ->selectRaw("
-                id.channel_item_id,
-                MAX(id.channel_campaign_id) as channel_campaign_id,
-                MAX(p.item_sku) as item_sku,
-                MAX(p.item_name) as item_name,
-                MAX(camp.target_roas) as target_roas,
-                MAX(camp.campaign_budget) as campaign_budget,
-                MAX(camp.campaign_status) as campaign_status,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.impressions ELSE 0 END) as impression,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.clicks ELSE 0 END) as click,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.expense ELSE 0 END) as expense,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.broad_order ELSE 0 END) as broad_order,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.broad_gmv ELSE 0 END) as broad_gmv,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.direct_order ELSE 0 END) as direct_order,
-                SUM(CASE WHEN id.date >= '{$dateFrom}' AND id.date <= '{$dateTo}' THEN id.direct_gmv ELSE 0 END) as direct_gmv,
-                
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.impressions ELSE 0 END) as prev_impression,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.clicks ELSE 0 END) as prev_click,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.expense ELSE 0 END) as prev_expense,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.broad_order ELSE 0 END) as prev_broad_order,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.broad_gmv ELSE 0 END) as prev_broad_gmv,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.direct_order ELSE 0 END) as prev_direct_order,
-                SUM(CASE WHEN id.date >= '{$prevDateFrom}' AND id.date <= '{$prevDateTo}' THEN id.direct_gmv ELSE 0 END) as prev_direct_gmv
-            ")
-            ->groupBy('id.channel_item_id')
-            ->orderByDesc('expense')
-            ->get()
-            ->map(function ($item) {
-                // Return original structure but with growth added
-                return $item;
-            });
-
-        $autoCampaign = $isAllStores ? null : \App\Models\MarketplaceAdCampaign::select([
-                'id',
-                'store_id',
-                'channel_campaign_id',
-                'channel_item_id',
-                'campaign_name',
-                'campaign_status',
-                'campaign_budget',
-                'target_roas',
-                'ad_type',
-            ])
-            ->where('store_id', $storeId)
-            ->where('ad_type', 'auto')
-            ->first();
-
-        return view('marketplace.ads_dashboard', compact(
-            'stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode', 'kpi', 'dailyChartData', 'campaigns', 'syncRuns', 'heatmapData', 'historicalData', 'itemPerformance', 'lastSuccessRun', 'adsSetting', 'gmsItems', 'autoCampaign'
-        ));
+        return view('marketplace.ads_dashboard', $dashboard);
     }
 
     /** Simpan pengaturan admin fee (otomatis dari settlement / manual %). */
@@ -437,55 +67,51 @@ class AdsDashboardController extends Controller
     public function sync(Request $request)
     {
         $request->validate([
-            'store_id' => 'required|exists:stores,id',
-            'sync_type' => 'required|in:incremental,hourly,backfill',
+            'sync_type' => 'required|in:today,yesterday',
         ]);
-        
+
         $storeId = $request->input('store_id');
-        $type = $request->input('sync_type');
-        $isBackfill = $type === 'backfill';
-        if ($isBackfill && ! auth()->user()->hasRole(['owner', 'admin'])) {
-            return back()->with('error', 'Hanya Admin/Owner yang dapat menjalankan backfill.');
+        $isAllStores = $storeId === null || $storeId === '' || $storeId === 'all';
+        if (! $isAllStores) {
+            $request->validate([
+                'store_id' => 'required|exists:stores,id',
+            ]);
         }
 
-        $progressKey = "marketplace:ads_sync_progress:{$storeId}";
-        $store = Store::findOrFail($storeId);
-        $label = $type === 'hourly'
-            ? "Sync heatmap untuk {$store->name} sedang antre…"
-            : ($isBackfill
-                ? "Backfill ads untuk {$store->name} sedang antre…"
-                : "Sync ads untuk {$store->name} sedang antre…");
+        $type = $request->input('sync_type');
+        $date = $type === 'yesterday'
+            ? now()->subDay()->toDateString()
+            : now()->toDateString();
+
+        $store = $isAllStores ? null : Store::findOrFail($storeId);
+        $storeLabel = $isAllStores ? 'Semua toko' : $store->name;
+        $progressKey = 'marketplace:ads_sync_progress:' . ($isAllStores ? 'all' : $storeId);
+        $dayLabel = $type === 'yesterday' ? 'kemarin' : 'hari ini';
+        $label = "Sync {$dayLabel} untuk {$storeLabel} sedang antre…";
 
         \Illuminate\Support\Facades\Cache::put($progressKey, [
             'status'     => 'queued',
             'phase'      => 'queued',
             'percent'    => 3,
             'label'      => $label,
-            'store_id'   => $store->id,
-            'store_name' => $store->name,
+            'store_id'   => $isAllStores ? null : $store->id,
+            'store_name' => $storeLabel,
             'mode'       => $type,
             'updated_at' => now()->toISOString(),
         ], 1800);
 
-        $params = ['--store' => $storeId];
-        if ($type === 'hourly') {
-            $params['--hourly'] = true;
-        } elseif ($isBackfill) {
-            $params['--backfill'] = true;
-            $params['--from'] = now()->subMonths(6)->toDateString();
-            $params['--to'] = now()->toDateString();
+        $params = [
+            '--from' => $date,
+            '--to'   => $date,
+        ];
+        if (! $isAllStores) {
+            $params['--store'] = $storeId;
         }
 
         $queued = Artisan::queue('marketplace:sync-ads', $params);
-        if ($isBackfill) {
-            $queued->onQueue('heavy');
-        } else {
-            $queued->onQueue('ads');
-        }
+        $queued->onQueue('ads');
 
-        $message = $isBackfill
-            ? "Backfill ads untuk {$store->name} telah dikirim ke latar belakang. Pantau progress di tab Sinkronisasi."
-            : "Sync ads untuk {$store->name} telah dikirim ke latar belakang. Pantau progress di tab Sinkronisasi.";
+        $message = "Sync " . ($type === 'yesterday' ? 'kemarin' : 'hari ini') . " untuk {$storeLabel} telah dikirim ke latar belakang. Pantau progress di tab Sinkronisasi.";
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -496,167 +122,6 @@ class AdsDashboardController extends Controller
         }
 
         return back()->with('success', $message);
-    }
-
-    /**
-     * Status sync untuk tab Sync: riwayat run, antrean job, dan cooldown rate-limit.
-     */
-    public function syncStatus(Request $request)
-    {
-        $storeId = $request->input('store_id');
-
-        $runs = MarketplaceAdsSyncRun::when($storeId, fn ($q) => $q->where('store_id', $storeId))
-            ->orderByDesc('id')
-            ->limit(20)
-            ->get()
-            ->map(function ($r) {
-                $duration = ($r->started_at && $r->finished_at)
-                    ? $r->finished_at->diffInSeconds($r->started_at)
-                    : null;
-                return [
-                    'id'         => $r->id,
-                    'type'       => $r->sync_type,
-                    'status'     => $r->status,
-                    'date_from'  => optional($r->date_from)->format('d/m/Y'),
-                    'date_to'    => optional($r->date_to)->format('d/m/Y'),
-                    'requests'   => (int) $r->total_requests,
-                    'updated'    => (int) $r->total_updated,
-                    'error'      => $r->error_message,
-                    'started_at' => optional($r->started_at)->format('d/m H:i:s'),
-                    'duration'   => $duration !== null ? abs($duration) : null,
-                    'ts'         => optional($r->finished_at ?? $r->started_at)->timestamp,
-                ];
-            });
-
-        // Detail antrean: parse payload job jadi info yang bisa dibaca manusia
-        // (rentang tanggal tiap chunk, sedang jalan / menunggu, percobaan ke-berapa).
-        $adsJobs = \Illuminate\Support\Facades\DB::table('jobs')
-            ->where(function ($q) {
-                $q->where('payload', 'like', '%ShopeeAdsSyncJob%')
-                  ->orWhere('payload', 'like', '%marketplace:sync-ads%');
-            })
-            ->orderBy('id')
-            ->get(['id', 'attempts', 'available_at', 'reserved_at', 'payload'])
-            ->map(function ($j) {
-                $payload = json_decode($j->payload, true);
-                $cmd = $payload['data']['command'] ?? '';
-                preg_match_all('/"date";s:\d+:"([0-9\-: \.]+)"/', $cmd, $m);
-                $dates = $m[1] ?? [];
-                $fmt = function ($s) {
-                    try { return \Carbon\Carbon::parse($s)->format('d/m/Y'); }
-                    catch (\Throwable) { return null; }
-                };
-                return [
-                    'id'           => (int) $j->id,
-                    'attempts'     => (int) $j->attempts,
-                    'running'      => ! is_null($j->reserved_at),
-                    'available_in' => max(0, ((int) $j->available_at) - time()),
-                    'date_from'    => isset($dates[0]) ? $fmt($dates[0]) : null,
-                    'date_to'      => isset($dates[1]) ? $fmt($dates[1]) : null,
-                    'hourly'       => str_contains($cmd, '"isHourly";b:1'),
-                ];
-            })
-            ->values();
-
-        $pendingAdsJobs = $adsJobs->count();
-
-        $cooldownUntil = (int) \Illuminate\Support\Facades\Cache::get('shopee-ads-cooldown:' . $storeId, 0);
-        $cooldownLeft = max(0, $cooldownUntil - time());
-
-        $adsProgress = $storeId ? \Illuminate\Support\Facades\Cache::get("marketplace:ads_sync_progress:{$storeId}") : null;
-
-        // Progress backfill: total tahap disimpan saat chain di-dispatch;
-        // sisa tahap = job ads yang masih ada di antrean (termasuk yang sedang jalan).
-        $backfill = null;
-        $bf = \Illuminate\Support\Facades\Cache::get('shopee-ads-backfill-progress:' . $storeId);
-        if (is_array($bf) && ($bf['total'] ?? 0) > 0) {
-            $total = (int) $bf['total'];
-            $done  = max(0, $total - $pendingAdsJobs);
-            if ($pendingAdsJobs === 0) {
-                \Illuminate\Support\Facades\Cache::forget('shopee-ads-backfill-progress:' . $storeId);
-                $backfill = ['total' => $total, 'done' => $total, 'percent' => 100];
-            } else {
-                $backfill = ['total' => $total, 'done' => $done, 'percent' => (int) round($done / $total * 100)];
-            }
-        }
-
-        // Peta kelengkapan data 60 hari terakhir (untuk strip visual di tab Sync).
-        $coverage = [];
-        if ($storeId) {
-            $covDays = 60;
-            $haveDates = \App\Models\MarketplaceAdsDaily::where('store_id', $storeId)
-                ->where('date', '>=', now()->subDays($covDays)->toDateString())
-                ->pluck('date')
-                ->map(fn ($d) => substr((string) $d, 0, 10))
-                ->flip();
-            for ($d = now()->subDays($covDays)->startOfDay(); $d->lte(now()); $d->addDay()) {
-                $key = $d->toDateString();
-                $coverage[] = ['d' => $key, 'ok' => isset($haveDates[$key])];
-            }
-        }
-
-        // Keterangan untuk tabel: toko yang dilewati semua proses sync karena nonaktif.
-        $inactiveStores = \App\Models\Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->where(fn ($q) => $q->where('is_active', false)->orWhere('status', '!=', 'active'))
-            ->pluck('name');
-
-        return response()->json([
-            'runs'             => $runs,
-            'pending_ads_jobs' => $pendingAdsJobs,
-            'cooldown_seconds' => $cooldownLeft,
-            'processing'       => $runs->where('status', 'processing')->count(),
-            'progress'         => $adsProgress,
-            'backfill'         => $backfill,
-            'queue'            => $adsJobs,
-            'coverage'         => $coverage,
-            'inactive_stores'  => $inactiveStores,
-            'server_time'      => now()->format('H:i:s'),
-        ]);
-    }
-
-    /**
-     * Batalkan semua job sync ads yang mengantre (tab Sync).
-     */
-    /**
-     * Antrekan audit kelengkapan 90 hari + perbaikan tanggal bolong (tab Sync).
-     */
-    public function gapFix(Request $request)
-    {
-        if (! \Illuminate\Support\Facades\Cache::add('ads-gapfix-queued', 1, 900)) {
-            return response()->json(['status' => 'busy', 'message' => 'Audit bolong sudah ada di antrean — tunggu selesai dulu (maks 15 menit).'], 409);
-        }
-
-        \Illuminate\Support\Facades\Artisan::queue('marketplace:ads-audit-gaps', [
-            '--days' => 90,
-            '--fix'  => true,
-        ]);
-
-        return response()->json([
-            'status'  => 'ok',
-            'message' => 'Audit kelengkapan 90 hari diantrekan — tanggal bolong akan diperbaiki otomatis.',
-        ]);
-    }
-
-    public function queueCancel(Request $request)
-    {
-        if (! auth()->user()->hasRole(['owner', 'admin'])) {
-            return response()->json(['message' => 'Hanya Admin/Owner yang dapat membatalkan antrean.'], 403);
-        }
-
-        $deleted = \Illuminate\Support\Facades\DB::table('jobs')
-            ->where(function ($q) {
-                $q->where('payload', 'like', '%ShopeeAdsSyncJob%')
-                  ->orWhere('payload', 'like', '%marketplace:sync-ads%');
-            })
-            ->delete();
-
-        foreach (\App\Models\Store::pluck('id') as $sid) {
-            \Illuminate\Support\Facades\Cache::forget('shopee-ads-backfill-progress:' . $sid);
-            \Illuminate\Support\Facades\Cache::forget('shopee-ads-backfill-queued:' . $sid);
-            \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:' . $sid);
-        }
-
-        return response()->json(['status' => 'ok', 'deleted' => $deleted, 'message' => $deleted . ' job antrean dibatalkan.']);
     }
 
     public function clear(Request $request)
@@ -688,7 +153,7 @@ class AdsDashboardController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Semua data iklan berhasil dihapus.']);
     }
 
-    public function realtimeStatus(Request $request, ShopeeAdsApiService $adsApi)
+    public function realtimeStatus(Request $request, AdsActionService $actions, ShopeeAdsApiService $adsApi)
     {
         $storeId = $request->input('store_id');
         if (!$storeId) {
@@ -701,18 +166,7 @@ class AdsDashboardController extends Controller
         }
 
         try {
-            $balance = $adsApi->getAdsTotalBalance($store);
-            $toggleInfo = $adsApi->getAdsShopToggleInfo($store);
-            $facilRate = $adsApi->getAdsFacilShopRate($store);
-
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    'balance' => $balance['response'] ?? [],
-                    'toggle_info' => $toggleInfo['response'] ?? [],
-                    'facil_rate' => $facilRate['response'] ?? [],
-                ]
-            ]);
+            return response()->json($actions->realtimeStatus($store, $adsApi));
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -721,7 +175,7 @@ class AdsDashboardController extends Controller
         }
     }
 
-    public function actionGmsItem(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
+    public function actionGmsItem(Request $request, AdsActionService $actions, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
     {
         $request->validate([
             'store_id' => 'required|exists:stores,id',
@@ -735,23 +189,8 @@ class AdsDashboardController extends Controller
         }
 
         try {
-            $res = $shopeeChannel->editGmsItemProductCampaign(
-                $store,
-                $request->input('action'),
-                [$request->input('item_id')]
-            );
-
-            if (!empty($res['error'])) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $res['message'] ?? $res['error']
-                ], 400);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Berhasil ' . ($request->input('action') === 'add' ? 'menambahkan' : 'mengeluarkan') . ' produk dari GMV Max.'
-            ]);
+            $result = $actions->actionGmsItem($store, (int) $request->input('item_id'), $request->input('action'), $shopeeChannel);
+            return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -760,7 +199,7 @@ class AdsDashboardController extends Controller
         }
     }
 
-    public function actionCpcCampaign(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
+    public function actionCpcCampaign(Request $request, AdsActionService $actions, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
     {
         $request->validate([
             'store_id' => 'required|exists:stores,id',
@@ -778,69 +217,10 @@ class AdsDashboardController extends Controller
         $roasTarget = $request->input('roas_target');
         $dailyBudget = $request->input('daily_budget');
         $statusAction = $request->input('status_action'); // 'pause' or 'resume'
-        
-        $results = [];
 
         try {
-            // Ubah ROAS
-            if ($roasTarget !== null && $roasTarget !== '') {
-                $params = ['roas_target' => (float)$roasTarget];
-                $resRoas = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_roas_target', $params);
-                if (!empty($resRoas['error'])) {
-                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error'])], 400);
-                }
-                $results[] = 'Target ROAS (' . ($roasTarget == 0 ? 'Auto' : $roasTarget) . ')';
-                
-                // Jeda sebentar agar tidak melanggar rate limit Shopee
-                usleep(300000); 
-            }
-
-            // Ubah Budget
-            if ($dailyBudget !== null && $dailyBudget !== '') {
-                $params = ['budget' => (float)$dailyBudget];
-                $resBudget = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_budget', $params);
-                if (!empty($resBudget['error'])) {
-                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah Budget: ' . ($resBudget['message'] ?? $resBudget['error'])], 400);
-                }
-                $results[] = 'Batas Modal Harian (' . ($dailyBudget == 0 ? 'Tidak Terbatas' : number_format($dailyBudget, 0, ',', '.')) . ')';
-            }
-
-            // Ubah Status (Pause / Resume)
-            if ($statusAction === 'pause' || $statusAction === 'resume') {
-                $resStatus = $shopeeChannel->editManualProductAds($store, $campaignId, $statusAction, []);
-                if (!empty($resStatus['error'])) {
-                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah status: ' . ($resStatus['message'] ?? $resStatus['error'])], 400);
-                }
-                $results[] = 'Status (' . ucfirst($statusAction) . ')';
-                usleep(300000);
-            }
-
-            if (empty($results)) {
-                return response()->json(['status' => 'error', 'message' => 'Tidak ada pengaturan yang diubah.'], 400);
-            }
-            
-            // Update local DB
-            $localCampaign = \App\Models\MarketplaceAdCampaign::where('store_id', $store->id)
-                ->where('channel_campaign_id', $campaignId)->first();
-            if ($localCampaign) {
-                if ($roasTarget !== null && $roasTarget !== '') {
-                    $localCampaign->target_roas = (float)$roasTarget;
-                }
-                if ($dailyBudget !== null && $dailyBudget !== '') {
-                    $localCampaign->campaign_budget = (float)$dailyBudget;
-                }
-                if ($statusAction === 'pause') {
-                    $localCampaign->campaign_status = 'paused';
-                } elseif ($statusAction === 'resume') {
-                    $localCampaign->campaign_status = 'ongoing';
-                }
-                $localCampaign->save();
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Pengaturan Kampanye CPC berhasil disimpan: ' . implode(' dan ', $results)
-            ]);
+            $result = $actions->actionCpcCampaign($store, $campaignId, $roasTarget !== null && $roasTarget !== '' ? (float) $roasTarget : null, $dailyBudget !== null && $dailyBudget !== '' ? (float) $dailyBudget : null, $statusAction, $shopeeChannel);
+            return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -850,7 +230,7 @@ class AdsDashboardController extends Controller
         }
     }
 
-    public function actionGmsCampaign(Request $request, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
+    public function actionGmsCampaign(Request $request, AdsActionService $actions, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
     {
         $request->validate([
             'store_id' => 'required|exists:stores,id',
@@ -872,48 +252,16 @@ class AdsDashboardController extends Controller
 
         $roasTarget = $request->input('roas_target');
         $dailyBudget = $request->input('daily_budget');
-        
-        $results = [];
 
         try {
-            // Ubah ROAS
-            if ($roasTarget !== null && $roasTarget !== '') {
-                $params = ['roas_target' => (float)$roasTarget];
-                if ($campaignId) $params['campaign_id'] = (int)$campaignId;
-                
-                $resRoas = $shopeeChannel->editGmsProductCampaign($store, 'change_roas_target', $params);
-                if (!empty($resRoas['error'])) {
-                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error'])], 400);
-                }
-                $results[] = 'Target ROAS (' . ($roasTarget == 0 ? 'Auto' : $roasTarget) . ')';
-            }
-
-            // Ubah Budget
-            if ($dailyBudget !== null && $dailyBudget !== '') {
-                $params = ['daily_budget' => (float)$dailyBudget];
-                if ($campaignId) $params['campaign_id'] = (int)$campaignId;
-                
-                $resBudget = $shopeeChannel->editGmsProductCampaign($store, 'change_budget', $params);
-                if (!empty($resBudget['error'])) {
-                    return response()->json(['status' => 'error', 'message' => 'Gagal ubah budget: ' . ($resBudget['message'] ?? $resBudget['error'])], 400);
-                }
-                $results[] = 'Batas Modal Harian';
-            }
-
-            if (empty($results)) {
-                return response()->json(['status' => 'error', 'message' => 'Tidak ada data yang diubah.'], 400);
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Berhasil memperbarui ' . implode(' dan ', $results) . ' pada kampanye GMV Max.'
-            ]);
+            $result = $actions->actionGmsCampaign($store, $campaignId, $roasTarget !== null && $roasTarget !== '' ? (float) $roasTarget : null, $dailyBudget !== null && $dailyBudget !== '' ? (float) $dailyBudget : null, $shopeeChannel);
+            return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function campaignHourly(Request $request, ShopeeAdsApiService $adsApi)
+    public function campaignHourly(Request $request, AdsActionService $actions, ShopeeAdsApiService $adsApi)
     {
         $storeId = $request->input('store_id');
         $campaignId = $request->input('campaign_id');
@@ -929,12 +277,8 @@ class AdsDashboardController extends Controller
         }
 
         try {
-            $res = $adsApi->getCampaignHourlyPerformance($store, [$campaignId], $date);
-            
-            return response()->json([
-                'status' => 'success',
-                'data' => $res['response'] ?? []
-            ]);
+            $result = $actions->campaignHourly($store, $campaignId, $date, $adsApi);
+            return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -1123,212 +467,4 @@ class AdsDashboardController extends Controller
         return $this->avgHppMemo[$memoKey] = ($count > 0 ? $totalHpp / $count : null);
     }
 
-    /**
-     * SATSET: signature dibetulkan — sebelumnya index() memanggil dengan 6 argumen
-     * ($netRevRatio ikut terkirim) sementara parameter cuma 4, sehingga $netRevRatio
-     * (float) nyasar jadi $channelCode dan filter channel_code tidak pernah match
-     * → fungsi ini selalu return null. Sekarang netRevRatio juga dipakai di formula:
-     * break-even saat dana cair per unit (harga × rasio) habis untuk HPP.
-     */
-    private function deriveAverageBreakEvenAcos(?string $channelItemId, float $gmv, int $units, ?float $netRevRatio = null, ?string $channelCode = null, ?int $storeId = null): ?float
-    {
-        if (! $channelItemId || $units <= 0 || $gmv <= 0) return null;
-
-        $avgHpp = $this->deriveAverageHpp($channelItemId, $channelCode, $storeId);
-        if ($avgHpp === null) return null;
-
-        $avgPrice = $gmv / $units;
-        $netPerUnit = $avgPrice * ($netRevRatio ?? 1.0);
-        if ($avgHpp >= $netPerUnit) return null;
-
-        return round(($netPerUnit - $avgHpp) / $avgPrice, 6);
-    }
-
-    private function deriveBreakEvenAcos(?\App\Models\Item $item, float $gmv, int $units, ?float $netRevRatio = null): ?float
-    {
-        if (! $item || $units <= 0 || $gmv <= 0) return null;
-        $hpp = (float) ($item->hpp ?? $item->base_unit_cost ?? 0);
-        if ($hpp <= 0) return null;
-        $avgPrice = $gmv / $units;
-        $netPerUnit = $avgPrice * ($netRevRatio ?? 1.0);
-        if ($hpp >= $netPerUnit) return null;
-        return round(($netPerUnit - $hpp) / $avgPrice, 6);
-    }
-
-    /**
-     * SATSET: preload statistik yang dipakai tiap kampanye dalam satu batch.
-     *
-     * Hasilnya:
-     * - average price per store|item
-     * - average HPP per store|item
-     * - rasio cair per item (fallback ke default kalau belum ada data)
-     *
-     * Ini menggantikan lookup per kampanye yang sebelumnya memicu query berulang
-     * ke marketplace_products, marketplace_product_models, sku_mappings, dan
-     * marketplace_order_settlements.
-     *
-     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>}
-     */
-    private function preloadCampaignAnalytics($campaigns): array
-    {
-        $realCampaigns = $campaigns->filter(function ($camp) {
-            $itemId = (string) ($camp->channel_item_id ?? '');
-            return $itemId !== '' && ! str_starts_with($itemId, 'GMS-');
-        });
-
-        $storeIds = $realCampaigns->pluck('store_id')->filter()->unique()->values();
-        $itemIds = $realCampaigns->pluck('channel_item_id')->filter()->map(fn ($v) => (string) $v)->unique()->values();
-
-        if ($storeIds->isEmpty() || $itemIds->isEmpty()) {
-            return [[], [], []];
-        }
-
-        $channelCodesByStore = $realCampaigns
-            ->mapWithKeys(function ($camp) {
-                $code = strtolower((string) data_get($camp, 'store.channel.code', ''));
-                return [$camp->store_id => $code ?: null];
-            })
-            ->all();
-
-        $products = \App\Models\MarketplaceProduct::query()
-            ->whereIn('store_id', $storeIds)
-            ->whereIn('item_id', $itemIds)
-            ->with([
-                'models' => function ($q) {
-                    $q->select('id', 'marketplace_product_id', 'model_id', 'model_sku', 'price', 'raw_json');
-                },
-            ])
-            ->get(['id', 'store_id', 'item_id']);
-
-        $modelSkus = $products
-            ->flatMap(fn ($product) => $product->models->pluck('model_sku'))
-            ->filter()
-            ->map(fn ($v) => (string) $v)
-            ->unique()
-            ->values();
-
-        $mappingBySku = [];
-        if ($modelSkus->isNotEmpty()) {
-            $mappings = \App\Models\SkuMapping::with(['item:id,hpp,base_unit_cost'])
-                ->whereIn('marketplace_sku', $modelSkus)
-                ->get(['id', 'marketplace_sku', 'channel_code', 'item_id']);
-
-            foreach ($mappings as $mapping) {
-                $sku = (string) $mapping->marketplace_sku;
-                $channel = strtolower((string) ($mapping->channel_code ?? '')) ?: '__global';
-                $mappingBySku[$sku][$channel] = $mapping;
-            }
-        }
-
-        $avgPriceByKey = [];
-        $unitCogsByKey = [];
-
-        foreach ($products as $product) {
-            $key = $product->store_id . '|' . $product->item_id;
-            $channelCode = strtolower((string) ($channelCodesByStore[$product->store_id] ?? '')) ?: '__global';
-
-            $prices = [];
-            $hpps = [];
-
-            foreach ($product->models as $model) {
-                $currentPrice = data_get($model->raw_json, 'price_info.0.current_price');
-                if ($currentPrice === null && (float) $model->price > 0) {
-                    $currentPrice = $model->price;
-                }
-                if ($currentPrice !== null && (float) $currentPrice > 0) {
-                    $prices[] = (float) $currentPrice;
-                }
-
-                $sku = (string) ($model->model_sku ?? '');
-                if ($sku === '') {
-                    continue;
-                }
-
-                $mapping = $mappingBySku[$sku][$channelCode] ?? $mappingBySku[$sku]['__global'] ?? null;
-                if ($mapping && $mapping->item) {
-                    $hpp = (float) ($mapping->item->hpp ?? $mapping->item->base_unit_cost ?? 0);
-                    if ($hpp > 0) {
-                        $hpps[] = $hpp;
-                    }
-                }
-            }
-
-            if (! empty($prices)) {
-                $avgPriceByKey[$key] = array_sum($prices) / count($prices);
-            }
-            if (! empty($hpps)) {
-                $unitCogsByKey[$key] = array_sum($hpps) / count($hpps);
-            }
-        }
-
-        $revenueRatioByKey = [];
-        $orderItemsSub = \Illuminate\Support\Facades\DB::table('marketplace_order_items as moi')
-            ->select('moi.external_item_id', 'moi.order_id')
-            ->distinct()
-            ->whereIn('moi.external_item_id', $itemIds)
-            ->whereNotNull('moi.order_id');
-
-        $ratioRows = \Illuminate\Support\Facades\DB::table('marketplace_order_settlements as s')
-            ->joinSub($orderItemsSub, 'oi', function ($join) {
-                $join->on('oi.order_id', '=', 's.order_id');
-            })
-            ->where('s.final_income', '>', 0)
-            ->groupBy('oi.external_item_id')
-            ->selectRaw('oi.external_item_id, SUM(s.final_income) as total_final_income, SUM(s.buyer_payment_amount) as total_item_value')
-            ->get();
-
-        foreach ($ratioRows as $row) {
-            $itemId = (string) ($row->external_item_id ?? '');
-            $totalItemValue = (float) ($row->total_item_value ?? 0);
-            $totalFinalIncome = (float) ($row->total_final_income ?? 0);
-            if ($itemId === '' || $totalItemValue <= 0) {
-                continue;
-            }
-
-            $revenueRatioByKey[$itemId] = [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
-        }
-
-        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
-    }
-
-    /** Validasi tanggal dari request — hanya Y-m-d hasil Carbon::parse yang dipakai. */
-    private function safeDate(?string $value, \Carbon\Carbon $fallback): string
-    {
-        if (! $value) return $fallback->toDateString();
-        try {
-            return Carbon::parse($value)->toDateString();
-        } catch (\Throwable) {
-            return $fallback->toDateString();
-        }
-    }
-    
-    private function adsRecommendation(float $spend, ?float $acos, ?float $breakEvenAcos, int $orders): array
-    {
-        if ($spend === 0.0) {
-            return ['label' => 'Tidak Aktif', 'color' => '#94a3b8', 'icon' => '⚪', 'class' => 'reco-nodata'];
-        }
-        if ($orders === 0) {
-            return ['label' => 'Stop — 0 Konversi', 'color' => '#b91c1c', 'icon' => '🔴', 'class' => 'reco-stop'];
-        }
-        if ($breakEvenAcos === null) {
-            return ['label' => 'Set Break-Even', 'color' => '#b45309', 'icon' => '⚠️', 'class' => 'reco-warn'];
-        }
-        if ($acos === null) {
-            return ['label' => 'Data Tidak Lengkap', 'color' => '#94a3b8', 'icon' => '⚪', 'class' => 'reco-nodata'];
-        }
-
-        $ratio = $acos / $breakEvenAcos;
-
-        if ($ratio <= 0.60) {
-            return ['label' => 'Scale — Naikkan Budget', 'color' => '#16a34a', 'icon' => '🚀', 'class' => 'reco-scale'];
-        }
-        if ($ratio <= 0.85) {
-            return ['label' => 'Pertahankan', 'color' => '#2563eb', 'icon' => '✅', 'class' => 'reco-ok'];
-        }
-        if ($ratio <= 1.00) {
-            return ['label' => 'Perhatikan — Margin Tipis', 'color' => '#d97706', 'icon' => '⚡', 'class' => 'reco-warn'];
-        }
-
-        return ['label' => 'Stop / Kurangi Bid', 'color' => '#b91c1c', 'icon' => '🔴', 'class' => 'reco-stop'];
-    }
 }

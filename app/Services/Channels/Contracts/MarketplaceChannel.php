@@ -58,7 +58,48 @@ interface MarketplaceChannel
         string $endDate
     ): array;
 
-    public function refreshToken(Store $store): array;
+    // ───────────────────────────────────────────────────────────────────────
+    // Discount APIs
+    // ───────────────────────────────────────────────────────────────────────
+
+    public function getDiscountList(
+        Store $store,
+        string $status = 'ongoing',
+        int $pageNo = 1,
+        int $pageSize = 100,
+        ?int $updateTimeFrom = null,
+        ?int $updateTimeTo = null
+    ): array;
+
+    public function addDiscount(Store $store, string $discountName, int $startTime, int $endTime): array;
+
+    public function addDiscountItem(Store $store, int $discountId, array $itemList): array;
+
+    public function updateDiscountItem(Store $store, int $discountId, array $itemList): array;
+
+    public function endDiscount(Store $store, int $discountId): array;
+
+    public function getDiscount(Store $store, int $discountId, int $pageNo = 1, int $pageSize = 50): array;
+
+    public function updateDiscount(
+        Store $store,
+        int $discountId,
+        ?string $discountName = null,
+        ?int $startTime = null,
+        ?int $endTime = null
+    ): array;
+
+    public function deleteDiscount(Store $store, int $discountId): array;
+
+    public function deleteDiscountItem(Store $store, int $discountId, int $itemId, int $modelId = 0): array;
+
+    public function getSipDiscounts(Store $store, ?string $region = null): array;
+
+    public function setSipDiscount(Store $store, string $region, int $sipDiscountRate): array;
+
+    public function deleteSipDiscount(Store $store, string $region): array;
+
+    public function refreshToken(Store $store, bool $force = false): array;
 
     /**
      * Logistics / Fulfillment

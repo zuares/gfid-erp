@@ -553,9 +553,10 @@ class WarehouseIntelligenceController extends Controller
                 ->filter(fn ($r) => ($r->ads ?? 0) > 0)
                 ->map(function ($r) {
                     $total = (float) (($r->ready ?? 0) + ($r->wh_prd ?? 0) + ($r->wip ?? 0));
-                $target30d = (float) (($r->ads ?? 0) * 30);
-                $minThreshold = $this->effectiveRtsMinDisplay($r);
-                $pullQty = (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0);
+                    $target30d = (float) (($r->ads ?? 0) * 30);
+                    $minThreshold = $this->effectiveRtsMinDisplay($r);
+                    $pullQty = (float) min($r->minta_prd ?? 0, $r->wh_prd ?? 0);
+                    $productionGroup = $this->normalizeProductionSourceGroup($r);
 
                     if (($r->wh_prd ?? 0) > 0 && (($r->ready ?? 0) <= $minThreshold)) {
                         $qty = max(1, $pullQty);

@@ -806,34 +806,91 @@
     window.testApiStoreId = null;
 
     // Webhook log function
-    window.openWebhookLogs = async function() {
+    let webhookLogMap = {};
+
+    const renderWebhookLogCard = (log) => `
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between mb-1">
+                <strong class="mb-1">#${log.id} • ${log.event_type}</strong>
+                <small class="text-muted">${new Date(log.created_at).toLocaleString('id-ID')}</small>
+            </div>
+            <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge ${log.signature_verified ? 'bg-success' : 'bg-warning text-dark'}">
+                    ${log.signature_verified ? 'Signature Valid' : 'Signature Unverified / Invalid'}
+                </span>
+                <a href="/marketplace/chat/audit?webhook_log_id=${log.id}" target="_blank" rel="noopener" class="badge bg-dark text-decoration-none">Lihat chat terkait</a>
+                <button type="button" class="badge bg-primary border-0 text-white" style="cursor:pointer" onclick="copyWebhookLogSection(${log.id}, 'payload')">Copy payload</button>
+                <button type="button" class="badge bg-secondary border-0 text-white" style="cursor:pointer" onclick="copyWebhookLogSection(${log.id}, 'related')">Copy related</button>
+            </div>
+            ${Array.isArray(log.related_messages) && log.related_messages.length ? `
+                <div class="mb-2" style="font-size:.75rem;color:#334155">
+                    ${log.related_messages.map(msg => `
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                            <span class="badge bg-light text-dark border">Message #${msg.id}</span>
+                            <span class="text-muted">${msg.external_message_id || '-'}</span>
+                            <span class="text-muted">${msg.store_name || '-'}</span>
+                            <a href="${msg.audit_url || ('/marketplace/chat/audit?webhook_log_id=' + log.id + '&message_id=' + msg.id + '#chat-message-row-' + msg.id)}" target="_blank" rel="noopener" class="text-decoration-none fw-semibold">Buka message</a>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            <pre style="background:#f8fafc; padding:10px; border-radius:6px; font-size:11px; max-height:200px; overflow:auto;">${JSON.stringify(log.payload, null, 2)}</pre>
+        </div>
+    `;
+
+    window.openWebhookLogs = async function(logId = null) {
         new bootstrap.Modal($('webhookModal')).show();
         $('webhookLogList').innerHTML = '<div class="p-4 text-center text-muted">Memuat logs...</div>';
         try {
+            if (logId) {
+                const log = await api('/api/webhooks/logs/' + logId);
+                webhookLogMap = { [log.id]: log };
+                $('webhookLogList').innerHTML = renderWebhookLogCard(log);
+                return;
+            }
+
             const logs = await api('/api/webhooks/logs?provider=shopee');
+            webhookLogMap = Object.fromEntries(logs.map(log => [log.id, log]));
             if (logs.length === 0) {
                 $('webhookLogList').innerHTML = '<div class="p-4 text-center text-muted">Belum ada webhook yang masuk.</div>';
                 return;
             }
             
-            $('webhookLogList').innerHTML = logs.map(log => `
-                <div class="list-group-item">
-                    <div class="d-flex w-100 justify-content-between mb-1">
-                        <strong class="mb-1">${log.event_type}</strong>
-                        <small class="text-muted">${new Date(log.created_at).toLocaleString('id-ID')}</small>
-                    </div>
-                    <div class="mb-2">
-                        <span class="badge ${log.signature_verified ? 'bg-success' : 'bg-warning text-dark'}">
-                            ${log.signature_verified ? 'Signature Valid' : 'Signature Unverified / Invalid'}
-                        </span>
-                    </div>
-                    <pre style="background:#f8fafc; padding:10px; border-radius:6px; font-size:11px; max-height:200px; overflow:auto;">${JSON.stringify(log.payload, null, 2)}</pre>
-                </div>
-            `).join('');
+            $('webhookLogList').innerHTML = logs.map(renderWebhookLogCard).join('');
         } catch (e) {
             $('webhookLogList').innerHTML = '<div class="p-4 text-center text-danger">Error: ' + e.message + '</div>';
         }
     };
+
+    window.copyWebhookLogSection = async function(logId, section) {
+        const log = webhookLogMap[logId];
+        if (!log) return;
+
+        const payload = section === 'related'
+            ? (log.related_messages || [])
+            : (log.payload || {});
+
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+        } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = JSON.stringify(payload, null, 2);
+            ta.setAttribute('readonly', 'readonly');
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const selectedLogId = new URLSearchParams(window.location.search).get('log_id');
+        if (selectedLogId) {
+            openWebhookLogs(selectedLogId);
+        }
+    });
 
     window.simulateWebhook = async function(id, name, driver, platformId, eventType = 'order_status_update') {
         if (driver !== 'shopee') {

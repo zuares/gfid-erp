@@ -46,11 +46,12 @@ class ShipmentScanController extends Controller
         $item = Item::query()
             ->where('type', 'finished_good')
             ->where(function ($q) use ($scanCode) {
-                $q->where('code', $scanCode);
-
-                // Jika punya kolom barcode / sku, boleh aktifkan:
-                // $q->orWhere('barcode', $scanCode);
-                // $q->orWhere('sku', $scanCode);
+                $q->where('code', $scanCode)
+                    ->orWhere('barcode', $scanCode)
+                    ->orWhereHas('barcodes', function ($barcodeQuery) use ($scanCode) {
+                        $barcodeQuery->where('barcode', $scanCode)
+                            ->where('is_active', true);
+                    });
             })
             ->first();
 

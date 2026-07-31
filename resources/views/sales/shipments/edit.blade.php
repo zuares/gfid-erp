@@ -1701,6 +1701,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     /* ── DOM refs ── */
     const scanInput         = document.getElementById('scanInput');
     const scanForm          = document.getElementById('scanForm');
+    const scanLookupUrl     = @json(route('sales.shipments.scan_lookup', $shipment));
     const linesWrapper      = document.getElementById('linesWrapper');
     const linesTbody        = document.getElementById('linesTbody');
     const itemFilterInput   = document.getElementById('itemFilterInput');
@@ -1932,6 +1933,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         scanErrorMsg.textContent = msg;
         scanErrorBox.style.display = 'flex';
         setTimeout(() => { scanErrorBox.style.display = 'none'; }, 3500);
+    }
+
+    function lookupScanCode(code) {
+        if (!scanLookupUrl || !code) return Promise.resolve(null);
+
+        return fetch(`${scanLookupUrl}?code=${encodeURIComponent(code)}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        }).then(res => res.ok ? res.json() : null).catch(() => null);
     }
 
     /* ── session counter ── */
@@ -2404,7 +2413,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 
     /* ── scan AJAX ── */
     if (scanForm && scanInput && linesTbody) {
-        scanForm.addEventListener('submit', function (e) {
+        scanForm.addEventListener('submit', async function (e) {
             e.preventDefault();
             unlockAudio();
             const code = scanInput.value.trim();
@@ -2419,6 +2428,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                         window.location.href = rekonBtn.dataset.rekonUrl;
                     }
                 }
+                return;
+            }
+
+            const lookup = await lookupScanCode(code);
+            if (lookup && lookup.type === 'order') {
+                scanInput.value = '';
+                beepErr();
+                const msg = 'Yang discan adalah nomor pesanan/resi, bukan item. Gunakan Scan Pesanan.';
+                showScanError(msg);
+                showToast('err', msg);
+                focusScan();
                 return;
             }
 

@@ -74,8 +74,13 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
     Route::get('/marketplace/webhook-tests', [MarketplaceController::class, 'webhookTests'])->name('marketplace.webhook-tests');
     Route::get('/marketplace/chat',        [\App\Http\Controllers\MarketplaceChatController::class, 'page'])->name('marketplace.chat');
+    Route::get('/marketplace/chat/audit',  [\App\Http\Controllers\MarketplaceChatController::class, 'audit'])->name('marketplace.chat.audit');
     Route::get('/marketplace/products',    [\App\Http\Controllers\MarketplaceProductController::class, 'page'])->name('marketplace.products');
     Route::get('/marketplace/boost',       [\App\Http\Controllers\MarketplaceBoostController::class, 'page'])->name('marketplace.boost');
+    Route::get('/marketplace/promotions',  [MarketplaceController::class, 'promotions'])->name('marketplace.promotions');
+    Route::get('/marketplace/promotions/create', [MarketplaceController::class, 'promotionCreatePage'])->name('marketplace.promotions.create');
+    Route::get('/marketplace/promotions/{store}/{discountId}/edit', [MarketplaceController::class, 'promotionEdit'])->name('marketplace.promotions.edit');
+    Route::get('/marketplace/promotions/summary',  [MarketplaceController::class, 'promotionsSummary'])->name('marketplace.promotions.summary');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
@@ -172,6 +177,25 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
 
+    // Promosi / Diskon
+    Route::get('/promotions',                         [MarketplaceController::class, 'promotionsIndex']);
+    Route::get('/promotions/summary',                 [MarketplaceController::class, 'promotionsSummaryData']);
+    Route::get('/promotions/{store}/{discountId}',    [MarketplaceController::class, 'promotionDetail']);
+    Route::post('/promotions',                        [MarketplaceController::class, 'promotionCreate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/update', [MarketplaceController::class, 'promotionUpdate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/activate', [MarketplaceController::class, 'promotionActivate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/deactivate', [MarketplaceController::class, 'promotionDeactivate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/end', [MarketplaceController::class, 'promotionEnd'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/delete', [MarketplaceController::class, 'promotionDelete'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/delete-item', [MarketplaceController::class, 'promotionDeleteItem'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
     // Naikkan Produk (boost)
     $noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
     Route::get('/boost/status',            [\App\Http\Controllers\MarketplaceBoostController::class, 'status']);
@@ -193,6 +217,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/chat/test-shopee-chat',                     [\App\Http\Controllers\MarketplaceChatController::class, 'diagnoseChat']);
     Route::get('/chat/conversations',                        [\App\Http\Controllers\MarketplaceChatController::class, 'conversations']);
     Route::get('/chat/conversations/{conversation}/messages', [\App\Http\Controllers\MarketplaceChatController::class, 'messages']);
+    Route::get('/chat/messages/{message}/raw',               [\App\Http\Controllers\MarketplaceChatController::class, 'messageRaw']);
     Route::post('/chat/conversations/{conversation}/send',    [\App\Http\Controllers\MarketplaceChatController::class, 'send'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/chat/conversations/{conversation}/read',    [\App\Http\Controllers\MarketplaceChatController::class, 'markRead'])

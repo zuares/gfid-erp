@@ -38,6 +38,7 @@ Route::prefix('webhooks')->group(function () {
     Route::post('/shopee', [\App\Http\Controllers\WebhookController::class, 'shopee']);
     Route::post('/simulate', [\App\Http\Controllers\WebhookController::class, 'simulate']);
     Route::get('/logs', [\App\Http\Controllers\WebhookController::class, 'logs']);
+    Route::get('/logs/{log}', [\App\Http\Controllers\WebhookController::class, 'show']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

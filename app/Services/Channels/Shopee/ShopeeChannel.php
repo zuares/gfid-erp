@@ -159,7 +159,7 @@ class ShopeeChannel implements MarketplaceChannel
             $error = (string) ($result['error'] ?? '');
             $msg   = strtolower((string) ($result['message'] ?? ''));
             if ($error === 'error_auth' || str_contains($msg, 'expired') || str_contains($msg, 'access_token') || str_contains($error, 'access_token')) {
-                $refreshed = $this->refreshToken($store);
+                $refreshed = $this->refreshToken($store, true);
                 if (empty($refreshed['error'])) {
                     $store->refresh(); // reload credentials dari DB
                     try {
@@ -645,7 +645,7 @@ class ShopeeChannel implements MarketplaceChannel
      * SATU proses yang benar-benar menukar token; sisanya menunggu lalu memakai
      * token baru yang sudah tersimpan.
      */
-    public function refreshToken(Store $store): array
+    public function refreshToken(Store $store, bool $force = false): array
     {
         if (! $store->is_active) {
             // Toko nonaktif: jangan hubungi API auth Shopee sama sekali.
@@ -666,7 +666,8 @@ class ShopeeChannel implements MarketplaceChannel
         try {
             // Proses lain mungkin sudah menyegarkan token selagi kita menunggu.
             $store->refresh();
-            if ($store->token_expires_at
+            if (! $force
+                && $store->token_expires_at
                 && $store->token_expires_at->isAfter(now()->addMinutes(2))
                 && filled($store->credential('access_token'))) {
                 return ['access_token' => $store->credential('access_token'), 'reused' => true];
@@ -1173,13 +1174,29 @@ class ShopeeChannel implements MarketplaceChannel
     // Discount APIs (Shopee v2.discount)
     // ─────────────────────────────────────────────────────────────────────────
 
-    public function getDiscountList(Store $store, string $status = 'ongoing', int $offset = 0, int $limit = 100): array
-    {
-        return $this->get($store, '/api/v2/discount/get_discount_list', [
+    public function getDiscountList(
+        Store $store,
+        string $status = 'ongoing',
+        int $pageNo = 1,
+        int $pageSize = 100,
+        ?int $updateTimeFrom = null,
+        ?int $updateTimeTo = null
+    ): array {
+        $params = [
             'discount_status' => $status,
-            'pagination_offset' => $offset,
-            'pagination_entries_per_page' => $limit,
-        ]);
+            'page_no' => $pageNo,
+            'page_size' => $pageSize,
+        ];
+
+        if ($updateTimeFrom !== null) {
+            $params['update_time_from'] = $updateTimeFrom;
+        }
+
+        if ($updateTimeTo !== null) {
+            $params['update_time_to'] = $updateTimeTo;
+        }
+
+        return $this->get($store, '/api/v2/discount/get_discount_list', $params);
     }
 
     public function addDiscount(Store $store, string $discountName, int $startTime, int $endTime): array
@@ -1211,6 +1228,74 @@ class ShopeeChannel implements MarketplaceChannel
     {
         return $this->post($store, '/api/v2/discount/end_discount', [
             'discount_id' => $discountId,
+        ]);
+    }
+
+    public function getDiscount(Store $store, int $discountId, int $pageNo = 1, int $pageSize = 50): array
+    {
+        return $this->get($store, '/api/v2/discount/get_discount', [
+            'discount_id' => $discountId,
+            'page_no' => $pageNo,
+            'page_size' => $pageSize,
+        ]);
+    }
+
+    public function updateDiscount(
+        Store $store,
+        int $discountId,
+        ?string $discountName = null,
+        ?int $startTime = null,
+        ?int $endTime = null
+    ): array {
+        $body = array_filter([
+            'discount_id' => $discountId,
+            'discount_name' => $discountName,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+        ], static fn ($value) => $value !== null);
+
+        return $this->post($store, '/api/v2/discount/update_discount', $body);
+    }
+
+    public function deleteDiscount(Store $store, int $discountId): array
+    {
+        return $this->post($store, '/api/v2/discount/delete_discount', [
+            'discount_id' => $discountId,
+        ]);
+    }
+
+    public function deleteDiscountItem(Store $store, int $discountId, int $itemId, int $modelId = 0): array
+    {
+        return $this->post($store, '/api/v2/discount/delete_discount_item', [
+            'discount_id' => $discountId,
+            'item_id' => $itemId,
+            'model_id' => $modelId,
+        ]);
+    }
+
+    public function getSipDiscounts(Store $store, ?string $region = null): array
+    {
+        $params = [];
+
+        if ($region !== null && $region !== '') {
+            $params['region'] = $region;
+        }
+
+        return $this->get($store, '/api/v2/discount/get_sip_discounts', $params);
+    }
+
+    public function setSipDiscount(Store $store, string $region, int $sipDiscountRate): array
+    {
+        return $this->post($store, '/api/v2/discount/set_sip_discount', [
+            'region' => $region,
+            'sip_discount_rate' => $sipDiscountRate,
+        ]);
+    }
+
+    public function deleteSipDiscount(Store $store, string $region): array
+    {
+        return $this->post($store, '/api/v2/discount/delete_sip_discount', [
+            'region' => $region,
         ]);
     }
 

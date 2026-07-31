@@ -10,6 +10,8 @@ use App\Models\MarketplaceAdGroup;
 use App\Models\MarketplaceAdItemMap;
 use App\Models\MarketplaceOrder;
 use App\Models\Item;
+use App\Models\MarketplaceProduct;
+use App\Models\MarketplacePromotion;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
@@ -28,6 +30,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class MarketplaceController extends Controller
@@ -386,6 +389,56 @@ class MarketplaceController extends Controller
         return view('marketplace.ads');
     }
 
+    public function promotions(Request $request): \Illuminate\View\View
+    {
+        return view('marketplace.promotions', [
+            'selectedStoreId' => $request->integer('store_id') ?: null,
+            'selectedStatus'   => $request->query('status', 'ongoing'),
+        ]);
+    }
+
+    public function promotionCreatePage(Request $request): \Illuminate\View\View
+    {
+        $store = $this->resolvePromotionStore($request->integer('store_id'));
+
+        return view('marketplace.promotion-edit', [
+            'store' => $store ? $this->normalizeStorePayload($store) : null,
+            'discountId' => null,
+            'mode' => 'create',
+            'backUrl' => route('marketplace.promotions', [
+                'store_id' => $store?->id,
+            ]),
+        ]);
+    }
+
+    public function promotionEdit(Request $request, Store $store, int $discountId): \Illuminate\View\View
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+
+        return view('marketplace.promotion-edit', [
+            'store' => $this->normalizeStorePayload($store),
+            'discountId' => $discountId,
+            'mode' => 'edit',
+            'backUrl' => route('marketplace.promotions', [
+                'store_id' => $store->id,
+            ]),
+        ]);
+    }
+
+    public function promotionsSummary(Request $request): \Illuminate\View\View
+    {
+        $today = now()->toDateString();
+
+        return view('marketplace.promotions-summary', [
+            'filters' => [
+                'store_id'  => $request->query('store_id', 'all'),
+                'status'    => $request->query('status', 'all'),
+                'date_from' => $request->query('date_from', now()->subDays(29)->toDateString()),
+                'date_to'   => $request->query('date_to', $today),
+            ],
+        ]);
+    }
+
     public function issueCenter(): \Illuminate\View\View
     {
         return view('marketplace.issues');
@@ -395,7 +448,7 @@ class MarketplaceController extends Controller
     {
         $disk = Storage::disk('local');
         $directory = 'shipping_labels';
-        
+
         $totalFiles = 0;
         $totalSizeBytes = 0;
         $expiredFiles = 0;
@@ -403,18 +456,18 @@ class MarketplaceController extends Controller
         if ($disk->exists($directory)) {
             $files = $disk->allFiles($directory);
             $totalFiles = count($files);
-            
+
             $fourDaysAgo = Carbon::now()->subDays(4);
 
             foreach ($files as $file) {
                 if (!str_ends_with($file, '.pdf.gz')) continue;
-                
+
                 $totalSizeBytes += $disk->size($file);
-                
+
                 $filename = basename($file);
                 $filenameWithoutExt = str_replace('.pdf.gz', '', $filename);
                 $parts = explode('_', $filenameWithoutExt, 2);
-                
+
                 if (count($parts) === 2) {
                     $storeId = $parts[0];
                     $orderSn = $parts[1];
@@ -423,7 +476,7 @@ class MarketplaceController extends Controller
                     $order = MarketplaceOrder::where('store_id', $storeId)
                         ->where('channel_order_id', $orderSn)
                         ->first();
-                    
+
                     if (!$order || ($order->order_status === 'COMPLETED' && $order->updated_at < $fourDaysAgo)) {
                         $expiredFiles++;
                     }
@@ -438,7 +491,7 @@ class MarketplaceController extends Controller
     {
         Artisan::call('marketplace:cleanup-labels');
         $output = Artisan::output();
-        
+
         return back()->with('success', nl2br(e($output)));
     }
 
@@ -459,7 +512,7 @@ class MarketplaceController extends Controller
             'marketplace_auto_process_orders'  => \App\Models\SystemSetting::get('marketplace_auto_process_orders', '0'),
             'marketplace_default_warehouse'    => \App\Models\SystemSetting::get('marketplace_default_warehouse', ''),
         ];
-        
+
         $warehouses = \App\Models\Warehouse::orderBy('name')->get();
 
         // Ambil daftar file template greeting
@@ -559,7 +612,7 @@ class MarketplaceController extends Controller
             }
             unset($data[$field]);
         }
-        
+
         if ($request->hasFile('add_greeting_template')) {
             $file = $request->file('add_greeting_template');
             $ext = $file->getClientOriginalExtension() ?: 'png';
@@ -568,7 +621,7 @@ class MarketplaceController extends Controller
             $file->storeAs('templates/greetings', $filename, 'public');
             unset($data['add_greeting_template']);
         }
-        
+
         if ($request->hasFile('add_footer_template')) {
             $file = $request->file('add_footer_template');
             $ext = $file->getClientOriginalExtension() ?: 'png';
@@ -581,10 +634,10 @@ class MarketplaceController extends Controller
         foreach ($data as $key => $value) {
             \App\Models\SystemSetting::set($key, $value);
         }
-        
+
         $platforms = $request->input('social_platforms', []);
         $usernames = $request->input('social_usernames', []);
-        
+
         $accounts = [];
         for ($i = 0; $i < count($platforms); $i++) {
             if (!empty(trim($usernames[$i] ?? ''))) {
@@ -594,38 +647,38 @@ class MarketplaceController extends Controller
                 ];
             }
         }
-        
+
         \App\Models\SystemSetting::set('marketplace_social_accounts', json_encode($accounts));
 
         return redirect()->route('marketplace.settings')->with('success', 'Pengaturan berhasil disimpan');
     }
-    
+
     public function deleteTemplate(\Illuminate\Http\Request $request)
     {
         $request->validate([
             'type' => 'required|in:greeting,footer',
             'filename' => 'required|string',
         ]);
-        
+
         $type = $request->input('type');
         $filename = $request->input('filename');
         $folder = $type === 'greeting' ? 'templates/greetings' : 'templates/footers';
         $path = $folder . '/' . $filename;
-        
+
         if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
         }
-        
+
         return redirect()->route('marketplace.settings')->with('success', 'Template berhasil dihapus!');
     }
 
     public function previewSettingsPdf(\Illuminate\Http\Request $request)
     {
         $config = $request->except(['marketplace_footer_image', 'social_platforms', 'social_usernames']);
-        
+
         $platforms = $request->input('social_platforms', []);
         $usernames = $request->input('social_usernames', []);
-        
+
         $accounts = [];
         for ($i = 0; $i < count($platforms); $i++) {
             if (!empty(trim($usernames[$i] ?? ''))) {
@@ -636,7 +689,7 @@ class MarketplaceController extends Controller
             }
         }
         $config['marketplace_social_accounts'] = json_encode($accounts);
-        
+
         $tmpImgPath = null;
         if ($request->hasFile('marketplace_footer_image')) {
             $path = $request->file('marketplace_footer_image')->store('marketplace/footer/tmp', 'public');
@@ -658,24 +711,24 @@ class MarketplaceController extends Controller
         $pdf->Cell(0, 10, 'MARKETPLACE AWB MOCKUP', 0, 1, 'C');
         $pdf->SetFont('Arial', '', 10);
         $pdf->Cell(0, 5, 'No. Pesanan: 260709908SV5CN', 0, 1, 'C');
-        
+
         $pdf->SetFillColor(0, 0, 0);
         for($i = 0; $i < 60; $i++) {
             $w = rand(1, 3);
             $pdf->Rect(15 + ($i * 1.2), 30, $w * 0.5, 15, 'F');
         }
-        
+
         $pdf->SetY(50);
         $pdf->Cell(0, 10, '==================================================', 0, 1, 'C');
         $rawPdf = $pdf->Output('S');
-        
+
         $overlayService = new \App\Services\ShippingLabelOverlayService();
         $finalPdf = $overlayService->overlayPdfContent($rawPdf, $config);
-        
+
         if ($tmpImgPath && file_exists($tmpImgPath)) {
             @unlink($tmpImgPath);
         }
-        
+
         return response($finalPdf, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="preview.pdf"'
@@ -686,12 +739,12 @@ class MarketplaceController extends Controller
     {
         $pdf = new \setasign\Fpdi\Fpdi();
         $pdf->AddPage('P', [100, 150]);
-        
+
         $settings = \App\Models\SystemSetting::all()->pluck('setting_value', 'setting_key')->toArray();
-        
+
         $greetingImageFull = null;
         $customGreetingImg = $settings['marketplace_greeting_card_image'] ?? '';
-        
+
         if (!empty($customGreetingImg) && file_exists(storage_path('app/public/' . $customGreetingImg))) {
             $greetingImageFull = storage_path('app/public/' . $customGreetingImg);
         } else {
@@ -706,7 +759,7 @@ class MarketplaceController extends Controller
                 }
             }
         }
-        
+
         if ($greetingImageFull) {
             $ext = strtolower(pathinfo($greetingImageFull, PATHINFO_EXTENSION));
             if ($ext === 'pdf') {
@@ -726,7 +779,7 @@ class MarketplaceController extends Controller
             $pdf->SetXY(0, 70);
             $pdf->Cell(100, 10, 'Thank you for your order!', 0, 1, 'C');
         }
-        
+
         return response($pdf->Output('S'), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="Sample_Greeting_Card.pdf"'
@@ -788,6 +841,1575 @@ class MarketplaceController extends Controller
         return response()->json(
             $this->manager->driver($store)->getShopInfo($store)
         );
+    }
+
+    public function promotionsIndex(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'store_id'         => ['nullable', 'integer', 'exists:stores,id'],
+            'status'           => ['nullable', 'string', 'in:all,ongoing,upcoming,ended'],
+            'page_no'          => ['nullable', 'integer', 'min:1'],
+            'page_size'        => ['nullable', 'integer', 'min:1', 'max:100'],
+            'update_time_from' => ['nullable', 'integer'],
+            'update_time_to'   => ['nullable', 'integer'],
+        ]);
+
+        $store = $this->resolvePromotionStore($data['store_id'] ?? null);
+
+        if (! $store) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Belum ada toko marketplace yang bisa dipakai untuk promosi.',
+            ], 422);
+        }
+
+        $status = $data['status'] ?? 'ongoing';
+        $pageNo = (int) ($data['page_no'] ?? 1);
+        $pageSize = (int) ($data['page_size'] ?? 100);
+        $updateTimeFrom = $data['update_time_from'] ?? null;
+        $updateTimeTo = $data['update_time_to'] ?? null;
+
+        try {
+            $driver = $this->manager->driver($store);
+            $responses = [];
+            $promotions = [];
+            $statuses = $status === 'all' ? ['ongoing', 'upcoming', 'ended'] : [$status];
+
+            foreach ($statuses as $statusItem) {
+                $response = $driver->getDiscountList(
+                    $store,
+                    $statusItem,
+                    $pageNo,
+                    $pageSize,
+                    $updateTimeFrom,
+                    $updateTimeTo
+                );
+
+                if (! empty($response['error'])) {
+                    $message = $this->promotionAuthErrorMessage($response, 'Gagal memuat data promosi.');
+                    return response()->json([
+                        'success' => false,
+                        'message' => $message,
+                        'code'    => $this->isShopeeAuthError($response) ? 'auth_required' : null,
+                        'store'   => $this->normalizeStorePayload($store),
+                        'raw'     => $response,
+                    ], 422);
+                }
+
+                $responses[$statusItem] = $response;
+
+                foreach ($this->extractPromotionList($response) as $promotion) {
+                    $promotions[] = $this->normalizePromotionCampaign($promotion);
+                }
+            }
+
+            if ($status === 'all') {
+                $promotions = collect($promotions)
+                    ->unique('discount_id')
+                    ->sortByDesc(fn ($item) => $item['start_time'] ?? 0)
+                    ->values()
+                    ->all();
+            }
+
+            $promotions = $this->enrichPromotionCampaignsWithLocalPreview($store, $promotions);
+
+            return response()->json([
+                'success'    => true,
+                'message'    => 'Daftar promosi berhasil dimuat.',
+                'store'      => $this->normalizeStorePayload($store),
+                'status'     => $status,
+                'promotions' => $promotions,
+                'count'      => count($promotions),
+                'raw'        => $status === 'all' ? $responses : ($responses[$status] ?? null),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionsSummaryData(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'store_id'  => ['nullable', 'string'],
+            'status'    => ['nullable', 'string', 'in:all,ongoing,upcoming,ended,suspended'],
+            'date_from' => ['nullable', 'date'],
+            'date_to'   => ['nullable', 'date'],
+        ]);
+
+        $stores = $this->resolvePromotionStores(
+            ($data['store_id'] ?? 'all') !== 'all' ? (int) $data['store_id'] : null
+        );
+
+        if ($stores->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Belum ada toko Shopee yang bisa dipakai untuk ringkasan promosi.',
+            ], 422);
+        }
+
+        $status = $data['status'] ?? 'all';
+        $statuses = $status === 'all' ? ['ongoing', 'upcoming', 'ended', 'suspended'] : [$status];
+        $dateFromTs = ! empty($data['date_from'])
+            ? Carbon::parse($data['date_from'])->startOfDay()->timestamp
+            : null;
+        $dateToTs = ! empty($data['date_to'])
+            ? Carbon::parse($data['date_to'])->endOfDay()->timestamp
+            : null;
+
+        $rows = [];
+        $storeSummaries = [];
+        $totals = [
+            'stores' => 0,
+            'promotions' => 0,
+            'ongoing' => 0,
+            'upcoming' => 0,
+            'ended' => 0,
+            'suspended' => 0,
+            'items' => 0,
+        ];
+
+        try {
+            foreach ($stores as $store) {
+                $driver = $this->manager->driver($store);
+                $storeRows = [];
+
+                foreach ($statuses as $statusItem) {
+                    $response = $driver->getDiscountList($store, $statusItem, 1, 100, null, null);
+
+                    if (! empty($response['error'])) {
+                        $message = $this->promotionAuthErrorMessage($response, 'Gagal memuat ringkasan promosi.');
+                        return response()->json([
+                            'success' => false,
+                            'message' => $message,
+                            'code'    => $this->isShopeeAuthError($response) ? 'auth_required' : null,
+                            'store'   => $this->normalizeStorePayload($store),
+                            'raw'     => $response,
+                        ], 422);
+                    }
+
+                    foreach ($this->extractPromotionList($response) as $promotion) {
+                        $normalized = $this->normalizePromotionCampaign($promotion);
+
+                        if (! $this->promotionMatchesDateRange($normalized, $dateFromTs, $dateToTs)) {
+                            continue;
+                        }
+
+                        $row = [
+                            'store' => $this->normalizeStorePayload($store),
+                            'store_label' => $this->formatStoreLabel($store),
+                            'status_key' => strtolower((string) ($normalized['discount_status'] ?? '')),
+                            'status_label' => $normalized['status_label'],
+                            'schedule_label' => $this->formatPromotionSchedule($normalized['start_time'], $normalized['end_time']),
+                        ] + $normalized;
+
+                        $rows[] = $row;
+                        $storeRows[] = $row;
+                    }
+                }
+
+                $storeSummary = $this->buildPromotionStoreSummary($store, $storeRows);
+                $storeSummaries[] = $storeSummary;
+
+                $totals['stores'] += 1;
+                $totals['promotions'] += $storeSummary['promotions'];
+                $totals['ongoing'] += $storeSummary['ongoing'];
+                $totals['upcoming'] += $storeSummary['upcoming'];
+                $totals['ended'] += $storeSummary['ended'];
+                $totals['suspended'] += $storeSummary['suspended'];
+                $totals['items'] += $storeSummary['items'];
+            }
+
+            usort($rows, function ($a, $b) {
+                $storeCmp = strcmp((string) ($a['store_label'] ?? ''), (string) ($b['store_label'] ?? ''));
+                if ($storeCmp !== 0) {
+                    return $storeCmp;
+                }
+
+                return ((int) ($b['start_time'] ?? 0)) <=> ((int) ($a['start_time'] ?? 0));
+            });
+
+            usort($storeSummaries, function ($a, $b) {
+                return strcmp((string) ($a['store']['name'] ?? ''), (string) ($b['store']['name'] ?? ''));
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ringkasan promosi berhasil dimuat.',
+                'filters' => [
+                    'store_id'  => $data['store_id'] ?? 'all',
+                    'status'    => $status,
+                    'date_from' => $data['date_from'] ?? null,
+                    'date_to'   => $data['date_to'] ?? null,
+                ],
+                'rows' => $rows,
+                'store_summaries' => $storeSummaries,
+                'totals' => $totals,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function promotionDetail(Request $request, Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        $pageNo = max(1, (int) $request->input('page_no', 1));
+        $pageSize = min(100, max(1, (int) $request->input('page_size', 50)));
+        $forceRefresh = $request->boolean('refresh');
+
+        try {
+            if (! $forceRefresh) {
+                $cached = $this->getCachedPromotionDetail($store, $discountId);
+                if ($cached) {
+                    return response()->json([
+                        'success'   => true,
+                        'message'   => 'Detail promosi dimuat dari cache lokal.',
+                        'store'     => $this->normalizeStorePayload($store),
+                        'promotion' => $cached['promotion'],
+                        'cached'    => true,
+                        'cached_at' => $cached['cached_at'],
+                    ]);
+                }
+            }
+
+            $response = $this->manager->driver($store)->getDiscount($store, $discountId, $pageNo, $pageSize);
+
+            if (! empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $response['message'] ?? $response['error'] ?? 'Gagal memuat detail promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $response,
+                ], 422);
+            }
+
+            return response()->json([
+                'success'   => true,
+                'message'   => 'Detail promosi berhasil dimuat.',
+                'store'     => $this->normalizeStorePayload($store),
+                'promotion' => $this->storePromotionDetailCache(
+                    $store,
+                    $discountId,
+                    $this->normalizePromotionDetail($response, $store, $discountId)
+                ),
+                'cached'    => false,
+                'raw'       => $response,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionCreate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'store_id'      => ['required', 'integer', 'exists:stores,id'],
+            'discount_name' => ['required', 'string', 'max:255'],
+            'start_time'    => ['required', 'integer'],
+            'end_time'      => ['required', 'integer', 'gte:start_time'],
+            'item_list'     => ['nullable'],
+            'duplicate_from_discount_id' => ['nullable', 'integer'],
+        ]);
+
+        $store = Store::with('channel')->findOrFail((int) $data['store_id']);
+        $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
+
+        try {
+            $driver = $this->manager->driver($store);
+            $createResponse = $driver->addDiscount(
+                $store,
+                $data['discount_name'],
+                (int) $data['start_time'],
+                (int) $data['end_time']
+            );
+
+            if (! empty($createResponse['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $createResponse['message'] ?? $createResponse['error'] ?? 'Gagal membuat promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $createResponse,
+                ], 422);
+            }
+
+            $discountId = (int) data_get($createResponse, 'response.discount_id', 0);
+            $itemsResponse = null;
+            $recordStatus = $this->inferPromotionStatus((int) $data['start_time'], (int) $data['end_time']);
+
+            if ($discountId && ! empty($itemList)) {
+                $itemsResponse = $driver->addDiscountItem($store, $discountId, $itemList);
+            }
+
+            $this->persistPromotionRecord($store, $discountId, [
+                'source_discount_id' => $data['duplicate_from_discount_id'] ?? null,
+                'discount_name' => $data['discount_name'],
+                'discount_status' => $recordStatus,
+                'sync_status' => empty($itemsResponse['error']) ? 'synced' : 'partial',
+                'sync_error' => ! empty($itemsResponse['error'])
+                    ? ($itemsResponse['message'] ?? $itemsResponse['error'] ?? null)
+                    : null,
+                'start_time' => (int) $data['start_time'],
+                'end_time' => (int) $data['end_time'],
+                'item_count' => count($itemList),
+                'item_list_json' => $itemList,
+                'request_payload' => array_merge($data, [
+                    'store_id' => (int) $data['store_id'],
+                    'item_list' => $itemList,
+                ]),
+                'create_response' => $createResponse,
+                'items_response' => $itemsResponse,
+                'detail_cache_json' => null,
+                'detail_cached_at' => null,
+                'raw_json' => [
+                    'create' => $createResponse,
+                    'items' => $itemsResponse,
+                ],
+            ]);
+
+            if (! empty($itemsResponse['error'])) {
+                return response()->json([
+                    'success'     => false,
+                    'message'     => $itemsResponse['message'] ?? $itemsResponse['error'] ?? 'Promosi dibuat, tetapi item gagal ditambahkan.',
+                    'store'       => $this->normalizeStorePayload($store),
+                    'discount_id' => $discountId,
+                    'create'      => $createResponse,
+                    'items'       => $itemsResponse,
+                ], 422);
+            }
+
+            return response()->json([
+                'success'     => true,
+                'message'     => $discountId && ! empty($itemList)
+                    ? 'Promosi berhasil dibuat dan item sudah ditambahkan.'
+                    : 'Promosi berhasil dibuat.',
+                'store'       => $this->normalizeStorePayload($store),
+                'discount_id' => $discountId,
+                'create'      => $createResponse,
+                'items'       => $itemsResponse,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionUpdate(Request $request, Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        $data = $request->validate([
+            'discount_name' => ['nullable', 'string', 'max:255'],
+            'start_time'    => ['nullable', 'integer'],
+            'end_time'      => ['nullable', 'integer'],
+            'item_list'     => ['nullable'],
+        ]);
+
+        $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
+        $currentRecord = MarketplacePromotion::query()
+            ->where('store_id', $store->id)
+            ->where('discount_id', $discountId)
+            ->first();
+        $currentStatus = strtolower((string) ($currentRecord->discount_status ?? ''));
+        $isOngoing = $currentStatus === 'ongoing';
+        $startTime = $isOngoing ? null : (array_key_exists('start_time', $data) ? (int) $data['start_time'] : null);
+        $endTime = array_key_exists('end_time', $data) ? (int) $data['end_time'] : null;
+        $shouldUpdateMeta = $request->filled('discount_name')
+            || (! $isOngoing && $request->filled('start_time'))
+            || $request->filled('end_time');
+
+        if (
+            ! $request->filled('discount_name')
+            && ! $request->filled('start_time')
+            && ! $request->filled('end_time')
+            && empty($itemList)
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada perubahan yang dikirim.',
+                'store'   => $this->normalizeStorePayload($store),
+            ], 422);
+        }
+
+        try {
+            $driver = $this->manager->driver($store);
+            $updateResponse = null;
+            $itemsResponse = null;
+
+            if ($shouldUpdateMeta) {
+                $updateResponse = $driver->updateDiscount(
+                    $store,
+                    $discountId,
+                    $data['discount_name'] ?? null,
+                    $startTime,
+                    $endTime
+                );
+
+                if (! empty($updateResponse['error'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $updateResponse['message'] ?? $updateResponse['error'] ?? 'Gagal memperbarui promosi.',
+                        'store'   => $this->normalizeStorePayload($store),
+                        'raw'     => $updateResponse,
+                    ], 422);
+                }
+            }
+
+            if (! empty($itemList)) {
+                $itemsResponse = $driver->updateDiscountItem($store, $discountId, $itemList);
+
+                if (! empty($itemsResponse['error'])) {
+                    $this->persistPromotionRecord($store, $discountId, [
+                        'discount_name' => $data['discount_name'] ?? null,
+                        'start_time' => $startTime,
+                        'end_time' => $endTime,
+                        'item_count' => count($itemList),
+                        'item_list_json' => $itemList,
+                        'request_payload' => array_merge($data, [
+                            'store_id' => $store->id,
+                            'item_list' => $itemList,
+                        ]),
+                        'update_response' => $updateResponse,
+                        'items_response' => $itemsResponse,
+                        'detail_cache_json' => null,
+                        'detail_cached_at' => null,
+                        'raw_json' => [
+                            'update' => $updateResponse,
+                            'items' => $itemsResponse,
+                        ],
+                        'sync_status' => 'partial',
+                        'sync_error' => $itemsResponse['message'] ?? $itemsResponse['error'] ?? null,
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => $itemsResponse['message'] ?? $itemsResponse['error'] ?? 'Promosi diperbarui, tetapi item gagal disimpan.',
+                        'store'   => $this->normalizeStorePayload($store),
+                        'update'  => $updateResponse,
+                        'items'   => $itemsResponse,
+                    ], 422);
+                }
+            }
+
+            $this->persistPromotionRecord($store, $discountId, [
+                'discount_name' => $data['discount_name'] ?? null,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'item_count' => ! empty($itemList) ? count($itemList) : null,
+                'item_list_json' => ! empty($itemList) ? $itemList : null,
+                'request_payload' => array_merge($data, [
+                    'store_id' => $store->id,
+                    'item_list' => $itemList,
+                ]),
+                'update_response' => $updateResponse,
+                'items_response' => $itemsResponse,
+                'detail_cache_json' => null,
+                'detail_cached_at' => null,
+                'raw_json' => [
+                    'update' => $updateResponse,
+                    'items' => $itemsResponse,
+                ],
+                'sync_status' => 'synced',
+                'sync_error' => null,
+            ]);
+
+            if (($request->filled('start_time') && ! $isOngoing) || $request->filled('end_time')) {
+                $this->persistPromotionRecord($store, $discountId, [
+                    'discount_status' => $this->inferPromotionStatus(
+                        $startTime,
+                        $endTime
+                    ),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Promosi berhasil diperbarui.',
+                'store'   => $this->normalizeStorePayload($store),
+                'update'  => $updateResponse,
+                'items'   => $itemsResponse,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionEnd(Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        try {
+            $response = $this->manager->driver($store)->endDiscount($store, $discountId);
+
+            if (! empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $response['message'] ?? $response['error'] ?? 'Gagal menutup promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $response,
+                ], 422);
+            }
+
+            $this->persistPromotionRecord($store, $discountId, [
+                'discount_status' => 'ended',
+                'ended_at' => now(),
+                'sync_status' => 'ended',
+                'sync_error' => null,
+                'end_response' => $response,
+                'detail_cache_json' => null,
+                'detail_cached_at' => null,
+                'raw_json' => [
+                    'end' => $response,
+                ],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Promosi berhasil ditutup.',
+                'store'   => $this->normalizeStorePayload($store),
+                'raw'     => $response,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionActivate(Request $request, Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        $data = $request->validate([
+            'current_status' => ['nullable', 'string', 'in:upcoming,ongoing,ended,suspended'],
+        ]);
+
+        try {
+            $response = $this->manager->driver($store)->updateDiscount(
+                $store,
+                $discountId,
+                null,
+                now()->timestamp,
+                null
+            );
+
+            if (! empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $response['message'] ?? $response['error'] ?? 'Gagal mengaktifkan promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $response,
+                ], 422);
+            }
+
+            $this->persistPromotionRecord($store, $discountId, [
+                'discount_status' => 'ongoing',
+                'start_time' => now()->timestamp,
+                'sync_status' => 'synced',
+                'sync_error' => null,
+                'update_response' => $response,
+                'detail_cache_json' => null,
+                'detail_cached_at' => null,
+                'raw_json' => [
+                    'activate' => $response,
+                    'current_status' => $data['current_status'] ?? null,
+                ],
+            ]);
+
+            DB::table('marketplace_promotions')
+                ->where('store_id', $store->id)
+                ->where('discount_id', $discountId)
+                ->update([
+                    'discount_status' => 'ongoing',
+                    'start_time' => now()->timestamp,
+                    'sync_status' => 'synced',
+                    'sync_error' => null,
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Promosi berhasil diaktifkan sekarang.',
+                'store'   => $this->normalizeStorePayload($store),
+                'raw'     => $response,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionDeactivate(Request $request, Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        $data = $request->validate([
+            'current_status' => ['required', 'string', 'in:upcoming,ongoing'],
+        ]);
+
+        try {
+            if ($data['current_status'] === 'ongoing') {
+                $response = $this->manager->driver($store)->endDiscount($store, $discountId);
+            } else {
+                $response = $this->manager->driver($store)->deleteDiscount($store, $discountId);
+            }
+
+            if (! empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $response['message'] ?? $response['error'] ?? 'Gagal menonaktifkan promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $response,
+                ], 422);
+            }
+
+            $this->persistPromotionRecord($store, $discountId, [
+                'discount_status' => $data['current_status'] === 'ongoing' ? 'ended' : 'deleted',
+                'ended_at' => now(),
+                'sync_status' => $data['current_status'] === 'ongoing' ? 'ended' : 'deleted',
+                'sync_error' => null,
+                'end_response' => $data['current_status'] === 'ongoing' ? $response : null,
+                'delete_response' => $data['current_status'] === 'ongoing' ? null : $response,
+                'detail_cache_json' => null,
+                'detail_cached_at' => null,
+                'raw_json' => [
+                    'deactivate' => $response,
+                    'current_status' => $data['current_status'],
+                ],
+            ]);
+
+            DB::table('marketplace_promotions')
+                ->where('store_id', $store->id)
+                ->where('discount_id', $discountId)
+                ->update([
+                    'discount_status' => $data['current_status'] === 'ongoing' ? 'ended' : 'deleted',
+                    'ended_at' => now(),
+                    'sync_status' => $data['current_status'] === 'ongoing' ? 'ended' : 'deleted',
+                    'sync_error' => null,
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $data['current_status'] === 'ongoing'
+                    ? 'Promosi berhasil dinonaktifkan.'
+                    : 'Promosi yang belum aktif berhasil dihapus.',
+                'store'   => $this->normalizeStorePayload($store),
+                'raw'     => $response,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    public function promotionDelete(Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        try {
+            $response = $this->manager->driver($store)->deleteDiscount($store, $discountId);
+
+            if (! empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $response['message'] ?? $response['error'] ?? 'Gagal menghapus promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $response,
+                ], 422);
+            }
+
+            $this->persistPromotionRecord($store, $discountId, [
+                'discount_status' => 'deleted',
+                'sync_status' => 'deleted',
+                'sync_error' => null,
+                'delete_response' => $response,
+                'detail_cache_json' => null,
+                'detail_cached_at' => null,
+                'raw_json' => [
+                    'delete' => $response,
+                ],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Promosi berhasil dihapus.',
+                'store'   => $this->normalizeStorePayload($store),
+                'raw'     => $response,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    private function clearPromotionDetailCache(Store $store, int $discountId): void
+    {
+        $this->persistPromotionRecord($store, $discountId, [
+            'detail_cache_json' => null,
+            'detail_cached_at' => null,
+        ]);
+    }
+
+    public function promotionDeleteItem(Request $request, Store $store, int $discountId): JsonResponse
+    {
+        $store = $this->resolvePromotionStoreBinding($store);
+        $data = $request->validate([
+            'item_id'  => ['required', 'integer'],
+            'model_id' => ['nullable', 'integer'],
+        ]);
+
+        try {
+            $response = $this->manager->driver($store)->deleteDiscountItem(
+                $store,
+                $discountId,
+                (int) $data['item_id'],
+                (int) ($data['model_id'] ?? 0)
+            );
+
+            if (! empty($response['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $response['message'] ?? $response['error'] ?? 'Gagal menghapus item dari promosi.',
+                    'store'   => $this->normalizeStorePayload($store),
+                    'raw'     => $response,
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item berhasil dihapus dari promosi.',
+                'store'   => $this->normalizeStorePayload($store),
+                'raw'     => $response,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'store'   => $this->normalizeStorePayload($store),
+            ], 500);
+        }
+    }
+
+    private function persistPromotionRecord(Store $store, int $discountId, array $attributes): void
+    {
+        if ($discountId <= 0) {
+            return;
+        }
+
+        $store->loadMissing('channel');
+        $record = MarketplacePromotion::firstOrNew([
+            'store_id' => $store->id,
+            'discount_id' => $discountId,
+        ]);
+
+        $record->store_id = $store->id;
+        $record->channel_code = strtolower((string) ($store->channel?->code ?? '')) ?: null;
+        $record->discount_id = $discountId;
+
+        if (array_key_exists('source_discount_id', $attributes)) {
+            $record->source_discount_id = $attributes['source_discount_id'] ? (int) $attributes['source_discount_id'] : null;
+        }
+
+        if (array_key_exists('discount_name', $attributes)) {
+            $record->discount_name = $attributes['discount_name'];
+        }
+
+        if (array_key_exists('discount_status', $attributes)) {
+            $record->discount_status = $attributes['discount_status'];
+        }
+
+        if (array_key_exists('sync_status', $attributes)) {
+            $record->sync_status = $attributes['sync_status'];
+        }
+
+        if (array_key_exists('sync_error', $attributes)) {
+            $record->sync_error = $attributes['sync_error'];
+        }
+
+        if (array_key_exists('start_time', $attributes)) {
+            $record->start_time = $attributes['start_time'] !== null ? (int) $attributes['start_time'] : null;
+        }
+
+        if (array_key_exists('end_time', $attributes)) {
+            $record->end_time = $attributes['end_time'] !== null ? (int) $attributes['end_time'] : null;
+        }
+
+        if (array_key_exists('item_count', $attributes) && $attributes['item_count'] !== null) {
+            $record->item_count = (int) $attributes['item_count'];
+        }
+
+        if (array_key_exists('item_list_json', $attributes) && $attributes['item_list_json'] !== null) {
+            $record->item_list_json = $attributes['item_list_json'];
+        }
+
+        if (array_key_exists('request_payload', $attributes)) {
+            $record->request_payload = $attributes['request_payload'];
+        }
+
+        if (array_key_exists('create_response', $attributes)) {
+            $record->create_response = $attributes['create_response'];
+        }
+
+        if (array_key_exists('items_response', $attributes)) {
+            $record->items_response = $attributes['items_response'];
+        }
+
+        if (array_key_exists('update_response', $attributes)) {
+            $record->update_response = $attributes['update_response'];
+        }
+
+        if (array_key_exists('end_response', $attributes)) {
+            $record->end_response = $attributes['end_response'];
+        }
+
+        if (array_key_exists('delete_response', $attributes)) {
+            $record->delete_response = $attributes['delete_response'];
+        }
+
+        if (array_key_exists('detail_cache_json', $attributes)) {
+            $record->detail_cache_json = $attributes['detail_cache_json'];
+        }
+
+        if (array_key_exists('detail_cached_at', $attributes)) {
+            $record->detail_cached_at = $attributes['detail_cached_at'] ? Carbon::parse($attributes['detail_cached_at']) : null;
+        }
+
+        if (array_key_exists('raw_json', $attributes)) {
+            $record->raw_json = $attributes['raw_json'];
+        }
+
+        if (array_key_exists('synced_at', $attributes)) {
+            $record->synced_at = $attributes['synced_at'] ? Carbon::parse($attributes['synced_at']) : now();
+        } else {
+            $record->synced_at = now();
+        }
+
+        if (array_key_exists('ended_at', $attributes)) {
+            $record->ended_at = $attributes['ended_at'] ? Carbon::parse($attributes['ended_at']) : null;
+        }
+
+        $record->save();
+    }
+
+    private function getCachedPromotionDetail(Store $store, int $discountId): ?array
+    {
+        $promotion = MarketplacePromotion::query()
+            ->where('store_id', $store->id)
+            ->where('discount_id', $discountId)
+            ->first();
+
+        if (! $promotion || empty($promotion->detail_cache_json) || ! $promotion->detail_cached_at) {
+            return null;
+        }
+
+        $maxAgeMinutes = (int) config('shopee.promotion_detail_cache_minutes', 15);
+        if ($promotion->detail_cached_at->lt(now()->subMinutes($maxAgeMinutes))) {
+            return null;
+        }
+
+        $cached = is_array($promotion->detail_cache_json) ? $promotion->detail_cache_json : [];
+        if (empty($cached)) {
+            return null;
+        }
+
+        return [
+            'promotion' => $cached,
+            'cached_at' => $promotion->detail_cached_at->toISOString(),
+        ];
+    }
+
+    private function storePromotionDetailCache(Store $store, int $discountId, array $promotion): array
+    {
+        if ($discountId <= 0) {
+            return $promotion;
+        }
+
+        $record = MarketplacePromotion::firstOrNew([
+            'store_id' => $store->id,
+            'discount_id' => $discountId,
+        ]);
+
+        $record->store_id = $store->id;
+        $record->discount_id = $discountId;
+        $record->detail_cache_json = $promotion;
+        $record->detail_cached_at = now();
+        $record->save();
+
+        return $promotion;
+    }
+
+    private function inferPromotionStatus(?int $startTime, ?int $endTime): string
+    {
+        $now = now()->timestamp;
+
+        if ($startTime && $startTime > $now) {
+            return 'upcoming';
+        }
+
+        if ($endTime && $endTime < $now) {
+            return 'ended';
+        }
+
+        return 'ongoing';
+    }
+
+    private function resolvePromotionStore(?int $storeId = null): ?Store
+    {
+        if ($storeId) {
+            $store = Store::with('channel')->find($storeId);
+            return $this->isPromotionFilterableStore($store) ? $store : null;
+        }
+
+        $preferred = Store::with('channel')
+            ->whereHas('channel', function ($query) {
+                $query->whereIn('code', ['shopee', 'shp']);
+            })
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if ($preferred) {
+            return $preferred;
+        }
+
+        return Store::with('channel')->where('is_active', true)->orderBy('id')->first();
+    }
+
+    private function resolvePromotionStores(?int $storeId = null)
+    {
+        if ($storeId) {
+            $store = Store::with('channel')->find($storeId);
+            return $this->isPromotionFilterableStore($store) ? collect([$store]) : collect();
+        }
+
+        return Store::with('channel')
+            ->whereHas('channel', function ($query) {
+                $query->whereIn('code', ['shopee', 'shp']);
+            })
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function resolvePromotionStoreBinding(mixed $store): Store
+    {
+        if ($store instanceof Store && filled($store->id)) {
+            return Store::with('channel')->findOrFail((int) $store->id);
+        }
+
+        $routeStore = request()->route('store');
+        if ($routeStore instanceof Store && filled($routeStore->id)) {
+            return Store::with('channel')->findOrFail((int) $routeStore->id);
+        }
+
+        if (is_numeric($routeStore)) {
+            return Store::with('channel')->findOrFail((int) $routeStore);
+        }
+
+        if (is_numeric($store)) {
+            return Store::with('channel')->findOrFail((int) $store);
+        }
+
+        abort(404, 'Toko promosi tidak ditemukan.');
+    }
+
+    private function isPromotionFilterableStore(?Store $store): bool
+    {
+        if (! $store) {
+            return false;
+        }
+
+        $store->loadMissing('channel');
+
+        $channelCode = strtolower((string) ($store->channel?->code ?? ''));
+
+        return $store->is_active
+            && in_array($channelCode, ['shopee', 'shp'], true);
+    }
+
+    private function normalizeStorePayload(Store $store): array
+    {
+        $store->loadMissing('channel');
+
+        return [
+            'id' => $store->id,
+            'name' => $store->name,
+            'channel' => $store->channel ? [
+                'id' => $store->channel->id,
+                'code' => $store->channel->code,
+                'name' => $store->channel->name,
+            ] : null,
+        ];
+    }
+
+    private function formatStoreLabel(Store $store): string
+    {
+        $store->loadMissing('channel');
+
+        return $store->channel
+            ? "{$store->name} • {$store->channel->name}"
+            : $store->name;
+    }
+
+    private function extractPromotionList(array $response): array
+    {
+        return data_get($response, 'response.discount_list')
+            ?? data_get($response, 'response.list')
+            ?? data_get($response, 'response.discount_info_list')
+            ?? [];
+    }
+
+    private function normalizePromotionCampaign(array $discount): array
+    {
+        $itemList = data_get($discount, 'discount_item_list')
+            ?? data_get($discount, 'item_list')
+            ?? data_get($discount, 'items')
+            ?? [];
+
+        if (! is_array($itemList)) {
+            $itemList = [];
+        }
+
+        $startTime = (int) (data_get($discount, 'start_time') ?? 0);
+        $endTime = (int) (data_get($discount, 'end_time') ?? 0);
+        $updateTime = (int) (data_get($discount, 'update_time') ?? 0);
+        $status = (string) (data_get($discount, 'discount_status') ?? data_get($discount, 'status') ?? '');
+
+        return [
+            'discount_id'   => (int) (data_get($discount, 'discount_id') ?? 0),
+            'discount_name' => (string) (data_get($discount, 'discount_name') ?? data_get($discount, 'name') ?? ''),
+            'discount_status' => $status ?: null,
+            'status_label'  => $this->formatPromotionStatus($status),
+            'start_time'    => $startTime ?: null,
+            'start_label'   => $this->formatPromotionTimestamp($startTime),
+            'end_time'      => $endTime ?: null,
+            'end_label'     => $this->formatPromotionTimestamp($endTime),
+            'update_time'   => $updateTime ?: null,
+            'update_label'  => $this->formatPromotionTimestamp($updateTime),
+            'item_count'    => (int) (data_get($discount, 'item_count') ?? count($itemList)),
+            'raw'           => $discount,
+        ];
+    }
+
+    private function enrichPromotionCampaignsWithLocalPreview(Store $store, array $promotions): array
+    {
+        if (empty($promotions)) {
+            return $promotions;
+        }
+
+        $discountIds = collect($promotions)
+            ->pluck('discount_id')
+            ->filter(fn ($value) => ! empty($value))
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($discountIds)) {
+            return $promotions;
+        }
+
+        $records = MarketplacePromotion::query()
+            ->where('store_id', $store->id)
+            ->whereIn('discount_id', $discountIds)
+            ->get()
+            ->keyBy('discount_id');
+
+        return collect($promotions)
+            ->map(function (array $promotion) use ($records) {
+                $record = $records->get((int) ($promotion['discount_id'] ?? 0));
+                if (! $record) {
+                    return $promotion + [
+                        'items_preview' => [],
+                        'item_preview_summary' => '—',
+                    ];
+                }
+
+                $items = [];
+                $previewSource = is_array($record->detail_cache_json ?? null)
+                    ? (data_get($record->detail_cache_json, 'items') ?: [])
+                    : [];
+
+                if (empty($previewSource) && is_array($record->item_list_json ?? null)) {
+                    $previewSource = $this->buildPromotionPreviewFromItemList($record->item_list_json);
+                }
+
+                if (is_array($previewSource)) {
+                    $items = $this->normalizePromotionPreviewItems($previewSource);
+                }
+
+                $promotion['items_preview'] = $items;
+                $promotion['item_preview_summary'] = $this->formatPromotionItemsPreview($items);
+                if (empty($promotion['item_count']) && ! empty($items)) {
+                    $promotion['item_count'] = count($items);
+                }
+
+                return $promotion;
+            })
+            ->all();
+    }
+
+    private function buildPromotionPreviewFromItemList(array $itemList): array
+    {
+        return collect($itemList)->map(function ($item) {
+            $models = data_get($item, 'model_list', []);
+            if (! is_array($models)) {
+                $models = [];
+            }
+
+            return [
+                'item_id' => (int) (data_get($item, 'item_id') ?? 0),
+                'item_name' => (string) (data_get($item, 'item_name') ?? ''),
+                'item_sku' => (string) (data_get($item, 'item_sku') ?? ''),
+                'sku_mapping_code' => (string) (data_get($item, 'sku_mapping_code') ?? ''),
+                'model_list' => collect($models)->map(function ($model) {
+                    return [
+                        'model_id' => (int) (data_get($model, 'model_id') ?? 0),
+                        'model_name' => (string) (data_get($model, 'model_name') ?? ''),
+                        'model_sku' => (string) (data_get($model, 'model_sku') ?? ''),
+                        'variant_sku_label' => (string) (data_get($model, 'variant_sku_label') ?? ''),
+                        'sku_mapping_code' => (string) (data_get($model, 'sku_mapping_code') ?? ''),
+                    ];
+                })->values()->all(),
+            ];
+        })->values()->all();
+    }
+
+    private function normalizePromotionPreviewItems(array $items): array
+    {
+        return collect($items)->map(function ($item) {
+            $models = data_get($item, 'model_list', []);
+            if (! is_array($models)) {
+                $models = [];
+            }
+
+            return [
+                'item_id' => (int) (data_get($item, 'item_id') ?? 0),
+                'item_name' => (string) (data_get($item, 'item_name') ?? data_get($item, 'product_title_label') ?? ''),
+                'item_sku' => (string) (data_get($item, 'item_sku') ?? ''),
+                'sku_mapping_code' => (string) (data_get($item, 'sku_mapping_code') ?? ''),
+                'model_list' => collect($models)->map(function ($model) {
+                    return [
+                        'model_id' => (int) (data_get($model, 'model_id') ?? 0),
+                        'model_name' => (string) (data_get($model, 'model_name') ?? ''),
+                        'model_sku' => (string) (data_get($model, 'model_sku') ?? ''),
+                        'variant_sku_label' => (string) (data_get($model, 'variant_sku_label') ?? data_get($model, 'model_sku') ?? ''),
+                        'sku_mapping_code' => (string) (data_get($model, 'sku_mapping_code') ?? ''),
+                    ];
+                })->values()->all(),
+            ];
+        })->values()->all();
+    }
+
+    private function formatPromotionItemsPreview(array $items, int $maxItems = 2, int $maxVariants = 3): string
+    {
+        if (empty($items)) {
+            return '—';
+        }
+
+        $chunks = [];
+
+        foreach (array_slice($items, 0, $maxItems) as $item) {
+            $itemLabel = trim((string) ($item['item_name'] ?? ''));
+            $itemId = (string) ($item['item_id'] ?? '');
+            $head = $itemId !== '' ? $itemId : '—';
+            if ($itemLabel !== '') {
+                $head .= ' • ' . Str::limit($itemLabel, 26);
+            }
+
+            $variants = [];
+            foreach (array_slice($item['model_list'] ?? [], 0, $maxVariants) as $model) {
+                $variant = trim((string) ($model['model_name'] ?? ''));
+                $variantId = (string) ($model['model_id'] ?? '');
+                $skuCode = trim((string) ($model['sku_mapping_code'] ?? ''));
+                $parts = [];
+                if ($variantId !== '') {
+                    $parts[] = $variantId;
+                }
+                if ($variant !== '') {
+                    $parts[] = $variant;
+                }
+                $label = implode(' • ', $parts);
+                if ($label === '') {
+                    $label = $variantId !== '' ? $variantId : 'variant';
+                }
+                if ($skuCode !== '') {
+                    $label .= ' [' . $skuCode . ']';
+                }
+                $variants[] = $label;
+            }
+
+            if (count(($item['model_list'] ?? [])) > $maxVariants) {
+                $variants[] = '+' . (count($item['model_list']) - $maxVariants);
+            }
+
+            $chunks[] = $head . ' | ' . implode(', ', $variants);
+        }
+
+        if (count($items) > $maxItems) {
+            $chunks[] = '+' . (count($items) - $maxItems) . ' item';
+        }
+
+        return implode(' · ', $chunks);
+    }
+
+    private function normalizePromotionDetail(array $response, Store $store, int $discountId): array
+    {
+        $detail = data_get($response, 'response.discount_info')
+            ?? data_get($response, 'response')
+            ?? [];
+
+        if (! is_array($detail)) {
+            $detail = [];
+        }
+
+        $items = data_get($response, 'response.discount_item_list')
+            ?? data_get($response, 'response.item_list')
+            ?? data_get($detail, 'discount_item_list')
+            ?? data_get($detail, 'item_list')
+            ?? [];
+
+        if (! is_array($items)) {
+            $items = [];
+        }
+
+        return [
+            'discount_id'   => (int) (data_get($detail, 'discount_id') ?? $discountId),
+            'discount_name' => (string) (data_get($detail, 'discount_name') ?? data_get($detail, 'name') ?? ''),
+            'discount_status' => (string) (data_get($detail, 'discount_status') ?? data_get($detail, 'status') ?? ''),
+            'status_label'  => $this->formatPromotionStatus((string) (data_get($detail, 'discount_status') ?? data_get($detail, 'status') ?? '')),
+            'start_time'    => (int) (data_get($detail, 'start_time') ?? 0) ?: null,
+            'end_time'      => (int) (data_get($detail, 'end_time') ?? 0) ?: null,
+            'item_count'    => (int) (data_get($detail, 'item_count') ?? count($items)),
+            'items'         => $this->enrichPromotionItemsWithSku($store, collect($items)->map(function ($item) {
+                $modelList = data_get($item, 'model_list')
+                    ?? data_get($item, 'models')
+                    ?? data_get($item, 'model_info')
+                    ?? [];
+
+                if (! is_array($modelList)) {
+                    $modelList = [];
+                }
+
+                return [
+                    'item_id' => (int) (data_get($item, 'item_id') ?? 0),
+                    'item_name' => (string) (data_get($item, 'item_name') ?? data_get($item, 'name') ?? ''),
+                    'item_original_price' => data_get($item, 'original_price', data_get($item, 'price', data_get($item, 'price_info.0.original_price'))),
+                    'model_list' => array_map(function ($model) {
+                        $originalPrice = data_get($model, 'model_original_price')
+                            ?? data_get($model, 'original_price')
+                            ?? data_get($model, 'price')
+                            ?? data_get($model, 'model_price')
+                            ?? data_get($model, 'price_info.0.original_price');
+
+                        return [
+                            'model_id' => (int) (data_get($model, 'model_id') ?? 0),
+                            'model_name' => (string) (data_get($model, 'model_name') ?? data_get($model, 'name') ?? ''),
+                            'model_original_price' => $originalPrice,
+                            'model_promotion_price' => data_get($model, 'model_promotion_price', data_get($model, 'promotion_price', data_get($model, 'discount_price'))),
+                            'model_promotion_percentage' => data_get($model, 'model_promotion_percentage', data_get($model, 'promotion_percentage')),
+                        ];
+                    }, $modelList),
+                    'raw' => $item,
+                ];
+            })->values()->all()),
+            'store'         => $this->normalizeStorePayload($store),
+            'raw'           => $response,
+        ];
+    }
+
+    private function enrichPromotionItemsWithSku(Store $store, array $items): array
+    {
+        $itemIds = collect($items)
+            ->pluck('item_id')
+            ->filter(fn ($itemId) => ! empty($itemId))
+            ->map(fn ($itemId) => (int) $itemId)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($itemIds)) {
+            return $items;
+        }
+
+        $products = MarketplaceProduct::with(['models'])
+            ->where('store_id', $store->id)
+            ->whereIn('item_id', $itemIds)
+            ->get()
+            ->keyBy('item_id');
+
+        $channelCode = strtolower((string) ($store->channel?->code ?? ''));
+
+        return collect($items)->map(function (array $item) use ($products, $channelCode) {
+            $product = $products->get((int) ($item['item_id'] ?? 0));
+            $productTitle = $product?->item_name
+                ?? data_get($item, 'item_name')
+                ?? data_get($item, 'name')
+                ?? null;
+
+            $itemVariantSku = $product?->item_sku
+                ?? data_get($item, 'item_sku')
+                ?? null;
+
+            $item['item_sku'] = $itemVariantSku;
+            $item['item_sku_label'] = $itemVariantSku ?: '—';
+            $item['product_title'] = $productTitle;
+            $item['product_title_label'] = $productTitle ?: '—';
+            $item['sku_mapping_label'] = '—';
+            $item['sku_mapping_code'] = null;
+            $item['promo_stock'] = (int) ($product?->stock_total ?? data_get($item, 'stock_total') ?? 0);
+
+            $modelRows = [];
+            foreach (($item['model_list'] ?? []) as $model) {
+                $modelId = (string) data_get($model, 'model_id', '');
+                $localModel = $product?->models?->firstWhere('model_id', $modelId);
+                $variantSku = $localModel?->model_sku
+                    ?? data_get($model, 'model_sku')
+                    ?? $itemVariantSku
+                    ?? null;
+
+                $mappingItem = null;
+                if ($variantSku) {
+                    $mappingItem = SkuMapping::query()
+                        ->with('item:id,code,name')
+                        ->where('marketplace_sku', $variantSku)
+                        ->when($channelCode !== '', fn ($q) => $q->where(function ($qq) use ($channelCode) {
+                            $qq->whereNull('channel_code')->orWhere('channel_code', $channelCode);
+                        }))
+                        ->orderByRaw('CASE WHEN channel_code IS NULL THEN 1 ELSE 0 END')
+                        ->first();
+                }
+
+                $modelStock = $localModel?->stock;
+                $promoStock = $modelStock !== null
+                    ? (int) $modelStock
+                    : (int) ($product?->stock_total ?? data_get($item, 'stock_total') ?? 0);
+
+                $modelRows[] = array_merge($model, [
+                    'model_sku' => $variantSku,
+                    'variant_sku_label' => $variantSku ?: '—',
+                    'sku_mapping_code' => $mappingItem?->item?->code,
+                    'sku_mapping_label' => $mappingItem?->item?->code
+                        ? ($mappingItem->item->code . ($mappingItem->item->name ? ' • ' . $mappingItem->item->name : ''))
+                        : '—',
+                    'promo_stock' => $promoStock,
+                    'promo_stock_label' => number_format($promoStock, 0, ',', '.'),
+                    'model_stock' => $modelStock !== null ? (int) $modelStock : null,
+                ]);
+            }
+
+            $item['model_list'] = $modelRows;
+
+            return $item;
+        })->values()->all();
+    }
+
+    private function normalizePromotionItemList(mixed $items): array
+    {
+        if (is_string($items)) {
+            $decoded = json_decode($items, true);
+            $items = is_array($decoded) ? $decoded : [];
+        }
+
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return collect($items)
+            ->map(fn ($item) => $this->normalizePromotionItem($item))
+            ->filter(fn ($item) => ! empty($item['item_id']))
+            ->values()
+            ->all();
+    }
+
+    private function normalizePromotionItem(mixed $item): array
+    {
+        $item = is_array($item) ? $item : [];
+
+        $modelList = data_get($item, 'model_list') ?? data_get($item, 'models') ?? [];
+        if (is_string($modelList)) {
+            $decoded = json_decode($modelList, true);
+            $modelList = is_array($decoded) ? $decoded : [];
+        }
+
+        if (! is_array($modelList)) {
+            $modelList = [];
+        }
+
+        if (empty($modelList)) {
+            $modelList = [[
+                'model_id' => data_get($item, 'model_id', 0),
+                'model_promotion_price' => data_get($item, 'model_promotion_price', data_get($item, 'promotion_price', data_get($item, 'discount_price'))),
+                'model_promotion_percentage' => data_get($item, 'model_promotion_percentage', data_get($item, 'promotion_percentage')),
+            ]];
+        }
+
+        $normalizedModels = collect($modelList)->map(function ($model) {
+            $model = is_array($model) ? $model : [];
+
+            return [
+                'model_id' => (int) (data_get($model, 'model_id') ?? 0),
+                'model_promotion_price' => $this->toNullableFloat(
+                    data_get($model, 'model_promotion_price', data_get($model, 'promotion_price', data_get($model, 'discount_price')))
+                ),
+                'model_promotion_percentage' => $this->toNullableFloat(
+                    data_get($model, 'model_promotion_percentage', data_get($model, 'promotion_percentage'))
+                ),
+            ];
+        })->filter(fn ($model) => $model['model_id'] !== 0 || $model['model_promotion_price'] !== null || $model['model_promotion_percentage'] !== null)
+            ->values()
+            ->all();
+
+        return [
+            'item_id' => (int) (data_get($item, 'item_id') ?? 0),
+            'model_list' => $normalizedModels,
+        ];
+    }
+
+    private function toNullableFloat(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function formatPromotionStatus(string $status): string
+    {
+        return match (strtolower($status)) {
+            'ongoing'  => 'Ongoing',
+            'upcoming' => 'Upcoming',
+            'ended'    => 'Ended',
+            'suspended'=> 'Suspended',
+            default    => $status !== '' ? ucfirst(strtolower($status)) : '-',
+        };
+    }
+
+    private function formatPromotionTimestamp(?int $timestamp): ?string
+    {
+        if (! $timestamp) {
+            return null;
+        }
+
+        return Carbon::createFromTimestamp($timestamp)
+            ->setTimezone(config('app.timezone'))
+            ->format('d M Y H:i');
+    }
+
+    private function formatPromotionSchedule(?int $startTime, ?int $endTime): string
+    {
+        $start = $this->formatPromotionTimestamp($startTime);
+        $end = $this->formatPromotionTimestamp($endTime);
+
+        if ($start && $end) {
+            return $start . ' - ' . $end;
+        }
+
+        return $start ?: $end ?: '-';
+    }
+
+    private function promotionMatchesDateRange(array $promotion, ?int $dateFromTs, ?int $dateToTs): bool
+    {
+        if (! $dateFromTs && ! $dateToTs) {
+            return true;
+        }
+
+        $start = (int) ($promotion['start_time'] ?? 0);
+        $end = (int) ($promotion['end_time'] ?? 0);
+
+        if ($dateFromTs && $end && $end < $dateFromTs) {
+            return false;
+        }
+
+        if ($dateToTs && $start && $start > $dateToTs) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function buildPromotionStoreSummary(Store $store, array $rows): array
+    {
+        $summary = [
+            'store' => $this->normalizeStorePayload($store),
+            'promotions' => count($rows),
+            'ongoing' => 0,
+            'upcoming' => 0,
+            'ended' => 0,
+            'suspended' => 0,
+            'items' => 0,
+            'next_start' => null,
+            'next_end' => null,
+        ];
+
+        foreach ($rows as $row) {
+            $status = strtolower((string) ($row['status_key'] ?? ''));
+            if (isset($summary[$status])) {
+                $summary[$status]++;
+            }
+            $summary['items'] += (int) ($row['item_count'] ?? 0);
+
+            $start = (int) ($row['start_time'] ?? 0);
+            $end = (int) ($row['end_time'] ?? 0);
+
+            if ($start && (! $summary['next_start'] || $start < $summary['next_start'])) {
+                $summary['next_start'] = $start;
+            }
+            if ($end && (! $summary['next_end'] || $end > $summary['next_end'])) {
+                $summary['next_end'] = $end;
+            }
+        }
+
+        $summary['next_start_label'] = $summary['next_start'] ? $this->formatPromotionTimestamp($summary['next_start']) : null;
+        $summary['next_end_label'] = $summary['next_end'] ? $this->formatPromotionTimestamp($summary['next_end']) : null;
+
+        return $summary;
+    }
+
+    private function isShopeeAuthError(array $response): bool
+    {
+        $error = strtolower((string) ($response['error'] ?? ''));
+        $message = strtolower((string) ($response['message'] ?? ''));
+
+        return $error === 'error_auth'
+            || str_contains($error, 'access_token')
+            || str_contains($message, 'access_token')
+            || str_contains($message, 'token expired')
+            || str_contains($message, 'expired');
+    }
+
+    private function promotionAuthErrorMessage(array $response, string $fallback): string
+    {
+        if ($this->isShopeeAuthError($response)) {
+            return 'Token Shopee untuk toko ini tidak valid atau perlu disambungkan ulang. Silakan buka menu Toko lalu reconnect akun Shopee.';
+        }
+
+        return $response['message'] ?? $response['error'] ?? $fallback;
     }
 
     /**
@@ -1030,15 +2652,15 @@ class MarketplaceController extends Controller
                 (int) ($request->page_size ?? 50),
                 (bool) $request->dry_run
             );
-            
+
             // Sinkronisasi pesanan kilat (bookings) agar statusnya ter-update di UI
             if (class_exists(\App\Jobs\SyncMarketplaceBookings::class)) {
                 dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, null, null, false));
             }
-            
+
         } catch (\RuntimeException $e) {
             $lock->release();
-            
+
             $msg = $e->getMessage();
             if (str_contains(strtolower($msg), 'access_token') || str_contains(strtolower($msg), 'auth')) {
                 return response()->json([
@@ -1052,7 +2674,7 @@ class MarketplaceController extends Controller
                     ]
                 ], 401);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'code'    => 'VALIDATION_ERROR',
@@ -1060,12 +2682,12 @@ class MarketplaceController extends Controller
             ], 422);
         } catch (\Throwable $e) {
             $lock->release();
-            
+
             \Illuminate\Support\Facades\Log::error('Marketplace sync internal error', [
                 'store_id' => $store->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'code'    => 'CONNECTION_ERROR',
@@ -1740,7 +3362,7 @@ class MarketplaceController extends Controller
                       ->where(function ($q) {
                           $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                       });
-                      
+
                 if ($request->filled('sub_tab')) {
                     if ($request->sub_tab === 'shipped') {
                         $query->whereHas('order', function ($q) {
@@ -1829,7 +3451,7 @@ class MarketplaceController extends Controller
             $marketplaceFeePercent = $grossAfterVoucherToko > 0 ? round(($marketplaceFeeAfterAffiliate / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
-            
+
             $netIncome = (float) $s->final_income;
             $isEstimatedIncome = false;
             $status = strtoupper($s->order?->order_status ?? '');
@@ -2006,16 +3628,16 @@ class MarketplaceController extends Controller
                 if (($feeTots['adjustment'] ?? 0) < 0) {
                     $countPenyesuaian++;
                 }
-                
+
                 $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
                 $isCancelledOrReturned = in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
                 $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
-                
+
                 if ($isCancelledOrReturned) {
                     $cogs = 0;
                 }
                 $kpiCogs += $cogs;
-                
+
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
                 } elseif ((float) $s->final_income <= 0) {
@@ -2058,7 +3680,7 @@ class MarketplaceController extends Controller
                     $kpiNet += (float) $s->final_income;
                 }
             }
-            
+
             $feePercent = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
 
@@ -2605,7 +4227,7 @@ class MarketplaceController extends Controller
             foreach ($items as $item) {
                 $sku = $item->model_sku ?: $item->item_sku;
                 $isMapped = $item->mapping_status === \App\Services\MarketplaceIssueService::MAPPING_MAPPED || !empty($item->internal_item_id);
-                
+
                 $hpp = (float) $item->hpp_snapshot;
                 // Fallback to active snapshot if hpp_snapshot is 0
                 if ($hpp <= 0 && $sku && isset($skuToHpp[$sku])) {
@@ -2617,7 +4239,7 @@ class MarketplaceController extends Controller
                 } else {
                     $hppMapped = false;
                 }
-                
+
                 $itemDetails[] = [
                     'sku' => $sku ?: 'No SKU',
                     'qty' => (int) $item->qty,
@@ -2649,7 +4271,7 @@ class MarketplaceController extends Controller
             $adCost      = $s ? (float) $s->ad_cost : 0.0;
             $profitNet   = $finalIncome - $hppTotal - $adCost;
             $buyerPayment = $s ? (float) $s->buyer_payment_amount : ($isCompleted && !empty($inc['buyer_total_amount']) ? (float)$inc['buyer_total_amount'] : $baseAmount);
-            
+
             $omzetGross = (float) ($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $rawJson['cost_of_goods_sold'] ?? $rawJson['order_selling_price'] ?? $buyerPayment);
 
             $data = [
@@ -2683,7 +4305,7 @@ class MarketplaceController extends Controller
                 'seller_coin_cash_back' => $s ? (float) $s->seller_coin_cash_back : 0.0,
                 'shipping_fee_subsidy'  => $s ? (float) $s->shipping_fee_subsidy : 0.0,
             ];
-            
+
             $itemsDiscount = 0;
             if (isset($rawJson['items']) && is_array($rawJson['items'])) {
                 foreach ($rawJson['items'] as $it) {
@@ -2694,10 +4316,10 @@ class MarketplaceController extends Controller
                     }
                 }
             }
-            
+
             $data['raw_json'] = $rawJson;
             $data['seller_discount'] = $itemsDiscount;
-            
+
             return $data;
         });
 
@@ -2715,11 +4337,11 @@ class MarketplaceController extends Controller
         $kpiNet = 0;
         $kpiProfit = 0;
         $kpiCount = $rows->count();
-        
+
         foreach ($rows as $row) {
             $inc = $row['raw_json']['income_details'] ?? [];
             $omzetGross = (float)($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
-            
+
             $kpiOmzet += $omzetGross;
             $kpiHpp += (float) $row['hpp_total'];
             $kpiNet += (float) $row['final_income'];
@@ -2779,23 +4401,23 @@ class MarketplaceController extends Controller
             // Default sort: latest settlement time or ordered at
             $rows = $rows->sortByDesc(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
         }
-        
+
         // 3. Export to CSV if requested
         if ($request->export === 'csv') {
             $headers = [
                 'Content-Type' => 'text/csv',
                 'Content-Disposition' => 'attachment; filename="profit_export.csv"',
             ];
-            
+
             $callback = function() use ($rows) {
                 $file = fopen('php://output', 'w');
                 // CSV Header
                 fputcsv($file, ['Order SN', 'Toko', 'Status', 'Tgl Order', 'Tgl Cair', 'Harga Jual', 'Promosi Seller (Voucher)', 'Promosi Seller (Koin)', 'Dana Cair', 'HPP', 'Profit', 'Margin %']);
-                
+
                 foreach ($rows as $row) {
                     $inc = $row['raw_json']['income_details'] ?? [];
                     $omzetGross = (float)($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
-                    
+
                     fputcsv($file, [
                         $row['channel_order_id'],
                         $row['store']['name'] ?? '',
@@ -2813,10 +4435,10 @@ class MarketplaceController extends Controller
                 }
                 fclose($file);
             };
-            
+
             return response()->stream($callback, 200, $headers);
         }
-        
+
         // 4. Manual Pagination
         $perPage = (int) $request->input('per_page', 50);
         $page = (int) $request->input('page', 1);
@@ -2878,7 +4500,7 @@ class MarketplaceController extends Controller
         \App\Jobs\SyncAdCampaignsJob::dispatch($store, $dateFrom, $dateTo);
 
         return response()->json([
-            'status' => 'success', 
+            'status' => 'success',
             'message' => 'Proses sinkronisasi campaign berjalan di background.'
         ]);
     }
@@ -2979,27 +4601,21 @@ class MarketplaceController extends Controller
         ignore_user_abort(true);
         \Log::info('SYNC_ADS_DAILY CALLED', $request->all());
 
-        $syncType = $request->input('sync_type', '1_week');
-        $dateTo   = now()->toDateString();
-        
-        if ($syncType === 'today') {
-            $dateFrom = now()->toDateString();
-            $dateTo   = now()->toDateString();
-        } elseif ($syncType === 'yesterday') {
+        $syncType = $request->input('sync_type', 'today');
+
+        if ($syncType === 'yesterday') {
             $dateFrom = now()->subDay()->toDateString();
             $dateTo   = now()->subDay()->toDateString();
-        } elseif ($syncType === '1_week') {
-            $dateFrom = now()->subDays(7)->toDateString();
-        } elseif ($syncType === '1_month') {
-            $dateFrom = now()->subDays(30)->toDateString();
-        } elseif ($syncType === '2_months') {
-            $dateFrom = now()->subDays(60)->toDateString();
-        } elseif ($syncType === '3_months') {
-            $dateFrom = now()->subDays(90)->toDateString();
-        } else {
+        } elseif ($syncType === 'today') {
+            $dateFrom = now()->toDateString();
+            $dateTo   = now()->toDateString();
+        } elseif ($request->filled('date_from') || $request->filled('date_to')) {
             // custom
             $dateFrom = $request->input('date_from', now()->subDays(7)->toDateString());
             $dateTo   = $request->input('date_to', now()->toDateString());
+        } else {
+            $dateFrom = now()->toDateString();
+            $dateTo   = now()->toDateString();
         }
 
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
@@ -3022,7 +4638,7 @@ class MarketplaceController extends Controller
             $saved = 0;
             $errors = [];
             $totalStores = $stores->count();
-            
+
             if ($totalStores === 0) {
                 $sendEvent('done', 'Tidak ada toko aktif untuk disinkronisasi.', 100, ['saved' => 0, 'errors' => []]);
                 return;
@@ -3116,7 +4732,7 @@ class MarketplaceController extends Controller
                         \App\Models\MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => $bal]);
                         $sendEvent('log', "[{$store->name}] Saldo berhasil disimpan.", $baseProgress + 10);
                     }
-                } catch (\Throwable $e) { 
+                } catch (\Throwable $e) {
                     $sendEvent('log', "[{$store->name}] Gagal menarik saldo: " . $e->getMessage(), $baseProgress + 10);
                 }
 
@@ -3146,19 +4762,19 @@ class MarketplaceController extends Controller
                 // 2. Performa harian, kampanye, dan produk
                 if (!$isRateLimited) {
                     $sendEvent('log', "[{$store->name}] Memulai sinkronisasi performa...", $baseProgress + 15);
-                    
+
                     $currentStart = \Carbon\Carbon::parse($dateFrom);
                     $finalEnd     = \Carbon\Carbon::parse($dateTo);
-                    
+
                     while ($currentStart->lessThanOrEqualTo($finalEnd)) {
                     $currentEnd = clone $currentStart;
                     $currentEnd->addDays(29);
                     if ($currentEnd->greaterThan($finalEnd)) {
                         $currentEnd = clone $finalEnd;
                     }
-                    
+
                     $sendEvent('log', "[{$store->name}] Menarik periode " . $currentStart->format('d-m-Y') . " s/d " . $currentEnd->format('d-m-Y'), $baseProgress + 20);
-                    
+
                     try {
                         $syncService->syncShopDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
                         $sendEvent('log', "[{$store->name}] Performa harian toko tersimpan.", $baseProgress + 22);
@@ -3206,7 +4822,7 @@ class MarketplaceController extends Controller
                         $errors[] = "[{$store->name}] " . $e->getMessage();
                         $sendEvent('log', "[{$store->name}] Kesalahan pada periode ini: " . $e->getMessage());
                     }
-                    
+
                     $currentStart = $currentEnd->addDay();
                     usleep(500000); // 0.5 sec delay between chunks
                 }
@@ -3896,7 +5512,7 @@ class MarketplaceController extends Controller
                 'credentials' => null,
                 'token_expires_at' => null,
             ]);
-            
+
             return response()->json([
                 'message' => 'Toko berhasil diputuskan koneksinya.'
             ]);
@@ -3940,7 +5556,7 @@ class MarketplaceController extends Controller
                 \Illuminate\Support\Facades\DB::table('marketplace_sync_logs')->where('store_id', $store->id)->delete();
                 $store->delete();
             });
-            
+
             return response()->json([
                 'message' => 'Toko berhasil dihapus karena belum memiliki riwayat pesanan.'
             ]);
