@@ -86,6 +86,7 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         // ================== STOCKS (ITEM & LOT) ==================
         Route::prefix('stocks')->name('stocks.')->group(function () {
             Route::get('/items', [InventoryStockController::class, 'items'])->name('items');
+            Route::get('/items/available', [InventoryStockController::class, 'available'])->name('items.available');
             Route::get('/lots', [InventoryStockController::class, 'lots'])->name('lots');
 
             // Sync HPP master → kolom items.hpp (owner only, cost-neutral)

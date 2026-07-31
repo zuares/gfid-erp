@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -305,6 +306,8 @@ class InventoryStockController extends Controller
                     ],
                     'total_qty' => (float) $r->total_qty,
                     'allocated_qty' => (float) $r->allocated_qty,
+                    'available_qty' => (float) $r->total_qty - (float) $r->allocated_qty,
+                    'available_stock' => (float) $r->total_qty - (float) $r->allocated_qty,
                     'fg_qty' => (float) $r->fg_qty,
                     'wip_qty' => (float) $r->wip_qty,
 
@@ -352,6 +355,92 @@ class InventoryStockController extends Controller
             'warehouses' => $warehouses,
             'hppSummary' => $hppSummary,
             'hppByCategory' => $hppByCategory,
+        ]);
+    }
+
+    /**
+     * JSON cek stok tersedia untuk 1 item.
+     *
+     * Query:
+     * - item_id atau item_code
+     * - warehouse_id opsional
+     */
+    public function available(Request $request): JsonResponse
+    {
+        $itemId = $request->integer('item_id');
+        $itemCode = trim((string) $request->input('item_code', ''));
+        $warehouseId = $request->filled('warehouse_id')
+            ? (int) $request->input('warehouse_id')
+            : null;
+
+        $itemQuery = Item::query()->with('category');
+
+        if ($itemId) {
+            $itemQuery->whereKey($itemId);
+        } elseif ($itemCode !== '') {
+            $itemQuery->where('code', $itemCode);
+        } else {
+            return response()->json([
+                'ok' => false,
+                'message' => 'item_id atau item_code wajib diisi.',
+            ], 422);
+        }
+
+        $item = $itemQuery->first();
+
+        if (! $item) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Item tidak ditemukan.',
+            ], 404);
+        }
+
+        $stockQuery = DB::table('inventory_stocks as s')
+            ->where('s.item_id', $item->id);
+
+        if ($warehouseId) {
+            $warehouse = Warehouse::select('id', 'code', 'name')->find($warehouseId);
+
+            if (! $warehouse) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Warehouse tidak ditemukan.',
+                ], 404);
+            }
+
+            $stockQuery->where('s.warehouse_id', $warehouseId);
+        } else {
+            $warehouse = null;
+        }
+
+        $totals = $stockQuery->selectRaw('
+            COALESCE(SUM(s.qty), 0) AS qty,
+            COALESCE(SUM(s.allocated_qty), 0) AS allocated_qty,
+            COALESCE(SUM(s.qty - s.allocated_qty), 0) AS available_qty
+        ')->first();
+
+        $qty = (float) ($totals->qty ?? 0);
+        $allocatedQty = (float) ($totals->allocated_qty ?? 0);
+        $availableQty = (float) ($totals->available_qty ?? ($qty - $allocatedQty));
+
+        return response()->json([
+            'ok' => true,
+            'item' => [
+                'id' => (int) $item->id,
+                'code' => (string) $item->code,
+                'name' => (string) $item->name,
+                'category' => $item->category?->name,
+            ],
+            'warehouse' => $warehouse ? [
+                'id' => (int) $warehouse->id,
+                'code' => (string) $warehouse->code,
+                'name' => (string) $warehouse->name,
+            ] : null,
+            'stock' => [
+                'qty' => $qty,
+                'allocated_qty' => $allocatedQty,
+                'available_qty' => $availableQty,
+            ],
         ]);
     }
 
