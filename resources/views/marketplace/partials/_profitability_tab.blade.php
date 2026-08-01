@@ -26,13 +26,18 @@
         $itemsSold     = (int) ($camp->items_sold ?? 0);
         $unitCogsRow   = (float) ($camp->unit_cogs ?? 0);
         $cogsExact     = $unitCogsRow > 0 && $itemsSold > 0 && ($camp->items_sold_source ?? 'api') === 'api';
-        $totalCogsRow  = $camp->total_cogs !== null
+        $hasSales      = (float) ($camp->gmv ?? 0) > 0 || (int) ($camp->orders ?? 0) > 0 || $itemsSold > 0;
+        $totalCogsRow  = !$hasSales
+            ? 0.0
+            : ($camp->total_cogs !== null
             ? (float) $camp->total_cogs
-            : null;
+            : null);
         $spendAfterTax = $camp->spend * 1.11; // PPN 11% topup iklan
-        $profit        = $camp->profit_after_ads !== null
+        $profit        = !$hasSales
+            ? -$spendAfterTax
+            : ($camp->profit_after_ads !== null
             ? (float) $camp->profit_after_ads
-            : null;
+            : null);
         $acos          = $camp->gmv > 0 ? ($camp->spend / $camp->gmv) * 100 : 0;
         $beAcos        = $camp->break_even_acos_pct; // batas aman (sudah faktor pajak)
 
@@ -98,6 +103,26 @@
     $totalNetRevenue = $rows->sum('netRevenue');
     $totalCogsAll    = $knownRows->sum('totalCogs');
     $totalProfit     = $knownRows->sum('profit');
+    // Selisih Seller Center vs rincian campaign adalah belanja GMV Max Auto
+    // yang tidak muncul sebagai campaign parent. Masukkan ke hitungan utama
+    // sebelum menghitung seluruh KPI turunan.
+    $shopSpend       = isset($kpi['current']) ? (float) ($kpi['current']->spend ?? 0) : null;
+    $sellerCenterSpend = $shopSpend !== null ? $shopSpend : $totalSpend;
+    $gmsSpendFromRows = $rows
+        ->filter(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))
+        ->sum(fn ($r) => (float) ($r->camp->spend ?? 0));
+    $gmvAutoSpend    = $shopSpend !== null ? min($sellerCenterSpend, $gmsSpendFromRows) : 0;
+    $unattributedSpend = $shopSpend !== null
+        ? max(0, $sellerCenterSpend - $rows->sum(fn ($r) => (float) ($r->camp->spend ?? 0)))
+        : 0;
+    $totalSpend      = $sellerCenterSpend;
+    $totalTopup      = $sellerCenterSpend * 1.11;
+    // GMS Auto yang ada sebagai row sudah masuk ke knownRows sebagai rugi
+    // biaya iklan saat tidak ada penjualan. Hanya biaya tanpa row yang perlu
+    // dikurangkan di sini agar tidak dihitung dua kali.
+    $totalProfit    -= $unattributedSpend * 1.11;
+    $totalSellerCenterSpend = max(0, $sellerCenterSpend);
+    $regularCampaignSpend = max(0, $sellerCenterSpend - $gmvAutoSpend);
     $knownGmv        = $knownRows->sum(fn ($r) => (float) $r->camp->gmv);
     $knownNetRevenue = $knownRows->sum('netRevenue');
     $avgAcos         = $totalGmv > 0 ? ($totalSpend / $totalGmv) * 100 : 0;
@@ -115,6 +140,8 @@
     $netMarginPct    = $knownGmv > 0 ? ($totalProfit / $knownGmv) * 100 : 0;       // Net Profit Margin %
     $totalOrders     = $rows->sum(fn ($r) => (int) $r->camp->orders);
     $cac             = $totalOrders > 0 ? $totalTopup / $totalOrders : 0;          // Cost per Acquisition
+    $profitPerOrder  = $totalOrders > 0 ? $totalProfit / $totalOrders : 0;
+    $tacosPct        = $totalGmv > 0 ? ($totalTopup / $totalGmv) * 100 : 0;
     $beRoas          = $grossMargin > 0 ? (1.11 * $knownGmv) / $grossMargin : 0;   // Break-even ROAS; spend termasuk PPN
     $mappableProfitRows = $rows->filter(function ($r) {
         $campaignId = (string) ($r->camp->channel_campaign_id ?? '');
@@ -130,6 +157,16 @@
     $gmsUnknownCount = $gmsProfitRows->count() - $gmsKnownRows->count();
     $gmsRoas = $gmsTotalSpend > 0 ? $gmsTotalGmv / $gmsTotalSpend : 0;
     $gmsMarginPct = $gmsTotalGmv > 0 ? ($gmsTotalProfit / $gmsTotalGmv) * 100 : 0;
+    $roasKnownRows = $displayRows->filter(fn ($r) => $r->profit !== null);
+    $roasTotalGmv = $displayRows->sum(fn ($r) => (float) $r->camp->gmv);
+    $roasTotalSpend = $displayRows->sum(fn ($r) => (float) $r->camp->spend);
+    $roasTotalOrders = $displayRows->sum(fn ($r) => (int) $r->camp->orders);
+    $roasTotalProfit = $roasKnownRows->sum('profit');
+    $roasUnknownCount = $displayRows->count() - $roasKnownRows->count();
+    $roasTotalCogs = $roasKnownRows->sum('totalCogs');
+    $roasKnownGmv = $roasKnownRows->sum(fn ($r) => (float) $r->camp->gmv);
+    $roasValue = $roasTotalSpend > 0 ? $roasTotalGmv / $roasTotalSpend : 0;
+    $roasMarginPct = $roasKnownGmv > 0 ? ($roasTotalProfit / $roasKnownGmv) * 100 : 0;
     $mappableProfitRows = $mappableProfitRows
         ->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))
         ->values();
@@ -138,11 +175,49 @@
     $productUnmappedRows = $mappableProfitRows
         ->filter(fn ($r) => !empty($r->camp->channel_item_id))
         ->values();
-    $hasProductUnmappedTab = $productUnmappedRows->isNotEmpty() || $gmsProfitRows->isNotEmpty();
+    // Saat satu toko dipilih, tetap tampilkan GMV Max Auto walaupun periode
+    // belum memiliki baris campaign parent; data item akan diambil dari endpoint.
+    $hasGmsTab = $gmsProfitRows->isNotEmpty() || (($storeId ?? 'all') !== 'all' && is_numeric($storeId));
+    $gmsStoreIds = $gmsProfitRows->pluck('camp.store_id')->filter()->unique()->values()->all();
+    if ($hasGmsTab && is_numeric($storeId) && !in_array((int) $storeId, array_map('intval', $gmsStoreIds), true)) {
+        $gmsStoreIds[] = (int) $storeId;
+    }
+    $hasProductUnmappedTab = $productUnmappedRows->isNotEmpty() || $hasGmsTab;
     
     $feeMode         = $adsSetting->admin_fee_mode ?? 'auto';
     $feeManualPct    = $adsSetting->admin_fee_pct ?? null;
+    $manualFeeValue  = $feeManualPct !== null ? (float) $feeManualPct : 21.9;
+    $autoFeeValue    = (float) $avgFeePct;
+    $activeFeeValue  = $feeMode === 'manual' ? $manualFeeValue : $autoFeeValue;
+    $compositionFeePct = $activeFeeValue;
+    $compositionFeeAmt = $totalGmv * ($compositionFeePct / 100);
     $fmt = fn ($n) => 'Rp ' . number_format(abs($n), 0, ',', '.');
+    $comparisonLabel = match ($compareMode ?? 'prev_period') {
+        'prev_month' => 'bulan lalu',
+        'prev_year' => 'tahun lalu',
+        default => 'periode lalu',
+    };
+    $previousKpi = $kpi['previous'] ?? (object) [];
+    $previousSpend = (float) ($previousKpi->spend ?? 0);
+    $previousGmv = (float) ($previousKpi->gmv ?? 0);
+    $previousOrders = (int) ($previousKpi->orders ?? 0);
+    $previousTopup = $previousSpend * 1.11;
+    $previousGrossProfit = (float) ($previousKpi->net_revenue ?? 0) - (float) ($previousKpi->total_cogs ?? 0);
+    $previousProfit = (float) ($previousKpi->net_profit ?? 0);
+    $previousNetMarginPct = $previousGmv > 0 ? ($previousProfit / $previousGmv) * 100 : 0;
+    $previousRoas = $previousSpend > 0 ? $previousGmv / $previousSpend : 0;
+    $previousPoas = $previousTopup > 0 ? $previousProfit / $previousTopup : 0;
+    $previousBeRoas = $previousGrossProfit > 0 ? (1.11 * $previousGmv) / $previousGrossProfit : 0;
+    $previousCac = $previousOrders > 0 ? $previousTopup / $previousOrders : 0;
+    $previousProfitPerOrder = $previousOrders > 0 ? $previousProfit / $previousOrders : 0;
+    $previousTacosPct = $previousGmv > 0 ? ($previousTopup / $previousGmv) * 100 : 0;
+    $profitCompare = function (float $current, float $previous, bool $cost = false): array {
+        if ($previous == 0) {
+            return ['value' => $current > 0 ? null : 0, 'good' => true];
+        }
+        $change = (($current - $previous) / abs($previous)) * 100;
+        return ['value' => round($change, 1), 'good' => $cost ? $change <= 0 : $change >= 0];
+    };
 @endphp
 <script>
 window.__profitChartData = {
@@ -152,68 +227,163 @@ window.__profitChartData = {
     totalSpend: {{ $totalSpend }},
     totalTopup: {{ $totalTopup }},
     totalProfit: {{ $totalProfit }},
-    feeAmt: {{ $totalFeeAmt }}
+    feeAmt: {{ $compositionFeeAmt }},
+    feePct: {{ $compositionFeePct }}
 };
 </script>
-@php
-
-    // Rekonsiliasi dengan Seller Center: belanja level toko (sumber yang sama
-    // dengan angka platform) vs total kampanye di tabel ini. Selisihnya =
-    // tipe iklan tanpa rincian kampanye (mis. Iklan Pencarian Toko/afiliasi).
-    $shopSpend = isset($kpi['current']) ? (float) ($kpi['current']->spend ?? 0) : null;
-    $otherAdsSpend = $shopSpend !== null ? max(0, $shopSpend - $totalSpend) : null;
-@endphp
-
-@if($otherAdsSpend !== null && $shopSpend > 0 && $otherAdsSpend > ($shopSpend * 0.005))
-<div style="display:flex; flex-wrap:wrap; gap:.4rem 1rem; align-items:center; font-size:.68rem; color:var(--dsh-muted); margin-bottom:.75rem; padding:.6rem .8rem; border:1px dashed var(--dsh-border); border-radius:12px;">
-    <span><i class="bi bi-shop"></i> Belanja iklan versi Seller Center: <b style="color:var(--text);">{{ $fmt($shopSpend) }}</b></span>
-    <span>Terpetakan ke kampanye di tabel ini: <b style="color:var(--text);">{{ $fmt($totalSpend) }}</b></span>
-    <span>Iklan lainnya (tanpa rincian kampanye, mis. Iklan Toko/afiliasi): <b style="color:#b45309;">{{ $fmt($otherAdsSpend) }}</b></span>
+@if($shopSpend !== null && $shopSpend > 0)
+<div class="profit-recon-grid">
+    <div class="profit-recon-card">
+        <div class="profit-recon-label"><i class="bi bi-shop"></i> Total Seller Center</div>
+        <div class="profit-recon-value">{{ $fmt($totalSellerCenterSpend) }}</div>
+        <div class="profit-recon-label" style="margin-top:.15rem;">+PPN {{ $fmt($totalSellerCenterSpend * 1.11) }}</div>
+    </div>
+    <div class="profit-recon-card">
+        <div class="profit-recon-label"><i class="bi bi-megaphone"></i> Kampanye Regular</div>
+        <div class="profit-recon-value">{{ $fmt($regularCampaignSpend) }}</div>
+    </div>
+    <div class="profit-recon-card">
+        <div class="profit-recon-label"><i class="bi bi-stars"></i> GMV Max Auto <span style="font-size:.58rem;">sebelum PPN</span></div>
+        <div class="profit-recon-value" style="color:#b45309;">{{ $fmt($gmvAutoSpend) }}</div>
+    </div>
+    <div class="profit-recon-card">
+        <div class="profit-recon-label"><i class="bi bi-check-circle"></i> Status BEP</div>
+        <div class="profit-recon-value" style="color:{{ $totalProfit >= 0 ? '#15803d' : '#b91c1c' }};">{{ $totalProfit >= 0 ? 'Sudah BEP' : 'Belum BEP' }}</div>
+        <div class="profit-recon-label" style="margin-top:.15rem;">{{ $totalProfit >= 0 ? 'Surplus ' : 'Defisit ' }}{{ $fmt($totalProfit) }}</div>
+    </div>
 </div>
 @endif
 
 <!-- ── Pengaturan admin fee: otomatis (settlement) / manual ── -->
 @if(($storeId ?? null) !== 'all')
-<div class="ads-tab-panel mb-3">
+<div class="ads-tab-panel mb-3 profit-fee-panel">
     <div class="ads-tab-panel-head">
         <div>
             <div class="ads-tab-panel-title">
                 <i class="bi bi-gear" style="color: var(--dsh-accent);"></i> Pengaturan Fee
             </div>
-            <div class="ads-tab-panel-note">Tersambung langsung ke route `ads.fee.setting`.</div>
         </div>
     </div>
     <div class="p-3">
-        <form method="POST" action="{{ route('marketplace.ads.fee.setting') }}" class="row g-3 align-items-end">
+        <form id="profitAdminFeeForm" method="POST" action="{{ route('marketplace.ads.fee.setting') }}" class="profit-fee-form">
             @csrf
             <input type="hidden" name="store_id" value="{{ $storeId }}">
-            <div class="col-lg-5">
-                <label class="form-label" style="font-size:.75rem; font-weight:650; color:var(--dsh-muted);">Mode Admin Fee</label>
-                <div class="d-flex flex-wrap gap-2">
-                    <label class="d-flex align-items-center gap-2 px-3 py-2" style="border:1px solid var(--dsh-border); border-radius:10px; cursor:pointer; background:var(--bg); font-size:.76rem;">
-                        <input type="radio" name="admin_fee_mode" value="auto" {{ $feeMode !== 'manual' ? 'checked' : '' }}>
-                        <span>Otomatis</span>
+            <div>
+                <label class="profit-fee-label">Mode Admin Fee</label>
+                <div class="profit-fee-switch-row">
+                    <span>Manual</span>
+                    <label class="profit-fee-switch">
+                        <input id="profitAdminFeeModeToggle" type="checkbox" {{ $feeMode !== 'manual' ? 'checked' : '' }}>
+                        <span class="profit-fee-switch-slider"></span>
                     </label>
-                    <label class="d-flex align-items-center gap-2 px-3 py-2" style="border:1px solid var(--dsh-border); border-radius:10px; cursor:pointer; background:var(--bg); font-size:.76rem;">
-                        <input type="radio" name="admin_fee_mode" value="manual" {{ $feeMode === 'manual' ? 'checked' : '' }}>
-                        <span>Manual</span>
-                    </label>
+                    <span>Otomatis</span>
+                    <input id="profitAdminFeeMode" type="hidden" name="admin_fee_mode" value="{{ $feeMode !== 'manual' ? 'auto' : 'manual' }}">
                 </div>
-                <div style="font-size:.68rem; color:var(--dsh-muted); margin-top:.4rem;">Otomatis pakai data settlement per item, manual pakai persen yang kamu isi.</div>
             </div>
-            <div class="col-lg-3">
-                <label class="form-label" style="font-size:.75rem; font-weight:650; color:var(--dsh-muted);">Admin Fee %</label>
-                <input type="number" name="admin_fee_pct" step="0.1" min="0" max="99" value="{{ $feeManualPct !== null ? number_format((float) $feeManualPct, 1, '.', '') : '21.9' }}" class="form-control" style="border-radius:10px; font-size:.85rem; background:var(--bg); color:var(--text); border-color:var(--dsh-border);">
-                <div style="font-size:.68rem; color:var(--dsh-muted); margin-top:.35rem;">Contoh: 21.9 untuk fee 21.9%.</div>
-            </div>
-            <div class="col-lg-4">
-                <button type="submit" class="btn fw-bold w-100" style="background: var(--dsh-accent); color:#fff; border-radius:10px; padding:.6rem .9rem;">
-                    <i class="bi bi-save"></i> Simpan Pengaturan
-                </button>
+            <div class="profit-fee-field">
+                <label class="profit-fee-label">Admin Fee %</label>
+                <div id="profitAdminFeeDisplay" class="profit-fee-display" role="button" tabindex="0" style="display:inline-flex; align-items:center; gap:.35rem; min-height:38px; padding:.35rem .7rem; border:1px solid var(--dsh-border); border-radius:10px; color:var(--text); background:var(--bg); font-size:1rem; font-weight:800; font-variant-numeric:tabular-nums; cursor:pointer;">
+                    {{ number_format($activeFeeValue, 1, ',', '.') }}%
+                </div>
+                <div id="profitAdminFeeEditor" class="input-group profit-fee-editor" style="display:none;">
+                    <input id="profitAdminFeePct" type="number" name="admin_fee_pct" step="0.1" min="0" max="99" value="{{ number_format($activeFeeValue, 1, '.', '') }}" class="form-control" style="border-radius:10px 0 0 10px; font-size:.85rem; background:var(--bg); color:var(--text); border-color:var(--dsh-border);">
+                    <span class="input-group-text" style="border-radius:0 10px 10px 0; background:var(--bg); color:var(--dsh-muted); border-color:var(--dsh-border);">%</span>
+                </div>
+                <div id="profitAdminFeeStatus" aria-live="polite" style="display:none; font-size:.64rem; color:var(--dsh-muted); margin-top:.2rem;"></div>
             </div>
         </form>
     </div>
 </div>
+@endif
+
+@if(($storeId ?? null) !== 'all')
+<script>
+(function () {
+    const form = document.getElementById('profitAdminFeeForm');
+    const display = document.getElementById('profitAdminFeeDisplay');
+    const editor = document.getElementById('profitAdminFeeEditor');
+    const modeToggle = document.getElementById('profitAdminFeeModeToggle');
+    const modeInput = document.getElementById('profitAdminFeeMode');
+    const input = document.getElementById('profitAdminFeePct');
+    const status = document.getElementById('profitAdminFeeStatus');
+    if (!form || !display || !editor || !modeToggle || !modeInput || !input || !status) return;
+    let timer = null;
+    let saving = false;
+    const autoFeeValue = Number({{ (float) $autoFeeValue }});
+    let manualFeeValue = Number({{ (float) $manualFeeValue }});
+
+    function setStatus(message, color) {
+        status.textContent = message;
+        status.style.color = color || 'var(--dsh-muted)';
+        status.style.display = message ? 'block' : 'none';
+    }
+
+    function syncModeState() {
+        const mode = modeToggle.checked ? 'auto' : 'manual';
+        modeInput.value = mode;
+        if (mode === 'auto') {
+            input.value = autoFeeValue.toFixed(1);
+            display.textContent = autoFeeValue.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        } else {
+            input.value = manualFeeValue.toFixed(1);
+            display.textContent = manualFeeValue.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        }
+        input.disabled = mode !== 'manual';
+        input.style.opacity = mode === 'manual' ? '1' : '.6';
+        display.style.cursor = mode === 'manual' ? 'pointer' : 'default';
+    }
+
+    function openEditor() {
+        const mode = modeToggle.checked ? 'auto' : 'manual';
+        if (mode !== 'manual') return;
+        display.style.display = 'none';
+        editor.style.display = 'flex';
+        input.focus();
+        input.select();
+    }
+
+    async function saveFee() {
+        if (saving) return;
+        const value = Number(input.value);
+        if (!Number.isFinite(value) || value < 0 || value > 99) {
+            setStatus('Masukkan fee 0–99%.', '#b91c1c');
+            return;
+        }
+        saving = true;
+        setStatus('Menyimpan…', '#2563eb');
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': form.querySelector('input[name="_token"]')?.value || '', 'Accept': 'application/json' },
+                body: new URLSearchParams(new FormData(form))
+            });
+            if (!response.ok) throw new Error('Gagal menyimpan fee.');
+            setStatus('', '#15803d');
+            setTimeout(() => window.location.reload(), 350);
+        } catch (error) {
+            setStatus(error.message, '#b91c1c');
+        } finally {
+            saving = false;
+        }
+    }
+
+    form.addEventListener('submit', (event) => { event.preventDefault(); saveFee(); });
+    display.addEventListener('click', openEditor);
+    display.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') openEditor();
+    });
+    input.addEventListener('change', () => {
+        manualFeeValue = Number(input.value);
+        saveFee();
+    });
+    modeToggle.addEventListener('change', () => {
+        syncModeState();
+        clearTimeout(timer);
+        timer = setTimeout(saveFee, 120);
+    });
+    syncModeState();
+})();
+</script>
 @endif
 
 <!-- ── KPI — urutan alur hitung: Omzet − HPP − Iklan = Net Profit ── -->
@@ -221,64 +391,91 @@ window.__profitChartData = {
     $profitMarginPct = $totalGmv > 0 ? ($totalProfit / $totalGmv) * 100 : 0;
 @endphp
 <div class="ads-tab-panel mb-3">
-    <div class="ads-tab-panel-head">
+    <div class="ads-tab-panel-head profitability-panel-head">
         <div>
             <div class="ads-tab-panel-title"><i class="bi bi-cash-stack text-success"></i> Profitabilitas &amp; Margin</div>
-            <div class="ads-tab-panel-note">Rincian efisiensi untung dan rugi iklan.</div>
+            <div class="ads-tab-panel-note">Omzet − HPP − iklan · vs {{ $comparisonLabel }}</div>
         </div>
+        <select name="compare_mode" form="filterForm" onchange="submitAdsFilters(document.getElementById('filterForm'))" class="form-select profit-compare-select" title="Pilih dasar perbandingan KPI">
+            <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Bandingkan: Periode lalu</option>
+            <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bandingkan: Bulan lalu</option>
+            <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Bandingkan: Tahun lalu</option>
+        </select>
     </div>
     <div class="p-3 p-md-3">
         <div class="ads-kpi-grid mb-3">
             <div class="dpanel ads-kpi kpi-revenue">
-                <div class="ads-kpi-label"><i class="bi bi-graph-up-arrow"></i> Omzet</div>
+                <div class="ads-kpi-label" title="Total nilai penjualan sebelum biaya"><i class="bi bi-graph-up-arrow"></i> Omzet Kotor</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($totalGmv) }}</div>
-                <div class="ads-kpi-sub">Cair <b>{{ $fmt($totalNetRevenue) }}</b> · adm {{ number_format($avgFeePct, 1, ',', '.') }}%</div>
+                <div class="ads-kpi-sub">Net {{ $fmt($totalNetRevenue) }} · {{ number_format($avgFeePct, 1, ',', '.') }}%</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $totalGmv, $previousGmv), 'label' => $comparisonLabel])
             </div>
             
             <div class="dpanel ads-kpi kpi-cogs">
-                <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> Gross Profit</div>
+                <div class="ads-kpi-label" title="Omzet setelah dikurangi HPP"><i class="bi bi-box-seam"></i> Laba Kotor</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $grossMargin < 0 ? '−' : '' }}{{ $fmt($grossMargin) }}</div>
-                <div class="ads-kpi-sub">HPP terhitung <b>{{ $fmt($totalCogsAll) }}</b>
+                <div class="ads-kpi-sub">HPP {{ $fmt($totalCogsAll) }}
                 @if($noHppCount > 0)
-                    · <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ $noHppCount }} campaign belum ada HPP</span>
+                    · <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ $noHppCount }} belum lengkap</span>
                 @endif
                 </div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $grossMargin, $previousGrossProfit), 'label' => $comparisonLabel])
             </div>
 
             <div class="dpanel ads-kpi kpi-spend">
-                <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Ad Spend</div>
+                <div class="ads-kpi-label" title="Total biaya iklan termasuk PPN"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">&minus;{{ $fmt($totalTopup) }}</div>
-                <div class="ads-kpi-sub">Net spend <b>{{ $fmt($totalSpend) }}</b> + PPN</div>
+                <div class="ads-kpi-sub">Net Seller Center {{ $fmt($sellerCenterSpend) }}</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $totalTopup, $previousTopup, true), 'label' => $comparisonLabel])
             </div>
 
             <div class="dpanel ads-kpi kpi-profit" style="border-left-color: {{ $unknownProfitCount > 0 ? '#d97706' : ($totalProfit >= 0 ? '#16a34a' : '#dc2626') }};">
-                <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit Setelah Iklan</div>
+                <div class="ads-kpi-label" title="Laba setelah HPP dan biaya iklan"><i class="bi bi-cash-stack"></i> Laba Bersih</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums; color: {{ $unknownProfitCount > 0 ? '#b45309' : ($totalProfit >= 0 ? '#16a34a' : '#dc2626') }};">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</div>
-                <div class="ads-kpi-sub">Terhitung dari {{ $knownRows->count() }} campaign · Margin <b>{{ number_format($netMarginPct, 1, ',', '.') }}%</b> &bull; {{ $profitableCount }} untung, {{ $lossCount }} rugi @if($unknownProfitCount > 0) &bull; <span class="text-warning">{{ $unknownProfitCount }} belum dihitung</span>@endif</div>
+                <div class="ads-kpi-sub">{{ $profitableCount }} untung · {{ $lossCount }} rugi @if($unknownProfitCount > 0) · <span class="text-warning">{{ $unknownProfitCount }} belum lengkap</span>@endif</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $totalProfit, $previousProfit), 'label' => $comparisonLabel])
             </div>
 
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label"><i class="bi bi-percent"></i> Margins</div>
-                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($grossMarginPct, 1, ',', '.') }}%</div>
-                <div class="ads-kpi-sub">Gross. Net Margin <b>{{ number_format($netMarginPct, 1, ',', '.') }}%</b></div>
+                <div class="ads-kpi-label" title="Persentase laba bersih dari omzet"><i class="bi bi-percent"></i> Margin Bersih</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums; color:{{ $netMarginPct >= 0 ? '#16a34a' : '#dc2626' }};">{{ number_format($netMarginPct, 1, ',', '.') }}%</div>
+                <div class="ads-kpi-sub">Kotor {{ number_format($grossMarginPct, 1, ',', '.') }}%</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $netMarginPct, $previousNetMarginPct), 'label' => $comparisonLabel])
             </div>
 
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label"><i class="bi bi-speedometer2"></i> POAS · ROAS</div>
+                <div class="ads-kpi-label" title="Laba bersih dibanding biaya iklan setelah PPN"><i class="bi bi-speedometer2"></i> POAS</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($poas, 2, ',', '.') }}x</div>
-                <div class="ads-kpi-sub">ROAS <b>{{ number_format($totalRoas, 2, ',', '.') }}x</b> · Net <b>{{ number_format($netRoas, 2, ',', '.') }}x</b></div>
+                <div class="ads-kpi-sub">ROAS Omzet {{ number_format($totalRoas, 2, ',', '.') }}x</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $poas, $previousPoas), 'label' => $comparisonLabel])
             </div>
 
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label"><i class="bi bi-dash-circle-dotted"></i> Break-even ROAS</div>
+                <div class="ads-kpi-label" title="ROAS minimum agar tidak rugi"><i class="bi bi-dash-circle-dotted"></i> ROAS Impas</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($beRoas, 2, ',', '.') }}x</div>
-                <div class="ads-kpi-sub">Batas minimum; biaya iklan sudah +PPN 11%</div>
+                <div class="ads-kpi-sub">Target minimum</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $beRoas, $previousBeRoas, true), 'label' => $comparisonLabel])
             </div>
 
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label"><i class="bi bi-person-plus"></i> CAC</div>
+                <div class="ads-kpi-label" title="Biaya iklan untuk mendapatkan satu order"><i class="bi bi-person-plus"></i> Biaya Iklan / Order</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($cac) }}</div>
-                <div class="ads-kpi-sub">Cost per Acquisition (per order)</div>
+                <div class="ads-kpi-sub">Per order</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $cac, $previousCac, true), 'label' => $comparisonLabel])
+            </div>
+
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label" title="Laba bersih rata-rata per order"><i class="bi bi-cash-coin"></i> Laba / Order</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums; color:{{ $profitPerOrder >= 0 ? '#16a34a' : '#dc2626' }};">{{ $profitPerOrder < 0 ? '−' : '' }}{{ $fmt($profitPerOrder) }}</div>
+                <div class="ads-kpi-sub">Rata-rata</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $profitPerOrder, $previousProfitPerOrder), 'label' => $comparisonLabel])
+            </div>
+
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label" title="Persentase omzet yang dipakai untuk iklan"><i class="bi bi-pie-chart"></i> Iklan / Omzet (TACOS)</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($tacosPct, 1, ',', '.') }}%</div>
+                <div class="ads-kpi-sub">Porsi omzet</div>
+                @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $tacosPct, $previousTacosPct, true), 'label' => $comparisonLabel])
             </div>
         </div>
         
@@ -286,9 +483,12 @@ window.__profitChartData = {
         <div class="row gx-3">
             <div class="col-md-5 mb-3">
                 <div class="p-2 border rounded h-100" style="background: var(--card-bg);">
-                    <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;"><i class="bi bi-pie-chart-fill me-1"></i> Cost Composition</div>
-                    <div style="position: relative; height: 180px; width: 100%;">
-                        <canvas id="chartProfitComposition"></canvas>
+                    <div class="fw-bold mb-1 text-center text-muted" style="font-size: 0.75rem;"><i class="bi bi-pie-chart-fill me-1"></i> Komposisi Omzet</div>
+                    <div class="profit-composition-layout">
+                        <div class="profit-composition-chart">
+                            <canvas id="chartProfitComposition"></canvas>
+                        </div>
+                        <div id="profitCompositionLegend" class="profit-composition-legend"></div>
                     </div>
                 </div>
             </div>
@@ -305,6 +505,74 @@ window.__profitChartData = {
 </div>
 
 <style>
+    .profit-compare-select {
+        width:auto;
+        min-width:155px;
+        border-radius:9px;
+        padding:.35rem 1.8rem .35rem .65rem;
+        border:1px solid var(--dsh-border);
+        background:var(--card-bg);
+        color:var(--text);
+        font-size:.68rem;
+        font-weight:700;
+    }
+    @media (max-width:575.98px) {
+        .profitability-panel-head { align-items:center; gap:.55rem; padding:.6rem .7rem; }
+        .profitability-panel-head > div { min-width:0; flex:1 1 auto; }
+        .profit-compare-select { width:auto; min-width:132px; flex:0 0 auto; margin-top:0; }
+    }
+    .profit-composition-legend {
+        display:grid;
+        grid-template-columns:1fr;
+        gap:.35rem .65rem;
+        margin:.2rem 0 0;
+    }
+    .profit-composition-layout {
+        display:grid;
+        grid-template-columns:minmax(155px,.95fr) minmax(145px,1.05fr);
+        align-items:center;
+        gap:.65rem;
+    }
+    .profit-composition-chart {
+        position:relative;
+        height:170px;
+        min-width:0;
+    }
+    .profit-composition-item {
+        display:grid;
+        grid-template-columns:8px minmax(0,1fr) minmax(92px,auto);
+        align-items:center;
+        gap:.3rem;
+        min-width:0;
+        font-size:.61rem;
+        line-height:1.15;
+    }
+    .profit-composition-dot {
+        width:8px;
+        height:8px;
+        border-radius:50%;
+    }
+    .profit-composition-name {
+        min-width:0;
+        color:var(--dsh-muted);
+        white-space:normal;
+    }
+    .profit-composition-value {
+        min-width:0;
+        color:var(--text);
+        font-weight:800;
+        white-space:normal;
+        text-align:right;
+        justify-self:end;
+        line-height:1.15;
+        font-variant-numeric:tabular-nums;
+    }
+    @media (max-width:575.98px) {
+        .profit-composition-layout { grid-template-columns:1fr; gap:.75rem; }
+        .profit-composition-chart { height:190px; }
+        .profit-composition-legend { grid-template-columns:repeat(2, minmax(0,1fr)); gap:.5rem .7rem; margin:.1rem .25rem .15rem; }
+        .profit-composition-item { grid-template-columns:8px minmax(0,1fr) minmax(78px,auto); font-size:.6rem; }
+    }
     .profit-table-wrap { overflow-x: hidden !important; }
     .profit-table-compact {
         width: 100% !important;
@@ -326,11 +594,276 @@ window.__profitChartData = {
         white-space: normal !important;
         overflow-wrap: anywhere;
     }
+    .profit-table-compact tbody tr:nth-child(even) {
+        background-color: rgba(148, 163, 184, .035);
+    }
+    .profit-table-compact thead th {
+        font-size: .65rem;
+        letter-spacing: .01em;
+        line-height: 1.25;
+    }
+    .profit-index-cell {
+        width: 2.4rem !important;
+        min-width: 2.4rem;
+        text-align: center !important;
+        color: var(--dsh-muted);
+        font-size: .66rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap !important;
+    }
+    .profit-campaign-cell { width: 22%; }
+    .profit-campaign-name {
+        display: block;
+        min-width: 0;
+        overflow: hidden !important;
+        text-overflow: ellipsis;
+        white-space: nowrap !important;
+        overflow-wrap: normal !important;
+    }
+    .profit-campaign-meta {
+        margin-top: .18rem;
+        color: var(--dsh-muted);
+        font-size: .62rem;
+        line-height: 1.2;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis;
+    }
+    .profit-campaign-product {
+        margin-top: .12rem;
+        color: var(--dsh-muted);
+        font-size: .62rem;
+        line-height: 1.2;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis;
+    }
+    .profit-roas-table {
+        font-size: .68rem;
+    }
+    .profit-roas-table .profit-campaign-name {
+        font-size: .74rem !important;
+    }
+    .profit-fee-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: .6rem .9rem;
+        align-items: end;
+        max-width: 620px;
+        margin: 0 auto;
+    }
+    .profit-fee-panel .ads-tab-panel-head { padding:.65rem .85rem; }
+    .profit-fee-panel > .p-3 { padding:.7rem .85rem !important; }
+    .profit-fee-label {
+        display: block;
+        margin-bottom: .25rem;
+        color: var(--dsh-muted);
+        font-size: .64rem;
+        font-weight: 700;
+    }
+    .profit-fee-mode-options { display:flex; gap:.45rem; flex-wrap:wrap; }
+    .profit-fee-mode-option {
+        display:inline-flex;
+        align-items:center;
+        gap:.4rem;
+        min-height:32px;
+        padding:.25rem .55rem;
+        border:1px solid var(--dsh-border);
+        border-radius:10px;
+        cursor:pointer;
+        background:var(--bg);
+        color:var(--text);
+        flex:1 1 120px;
+        justify-content:center;
+        font-size:.7rem;
+    }
+    .profit-fee-switch-row { display:flex; align-items:center; gap:.55rem; min-height:38px; color:var(--dsh-muted); font-size:.7rem; font-weight:700; }
+    .profit-fee-switch { position:relative; display:inline-block; width:38px; height:21px; flex:0 0 auto; }
+    .profit-fee-switch input { opacity:0; width:0; height:0; }
+    .profit-fee-switch-slider { position:absolute; inset:0; cursor:pointer; border-radius:999px; background:#94a3b8; transition:.2s ease; }
+    .profit-fee-switch-slider::before { content:""; position:absolute; width:17px; height:17px; left:2px; top:2px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(15,23,42,.25); transition:.2s ease; }
+    .profit-fee-switch input:checked + .profit-fee-switch-slider { background:var(--dsh-accent); }
+    .profit-fee-switch input:checked + .profit-fee-switch-slider::before { transform:translateX(17px); }
+    .profit-fee-field { min-width:0; display:flex; flex-direction:column; }
+    .profit-fee-display, .profit-fee-editor { width:max-content; max-width:100%; box-sizing:border-box; }
+    .profit-fee-display { justify-content:space-between; min-height:38px; padding:.3rem .6rem; font-size:.9rem; }
+    .profit-fee-editor input { width:72px; flex:0 0 72px; }
+    @media (max-width:768px) {
+        .profit-fee-form { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.55rem; }
+        .profit-fee-form { max-width:none; width:100%; }
+        .profit-fee-panel .ads-tab-panel-head { padding:.6rem .7rem; }
+        .profit-fee-panel > .p-3 { padding:.65rem .7rem !important; }
+        .profit-fee-mode-options { display:grid; grid-template-columns:1fr 1fr; gap:.35rem; }
+        .profit-fee-mode-option { min-width:0; width:100%; flex:none; }
+        .profit-fee-display { min-height:36px !important; font-size:.92rem !important; }
+        .profit-fee-editor input { min-width:0; }
+    }
+    @media (max-width:360px) {
+        .profit-fee-form { grid-template-columns:1fr; }
+        .profit-fee-mode-options { grid-template-columns:1fr; }
+    }
+    .profit-recon-grid {
+        display:grid;
+        grid-template-columns:repeat(4, minmax(0, 1fr));
+        gap:.55rem;
+        margin-bottom:.75rem;
+    }
+    .profit-recon-card {
+        min-width:0;
+        padding:.6rem .75rem;
+        border:1px solid var(--dsh-border);
+        border-radius:10px;
+        background:var(--card-bg, var(--card, #fff));
+    }
+    .ads-kpi-grid .ads-kpi-sub {
+        display:block;
+        width:auto;
+        min-width:0;
+        grid-column:1;
+        grid-row:3;
+        align-self:center;
+        margin:0;
+        padding-top:.78rem;
+        color:var(--dsh-muted);
+        font-size:.59rem;
+        line-height:1.15;
+        min-height:1rem;
+        overflow:visible;
+        text-overflow:clip;
+        white-space:nowrap;
+    }
+    .ads-kpi-grid .ads-kpi {
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        align-content:start;
+        row-gap:.12rem;
+    }
+    .ads-kpi-grid .ads-kpi-label,
+    .ads-kpi-grid .ads-kpi-value {
+        grid-column:1 / -1;
+    }
+    .profit-kpi-compare {
+        display:flex;
+        grid-column:2;
+        grid-row:3;
+        align-items:center;
+        gap:.2rem;
+        margin:.28rem 0 0 .35rem;
+        font-size:.66rem;
+        line-height:1.1;
+        font-weight:800;
+        white-space:nowrap;
+        vertical-align:middle;
+    }
+    .profit-kpi-compare.is-good { color:#15803d; }
+    .profit-kpi-compare.is-bad { color:#b91c1c; }
+    .profit-kpi-compare.is-neutral { color:var(--dsh-muted); font-weight:700; }
+    .profit-kpi-compare-label { color:var(--dsh-muted); font-weight:600; }
+    .profit-recon-label {
+        color:var(--dsh-muted);
+        font-size:.63rem;
+        line-height:1.2;
+    }
+    .profit-recon-value {
+        margin-top:.2rem;
+        color:var(--text);
+        font-size:.86rem;
+        font-weight:800;
+        font-variant-numeric:tabular-nums;
+    }
+    @media (max-width:768px) {
+        .profit-recon-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.45rem; }
+    }
+    @media (max-width:360px) {
+        .profit-recon-grid { grid-template-columns:1fr; }
+    }
     @media (max-width: 768px) {
         .profit-table-compact { font-size: .66rem; }
+        .profit-table-compact,
+        .profit-table-compact.dpanel-table { min-width: 100% !important; width: 100% !important; }
         .profit-table-compact th,
         .profit-table-compact td { padding: .38rem .24rem !important; }
+        .profit-index-cell { width: 1.9rem !important; min-width: 1.9rem; }
         .profit-table-compact .btn { font-size: .58rem !important; padding: .14rem .3rem !important; }
+
+        /* Mobile: tampilkan kolom inti saja agar tabel tetap mudah dibaca. */
+        #profitViewProductUnmapped .product-unmapped-table th:nth-child(3),
+        #profitViewProductUnmapped .product-unmapped-table td:nth-child(3),
+        #profitViewProductUnmapped .product-unmapped-table th:nth-child(5),
+        #profitViewProductUnmapped .product-unmapped-table td:nth-child(5),
+        #profitViewCategory .profit-table-compact th:nth-child(3),
+        #profitViewCategory .profit-table-compact td:nth-child(3),
+        #profitViewCategory .profit-table-compact th:nth-child(5),
+        #profitViewCategory .profit-table-compact td:nth-child(5),
+        #profitViewCategory .profit-table-compact th:nth-child(6),
+        #profitViewCategory .profit-table-compact td:nth-child(6),
+        #profitViewCategory .profit-table-compact th:nth-child(8),
+        #profitViewCategory .profit-table-compact td:nth-child(8),
+        #profitViewCampaign .profit-table-compact th:nth-child(4),
+        #profitViewCampaign .profit-table-compact td:nth-child(4),
+        #profitViewCampaign .profit-table-compact th:nth-child(5),
+        #profitViewCampaign .profit-table-compact td:nth-child(5),
+        #profitViewCampaign .profit-table-compact th:nth-child(6),
+        #profitViewCampaign .profit-table-compact td:nth-child(6),
+        #profitViewCampaign .profit-table-compact th:nth-child(10),
+        #profitViewCampaign .profit-table-compact td:nth-child(10),
+        #profitViewGms .profit-table-compact th:nth-child(4),
+        #profitViewGms .profit-table-compact td:nth-child(4),
+        #profitViewGms .profit-table-compact th:nth-child(5),
+        #profitViewGms .profit-table-compact td:nth-child(5),
+        #profitViewGms .profit-table-compact th:nth-child(6),
+        #profitViewGms .profit-table-compact td:nth-child(6),
+        #profitViewGms .profit-table-compact th:nth-child(8),
+        #profitViewGms .profit-table-compact td:nth-child(8),
+        #profitViewProductUnmapped .product-unmapped-api-table th:nth-child(4),
+        #profitViewProductUnmapped .product-unmapped-api-table td:nth-child(4) {
+            display: none;
+        }
+
+        /* Mode ultra-compact: tepat tiga kolom utama di layar kecil. */
+        #profitViewCategory .profit-table-compact th,
+        #profitViewCategory .profit-table-compact td,
+        #profitViewCampaign .profit-table-compact th,
+        #profitViewCampaign .profit-table-compact td,
+        #profitViewGms .profit-table-compact th,
+        #profitViewGms .profit-table-compact td,
+        #profitViewProductUnmapped .profit-table-compact th,
+        #profitViewProductUnmapped .profit-table-compact td {
+            display: none;
+        }
+
+        #profitViewCategory .profit-table-compact th:nth-child(2),
+        #profitViewCategory .profit-table-compact td:nth-child(2),
+        #profitViewCategory .profit-table-compact th:nth-child(7),
+        #profitViewCategory .profit-table-compact td:nth-child(7),
+        #profitViewCategory .profit-table-compact th:nth-child(10),
+        #profitViewCategory .profit-table-compact td:nth-child(10),
+        #profitViewCampaign .profit-table-compact th:nth-child(2),
+        #profitViewCampaign .profit-table-compact td:nth-child(2),
+        #profitViewCampaign .profit-table-compact th:nth-child(8),
+        #profitViewCampaign .profit-table-compact td:nth-child(8),
+        #profitViewCampaign .profit-table-compact th:nth-child(9),
+        #profitViewCampaign .profit-table-compact td:nth-child(9),
+        #profitViewGms .profit-table-compact th:nth-child(2),
+        #profitViewGms .profit-table-compact td:nth-child(2),
+        #profitViewGms .profit-table-compact th:nth-child(7),
+        #profitViewGms .profit-table-compact td:nth-child(7),
+        #profitViewGms .profit-table-compact th:nth-child(10),
+        #profitViewGms .profit-table-compact td:nth-child(10),
+        #profitViewProductUnmapped .product-unmapped-table th:nth-child(2),
+        #profitViewProductUnmapped .product-unmapped-table td:nth-child(2),
+        #profitViewProductUnmapped .product-unmapped-table th:nth-child(6),
+        #profitViewProductUnmapped .product-unmapped-table td:nth-child(6),
+        #profitViewProductUnmapped .product-unmapped-table th:nth-child(7),
+        #profitViewProductUnmapped .product-unmapped-table td:nth-child(7),
+        #profitViewProductUnmapped .product-unmapped-api-table th:nth-child(2),
+        #profitViewProductUnmapped .product-unmapped-api-table td:nth-child(2),
+        #profitViewProductUnmapped .product-unmapped-api-table th:nth-child(5),
+        #profitViewProductUnmapped .product-unmapped-api-table td:nth-child(5),
+        #profitViewProductUnmapped .product-unmapped-api-table th:nth-child(6),
+        #profitViewProductUnmapped .product-unmapped-api-table td:nth-child(6) {
+            display: table-cell;
+        }
     }
 </style>
 
@@ -338,7 +871,7 @@ window.__profitChartData = {
 <div style="display:flex; gap:.35rem; margin-bottom:.75rem;">
     <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kategori</button>
     <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">GMV Max ROAS</button>
-    @if($gmsProfitRows->isNotEmpty())
+    @if($hasGmsTab)
         <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">GMV Max Auto</button>
     @endif
     @if($hasProductUnmappedTab)
@@ -367,9 +900,10 @@ window.__profitChartData = {
             @if($productUnmappedRows->isNotEmpty())
                 <div style="font-size:.75rem;font-weight:800;color:var(--text);margin-bottom:.45rem;">Produk iklan regular</div>
                 <div class="table-responsive profit-table-wrap mb-3">
-                    <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact">
+                    <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact product-unmapped-table">
                         <thead>
                             <tr>
+                                <th class="profit-index-cell">#</th>
                                 <th>Produk / SKU</th>
                                 <th>Kampanye</th>
                                 <th class="text-end">Penjualan</th>
@@ -379,13 +913,14 @@ window.__profitChartData = {
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach($productUnmappedRows as $r)
+                        @foreach($productUnmappedRows as $index => $r)
                             @php
                                 $camp = $r->camp;
                                 $itemName = $camp->marketplace_item_name ?: 'Produk belum ditemukan';
                                 $itemSku = $camp->marketplace_item_sku ?: ('Item ID ' . $camp->channel_item_id);
                             @endphp
                             <tr style="border-bottom:1px solid var(--dsh-border);">
+                                <td class="profit-index-cell">{{ $index + 1 }}</td>
                                 <td style="padding:.65rem .5rem;max-width:280px;">
                                     <div style="font-weight:750;color:var(--text);overflow:hidden;text-overflow:ellipsis;" title="{{ $itemName }}">{{ $itemName }}</div>
                                     <div style="font-size:.64rem;color:var(--dsh-muted);">{{ $itemSku }}</div>
@@ -396,7 +931,7 @@ window.__profitChartData = {
                                     @if($camp->items_sold > 0)<div style="font-size:.62rem;color:var(--dsh-muted);">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs{{ ($camp->items_sold_source ?? 'api') === 'order_fallback' ? ' · estimasi' : '' }}</div>@endif
                                 </td>
                                 <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
-                                <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>
+                                <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">sebelum PPN {{ $fmt($camp->spend) }}</div></td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($itemName) }}" data-profit-map-item="{{ e((string) $camp->channel_item_id) }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
                                         <i class="bi bi-link-45deg"></i> Pilih item HPP
@@ -408,7 +943,7 @@ window.__profitChartData = {
                     </table>
                 </div>
             @endif
-            @if($gmsProfitRows->isNotEmpty())
+            @if($hasGmsTab)
                 <div style="font-size:.75rem;font-weight:800;color:var(--text);margin:.8rem 0 .45rem;">GMV Max Auto yang belum mapping</div>
                 <div id="productUnmappedGmsBody" style="color:var(--dsh-muted);font-size:.75rem;">Buka tab ini untuk memuat GMV Max Auto…</div>
             @endif
@@ -424,18 +959,22 @@ window.__profitChartData = {
             <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact">
             <thead>
                 <tr>
-                    <th>Kategori<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">dari mapping SKU</div></th>
+                    <th class="profit-index-cell">#</th>
+                    <th>Kategori</th>
                     <th class="text-end">Kampanye</th>
-                    <th class="text-end">Konversi<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">order &bull; pcs</div></th>
-                    <th class="text-end">Biaya Iklan<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">+PPN 11%</div></th>
-                    <th class="text-end">Pendapatan<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">bersih vs omzet</div></th>
+                    <th class="text-end">Pesanan</th>
+                    <th class="text-end">Terjual</th>
+                    <th class="text-end">AOV</th>
+                    <th class="text-end">Iklan</th>
+                    <th class="text-end">Dana Cair</th>
                     <th class="text-end">HPP</th>
-                    <th class="text-end">Net Profit</th>
+                    <th class="text-end">Laba Bersih</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($byCategory as $cat)
+                @forelse($byCategory as $index => $cat)
                     <tr style="border-bottom: 1px solid var(--dsh-border); {{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'background: rgba(217, 119, 6, 0.045);' : ($cat->profit >= 0 ? '' : 'background: rgba(220, 38, 38, 0.045);') }}">
+                        <td class="profit-index-cell">{{ $index + 1 }}</td>
                         <td style="padding:.6rem .5rem;">
                             <span style="font-weight:700; color:{{ $cat->unmapped ? '#b45309' : 'var(--text)' }}; font-size:.85rem;">{{ $cat->name }}</span>
                             @if($cat->unmapped)
@@ -446,14 +985,16 @@ window.__profitChartData = {
                             @if($cat->unknownCount > 0)<div style="font-size:.62rem; color:#b45309;">{{ $cat->unknownCount }} belum ada HPP</div>@endif
                         </td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">{{ $cat->campaigns }}</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; color:var(--text); vertical-align:middle;">{{ number_format($cat->orders, 0, ',', '.') }} <span style="color:var(--dsh-muted);">&bull;</span> {{ number_format($cat->items, 0, ',', '.') }} pcs</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:#dc2626; vertical-align:middle;">{{ $fmt($cat->spend) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">+PPN {{ $fmt($cat->topup) }}</div></td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; color:#0369a1; vertical-align:middle;">{{ $fmt($cat->netRevenue) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($cat->gmv) }}</div></td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; color:var(--text); vertical-align:middle;">{{ number_format($cat->orders, 0, ',', '.') }}</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; color:var(--text); vertical-align:middle;">{{ number_format($cat->items, 0, ',', '.') }} pcs</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">{{ $cat->orders > 0 ? $fmt($cat->gmv / $cat->orders) : '—' }}</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:#dc2626; vertical-align:middle;">−{{ $fmt($cat->topup) }}<div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;">sebelum PPN {{ $fmt($cat->spend) }}</div></td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; color:#0369a1; vertical-align:middle;">{{ $fmt($cat->netRevenue) }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">&minus;{{ $fmt($cat->cogs) }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; font-size:.95rem; color:{{ $cat->unknownCount > 0 && $cat->profit == 0 ? '#b45309' : ($cat->profit >= 0 ? '#16a34a' : '#dc2626') }}; vertical-align:middle;">{{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'N/A' : (($cat->profit < 0 ? '-' : '') . $fmt($cat->profit)) }}</td>
                     </tr>
             @empty
-                <tr><td colspan="7" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
+                <tr><td colspan="10" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
             @endforelse
             </tbody>
             </table>
@@ -500,7 +1041,7 @@ window.__profitView = function (mode) {
 })();
 </script>
 
-@if($mappableProfitRows->isNotEmpty() || $gmsProfitRows->isNotEmpty())
+@if($mappableProfitRows->isNotEmpty() || $hasGmsTab)
 <div class="modal fade" id="profitCampaignMappingModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:18px;border:1px solid var(--dsh-border);background:var(--card-bg,#fff);color:var(--text,#0f172a);">
@@ -644,22 +1185,60 @@ window.__profitView = function (mode) {
 <div id="profitViewCampaign" style="display:none;">
 <!-- ── Tabel per kampanye — kolom mengikuti alur hitung: Pendapatan Bersih − HPP − Iklan = Net Profit ── -->
 <div class="ads-tab-panel">
+    <div class="ads-tab-panel-head">
+        <div>
+            <div class="ads-tab-panel-title"><i class="bi bi-play-circle-fill" style="color:#7c3aed;"></i> GMV Max ROAS</div>
+            <div class="ads-tab-panel-note">Omzet, biaya iklan, HPP, dan laba kampanye.</div>
+        </div>
+    </div>
+    <div class="p-3 pb-2">
+        <div class="ads-kpi-grid mb-3">
+            <div class="dpanel ads-kpi kpi-revenue">
+                <div class="ads-kpi-label" title="Total omzet dari kampanye GMV Max ROAS"><i class="bi bi-graph-up-arrow"></i> Omzet GMV</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($roasTotalGmv) }}</div>
+                <div class="ads-kpi-sub">{{ number_format($roasTotalOrders, 0, ',', '.') }} order</div>
+            </div>
+            <div class="dpanel ads-kpi kpi-spend">
+                <div class="ads-kpi-label" title="Belanja iklan termasuk PPN"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">−{{ $fmt($roasTotalSpend * 1.11) }}</div>
+                <div class="ads-kpi-sub">Net {{ $fmt($roasTotalSpend) }} · +PPN</div>
+            </div>
+            <div class="dpanel ads-kpi kpi-cogs">
+                <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> HPP Produk</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($roasTotalCogs) }}</div>
+                <div class="ads-kpi-sub">{{ $roasKnownRows->count() }}/{{ $displayRows->count() }} campaign terhitung</div>
+            </div>
+            <div class="dpanel ads-kpi kpi-profit" style="border-left-color:{{ $roasTotalProfit >= 0 ? '#16a34a' : '#dc2626' }};">
+                <div class="ads-kpi-label" title="Laba setelah HPP dan biaya iklan"><i class="bi bi-cash-stack"></i> Laba Bersih</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;color:{{ $roasTotalProfit >= 0 ? '#16a34a' : '#dc2626' }};">{{ $roasTotalProfit < 0 ? '−' : '' }}{{ $fmt($roasTotalProfit) }}</div>
+                <div class="ads-kpi-sub">HPP tersedia · Margin <b>{{ number_format($roasMarginPct, 1, ',', '.') }}%</b></div>
+            </div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label" title="Omzet dibanding biaya iklan"><i class="bi bi-speedometer2"></i> ROAS</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($roasValue, 2, ',', '.') }}x</div>
+                <div class="ads-kpi-sub">{{ $roasUnknownCount > 0 ? $roasUnknownCount . ' belum dihitung' : 'HPP lengkap' }}</div>
+            </div>
+        </div>
+    </div>
     <div class="table-responsive profit-table-wrap">
-        <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact">
+        <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact profit-roas-table">
         <thead>
             <tr>
-                <th onclick="sortProfitTable('campaign')" style="cursor:pointer">Kampanye <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                <th class="text-end" onclick="sortProfitTable('orders')" style="cursor:pointer">Konversi <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="profit-index-cell">#</th>
+                <th onclick="sortProfitTable('campaign')" style="cursor:pointer">Kampanye / Produk <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('orders')" style="cursor:pointer">Pesanan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end">Terjual</th>
+                <th class="text-end">AOV</th>
                 <th class="text-end" onclick="sortProfitTable('net_revenue')" style="cursor:pointer">Dana Cair <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('hpp')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> HPP <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                <th class="text-end" onclick="sortProfitTable('ad_spend')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <span style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">+PPN</span> <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('ad_spend')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('net_profit')" style="cursor:pointer; border-left: 2px solid var(--dsh-border);"><span style="color:var(--dsh-muted); font-weight:600;">=</span> Net Profit <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('acos')" style="cursor:pointer">ACOS <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-center">Rekomendasi</th>
             </tr>
         </thead>
         <tbody>
-            @forelse($displayRows as $r)
+            @forelse($displayRows as $index => $r)
                 @php
                     $camp = $r->camp;
                     $reco = $camp->reco ?? ['label' => 'Optimize', 'color' => '#ca8a04', 'icon' => '⚡'];
@@ -682,37 +1261,24 @@ window.__profitView = function (mode) {
                     data-net_profit="{{ $r->profit ?? '' }}"
                     data-acos="{{ $r->acos }}"
                     style="border-bottom: 1px solid var(--dsh-border); {{ !$profitKnown ? 'background: rgba(217, 119, 6, 0.045);' : ($r->isProfitable ? '' : 'background: rgba(220, 38, 38, 0.045);') }}">
-                    <td style="padding: 0.75rem 0.5rem; max-width: 250px;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            @if($camp->campaign_status === 'ongoing')
-                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; background:rgba(22, 163, 74, 0.15); border-radius:50%; flex-shrink:0;" title="Berjalan">
-                                    <i class="bi bi-play-fill text-success" style="font-size: .8rem;"></i>
-                                </span>
-                            @elseif($camp->campaign_status === 'paused')
-                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; background:rgba(234, 179, 8, 0.15); border-radius:50%; flex-shrink:0;" title="Jeda">
-                                    <i class="bi bi-pause-fill text-warning" style="font-size: .8rem;"></i>
-                                </span>
-                            @else
-                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; background:rgba(148, 163, 184, 0.15); border-radius:50%; flex-shrink:0;" title="{{ ucfirst($camp->campaign_status ?? '-') }}">
-                                    <span style="display:inline-block; width:6px; height:6px; background:#94a3b8; border-radius:50%;"></span>
-                                </span>
-                            @endif
-                            <span style="font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size:.85rem;" title="{{ $camp->campaign_name ?: 'Kampanye Tidak Ditemukan' }} (Camp ID: {{ $camp->channel_campaign_id }})">
-                                {{ $camp->campaign_name ?: 'Kampanye Tidak Ditemukan' }}
-                            </span>
+                    <td class="profit-index-cell">{{ $index + 1 }}</td>
+                    <td class="profit-campaign-cell" style="padding: 0.75rem 0.5rem; max-width: 250px;">
+                        <span class="profit-campaign-product" style="margin-top:0; font-weight:700; color:var(--text); font-size:.74rem;" title="{{ $camp->marketplace_item_name ?: ($camp->campaign_name ?: 'Produk marketplace') }}">
+                            {{ $camp->marketplace_item_name ?: ($camp->campaign_name ?: 'Produk marketplace') }}
+                        </span>
+                        <div class="profit-campaign-meta" title="{{ $camp->channel_item_id ? 'SKU ' . ($camp->marketplace_item_sku ?: '-') : 'GMV Max Auto · semua item' }}">
+                            {{ $camp->channel_item_id ? 'SKU ' . ($camp->marketplace_item_sku ?: '-') : 'GMV Max Auto · semua item' }}
                         </div>
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
-                        <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($camp->orders, 0, ',', '.') }} order{{ $camp->items_sold > 0 ? ' · ' . number_format($camp->items_sold, 0, ',', '.') . ' pcs' : '' }}</div>
-                        @if($r->aov > 0)
-                            <div style="font-size: .65rem; color: var(--dsh-muted); margin-top: 2px; font-variant-numeric: tabular-nums;">AOV {{ $fmt($r->aov) }} &rarr; cair <b style="color:#0369a1;">{{ $fmt($r->aovNet) }}</b></div>
-                        @endif
+                        <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($camp->orders, 0, ',', '.') }}</div>
                     </td>
+                    <td class="text-end" style="vertical-align: middle; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs</td>
+                    <td class="text-end" style="vertical-align: middle; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;">{{ $r->aov > 0 ? $fmt($r->aov) : '—' }}</td>
 
                     <td class="text-end" style="vertical-align: middle;">
-                        <div style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;">{{ $fmt($r->netRevenue) }}</div>
-                        <div style="font-size: .65rem; color: var(--dsh-muted); margin-top: 2px;" @if($r->feeIsEstimate) title="Estimasi — belum ada data pencairan untuk item ini" @endif>Omzet {{ $fmt($camp->gmv) }} · adm {{ $r->feeIsEstimate ? '±' : '' }}{{ number_format($r->feePct, 1, ',', '.') }}%</div>
+                        <div style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;" @if($r->feeIsEstimate) title="Estimasi dana cair" @endif>{{ $fmt($r->netRevenue) }}</div>
                     </td>
 
                         <td class="text-end" style="vertical-align: middle;">
@@ -727,7 +1293,7 @@ window.__profitView = function (mode) {
 
                     <td class="text-end" style="vertical-align: middle;">
                         <div style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($r->spendAfterTax) }}</div>
-                        <div style="font-size: .65rem; color: var(--dsh-muted); margin-top: 2px;">iklan {{ $fmt($camp->spend) }}</div>
+                        <div style="font-size:.65rem;color:var(--dsh-muted);margin-top:2px;">sebelum PPN {{ $fmt($camp->spend) }}</div>
                     </td>
 
                     <td class="text-end" style="vertical-align: middle; border-left: 2px solid var(--dsh-border); background: rgba({{ !$profitKnown ? '217, 119, 6' : ($r->isProfitable ? '22, 163, 74' : '220, 38, 38') }}, 0.05);">
@@ -735,8 +1301,7 @@ window.__profitView = function (mode) {
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
-                        <div style="font-weight: 800; font-size: .95rem; color: {{ $r->acosOk === null ? 'var(--text)' : ($r->acosOk ? '#16a34a' : '#dc2626') }}; font-variant-numeric: tabular-nums;">{{ $r->acos > 0 ? number_format($r->acos, 1, ',', '.') . '%' : '-' }}</div>
-                        <div style="font-size: .65rem; color: var(--dsh-muted); margin-top: 2px;">batas {{ $r->beAcos !== null ? number_format($r->beAcos, 1, ',', '.') . '%' : '-' }}</div>
+                        <div style="font-weight: 800; font-size: .95rem; color: {{ $r->acosOk === null ? 'var(--text)' : ($r->acosOk ? '#16a34a' : '#dc2626') }}; font-variant-numeric: tabular-nums;" title="Batas aman {{ $r->beAcos !== null ? number_format($r->beAcos, 1, ',', '.') . '%' : '-' }}">{{ $r->acos > 0 ? number_format($r->acos, 1, ',', '.') . '%' : '-' }}</div>
                         @if($r->beAcos !== null && $r->acos > 0)
                             <div style="height: 4px; width: 72px; margin-left: auto; margin-top: 4px; background: var(--dsh-border); border-radius: 99px; overflow: hidden;">
                                 <div style="height: 100%; width: {{ number_format($r->acosBarPct, 0, '.', '') }}%; background: {{ $r->acosOk ? '#16a34a' : '#dc2626' }};"></div>
@@ -752,7 +1317,7 @@ window.__profitView = function (mode) {
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                        <td colspan="11" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
                         Belum ada data kampanye yang memiliki pengeluaran atau pendapatan.
                     </td>
                 </tr>
@@ -761,13 +1326,16 @@ window.__profitView = function (mode) {
         @if($displayRows->isNotEmpty())
         <tfoot>
             <tr style="border-top: 2px solid var(--dsh-border);">
+                <td class="profit-index-cell"></td>
                 <td style="padding: .7rem .5rem; font-weight: 800; font-size: .75rem; color: var(--text); text-transform: uppercase;">Total</td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($displayRows->sum(fn ($r) => $r->camp->orders), 0, ',', '.') }} order</td>
-                <td class="text-end" style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;">{{ $fmt($totalNetRevenue) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($totalGmv) }} · adm {{ $fmt($totalFeeAmt) }} ({{ number_format($avgFeePct, 1, ',', '.') }}%)</div></td>
-                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">&minus;{{ $fmt($totalCogsAll) }}</td>
-                <td class="text-end" style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($totalTopup) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">iklan {{ $fmt($totalSpend) }}</div></td>
-                <td class="text-end" style="font-weight: 800; font-size: .95rem; color: {{ $unknownProfitCount > 0 ? '#b45309' : ($totalProfit >= 0 ? '#16a34a' : '#dc2626') }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $unknownProfitCount > 0 ? '217, 119, 6' : ($totalProfit >= 0 ? '22, 163, 74' : '220, 38, 38') }}, 0.05);">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">{{ $unknownProfitCount > 0 ? $unknownProfitCount . ' campaign belum dihitung' : 'HPP tersedia' }}</div></td>
-                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($avgAcos, 1, ',', '.') }}%</td>
+                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($displayRows->sum(fn ($r) => $r->camp->items_sold), 0, ',', '.') }} pcs</td>
+                <td class="text-end" style="font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;">{{ $displayRows->sum(fn ($r) => $r->camp->orders) > 0 ? $fmt($displayRows->sum(fn ($r) => $r->camp->gmv) / $displayRows->sum(fn ($r) => $r->camp->orders)) : '—' }}</td>
+                <td class="text-end" style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;">{{ $fmt($roasKnownRows->sum('netRevenue')) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($roasTotalGmv) }}</div></td>
+                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">&minus;{{ $fmt($roasTotalCogs) }}</td>
+                <td class="text-end" style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($roasTotalSpend * 1.11) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">sebelum PPN {{ $fmt($roasTotalSpend) }}</div></td>
+                <td class="text-end" style="font-weight: 800; font-size: .95rem; color: {{ $roasTotalProfit >= 0 ? '#16a34a' : '#dc2626' }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $roasTotalProfit >= 0 ? '22, 163, 74' : '220, 38, 38' }}, 0.05);">{{ $roasTotalProfit < 0 ? '−' : '' }}{{ $fmt($roasTotalProfit) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">{{ $roasUnknownCount > 0 ? $roasUnknownCount . ' campaign belum dihitung' : 'HPP tersedia' }}</div></td>
+                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ $roasTotalGmv > 0 ? number_format(($roasTotalSpend / $roasTotalGmv) * 100, 1, ',', '.') : '0,0' }}%</td>
                 <td></td>
             </tr>
         </tfoot>
@@ -777,47 +1345,43 @@ window.__profitView = function (mode) {
 </div>
 </div>
 
-@if($gmsProfitRows->isNotEmpty())
+@if($hasGmsTab)
 <div id="profitViewGms" style="display:none;">
     <div class="ads-tab-panel">
         <div class="ads-tab-panel-head">
             <div>
-                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#0369a1;"></i> GMV Max Auto</div>
-                <div class="ads-tab-panel-note">Rincian item yang berjalan otomatis di GMV Max. Parent agregat tidak ditampilkan sebagai SKU.</div>
+                <div class="ads-tab-panel-title"><i class="bi bi-play-circle-fill" style="color:#0369a1;"></i> GMV Max Auto</div>
+                <div class="ads-tab-panel-note">Omzet, biaya iklan, HPP, dan laba item.</div>
                 <div id="gmsItemsPeriod" style="font-size:.68rem;color:var(--dsh-muted);margin-top:.2rem;"></div>
             </div>
         </div>
         <div class="p-3">
             <div class="ads-kpi-grid mb-3">
                 <div class="dpanel ads-kpi kpi-revenue">
-                    <div class="ads-kpi-label"><i class="bi bi-graph-up-arrow"></i> GMV Auto</div>
+                    <div class="ads-kpi-label" title="Total omzet dari GMV Max Auto"><i class="bi bi-graph-up-arrow"></i> Omzet GMV Auto</div>
                     <div class="ads-kpi-value">{{ $fmt($gmsTotalGmv) }}</div>
                     <div class="ads-kpi-sub">{{ number_format($gmsTotalOrders, 0, ',', '.') }} order</div>
                 </div>
                 <div class="dpanel ads-kpi kpi-spend">
-                    <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Iklan + PPN</div>
+                    <div class="ads-kpi-label" title="Belanja iklan termasuk PPN"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
                     <div class="ads-kpi-value">−{{ $fmt($gmsTotalSpend * 1.11) }}</div>
-                    <div class="ads-kpi-sub">Iklan {{ $fmt($gmsTotalSpend) }}</div>
+                    <div class="ads-kpi-sub">Net {{ $fmt($gmsTotalSpend) }} · +PPN</div>
                 </div>
                 <div class="dpanel ads-kpi kpi-cogs">
-                    <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> HPP</div>
+                    <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> HPP Produk</div>
                     <div class="ads-kpi-value">{{ $gmsUnknownCount > 0 ? 'N/A' : $fmt($gmsKnownRows->sum('totalCogs')) }}</div>
                     <div class="ads-kpi-sub">{{ $gmsKnownRows->count() }}/{{ $gmsProfitRows->count() }} campaign terhitung</div>
                 </div>
                 <div class="dpanel ads-kpi kpi-profit">
-                    <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit Auto</div>
+                    <div class="ads-kpi-label" title="Laba setelah HPP dan biaya iklan"><i class="bi bi-cash-stack"></i> Laba Bersih</div>
                     <div class="ads-kpi-value" style="color:{{ $gmsTotalProfit >= 0 ? '#16a34a' : '#dc2626' }};">{{ $gmsUnknownCount > 0 ? 'N/A' : (($gmsTotalProfit < 0 ? '−' : '') . $fmt($gmsTotalProfit)) }}</div>
                     <div class="ads-kpi-sub">Margin <b>{{ number_format($gmsMarginPct, 1, ',', '.') }}%</b></div>
                 </div>
                 <div class="dpanel ads-kpi">
-                    <div class="ads-kpi-label"><i class="bi bi-speedometer2"></i> ROAS Auto</div>
+                    <div class="ads-kpi-label" title="Omzet dibanding biaya iklan"><i class="bi bi-speedometer2"></i> ROAS</div>
                     <div class="ads-kpi-value">{{ number_format($gmsRoas, 2, ',', '.') }}x</div>
                     <div class="ads-kpi-sub">{{ $gmsUnknownCount > 0 ? $gmsUnknownCount . ' belum dihitung' : 'HPP lengkap' }}</div>
                 </div>
-            </div>
-            <div style="padding:.7rem .8rem;margin-bottom:.75rem;border-radius:12px;background:rgba(3,105,161,.06);border:1px solid rgba(3,105,161,.14);font-size:.72rem;color:var(--dsh-muted);">
-                <i class="bi bi-info-circle" style="color:#0369a1;"></i>
-                Mapping HPP dilakukan per item GMV Max Auto. Jika HPP belum ada, pilih item internal pada baris tersebut agar profit dapat dihitung.
             </div>
             <div id="gmsItemsSummary" style="display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.8rem;"></div>
             <div id="gmsItemsBody">
@@ -834,7 +1398,7 @@ window.__profitView = function (mode) {
     const endpointBase = @json(url('/marketplace/ads-dashboard/gms-items'));
     const fromDate = @json($dateFrom ?? now()->subDays(6)->toDateString());
     const toDate = @json($dateTo ?? now()->toDateString());
-    const storeIds = @json($gmsProfitRows->pluck('camp.store_id')->filter()->unique()->values()->all());
+    const storeIds = @json($gmsStoreIds);
     const storeNames = @json($gmsProfitRows->mapWithKeys(fn ($r) => [$r->camp->store_id => $r->camp->store?->name ?: ('Toko #' . $r->camp->store_id)])->all());
     const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
     const fmtRp = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
@@ -843,27 +1407,29 @@ window.__profitView = function (mode) {
 
     function renderStore(storeId, payload) {
         if (!payload.data || !payload.data.length) return '<div style="padding:1rem;color:var(--dsh-muted);font-size:.75rem;">Belum ada data produk untuk ' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '.</div>';
-        const rows = payload.data.map(function (item) {
+        const rows = payload.data.map(function (item, index) {
             const mapped = item.mapped;
             const profit = item.profit_after_ads;
             const profitText = profit === null ? 'N/A' : (profit < 0 ? '−' : '') + fmtRp(profit);
             const itemName = item.item_name || 'Produk tanpa nama';
-            const pcsNote = item.pcs_source === 'api' ? 'pcs dari data penjualan' : 'pcs estimasi dari order';
             const mappingStatus = mapped
-                ? '<span style="color:#15803d;font-weight:700;"><i class="bi bi-check-circle"></i> HPP tersedia</span><div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.15rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;">' + esc(item.internal_item_code || item.internal_item_name || item.mapping_source || 'Item internal') + '</div>'
-                : '<span style="color:#b45309;font-weight:700;"><i class="bi bi-exclamation-circle"></i> HPP belum ada</span><button type="button" class="btn btn-sm d-block mt-1" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Pilih item HPP</button>';
+                ? '<span style="color:#15803d;font-weight:700;"><i class="bi bi-check-circle"></i> HPP tersedia</span>'
+                : '<button type="button" class="btn btn-sm" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Mapping HPP</button>';
             return '<tr>' +
+                '<td class="profit-index-cell">' + (index + 1) + '</td>' +
                 '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>' +
-                '<td class="text-end"><div style="font-weight:700;">' + Number(item.orders || 0).toLocaleString('id-ID') + ' order · ' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div><div style="font-size:.62rem;color:var(--dsh-muted);">' + pcsNote + '</div></td>' +
-                '<td class="text-end"><div style="font-weight:700;">' + fmtRp(item.gmv) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">Dana cair ± ' + fmtRp(item.net_revenue) + '</div></td>' +
-                '<td class="text-end" style="color:#dc2626;"><div style="font-weight:700;">−' + fmtRp(Number(item.spend || 0) * 1.11) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN 11%</div></td>' +
-                '<td class="text-end">' + (mapped ? fmtRp(item.unit_cogs) + '<div style="font-size:.62rem;color:var(--dsh-muted);">per pcs</div>' : '<span style="color:#b45309;">—</span>') + '</td>' +
+                '<td class="text-end"><div style="font-weight:700;">' + Number(item.orders || 0).toLocaleString('id-ID') + '</div></td>' +
+                '<td class="text-end"><div style="font-weight:700;">' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div></td>' +
+                '<td class="text-end"><div style="font-weight:700;">' + (Number(item.orders || 0) > 0 ? fmtRp(Number(item.gmv || 0) / Number(item.orders || 0)) : '—') + '</div></td>' +
+                '<td class="text-end"><div style="font-weight:700;">' + fmtRp(item.gmv) + '</div></td>' +
+                '<td class="text-end" style="color:#dc2626;"><div style="font-weight:700;">−' + fmtRp(Number(item.spend || 0) * 1.11) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">sebelum PPN ' + fmtRp(Number(item.spend || 0)) + '</div></td>' +
+                '<td class="text-end">' + (mapped ? fmtRp(item.unit_cogs) : '<span style="color:#b45309;">—</span>') + '</td>' +
                 '<td class="text-end">' + (item.hpp_total !== null ? '−' + fmtRp(item.hpp_total) : '<span style="color:#b45309;">—</span>') + '</td>' +
-                '<td class="text-end" style="font-weight:800;color:' + (profit === null ? '#b45309' : (profit >= 0 ? '#15803d' : '#b91c1c')) + ';">' + profitText + (profit === null ? '<div style="font-size:.62rem;font-weight:500;color:var(--dsh-muted);">menunggu HPP</div>' : '') + '</td>' +
+                '<td class="text-end" style="font-weight:800;color:' + (profit === null ? '#b45309' : (profit >= 0 ? '#15803d' : '#b91c1c')) + ';">' + profitText + '</td>' +
                 '<td>' + mappingStatus + '</td>' +
                 '</tr>';
         }).join('');
-        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th>Item</th><th class="text-end">Penjualan</th><th class="text-end">GMV<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">dana cair</span></th><th class="text-end">Iklan<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">+PPN</span></th><th class="text-end">HPP/pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th class="profit-index-cell">#</th><th>Item</th><th class="text-end">Pesanan</th><th class="text-end">Terjual</th><th class="text-end">AOV</th><th class="text-end">GMV</th><th class="text-end">Iklan</th><th class="text-end">HPP/pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     window.loadGmsItemsTab = async function () {
@@ -903,7 +1469,7 @@ window.__profitView = function (mode) {
     const endpointBase = @json(url('/marketplace/ads-dashboard/gms-items'));
     const fromDate = @json($dateFrom ?? now()->subDays(6)->toDateString());
     const toDate = @json($dateTo ?? now()->toDateString());
-    const storeIds = @json($gmsProfitRows->pluck('camp.store_id')->filter()->unique()->values()->all());
+    const storeIds = @json($gmsStoreIds);
     const storeNames = @json($gmsProfitRows->mapWithKeys(fn ($r) => [$r->camp->store_id => $r->camp->store?->name ?: ('Toko #' . $r->camp->store_id)])->all());
     const regularCount = @json($productUnmappedRows->count());
     const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
@@ -913,18 +1479,19 @@ window.__profitView = function (mode) {
 
     function renderStore(storeId, items) {
         if (!items.length) return '';
-        const rows = items.map(function (item) {
+        const rows = items.map(function (item, index) {
             const itemName = item.item_name || 'GMV Max Auto';
             return '<tr>'
+                + '<td class="profit-index-cell">' + (index + 1) + '</td>'
                 + '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>'
                 + '<td class="text-end"><b>' + Number(item.orders || 0).toLocaleString('id-ID') + ' order</b><div style="font-size:.62rem;color:var(--dsh-muted);">' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div></td>'
                 + '<td class="text-end">' + fmtRp(item.gmv) + '<div style="font-size:.62rem;color:var(--dsh-muted);">dana cair ± ' + fmtRp(item.net_revenue) + '</div></td>'
-                + '<td class="text-end" style="color:#dc2626;"><b>−' + fmtRp(Number(item.spend || 0) * 1.11) + '</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>'
+                + '<td class="text-end" style="color:#dc2626;"><b>−' + fmtRp(Number(item.spend || 0) * 1.11) + '</b><div style="font-size:.62rem;color:var(--dsh-muted);">sebelum PPN ' + fmtRp(Number(item.spend || 0)) + '</div></td>'
                 + '<td class="text-center"><span style="color:#b45309;font-weight:700;"><i class="bi bi-exclamation-circle"></i> HPP belum ada</span><button type="button" class="btn btn-sm d-block mt-1" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Pilih item HPP</button></td>'
                 + '</tr>';
         }).join('');
         return '<div style="font-size:.72rem;font-weight:750;color:var(--dsh-muted);margin:.8rem 0 .35rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div>'
-            + '<div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th>Item / SKU</th><th class="text-end">Penjualan</th><th class="text-end">GMV</th><th class="text-end">Iklan</th><th class="text-center">Tindakan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+            + '<div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact product-unmapped-api-table"><thead><tr><th class="profit-index-cell">#</th><th>Item / SKU</th><th class="text-end">Penjualan</th><th class="text-end">GMV</th><th class="text-end">Iklan</th><th class="text-center">Tindakan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     window.loadProductUnmappedTab = function () {
@@ -998,6 +1565,10 @@ function sortProfitTable(col) {
         }
     });
 
-    rows.forEach(row => tbody.appendChild(row));
+    rows.forEach((row, index) => {
+        tbody.appendChild(row);
+        const indexCell = row.querySelector('.profit-index-cell');
+        if (indexCell) indexCell.textContent = index + 1;
+    });
 }
 </script>

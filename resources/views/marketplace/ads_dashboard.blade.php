@@ -737,6 +737,18 @@ body[data-theme="dark"] .dpanel-table-sm tbody td {
 
 /* Responsive Overrides */
 @media (max-width: 768px) {
+    .ads-tabs-wrap {
+        position:sticky;
+        top:3.1rem;
+        z-index:300;
+        margin-inline:-.75rem;
+        padding:.25rem .75rem .35rem !important;
+        background:var(--card-bg, #fff);
+        border-bottom:1px solid var(--card-border, rgba(148,163,184,.18));
+    }
+    body[data-theme="dark"] .ads-tabs-wrap {
+        background:var(--card-bg, #0f172a);
+    }
     .dash-hero {
         flex-direction: column;
         align-items: stretch;
@@ -915,12 +927,25 @@ body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
 /* Final UI pass: flat header + cleaner tabs, aligned with shipments/income */
 .ads-shell{
     max-width:1040px; /* Selaras dengan shipments */
+    width:100%;
+    min-width:0;
+    box-sizing:border-box;
     margin-inline:auto;
 }
 
-@media (min-width: 992px) {
+/* Layout lebar hanya untuk desktop besar; tablet dan mobile tetap fluid. */
+@media (min-width: 1200px) {
     .ads-shell {
         min-width: 1040px;
+    }
+}
+
+@media (max-width: 1199.98px) {
+    .ads-shell {
+        width:100%;
+        min-width:0;
+        max-width:none;
+        padding-inline:.75rem;
     }
 }
 
@@ -1244,8 +1269,8 @@ body[data-theme="dark"] .dash-sec{
 </style>
 
 <script>
-let sortTrafficCol = 'spend';
-let sortTrafficDir = 'desc';
+var sortTrafficCol = window.__adsTrafficSortCol || 'spend';
+var sortTrafficDir = window.__adsTrafficSortDir || 'desc';
 
 function sortTrafficTable(col) {
     if (sortTrafficCol === col) {
@@ -1512,8 +1537,8 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-let sortTrafficCol = 'spend';
-let sortTrafficDir = 'desc';
+var sortTrafficCol = window.__adsTrafficSortCol || 'spend';
+var sortTrafficDir = window.__adsTrafficSortDir || 'desc';
 
 function sortTrafficTable(col) {
     if (sortTrafficCol === col) {
@@ -1610,8 +1635,6 @@ function sortTrafficTable(col) {
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}" data-gf-date="off">
             </div>
 
-            {{-- HIDDEN COMPARE MODE --}}
-            <input type="hidden" name="compare_mode" value="{{ $compareMode ?? 'prev_period' }}">
         </form>
     </div>
 
@@ -2236,6 +2259,12 @@ function sortTrafficTable(col) {
                 <div class="p-2">
                     <div class="ads-kpi-grid mb-0" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
                 @php
+                    $comparisonLabel = match ($compareMode ?? 'prev_period') {
+                        'prev_month' => 'bulan lalu',
+                        'prev_year' => 'tahun lalu',
+                        default => 'periode lalu',
+                    };
+
                     // KPI metrics are now fully calculated and aggregated 
                     // within AdsDashboardService and passed precisely via $kpi.
 
@@ -2332,7 +2361,7 @@ function sortTrafficTable(col) {
                             <span style="font-weight:900; {{ $colorClass }}">
                                 @if($hasComparison)<i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%@else<span>Baru</span>@endif
                             </span> 
-                            vs lalu
+                            vs {{ $comparisonLabel }}
                         </div>
                     </div>
                 @endforeach
@@ -3310,15 +3339,59 @@ document.addEventListener("DOMContentLoaded", function() {
     
     if (ctxProfitComp && window.__profitChartData) {
         const pd = window.__profitChartData;
-        const pNet = pd.totalProfit > 0 ? pd.totalProfit : 0;
+        const hasProfit = pd.totalProfit >= 0;
+        const pNet = Math.abs(pd.totalProfit || 0);
+        const compositionValues = [pd.totalCogs, pd.feeAmt, pd.totalTopup, pNet].map(value => Number(value) || 0);
+        const compositionTotal = compositionValues.reduce((sum, value) => sum + value, 0);
+        const compactComposition = window.matchMedia('(max-width: 991.98px)').matches;
+        const compositionNames = compactComposition
+            ? ['HPP', 'Fee', 'Iklan', hasProfit ? 'Laba' : 'Rugi']
+            : ['HPP Produk', 'Fee Marketplace', 'Iklan + PPN', hasProfit ? 'Laba Bersih' : 'Rugi Bersih'];
+        const compositionPercentages = compositionNames.map((name, index) => {
+            const percentage = index === 1
+                ? Number(pd.feePct || 0).toFixed(1).replace('.', ',')
+                : (compositionTotal > 0 ? ((compositionValues[index] / compositionTotal) * 100).toFixed(1).replace('.', ',') : '0,0');
+            return percentage;
+        });
+        const formatCompositionIDR = value => 'Rp ' + Math.round(Math.abs(Number(value) || 0)).toLocaleString('id-ID');
+        const compositionPercentPlugin = {
+            id: 'profitCompositionCenterText',
+            afterDatasetsDraw(chart) {
+                const ctx = chart.ctx;
+                const arc = chart.getDatasetMeta(0).data[0];
+                if (!arc) return;
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = tooltipText;
+                ctx.font = '700 9px Inter, sans-serif';
+                ctx.fillText(compactComposition ? (hasProfit ? 'Laba' : 'Rugi') : (hasProfit ? 'Laba Bersih' : 'Rugi Bersih'), arc.x, arc.y - 7);
+                ctx.font = '800 11px Inter, sans-serif';
+                ctx.fillText((hasProfit ? '' : '−') + formatCompositionIDR(pd.totalProfit), arc.x, arc.y + 8);
+                ctx.restore();
+            }
+        };
+
+        const legend = document.getElementById('profitCompositionLegend');
+        if (legend) {
+            const colors = ['#94a3b8', '#f59e0b', '#dc2626', hasProfit ? '#10b981' : '#7f1d1d'];
+            legend.innerHTML = compositionNames.map((name, index) =>
+                '<div class="profit-composition-item">' +
+                    '<span class="profit-composition-dot" style="background:' + colors[index] + '"></span>' +
+                    '<span class="profit-composition-name">' + name + '</span>' +
+                    '<span class="profit-composition-value">' + formatCompositionIDR(compositionValues[index]) + ' · ' + compositionPercentages[index] + '%</span>' +
+                '</div>'
+            ).join('');
+        }
         
         new Chart(ctxProfitComp.getContext('2d'), {
             type: 'doughnut',
+            plugins: [compositionPercentPlugin],
             data: {
-                labels: ['HPP', 'Platform Fee', 'Iklan (+PPN)', 'Net Profit'],
+                labels: compositionNames,
                 datasets: [{
-                    data: [pd.totalCogs, pd.feeAmt, pd.totalTopup, pNet],
-                    backgroundColor: ['#94a3b8', '#f59e0b', '#dc2626', '#10b981'],
+                    data: compositionValues,
+                    backgroundColor: ['#94a3b8', '#f59e0b', '#dc2626', hasProfit ? '#10b981' : '#7f1d1d'],
                     borderWidth: 0
                 }]
             },
@@ -3326,8 +3399,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right', labels: { boxWidth: 12, font: {size: 10} } },
-                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + formatShortIDR(context.parsed);
+                            }
+                        }
+                    }
                 },
                 cutout: '65%'
             }
@@ -4156,8 +4240,8 @@ document.addEventListener("DOMContentLoaded", function() {
 @endif
 
 <script>
-let sortTrafficCol = 'spend';
-let sortTrafficDir = 'desc';
+var sortTrafficCol = window.__adsTrafficSortCol || 'spend';
+var sortTrafficDir = window.__adsTrafficSortDir || 'desc';
 
 function sortTrafficTable(col) {
     if (sortTrafficCol === col) {

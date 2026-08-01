@@ -75,9 +75,24 @@ class AdsDashboardService
             $dates = $shop->keys()->merge($campaign->keys())->merge($gms->keys())->unique()->sort()->values();
 
             return $dates->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
-                // Jika total toko sudah tersedia, campaign non-GMS tidak
-                // dijumlahkan lagi. GMS ditambahkan sebagai komponen terpisah.
-                $base = $shop->get($date) ?? $campaign->get($date);
+                // Shop daily adalah total Seller Center dan sudah mencakup
+                // seluruh tipe campaign, termasuk GMV Max. Jangan tambahkan
+                // baris GMS lagi ketika total toko tersedia.
+                $shopRow = $shop->get($date);
+                if ($shopRow) {
+                    return [$date => (object) [
+                        'date' => $date,
+                        'impressions' => (int) ($shopRow->impressions ?? 0),
+                        'clicks' => (int) ($shopRow->clicks ?? 0),
+                        'spend' => (float) ($shopRow->spend ?? 0),
+                        'orders' => (int) ($shopRow->orders ?? 0),
+                        'gmv' => (float) ($shopRow->gmv ?? 0),
+                    ]];
+                }
+
+                // Fallback untuk tanggal tanpa shop daily: gabungkan rincian
+                // regular dan GMS agar metrik tetap tersedia.
+                $base = $campaign->get($date);
                 $extra = $gms->get($date);
                 $row = (object) [
                     'date' => $date,
@@ -399,8 +414,25 @@ class AdsDashboardService
         // HPP tidak boleh dianggap sebagai profit 0 atau rugi.
         $knownProfitCampaigns = $campaigns->filter(fn ($camp) => ($camp->spend > 0 || $camp->gmv > 0) && $camp->profit_after_ads !== null);
         $unknownProfitCampaigns = $campaigns->filter(fn ($camp) => ($camp->spend > 0 || $camp->gmv > 0) && $camp->profit_after_ads === null);
-        $kpi['current']->net_profit = $knownProfitCampaigns->sum('profit_after_ads');
-        $kpi['previous']->net_profit = $campaigns->filter(fn ($camp) => $camp->prev_profit_after_ads !== null)->sum('prev_profit_after_ads');
+        // Samakan dengan Profit tab: belanja yang ada di Seller Center tetapi
+        // belum punya baris campaign (umumnya GMV Max Auto) tetap dianggap
+        // sebagai biaya iklan dan mengurangi net profit setelah PPN.
+        $unattributedSpend = max(0, (float) $summaryCurrent->spend - (float) $campaigns->sum('spend'));
+        $unattributedPreviousSpend = max(0, (float) $summaryPrevious->spend - (float) $campaigns->sum('prev_spend'));
+        $gmsNoSaleSpend = $campaigns
+            ->filter(fn ($camp) => str_starts_with((string) $camp->channel_campaign_id, 'GMS-'))
+            ->filter(fn ($camp) => (float) ($camp->gmv ?? 0) <= 0 && (int) ($camp->orders ?? 0) <= 0 && (int) ($camp->items_sold ?? 0) <= 0)
+            ->sum('spend');
+        $gmsNoSalePreviousSpend = $campaigns
+            ->filter(fn ($camp) => str_starts_with((string) $camp->channel_campaign_id, 'GMS-'))
+            ->filter(fn ($camp) => (float) ($camp->prev_gmv ?? 0) <= 0 && (int) ($camp->prev_orders ?? 0) <= 0 && (int) ($camp->prev_items_sold ?? 0) <= 0)
+            ->sum('prev_spend');
+        $kpi['current']->net_profit = $knownProfitCampaigns->sum('profit_after_ads')
+            - (($unattributedSpend + $gmsNoSaleSpend) * 1.11);
+        $kpi['previous']->net_profit = $campaigns->filter(fn ($camp) => $camp->prev_profit_after_ads !== null)->sum('prev_profit_after_ads')
+            - (($unattributedPreviousSpend + $gmsNoSalePreviousSpend) * 1.11);
+        $kpi['current']->unattributed_ad_spend = $unattributedSpend;
+        $kpi['previous']->unattributed_ad_spend = $unattributedPreviousSpend;
         $kpi['current']->profit_campaign_count = $knownProfitCampaigns->count();
         $kpi['current']->profit_unknown_campaign_count = $unknownProfitCampaigns->count();
         $kpi['current']->profit_estimated_campaign_count = $knownProfitCampaigns

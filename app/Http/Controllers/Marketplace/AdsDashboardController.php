@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use App\Services\Marketplace\Ads\ShopeeAdsApiService;
 
 class AdsDashboardController extends Controller
@@ -30,7 +31,9 @@ class AdsDashboardController extends Controller
         if ($stores->isEmpty()) {
             $dateFrom = now()->subDays(6)->toDateString();
             $dateTo = now()->toDateString();
-            $compareMode = $request->input('compare_mode', 'prev_period');
+            $compareMode = in_array($request->input('compare_mode'), ['prev_period', 'prev_month', 'prev_year'], true)
+                ? $request->input('compare_mode')
+                : 'prev_period';
 
             return view('marketplace.ads_dashboard', compact('stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode'))
                 ->with('error', 'Tidak ada toko Shopee aktif dengan token valid.');
@@ -91,12 +94,16 @@ class AdsDashboardController extends Controller
             }
         }
 
+        $compareMode = in_array($request->input('compare_mode'), ['prev_period', 'prev_month', 'prev_year'], true)
+            ? $request->input('compare_mode')
+            : 'prev_period';
+
         $dashboard = $dashboardService->buildDashboardData(
             $stores,
             $storeId,
             $request->input('date_from'),
             $request->input('date_to'),
-            $request->input('compare_mode', 'prev_period'),
+            $compareMode,
             $analytics
         );
         
@@ -474,8 +481,11 @@ class AdsDashboardController extends Controller
             $apiPcs = (float) $dailyRows->sum(fn ($row) => (float) data_get($row->raw_json, 'broad_order_amount', 0));
             $pcs = $apiPcs > 0 ? $apiPcs : (float) $orders;
             $netRevenue = $gmv * \App\Services\Marketplace\Ads\AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
-            $hppTotal = $unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null;
-            $profit = $hppTotal !== null ? round($netRevenue - $hppTotal - ($spend * 1.11), 2) : null;
+            $hasSales = $gmv > 0 || $orders > 0 || $pcs > 0;
+            $hppTotal = !$hasSales ? 0.0 : ($unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null);
+            $profit = !$hasSales
+                ? round(-($spend * 1.11), 2)
+                : ($hppTotal !== null ? round($netRevenue - $hppTotal - ($spend * 1.11), 2) : null);
 
             return [
                 'channel_item_id' => $channelItemId,
@@ -503,6 +513,30 @@ class AdsDashboardController extends Controller
                 'internal_item_name' => $mappedItem?->name,
             ];
         })->sortByDesc('spend')->values();
+
+        // Detail item kadang berbeda 1–2 rupiah dari campaign parent karena
+        // pembulatan API. Gunakan total parent sebagai sumber biaya iklan agar
+        // tabel GMV Max Auto selalu sama dengan KPI dashboard.
+        $parentSpend = (float) DB::table('marketplace_ad_campaign_dailies')
+            ->where('store_id', $store->id)
+            ->where('channel_campaign_id', 'GMS-' . $store->id)
+            ->whereBetween('date', [$fromDate, $toDate])
+            ->sum('expense');
+        $itemSpend = (float) $items->sum('spend');
+        if ($parentSpend >= 0 && $itemSpend > 0 && abs($parentSpend - $itemSpend) > 0.001) {
+            $scale = $parentSpend / $itemSpend;
+            $items = $items->map(function (array $item) use ($scale) {
+                $item['spend'] = round((float) $item['spend'] * $scale, 2);
+                $hasSales = (float) ($item['gmv'] ?? 0) > 0 || (int) ($item['orders'] ?? 0) > 0 || (float) ($item['pcs'] ?? 0) > 0;
+                $item['profit_after_ads'] = !$hasSales
+                    ? round(-($item['spend'] * 1.11), 2)
+                    : ($item['hpp_total'] !== null
+                        ? round((float) $item['net_revenue'] - (float) $item['hpp_total'] - ($item['spend'] * 1.11), 2)
+                        : null);
+                $item['roas'] = $item['spend'] > 0 ? round((float) $item['gmv'] / $item['spend'], 4) : null;
+                return $item;
+            })->sortByDesc('spend')->values();
+        }
 
         return response()->json([
             'status' => 'success',
