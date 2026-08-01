@@ -101,6 +101,11 @@
                                 {{ $camp->campaign_name ?: 'Kampanye Tidak Ditemukan' }}
                             </span>
                         </div>
+                        @if(($camp->channel_item_id ?? null) !== null)
+                            <div style="font-size:.65rem; color:var(--dsh-muted); margin:-4px 0 7px 28px;">
+                                HPP/unit: {{ ($camp->unit_cogs ?? 0) > 0 ? 'Rp ' . number_format($camp->unit_cogs, 0, ',', '.') : 'belum tersedia' }}
+                            </div>
+                        @endif
 
                         <div style="display:flex; align-items:center; gap:8px;">
                             <div class="inline-edit-wrapper" data-type="daily_budget" data-camp="{{ $camp->channel_campaign_id }}" data-val="{{ $camp->campaign_budget > 0 ? $camp->campaign_budget : 0 }}">

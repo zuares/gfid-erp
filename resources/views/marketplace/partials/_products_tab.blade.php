@@ -116,6 +116,9 @@
                                     <div class="text-muted small">
                                         {{ $row->item_sku }} <span class="badge bg-light text-dark ms-1">{{ $row->item_category }}</span>
                                     </div>
+                                    <div class="text-muted" style="font-size:.65rem;">
+                                        HPP/unit: {{ ($row->unit_cogs ?? 0) > 0 ? 'Rp ' . number_format($row->unit_cogs, 0, ',', '.') : 'belum tersedia' }}
+                                    </div>
                                 </div>
                             </div>
                         </td>

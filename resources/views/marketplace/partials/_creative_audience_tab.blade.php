@@ -122,6 +122,7 @@
                         </div>
                         <div class="p-2">
                             <div class="text-truncate small fw-bold" title="{{ $item->item_name }}">{{ $item->item_name }}</div>
+                            <div class="text-muted" style="font-size:.65rem;">HPP/unit: {{ ($item->unit_cogs ?? 0) > 0 ? 'Rp ' . number_format($item->unit_cogs, 0, ',', '.') : 'belum tersedia' }}</div>
                             <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem;">
                                 <span class="text-muted">CVR: {{ number_format($item->cvr, 2) }}%</span>
                                 <span class="{{ $item->profit_after_ads === null ? 'text-muted' : ($item->profit_after_ads >= 0 ? 'text-success' : 'text-danger') }} fw-bold">
@@ -160,6 +161,7 @@
                         </div>
                         <div class="p-2">
                             <div class="text-truncate small fw-bold" title="{{ $item->item_name }}">{{ $item->item_name }}</div>
+                            <div class="text-muted" style="font-size:.65rem;">HPP/unit: {{ ($item->unit_cogs ?? 0) > 0 ? 'Rp ' . number_format($item->unit_cogs, 0, ',', '.') : 'belum tersedia' }}</div>
                             <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem;">
                                 <span class="text-muted">Spend: {{ number_format($item->spend / 1000, 0) }}k</span>
                                 <span class="text-danger fw-bold">

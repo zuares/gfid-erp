@@ -100,7 +100,8 @@
             'poas' => $poas,
             'reco' => $reco,
             'recoColor' => $recoColor,
-            'item_name' => $camp->internalItem ? $camp->internalItem->name : 'N/A'
+            'item_name' => $camp->internalItem ? $camp->internalItem->name : 'N/A',
+            'unit_cogs' => (float) ($camp->unit_cogs ?? 0),
         ]);
     }
     
@@ -207,6 +208,9 @@
                             <div class="text-muted small text-truncate" style="max-width: 200px;">
                                 <i class="bi bi-box"></i> {{ $row['item_name'] }}
                             </div>
+                            @if($row['item_name'] !== 'N/A')
+                                <div class="text-muted" style="font-size:.65rem;">HPP/unit: {{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : 'belum tersedia' }}</div>
+                            @endif
                         </td>
                         <td>
                             <span class="badge bg-{{ $row['status'] === 'ongoing' ? 'success' : 'secondary' }}">

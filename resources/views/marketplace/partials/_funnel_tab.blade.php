@@ -124,6 +124,7 @@
                                 <td>
                                     <div class="fw-bold text-truncate" style="max-width: 200px;" title="{{ $p->item_name }}">{{ $p->item_name }}</div>
                                     <div class="text-muted small">{{ $p->item_sku }}</div>
+                                    <div class="text-muted" style="font-size:.65rem;">HPP/unit: {{ ($p->unit_cogs ?? 0) > 0 ? 'Rp ' . number_format($p->unit_cogs, 0, ',', '.') : 'belum tersedia' }}</div>
                                 </td>
                                 <td class="text-end fw-bold text-warning">{{ number_format($p->clicks, 0, ',', '.') }}</td>
                                 <td class="text-end text-danger">Rp {{ number_format($p->spend, 0, ',', '.') }}</td>
