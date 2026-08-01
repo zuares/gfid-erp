@@ -125,6 +125,12 @@
     $mappableProfitRows = $mappableProfitRows
         ->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))
         ->values();
+    // Subtab produk hanya menampilkan campaign regular yang punya item/SKU.
+    // Produk GMV Max dimuat dari endpoint item-performance saat tab dibuka.
+    $productUnmappedRows = $mappableProfitRows
+        ->filter(fn ($r) => !empty($r->camp->channel_item_id))
+        ->values();
+    $hasProductUnmappedTab = $productUnmappedRows->isNotEmpty() || $gmsProfitRows->isNotEmpty();
     
     $feeMode         = $adsSetting->admin_fee_mode ?? 'auto';
     $feeManualPct    = $adsSetting->admin_fee_pct ?? null;
@@ -295,7 +301,10 @@ window.__profitChartData = {
     <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kategori</button>
     <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kampanye</button>
     @if($mappableProfitRows->isNotEmpty())
-        <button type="button" id="btnViewUnmapped" class="btn fw-bold" onclick="__profitView('unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#92400e; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Belum Mapping ({{ $mappableProfitRows->count() }})</button>
+        <button type="button" id="btnViewUnmapped" class="btn fw-bold" onclick="__profitView('unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#92400e; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Campaign Belum Mapping ({{ $mappableProfitRows->count() }})</button>
+    @endif
+    @if($hasProductUnmappedTab)
+        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Produk Belum Mapping</button>
     @endif
     @if($gmsProfitRows->isNotEmpty())
         <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">Produk GMV Max</button>
@@ -314,7 +323,7 @@ window.__profitChartData = {
     <div class="ads-tab-panel mb-3">
         <div class="ads-tab-panel-head">
             <div>
-                <div class="ads-tab-panel-title"><i class="bi bi-link-45deg" style="color:#b45309;"></i> Produk / SKU Belum Mapping</div>
+                <div class="ads-tab-panel-title"><i class="bi bi-link-45deg" style="color:#b45309;"></i> Campaign Belum Mapping</div>
                 <div class="ads-tab-panel-note">Mapping item internal agar HPP dan Net Profit dapat dihitung. Diurutkan dari biaya iklan terbesar.</div>
             </div>
             <span style="font-size:.7rem;font-weight:800;color:#92400e;background:rgba(217,119,6,.1);padding:.3rem .6rem;border-radius:999px;">{{ $mappableProfitRows->count() }} perlu tindakan</span>
@@ -360,6 +369,70 @@ window.__profitChartData = {
                 @endforeach
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+@endif
+
+@if($hasProductUnmappedTab)
+<div id="profitViewProductUnmapped" style="display:none;">
+    <div class="ads-tab-panel mb-3">
+        <div class="ads-tab-panel-head">
+            <div>
+                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#b45309;"></i> Produk / SKU Belum Mapping</div>
+                <div class="ads-tab-panel-note">Daftar produk yang belum memiliki HPP. Pilih item internal yang sesuai agar profit dapat dihitung.</div>
+            </div>
+            <span id="productUnmappedBadge" style="font-size:.7rem;font-weight:800;color:#92400e;background:rgba(217,119,6,.1);padding:.3rem .6rem;border-radius:999px;">Memuat…</span>
+        </div>
+        <div class="p-3">
+            @if($productUnmappedRows->isNotEmpty())
+                <div style="font-size:.75rem;font-weight:800;color:var(--text);margin-bottom:.45rem;">Produk iklan regular</div>
+                <div class="table-responsive mb-3">
+                    <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space:nowrap;">
+                        <thead>
+                            <tr>
+                                <th>Produk / SKU</th>
+                                <th>Kampanye</th>
+                                <th class="text-end">Penjualan</th>
+                                <th class="text-end">Omzet</th>
+                                <th class="text-end">Biaya Iklan</th>
+                                <th class="text-center">Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($productUnmappedRows as $r)
+                            @php
+                                $camp = $r->camp;
+                                $itemName = $camp->marketplace_item_name ?: 'Produk belum ditemukan';
+                                $itemSku = $camp->marketplace_item_sku ?: ('Item ID ' . $camp->channel_item_id);
+                            @endphp
+                            <tr style="border-bottom:1px solid var(--dsh-border);">
+                                <td style="padding:.65rem .5rem;max-width:280px;">
+                                    <div style="font-weight:750;color:var(--text);overflow:hidden;text-overflow:ellipsis;" title="{{ $itemName }}">{{ $itemName }}</div>
+                                    <div style="font-size:.64rem;color:var(--dsh-muted);">{{ $itemSku }}</div>
+                                </td>
+                                <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;" title="{{ $camp->campaign_name ?: 'Kampanye' }}">{{ $camp->campaign_name ?: 'Kampanye' }}</td>
+                                <td class="text-end" style="font-variant-numeric:tabular-nums;">
+                                    <b>{{ number_format($camp->orders, 0, ',', '.') }} order</b>
+                                    @if($camp->items_sold > 0)<div style="font-size:.62rem;color:var(--dsh-muted);">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs{{ ($camp->items_sold_source ?? 'api') === 'order_fallback' ? ' · estimasi' : '' }}</div>@endif
+                                </td>
+                                <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
+                                <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($itemName) }}" data-profit-map-item="{{ e((string) $camp->channel_item_id) }}" onclick="openProfitCampaignMapping(this)">
+                                        <i class="bi bi-link-45deg"></i> Pilih item HPP
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+            @if($gmsProfitRows->isNotEmpty())
+                <div style="font-size:.75rem;font-weight:800;color:var(--text);margin:.8rem 0 .45rem;">Produk GMV Max yang belum mapping</div>
+                <div id="productUnmappedGmsBody" style="color:var(--dsh-muted);font-size:.75rem;">Buka tab ini untuk memuat produk GMV Max…</div>
+            @endif
         </div>
     </div>
 </div>
@@ -414,31 +487,37 @@ window.__profitView = function (mode) {
     const cat = document.getElementById('profitViewCategory');
     const camp = document.getElementById('profitViewCampaign');
     const unmapped = document.getElementById('profitViewUnmapped');
+    const productUnmapped = document.getElementById('profitViewProductUnmapped');
     const gms = document.getElementById('profitViewGms');
     const bCat = document.getElementById('btnViewCategory');
     const bCamp = document.getElementById('btnViewCampaign');
     const bUnmapped = document.getElementById('btnViewUnmapped');
+    const bProductUnmapped = document.getElementById('btnViewProductUnmapped');
     const bGms = document.getElementById('btnViewGms');
     const on  = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
     const off = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;';
     const isCat = mode === 'category';
     const isUnmapped = mode === 'unmapped';
+    const isProductUnmapped = mode === 'product-unmapped';
     const isGms = mode === 'gms';
     cat.style.display = isCat ? 'block' : 'none';
-    camp.style.display = isCat || isUnmapped || isGms ? 'none' : 'block';
+    camp.style.display = isCat || isUnmapped || isProductUnmapped || isGms ? 'none' : 'block';
     if (unmapped) unmapped.style.display = isUnmapped ? 'block' : 'none';
+    if (productUnmapped) productUnmapped.style.display = isProductUnmapped ? 'block' : 'none';
     if (gms) gms.style.display = isGms ? 'block' : 'none';
     bCat.style.cssText = isCat ? on : off;
-    bCamp.style.cssText = !isCat && !isUnmapped && !isGms ? on : off;
+    bCamp.style.cssText = !isCat && !isUnmapped && !isProductUnmapped && !isGms ? on : off;
     if (bUnmapped) bUnmapped.style.cssText = isUnmapped ? on : off;
+    if (bProductUnmapped) bProductUnmapped.style.cssText = isProductUnmapped ? on : off;
     if (bGms) bGms.style.cssText = isGms ? on : off;
     if (isGms && window.loadGmsItemsTab) window.loadGmsItemsTab();
+    if (isProductUnmapped && window.loadProductUnmappedTab) window.loadProductUnmappedTab();
     try { localStorage.setItem('profitViewMode', mode); } catch (e) {}
 };
 (function () {
     try { 
         const savedMode = localStorage.getItem('profitViewMode');
-        if (savedMode === 'campaign' || savedMode === 'unmapped') {
+        if (savedMode === 'campaign' || savedMode === 'unmapped' || savedMode === 'product-unmapped') {
             window.__profitView(savedMode);
         } else {
             window.__profitView('category'); 
@@ -800,6 +879,78 @@ window.__profitView = function (mode) {
         }
     };
     try { if (localStorage.getItem('profitViewMode') === 'gms') window.loadGmsItemsTab(); } catch (e) {}
+})();
+</script>
+@endif
+
+@if($hasProductUnmappedTab)
+<script>
+(function () {
+    const bodyEl = document.getElementById('productUnmappedGmsBody');
+    const badgeEl = document.getElementById('productUnmappedBadge');
+    const endpointBase = @json(url('/marketplace/ads-dashboard/gms-items'));
+    const fromDate = @json($dateFrom ?? now()->subDays(6)->toDateString());
+    const toDate = @json($dateTo ?? now()->toDateString());
+    const storeIds = @json($gmsProfitRows->pluck('camp.store_id')->filter()->unique()->values()->all());
+    const storeNames = @json($gmsProfitRows->mapWithKeys(fn ($r) => [$r->camp->store_id => $r->camp->store?->name ?: ('Toko #' . $r->camp->store_id)])->all());
+    const regularCount = @json($productUnmappedRows->count());
+    const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
+    const fmtRp = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    let loaded = false;
+    let loading = null;
+
+    function renderStore(storeId, items) {
+        if (!items.length) return '';
+        const rows = items.map(function (item) {
+            const itemName = item.item_name || 'Produk GMV Max';
+            return '<tr>'
+                + '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>'
+                + '<td class="text-end"><b>' + Number(item.orders || 0).toLocaleString('id-ID') + ' order</b><div style="font-size:.62rem;color:var(--dsh-muted);">' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div></td>'
+                + '<td class="text-end">' + fmtRp(item.gmv) + '<div style="font-size:.62rem;color:var(--dsh-muted);">dana cair ± ' + fmtRp(item.net_revenue) + '</div></td>'
+                + '<td class="text-end" style="color:#dc2626;"><b>−' + fmtRp(Number(item.spend || 0) * 1.11) + '</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>'
+                + '<td class="text-center"><span style="color:#b45309;font-weight:700;"><i class="bi bi-exclamation-circle"></i> HPP belum ada</span><button type="button" class="btn btn-sm d-block mt-1" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Pilih item HPP</button></td>'
+                + '</tr>';
+        }).join('');
+        return '<div style="font-size:.72rem;font-weight:750;color:var(--dsh-muted);margin:.8rem 0 .35rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div>'
+            + '<div class="table-responsive"><table class="dpanel-table dpanel-table-sm w-100" style="white-space:nowrap;min-width:900px;"><thead><tr><th>Produk / SKU</th><th class="text-end">Penjualan</th><th class="text-end">Omzet</th><th class="text-end">Biaya Iklan</th><th class="text-center">Tindakan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    window.loadProductUnmappedTab = function () {
+        if (loaded) return Promise.resolve();
+        if (loading) return loading;
+        if (!bodyEl) {
+            if (badgeEl) badgeEl.textContent = regularCount + ' produk perlu mapping';
+            loaded = true;
+            return Promise.resolve();
+        }
+        if (!storeIds.length) {
+            if (badgeEl) badgeEl.textContent = regularCount + ' produk perlu mapping';
+            bodyEl.textContent = 'Tidak ada produk GMV Max yang perlu ditampilkan.';
+            loaded = true;
+            return Promise.resolve();
+        }
+        loading = Promise.all(storeIds.map(async function (storeId) {
+            const response = await fetch(endpointBase + '/' + storeId + '?date_from=' + encodeURIComponent(fromDate) + '&date_to=' + encodeURIComponent(toDate), { headers: { Accept: 'application/json' } });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.message || 'Gagal memuat produk GMV Max belum mapping.');
+            return { storeId: storeId, items: (payload.data || []).filter((item) => !item.mapped) };
+        })).then(function (entries) {
+            const gmsItems = entries.reduce((sum, entry) => sum + entry.items.length, 0);
+            const total = regularCount + gmsItems;
+            if (badgeEl) badgeEl.textContent = total + ' produk perlu mapping';
+            bodyEl.innerHTML = gmsItems
+                ? entries.map((entry) => renderStore(entry.storeId, entry.items)).join('')
+                : 'Semua produk GMV Max sudah memiliki HPP.';
+            loaded = true;
+        }).catch(function (error) {
+            if (badgeEl) badgeEl.textContent = regularCount + ' produk perlu mapping';
+            bodyEl.innerHTML = '<span style="color:#b91c1c;">' + esc(error.message) + '</span>';
+        }).finally(function () {
+            loading = null;
+        });
+        return loading;
+    };
+    try { if (localStorage.getItem('profitViewMode') === 'product-unmapped') window.loadProductUnmappedTab(); } catch (e) {}
 })();
 </script>
 @endif
