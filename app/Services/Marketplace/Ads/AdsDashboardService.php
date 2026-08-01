@@ -4,6 +4,8 @@ namespace App\Services\Marketplace\Ads;
 
 use App\Models\Item;
 use App\Models\MarketplaceAdCampaign;
+use App\Models\MarketplaceAdItemMap;
+use App\Models\MarketplaceAdsItemDaily;
 use App\Models\MarketplaceAdsSetting;
 use App\Models\MarketplaceAdsSyncRun;
 use App\Models\MarketplaceOrderItem;
@@ -183,7 +185,7 @@ class AdsDashboardService
             ->whereIn('store_id', $storeIds)
             ->get();
 
-        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey] = $this->preloadCampaignAnalytics($campaigns);
+        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
 
         $campaigns = $campaigns
             ->map(function ($camp) use ($manualFeeRatio, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey) {
@@ -252,7 +254,9 @@ class AdsDashboardService
                 $acos = $camp->gmv > 0 && $camp->spend > 0 ? round($camp->spend / $camp->gmv, 4) : null;
                 $camp->acos_pct = $acos !== null ? round($acos * 100, 1) : null;
 
-                $campaignKey = $camp->store_id . '|' . (string) $camp->channel_item_id;
+                $campaignKey = str_starts_with((string) $camp->channel_campaign_id, 'GMS-')
+                    ? $camp->store_id . '|GMS'
+                    : $camp->store_id . '|' . (string) $camp->channel_item_id;
                 $internalUnitCogs = $this->resolveItemUnitCogs($camp->internalItem);
                 $camp->unit_cogs = (float) ($unitCogsByKey[$campaignKey] ?? $internalUnitCogs);
 
@@ -641,7 +645,7 @@ class AdsDashboardService
     /**
      * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>}
      */
-    private function preloadCampaignAnalytics(Collection $campaigns): array
+    private function preloadCampaignAnalytics(Collection $campaigns, string $dateFrom, string $dateTo): array
     {
         $realCampaigns = $campaigns->filter(function ($camp) {
             $itemId = (string) ($camp->channel_item_id ?? '');
@@ -651,8 +655,13 @@ class AdsDashboardService
         $storeIds = $realCampaigns->pluck('store_id')->filter()->unique()->values();
         $itemIds = $realCampaigns->pluck('channel_item_id')->filter()->map(fn ($v) => (string) $v)->unique()->values();
 
+        $avgPriceByKey = [];
+        $unitCogsByKey = [];
+        $revenueRatioByKey = [];
+
         if ($storeIds->isEmpty() || $itemIds->isEmpty()) {
-            return [[], [], []];
+            $this->preloadGmsAnalytics($campaigns, $dateFrom, $dateTo, $avgPriceByKey, $unitCogsByKey);
+            return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
         }
 
         $channelCodesByStore = $realCampaigns
@@ -692,8 +701,7 @@ class AdsDashboardService
             }
         }
 
-        $avgPriceByKey = [];
-        $unitCogsByKey = [];
+        $this->preloadGmsAnalytics($campaigns, $dateFrom, $dateTo, $avgPriceByKey, $unitCogsByKey);
 
         foreach ($products as $product) {
             $key = $product->store_id . '|' . $product->item_id;
@@ -751,7 +759,6 @@ class AdsDashboardService
             }
         }
 
-        $revenueRatioByKey = [];
         $orderItemsSub = MarketplaceOrderItem::query()
             ->select('external_item_id', 'order_id')
             ->distinct()
@@ -779,6 +786,128 @@ class AdsDashboardService
         }
 
         return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
+    }
+
+    /**
+     * GMV Max menyimpan total campaign terpisah dari performa produknya.
+     * HPP yang dipetakan di marketplace/products atau tab Produk GMV Max
+     * harus diagregasikan kembali agar parent campaign tidak tetap N/A.
+     *
+     * @param array<string, float> $avgPriceByKey
+     * @param array<string, float> $unitCogsByKey
+     */
+    private function preloadGmsAnalytics(
+        Collection $campaigns,
+        string $dateFrom,
+        string $dateTo,
+        array &$avgPriceByKey,
+        array &$unitCogsByKey
+    ): void {
+        $gmsCampaigns = $campaigns->filter(fn ($camp) => str_starts_with((string) ($camp->channel_campaign_id ?? ''), 'GMS-'));
+        if ($gmsCampaigns->isEmpty()) {
+            return;
+        }
+
+        $gmsCampaignIds = $gmsCampaigns->pluck('channel_campaign_id')->filter()->map(fn ($id) => (string) $id)->unique()->values();
+        $storeIds = $gmsCampaigns->pluck('store_id')->filter()->unique()->values();
+        $dailyRows = MarketplaceAdsItemDaily::query()
+            ->whereIn('store_id', $storeIds->all())
+            ->whereIn('channel_campaign_id', $gmsCampaignIds->all())
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->get(['store_id', 'channel_campaign_id', 'channel_item_id', 'broad_order', 'broad_gmv', 'raw_json']);
+
+        if ($dailyRows->isEmpty()) {
+            return;
+        }
+
+        $itemIds = $dailyRows->pluck('channel_item_id')->filter()->map(fn ($id) => (string) $id)->unique()->values();
+        if ($itemIds->isEmpty()) {
+            return;
+        }
+
+        $products = MarketplaceProduct::query()
+            ->whereIn('store_id', $storeIds->all())
+            ->whereIn('item_id', $itemIds->all())
+            ->with([
+                'models' => function ($query) {
+                    $query->select('id', 'marketplace_product_id', 'model_sku');
+                },
+            ])
+            ->get(['id', 'store_id', 'item_id', 'item_sku'])
+            ->keyBy(fn ($product) => $product->store_id . '|' . (string) $product->item_id);
+
+        $productSkus = $products->flatMap(fn ($product) => $product->models->pluck('model_sku')->push($product->item_sku))
+            ->filter()
+            ->map(fn ($sku) => trim((string) $sku))
+            ->unique()
+            ->values();
+
+        $mappingBySku = collect();
+        if ($productSkus->isNotEmpty()) {
+            $mappingBySku = SkuMapping::query()
+                ->with('item:id,hpp,base_unit_cost')
+                ->whereIn('marketplace_sku', $productSkus->all())
+                ->where(function ($query) {
+                    $query->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) = ?', ['shopee']);
+                })
+                ->get()
+                ->groupBy(fn ($mapping) => mb_strtolower(trim((string) $mapping->marketplace_sku)));
+        }
+
+        $manualMaps = MarketplaceAdItemMap::query()
+            ->with('item:id,hpp,base_unit_cost')
+            ->whereIn('store_id', $storeIds->all())
+            ->whereIn('channel_campaign_id', $gmsCampaignIds->all())
+            ->whereIn('channel_item_id', $itemIds->map(fn ($id) => (int) $id)->all())
+            ->get()
+            ->keyBy(fn ($map) => $map->store_id . '|' . (string) $map->channel_item_id);
+
+        foreach ($dailyRows->groupBy(fn ($row) => $row->store_id . '|' . $row->channel_campaign_id) as $campaignKey => $rows) {
+            [$storeId] = explode('|', $campaignKey, 2);
+            $totalUnits = 0.0;
+            $totalGmv = 0.0;
+            $totalCogs = 0.0;
+
+            foreach ($rows->groupBy(fn ($row) => (string) $row->channel_item_id) as $itemId => $itemRows) {
+                $product = $products->get($storeId . '|' . $itemId);
+                $manual = $manualMaps->get($storeId . '|' . $itemId);
+                $modelMappings = $product
+                    ? $product->models->flatMap(fn ($model) => $mappingBySku->get(mb_strtolower(trim((string) $model->model_sku)), collect()))
+                        ->filter(fn ($mapping) => $mapping->item)
+                    : collect();
+                $productMappings = $modelMappings;
+                if ($productMappings->isEmpty() && $product?->item_sku) {
+                    $productMappings = $mappingBySku
+                        ->get(mb_strtolower(trim((string) $product->item_sku)), collect())
+                        ->filter(fn ($mapping) => $mapping->item);
+                }
+
+                $unitCogs = $manual?->item
+                    ? $this->resolveItemUnitCogs($manual->item)
+                    : ($productMappings->isNotEmpty()
+                        ? (float) $productMappings->map(fn ($mapping) => $this->resolveItemUnitCogs($mapping->item))->filter(fn ($hpp) => $hpp > 0)->avg()
+                        : 0.0);
+
+                $units = (float) $itemRows->sum(function ($row) {
+                    $apiUnits = (float) data_get($row->raw_json, 'broad_order_amount', 0);
+                    return $apiUnits > 0 ? $apiUnits : (float) $row->broad_order;
+                });
+                $gmv = (float) $itemRows->sum('broad_gmv');
+                $totalUnits += $units;
+                $totalGmv += $gmv;
+                if ($unitCogs > 0 && $units > 0) {
+                    $totalCogs += $unitCogs * $units;
+                }
+            }
+
+            if ($totalUnits > 0 && $totalCogs > 0) {
+                $effectiveKey = $storeId . '|GMS';
+                $unitCogsByKey[$effectiveKey] = $totalCogs / $totalUnits;
+                if ($totalGmv > 0) {
+                    $avgPriceByKey[$effectiveKey] = $totalGmv / $totalUnits;
+                }
+            }
+        }
     }
 
     private function getCustomerLtvData(array $storeIds, string $dateFrom, string $dateTo, float $totalAdSpend): array

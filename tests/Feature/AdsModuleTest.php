@@ -1042,6 +1042,74 @@ class AdsModuleTest extends TestCase
             ->assertJsonPath('data.0.unit_cogs', 15000);
     }
 
+    public function test_gmv_max_product_mapping_updates_parent_campaign_profit_kpi()
+    {
+        $store = $this->createStore('GMSKPIPROFIT');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMS-KPI',
+            'name' => 'Item GMV Max KPI',
+            'type' => 'finished',
+            'hpp' => 15000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654402',
+            'item_name' => 'Produk GMV Max KPI',
+            'item_sku' => 'GMS-KPI-SKU',
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'GMS-KPI-SKU',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => null,
+            'campaign_name' => 'GMV Max Semua Produk',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => $product->item_id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_gmv' => 100000,
+            'raw_json' => ['broad_order_amount' => 1],
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'GMS-' . $store->id);
+
+        $this->assertNotNull($campaign->profit_after_ads);
+        $this->assertSame(0, (int) $data['kpi']['current']->profit_unknown_campaign_count);
+        $this->assertSame(15000.0, (float) $campaign->unit_cogs);
+    }
+
     public function test_historical_comparison_uses_selected_compare_mode()
     {
         $store = $this->createStore('HISTMODE');
