@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsActionService;
 use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\Ads\AdsAnalyticsService;
+use App\Services\Marketplace\Ads\ItemHppResolver;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -392,7 +393,7 @@ class AdsDashboardController extends Controller
      * Sumber utama adalah data item performance hasil sync, bukan campaign
      * parent "GMV Max (Semua Produk)" yang hanya menyimpan total agregat.
      */
-    public function gmsItems(Request $request, Store $store): JsonResponse
+    public function gmsItems(Request $request, Store $store, ItemHppResolver $hppResolver): JsonResponse
     {
         $from = $request->input('date_from', now()->subDays(6)->toDateString());
         $to = $request->input('date_to', now()->toDateString());
@@ -445,13 +446,7 @@ class AdsDashboardController extends Controller
             ->get()
             ->keyBy(fn ($mapping) => (string) $mapping->channel_item_id);
 
-        $resolveCogs = static function ($item): float {
-            if (! $item) return 0.0;
-            $hpp = (float) ($item->hpp ?? 0);
-            return $hpp > 0 ? $hpp : (float) ($item->base_unit_cost ?? 0);
-        };
-
-        $items = $grouped->map(function ($dailyRows, string $channelItemId) use ($products, $skuMappings, $manualMaps, $resolveCogs) {
+        $items = $grouped->map(function ($dailyRows, string $channelItemId) use ($products, $skuMappings, $manualMaps, $hppResolver) {
             $product = $products->get($channelItemId);
             $manual = $manualMaps->get($channelItemId);
             $productMappings = $product
@@ -459,8 +454,9 @@ class AdsDashboardController extends Controller
                     ->filter(fn ($mapping) => $mapping->item)
                 : collect();
             $mappedItem = $manual?->item ?? $productMappings->first()?->item;
-            $hppCandidates = $productMappings->map(fn ($mapping) => $resolveCogs($mapping->item))->filter(fn ($hpp) => $hpp > 0);
-            $unitCogs = $manual?->item ? $resolveCogs($manual->item) : ($hppCandidates->isNotEmpty() ? (float) $hppCandidates->avg() : 0.0);
+            $manualHpp = $manual?->item ? $hppResolver->resolve($manual->item) : 0.0;
+            $hppCandidates = $productMappings->map(fn ($mapping) => $hppResolver->resolve($mapping->item))->filter(fn ($hpp) => $hpp > 0);
+            $unitCogs = $manual?->item ? $manualHpp : ($hppCandidates->isNotEmpty() ? (float) $hppCandidates->avg() : 0.0);
 
             $impressions = (int) $dailyRows->sum('impressions');
             $clicks = (int) $dailyRows->sum('clicks');

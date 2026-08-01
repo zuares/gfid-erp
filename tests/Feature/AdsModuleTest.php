@@ -769,6 +769,76 @@ class AdsModuleTest extends TestCase
         ]);
     }
 
+    public function test_ads_mapping_search_returns_product_and_average_variant_hpp()
+    {
+        $parent = \App\Models\Item::create([
+            'code' => 'ITEM-PRODUCT-PARENT',
+            'name' => 'Parent Produk Ads',
+            'type' => 'finished',
+            'hpp' => 0,
+            'active' => true,
+        ]);
+        $variantOne = \App\Models\Item::create([
+            'code' => 'ITEM-PRODUCT-V1',
+            'name' => 'Variant Produk Ads Merah',
+            'type' => 'finished',
+            'hpp' => 10000,
+            'active' => true,
+        ]);
+        $variantTwo = \App\Models\Item::create([
+            'code' => 'ITEM-PRODUCT-V2',
+            'name' => 'Variant Produk Ads Biru',
+            'type' => 'finished',
+            'hpp' => 30000,
+            'active' => true,
+        ]);
+        $product = \App\Models\StorefrontProduct::create([
+            'slug' => 'parent-produk-ads',
+            'name' => 'Parent Produk Ads',
+            'base_price' => 100000,
+            'item_id' => $parent->id,
+        ]);
+        $size = \App\Models\StorefrontProductSize::create([
+            'product_id' => $product->id,
+            'size_label' => 'M',
+        ]);
+        $colorRed = \App\Models\StorefrontProductVariant::create([
+            'product_id' => $product->id,
+            'color_name' => 'Merah',
+        ]);
+        $colorBlue = \App\Models\StorefrontProductVariant::create([
+            'product_id' => $product->id,
+            'color_name' => 'Biru',
+        ]);
+        \App\Models\StorefrontVariantItemMapping::create([
+            'product_id' => $product->id,
+            'variant_id' => $colorRed->id,
+            'size_id' => $size->id,
+            'item_id' => $variantOne->id,
+        ]);
+        \App\Models\StorefrontVariantItemMapping::create([
+            'product_id' => $product->id,
+            'variant_id' => $colorBlue->id,
+            'size_id' => $size->id,
+            'item_id' => $variantTwo->id,
+        ]);
+
+        $this->assertSame(
+            20000.0,
+            app(\App\Services\Marketplace\Ads\ItemHppResolver::class)->resolve($parent)
+        );
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/api/marketplace/items/search?q=Parent%20Produk%20Ads&group_products=1');
+
+        $response->assertOk()
+            ->assertJsonPath('0.id', $parent->id)
+            ->assertJsonPath('0.name', 'Parent Produk Ads')
+            ->assertJsonPath('0.hpp', 20000)
+            ->assertJsonPath('0.hpp_source', 'variant_average')
+            ->assertJsonPath('0.variant_count', 2);
+    }
+
     public function test_historical_comparison_uses_selected_compare_mode()
     {
         $store = $this->createStore('HISTMODE');

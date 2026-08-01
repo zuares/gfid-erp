@@ -20,6 +20,7 @@ use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\Ads\ItemHppResolver;
 use App\Services\Channels\ChannelManager;
 use App\Support\GmvMaxAnalytics;
 use App\Services\MarketplaceIssueService;
@@ -5852,10 +5853,19 @@ class MarketplaceController extends Controller
         ]);
     }
 
-        public function searchInternalItems(Request $request): JsonResponse
+    public function searchInternalItems(Request $request): JsonResponse
     {
         $q     = trim($request->input('q', ''));
         $limit = min(20, (int) $request->input('limit', 15));
+
+        // Ads mapping memilih level produk utama. HPP yang dikirim ke UI
+        // sudah dirata-ratakan dari seluruh item variant yang terkait.
+        if ($request->boolean('group_products')) {
+            $products = app(ItemHppResolver::class)->searchProducts($q, $limit);
+            if ($products->isNotEmpty()) {
+                return response()->json($products->values());
+            }
+        }
 
         $items = Item::query()
             ->when($q, fn ($query) => $query->where(function ($qr) use ($q) {

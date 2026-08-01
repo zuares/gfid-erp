@@ -538,8 +538,8 @@ window.__profitView = function (mode) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
             </div>
             <div class="modal-body">
-                <div id="profitMapScopeNote" style="font-size:.72rem;color:var(--dsh-muted);margin-bottom:.65rem;">Pilih item internal yang sesuai. HPP item tersebut akan dipakai untuk menghitung ulang profit.</div>
-                <input type="search" id="profitMapItemSearch" class="form-control" placeholder="Cari kode atau nama item…" autocomplete="off" style="font-size:.82rem;border-radius:10px;">
+                <div id="profitMapScopeNote" style="font-size:.72rem;color:var(--dsh-muted);margin-bottom:.65rem;">Pilih produk utama, bukan variant. HPP akan memakai rata-rata HPP variant yang terkait.</div>
+                <input type="search" id="profitMapItemSearch" class="form-control" placeholder="Cari nama produk atau kode item…" autocomplete="off" style="font-size:.82rem;border-radius:10px;">
                 <div id="profitMapItemResults" style="max-height:260px;overflow-y:auto;margin-top:.65rem;"></div>
                 <div id="profitMapSelected" style="display:none;margin-top:.65rem;padding:.55rem .7rem;border-radius:10px;background:rgba(22,163,74,.08);color:#15803d;font-size:.75rem;"></div>
                 <div id="profitMapError" style="display:none;margin-top:.65rem;color:#b91c1c;font-size:.75rem;"></div>
@@ -569,13 +569,18 @@ window.__profitView = function (mode) {
     }[char]));
 
     async function searchItems(query) {
-        resultsEl.innerHTML = '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Mencari item…</div>';
+        resultsEl.innerHTML = '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Mencari produk…</div>';
         try {
-            const response = await fetch('/api/marketplace/items/search?q=' + encodeURIComponent(query), { headers: { Accept: 'application/json' } });
+            const response = await fetch('/api/marketplace/items/search?q=' + encodeURIComponent(query) + '&group_products=1', { headers: { Accept: 'application/json' } });
             const items = await response.json();
             if (!response.ok) throw new Error(items.message || 'Gagal mencari item.');
             resultsEl.innerHTML = items.length
-                ? items.map((item) => `<button type="button" class="profit-map-option" data-id="${item.id}" data-code="${esc(item.code || '')}" data-name="${esc(item.name || '')}" style="display:block;width:100%;text-align:left;padding:.55rem .65rem;margin-bottom:.35rem;border:1px solid var(--dsh-border);border-radius:10px;background:transparent;color:var(--text);cursor:pointer;"><b style="font-size:.76rem;">${esc(item.code || 'Tanpa kode')}</b><span style="font-size:.72rem;color:var(--dsh-muted);"> — ${esc(item.name || '')}</span><span style="display:block;font-size:.66rem;color:var(--dsh-muted);margin-top:.15rem;">HPP ${window.__profitFmtRp ? window.__profitFmtRp(item.hpp) : ('Rp ' + Number(item.hpp || 0).toLocaleString('id-ID'))}</span></button>`).join('')
+                ? items.map((item) => {
+                    const hppNote = item.hpp_source === 'variant_average'
+                        ? `HPP rata-rata ${Number(item.variant_count || 0).toLocaleString('id-ID')} variant`
+                        : 'HPP item utama';
+                    return `<button type="button" class="profit-map-option" data-id="${item.id}" data-code="${esc(item.code || '')}" data-name="${esc(item.name || '')}" style="display:block;width:100%;text-align:left;padding:.55rem .65rem;margin-bottom:.35rem;border:1px solid var(--dsh-border);border-radius:10px;background:transparent;color:var(--text);cursor:pointer;"><b style="font-size:.76rem;">${esc(item.name || 'Produk tanpa nama')}</b><span style="display:block;font-size:.7rem;color:var(--dsh-muted);margin-top:.12rem;">Item utama: ${esc(item.code || 'Tanpa kode')}</span><span style="display:block;font-size:.66rem;color:var(--dsh-muted);margin-top:.15rem;">${hppNote} · ${window.__profitFmtRp ? window.__profitFmtRp(item.hpp) : ('Rp ' + Number(item.hpp || 0).toLocaleString('id-ID'))}</span></button>`;
+                }).join('')
                 : '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Item tidak ditemukan.</div>';
             resultsEl.querySelectorAll('.profit-map-option').forEach((button) => {
                 button.addEventListener('click', () => {
@@ -596,8 +601,8 @@ window.__profitView = function (mode) {
         const isGms = button.dataset.profitMapItem.indexOf('Semua Produk') !== -1;
         labelEl.textContent = button.dataset.profitMapName + (isGms ? ' · HPP acuan agregat GMV Max' : ' · Shopee item ' + button.dataset.profitMapItem);
         document.getElementById('profitMapScopeNote').textContent = isGms
-            ? 'Ini hanya HPP acuan untuk angka agregat campaign. Untuk hasil paling akurat, buka “Lihat produk & HPP” lalu mapping setiap produk GMV Max.'
-            : 'Pilih item internal yang sesuai. HPP item tersebut akan dipakai untuk menghitung ulang profit campaign.';
+            ? 'Pilih produk utama. Jika produk memiliki beberapa variant, HPP yang dipakai adalah rata-rata HPP variant tersebut.'
+            : 'Pilih produk utama, bukan variant. Jika tersedia, HPP dihitung sebagai rata-rata HPP seluruh variant produk.';
         searchEl.value = '';
         selectedEl.style.display = 'none';
         errorEl.style.display = 'none';
@@ -611,7 +616,7 @@ window.__profitView = function (mode) {
     window.openGmsItemMapping = function (button) {
         state = { mode: 'gms-item', campaignId: null, storeId: Number(button.dataset.gmsMapStore), gmsItemId: String(button.dataset.gmsMapItem), itemId: null, timer: null };
         labelEl.textContent = (button.dataset.gmsMapName || 'Produk GMV Max') + ' · item GMV Max ' + state.gmsItemId;
-        document.getElementById('profitMapScopeNote').textContent = 'Pilih item internal yang sesuai. HPP per pcs dari item ini akan dipakai untuk menghitung profit produk GMV Max.';
+        document.getElementById('profitMapScopeNote').textContent = 'Pilih produk utama, bukan variant. HPP per pcs GMV Max dihitung dari rata-rata HPP variant produk tersebut.';
         searchEl.value = '';
         selectedEl.style.display = 'none';
         errorEl.style.display = 'none';

@@ -18,6 +18,10 @@ class AdsDashboardService
 {
     public const DEFAULT_NET_REVENUE_RATIO = 0.781;
 
+    public function __construct(private readonly ItemHppResolver $hppResolver)
+    {
+    }
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,
@@ -836,12 +840,7 @@ class AdsDashboardService
 
     private function resolveItemUnitCogs(?Item $item): float
     {
-        if (! $item) {
-            return 0.0;
-        }
-
-        $hpp = (float) ($item->hpp ?? 0);
-        return $hpp > 0 ? $hpp : (float) ($item->base_unit_cost ?? 0);
+        return $this->hppResolver->resolve($item);
     }
 
     private function adsRecommendation(float $spend, ?float $acos, ?float $breakEvenAcos, int $orders): array
