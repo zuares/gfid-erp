@@ -363,8 +363,6 @@ class ShopeeAdsSyncService
         
         Log::info("[ShopeeAdsSync] GMS sync for store {$store->id}: {$dateFrom} to {$dateTo}, " . count($campaigns) . " active campaigns.");
         
-        $dbDateFrom = Carbon::parse($dateFrom)->format('Y-m-d');
-        $dbDateTo = Carbon::parse($dateTo)->format('Y-m-d');
         $start = Carbon::parse($dateFrom);
         $end = Carbon::parse($dateTo);
         $days = $start->diffInDays($end) + 1;
@@ -372,8 +370,8 @@ class ShopeeAdsSyncService
         
         for ($i = 0; $i < $days; $i++) {
             $currentCarbon = $start->copy()->addDays($i);
-            // Endpoint GMS hanya menerima format ISO YYYY-MM-DD.
-            $dCurrent = $currentCarbon->format('Y-m-d');
+            // Endpoint GMS menerima format DD-MM-YYYY.
+            $dCurrent = $currentCarbon->format('d-m-Y');
             $dbCurrent = $currentCarbon->format('Y-m-d');
 
             // Resume-aware: hari historis yang BARU SAJA ditarik (≤2 jam lalu)
@@ -394,7 +392,8 @@ class ShopeeAdsSyncService
             
             // 1. Campaign Performance (1 API call per day for global GMS)
             try {
-                $res = $this->api->getGmsCampaignPerformance($store, [], $dCurrent, $dCurrent);
+                // campaign_id bersifat opsional untuk mengambil performa GMS tingkat toko.
+                $res = $this->api->getGmsCampaignPerformance($store, null, $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
                 if (!empty($res['error'])) {
@@ -446,7 +445,7 @@ class ShopeeAdsSyncService
             // 2. Item Performance
             usleep(120000);
             try {
-                $resItem = $this->api->getGmsItemPerformance($store, [], $dCurrent, $dCurrent);
+                $resItem = $this->api->getGmsItemPerformance($store, null, $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
                 if (!empty($resItem['error'])) {

@@ -121,15 +121,13 @@ class ShopeeAdsApiService
         return $this->execute($store, 'get_campaign_hourly_performance', fn() => $this->driver($store)->getCampaignHourlyPerformance($store, $campaignIds, $performanceDate));
     }
 
-    public function getGmsCampaignPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    public function getGmsCampaignPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate): array
     {
-        return $this->execute($store, 'get_gms_campaign_performance', fn() => $this->driver($store)->getGmsCampaignPerformance($store, $campaignIds, $startDate, $endDate));
+        return $this->execute($store, 'get_gms_campaign_performance', fn() => $this->driver($store)->getGmsCampaignPerformance($store, $campaignId, $startDate, $endDate));
     }
 
-    public function getGmsItemPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    public function getGmsItemPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate): array
     {
-        // For GMS item performance, it takes a single campaign ID or null. We'll pass null to get store-wide, or the first ID if available.
-        $campaignId = !empty($campaignIds) ? (int)$campaignIds[0] : null;
         return $this->execute($store, 'get_gms_item_performance', fn() => $this->driver($store)->getGmsItemPerformance($store, $campaignId, $startDate, $endDate));
     }
 }

@@ -585,21 +585,26 @@ class ShopeeChannel implements MarketplaceChannel
     /**
      * Performa campaign GMV Max (GMS).
      * Endpoint: POST /api/v2/ads/get_gms_campaign_performance
-     * Date format: YYYY-MM-DD
+     * Date format: DD-MM-YYYY
      */
-    public function getGmsCampaignPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    public function getGmsCampaignPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate): array
     {
-        return $this->post($store, '/api/v2/ads/get_gms_campaign_performance', [
-            'campaign_id_list' => array_map('intval', $campaignIds),
-            'start_date'       => $startDate,
-            'end_date'         => $endDate,
-        ]);
+        $payload = [
+            'start_date' => $startDate,
+            'end_date'   => $endDate,
+        ];
+
+        if ($campaignId !== null && $campaignId > 0) {
+            $payload['campaign_id'] = $campaignId;
+        }
+
+        return $this->post($store, '/api/v2/ads/get_gms_campaign_performance', $payload);
     }
 
     /**
      * Performa item pada GMV Max (GMS).
      * Endpoint: POST /api/v2/ads/get_gms_item_performance
-     * Date format: YYYY-MM-DD
+     * Date format: DD-MM-YYYY
      */
     public function getGmsItemPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate, int $offset = 0, int $limit = 50): array
     {

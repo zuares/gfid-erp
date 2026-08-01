@@ -303,7 +303,7 @@ class AdsModuleTest extends TestCase
         $this->assertTrue(true);
     }
 
-    public function test_gms_api_uses_iso_date_format()
+    public function test_gms_api_uses_shopee_date_format()
     {
         $store = $this->createStore('GMSDATE');
         MarketplaceAdCampaign::create([
@@ -315,11 +315,11 @@ class AdsModuleTest extends TestCase
         $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
         $api->shouldReceive('getGmsCampaignPerformance')
             ->once()
-            ->with($store, [], '2026-07-30', '2026-07-30')
+            ->with($store, null, '30-07-2026', '30-07-2026')
             ->andReturn(['response' => []]);
         $api->shouldReceive('getGmsItemPerformance')
             ->once()
-            ->with($store, [], '2026-07-30', '2026-07-30')
+            ->with($store, null, '30-07-2026', '30-07-2026')
             ->andReturn(['response' => []]);
 
         $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
