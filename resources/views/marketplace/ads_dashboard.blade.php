@@ -1303,41 +1303,6 @@ body[data-theme="dark"] .dash-sec{
 @keyframes adsToastIn { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 </style>
 
-<script>
-var sortTrafficCol = window.__adsTrafficSortCol || 'spend';
-var sortTrafficDir = window.__adsTrafficSortDir || 'desc';
-
-function sortTrafficTable(col) {
-    if (sortTrafficCol === col) {
-        sortTrafficDir = sortTrafficDir === 'desc' ? 'asc' : 'desc';
-    } else {
-        sortTrafficCol = col;
-        sortTrafficDir = 'desc';
-    }
-
-    const tbody = document.querySelector('#trafficTable tbody');
-    if (!tbody) return;
-    
-    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign_name]'));
-    if (rows.length === 0) return;
-
-    rows.sort((a, b) => {
-        let valA, valB;
-        if (col === 'campaign_name') {
-            valA = a.getAttribute('data-campaign_name') || '';
-            valB = b.getAttribute('data-campaign_name') || '';
-            return sortTrafficDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        } else {
-            valA = parseFloat(a.getAttribute('data-' + col)) || 0;
-            valB = parseFloat(b.getAttribute('data-' + col)) || 0;
-            return sortTrafficDir === 'asc' ? valA - valB : valB - valA;
-        }
-    });
-
-    rows.forEach(row => tbody.appendChild(row));
-}
-</script>
-
 @endpush
 
 @push('scripts')
@@ -1998,7 +1963,7 @@ function sortTrafficTable(col) {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-stoplights text-primary"></i> Analisa Traffic</div>
-                        <div class="ads-tab-panel-note">Evaluasi interaksi pelanggan (top of funnel). Reach, Frequency, dan LPV tidak tersedia dari API Shopee Ads dan ditampilkan sebagai —.</div>
+                        <div class="ads-tab-panel-note">Impresi → klik → pesanan, plus efisiensi biaya iklan.</div>
                     </div>
                 </div>
                 
@@ -2009,10 +1974,15 @@ function sortTrafficTable(col) {
                         $trSpend = $kpi['current']->spend ?? 0;
                         $trImp = $kpi['current']->impressions ?? 0;
                         $trClicks = $kpi['current']->clicks ?? 0;
+                        $trOrders = $kpi['current']->orders ?? 0;
+                        $trGmv = $kpi['current']->gmv ?? 0;
                         
                         $trCtr = $trImp > 0 ? ($trClicks / $trImp) * 100 : 0;
                         $trCpc = $trClicks > 0 ? $trSpend / $trClicks : 0;
                         $trCpm = $trImp > 0 ? ($trSpend / $trImp) * 1000 : 0;
+                        $trCvr = $trClicks > 0 ? ($trOrders / $trClicks) * 100 : 0;
+                        $trCpa = $trOrders > 0 ? $trSpend / $trOrders : 0;
+                        $trRoas = $trSpend > 0 ? $trGmv / $trSpend : 0;
                     @endphp
                     <div class="kpi-card">
                         <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> Ad Spend</div>
@@ -2023,15 +1993,7 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trImp, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-people me-1"></i> Reach <i class="bi bi-info-circle text-muted" title="Tidak disediakan API" style="font-size: 0.6rem;"></i></div>
-                        <div class="kpi-value fw-bold text-muted">—</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-arrow-repeat me-1"></i> Frequency <i class="bi bi-info-circle text-muted" title="Tidak disediakan API" style="font-size: 0.6rem;"></i></div>
-                        <div class="kpi-value fw-bold text-muted">—</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-hand-index-thumb me-1"></i> Link Clicks</div>
+                        <div class="kpi-label"><i class="bi bi-hand-index-thumb me-1"></i> Klik</div>
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trClicks, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
@@ -2047,12 +2009,20 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpm, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-box-arrow-in-right me-1"></i> LP Views <i class="bi bi-info-circle text-muted" title="Tidak disediakan API" style="font-size: 0.6rem;"></i></div>
-                        <div class="kpi-value fw-bold text-muted">—</div>
+                        <div class="kpi-label"><i class="bi bi-cart-check me-1"></i> Pesanan</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trOrders, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-cash me-1"></i> Cost per LPV</div>
-                        <div class="kpi-value fw-bold text-muted">—</div>
+                        <div class="kpi-label"><i class="bi bi-funnel me-1"></i> CVR</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trCvr, 2, ',', '.') }}%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> CPA</div>
+                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpa, 0, ',', '.') }}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label"><i class="bi bi-lightning-charge me-1"></i> ROAS</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trRoas, 2, ',', '.') }}x</div>
                     </div>
                 </div>
 
@@ -2114,7 +2084,7 @@ function sortTrafficTable(col) {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Campaign (Traffic)</div>
-                        <div class="ads-tab-panel-note">Rincian metrik impressions, clicks, dan cost tiap campaign.</div>
+                        <div class="ads-tab-panel-note">Impresi, klik, pesanan, konversi, dan efisiensi biaya per campaign.</div>
                     </div>
                 </div>
                 
@@ -2126,10 +2096,10 @@ function sortTrafficTable(col) {
                                 <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Spend <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Impressions <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('reach')" style="cursor:pointer">Reach* <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('freq')" style="cursor:pointer">Freq* <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Clicks <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Orders <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('cvr')" style="cursor:pointer">CVR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">CPC <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('cpm')" style="cursor:pointer">CPM <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                             </tr>
@@ -2146,16 +2116,18 @@ function sortTrafficTable(col) {
                                         $cClicks = $row->clicks ?? 0;
                                         $cSpend = $row->spend ?? 0;
                                         $cCtr = $cImp > 0 ? ($cClicks / $cImp) * 100 : 0;
+                                        $cOrders = $row->orders ?? 0;
+                                        $cCvr = $cClicks > 0 ? ($cOrders / $cClicks) * 100 : 0;
                                         $cCpc = $cClicks > 0 ? $cSpend / $cClicks : 0;
                                         $cCpm = $cImp > 0 ? ($cSpend / $cImp) * 1000 : 0;
                                     @endphp
                                     <tr data-campaign_name="{{ strtolower($row->campaign_name ?? '') }}"
                                         data-spend="{{ $cSpend }}"
                                         data-impressions="{{ $cImp }}"
-                                        data-reach="0"
-                                        data-freq="0"
                                         data-clicks="{{ $cClicks }}"
                                         data-ctr="{{ $cCtr }}"
+                                        data-orders="{{ $cOrders }}"
+                                        data-cvr="{{ $cCvr }}"
                                         data-cpc="{{ $cCpc }}"
                                         data-cpm="{{ $cCpm }}">
                                         <td>
@@ -2167,10 +2139,10 @@ function sortTrafficTable(col) {
                                         </td>
                                         <td class="text-end">Rp {{ number_format($cSpend, 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($cImp, 0, ',', '.') }}</td>
-                                        <td class="text-end text-muted">—</td>
-                                        <td class="text-end text-muted">—</td>
                                         <td class="text-end">{{ number_format($cClicks, 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($cCtr, 2, ',', '.') }}%</td>
+                                        <td class="text-end">{{ number_format($cOrders, 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($cCvr, 2, ',', '.') }}%</td>
                                         <td class="text-end">Rp {{ number_format($cCpc, 0, ',', '.') }}</td>
                                         <td class="text-end">Rp {{ number_format($cCpm, 0, ',', '.') }}</td>
                                     </tr>
@@ -2409,8 +2381,10 @@ function sortTrafficTable(col) {
                     </div>
                 @endforeach
             </div>
+            </div>
         </div>
-    </div>
+
+            @include('marketplace.partials._summary_profit_breakdown')
 
             <div class="dash-panels mb-3">
                 <div class="dpanel p-3 d-flex flex-wrap align-items-center gap-3" style="background: var(--card-bg);">
@@ -4309,41 +4283,6 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 @endif
-
-<script>
-var sortTrafficCol = window.__adsTrafficSortCol || 'spend';
-var sortTrafficDir = window.__adsTrafficSortDir || 'desc';
-
-function sortTrafficTable(col) {
-    if (sortTrafficCol === col) {
-        sortTrafficDir = sortTrafficDir === 'desc' ? 'asc' : 'desc';
-    } else {
-        sortTrafficCol = col;
-        sortTrafficDir = 'desc';
-    }
-
-    const tbody = document.querySelector('#trafficTable tbody');
-    if (!tbody) return;
-    
-    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign_name]'));
-    if (rows.length === 0) return;
-
-    rows.sort((a, b) => {
-        let valA, valB;
-        if (col === 'campaign_name') {
-            valA = a.getAttribute('data-campaign_name') || '';
-            valB = b.getAttribute('data-campaign_name') || '';
-            return sortTrafficDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        } else {
-            valA = parseFloat(a.getAttribute('data-' + col)) || 0;
-            valB = parseFloat(b.getAttribute('data-' + col)) || 0;
-            return sortTrafficDir === 'asc' ? valA - valB : valB - valA;
-        }
-    });
-
-    rows.forEach(row => tbody.appendChild(row));
-}
-</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
