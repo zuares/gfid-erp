@@ -122,11 +122,19 @@
         return $r->totalCogs === null && (!empty($r->camp->channel_item_id) || $isGms);
     })->sortByDesc(fn ($r) => (float) ($r->camp->spend ?? 0))->values();
     $gmsProfitRows = $rows->filter(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'));
+    $gmsKnownRows = $gmsProfitRows->filter(fn ($r) => $r->profit !== null);
+    $gmsTotalGmv = $gmsProfitRows->sum(fn ($r) => (float) $r->camp->gmv);
+    $gmsTotalSpend = $gmsProfitRows->sum(fn ($r) => (float) $r->camp->spend);
+    $gmsTotalOrders = $gmsProfitRows->sum(fn ($r) => (int) $r->camp->orders);
+    $gmsTotalProfit = $gmsKnownRows->sum('profit');
+    $gmsUnknownCount = $gmsProfitRows->count() - $gmsKnownRows->count();
+    $gmsRoas = $gmsTotalSpend > 0 ? $gmsTotalGmv / $gmsTotalSpend : 0;
+    $gmsMarginPct = $gmsTotalGmv > 0 ? ($gmsTotalProfit / $gmsTotalGmv) * 100 : 0;
     $mappableProfitRows = $mappableProfitRows
         ->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))
         ->values();
     // Subtab produk hanya menampilkan campaign regular yang punya item/SKU.
-    // Produk GMV Max dimuat dari endpoint item-performance saat tab dibuka.
+    // GMV Max Auto dimuat dari endpoint item-performance saat tab dibuka.
     $productUnmappedRows = $mappableProfitRows
         ->filter(fn ($r) => !empty($r->camp->channel_item_id))
         ->values();
@@ -296,18 +304,18 @@ window.__profitChartData = {
     </div>
 </div>
 
-<!-- ── Toggle tampilan: Per Kampanye / Per Kategori ── -->
+<!-- ── Toggle tampilan: GMV Max ROAS / Per Kategori ── -->
 <div style="display:flex; gap:.35rem; margin-bottom:.75rem;">
     <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kategori</button>
-    <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kampanye</button>
+    <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">GMV Max ROAS</button>
     @if($mappableProfitRows->isNotEmpty())
         <button type="button" id="btnViewUnmapped" class="btn fw-bold" onclick="__profitView('unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#92400e; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Campaign Belum Mapping ({{ $mappableProfitRows->count() }})</button>
     @endif
     @if($hasProductUnmappedTab)
-        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Produk Belum Mapping</button>
+        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">GMV Max Auto Belum Mapping</button>
     @endif
     @if($gmsProfitRows->isNotEmpty())
-        <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">Produk GMV Max</button>
+        <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">GMV Max Auto</button>
     @endif
 </div>
 @if($mappableProfitRows->isNotEmpty())
@@ -345,7 +353,7 @@ window.__profitChartData = {
                     @php
                         $camp = $r->camp;
                         $isGms = str_starts_with((string) ($camp->channel_campaign_id ?? ''), 'GMS-');
-                        $itemName = $camp->marketplace_item_name ?: ($isGms ? 'GMV Max (Semua Produk)' : 'Produk belum ditemukan');
+                        $itemName = $camp->marketplace_item_name ?: ($isGms ? 'GMV Max Auto (Semua Item)' : 'Produk belum ditemukan');
                         $itemSku = $camp->marketplace_item_sku ?: ($camp->channel_item_id ? 'Item ID ' . $camp->channel_item_id : 'Semua produk');
                     @endphp
                     <tr style="border-bottom:1px solid var(--dsh-border);">
@@ -430,8 +438,8 @@ window.__profitChartData = {
                 </div>
             @endif
             @if($gmsProfitRows->isNotEmpty())
-                <div style="font-size:.75rem;font-weight:800;color:var(--text);margin:.8rem 0 .45rem;">Produk GMV Max yang belum mapping</div>
-                <div id="productUnmappedGmsBody" style="color:var(--dsh-muted);font-size:.75rem;">Buka tab ini untuk memuat produk GMV Max…</div>
+                <div style="font-size:.75rem;font-weight:800;color:var(--text);margin:.8rem 0 .45rem;">GMV Max Auto yang belum mapping</div>
+                <div id="productUnmappedGmsBody" style="color:var(--dsh-muted);font-size:.75rem;">Buka tab ini untuk memuat GMV Max Auto…</div>
             @endif
         </div>
     </div>
@@ -621,7 +629,7 @@ window.__profitView = function (mode) {
 
     window.openGmsItemMapping = function (button) {
         state = { mode: 'gms-item', campaignId: null, storeId: Number(button.dataset.gmsMapStore), gmsItemId: String(button.dataset.gmsMapItem), suggestStoreId: Number(button.dataset.gmsMapStore), suggestChannelItemId: String(button.dataset.gmsMapItem), itemId: null, timer: null };
-        labelEl.textContent = (button.dataset.gmsMapName || 'Produk GMV Max') + ' · item GMV Max ' + state.gmsItemId;
+        labelEl.textContent = (button.dataset.gmsMapName || 'GMV Max Auto') + ' · item GMV Max Auto ' + state.gmsItemId;
         document.getElementById('profitMapScopeNote').textContent = 'Pilih produk utama, bukan variant. HPP per pcs GMV Max dihitung dari rata-rata HPP variant produk tersebut.';
         searchEl.value = '';
         selectedEl.style.display = 'none';
@@ -808,19 +816,46 @@ window.__profitView = function (mode) {
     <div class="ads-tab-panel">
         <div class="ads-tab-panel-head">
             <div>
-                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#0369a1;"></i> Produk GMV Max</div>
-                <div class="ads-tab-panel-note">Rincian produk di dalam campaign GMV Max. Parent “GMV Max (Semua Produk)” tidak ditampilkan sebagai SKU.</div>
+                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#0369a1;"></i> GMV Max Auto</div>
+                <div class="ads-tab-panel-note">Rincian item yang berjalan otomatis di GMV Max. Parent agregat tidak ditampilkan sebagai SKU.</div>
                 <div id="gmsItemsPeriod" style="font-size:.68rem;color:var(--dsh-muted);margin-top:.2rem;"></div>
             </div>
         </div>
         <div class="p-3">
+            <div class="ads-kpi-grid mb-3">
+                <div class="dpanel ads-kpi kpi-revenue">
+                    <div class="ads-kpi-label"><i class="bi bi-graph-up-arrow"></i> GMV Auto</div>
+                    <div class="ads-kpi-value">{{ $fmt($gmsTotalGmv) }}</div>
+                    <div class="ads-kpi-sub">{{ number_format($gmsTotalOrders, 0, ',', '.') }} order</div>
+                </div>
+                <div class="dpanel ads-kpi kpi-spend">
+                    <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Iklan + PPN</div>
+                    <div class="ads-kpi-value">−{{ $fmt($gmsTotalSpend * 1.11) }}</div>
+                    <div class="ads-kpi-sub">Iklan {{ $fmt($gmsTotalSpend) }}</div>
+                </div>
+                <div class="dpanel ads-kpi kpi-cogs">
+                    <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> HPP</div>
+                    <div class="ads-kpi-value">{{ $gmsUnknownCount > 0 ? 'N/A' : $fmt($gmsKnownRows->sum('totalCogs')) }}</div>
+                    <div class="ads-kpi-sub">{{ $gmsKnownRows->count() }}/{{ $gmsProfitRows->count() }} campaign terhitung</div>
+                </div>
+                <div class="dpanel ads-kpi kpi-profit">
+                    <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit Auto</div>
+                    <div class="ads-kpi-value" style="color:{{ $gmsTotalProfit >= 0 ? '#16a34a' : '#dc2626' }};">{{ $gmsUnknownCount > 0 ? 'N/A' : (($gmsTotalProfit < 0 ? '−' : '') . $fmt($gmsTotalProfit)) }}</div>
+                    <div class="ads-kpi-sub">Margin <b>{{ number_format($gmsMarginPct, 1, ',', '.') }}%</b></div>
+                </div>
+                <div class="dpanel ads-kpi">
+                    <div class="ads-kpi-label"><i class="bi bi-speedometer2"></i> ROAS Auto</div>
+                    <div class="ads-kpi-value">{{ number_format($gmsRoas, 2, ',', '.') }}x</div>
+                    <div class="ads-kpi-sub">{{ $gmsUnknownCount > 0 ? $gmsUnknownCount . ' belum dihitung' : 'HPP lengkap' }}</div>
+                </div>
+            </div>
             <div style="padding:.7rem .8rem;margin-bottom:.75rem;border-radius:12px;background:rgba(3,105,161,.06);border:1px solid rgba(3,105,161,.14);font-size:.72rem;color:var(--dsh-muted);">
                 <i class="bi bi-info-circle" style="color:#0369a1;"></i>
-                Mapping HPP dilakukan per produk. Jika HPP belum ada, pilih item internal pada baris tersebut agar profit produk dapat dihitung.
+                Mapping HPP dilakukan per item GMV Max Auto. Jika HPP belum ada, pilih item internal pada baris tersebut agar profit dapat dihitung.
             </div>
             <div id="gmsItemsSummary" style="display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.8rem;"></div>
             <div id="gmsItemsBody">
-                <div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Pilih tab Produk GMV Max untuk memuat data…</div>
+                <div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Pilih tab GMV Max Auto untuk memuat data…</div>
             </div>
         </div>
     </div>
@@ -867,7 +902,7 @@ window.__profitView = function (mode) {
 
     window.loadGmsItemsTab = async function () {
         periodEl.textContent = 'Periode ' + fromDate + ' s/d ' + toDate;
-        bodyEl.innerHTML = '<div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Memuat produk GMV Max…</div>';
+        bodyEl.innerHTML = '<div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Memuat GMV Max Auto…</div>';
         summaryEl.textContent = '';
         try {
             const payloads = await Promise.all(storeIds.map(async function (storeId) {
@@ -881,7 +916,7 @@ window.__profitView = function (mode) {
                 mapped: sum.mapped + Number(entry.payload.mapped_items || 0),
                 unmapped: sum.unmapped + Number(entry.payload.unmapped_items || 0),
             }), { items: 0, mapped: 0, unmapped: 0 });
-            summaryEl.innerHTML = summaryCard('Produk GMV Max', totals.items.toLocaleString('id-ID'), 'var(--text)', 'terjual pada periode ini')
+            summaryEl.innerHTML = summaryCard('Item GMV Max Auto', totals.items.toLocaleString('id-ID'), 'var(--text)', 'terjual pada periode ini')
                 + summaryCard('HPP sudah tersedia', totals.mapped.toLocaleString('id-ID'), '#15803d', 'profit dapat dihitung')
                 + summaryCard('Perlu mapping', totals.unmapped.toLocaleString('id-ID'), totals.unmapped > 0 ? '#b45309' : '#15803d', totals.unmapped > 0 ? 'pilih item internal' : 'semua sudah siap');
             bodyEl.innerHTML = payloads.map((entry) => renderStore(entry.storeId, entry.payload)).join('');
@@ -913,7 +948,7 @@ window.__profitView = function (mode) {
     function renderStore(storeId, items) {
         if (!items.length) return '';
         const rows = items.map(function (item) {
-            const itemName = item.item_name || 'Produk GMV Max';
+            const itemName = item.item_name || 'GMV Max Auto';
             return '<tr>'
                 + '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>'
                 + '<td class="text-end"><b>' + Number(item.orders || 0).toLocaleString('id-ID') + ' order</b><div style="font-size:.62rem;color:var(--dsh-muted);">' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div></td>'
@@ -936,14 +971,14 @@ window.__profitView = function (mode) {
         }
         if (!storeIds.length) {
             if (badgeEl) badgeEl.textContent = regularCount + ' produk perlu mapping';
-            bodyEl.textContent = 'Tidak ada produk GMV Max yang perlu ditampilkan.';
+            bodyEl.textContent = 'Tidak ada item GMV Max Auto yang perlu ditampilkan.';
             loaded = true;
             return Promise.resolve();
         }
         loading = Promise.all(storeIds.map(async function (storeId) {
             const response = await fetch(endpointBase + '/' + storeId + '?date_from=' + encodeURIComponent(fromDate) + '&date_to=' + encodeURIComponent(toDate), { headers: { Accept: 'application/json' } });
             const payload = await response.json();
-            if (!response.ok) throw new Error(payload.message || 'Gagal memuat produk GMV Max belum mapping.');
+            if (!response.ok) throw new Error(payload.message || 'Gagal memuat item GMV Max Auto belum mapping.');
             return { storeId: storeId, items: (payload.data || []).filter((item) => !item.mapped) };
         })).then(function (entries) {
             const gmsItems = entries.reduce((sum, entry) => sum + entry.items.length, 0);
@@ -951,7 +986,7 @@ window.__profitView = function (mode) {
             if (badgeEl) badgeEl.textContent = total + ' produk perlu mapping';
             bodyEl.innerHTML = gmsItems
                 ? entries.map((entry) => renderStore(entry.storeId, entry.items)).join('')
-                : 'Semua produk GMV Max sudah memiliki HPP.';
+                : 'Semua item GMV Max Auto sudah memiliki HPP.';
             loaded = true;
         }).catch(function (error) {
             if (badgeEl) badgeEl.textContent = regularCount + ' produk perlu mapping';
