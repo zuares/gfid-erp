@@ -304,82 +304,53 @@ window.__profitChartData = {
     </div>
 </div>
 
+<style>
+    .profit-table-wrap { overflow-x: hidden !important; }
+    .profit-table-compact {
+        width: 100% !important;
+        table-layout: fixed;
+        white-space: normal !important;
+        font-size: .72rem;
+    }
+    .profit-table-compact th,
+    .profit-table-compact td {
+        padding: .48rem .4rem !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        vertical-align: middle;
+    }
+    .profit-table-compact td span,
+    .profit-table-compact td div {
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+    @media (max-width: 768px) {
+        .profit-table-compact { font-size: .66rem; }
+        .profit-table-compact th,
+        .profit-table-compact td { padding: .38rem .24rem !important; }
+        .profit-table-compact .btn { font-size: .58rem !important; padding: .14rem .3rem !important; }
+    }
+</style>
+
 <!-- ── Toggle tampilan: GMV Max ROAS / Per Kategori ── -->
 <div style="display:flex; gap:.35rem; margin-bottom:.75rem;">
     <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kategori</button>
     <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">GMV Max ROAS</button>
-    @if($mappableProfitRows->isNotEmpty())
-        <button type="button" id="btnViewUnmapped" class="btn fw-bold" onclick="__profitView('unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#92400e; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Campaign Belum Mapping ({{ $mappableProfitRows->count() }})</button>
-    @endif
-    @if($hasProductUnmappedTab)
-        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">GMV Max Auto Belum Mapping</button>
-    @endif
     @if($gmsProfitRows->isNotEmpty())
         <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">GMV Max Auto</button>
+    @endif
+    @if($hasProductUnmappedTab)
+        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Produk Belum Mapping</button>
     @endif
 </div>
 @if($mappableProfitRows->isNotEmpty())
     <div class="mb-3" style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;padding:.65rem .8rem;border:1px dashed rgba(180,83,9,.35);border-radius:12px;background:rgba(217,119,6,.05);font-size:.72rem;color:var(--dsh-muted);">
         <i class="bi bi-info-circle" style="color:#b45309;"></i>
         <span><b style="color:#b45309;">{{ $mappableProfitRows->count() }} campaign</b> belum punya HPP/mapping item.</span>
-        <button type="button" class="btn btn-sm" style="font-size:.68rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:transparent;" onclick="__profitView('unmapped')">Tampilkan &amp; perbaiki</button>
+        <button type="button" class="btn btn-sm" style="font-size:.68rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:transparent;" onclick="__profitView('product-unmapped')">Tampilkan &amp; perbaiki</button>
     </div>
-@endif
-
-@if($mappableProfitRows->isNotEmpty())
-<div id="profitViewUnmapped" style="display:none;">
-    <div class="ads-tab-panel mb-3">
-        <div class="ads-tab-panel-head">
-            <div>
-                <div class="ads-tab-panel-title"><i class="bi bi-link-45deg" style="color:#b45309;"></i> Campaign Belum Mapping</div>
-                <div class="ads-tab-panel-note">Mapping item internal agar HPP dan Net Profit dapat dihitung. Diurutkan dari biaya iklan terbesar.</div>
-            </div>
-            <span style="font-size:.7rem;font-weight:800;color:#92400e;background:rgba(217,119,6,.1);padding:.3rem .6rem;border-radius:999px;">{{ $mappableProfitRows->count() }} perlu tindakan</span>
-        </div>
-        <div class="table-responsive">
-            <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space:nowrap;">
-                <thead>
-                    <tr>
-                        <th>Produk / SKU</th>
-                        <th>Kampanye</th>
-                        <th class="text-end">Penjualan</th>
-                        <th class="text-end">Omzet</th>
-                        <th class="text-end">Biaya Iklan</th>
-                        <th class="text-center">Tindakan</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach($mappableProfitRows as $r)
-                    @php
-                        $camp = $r->camp;
-                        $isGms = str_starts_with((string) ($camp->channel_campaign_id ?? ''), 'GMS-');
-                        $itemName = $camp->marketplace_item_name ?: ($isGms ? 'GMV Max Auto (Semua Item)' : 'Produk belum ditemukan');
-                        $itemSku = $camp->marketplace_item_sku ?: ($camp->channel_item_id ? 'Item ID ' . $camp->channel_item_id : 'Semua produk');
-                    @endphp
-                    <tr style="border-bottom:1px solid var(--dsh-border);">
-                        <td style="padding:.65rem .5rem;max-width:260px;">
-                            <div style="font-weight:750;color:var(--text);overflow:hidden;text-overflow:ellipsis;" title="{{ $itemName }}">{{ $itemName }}</div>
-                            <div style="font-size:.64rem;color:var(--dsh-muted);">{{ $itemSku }}</div>
-                        </td>
-                        <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;" title="{{ $camp->campaign_name ?: 'Kampanye' }}">{{ $camp->campaign_name ?: 'Kampanye' }}</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums;">
-                            <b>{{ number_format($camp->orders, 0, ',', '.') }} order</b>
-                            @if($camp->items_sold > 0)<div style="font-size:.62rem;color:var(--dsh-muted);">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs{{ ($camp->items_sold_source ?? 'api') === 'order_fallback' ? ' · estimasi' : '' }}</div>@endif
-                        </td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->campaign_name ?: $itemName) }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
-                                <i class="bi bi-link-45deg"></i> {{ $isGms ? 'Atur HPP acuan' : 'Pilih item HPP' }}
-                            </button>
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 @endif
 
 @if($hasProductUnmappedTab)
@@ -387,16 +358,16 @@ window.__profitChartData = {
     <div class="ads-tab-panel mb-3">
         <div class="ads-tab-panel-head">
             <div>
-                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#b45309;"></i> Produk / SKU Belum Mapping</div>
-                <div class="ads-tab-panel-note">Daftar produk yang belum memiliki HPP. Pilih item internal yang sesuai agar profit dapat dihitung.</div>
+                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#b45309;"></i> Produk Belum Mapping</div>
+                <div class="ads-tab-panel-note">Daftar produk regular dan GMV Max Auto yang belum memiliki HPP. Pilih item internal yang sesuai agar profit dapat dihitung.</div>
             </div>
             <span id="productUnmappedBadge" style="font-size:.7rem;font-weight:800;color:#92400e;background:rgba(217,119,6,.1);padding:.3rem .6rem;border-radius:999px;">Memuat…</span>
         </div>
         <div class="p-3">
             @if($productUnmappedRows->isNotEmpty())
                 <div style="font-size:.75rem;font-weight:800;color:var(--text);margin-bottom:.45rem;">Produk iklan regular</div>
-                <div class="table-responsive mb-3">
-                    <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space:nowrap;">
+                <div class="table-responsive profit-table-wrap mb-3">
+                    <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact">
                         <thead>
                             <tr>
                                 <th>Produk / SKU</th>
@@ -449,8 +420,8 @@ window.__profitChartData = {
 <!-- ── Tabel per KATEGORI ── -->
 <div id="profitViewCategory" style="display:block;">
     <div class="ads-tab-panel">
-        <div class="table-responsive">
-            <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space: nowrap;">
+        <div class="table-responsive profit-table-wrap">
+            <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact">
             <thead>
                 <tr>
                     <th>Kategori<div style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">dari mapping SKU</div></th>
@@ -494,28 +465,23 @@ window.__profitChartData = {
 window.__profitView = function (mode) {
     const cat = document.getElementById('profitViewCategory');
     const camp = document.getElementById('profitViewCampaign');
-    const unmapped = document.getElementById('profitViewUnmapped');
     const productUnmapped = document.getElementById('profitViewProductUnmapped');
     const gms = document.getElementById('profitViewGms');
     const bCat = document.getElementById('btnViewCategory');
     const bCamp = document.getElementById('btnViewCampaign');
-    const bUnmapped = document.getElementById('btnViewUnmapped');
     const bProductUnmapped = document.getElementById('btnViewProductUnmapped');
     const bGms = document.getElementById('btnViewGms');
     const on  = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
     const off = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;';
     const isCat = mode === 'category';
-    const isUnmapped = mode === 'unmapped';
     const isProductUnmapped = mode === 'product-unmapped';
     const isGms = mode === 'gms';
     cat.style.display = isCat ? 'block' : 'none';
-    camp.style.display = isCat || isUnmapped || isProductUnmapped || isGms ? 'none' : 'block';
-    if (unmapped) unmapped.style.display = isUnmapped ? 'block' : 'none';
+    camp.style.display = isCat || isProductUnmapped || isGms ? 'none' : 'block';
     if (productUnmapped) productUnmapped.style.display = isProductUnmapped ? 'block' : 'none';
     if (gms) gms.style.display = isGms ? 'block' : 'none';
     bCat.style.cssText = isCat ? on : off;
-    bCamp.style.cssText = !isCat && !isUnmapped && !isProductUnmapped && !isGms ? on : off;
-    if (bUnmapped) bUnmapped.style.cssText = isUnmapped ? on : off;
+    bCamp.style.cssText = !isCat && !isProductUnmapped && !isGms ? on : off;
     if (bProductUnmapped) bProductUnmapped.style.cssText = isProductUnmapped ? on : off;
     if (bGms) bGms.style.cssText = isGms ? on : off;
     if (isGms && window.loadGmsItemsTab) window.loadGmsItemsTab();
@@ -525,7 +491,7 @@ window.__profitView = function (mode) {
 (function () {
     try { 
         const savedMode = localStorage.getItem('profitViewMode');
-        if (savedMode === 'campaign' || savedMode === 'unmapped' || savedMode === 'product-unmapped') {
+        if (savedMode === 'campaign' || savedMode === 'product-unmapped' || savedMode === 'gms') {
             window.__profitView(savedMode);
         } else {
             window.__profitView('category'); 
@@ -678,15 +644,15 @@ window.__profitView = function (mode) {
 <div id="profitViewCampaign" style="display:none;">
 <!-- ── Tabel per kampanye — kolom mengikuti alur hitung: Pendapatan Bersih − HPP − Iklan = Net Profit ── -->
 <div class="ads-tab-panel">
-    <div class="table-responsive">
-        <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space: nowrap;">
+    <div class="table-responsive profit-table-wrap">
+        <table class="dpanel-table dpanel-table-sm table-hover w-100 profit-table-compact">
         <thead>
             <tr>
                 <th onclick="sortProfitTable('campaign')" style="cursor:pointer">Kampanye <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('orders')" style="cursor:pointer">Konversi <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                <th class="text-end" onclick="sortProfitTable('net_revenue')" style="cursor:pointer">Pendapatan Bersih <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('net_revenue')" style="cursor:pointer">Dana Cair <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('hpp')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> HPP <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                <th class="text-end" onclick="sortProfitTable('ad_spend')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <span style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">+PPN 11%</span> <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('ad_spend')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <span style="font-size:.6rem; font-weight:500; color:var(--dsh-muted); text-transform:none;">+PPN</span> <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('net_profit')" style="cursor:pointer; border-left: 2px solid var(--dsh-border);"><span style="color:var(--dsh-muted); font-weight:600;">=</span> Net Profit <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('acos')" style="cursor:pointer">ACOS <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-center">Rekomendasi</th>
@@ -897,7 +863,7 @@ window.__profitView = function (mode) {
                 '<td>' + mappingStatus + '</td>' +
                 '</tr>';
         }).join('');
-        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive"><table class="dpanel-table dpanel-table-sm w-100" style="white-space:nowrap;min-width:1120px;"><thead><tr><th>Produk</th><th class="text-end">Penjualan</th><th class="text-end">Omzet kotor<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">dana cair</span></th><th class="text-end">Biaya iklan<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">setelah PPN</span></th><th class="text-end">HPP / pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit setelah iklan</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th>Item</th><th class="text-end">Penjualan</th><th class="text-end">GMV<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">dana cair</span></th><th class="text-end">Iklan<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">+PPN</span></th><th class="text-end">HPP/pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     window.loadGmsItemsTab = async function () {
@@ -958,7 +924,7 @@ window.__profitView = function (mode) {
                 + '</tr>';
         }).join('');
         return '<div style="font-size:.72rem;font-weight:750;color:var(--dsh-muted);margin:.8rem 0 .35rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div>'
-            + '<div class="table-responsive"><table class="dpanel-table dpanel-table-sm w-100" style="white-space:nowrap;min-width:900px;"><thead><tr><th>Produk / SKU</th><th class="text-end">Penjualan</th><th class="text-end">Omzet</th><th class="text-end">Biaya Iklan</th><th class="text-center">Tindakan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+            + '<div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th>Item / SKU</th><th class="text-end">Penjualan</th><th class="text-end">GMV</th><th class="text-end">Iklan</th><th class="text-center">Tindakan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     window.loadProductUnmappedTab = function () {
