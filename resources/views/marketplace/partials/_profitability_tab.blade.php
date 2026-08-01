@@ -361,7 +361,7 @@ window.__profitChartData = {
                         <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->campaign_name ?: $itemName) }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" onclick="openProfitCampaignMapping(this)">
+                            <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->campaign_name ?: $itemName) }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
                                 <i class="bi bi-link-45deg"></i> {{ $isGms ? 'Atur HPP acuan' : 'Pilih item HPP' }}
                             </button>
                         </td>
@@ -419,7 +419,7 @@ window.__profitChartData = {
                                 <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
                                 <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>
                                 <td class="text-center">
-                                    <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($itemName) }}" data-profit-map-item="{{ e((string) $camp->channel_item_id) }}" onclick="openProfitCampaignMapping(this)">
+                                    <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($itemName) }}" data-profit-map-item="{{ e((string) $camp->channel_item_id) }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
                                         <i class="bi bi-link-45deg"></i> Pilih item HPP
                                     </button>
                                 </td>
@@ -562,7 +562,7 @@ window.__profitView = function (mode) {
     const saveEl = document.getElementById('profitMapSave');
     const labelEl = document.getElementById('profitMapCampaignLabel');
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    let state = { mode: 'campaign', campaignId: null, storeId: null, gmsItemId: null, itemId: null, timer: null };
+    let state = { mode: 'campaign', campaignId: null, storeId: null, gmsItemId: null, suggestStoreId: null, suggestChannelItemId: null, itemId: null, timer: null };
 
     const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;'
@@ -571,7 +571,12 @@ window.__profitView = function (mode) {
     async function searchItems(query) {
         resultsEl.innerHTML = '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Mencari produk…</div>';
         try {
-            const response = await fetch('/api/marketplace/items/search?q=' + encodeURIComponent(query) + '&group_products=1', { headers: { Accept: 'application/json' } });
+            const params = new URLSearchParams({ q: query, group_products: '1' });
+            if (state.suggestStoreId && state.suggestChannelItemId) {
+                params.set('store_id', state.suggestStoreId);
+                params.set('channel_item_id', state.suggestChannelItemId);
+            }
+            const response = await fetch('/api/marketplace/items/search?' + params.toString(), { headers: { Accept: 'application/json' } });
             const items = await response.json();
             if (!response.ok) throw new Error(items.message || 'Gagal mencari item.');
             resultsEl.innerHTML = items.length
@@ -579,14 +584,15 @@ window.__profitView = function (mode) {
                     const hppNote = item.hpp_source === 'variant_average'
                         ? `HPP rata-rata ${Number(item.variant_count || 0).toLocaleString('id-ID')} variant`
                         : 'HPP item utama';
-                    return `<button type="button" class="profit-map-option" data-id="${item.id}" data-code="${esc(item.code || '')}" data-name="${esc(item.name || '')}" style="display:block;width:100%;text-align:left;padding:.55rem .65rem;margin-bottom:.35rem;border:1px solid var(--dsh-border);border-radius:10px;background:transparent;color:var(--text);cursor:pointer;"><b style="font-size:.76rem;">${esc(item.name || 'Produk tanpa nama')}</b><span style="display:block;font-size:.7rem;color:var(--dsh-muted);margin-top:.12rem;">Item utama: ${esc(item.code || 'Tanpa kode')}</span><span style="display:block;font-size:.66rem;color:var(--dsh-muted);margin-top:.15rem;">${hppNote} · ${window.__profitFmtRp ? window.__profitFmtRp(item.hpp) : ('Rp ' + Number(item.hpp || 0).toLocaleString('id-ID'))}</span></button>`;
+                    const suggestionNote = item.suggestion_source ? `<span style="display:inline-block;margin-left:.25rem;color:#0369a1;">· ${esc(item.suggestion_source)}</span>` : '';
+                    return `<button type="button" class="profit-map-option" data-id="${item.id}" data-code="${esc(item.code || '')}" data-name="${esc(item.name || '')}" data-hpp="${Number(item.hpp || 0)}" style="display:block;width:100%;text-align:left;padding:.55rem .65rem;margin-bottom:.35rem;border:1px solid var(--dsh-border);border-radius:10px;background:transparent;color:var(--text);cursor:pointer;"><b style="font-size:.76rem;">${esc(item.name || 'Produk tanpa nama')}</b>${suggestionNote}<span style="display:block;font-size:.7rem;color:var(--dsh-muted);margin-top:.12rem;">Item utama: ${esc(item.code || 'Tanpa kode')}</span><span style="display:block;font-size:.66rem;color:var(--dsh-muted);margin-top:.15rem;">${hppNote} · ${window.__profitFmtRp ? window.__profitFmtRp(item.hpp) : ('Rp ' + Number(item.hpp || 0).toLocaleString('id-ID'))}</span></button>`;
                 }).join('')
                 : '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Item utama tidak ditemukan. Pastikan produk sudah memiliki mapping variant ke item internal.</div>';
             resultsEl.querySelectorAll('.profit-map-option').forEach((button) => {
                 button.addEventListener('click', () => {
                     state.itemId = Number(button.dataset.id);
                     selectedEl.style.display = 'block';
-                    selectedEl.innerHTML = '✓ ' + button.dataset.code + ' — ' + button.dataset.name;
+                    selectedEl.innerHTML = '✓ ' + button.dataset.name + '<div style="font-size:.66rem;color:var(--dsh-muted);margin-top:.15rem;">Item utama: ' + button.dataset.code + ' · HPP ' + (window.__profitFmtRp ? window.__profitFmtRp(button.dataset.hpp) : ('Rp ' + Number(button.dataset.hpp || 0).toLocaleString('id-ID'))) + '</div>';
                     saveEl.disabled = !state.itemId;
                     resultsEl.innerHTML = '';
                 });
@@ -597,7 +603,7 @@ window.__profitView = function (mode) {
     }
 
     window.openProfitCampaignMapping = function (button) {
-        state = { mode: 'campaign', campaignId: Number(button.dataset.profitMapCampaign), storeId: null, gmsItemId: null, itemId: null, timer: null };
+        state = { mode: 'campaign', campaignId: Number(button.dataset.profitMapCampaign), storeId: null, gmsItemId: null, suggestStoreId: Number(button.dataset.profitMapStore || 0) || null, suggestChannelItemId: button.dataset.profitMapChannelItem || button.dataset.profitMapItem || null, itemId: null, timer: null };
         const isGms = button.dataset.profitMapItem.indexOf('Semua Produk') !== -1;
         labelEl.textContent = button.dataset.profitMapName + (isGms ? ' · HPP acuan agregat GMV Max' : ' · Shopee item ' + button.dataset.profitMapItem);
         document.getElementById('profitMapScopeNote').textContent = isGms
@@ -614,7 +620,7 @@ window.__profitView = function (mode) {
     };
 
     window.openGmsItemMapping = function (button) {
-        state = { mode: 'gms-item', campaignId: null, storeId: Number(button.dataset.gmsMapStore), gmsItemId: String(button.dataset.gmsMapItem), itemId: null, timer: null };
+        state = { mode: 'gms-item', campaignId: null, storeId: Number(button.dataset.gmsMapStore), gmsItemId: String(button.dataset.gmsMapItem), suggestStoreId: Number(button.dataset.gmsMapStore), suggestChannelItemId: String(button.dataset.gmsMapItem), itemId: null, timer: null };
         labelEl.textContent = (button.dataset.gmsMapName || 'Produk GMV Max') + ' · item GMV Max ' + state.gmsItemId;
         document.getElementById('profitMapScopeNote').textContent = 'Pilih produk utama, bukan variant. HPP per pcs GMV Max dihitung dari rata-rata HPP variant produk tersebut.';
         searchEl.value = '';
@@ -739,7 +745,7 @@ window.__profitView = function (mode) {
                         <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{!! $r->totalCogs > 0 ? '&minus;' . $fmt($r->totalCogs) : '<span style="color:#b45309;">&mdash;</span>' !!}</div>
                         <div style="font-size: .65rem; color: {{ $r->totalCogs !== null ? 'var(--dsh-muted)' : '#b45309' }}; margin-top: 2px;" title="{{ $r->totalCogs === null ? 'HPP belum tersedia, profit tidak dihitung' : ($r->cogsExact ? 'Eksak: HPP × pcs terjual' : 'Estimasi dari rasio harga (pcs belum tercatat)') }}">{{ $r->totalCogs === null ? 'belum diisi' : ($r->cogsExact ? $fmt($r->unitCogs) . '/pcs × ' . $r->itemsSold : $fmt($r->unitCogs) . '/pcs · estimasi') }}</div>
                         @if($r->totalCogs === null && ($camp->channel_item_id || str_starts_with((string) $camp->channel_campaign_id, 'GMS-')))
-                            <button type="button" class="btn btn-sm mt-1" style="font-size:.62rem; padding:.16rem .45rem; border-radius:999px; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->campaign_name ?: 'Kampanye') }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" onclick="openProfitCampaignMapping(this)">
+                            <button type="button" class="btn btn-sm mt-1" style="font-size:.62rem; padding:.16rem .45rem; border-radius:999px; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->marketplace_item_name ?: ($camp->campaign_name ?: 'Kampanye')) }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
                                 <i class="bi bi-link-45deg"></i> {{ str_starts_with((string) $camp->channel_campaign_id, 'GMS-') ? 'Atur HPP acuan' : 'Pilih item HPP' }}
                             </button>
                         @endif

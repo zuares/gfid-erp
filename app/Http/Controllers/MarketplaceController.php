@@ -5861,8 +5861,18 @@ class MarketplaceController extends Controller
         // Ads mapping memilih level produk utama. HPP yang dikirim ke UI
         // sudah dirata-ratakan dari seluruh item variant yang terkait.
         if ($request->boolean('group_products')) {
-            $products = app(ItemHppResolver::class)->searchProducts($q, $limit);
-            return response()->json($products->values());
+            $resolver = app(ItemHppResolver::class);
+            $suggestions = $resolver->suggestionsForMarketplace(
+                $request->integer('store_id') ?: null,
+                $request->input('channel_item_id'),
+                $q,
+                $limit
+            );
+            $products = $resolver->searchProducts($q, $limit);
+
+            return response()->json(
+                $suggestions->merge($products)->unique(fn (array $row) => (string) $row['id'])->take($limit)->values()
+            );
         }
 
         $items = Item::query()

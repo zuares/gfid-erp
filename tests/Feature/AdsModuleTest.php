@@ -828,15 +828,36 @@ class AdsModuleTest extends TestCase
             app(\App\Services\Marketplace\Ads\ItemHppResolver::class)->resolve($parent)
         );
 
+        $store = $this->createStore('AUTOSUGGEST');
+        $marketplaceProduct = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654398',
+            'item_name' => 'Parent Produk Ads',
+            'price_min' => 100000,
+            'price_max' => 100000,
+        ]);
+        \App\Models\MarketplaceProductModel::create([
+            'marketplace_product_id' => $marketplaceProduct->id,
+            'model_id' => 'MODEL-AUTOSUGGEST',
+            'model_sku' => 'SKU-AUTOSUGGEST',
+            'price' => 100000,
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'SKU-AUTOSUGGEST',
+            'channel_code' => 'shopee',
+            'item_id' => $variantOne->id,
+        ]);
+
         $response = $this->actingAs($this->createUser('admin'))
-            ->getJson('/api/marketplace/items/search?q=Parent%20Produk%20Ads&group_products=1');
+            ->getJson('/api/marketplace/items/search?q=&group_products=1&store_id=' . $store->id . '&channel_item_id=987654398');
 
         $response->assertOk()
             ->assertJsonPath('0.id', $parent->id)
             ->assertJsonPath('0.name', 'Parent Produk Ads')
             ->assertJsonPath('0.hpp', 20000)
             ->assertJsonPath('0.hpp_source', 'variant_average')
-            ->assertJsonPath('0.variant_count', 2);
+            ->assertJsonPath('0.variant_count', 2)
+            ->assertJsonPath('0.suggestion_source', 'SKU marketplace');
     }
 
     public function test_campaign_profit_uses_average_hpp_after_product_mapping()

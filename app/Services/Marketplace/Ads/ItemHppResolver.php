@@ -3,6 +3,8 @@
 namespace App\Services\Marketplace\Ads;
 
 use App\Models\Item;
+use App\Models\MarketplaceProduct;
+use App\Models\SkuMapping;
 use App\Models\StorefrontProduct;
 use Illuminate\Support\Collection;
 
@@ -163,6 +165,71 @@ class ItemHppResolver
             })
             ->filter()
             ->unique(fn (array $row) => (string) $row['id'])
+            ->values();
+    }
+
+    /**
+     * Suggest item utama dari SKU/model marketplace pada campaign yang sedang
+     * dipetakan. Ini membuat modal langsung berisi kandidat yang relevan.
+     */
+    public function suggestionsForMarketplace(?int $storeId, ?string $channelItemId, ?string $query = null, int $limit = 15): Collection
+    {
+        if (! $storeId || blank($channelItemId)) {
+            return collect();
+        }
+
+        $product = MarketplaceProduct::query()
+            ->where('store_id', $storeId)
+            ->where('item_id', (string) $channelItemId)
+            ->with('models:id,marketplace_product_id,model_sku')
+            ->first();
+        $skus = $product?->models->pluck('model_sku')->filter()->map(fn ($sku) => (string) $sku)->unique()->values();
+
+        if ($skus->isEmpty()) {
+            return collect();
+        }
+
+        $mappedItemIds = SkuMapping::query()
+            ->whereIn('marketplace_sku', $skus->all())
+            ->where(function ($builder) {
+                $builder->whereNull('channel_code')->orWhere('channel_code', 'shopee');
+            })
+            ->pluck('item_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($mappedItemIds->isEmpty()) {
+            return collect();
+        }
+
+        $needle = mb_strtolower(trim((string) $query));
+
+        return Item::query()
+            ->whereIn('id', $mappedItemIds->all())
+            ->get(['id', 'name', 'code', 'hpp', 'base_unit_cost'])
+            ->filter(function (Item $item) use ($needle) {
+                if ($needle === '') return true;
+                return str_contains(mb_strtolower((string) $item->name), $needle)
+                    || str_contains(mb_strtolower((string) $item->code), $needle);
+            })
+            ->map(function (Item $item) {
+                $summary = $this->summary($item);
+                $representativeId = (int) ($summary['representative_item_id'] ?: $item->id);
+
+                return [
+                    'id' => $representativeId,
+                    'name' => $summary['product_name'] ?: $item->name,
+                    'code' => $summary['item']?->code ?: $item->code,
+                    'hpp' => round((float) $summary['hpp'], 2),
+                    'hpp_source' => $summary['hpp_source'],
+                    'variant_count' => $summary['variant_count'],
+                    'suggestion_source' => 'SKU marketplace',
+                ];
+            })
+            ->unique(fn (array $row) => (string) $row['id'])
+            ->take($limit)
             ->values();
     }
 
