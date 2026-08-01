@@ -23,11 +23,13 @@
         </div>
     </div>
 
-    <!-- ── Tab: Profit | Riwayat Sync — gaya segmented sama dengan Ads Dashboard ── -->
+    <!-- ── Navigasi Profit — urut berdasarkan alur kerja user ── -->
     <div style="margin-bottom:1rem;">
         <div class="profit-tabs-modern">
-            <button type="button" id="ptabData" class="profit-tab-m active" onclick="switchProfitTab('data')"><i class="bi bi-cash-coin"></i> Profit</button>
-            <button type="button" id="ptabSync" class="profit-tab-m" onclick="switchProfitTab('sync')"><i class="bi bi-arrow-repeat"></i> Sync <span id="syncTabDot" style="display:none; width:8px; height:8px; border-radius:50%; background:#3b82f6;"></span></button>
+            <button type="button" id="ptabSummary" class="profit-tab-m active" onclick="switchProfitTab('summary')"><i class="bi bi-bar-chart-line"></i> Ringkasan</button>
+            <button type="button" id="ptabUnmapped" class="profit-tab-m" onclick="switchProfitTab('unmapped')"><i class="bi bi-exclamation-triangle"></i> Perlu Mapping</button>
+            <button type="button" id="ptabUnsettled" class="profit-tab-m" onclick="switchProfitTab('unsettled')"><i class="bi bi-hourglass-split"></i> Belum Cair</button>
+            <button type="button" id="ptabSync" class="profit-tab-m" onclick="switchProfitTab('sync')"><i class="bi bi-arrow-repeat"></i> Sinkronisasi <span id="syncTabDot" style="display:none; width:8px; height:8px; border-radius:50%; background:#3b82f6;"></span></button>
         </div>
     </div>
 
@@ -356,7 +358,7 @@
 <style>
     /* Segmented tabs — mengikuti .dash-tabs-modern / .dash-tab-m di Ads Dashboard */
     .profit-tabs-modern{
-        display:inline-flex; background:rgba(148,163,184,.1); padding:.35rem; border-radius:12px; gap:.25rem;
+        display:inline-flex; flex-wrap:wrap; background:rgba(148,163,184,.1); padding:.35rem; border-radius:12px; gap:.25rem;
     }
     body[data-theme="dark"] .profit-tabs-modern{ background:rgba(30,41,59,.5); }
     .profit-tab-m{
@@ -541,13 +543,37 @@
     }
 
     // ── Tab Profit / Riwayat Sync ─────────────────────────────────────────────
+    let activeProfitTab = 'summary';
+
+    // Navigasi mengikuti prioritas kerja: lihat hasil → perbaiki mapping →
+    // cek dana tertahan → pantau sinkronisasi.
     window.switchProfitTab = function (tab) {
+        if (tab === 'data') tab = 'summary'; // kompatibilitas pemanggil lama
+        activeProfitTab = tab;
         const isSync = tab === 'sync';
         $('profitTabData').style.display = isSync ? 'none' : '';
         $('profitTabSync').style.display = isSync ? '' : 'none';
-        $('ptabData').classList.toggle('active', !isSync);
+        $('ptabSummary').classList.toggle('active', tab === 'summary');
+        $('ptabUnmapped').classList.toggle('active', tab === 'unmapped');
+        $('ptabUnsettled').classList.toggle('active', tab === 'unsettled');
         $('ptabSync').classList.toggle('active', isSync);
-        if (isSync) refreshFinanceSyncStatus();
+
+        if (!isSync) {
+            if (tab === 'unmapped') {
+                $('filterHppStatus').value = 'empty';
+                $('filterSettlementStatus').value = '';
+            } else if (tab === 'unsettled') {
+                $('filterHppStatus').value = '';
+                $('filterSettlementStatus').value = 'belum_cair';
+            } else {
+                $('filterHppStatus').value = '';
+                $('filterSettlementStatus').value = '';
+            }
+            currentPage = 1;
+            loadProfits();
+        } else {
+            refreshFinanceSyncStatus();
+        }
     };
 
     // ── Modal sync ────────────────────────────────────────────────────────────

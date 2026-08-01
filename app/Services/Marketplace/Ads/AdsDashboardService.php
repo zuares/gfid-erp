@@ -670,23 +670,23 @@ class AdsDashboardService
                     $q->select('id', 'marketplace_product_id', 'model_id', 'model_sku', 'price', 'raw_json');
                 },
             ])
-            ->get(['id', 'store_id', 'item_id']);
+            ->get(['id', 'store_id', 'item_id', 'item_sku']);
 
-        $modelSkus = $products
-            ->flatMap(fn ($product) => $product->models->pluck('model_sku'))
+        $productSkus = $products
+            ->flatMap(fn ($product) => $product->models->pluck('model_sku')->push($product->item_sku))
             ->filter()
-            ->map(fn ($v) => (string) $v)
+            ->map(fn ($v) => trim((string) $v))
             ->unique()
             ->values();
 
         $mappingBySku = [];
-        if ($modelSkus->isNotEmpty()) {
+        if ($productSkus->isNotEmpty()) {
             $mappings = SkuMapping::with(['item:id,hpp,base_unit_cost'])
-                ->whereIn('marketplace_sku', $modelSkus)
+                ->whereIn('marketplace_sku', $productSkus)
                 ->get(['id', 'marketplace_sku', 'channel_code', 'item_id']);
 
             foreach ($mappings as $mapping) {
-                $sku = (string) $mapping->marketplace_sku;
+                $sku = mb_strtolower(trim((string) $mapping->marketplace_sku));
                 $channel = strtolower((string) ($mapping->channel_code ?? '')) ?: '__global';
                 $mappingBySku[$sku][$channel] = $mapping;
             }
@@ -700,7 +700,7 @@ class AdsDashboardService
             $channelCode = strtolower((string) ($channelCodesByStore[$product->store_id] ?? '')) ?: '__global';
 
             $prices = [];
-            $hpps = [];
+            $modelHpps = [];
 
             foreach ($product->models as $model) {
                 $currentPrice = data_get($model->raw_json, 'price_info.0.current_price');
@@ -711,16 +711,34 @@ class AdsDashboardService
                     $prices[] = (float) $currentPrice;
                 }
 
-                $sku = (string) ($model->model_sku ?? '');
+                $sku = trim((string) ($model->model_sku ?? ''));
                 if ($sku === '') {
                     continue;
                 }
 
-                $mapping = $mappingBySku[$sku][$channelCode] ?? $mappingBySku[$sku]['__global'] ?? null;
+                $normalizedSku = mb_strtolower($sku);
+                $mapping = $mappingBySku[$normalizedSku][$channelCode] ?? $mappingBySku[$normalizedSku]['__global'] ?? null;
                 if ($mapping && $mapping->item) {
                     $hpp = $this->resolveItemUnitCogs($mapping->item);
                     if ($hpp > 0) {
-                        $hpps[] = $hpp;
+                        $modelHpps[] = $hpp;
+                    }
+                }
+            }
+
+            // Mapping variant lebih spesifik. Jika belum ada mapping variant,
+            // gunakan mapping SKU induk yang dibuat dari marketplace/products.
+            $hpps = $modelHpps;
+            if (empty($hpps)) {
+                $parentSku = trim((string) ($product->item_sku ?? ''));
+                if ($parentSku !== '') {
+                    $normalizedSku = mb_strtolower($parentSku);
+                    $mapping = $mappingBySku[$normalizedSku][$channelCode] ?? $mappingBySku[$normalizedSku]['__global'] ?? null;
+                    if ($mapping && $mapping->item) {
+                        $hpp = $this->resolveItemUnitCogs($mapping->item);
+                        if ($hpp > 0) {
+                            $hpps[] = $hpp;
+                        }
                     }
                 }
             }

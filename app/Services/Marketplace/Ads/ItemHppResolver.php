@@ -183,7 +183,10 @@ class ItemHppResolver
             ->where('item_id', (string) $channelItemId)
             ->with('models:id,marketplace_product_id,model_sku')
             ->first();
-        $skus = $product?->models->pluck('model_sku')->filter()->map(fn ($sku) => (string) $sku)->unique()->values();
+        $skus = $product
+            ? $product->models->pluck('model_sku')->push($product->item_sku)
+                ->filter()->map(fn ($sku) => trim((string) $sku))->unique()->values()
+            : collect();
 
         if ($skus->isEmpty()) {
             return collect();
@@ -192,7 +195,7 @@ class ItemHppResolver
         $mappedItemIds = SkuMapping::query()
             ->whereIn('marketplace_sku', $skus->all())
             ->where(function ($builder) {
-                $builder->whereNull('channel_code')->orWhere('channel_code', 'shopee');
+                $builder->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) = ?', ['shopee']);
             })
             ->pluck('item_id')
             ->filter()

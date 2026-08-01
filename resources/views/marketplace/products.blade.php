@@ -436,7 +436,9 @@
     }
     function productMapState(p) {
         const models = p.models || [];
-        if (!models.length) return 'nosku';
+        if (!models.length) {
+            return p.item_sku ? (p.mapping ? 'mapped' : 'unmapped') : 'nosku';
+        }
         const states = models.map(modelMapState);
         if (states.every(s => s === 'nosku')) return 'nosku';
         return states.some(s => s === 'unmapped') ? 'unmapped' : 'mapped';
@@ -539,13 +541,15 @@
         return `<b>${n}</b>`;
     }
 
-    function mappingBadge(m) {
-        if (!m.model_sku) return '<span class="badge-status st-map-warn">SKU kosong</span>';
-        if (m.mapping) {
-            return `<span class="badge-status st-map-ok" title="${esc(m.mapping.item_name || '')}">${esc(m.mapping.item_code || m.mapping.item_id)}</span>
-                <button class="btn btn-prd-outline btn-mini" onclick="openMapModal('${esc(m.model_sku)}')" title="Ganti mapping">✎</button>`;
+    function mappingBadge(m, skuOverride = null, mappingOverride = undefined) {
+        const sku = skuOverride ?? m.model_sku ?? '';
+        const mapping = mappingOverride === undefined ? m.mapping : mappingOverride;
+        if (!sku) return '<span class="badge-status st-map-warn">SKU kosong</span>';
+        if (mapping) {
+            return `<span class="badge-status st-map-ok" title="${esc(mapping.item_name || '')}">${esc(mapping.item_code || mapping.item_id)}</span>
+                <button class="btn btn-prd-outline btn-mini" onclick="openMapModal('${esc(sku)}')" title="Ganti mapping">✎</button>`;
         }
-        return `<button class="btn btn-outline-danger btn-mini" onclick="openMapModal('${esc(m.model_sku)}')">❌ Map</button>`;
+        return `<button class="btn btn-outline-danger btn-mini" onclick="openMapModal('${esc(sku)}')">❌ Map</button>`;
     }
 
     function mappingSummary(models) {
@@ -667,7 +671,7 @@
                 <td>${stockCell(p.stock_total)}</td>
                 <td class="muted">${p.sales ?? '—'}</td>
                 <td>${stats}</td>
-                <td data-product-mapping="${p.id}">${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
+                <td data-product-mapping="${p.id}">${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : mappingBadge(p, p.item_sku, p.mapping))}</td>
                 <td>
                     ${aksiContent}
                 </td>
@@ -1044,6 +1048,7 @@
             if (!res.ok) throw new Error(dat.message || 'Gagal update SKU');
             
             prod.item_sku = newSku;
+            prod.mapping = null;
             toast('Induk SKU berhasil disimpan ✔');
             
             if (!prod.has_model) {
@@ -1116,6 +1121,9 @@
             products.forEach(p => (p.models || []).forEach(m => {
                 if (m.model_sku === sku) m.mapping = map;
             }));
+            products.forEach(p => {
+                if (p.item_sku === sku) p.mapping = map;
+            });
 
             toast(`SKU ${sku} berhasil di-mapping ✔`);
             render();

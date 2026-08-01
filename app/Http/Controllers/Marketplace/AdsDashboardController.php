@@ -426,17 +426,17 @@ class AdsDashboardController extends Controller
             ->get()
             ->keyBy(fn ($product) => (string) $product->item_id);
 
-        $modelSkus = $products->flatMap(fn ($product) => $product->models->pluck('model_sku'))
-            ->filter()->map(fn ($sku) => (string) $sku)->unique()->values();
+        $productSkus = $products->flatMap(fn ($product) => $product->models->pluck('model_sku')->push($product->item_sku))
+            ->filter()->map(fn ($sku) => trim((string) $sku))->unique()->values();
 
         $skuMappings = \App\Models\SkuMapping::query()
             ->with('item:id,code,name,hpp,base_unit_cost')
-            ->whereIn('marketplace_sku', $modelSkus->all())
+            ->whereIn('marketplace_sku', $productSkus->all())
             ->where(function ($query) {
-                $query->whereNull('channel_code')->orWhere('channel_code', 'shopee');
+                $query->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) = ?', ['shopee']);
             })
             ->get()
-            ->groupBy(fn ($mapping) => (string) $mapping->marketplace_sku);
+            ->groupBy(fn ($mapping) => mb_strtolower(trim((string) $mapping->marketplace_sku)));
 
         $manualMaps = \App\Models\MarketplaceAdItemMap::query()
             ->with('item:id,code,name,hpp,base_unit_cost')
@@ -449,10 +449,16 @@ class AdsDashboardController extends Controller
         $items = $grouped->map(function ($dailyRows, string $channelItemId) use ($products, $skuMappings, $manualMaps, $hppResolver) {
             $product = $products->get($channelItemId);
             $manual = $manualMaps->get($channelItemId);
-            $productMappings = $product
-                ? $product->models->flatMap(fn ($model) => $skuMappings->get((string) $model->model_sku, collect()))
+            $modelMappings = $product
+                ? $product->models->flatMap(fn ($model) => $skuMappings->get(mb_strtolower(trim((string) $model->model_sku)), collect()))
                     ->filter(fn ($mapping) => $mapping->item)
                 : collect();
+            $productMappings = $modelMappings;
+            if ($productMappings->isEmpty() && $product?->item_sku) {
+                $productMappings = $skuMappings
+                    ->get(mb_strtolower(trim((string) $product->item_sku)), collect())
+                    ->filter(fn ($mapping) => $mapping->item);
+            }
             $mappedItem = $manual?->item ?? $productMappings->first()?->item;
             $manualHpp = $manual?->item ? $hppResolver->resolve($manual->item) : 0.0;
             $hppCandidates = $productMappings->map(fn ($mapping) => $hppResolver->resolve($mapping->item))->filter(fn ($hpp) => $hpp > 0);

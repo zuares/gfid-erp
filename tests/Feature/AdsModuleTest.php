@@ -945,6 +945,103 @@ class AdsModuleTest extends TestCase
         $this->assertSame(20000.0, (float) $mappedCampaign->total_cogs);
     }
 
+    public function test_campaign_profit_uses_parent_marketplace_sku_mapping_when_no_variant_exists()
+    {
+        $store = $this->createStore('MAPPARENTSKU');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-PARENT-SKU',
+            'name' => 'Item Parent SKU Ads',
+            'type' => 'finished',
+            'hpp' => 15000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654400',
+            'item_name' => 'Produk Tanpa Variant',
+            'item_sku' => 'PARENT-SKU-ADS',
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'PARENT-SKU-ADS',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPPARENTSKU',
+            'channel_item_id' => $product->item_id,
+            'campaign_name' => 'Campaign Parent SKU',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPPARENTSKU',
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-MAPPARENTSKU');
+
+        $this->assertSame(15000.0, (float) $campaign->unit_cogs);
+        $this->assertSame(15000.0, (float) $campaign->total_cogs);
+    }
+
+    public function test_gmv_max_items_use_parent_marketplace_sku_mapping_when_no_variant_exists()
+    {
+        $store = $this->createStore('GMSPARENTSKU');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMS-PARENT-SKU',
+            'name' => 'Item GMV Max Parent SKU',
+            'type' => 'finished',
+            'hpp' => 15000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654401',
+            'item_name' => 'Produk GMV Max Tanpa Variant',
+            'item_sku' => 'GMS-PARENT-SKU',
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'GMS-PARENT-SKU',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => $product->item_id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 1000,
+            'broad_order' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_gmv' => 100000,
+            'raw_json' => ['broad_order_amount' => 1],
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '?date_from=2026-07-30&date_to=2026-07-30');
+
+        $response->assertOk()
+            ->assertJsonPath('mapped_items', 1)
+            ->assertJsonPath('data.0.unit_cogs', 15000);
+    }
+
     public function test_historical_comparison_uses_selected_compare_mode()
     {
         $store = $this->createStore('HISTMODE');
