@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Sales;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\Shipment;
-use App\Models\ShipmentLine;
 use App\Models\ShipmentReturn;
 use App\Models\ShipmentReturnLine;
 use App\Models\ShipmentReturnOrderScan;
 use App\Models\ShipmentReturnOrderScanItem;
-use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
@@ -22,33 +20,6 @@ class ShipmentReturnController extends Controller
     public function __construct(
         protected InventoryService $inventory
     ) {}
-
-    protected function returnStoreChannel(Store $store): ?string
-    {
-        $key = strtoupper(trim(($store->code ?? '') . ' ' . ($store->name ?? '')));
-
-        return match (true) {
-            str_contains($key, 'SHOPEE') || str_starts_with($key, 'SHP') => 'Shopee',
-            str_contains($key, 'TIKTOK') || str_contains($key, 'TTK') => 'TikTok',
-            str_contains($key, 'OFFLINE') || str_contains($key, 'OFFL') => 'Offline',
-            default => null,
-        };
-    }
-
-    protected function returnStores()
-    {
-        return Store::orderBy('code')
-            ->get()
-            ->filter(function (Store $store) {
-                return $this->returnStoreChannel($store) !== null;
-            })
-            ->map(function (Store $store) {
-                $store->setAttribute('return_channel', $this->returnStoreChannel($store));
-
-                return $store;
-            })
-            ->values();
-    }
 
     protected function devOrderCommandAllowed(): bool
     {
@@ -84,18 +55,20 @@ class ShipmentReturnController extends Controller
      */
     public function create(Request $request)
     {
-        $stores = $this->returnStores();
+        // Draft dibuat tanpa marketplace/shipment agar scanner menjadi entry point
+        // pencatatan yang mandiri. Relasi bisa ditambahkan di fase berikutnya.
+        $shipmentReturn = DB::transaction(function () {
+            return ShipmentReturn::create([
+                'code' => ShipmentReturn::generateCode('RTP'),
+                'store_id' => null,
+                'shipment_id' => null,
+                'date' => now()->toDateString(),
+                'status' => 'draft',
+                'created_by' => Auth::id(),
+            ]);
+        });
 
-        $shipment = null;
-        if ($request->filled('shipment_id')) {
-            $shipment = Shipment::with(['store', 'lines.item'])
-                ->find($request->shipment_id);
-        }
-
-        return view('sales.shipment_returns.create', [
-            'stores' => $stores,
-            'shipment' => $shipment,
-        ]);
+        return redirect()->route('sales.shipment_returns.edit', $shipmentReturn);
     }
 
     public function edit(ShipmentReturn $shipmentReturn)
@@ -121,47 +94,77 @@ class ShipmentReturnController extends Controller
             ]);
         }
 
-        $item = Item::query()
-            ->where('type', 'finished_good')
-            ->where(function ($query) use ($code) {
-                $query->where('barcode', $code)
-                    ->orWhere('code', $code)
-                    ->orWhereHas('barcodes', function ($barcodeQuery) use ($code) {
-                        $barcodeQuery->where('barcode', $code)
-                            ->where('is_active', true);
-                    });
-            })
-            ->first(['id', 'code', 'name']);
+        // Lookup order sengaja tidak mengakses marketplace/shipment. Semua kode
+        // yang discan diterima sebagai nomor order dan dicatat apa adanya.
+        return response()->json([
+            'type' => 'order',
+            'order' => [
+                'code' => $code,
+            ],
+        ]);
+    }
 
-        if ($item) {
+    /**
+     * Catat nomor order hasil scan tanpa mencoba resolve ke marketplace/shipment.
+     */
+    public function scanOrder(Request $request, ShipmentReturn $shipmentReturn)
+    {
+        if ($shipmentReturn->status !== 'draft') {
             return response()->json([
-                'type' => 'item',
-                'item' => [
-                    'id' => $item->id,
-                    'code' => $item->code,
-                    'name' => $item->name,
-                ],
-            ]);
+                'status' => 'error',
+                'message' => 'Pencatatan sudah tidak berstatus draft.',
+            ], 409);
         }
 
-        $shipment = Shipment::with('store:id,code,name')
-            ->where('code', $code)
-            ->first(['id', 'code', 'store_id', 'date']);
+        $data = $request->validate([
+            'order_number' => ['required', 'string', 'max:100'],
+        ]);
 
-        if ($shipment) {
+        $orderNumber = mb_strtoupper(trim($data['order_number']));
+        if ($orderNumber === '') {
             return response()->json([
-                'type' => 'order',
-                'order' => [
-                    'id' => $shipment->id,
-                    'code' => $shipment->code,
-                    'store_code' => $shipment->store?->code,
-                    'store_name' => $shipment->store?->name,
-                ],
-            ]);
+                'status' => 'error',
+                'message' => 'Nomor order belum diisi.',
+            ], 422);
         }
+
+        $scan = DB::transaction(function () use ($shipmentReturn, $orderNumber) {
+            ShipmentReturn::query()
+                ->lockForUpdate()
+                ->findOrFail($shipmentReturn->id);
+
+            $scan = ShipmentReturnOrderScan::query()
+                ->where('shipment_return_id', $shipmentReturn->id)
+                ->where('order_number', $orderNumber)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$scan) {
+                $scan = ShipmentReturnOrderScan::create([
+                    'shipment_return_id' => $shipmentReturn->id,
+                    'order_number' => $orderNumber,
+                    'match_status' => 'pending',
+                    'source' => 'scanner',
+                    'raw_payload' => [
+                        'mode' => 'record_only',
+                        'label' => 'Pencatatan order',
+                    ],
+                ]);
+            }
+
+            return $scan;
+        });
 
         return response()->json([
-            'type' => 'unknown',
+            'status' => 'ok',
+            'created' => $scan->wasRecentlyCreated,
+            'message' => $scan->wasRecentlyCreated
+                ? "Order {$orderNumber} dicatat."
+                : "Order {$orderNumber} sudah tercatat.",
+            'order' => [
+                'code' => $orderNumber,
+                'label' => 'Pencatatan order',
+            ],
         ]);
     }
 
@@ -203,56 +206,28 @@ class ShipmentReturnController extends Controller
                 ->findOrFail($shipmentReturn->id);
 
             return $codes->map(function (string $code) use ($shipmentReturn) {
-                $shipment = Shipment::with('store:id,code,name')
-                    ->where('code', $code)
-                    ->first();
-
                 $scan = ShipmentReturnOrderScan::query()
                     ->where('shipment_return_id', $shipmentReturn->id)
-                    ->where(function ($query) use ($code) {
-                        $query->where('order_number', $code)
-                            ->orWhere('order_no', $code);
-                    })
+                    ->where('order_number', $code)
                     ->lockForUpdate()
                     ->first();
 
                 if (!$scan) {
                     $scan = ShipmentReturnOrderScan::create([
                         'shipment_return_id' => $shipmentReturn->id,
-                        'order_no' => $code,
                         'order_number' => $code,
-                        'shipment_id' => $shipment?->id,
-                        'status' => 'pending',
                         'match_status' => 'pending',
-                        'source_type' => 'dev_command',
                         'source' => 'dev_command',
-                        'raw_payload' => $shipment ? [
-                            'shipment_id' => $shipment->id,
-                            'store_id' => $shipment->store_id,
-                            'store_code' => $shipment->store?->code,
-                            'store_name' => $shipment->store?->name,
-                        ] : null,
+                        'raw_payload' => [
+                            'mode' => 'record_only',
+                            'label' => 'Pencatatan order',
+                        ],
                     ]);
-                } else {
-                    $scan->fill([
-                        'order_number' => $scan->order_number ?: $code,
-                        'order_no' => $scan->order_no ?: $code,
-                        'shipment_id' => $scan->shipment_id ?: $shipment?->id,
-                    ])->save();
                 }
-
-                if (!$shipmentReturn->shipment_id && $shipment) {
-                    $shipmentReturn->shipment_id = $shipment->id;
-                    $shipmentReturn->save();
-                }
-
-                $label = $shipment
-                    ? collect([$shipment->store?->code, $shipment->store?->name])->filter()->implode(' - ')
-                    : 'Manual';
 
                 return [
                     'code' => $code,
-                    'label' => $label !== '' ? $label : 'Manual',
+                    'label' => 'Pencatatan order',
                     'items' => [],
                 ];
             })->values();
@@ -288,7 +263,7 @@ class ShipmentReturnController extends Controller
                 ->get();
 
             $orderNumbers = $orderScans
-                ->map(fn ($scan) => mb_strtoupper(trim((string) ($scan->order_number ?: $scan->order_no))))
+                ->map(fn ($scan) => mb_strtoupper(trim((string) $scan->order_number)))
                 ->filter()
                 ->unique()
                 ->values();
@@ -336,7 +311,7 @@ class ShipmentReturnController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'store_id'      => ['required', 'exists:stores,id'],
+            'store_id'      => ['nullable', 'exists:stores,id'],
             'shipment_id'   => ['nullable', 'exists:shipments,id'],
             'order_number'  => ['nullable', 'string', 'max:100'],
             'date'          => ['required', 'date'],
@@ -373,26 +348,7 @@ class ShipmentReturnController extends Controller
             $notes = $notes !== '' ? ($notes . "\n" . $orderNote) : $orderNote;
         }
 
-        $store = Store::findOrFail($data['store_id']);
-        if ($this->returnStoreChannel($store) === null) {
-            return back()
-                ->withErrors(['store_id' => 'Marketplace retur hanya Shopee, TikTok, atau Offline.'])
-                ->withInput();
-        }
-
-        $storeCode = strtoupper(trim($store->code ?? ''));
-        $storeKey  = $storeCode . ' ' . strtoupper(trim($store->name ?? ''));
-
         $prefix = 'RTP';
-        $cleanCode = preg_replace('/[^A-Z0-9]/', '', $storeCode);
-        if ($cleanCode !== '') {
-            $prefix = substr($cleanCode, 0, 3) . 'R';
-        }
-        if (str_contains($storeKey, 'SHP') || str_contains($storeKey, 'SHOPEE')) {
-            $prefix = 'SHR';
-        } elseif (str_contains($storeKey, 'TTK') || str_contains($storeKey, 'TIKTOK')) {
-            $prefix = 'TTR';
-        }
 
         $ret = DB::transaction(function () use ($data, $shipmentId, $prefix, $notes) {
             $ret = ShipmentReturn::create([
@@ -541,53 +497,25 @@ class ShipmentReturnController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($shipmentReturn->id);
 
-            $foundShipment = null;
             $orderScan = null;
             if ($orderNumber !== '') {
-                $foundShipment = Shipment::with('store:id,code,name')
-                    ->where('code', $orderNumber)
-                    ->first();
-
                 $orderScan = ShipmentReturnOrderScan::query()
                     ->where('shipment_return_id', $shipmentReturn->id)
-                    ->where(function ($query) use ($orderNumber) {
-                        $query->where('order_number', $orderNumber)
-                            ->orWhere('order_no', $orderNumber);
-                    })
+                    ->where('order_number', $orderNumber)
                     ->lockForUpdate()
                     ->first();
 
                 if (!$orderScan) {
                     $orderScan = ShipmentReturnOrderScan::create([
                         'shipment_return_id' => $shipmentReturn->id,
-                        'order_no' => $orderNumber,
                         'order_number' => $orderNumber,
-                        'shipment_id' => $foundShipment?->id,
-                        'matched_order_id' => null,
-                        'status' => 'pending',
                         'match_status' => 'pending',
-                        'source_type' => 'scanner',
                         'source' => 'scanner',
-                        'raw_payload' => $foundShipment ? [
-                            'shipment_id' => $foundShipment->id,
-                            'store_id' => $foundShipment->store_id,
-                            'store_code' => $foundShipment->store?->code,
-                            'store_name' => $foundShipment->store?->name,
-                        ] : null,
+                        'raw_payload' => [
+                            'mode' => 'record_only',
+                            'label' => 'Pencatatan order',
+                        ],
                     ]);
-                } elseif (!$orderScan->order_number) {
-                    $orderScan->order_number = $orderNumber;
-                    $orderScan->save();
-                }
-
-                if (!$shipmentReturn->shipment_id && $foundShipment) {
-                    $shipmentReturn->shipment_id = $foundShipment->id;
-                }
-
-                $noteLine = 'Pesanan retur: ' . $orderNumber;
-                $notes = (string) ($shipmentReturn->notes ?? '');
-                if (!str_contains($notes, $noteLine)) {
-                    $shipmentReturn->notes = trim($notes . "\n" . $noteLine);
                 }
                 $shipmentReturn->save();
             }
@@ -606,19 +534,9 @@ class ShipmentReturnController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            // Opsional: link ke shipment_line asal kalau ada shipment_id
+            // Link ke shipment_line sengaja ditunda agar pencatatan tidak
+            // bergantung pada modul shipment/marketplace.
             $shipmentLineId = null;
-            $shipmentForLine = $foundShipment ?: $shipmentReturn->shipment;
-            if ($shipmentForLine) {
-                $shipmentLine = ShipmentLine::query()
-                    ->where('shipment_id', $shipmentForLine->id)
-                    ->where('item_id', $item->id)
-                    ->first();
-
-                if ($shipmentLine) {
-                    $shipmentLineId = $shipmentLine->id;
-                }
-            }
 
             if ($line) {
                 $line->qty = (int) $line->qty + $qty;
@@ -645,7 +563,6 @@ class ShipmentReturnController extends Controller
                         ],
                         [
                             'shipment_return_line_id' => $line->id,
-                            'qty' => (int) $line->qty,
                             'qty_scanned' => (int) $line->qty,
                             'match_status' => 'pending',
                         ]
@@ -738,6 +655,12 @@ class ShipmentReturnController extends Controller
             return back()
                 ->with('status', 'error')
                 ->with('message', 'Shipment retur harus berstatus submitted sebelum diposting.');
+        }
+
+        if (!$shipmentReturn->store_id) {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Pencatatan mandiri belum terhubung ke marketplace/store. Posting inventory belum tersedia.');
         }
 
         $shipmentReturn->load(['lines.item', 'store']);

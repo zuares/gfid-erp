@@ -6,6 +6,8 @@
     $ctr = $funnelImpressions > 0 ? ($funnelClicks / $funnelImpressions) * 100 : 0;
     $cvr = $funnelClicks > 0 ? ($funnelOrders / $funnelClicks) * 100 : 0;
     $overallConv = $funnelImpressions > 0 ? ($funnelOrders / $funnelImpressions) * 100 : 0;
+    $impressionDropoff = max(0, min(100, 100 - $ctr));
+    $clickDropoff = max(0, min(100, 100 - $cvr));
 
     // Drop-off Analysis: Products with high clicks but 0 orders (Clickbait / Pricing issue)
     $highDropoffProducts = $itemPerformance->filter(function($p) {
@@ -37,7 +39,7 @@
                 </div>
                 <!-- Drop-off arrow -->
                 <div class="text-center my-2 text-muted small">
-                    <i class="bi bi-arrow-down"></i> Drop-off: {{ number_format(100 - $ctr, 2) }}% (Tidak klik iklan)
+                    <i class="bi bi-arrow-down"></i> Drop-off: {{ number_format($impressionDropoff, 2) }}% (Tidak klik iklan)
                 </div>
             </div>
 
@@ -54,7 +56,7 @@
                 </div>
                 <!-- Drop-off arrow -->
                 <div class="text-center my-2 text-muted small">
-                    <i class="bi bi-arrow-down"></i> Drop-off: {{ number_format(100 - $cvr, 2) }}% (Klik tapi tidak beli)
+                    <i class="bi bi-arrow-down"></i> Drop-off: {{ number_format($clickDropoff, 2) }}% (Klik tapi tidak beli)
                 </div>
             </div>
 

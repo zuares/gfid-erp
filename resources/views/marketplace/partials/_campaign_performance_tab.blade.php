@@ -14,6 +14,7 @@
     $totalClicks = 0;
     $totalImpressions = 0;
     $totalProfit = 0;
+    $profitUnknownCount = 0;
 
     foreach ($campaigns as $camp) {
         if (!($camp->spend > 0 || $camp->gmv > 0)) continue;
@@ -39,15 +40,24 @@
         $cpa = $orders > 0 ? $spend / $orders : 0;
 
         // Profit & POAS
-        $profit = (float) ($camp->profit_after_ads ?? 0);
-        $totalProfit += $profit;
-        $poas = $spend > 0 ? $profit / $spend : 0;
+        $profitAvailable = $camp->profit_after_ads !== null;
+        $profit = $profitAvailable ? (float) $camp->profit_after_ads : null;
+        if ($profitAvailable) {
+            $totalProfit += $profit;
+        } else {
+            $profitUnknownCount++;
+        }
+        $topup = $spend * 1.11;
+        $poas = $profitAvailable && $topup > 0 ? $profit / $topup : null;
 
         // Recommendation Logic
         $reco = 'Review';
         $recoColor = 'secondary';
         
-        if ($profit > 0) {
+        if (!$profitAvailable) {
+            $reco = 'Data HPP';
+            $recoColor = 'secondary';
+        } elseif ($profit > 0) {
             if ($poas > 0.2) { // Profit 20% of spend is good enough to scale
                 $reco = 'Scale';
                 $recoColor = 'success';
@@ -86,6 +96,7 @@
             'roas' => $roas,
             'cpa' => $cpa,
             'profit' => $profit,
+            'profit_available' => $profitAvailable,
             'poas' => $poas,
             'reco' => $reco,
             'recoColor' => $recoColor,
@@ -131,11 +142,11 @@
     </div>
     <div class="col-6 col-md-3">
         <div class="dpanel p-3 h-100">
-            <div class="text-muted small fw-bold text-uppercase mb-1" data-bs-toggle="tooltip" title="Estimasi profit bersih setelah dikurangi HPP, Ad Spend, dan Potongan Marketplace">Est. Net Profit</div>
-            <div class="fs-4 fw-bolder {{ $totalProfit >= 0 ? 'text-success' : 'text-danger' }}">
+            <div class="text-muted small fw-bold text-uppercase mb-1" data-bs-toggle="tooltip" title="Profit hanya dijumlahkan untuk campaign yang memiliki HPP">Net Profit Terhitung</div>
+            <div class="fs-4 fw-bolder {{ $profitUnknownCount > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">
                 Rp {{ number_format($totalProfit, 0, ',', '.') }}
             </div>
-            <div class="small text-muted mt-1">POAS: {{ number_format($totalSpend > 0 ? $totalProfit / $totalSpend : 0, 2) }}x</div>
+            <div class="small text-muted mt-1">POAS: {{ number_format($totalSpend > 0 ? $totalProfit / ($totalSpend * 1.11) : 0, 2) }}x · {{ $profitUnknownCount }} belum ada HPP</div>
         </div>
     </div>
 </div>
@@ -214,10 +225,10 @@
                         <td class="text-end text-success fw-bold">Rp {{ number_format($row['gmv'], 0, ',', '.') }}</td>
                         <td class="text-end">Rp {{ number_format($row['cpa'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($row['roas'], 2) }}x</td>
-                        <td class="text-end fw-bold {{ $row['profit'] >= 0 ? 'text-success' : 'text-danger' }}">
-                            Rp {{ number_format($row['profit'], 0, ',', '.') }}
+                        <td class="text-end fw-bold {{ !$row['profit_available'] ? 'text-muted' : ($row['profit'] >= 0 ? 'text-success' : 'text-danger') }}">
+                            {{ !$row['profit_available'] ? 'N/A' : 'Rp ' . number_format($row['profit'], 0, ',', '.') }}
                         </td>
-                        <td class="text-end">{{ number_format($row['poas'], 2) }}</td>
+                        <td class="text-end">{{ $row['poas'] === null ? 'N/A' : number_format($row['poas'], 2) . 'x' }}</td>
                         <td class="text-center">
                             <button class="btn btn-sm btn-light border" onclick="alert('Drill-down insight detail campaign {{ $row['id'] }}')">
                                 <i class="bi bi-search"></i>

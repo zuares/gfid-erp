@@ -4,7 +4,6 @@ namespace App\Services\Marketplace\Ads;
 
 use App\Models\Item;
 use App\Models\MarketplaceAdCampaign;
-use App\Models\MarketplaceAdsDaily;
 use App\Models\MarketplaceAdsSetting;
 use App\Models\MarketplaceAdsSyncRun;
 use App\Models\MarketplaceOrderItem;
@@ -29,23 +28,74 @@ class AdsDashboardService
     ): array {
         $dateFrom = $this->safeDate($dateFromInput, now()->subDays(6));
         $dateTo = $this->safeDate($dateToInput, now());
+        if ($dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
         $isAllStores = $storeId === 'all';
         $storeIds = $isAllStores ? $stores->pluck('id')->all() : [$storeId];
 
         // (Removed getKpiSummary)
 
-        $dailyChartData = MarketplaceAdsDaily::whereIn('store_id', $storeIds)
-            ->whereBetween('date', [$dateFrom, $dateTo])
-            ->orderBy('date')
-            ->get(['date', 'impressions', 'clicks', 'spend', 'orders', 'gmv', 'roas'])
-            ->map(fn (MarketplaceAdsDaily $row) => [
-                'date'        => substr((string) $row->date, 0, 10),
-                'impressions' => (int) $row->impressions,
-                'clicks'      => (int) $row->clicks,
-                'spend'       => (float) $row->spend,
-                'orders'      => (int) $row->orders,
-                'gmv'         => (float) $row->gmv,
-                'roas'        => (float) ($row->roas ?? 0),
+        // Ringkasan memakai grain level toko sebagai sumber utama. Campaign
+        // daily tetap dipakai untuk drill-down, tetapi menjumlahkan semua
+        // campaign dapat membesar jika laporan agregat GMS ikut tersimpan.
+        $summaryByDate = function (string $from, string $to) use ($storeIds): array {
+            $shop = DB::table('marketplace_ads_dailies')
+                ->whereIn('store_id', $storeIds)
+                ->whereBetween('date', [$from, $to])
+                ->selectRaw('date, SUM(impressions) impressions, SUM(clicks) clicks, SUM(spend) spend, SUM(orders) orders, SUM(gmv) gmv')
+                ->groupBy('date')
+                ->get()
+                ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+            $campaign = DB::table('marketplace_ad_campaign_dailies')
+                ->whereIn('store_id', $storeIds)
+                ->whereNotLike('channel_campaign_id', 'GMS-%')
+                ->whereBetween('date', [$from, $to])
+                ->selectRaw('date, SUM(impressions) impressions, SUM(clicks) clicks, SUM(expense) spend, SUM(broad_order) orders, SUM(broad_gmv) gmv')
+                ->groupBy('date')
+                ->get()
+                ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+            $gms = DB::table('marketplace_ad_campaign_dailies')
+                ->whereIn('store_id', $storeIds)
+                ->whereLike('channel_campaign_id', 'GMS-%')
+                ->whereBetween('date', [$from, $to])
+                ->selectRaw('date, SUM(impressions) impressions, SUM(clicks) clicks, SUM(expense) spend, SUM(broad_order) orders, SUM(broad_gmv) gmv')
+                ->groupBy('date')
+                ->get()
+                ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+            $dates = $shop->keys()->merge($campaign->keys())->merge($gms->keys())->unique()->sort()->values();
+
+            return $dates->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
+                // Jika total toko sudah tersedia, campaign non-GMS tidak
+                // dijumlahkan lagi. GMS ditambahkan sebagai komponen terpisah.
+                $base = $shop->get($date) ?? $campaign->get($date);
+                $extra = $gms->get($date);
+                $row = (object) [
+                    'date' => $date,
+                    'impressions' => (int) ($base->impressions ?? 0) + (int) ($extra->impressions ?? 0),
+                    'clicks' => (int) ($base->clicks ?? 0) + (int) ($extra->clicks ?? 0),
+                    'spend' => (float) ($base->spend ?? 0) + (float) ($extra->spend ?? 0),
+                    'orders' => (int) ($base->orders ?? 0) + (int) ($extra->orders ?? 0),
+                    'gmv' => (float) ($base->gmv ?? 0) + (float) ($extra->gmv ?? 0),
+                ];
+
+                return [$date => $row];
+            })->all();
+        };
+
+        $dailyChartData = collect($summaryByDate($dateFrom, $dateTo))
+            ->sortKeys()
+            ->map(fn ($row) => [
+                'date'        => $row->date,
+                'impressions' => $row->impressions,
+                'clicks'      => $row->clicks,
+                'spend'       => $row->spend,
+                'orders'      => $row->orders,
+                'gmv'         => $row->gmv,
+                'roas'        => (float) ($row->spend > 0 ? $row->gmv / $row->spend : 0),
             ])
             ->values();
 
@@ -84,6 +134,18 @@ class AdsDashboardService
         };
         $aggCur = $aggFor($dateFrom, $dateTo);
         $aggPrev = $aggFor($prevDateFrom, $prevDateTo);
+        $sumSummary = function (array $rows): object {
+            return collect($rows)->reduce(function ($carry, $row) {
+            $carry->spend += $row->spend;
+            $carry->gmv += $row->gmv;
+            $carry->orders += $row->orders;
+            $carry->clicks += $row->clicks;
+            $carry->impressions += $row->impressions;
+            return $carry;
+            }, (object) ['spend' => 0.0, 'gmv' => 0.0, 'orders' => 0, 'clicks' => 0, 'impressions' => 0]);
+        };
+        $summaryCurrent = $sumSummary($summaryByDate($dateFrom, $dateTo));
+        $summaryPrevious = $sumSummary($summaryByDate($prevDateFrom, $prevDateTo));
 
         $campaigns = MarketplaceAdCampaign::query()
             ->select([
@@ -95,6 +157,7 @@ class AdsDashboardService
                 'campaign_name',
                 'campaign_status',
                 'ad_type',
+                'campaign_placement',
                 'target_roas',
                 'campaign_budget',
                 'break_even_acos',
@@ -140,6 +203,7 @@ class AdsDashboardService
                 $camp->sum_prev_impressions = (int) ($p->si ?? 0);
                 $camp->sum_prev_broad_orders = (int) ($p->sbo ?? 0);
                 $camp->sum_prev_direct_orders = (int) ($p->sdo ?? 0);
+                $camp->sum_prev_broad_order_amount = (float) ($p->sboa ?? 0);
 
                 $camp->sum_gmv = $camp->sum_broad_gmv ?? 0;
                 $camp->sum_orders = $camp->sum_broad_orders ?? 0;
@@ -204,7 +268,9 @@ class AdsDashboardService
                 }
                 $camp->break_even_acos_pct = $beAcos !== null ? round($beAcos * 100, 1) : null;
 
-                if ($beAcos !== null) {
+                $hasCogsData = $camp->unit_cogs > 0
+                    && (($camp->items_sold ?? 0) > 0 || $trueAvgPrice > 0);
+                if ($beAcos !== null && $hasCogsData) {
                     $netRevenue = $camp->gmv * $netRevRatio;
                     $totalCogs = ($camp->unit_cogs > 0 && ($camp->items_sold ?? 0) > 0)
                         ? $camp->unit_cogs * $camp->items_sold
@@ -221,12 +287,14 @@ class AdsDashboardService
 
                 // Kalkulasi Previous Net & Profit
                 $prevNetRevenue = $camp->prev_gmv * $netRevRatio;
-                $prevTotalCogs = ($camp->unit_cogs > 0 && ($camp->sum_prev_broad_orders ?? 0) > 0) // Approximation if previous items sold is missing
-                    ? $camp->unit_cogs * ($camp->sum_prev_broad_orders ?? 0)
+                $prevTotalCogs = ($camp->unit_cogs > 0 && ($camp->sum_prev_broad_order_amount ?? 0) > 0)
+                    ? $camp->unit_cogs * ($camp->sum_prev_broad_order_amount ?? 0)
                     : $camp->prev_gmv * ($camp->cogs_ratio ?? 0);
                 $camp->prev_net_revenue = $prevNetRevenue;
                 $camp->prev_total_cogs = $prevTotalCogs;
-                $camp->prev_profit_after_ads = $beAcos !== null ? round($prevNetRevenue - $prevTotalCogs - ($camp->prev_spend * 1.11), 2) : 0;
+                $camp->prev_profit_after_ads = $beAcos !== null && $hasCogsData
+                    ? round($prevNetRevenue - $prevTotalCogs - ($camp->prev_spend * 1.11), 2)
+                    : null;
 
                 $camp->reco = $this->adsRecommendation((float) $camp->spend, $acos, $beAcos, (int) $camp->orders);
 
@@ -261,29 +329,30 @@ class AdsDashboardService
         // -------------------------------------------------------------
         $kpi = [
             'current' => (object) [
-                'spend' => $campaigns->sum('spend'),
-                'gmv' => $campaigns->sum('gmv'),
-                'orders' => $campaigns->sum('orders'),
-                'clicks' => $campaigns->sum('clicks'),
-                'impressions' => $campaigns->sum('impressions'),
+                'spend' => $summaryCurrent->spend,
+                'gmv' => $summaryCurrent->gmv,
+                'orders' => $summaryCurrent->orders,
+                'clicks' => $summaryCurrent->clicks,
+                'impressions' => $summaryCurrent->impressions,
                 'net_revenue' => $campaigns->sum('net_revenue'),
                 'total_cogs' => $campaigns->sum('total_cogs'),
             ],
             'previous' => (object) [
-                'spend' => $campaigns->sum('prev_spend'),
-                'gmv' => $campaigns->sum('prev_gmv'),
-                'orders' => $campaigns->sum('prev_orders'),
-                'clicks' => $campaigns->sum('prev_clicks'),
-                'impressions' => $campaigns->sum('prev_impressions'),
+                'spend' => $summaryPrevious->spend,
+                'gmv' => $summaryPrevious->gmv,
+                'orders' => $summaryPrevious->orders,
+                'clicks' => $summaryPrevious->clicks,
+                'impressions' => $summaryPrevious->impressions,
                 'net_revenue' => $campaigns->sum('prev_net_revenue'),
                 'total_cogs' => $campaigns->sum('prev_total_cogs'),
             ],
             'changes' => []
         ];
 
-        // Hitung Net Profit dari total agregasi agar mencakup campaign tanpa HPP
-        $kpi['current']->net_profit = $kpi['current']->net_revenue - $kpi['current']->total_cogs - ($kpi['current']->spend * 1.11);
-        $kpi['previous']->net_profit = $kpi['previous']->net_revenue - $kpi['previous']->total_cogs - ($kpi['previous']->spend * 1.11);
+        // Profit hanya dijumlahkan dari campaign yang punya HPP; campaign tanpa
+        // HPP tidak boleh dianggap sebagai profit 0 atau rugi.
+        $kpi['current']->net_profit = $campaigns->filter(fn ($camp) => $camp->profit_after_ads !== null)->sum('profit_after_ads');
+        $kpi['previous']->net_profit = $campaigns->filter(fn ($camp) => $camp->prev_profit_after_ads !== null)->sum('prev_profit_after_ads');
 
         // Hitung AOV Net
         $kpi['current']->aov_net = $kpi['current']->orders > 0 ? $kpi['current']->net_revenue / $kpi['current']->orders : 0;
@@ -293,7 +362,7 @@ class AdsDashboardService
             $c = $kpi['current']->$m;
             $p = $kpi['previous']->$m;
             if ($p == 0) {
-                $kpi['changes'][$m] = $c > 0 ? 100 : 0;
+                $kpi['changes'][$m] = $c > 0 ? null : 0;
             } else {
                 $kpi['changes'][$m] = round((($c - $p) / abs($p)) * 100, 2);
             }
@@ -338,7 +407,7 @@ class AdsDashboardService
             ->first();
 
         $heatmapData = $analytics->getHourlyHeatmap($storeIds, $dateFrom, $dateTo);
-        $historicalData = $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3);
+        $historicalData = $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3, $compareMode);
 
         $itemPerformanceRaw = DB::table('marketplace_ad_campaign_dailies as cd')
             ->join('marketplace_ad_campaigns as c', function ($join) {
@@ -406,11 +475,12 @@ class AdsDashboardService
                 $prod->gross_profit = $prod->net_revenue - $totalCogs;
                 // Subtract Ad Spend (with 11% Tax)
                 $prod->profit_after_ads = round($prod->gross_profit - ($prod->spend * 1.11), 2);
-                $prod->poas = $prod->spend > 0 ? $prod->profit_after_ads / $prod->spend : 0;
+                $prod->poas = $prod->spend > 0 ? $prod->profit_after_ads / ($prod->spend * 1.11) : 0;
             } else {
-                $prod->gross_profit = $prod->net_revenue; // Without COGS
+                // HPP tidak tersedia: jangan menganggap seluruh pendapatan sebagai gross profit.
+                $prod->gross_profit = null;
                 $prod->profit_after_ads = null;
-                $prod->poas = 0;
+                $prod->poas = null;
             }
             
             $prod->item_category = $catByChan[(string) $prod->channel_item_id] ?? 'Uncategorized';
@@ -636,7 +706,8 @@ class AdsDashboardService
         // 1. Get unique buyers who purchased in the current period
         $ordersInPeriod = DB::table('marketplace_orders')
             ->whereIn('store_id', $storeIds)
-            ->whereBetween('order_date', [$dateFrom, $dateTo])
+            ->whereDate('order_date', '>=', $dateFrom)
+            ->whereDate('order_date', '<=', $dateTo)
             ->whereNotIn('status', ['CANCELLED', 'UNPAID', 'cancelled', 'unpaid'])
             ->whereNotNull('buyer_username')
             ->select('buyer_username', 'total_amount')

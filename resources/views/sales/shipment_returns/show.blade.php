@@ -374,12 +374,12 @@
     $totalQty = (int) $lines->sum('qty');
     $groupedOrders = $shipmentReturn->orderScans->isNotEmpty()
         ? $shipmentReturn->orderScans->map(fn ($scan) => [
-            'code' => ($scan->order_number ?: $scan->order_no) ?: 'MANUAL',
-            'qty' => (int) $scan->items->sum(fn ($scanItem) => (int) ($scanItem->qty_scanned ?: $scanItem->qty)),
+            'code' => $scan->order_number ?: 'MANUAL',
+            'qty' => (int) $scan->items->sum(fn ($scanItem) => (int) $scanItem->qty_scanned),
             'items' => $scan->items->map(fn ($scanItem) => [
                 'code' => $scanItem->item->code ?? '-',
                 'name' => $scanItem->item->name ?? '',
-                'qty' => (int) ($scanItem->qty_scanned ?: $scanItem->qty),
+                'qty' => (int) $scanItem->qty_scanned,
             ])->values(),
         ])->values()
         : $lines
@@ -438,7 +438,7 @@
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Marketplace</div>
-                        <div class="sr-meta-value">{{ $shipmentReturn->store->code ?? '-' }} - {{ $shipmentReturn->store->name ?? '-' }}</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->store ? (($shipmentReturn->store->code ?? '-') . ' - ' . ($shipmentReturn->store->name ?? '-')) : 'Belum dihubungkan' }}</div>
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Tanggal</div>
@@ -446,7 +446,7 @@
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Shipment Asal</div>
-                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Manual' }}</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Belum dihubungkan' }}</div>
                     </div>
                 </div>
             </div>
@@ -559,10 +559,15 @@
                         <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Submit</button>
                     </form>
                 @elseif ($status === 'submitted')
-                    <form action="{{ route('sales.shipment_returns.post', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Posting retur ini dan tambah stok ke WH-RTS?');">
-                        @csrf
-                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Posting WH-RTS</button>
-                    </form>
+                    @if ($shipmentReturn->store_id)
+                        <form action="{{ route('sales.shipment_returns.post', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Posting retur ini dan tambah stok ke WH-RTS?');">
+                            @csrf
+                            <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Posting WH-RTS</button>
+                        </form>
+                    @else
+                        <span class="sr-note">Pencatatan tersimpan. Posting inventory menunggu koneksi marketplace.</span>
+                        <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>
+                    @endif
                 @else
                     <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>
                 @endif

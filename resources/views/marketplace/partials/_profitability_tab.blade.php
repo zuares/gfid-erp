@@ -23,13 +23,16 @@
         $itemsSold     = (int) ($camp->items_sold ?? 0);
         $unitCogsRow   = (float) ($camp->unit_cogs ?? 0);
         // COGS eksak = HPP/unit × pcs terjual; fallback estimasi rasio harga
-        // hanya untuk data lama yang belum punya pcs.
+        // hanya jika HPP tersedia tetapi jumlah pcs belum tersedia.
         $cogsExact     = $unitCogsRow > 0 && $itemsSold > 0;
+        $cogsRatio     = (float) ($camp->cogs_ratio ?? 0);
         $totalCogsRow  = $cogsExact
             ? $unitCogsRow * $itemsSold
-            : $camp->gmv * ($camp->cogs_ratio ?? 0);
+            : ($cogsRatio > 0 ? $camp->gmv * $cogsRatio : null);
         $spendAfterTax = $camp->spend * 1.11; // PPN 11% topup iklan
-        $profit        = $netRevenue - $totalCogsRow - $spendAfterTax;
+        $profit        = $totalCogsRow !== null
+            ? $netRevenue - $totalCogsRow - $spendAfterTax
+            : null;
         $acos          = $camp->gmv > 0 ? ($camp->spend / $camp->gmv) * 100 : 0;
         $beAcos        = $camp->break_even_acos_pct; // batas aman (sudah faktor pajak)
 
@@ -50,17 +53,18 @@
             'acosBarPct'    => ($beAcos && $beAcos > 0) ? min(100, ($acos / $beAcos) * 100) : 0,
             'acosOk'        => $beAcos !== null ? $acos <= $beAcos : null,
             'profit'        => $profit,
-            'isProfitable'  => $profit >= 0,
+            'isProfitable'  => $profit === null ? null : $profit >= 0,
         ]);
     }
 
     // Kampanye paling rugi ditaruh paling atas — itu yang butuh perhatian duluan.
-    $rows = $rows->sortBy('profit')->values();
+    $rows = $rows->sortBy(fn ($r) => $r->profit === null ? INF : $r->profit)->values();
 
     // ── Group by KATEGORI (hasil mapping SKU produk marketplace → item internal) ──
     $byCategory = $rows
         ->groupBy(fn ($r) => $r->camp->item_category ?? 'Belum termapping')
         ->map(function ($grp, $name) {
+            $known = $grp->filter(fn ($r) => $r->profit !== null);
             return (object) [
                 'name'       => $name,
                 'campaigns'  => $grp->count(),
@@ -70,9 +74,10 @@
                 'topup'      => $grp->sum('spendAfterTax'),
                 'gmv'        => $grp->sum(fn ($r) => (float) $r->camp->gmv),
                 'netRevenue' => $grp->sum('netRevenue'),
-                'cogs'       => $grp->sum('totalCogs'),
-                'profit'     => $grp->sum('profit'),
-                'lossCount'  => $grp->where('isProfitable', false)->count(),
+                'cogs'       => $known->sum('totalCogs'),
+                'profit'     => $known->sum('profit'),
+                'lossCount'  => $known->where('isProfitable', false)->count(),
+                'unknownCount'=> $grp->count() - $known->count(),
                 'unmapped'   => $name === 'Belum termapping',
             ];
         })
@@ -80,18 +85,22 @@
         ->values();
 
     $totalCampaigns  = $rows->count();
-    $profitableCount = $rows->where('isProfitable', true)->count();
-    $lossCount       = $totalCampaigns - $profitableCount;
+    $knownRows       = $rows->filter(fn ($r) => $r->profit !== null);
+    $profitableCount = $knownRows->where('isProfitable', true)->count();
+    $lossCount       = $knownRows->where('isProfitable', false)->count();
+    $unknownProfitCount = $totalCampaigns - $knownRows->count();
     $totalSpend      = $rows->sum(fn ($r) => $r->camp->spend);
     $totalTopup      = $rows->sum('spendAfterTax');
     $totalGmv        = $rows->sum(fn ($r) => $r->camp->gmv);
     $totalNetRevenue = $rows->sum('netRevenue');
-    $totalCogsAll    = $rows->sum('totalCogs');
-    $totalProfit     = $rows->sum('profit');
+    $totalCogsAll    = $knownRows->sum('totalCogs');
+    $totalProfit     = $knownRows->sum('profit');
+    $knownGmv        = $knownRows->sum(fn ($r) => (float) $r->camp->gmv);
+    $knownNetRevenue = $knownRows->sum('netRevenue');
     $avgAcos         = $totalGmv > 0 ? ($totalSpend / $totalGmv) * 100 : 0;
     $cogsPctOmzet    = $totalGmv > 0 ? ($totalCogsAll / $totalGmv) * 100 : 0;   // porsi modal terhadap omzet
-    $grossMargin     = $totalNetRevenue - $totalCogsAll;                        // sisa setelah HPP, sebelum iklan
-    $noHppCount      = $rows->filter(fn ($r) => $r->unitCogs <= 0)->count();    // kampanye tanpa data HPP
+    $grossMargin     = $knownNetRevenue - $totalCogsAll;                        // sisa setelah HPP, sebelum iklan
+    $noHppCount      = $rows->filter(fn ($r) => $r->totalCogs === null)->count(); // kampanye tanpa HPP yang dapat dipakai
     $avgFeePct       = $totalGmv > 0 ? max(0, (1 - ($totalNetRevenue / $totalGmv)) * 100) : 0; // rata-rata tertimbang potongan admin
     $totalFeeAmt     = max(0, $totalGmv - $totalNetRevenue); // total rupiah potongan platform
     $totalRoas       = $totalSpend > 0 ? $totalGmv / $totalSpend : 0;              // omzet per rupiah iklan
@@ -99,11 +108,11 @@
     
     // Additional metrics for POAS, Margin, CAC, Break-even ROAS
     $poas            = $totalTopup > 0 ? $totalProfit / $totalTopup : 0;           // Net Profit / Ad Spend (dengan PPN)
-    $grossMarginPct  = $totalGmv > 0 ? ($grossMargin / $totalGmv) * 100 : 0;       // Gross Margin %
-    $netMarginPct    = $totalGmv > 0 ? ($totalProfit / $totalGmv) * 100 : 0;       // Net Profit Margin %
+    $grossMarginPct  = $knownGmv > 0 ? ($grossMargin / $knownGmv) * 100 : 0;       // Gross Margin %
+    $netMarginPct    = $knownGmv > 0 ? ($totalProfit / $knownGmv) * 100 : 0;       // Net Profit Margin %
     $totalOrders     = $rows->sum(fn ($r) => (int) $r->camp->orders);
     $cac             = $totalOrders > 0 ? $totalTopup / $totalOrders : 0;          // Cost per Acquisition
-    $beRoas          = $grossMargin > 0 ? $totalGmv / $grossMargin : 0;            // Break-even ROAS
+    $beRoas          = $grossMargin > 0 ? (1.11 * $knownGmv) / $grossMargin : 0;   // Break-even ROAS; spend termasuk PPN
     
     $feeMode         = $adsSetting->admin_fee_mode ?? 'auto';
     $feeManualPct    = $adsSetting->admin_fee_pct ?? null;
@@ -203,9 +212,9 @@ window.__profitChartData = {
             <div class="dpanel ads-kpi kpi-cogs">
                 <div class="ads-kpi-label"><i class="bi bi-box-seam"></i> Gross Profit</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $grossMargin < 0 ? '−' : '' }}{{ $fmt($grossMargin) }}</div>
-                <div class="ads-kpi-sub">HPP <b>{{ $fmt($totalCogsAll) }}</b>
+                <div class="ads-kpi-sub">HPP terhitung <b>{{ $fmt($totalCogsAll) }}</b>
                 @if($noHppCount > 0)
-                    · <span class="text-danger"><i class="bi bi-exclamation-triangle"></i> {{ $noHppCount }} item 0 HPP</span>
+                    · <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ $noHppCount }} campaign belum ada HPP</span>
                 @endif
                 </div>
             </div>
@@ -216,10 +225,10 @@ window.__profitChartData = {
                 <div class="ads-kpi-sub">Net spend <b>{{ $fmt($totalSpend) }}</b> + PPN</div>
             </div>
 
-            <div class="dpanel ads-kpi kpi-profit" style="border-left-color: {{ $totalProfit >= 0 ? '#16a34a' : '#dc2626' }};">
+            <div class="dpanel ads-kpi kpi-profit" style="border-left-color: {{ $unknownProfitCount > 0 ? '#d97706' : ($totalProfit >= 0 ? '#16a34a' : '#dc2626') }};">
                 <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit Setelah Iklan</div>
-                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums; color: {{ $totalProfit >= 0 ? '#16a34a' : '#dc2626' }};">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</div>
-                <div class="ads-kpi-sub">Margin <b>{{ number_format($netMarginPct, 1, ',', '.') }}%</b> &bull; {{ $profitableCount }} untung, {{ $lossCount }} rugi</div>
+                <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums; color: {{ $unknownProfitCount > 0 ? '#b45309' : ($totalProfit >= 0 ? '#16a34a' : '#dc2626') }};">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</div>
+                <div class="ads-kpi-sub">Terhitung dari {{ $knownRows->count() }} campaign · Margin <b>{{ number_format($netMarginPct, 1, ',', '.') }}%</b> &bull; {{ $profitableCount }} untung, {{ $lossCount }} rugi @if($unknownProfitCount > 0) &bull; <span class="text-warning">{{ $unknownProfitCount }} belum dihitung</span>@endif</div>
             </div>
 
             <div class="dpanel ads-kpi">
@@ -237,7 +246,7 @@ window.__profitChartData = {
             <div class="dpanel ads-kpi">
                 <div class="ads-kpi-label"><i class="bi bi-dash-circle-dotted"></i> Break-even ROAS</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ number_format($beRoas, 2, ',', '.') }}x</div>
-                <div class="ads-kpi-sub">Batas ROAS minimum agar untung</div>
+                <div class="ads-kpi-sub">Batas minimum; biaya iklan sudah +PPN 11%</div>
             </div>
 
             <div class="dpanel ads-kpi">
@@ -293,7 +302,7 @@ window.__profitChartData = {
             </thead>
             <tbody>
                 @forelse($byCategory as $cat)
-                    <tr style="border-bottom: 1px solid var(--dsh-border); {{ $cat->profit >= 0 ? '' : 'background: rgba(220, 38, 38, 0.045);' }}">
+                    <tr style="border-bottom: 1px solid var(--dsh-border); {{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'background: rgba(217, 119, 6, 0.045);' : ($cat->profit >= 0 ? '' : 'background: rgba(220, 38, 38, 0.045);') }}">
                         <td style="padding:.6rem .5rem;">
                             <span style="font-weight:700; color:{{ $cat->unmapped ? '#b45309' : 'var(--text)' }}; font-size:.85rem;">{{ $cat->name }}</span>
                             @if($cat->unmapped)
@@ -301,13 +310,14 @@ window.__profitChartData = {
                             @elseif($cat->lossCount > 0)
                                 <div style="font-size:.62rem; color:#b91c1c;">{{ $cat->lossCount }} kampanye rugi</div>
                             @endif
+                            @if($cat->unknownCount > 0)<div style="font-size:.62rem; color:#b45309;">{{ $cat->unknownCount }} belum ada HPP</div>@endif
                         </td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">{{ $cat->campaigns }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; color:var(--text); vertical-align:middle;">{{ number_format($cat->orders, 0, ',', '.') }} <span style="color:var(--dsh-muted);">&bull;</span> {{ number_format($cat->items, 0, ',', '.') }} pcs</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:#dc2626; vertical-align:middle;">{{ $fmt($cat->spend) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">+PPN {{ $fmt($cat->topup) }}</div></td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; color:#0369a1; vertical-align:middle;">{{ $fmt($cat->netRevenue) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($cat->gmv) }}</div></td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">&minus;{{ $fmt($cat->cogs) }}</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; font-size:.95rem; color:{{ $cat->profit >= 0 ? '#16a34a' : '#dc2626' }}; vertical-align:middle;">{{ $cat->profit < 0 ? '-' : '' }}{{ $fmt($cat->profit) }}</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; font-size:.95rem; color:{{ $cat->unknownCount > 0 && $cat->profit == 0 ? '#b45309' : ($cat->profit >= 0 ? '#16a34a' : '#dc2626') }}; vertical-align:middle;">{{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'N/A' : (($cat->profit < 0 ? '-' : '') . $fmt($cat->profit)) }}</td>
                     </tr>
             @empty
                 <tr><td colspan="7" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
@@ -366,6 +376,8 @@ window.__profitView = function (mode) {
                 @php
                     $camp = $r->camp;
                     $reco = $camp->reco ?? ['label' => 'Optimize', 'color' => '#ca8a04', 'icon' => '⚡'];
+                    $profitKnown = $r->profit !== null;
+                    $profitColor = !$profitKnown ? '#64748b' : ($r->isProfitable ? '#16a34a' : '#dc2626');
                     $baseColor = $reco['color'] ?? '#64748b';
                     $bgColor = match($baseColor) {
                         '#16a34a' => 'rgba(22, 163, 74, 0.15)',
@@ -378,11 +390,11 @@ window.__profitView = function (mode) {
                 <tr data-campaign="{{ strtolower($camp->campaign_name ?? '') }}"
                     data-orders="{{ $camp->orders }}"
                     data-net_revenue="{{ $r->netRevenue }}"
-                    data-hpp="{{ $r->totalCogs }}"
+                    data-hpp="{{ $r->totalCogs ?? '' }}"
                     data-ad_spend="{{ $r->spendAfterTax }}"
-                    data-net_profit="{{ $r->profit }}"
+                    data-net_profit="{{ $r->profit ?? '' }}"
                     data-acos="{{ $r->acos }}"
-                    style="border-bottom: 1px solid var(--dsh-border); {{ $r->isProfitable ? '' : 'background: rgba(220, 38, 38, 0.045);' }}">
+                    style="border-bottom: 1px solid var(--dsh-border); {{ !$profitKnown ? 'background: rgba(217, 119, 6, 0.045);' : ($r->isProfitable ? '' : 'background: rgba(220, 38, 38, 0.045);') }}">
                     <td style="padding: 0.75rem 0.5rem; max-width: 250px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             @if($camp->campaign_status === 'ongoing')
@@ -418,7 +430,7 @@ window.__profitView = function (mode) {
 
                     <td class="text-end" style="vertical-align: middle;">
                         <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{!! $r->totalCogs > 0 ? '&minus;' . $fmt($r->totalCogs) : '<span style="color:#b45309;">&mdash;</span>' !!}</div>
-                        <div style="font-size: .65rem; color: {{ $r->unitCogs > 0 ? 'var(--dsh-muted)' : '#b45309' }}; margin-top: 2px;" title="{{ $r->cogsExact ? 'Eksak: HPP × pcs terjual' : 'Estimasi dari rasio harga (pcs belum tercatat)' }}">{{ $r->unitCogs > 0 ? ($r->cogsExact ? $fmt($r->unitCogs) . '/pcs × ' . $r->itemsSold : $fmt($r->unitCogs) . '/pcs · estimasi') : 'belum diisi' }}</div>
+                        <div style="font-size: .65rem; color: {{ $r->totalCogs !== null ? 'var(--dsh-muted)' : '#b45309' }}; margin-top: 2px;" title="{{ $r->totalCogs === null ? 'HPP belum tersedia, profit tidak dihitung' : ($r->cogsExact ? 'Eksak: HPP × pcs terjual' : 'Estimasi dari rasio harga (pcs belum tercatat)') }}">{{ $r->totalCogs === null ? 'belum diisi' : ($r->cogsExact ? $fmt($r->unitCogs) . '/pcs × ' . $r->itemsSold : $fmt($r->unitCogs) . '/pcs · estimasi') }}</div>
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
@@ -426,8 +438,8 @@ window.__profitView = function (mode) {
                         <div style="font-size: .65rem; color: var(--dsh-muted); margin-top: 2px;">iklan {{ $fmt($camp->spend) }}</div>
                     </td>
 
-                    <td class="text-end" style="vertical-align: middle; border-left: 2px solid var(--dsh-border); background: rgba({{ $r->isProfitable ? '22, 163, 74' : '220, 38, 38' }}, 0.05);">
-                        <div style="font-weight: 800; font-size: .95rem; color: {{ $r->isProfitable ? '#16a34a' : '#dc2626' }}; font-variant-numeric: tabular-nums;" @if($r->feeIsEstimate || $r->unitCogs <= 0) title="Estimasi — {{ $r->unitCogs <= 0 ? 'HPP belum diisi' : 'belum ada data pencairan' }}" @endif>{{ ($r->feeIsEstimate || $r->unitCogs <= 0) ? '±' : '' }}{{ $r->profit < 0 ? '−' : '' }}{{ $fmt($r->profit) }}</div>
+                    <td class="text-end" style="vertical-align: middle; border-left: 2px solid var(--dsh-border); background: rgba({{ !$profitKnown ? '217, 119, 6' : ($r->isProfitable ? '22, 163, 74' : '220, 38, 38') }}, 0.05);">
+                        <div style="font-weight: 800; font-size: .95rem; color: {{ $profitColor }}; font-variant-numeric: tabular-nums;" @if(!$profitKnown || $r->feeIsEstimate) title="{{ !$profitKnown ? 'Tidak dihitung — HPP belum tersedia' : 'Estimasi — belum ada data pencairan' }}" @endif>{{ !$profitKnown ? 'N/A' : (($r->feeIsEstimate ? '±' : '') . ($r->profit < 0 ? '−' : '') . $fmt($r->profit)) }}</div>
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
@@ -462,7 +474,7 @@ window.__profitView = function (mode) {
                 <td class="text-end" style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;">{{ $fmt($totalNetRevenue) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($totalGmv) }} · adm {{ $fmt($totalFeeAmt) }} ({{ number_format($avgFeePct, 1, ',', '.') }}%)</div></td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">&minus;{{ $fmt($totalCogsAll) }}</td>
                 <td class="text-end" style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($totalTopup) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">iklan {{ $fmt($totalSpend) }}</div></td>
-                <td class="text-end" style="font-weight: 800; font-size: .95rem; color: {{ $totalProfit >= 0 ? '#16a34a' : '#dc2626' }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $totalProfit >= 0 ? '22, 163, 74' : '220, 38, 38' }}, 0.05);">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}</td>
+                <td class="text-end" style="font-weight: 800; font-size: .95rem; color: {{ $unknownProfitCount > 0 ? '#b45309' : ($totalProfit >= 0 ? '#16a34a' : '#dc2626') }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $unknownProfitCount > 0 ? '217, 119, 6' : ($totalProfit >= 0 ? '22, 163, 74' : '220, 38, 38') }}, 0.05);">{{ $totalProfit < 0 ? '−' : '' }}{{ $fmt($totalProfit) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">{{ $unknownProfitCount > 0 ? $unknownProfitCount . ' campaign belum dihitung' : 'HPP tersedia' }}</div></td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($avgAcos, 1, ',', '.') }}%</td>
                 <td></td>
             </tr>

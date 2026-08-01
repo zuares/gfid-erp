@@ -1,9 +1,12 @@
 @php
     $totalActiveProducts = $itemPerformance->count();
     $totalStock = $itemPerformance->sum('stock_total');
-    $totalProfit = $itemPerformance->sum('profit_after_ads');
-    $totalGrossProfit = $itemPerformance->sum('gross_profit');
+    $knownProfitItems = $itemPerformance->filter(fn ($r) => $r->profit_after_ads !== null);
+    $totalProfit = $knownProfitItems->sum('profit_after_ads');
+    $totalGrossProfit = $knownProfitItems->sum('gross_profit');
+    $unknownProfitItems = $itemPerformance->count() - $knownProfitItems->count();
     $totalAdSpend = $itemPerformance->sum('spend');
+    $knownAdSpend = $knownProfitItems->sum('spend');
     $totalOrders = $itemPerformance->sum('orders');
     $totalGmv = $itemPerformance->sum('gmv');
 
@@ -38,16 +41,16 @@
         <div class="dpanel p-3 h-100">
             <div class="text-muted small fw-bold text-uppercase mb-1">Gross Profit (Iklan)</div>
             <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalGrossProfit, 0, ',', '.') }}</div>
-            <div class="small text-muted mt-1">GMV Netto - HPP</div>
+            <div class="small text-muted mt-1">Terhitung dari {{ $knownProfitItems->count() }} produk ber-HPP</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="dpanel p-3 h-100">
-            <div class="text-muted small fw-bold text-uppercase mb-1" data-bs-toggle="tooltip" title="Estimasi profit bersih (Gross Profit - Ad Spend + Pajak)">Net Profit (Iklan)</div>
-            <div class="fs-4 fw-bolder {{ $totalProfit >= 0 ? 'text-success' : 'text-danger' }}">
+            <div class="text-muted small fw-bold text-uppercase mb-1" data-bs-toggle="tooltip" title="Profit hanya dijumlahkan untuk produk yang memiliki HPP">Net Profit Terhitung</div>
+            <div class="fs-4 fw-bolder {{ $unknownProfitItems > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">
                 Rp {{ number_format($totalProfit, 0, ',', '.') }}
             </div>
-            <div class="small text-muted mt-1">POAS: {{ number_format($totalAdSpend > 0 ? $totalProfit / $totalAdSpend : 0, 2) }}x</div>
+            <div class="small text-muted mt-1">POAS: {{ number_format($knownAdSpend > 0 ? $totalProfit / ($knownAdSpend * 1.11) : 0, 2) }}x · {{ $unknownProfitItems }} belum ada HPP</div>
         </div>
     </div>
 </div>
@@ -133,11 +136,11 @@
                         <td class="text-end">{{ number_format($row->ctr, 2) }}%</td>
                         <td class="text-end">{{ number_format($row->cvr, 2) }}%</td>
                         <td class="text-end text-success fw-bold">Rp {{ number_format($row->gmv, 0, ',', '.') }}</td>
-                        <td class="text-end text-muted">Rp {{ number_format($row->gross_profit, 0, ',', '.') }}</td>
-                        <td class="text-end fw-bold {{ $row->profit_after_ads >= 0 ? 'text-success' : 'text-danger' }}">
-                            Rp {{ number_format($row->profit_after_ads, 0, ',', '.') }}
+                        <td class="text-end text-muted">{{ $row->gross_profit === null ? 'N/A' : 'Rp ' . number_format($row->gross_profit, 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold {{ $row->profit_after_ads === null ? 'text-muted' : ($row->profit_after_ads >= 0 ? 'text-success' : 'text-danger') }}">
+                            {{ $row->profit_after_ads === null ? 'N/A' : 'Rp ' . number_format($row->profit_after_ads, 0, ',', '.') }}
                         </td>
-                        <td class="text-end">{{ number_format($row->poas, 2) }}x</td>
+                        <td class="text-end">{{ $row->poas === null ? 'N/A' : number_format($row->poas, 2) . 'x' }}</td>
                     </tr>
                 @empty
                     <tr>

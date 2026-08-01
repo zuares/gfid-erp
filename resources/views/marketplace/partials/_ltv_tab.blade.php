@@ -18,11 +18,11 @@
     <!-- Blended CAC -->
     <div class="col-md-3 col-6">
         <div class="dpanel p-3 h-100 text-center">
-            <div class="text-muted small fw-bold mb-2">Blended CAC</div>
+            <div class="text-muted small fw-bold mb-2">Blended CAC (Estimasi)</div>
             <div class="fs-4 fw-bolder {{ $blendedCac > 50000 ? 'text-danger' : 'text-success' }}">
                 Rp {{ number_format($blendedCac, 0, ',', '.') }}
             </div>
-            <div class="small text-muted mt-1" style="font-size: 0.7rem;">Biaya rata-rata akuisisi 1 pelanggan baru.</div>
+            <div class="small text-muted mt-1" style="font-size: 0.7rem;">Spend iklan ÷ pelanggan baru; bukan atribusi klik.</div>
         </div>
     </div>
     
@@ -78,46 +78,12 @@
                     kami mengambil estimasi Repeat Purchase Rate ({{ number_format($rpr, 1) }}%) sebagai indikator LTV harian.
                 </div>
                 
-                <!-- Mockup Cohort Table to show the concept to the user -->
-                <div class="table-responsive mt-3">
-                    <table class="table table-bordered table-sm text-center align-middle" style="font-size: 0.8rem;">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="text-start">Bulan Akuisisi</th>
-                                <th>Pelanggan Baru</th>
-                                <th>Bulan 0</th>
-                                <th>Bulan 1</th>
-                                <th>Bulan 2</th>
-                                <th>Bulan 3</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="text-start fw-bold">{{ \Carbon\Carbon::parse($dateFrom)->subMonths(3)->format('M Y') }}</td>
-                                <td>~1.240</td>
-                                <td style="background: rgba(13, 110, 253, 1); color: white;">100%</td>
-                                <td style="background: rgba(13, 110, 253, 0.3);">22%</td>
-                                <td style="background: rgba(13, 110, 253, 0.15);">14%</td>
-                                <td style="background: rgba(13, 110, 253, 0.1);">9%</td>
-                            </tr>
-                            <tr>
-                                <td class="text-start fw-bold">{{ \Carbon\Carbon::parse($dateFrom)->subMonths(2)->format('M Y') }}</td>
-                                <td>~1.450</td>
-                                <td style="background: rgba(13, 110, 253, 1); color: white;">100%</td>
-                                <td style="background: rgba(13, 110, 253, 0.25);">25%</td>
-                                <td style="background: rgba(13, 110, 253, 0.18);">16%</td>
-                                <td class="bg-light text-muted">-</td>
-                            </tr>
-                            <tr>
-                                <td class="text-start fw-bold">{{ \Carbon\Carbon::parse($dateFrom)->subMonths(1)->format('M Y') }}</td>
-                                <td>~1.800</td>
-                                <td style="background: rgba(13, 110, 253, 1); color: white;">100%</td>
-                                <td style="background: rgba(13, 110, 253, 0.28);">28%</td>
-                                <td class="bg-light text-muted">-</td>
-                                <td class="bg-light text-muted">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="dpanel p-3 mt-3 text-start">
+                    <div class="fw-bold mb-1"><i class="bi bi-database-exclamation text-warning me-1"></i> Cohort belum tersedia</div>
+                    <div class="small text-muted">
+                        Tabel cohort membutuhkan histori pembelian minimal beberapa bulan dan identitas pelanggan yang konsisten.
+                        Dashboard ini belum memiliki data cohort aktual, jadi tidak menampilkan angka estimasi yang dapat disalahartikan sebagai data nyata.
+                    </div>
                 </div>
             </div>
         </div>

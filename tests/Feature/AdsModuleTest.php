@@ -481,6 +481,103 @@ class AdsModuleTest extends TestCase
         $this->assertTrue(true); // Tested intrinsically
     }
 
+    public function test_dashboard_kpi_aggregates_campaign_daily_facts()
+    {
+        $store = $this->createStore('KPIFACTS');
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-KPI',
+            'date' => '2026-07-30',
+            'impressions' => 1000,
+            'clicks' => 50,
+            'expense' => 12500,
+            'broad_order' => 4,
+            'broad_gmv' => 200000,
+            'direct_order' => 2,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $summary = app(AdsAnalyticsService::class)->getKpiSummary($store->id, '2026-07-30', '2026-07-30');
+
+        $this->assertSame(12500.0, (float) $summary['current']->spend);
+        $this->assertSame(200000.0, (float) $summary['current']->gmv);
+        $this->assertSame(4, (int) $summary['current']->orders);
+    }
+
+    public function test_historical_comparison_uses_selected_compare_mode()
+    {
+        $store = $this->createStore('HISTMODE');
+        $rows = [
+            ['date' => '2026-07-30', 'expense' => 10000, 'broad_gmv' => 100000],
+            ['date' => '2026-06-30', 'expense' => 20000, 'broad_gmv' => 180000],
+        ];
+
+        foreach ($rows as $row) {
+            \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert(array_merge($row, [
+                'store_id' => $store->id,
+                'channel_campaign_id' => 'C-HIST',
+                'impressions' => 100,
+                'clicks' => 10,
+                'broad_order' => 1,
+                'direct_order' => 1,
+                'direct_gmv' => 50000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+        }
+
+        $history = app(AdsAnalyticsService::class)
+            ->getHistoricalComparison($store->id, '2026-07-30', '2026-07-30', 2, 'prev_month');
+
+        $this->assertSame('2026-07-30', $history[0]['start']);
+        $this->assertSame('2026-06-30', $history[1]['start']);
+        $this->assertSame(20000.0, (float) $history[1]['data']->first()['spend']);
+    }
+
+    public function test_summary_prefers_shop_total_and_adds_gms_once()
+    {
+        $store = $this->createStore('SUMMARYSOURCE');
+        $now = now();
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 1000,
+            'clicks' => 50,
+            'spend' => 10000,
+            'orders' => 3,
+            'gmv' => 100000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach ([
+            ['channel_campaign_id' => '123', 'expense' => 10000, 'broad_gmv' => 100000],
+            ['channel_campaign_id' => 'GMS-' . $store->id, 'expense' => 5000, 'broad_gmv' => 50000],
+        ] as $fact) {
+            \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert(array_merge($fact, [
+                'store_id' => $store->id,
+                'date' => '2026-07-30',
+                'impressions' => 100,
+                'clicks' => 10,
+                'broad_order' => 1,
+                'direct_order' => 1,
+                'direct_gmv' => 50000,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]));
+        }
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        $this->assertSame(15000.0, (float) $data['kpi']['current']->spend);
+        $this->assertSame(150000.0, (float) $data['kpi']['current']->gmv);
+    }
+
     // 19. Sync overlap dicegah
     public function test_job_has_without_overlapping_middleware()
     {

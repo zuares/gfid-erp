@@ -11,15 +11,9 @@ class ShipmentReturnOrderScan extends Model
 
     protected $fillable = [
         'shipment_return_id',
-        'order_no',
         'order_number',
-        'shipment_id',
-        'sales_invoice_id',
-        'marketplace_order_id',
         'matched_order_id',
-        'status',
         'match_status',
-        'source_type',
         'source',
         'raw_payload',
         'matched_at',

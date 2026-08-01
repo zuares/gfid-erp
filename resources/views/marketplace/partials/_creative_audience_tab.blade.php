@@ -2,17 +2,18 @@
     // --- AUDIENCE INTENT ANALYSIS ---
     // Aggregate by ad_type
     $audienceIntent = [
-        'search' => ['name' => 'Search Ads (High Intent)', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'color' => 'primary'],
-        'discovery' => ['name' => 'Discovery Ads (Prospecting)', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'color' => 'info'],
-        'auto' => ['name' => 'Auto / GMS', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'color' => 'success'],
-        'other' => ['name' => 'Lainnya', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'color' => 'secondary']
+        'search' => ['name' => 'Search Ads (High Intent)', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'profit_known' => 0, 'color' => 'primary'],
+        'discovery' => ['name' => 'Discovery Ads (Prospecting)', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'profit_known' => 0, 'color' => 'info'],
+        'auto' => ['name' => 'Auto / GMS', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'profit_known' => 0, 'color' => 'success'],
+        'other' => ['name' => 'Lainnya', 'impressions' => 0, 'clicks' => 0, 'spend' => 0, 'orders' => 0, 'gmv' => 0, 'profit' => 0, 'profit_known' => 0, 'color' => 'secondary']
     ];
 
     foreach ($campaigns as $camp) {
         $type = strtolower($camp->ad_type ?? '');
+        $placement = strtolower($camp->campaign_placement ?? '');
         $key = 'other';
-        if (str_contains($type, 'search')) $key = 'search';
-        elseif (str_contains($type, 'discovery') || str_contains($type, 'target')) $key = 'discovery';
+        if (str_contains($placement, 'search') || str_contains($type, 'search')) $key = 'search';
+        elseif (str_contains($placement, 'discovery') || str_contains($type, 'discovery') || str_contains($type, 'target')) $key = 'discovery';
         elseif (str_contains($type, 'auto') || str_contains($camp->channel_campaign_id, 'GMS')) $key = 'auto';
 
         $audienceIntent[$key]['impressions'] += $camp->impressions;
@@ -20,7 +21,10 @@
         $audienceIntent[$key]['spend'] += $camp->spend;
         $audienceIntent[$key]['orders'] += $camp->orders;
         $audienceIntent[$key]['gmv'] += $camp->gmv;
-        $audienceIntent[$key]['profit'] += $camp->profit_after_ads ?? 0;
+        if ($camp->profit_after_ads !== null) {
+            $audienceIntent[$key]['profit'] += $camp->profit_after_ads;
+            $audienceIntent[$key]['profit_known']++;
+        }
     }
 
     // Filter out types with no spend/impressions
@@ -34,13 +38,13 @@
     $topCtrItems = $validItems->sortByDesc('ctr')->take(6);
 
     // High CTR but Loss Maker (The "Clickbait" or Price/Copy Losers)
-    $clickbaitItems = $validItems->filter(fn($p) => $p->ctr > 2.0 && $p->profit_after_ads < 0)->sortBy('profit_after_ads')->take(6);
+    $clickbaitItems = $validItems->filter(fn($p) => $p->ctr > 2.0 && $p->profit_after_ads !== null && $p->profit_after_ads < 0)->sortBy('profit_after_ads')->take(6);
 @endphp
 
 <div class="dash-sec"><i class="bi bi-people"></i> Analisa Audience Intent</div>
 <div class="dpanel p-0 overflow-hidden mb-4">
     <div class="p-3 border-bottom bg-light">
-        <div class="small text-muted">Karena Shopee API tidak memberikan data demografi audiens secara spesifik, segmentasi audiens didekati melalui <strong>Tipe Iklan (Ad Type)</strong>. Iklan Pencarian mewakili audiens dengan niat beli tinggi (sudah mencari), sedangkan Penemuan mewakili <em>prospecting</em> (cuci mata).</div>
+    <div class="small text-muted">Karena Shopee API tidak memberikan data demografi audiens secara spesifik, segmentasi didekati melalui <strong>Placement/Tipe Iklan</strong>. Search mewakili niat beli tinggi, sedangkan Discovery mewakili <em>prospecting</em>. Profit hanya dihitung jika HPP tersedia.</div>
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
@@ -62,7 +66,7 @@
                     @php
                         $ctr = $data['impressions'] > 0 ? ($data['clicks'] / $data['impressions']) * 100 : 0;
                         $cvr = $data['clicks'] > 0 ? ($data['orders'] / $data['clicks']) * 100 : 0;
-                        $poas = $data['spend'] > 0 ? ($data['profit'] / $data['spend']) : 0;
+                        $poas = $data['profit_known'] > 0 && $data['spend'] > 0 ? ($data['profit'] / ($data['spend'] * 1.11)) : null;
                     @endphp
                     <tr>
                         <td>
@@ -74,10 +78,10 @@
                         <td class="text-end text-danger">Rp {{ number_format($data['spend'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($data['orders'], 0, ',', '.') }}</td>
                         <td class="text-end fw-bold">{{ number_format($cvr, 2) }}%</td>
-                        <td class="text-end fw-bold {{ $data['profit'] >= 0 ? 'text-success' : 'text-danger' }}">
-                            Rp {{ number_format($data['profit'], 0, ',', '.') }}
+                        <td class="text-end fw-bold {{ $data['profit_known'] === 0 ? 'text-muted' : ($data['profit'] >= 0 ? 'text-success' : 'text-danger') }}">
+                            {{ $data['profit_known'] === 0 ? 'N/A' : 'Rp ' . number_format($data['profit'], 0, ',', '.') }}
                         </td>
-                        <td class="text-end fw-bold">{{ number_format($poas, 2) }}x</td>
+                        <td class="text-end fw-bold">{{ $poas === null ? 'N/A' : number_format($poas, 2) . 'x' }}</td>
                     </tr>
                 @empty
                     <tr>
@@ -120,8 +124,8 @@
                             <div class="text-truncate small fw-bold" title="{{ $item->item_name }}">{{ $item->item_name }}</div>
                             <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem;">
                                 <span class="text-muted">CVR: {{ number_format($item->cvr, 2) }}%</span>
-                                <span class="{{ $item->profit_after_ads >= 0 ? 'text-success' : 'text-danger' }} fw-bold">
-                                    {{ $item->profit_after_ads >= 0 ? '+' : '' }}{{ number_format($item->profit_after_ads / 1000, 0) }}k
+                                <span class="{{ $item->profit_after_ads === null ? 'text-muted' : ($item->profit_after_ads >= 0 ? 'text-success' : 'text-danger') }} fw-bold">
+                                    {{ $item->profit_after_ads === null ? 'HPP?' : (($item->profit_after_ads >= 0 ? '+' : '') . number_format($item->profit_after_ads / 1000, 0) . 'k') }}
                                 </span>
                             </div>
                         </div>

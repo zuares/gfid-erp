@@ -14,10 +14,8 @@ class ShipmentReturnOrderScanItem extends Model
         'item_id',
         'shipment_return_line_id',
         'matched_order_item_id',
-        'qty',
         'qty_scanned',
         'qty_expected',
-        'barcode',
         'match_status',
         'raw_payload',
     ];

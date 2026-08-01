@@ -86,6 +86,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('create', 'create')->name('create');
                 Route::post('/', 'store')->name('store');
 
+                Route::post('{shipmentReturn}/scan-order', 'scanOrder')->name('scan_order');
                 Route::get('{shipmentReturn}/scan-lookup', 'scanLookup')->name('scan_lookup');
                 Route::get('{shipmentReturn}/edit', 'edit')->name('edit');
 

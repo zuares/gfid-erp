@@ -8,7 +8,8 @@
         $orders = $camp->orders ?? 0;
         $clicks = $camp->clicks ?? 0;
         $impressions = $camp->impressions ?? 0;
-        $profit = $camp->profit_after_ads ?? 0;
+        $profit = $camp->profit_after_ads;
+        $profitKnown = $profit !== null;
         $acos = $camp->acos_pct ?? null;
         $breakEven = $camp->break_even_acos_pct ?? null;
         $budget = $camp->campaign_budget ?? 0;
@@ -35,15 +36,17 @@
                 'priority' => 1,
                 'type' => 'danger',
                 'icon' => 'bi-graph-down-arrow',
-                'title' => 'Rugi (ACOS Menjebol Break-Even)',
-                'message' => "Kampanye <strong>{$cName}</strong> mencetak ACOS {$acos}%, melebihi batas toleransi margin ({$breakEven}%). Anda rugi Rp " . number_format(abs($profit), 0, ',', '.') . ".",
+                'title' => $profitKnown ? 'Rugi (ACOS Menjebol Break-Even)' : 'ACOS Menjebol Break-Even',
+                'message' => $profitKnown
+                    ? "Kampanye <strong>{$cName}</strong> mencetak ACOS {$acos}%, melebihi batas toleransi margin ({$breakEven}%). Estimasi rugi Rp " . number_format(abs($profit), 0, ',', '.') . "."
+                    : "Kampanye <strong>{$cName}</strong> mencetak ACOS {$acos}%, melebihi batas toleransi margin ({$breakEven}%). Profit belum dihitung karena data HPP belum tersedia.",
                 'action' => 'Kurangi Bid Keyword / Pause',
                 'entity' => 'Campaign'
             ];
         }
 
         // 3. Scale Up Opportunity (Profitable, near budget limit)
-        if ($profit > 50000 && $budget > 0 && $spend >= ($budget * 0.8)) {
+        if ($profitKnown && $profit > 50000 && $budget > 0 && $spend >= ($budget * 0.8)) {
             $generatedAlerts[] = [
                 'priority' => 3,
                 'type' => 'success',
@@ -76,7 +79,7 @@
     foreach ($itemPerformance as $item) {
         $iName = $item->item_name ?? 'Unknown Product';
         $stock = $item->stock_total ?? null;
-        $profit = $item->profit_after_ads ?? 0;
+        $profit = $item->profit_after_ads;
         
         // 5. Stock Running Out
         if ($stock !== null && $stock <= 3 && $item->orders > 0) {

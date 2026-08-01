@@ -1940,7 +1940,7 @@ function sortTrafficTable(col) {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-stoplights text-primary"></i> Analisa Traffic</div>
-                        <div class="ads-tab-panel-note">Evaluasi interaksi pelanggan (top of funnel). Data <span class="badge" style="font-size:0.6rem; background: var(--dsh-border); color: var(--dsh-muted)">Reach</span> dan <span class="badge" style="font-size:0.6rem; background: var(--dsh-border); color: var(--dsh-muted)">Frequency</span> merupakan estimasi.</div>
+                        <div class="ads-tab-panel-note">Evaluasi interaksi pelanggan (top of funnel). Reach, Frequency, dan LPV tidak tersedia dari API Shopee Ads dan ditampilkan sebagai —.</div>
                     </div>
                 </div>
                 
@@ -1952,8 +1952,6 @@ function sortTrafficTable(col) {
                         $trImp = $kpi['current']->impressions ?? 0;
                         $trClicks = $kpi['current']->clicks ?? 0;
                         
-                        $trReach = (int)($trImp * 0.82);
-                        $trFreq = $trReach > 0 ? $trImp / $trReach : 0;
                         $trCtr = $trImp > 0 ? ($trClicks / $trImp) * 100 : 0;
                         $trCpc = $trClicks > 0 ? $trSpend / $trClicks : 0;
                         $trCpm = $trImp > 0 ? ($trSpend / $trImp) * 1000 : 0;
@@ -1967,12 +1965,12 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trImp, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-people me-1"></i> Reach <i class="bi bi-info-circle text-muted" title="Estimasi" style="font-size: 0.6rem;"></i></div>
-                        <div class="kpi-value fw-bold text-dark">{{ number_format($trReach, 0, ',', '.') }}</div>
+                        <div class="kpi-label"><i class="bi bi-people me-1"></i> Reach <i class="bi bi-info-circle text-muted" title="Tidak disediakan API" style="font-size: 0.6rem;"></i></div>
+                        <div class="kpi-value fw-bold text-muted">—</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-arrow-repeat me-1"></i> Frequency <i class="bi bi-info-circle text-muted" title="Estimasi" style="font-size: 0.6rem;"></i></div>
-                        <div class="kpi-value fw-bold text-dark">{{ number_format($trFreq, 2, ',', '.') }}x</div>
+                        <div class="kpi-label"><i class="bi bi-arrow-repeat me-1"></i> Frequency <i class="bi bi-info-circle text-muted" title="Tidak disediakan API" style="font-size: 0.6rem;"></i></div>
+                        <div class="kpi-value fw-bold text-muted">—</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label"><i class="bi bi-hand-index-thumb me-1"></i> Link Clicks</div>
@@ -1991,12 +1989,12 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpm, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-box-arrow-in-right me-1"></i> LP Views <i class="bi bi-info-circle text-muted" title="Sama dengan clicks" style="font-size: 0.6rem;"></i></div>
-                        <div class="kpi-value fw-bold text-dark">{{ number_format($trClicks, 0, ',', '.') }}</div>
+                        <div class="kpi-label"><i class="bi bi-box-arrow-in-right me-1"></i> LP Views <i class="bi bi-info-circle text-muted" title="Tidak disediakan API" style="font-size: 0.6rem;"></i></div>
+                        <div class="kpi-value fw-bold text-muted">—</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label"><i class="bi bi-cash me-1"></i> Cost per LPV</div>
-                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpc, 0, ',', '.') }}</div>
+                        <div class="kpi-value fw-bold text-muted">—</div>
                     </div>
                 </div>
 
@@ -2031,9 +2029,6 @@ function sortTrafficTable(col) {
                         }
                         if ($trCpc > 500) {
                             $insightTraffic[] = ['type' => 'danger', 'icon' => 'bi-exclamation-octagon', 'text' => 'Biaya per Klik (CPC) cukup mahal (> Rp 500). Pertimbangkan untuk menurunkan batas maksimum bid.'];
-                        }
-                        if ($trFreq > 3) {
-                            $insightTraffic[] = ['type' => 'warning', 'icon' => 'bi-arrow-repeat', 'text' => 'Frequency estimasi tinggi (> 3x). Iklan mungkin ditampilkan berulang ke orang yang sama, pertimbangkan untuk mengganti materi iklan.'];
                         }
                         if(empty($insightTraffic)) {
                             $insightTraffic[] = ['type' => 'success', 'icon' => 'bi-check-circle', 'text' => 'Performa traffic berjalan dengan baik. Metrik CTR dan CPC berada dalam batas wajar.'];
@@ -2092,8 +2087,6 @@ function sortTrafficTable(col) {
                                         $cImp = $row->sum_impressions ?? 0;
                                         $cClicks = $row->clicks ?? 0;
                                         $cSpend = $row->spend ?? 0;
-                                        $cReach = (int)($cImp * 0.82);
-                                        $cFreq = $cReach > 0 ? $cImp / $cReach : 0;
                                         $cCtr = $cImp > 0 ? ($cClicks / $cImp) * 100 : 0;
                                         $cCpc = $cClicks > 0 ? $cSpend / $cClicks : 0;
                                         $cCpm = $cImp > 0 ? ($cSpend / $cImp) * 1000 : 0;
@@ -2101,8 +2094,8 @@ function sortTrafficTable(col) {
                                     <tr data-campaign_name="{{ strtolower($row->campaign_name ?? '') }}"
                                         data-spend="{{ $cSpend }}"
                                         data-impressions="{{ $cImp }}"
-                                        data-reach="{{ $cReach }}"
-                                        data-freq="{{ $cFreq }}"
+                                        data-reach="0"
+                                        data-freq="0"
                                         data-clicks="{{ $cClicks }}"
                                         data-ctr="{{ $cCtr }}"
                                         data-cpc="{{ $cCpc }}"
@@ -2116,8 +2109,8 @@ function sortTrafficTable(col) {
                                         </td>
                                         <td class="text-end">Rp {{ number_format($cSpend, 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($cImp, 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cReach, 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cFreq, 2, ',', '.') }}x</td>
+                                        <td class="text-end text-muted">—</td>
+                                        <td class="text-end text-muted">—</td>
                                         <td class="text-end">{{ number_format($cClicks, 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($cCtr, 2, ',', '.') }}%</td>
                                         <td class="text-end">Rp {{ number_format($cCpc, 0, ',', '.') }}</td>
@@ -2296,17 +2289,20 @@ function sortTrafficTable(col) {
                         $change = $kpi['changes'][$m['key']] ?? 0;
                         if (in_array($m['key'], ['aov', 'aov_net', 'cpc', 'ctr', 'cvr', 'net_revenue', 'net_profit', 'spend_topup'])) {
                             if ($prevVal == 0) {
-                                $change = $val > 0 ? 100 : 0;
+                                $change = $val > 0 ? null : 0;
                             } else {
                                 $change = round((($val - $prevVal) / abs($prevVal)) * 100, 2);
                             }
                         }
 
 
-                        $isUp = $change >= 0;
+                        $hasComparison = $change !== null;
+                        $isUp = $hasComparison ? $change >= 0 : true;
                         
                         // For cost metrics, going down is good (green). For others, going up is good.
-                        if (in_array($m['key'], ['spend', 'cpc', 'spend_topup'])) {
+                        if (!$hasComparison) {
+                            $colorClass = 'color: #64748b;';
+                        } elseif (in_array($m['key'], ['spend', 'cpc', 'spend_topup'])) {
                             $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
                         } else {
                             $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
@@ -2321,7 +2317,7 @@ function sortTrafficTable(col) {
                         </div>
                         <div class="ads-kpi-sub">
                             <span style="font-weight:900; {{ $colorClass }}">
-                                <i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%
+                                @if($hasComparison)<i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%@else<span>Baru</span>@endif
                             </span> 
                             vs lalu
                         </div>

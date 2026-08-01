@@ -1128,11 +1128,11 @@
         ? $shipmentReturn->orderScans->flatMap(function ($scan) {
             return $scan->items->map(fn ($scanItem) => [
                 'id' => $scanItem->shipment_return_line_id ?: $scanItem->id,
-                'order_number' => ($scan->order_number ?: $scan->order_no) ?: 'MANUAL',
+                'order_number' => $scan->order_number ?: 'MANUAL',
                 'item_id' => $scanItem->item_id,
                 'code' => $scanItem->item->code ?? '-',
                 'name' => $scanItem->item->name ?? '',
-                'qty' => (int) ($scanItem->qty_scanned ?: $scanItem->qty),
+                'qty' => (int) $scanItem->qty_scanned,
                 'update_url' => $scanItem->shipment_return_line_id
                     ? route('sales.shipment_returns.update_line_qty', $scanItem->shipment_return_line_id)
                     : null,
@@ -1158,8 +1158,8 @@
             ])->filter()->implode(' - ');
 
             return [
-                'code' => ($scan->order_number ?: $scan->order_no) ?: 'MANUAL',
-                'label' => $label !== '' ? $label : 'Manual',
+                'code' => $scan->order_number ?: 'MANUAL',
+                'label' => $payload['label'] ?? ($label !== '' ? $label : 'Pencatatan order'),
             ];
         })
         ->values();
@@ -1176,7 +1176,7 @@
     <div class="sr-topbar">
         <div class="sr-top-main">
             <h1 class="sr-title">{{ $shipmentReturn->code }}</h1>
-            <div class="sr-sub">Scan order, scan item, lalu order baru.</div>
+            <div class="sr-sub">Pencatatan retur mandiri · scan order untuk mulai.</div>
         </div>
         <div class="sr-top-actions">
             @if ($shipmentReturn->status === 'draft' && $canUseDevOrderCommands)
@@ -1213,7 +1213,7 @@
                 <div class="sr-meta">
                     <div class="sr-meta-item sr-meta-store">
                         <div class="sr-meta-label">Marketplace</div>
-                        <div class="sr-meta-value">{{ $shipmentReturn->store->code ?? '-' }} - {{ $shipmentReturn->store->name ?? '-' }}</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->store ? (($shipmentReturn->store->code ?? '-') . ' - ' . ($shipmentReturn->store->name ?? '-')) : 'Belum dihubungkan' }}</div>
                     </div>
                     <div class="sr-meta-item sr-meta-date">
                         <div class="sr-meta-label">Tanggal</div>
@@ -1225,7 +1225,7 @@
                     </div>
                     <div class="sr-meta-item sr-meta-source">
                         <div class="sr-meta-label">Shipment Asal</div>
-                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Manual' }}</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Belum dihubungkan' }}</div>
                     </div>
                 </div>
             </div>
@@ -1294,10 +1294,9 @@
 <script>
 (function () {
     const scanUrl = @json(route('sales.shipment_returns.scan_item', $shipmentReturn));
-    const scanLookupUrl = @json(route('sales.shipment_returns.scan_lookup', $shipmentReturn));
+    const scanOrderUrl = @json(route('sales.shipment_returns.scan_order', $shipmentReturn));
     const bulkOrdersUrl = @json(route('sales.shipment_returns.bulk_orders', $shipmentReturn));
     const clearOrdersUrl = @json(route('sales.shipment_returns.clear_orders', $shipmentReturn));
-    const lookupShipmentUrl = @json(route('sales.api.shipments.lookup'));
     const csrf = @json(csrf_token());
     const isDraft = @json($shipmentReturn->status === 'draft');
     const initialLines = @json($initialLines);
@@ -1830,16 +1829,6 @@
             toast('ok', 'Scan terakhir dibatalkan');
         });
     }
-    function lookupScanCode(code) {
-        return fetch(`${scanLookupUrl}?code=${encodeURIComponent(code)}`, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(r => r.ok ? r.json() : Promise.reject(new Error('lookup_failed')));
-    }
-    function lookupShipment(code) {
-        return fetch(`${lookupShipmentUrl}?code=${encodeURIComponent(code)}`, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(r => r.ok ? r.json() : null);
-    }
     function startOrder(code) {
         code = normalize(code);
         if (!code) return;
@@ -1854,24 +1843,28 @@
             return;
         }
 
-        lookupScanCode(code).then(data => {
-            if (data?.type === 'item') {
-                alertError(`Yang discan adalah item ${data.item?.code || code}. Scan nomor order dulu.`, 'errorGuard');
-                setMode('order');
-                return;
-            }
-
-            const orderCode = normalize(data?.order?.code || code);
-            const label = data?.type === 'order'
-                ? [data.order?.store_code, data.order?.store_name].filter(Boolean).join(' - ')
-                : 'Manual';
-            const order = ensureOrder(orderCode, { label: label || 'Manual' });
+        fetch(scanOrderUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ order_number: code })
+        }).then(async response => {
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.message || 'Gagal mencatat order');
+            return payload;
+        }).then(payload => {
+            const orderCode = normalize(payload.order?.code || code);
+            const order = ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
             scrollTarget = { orderCode: order.code, lineId: null };
             playTone('order');
-            toast('ok', `Order ${order.code}`);
+            toast('ok', payload.message || `Order ${order.code} dicatat`);
             setMode('item');
         }).catch(() => {
-            alertError('Gagal cek nomor order. Coba scan ulang.', 'errorNetwork');
+            alertError('Gagal mencatat nomor order. Coba scan ulang.', 'errorNetwork');
         });
     }
     function scanItem(code) {
