@@ -1603,6 +1603,23 @@ window.__profitView = function (mode) {
     const regularCount = @json($productUnmappedRows->count());
     const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
     const fmtRp = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    async function fetchGmsItems(storeId) {
+        const response = await fetch(endpointBase + '/' + storeId + '?date_from=' + encodeURIComponent(fromDate) + '&date_to=' + encodeURIComponent(toDate), {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        const raw = await response.text();
+        let payload = {};
+        try {
+            payload = raw ? JSON.parse(raw) : {};
+        } catch (_) {
+            throw new Error('GMV Max Auto gagal dimuat (HTTP ' + response.status + ').');
+        }
+        if (!response.ok) {
+            throw new Error(payload.message || ('GMV Max Auto gagal dimuat (HTTP ' + response.status + ').'));
+        }
+        return payload;
+    }
     let loaded = false;
     let loading = null;
 
@@ -1638,17 +1655,27 @@ window.__profitView = function (mode) {
             return Promise.resolve();
         }
         loading = Promise.all(storeIds.map(async function (storeId) {
-            const response = await fetch(endpointBase + '/' + storeId + '?date_from=' + encodeURIComponent(fromDate) + '&date_to=' + encodeURIComponent(toDate), { headers: { Accept: 'application/json' } });
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.message || 'Gagal memuat item GMV Max Auto belum mapping.');
-            return { storeId: storeId, items: (payload.data || []).filter((item) => !item.mapped) };
+            try {
+                const payload = await fetchGmsItems(storeId);
+                return { storeId: storeId, items: (payload.data || []).filter((item) => !item.mapped), error: null };
+            } catch (error) {
+                return { storeId: storeId, items: [], error: error };
+            }
         })).then(function (entries) {
+            const failed = entries.filter((entry) => entry.error);
+            if (failed.length === entries.length) {
+                throw failed[0].error;
+            }
             const gmsItems = entries.reduce((sum, entry) => sum + entry.items.length, 0);
             const total = regularCount + gmsItems;
             if (badgeEl) badgeEl.textContent = total + ' produk perlu mapping';
             bodyEl.innerHTML = gmsItems
-                ? entries.map((entry) => renderStore(entry.storeId, entry.items)).join('')
-                : 'Semua item GMV Max Auto sudah memiliki HPP.';
+                ? entries.map((entry) => entry.error
+                    ? '<div style="padding:.65rem 0;color:#b91c1c;font-size:.72rem;">' + esc((storeNames[entry.storeId] || ('Toko #' + entry.storeId)) + ': ' + entry.error.message) + '</div>'
+                    : renderStore(entry.storeId, entry.items)).join('')
+                : (failed.length
+                    ? failed.map((entry) => '<div style="padding:.65rem 0;color:#b91c1c;font-size:.72rem;">' + esc((storeNames[entry.storeId] || ('Toko #' + entry.storeId)) + ': ' + entry.error.message) + '</div>').join('')
+                    : 'Semua item GMV Max Auto sudah memiliki HPP.');
             loaded = true;
         }).catch(function (error) {
             if (badgeEl) badgeEl.textContent = regularCount + ' produk perlu mapping';

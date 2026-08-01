@@ -754,7 +754,15 @@ class AdsDashboardController extends Controller
             $directGmv = (float) $dailyRows->sum('direct_gmv');
             $apiPcs = (float) $dailyRows->sum(fn ($row) => (float) data_get($row->raw_json, 'broad_order_amount', 0));
             $pcs = $apiPcs > 0 ? $apiPcs : (float) $orders;
-            [$netRevenueRatio] = $dashboardService->resolveConfiguredNetRevenueRatio($channelItemId, $store->id);
+            try {
+                [$netRevenueRatio] = $dashboardService->resolveConfiguredNetRevenueRatio($channelItemId, $store->id);
+            } catch (\Throwable $e) {
+                // Satu item dengan data settlement rusak tidak boleh membuat
+                // seluruh tab Produk Belum Mapping gagal. Gunakan rasio default
+                // dan biarkan endpoint tetap mengembalikan daftar item.
+                report($e);
+                $netRevenueRatio = AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+            }
             $netRevenue = $gmv * $netRevenueRatio;
             $hasSales = $gmv > 0 || $orders > 0 || $pcs > 0;
             $hppTotal = !$hasSales ? 0.0 : ($unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null);
