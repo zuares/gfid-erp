@@ -84,6 +84,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.realtime.status');
         Route::get('ads-dashboard/campaign-hourly', [AdsDashboardController::class, 'campaignHourly'])
             ->name('ads.campaign.hourly');
+        Route::get('ads-dashboard/drilldown/{store}', [AdsDashboardController::class, 'drilldown'])
+            ->name('ads.drilldown');
         Route::get('ads-dashboard/gms-items/{store}', [AdsDashboardController::class, 'gmsItems'])
             ->name('ads.gms.items');
         Route::patch('ads-dashboard/gms-items/{store}/{channelItemId}/map', [AdsDashboardController::class, 'mapGmsItem'])

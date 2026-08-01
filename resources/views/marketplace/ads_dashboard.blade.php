@@ -1033,6 +1033,41 @@ body[data-theme="dark"] .ads-chip{
 
 .ads-tabs-wrap{
     margin:0 0 .65rem;
+    position:sticky;
+    top:3.1rem;
+    z-index:300;
+    padding:.25rem 0 .35rem;
+    background:var(--card-bg,#fff);
+    border-bottom:1px solid var(--card-border,rgba(148,163,184,.18));
+    overflow-x:auto;
+    scrollbar-width:none;
+}
+.ads-tabs-wrap::-webkit-scrollbar{display:none;}
+body[data-theme="dark"] .ads-tabs-wrap{background:var(--card-bg,#0f172a);}
+
+.daily-trend-stats{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:.5rem;
+}
+.daily-trend-stat{
+    display:inline-flex;
+    flex-direction:column;
+    gap:.08rem;
+    min-width:86px;
+    padding:.42rem .58rem;
+    border:1px solid var(--dsh-border);
+    border-radius:8px;
+    background:var(--bg,#fff);
+    line-height:1.1;
+    text-align:right;
+}
+.daily-trend-stat-label{font-size:.6rem;color:var(--dsh-muted);font-weight:650;}
+.daily-trend-stat-value{font-size:.76rem;font-weight:800;font-variant-numeric:tabular-nums;}
+@media (max-width:575.98px){
+    .daily-trend-stats{justify-content:flex-start;width:100%;}
+    .daily-trend-stat{flex:1 1 calc(50% - .35rem);min-width:0;text-align:left;}
 }
 
 .ads-tabs-wrap::before{
@@ -2790,22 +2825,29 @@ document.addEventListener("DOMContentLoaded", function() {
         return value;
     };
 
-    // Helper: Format Indo Date (YYYY-MM-DD to DD MMM YYYY)
+    // Helper: Format Indo Date (YYYY-MM-DD to DD MMM)
     const formatIndoDate = (dateStr) => {
         if(!dateStr) return '';
         const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
         let parts = dateStr.split('-');
         if(parts.length !== 3) return dateStr;
-        return parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+        return parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1];
     };
 
     // Calculate summaries for charts
     let totalDailySpend = dailyData.reduce((sum, d) => sum + parseFloat(d.spend || 0), 0);
     let totalDailyGmv = dailyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+    let totalDailyOrders = dailyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
+    let totalDailyAov = totalDailyOrders > 0 ? (totalDailyGmv / totalDailyOrders) : 0;
     let totalDailyRoas = totalDailySpend > 0 ? (totalDailyGmv / totalDailySpend).toFixed(2) : "0.00";
     let dsEl = document.getElementById('dailySummary');
     if(dsEl) {
-        dsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalDailySpend)} Biaya</span> &bull; <span style="color:#16a34a">Rp ${formatShortIDR(totalDailyGmv)} GMV</span> &bull; <span style="color:#eab308">${totalDailyRoas}x ROAS</span>`;
+        dsEl.className = 'daily-trend-stats';
+        dsEl.innerHTML = `
+            <span class="daily-trend-stat"><span class="daily-trend-stat-label">Biaya</span><span class="daily-trend-stat-value" style="color:#dc2626">Rp ${formatShortIDR(totalDailySpend)}</span></span>
+            <span class="daily-trend-stat"><span class="daily-trend-stat-label">GMV</span><span class="daily-trend-stat-value" style="color:#16a34a">Rp ${formatShortIDR(totalDailyGmv)}</span></span>
+            <span class="daily-trend-stat"><span class="daily-trend-stat-label">AOV</span><span class="daily-trend-stat-value" style="color:#64748b">Rp ${formatShortIDR(totalDailyAov)}</span></span>
+            <span class="daily-trend-stat"><span class="daily-trend-stat-label">ROAS</span><span class="daily-trend-stat-value" style="color:#b45309">${totalDailyRoas}x</span></span>`;
     }
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + parseFloat(d.expense || 0), 0);
@@ -2825,7 +2867,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // --- AI INSIGHTS GENERATOR (ULTRA SMART EDITION) ---
-    let totalDailyOrders = dailyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let avgDailyCvr = totalDailyClicks > 0 ? ((totalDailyOrders / totalDailyClicks) * 100).toFixed(2) : "0.00";
     let avgCpc = totalDailyClicks > 0 ? (totalDailySpend / totalDailyClicks) : 0;
     
@@ -2952,25 +2993,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 }),
                 datasets: [
                     {
-                        label: 'AOV',
-                        data: dailyData.map(d => {
-                            let gm = parseFloat(d.gmv || 0);
-                            let or = parseInt(d.orders || 0);
-                            return or > 0 ? parseFloat((gm/or).toFixed(0)) : 0;
-                        }),
-                        borderColor: '#94a3b8', // slate
-                        backgroundColor: '#94a3b8',
-                        borderDash: [5, 5],
-                        fill: false,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        pointRadius: 0, // hide dots
-                        pointHitRadius: 15,
-                        pointHoverRadius: 4,
-                        pointHoverBackgroundColor: '#94a3b8',
-                        yAxisID: 'y2'
-                    },
-                    {
                         label: 'ROAS',
                         data: dailyData.map(d => {
                             let sp = parseFloat(d.spend || 0);
@@ -3049,6 +3071,14 @@ document.addEventListener("DOMContentLoaded", function() {
                                 } else {
                                     return label + formatFullIDR(context.parsed.y);
                                 }
+                            },
+                            afterBody: function(items) {
+                                const point = items && items[0];
+                                if (!point) return [];
+                                const day = dailyData[point.dataIndex] || {};
+                                const orders = parseInt(day.orders || 0);
+                                const aov = orders > 0 ? (parseFloat(day.gmv || 0) / orders) : 0;
+                                return ['AOV: ' + formatFullIDR(aov)];
                             }
                         }
                     }
@@ -3080,12 +3110,6 @@ document.addEventListener("DOMContentLoaded", function() {
                             callback: function(value) { return value + 'x'; }
                         }
                     },
-                    y2: {
-                        type: 'linear',
-                        display: false,
-                        position: 'left',
-                        beginAtZero: true
-                    }
                 }
             }
         });
@@ -3453,7 +3477,23 @@ document.addEventListener("DOMContentLoaded", function() {
                         tension: 0.3,
                         pointRadius: 2,
                         yAxisID: 'y'
-                    }
+                    },
+                    {
+                        label: 'ROAS',
+                        data: dailyData.map(d => {
+                            const spend = parseFloat(d.spend) || 0;
+                            const gmv = parseFloat(d.gmv) || 0;
+                            return spend > 0 ? parseFloat((gmv / spend).toFixed(2)) : 0;
+                        }),
+                        type: 'line',
+                        borderColor: '#eab308',
+                        backgroundColor: '#eab308',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y1'
+                    },
                 ]
             },
             options: {
@@ -3462,11 +3502,34 @@ document.addEventListener("DOMContentLoaded", function() {
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: {size: 10} } },
-                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                return context.dataset.yAxisID === 'y1'
+                                    ? label + ': ' + Number(context.parsed.y || 0).toFixed(2) + 'x'
+                                    : label + ': ' + formatFullIDR(context.parsed.y || 0);
+                            },
+                            afterBody: function(items) {
+                                const point = items && items[0];
+                                if (!point) return [];
+                                const day = dailyData[point.dataIndex] || {};
+                                const orders = parseInt(day.orders || 0);
+                                const aov = orders > 0 ? (parseFloat(day.gmv || 0) / orders) : 0;
+                                return ['AOV: ' + formatFullIDR(aov)];
+                            }
+                        }
+                    }
                 },
                 scales: {
                     x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
-                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: false } }
+                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: false }, ticks: { callback: value => formatShortIDR(value) } },
+                    y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { callback: value => value + 'x' } }
                 }
             }
         });
