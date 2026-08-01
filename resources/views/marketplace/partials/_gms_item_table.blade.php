@@ -3,7 +3,7 @@
         <thead>
             <tr>
                 <th>Produk</th>
-                <th class="text-end" title="Total tayangan iklan">Impresi</th>
+                <th class="text-end" title="Total jangkauan iklan">Jangkauan</th>
                 <th class="text-end" title="Total klik iklan">Klik</th>
                 <th class="text-end" title="Biaya Iklan">Pengeluaran</th>
                 <th class="text-end" title="Pesanan Broad">Pesanan (B)</th>

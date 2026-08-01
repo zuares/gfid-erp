@@ -148,7 +148,7 @@
             <div class="kpis">
                 <span class="kpi" title="Sisa kredit iklan"><span class="lbl">Saldo</span><span class="val" id="kpiBalance">—</span></span>
                 <span class="kpi"><span class="lbl">Spend</span><span class="val" id="kpiSpend">—</span></span>
-                <span class="kpi"><span class="lbl">Sales</span><span class="val" id="kpiGmv">—</span></span>
+                <span class="kpi"><span class="lbl">Gross Sales</span><span class="val" id="kpiGmv">—</span></span>
                 <span class="kpi"><span class="lbl">ROAS</span><span class="val" id="kpiRoas">—</span></span>
                 <span class="kpi"><span class="lbl">ACOS</span><span class="val" id="kpiAcos">—</span></span>
                 <span class="kpi"><span class="lbl">Orders</span><span class="val" id="kpiOrders">—</span></span>
@@ -215,7 +215,7 @@
                 <thead>
                     <tr>
                         <th>Tanggal</th>
-                        <th class="text-end">Impresi</th>
+                        <th class="text-end">Jangkauan</th>
                         <th class="text-end">Klik</th>
                         <th class="text-end">CTR</th>
                         <th class="text-end">Spend</th>
@@ -758,7 +758,7 @@
                 ${showMapCol ? sortTh('target_roas','Target','right') : ''}
                 ${showMapCol ? sortTh('campaign_budget','Budget','right') : ''}
                 ${sortTh('spend','Spend','right')}
-                ${sortTh('gmv','Sales','right')}
+                ${sortTh('gmv','Gross Sales','right')}
                 ${sortTh('roas','ROAS','right')}
                 ${sortTh('acos_pct','ACOS','right')}
                 <th class="text-end" title="${showMapCol ? 'Klik ✎ untuk set margin kotor' : 'break-even tertimbang'}">Break-Even${showMapCol ? ' ✎' : ''}</th>

@@ -39,7 +39,7 @@
         <thead>
             <tr>
                 <th style="cursor:pointer;" onclick="sortCampaignTable('name', this)">Kampanye <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
-                <th class="text-end" style="cursor:pointer;" title="Total tayangan iklan" onclick="sortCampaignTable('impressions', this)">Impresi <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Total jangkauan iklan" onclick="sortCampaignTable('impressions', this)">Jangkauan <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
                 <th class="text-end" style="cursor:pointer;" title="Total klik iklan" onclick="sortCampaignTable('clicks', this)">Klik <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
                 <th class="text-end" style="cursor:pointer;" title="Biaya Iklan" onclick="sortCampaignTable('spend', this)">Pengeluaran <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
                 <th class="text-end" style="cursor:pointer;" title="Pesanan Broad" onclick="sortCampaignTable('orders_b', this)">Pesanan (B) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>

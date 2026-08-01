@@ -184,7 +184,7 @@
                     <th>Campaign / Item</th>
                     <th>Status</th>
                     <th class="text-end">Spend</th>
-                    <th class="text-end">Impressions</th>
+                    <th class="text-end">Jangkauan</th>
                     <th class="text-end">Clicks</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Click-Through Rate">CTR</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Cost Per Click">CPC</th>

@@ -31,7 +31,7 @@
             <!-- Step 1: Impressions -->
             <div class="mb-3 position-relative">
                 <div class="d-flex justify-content-between mb-1">
-                    <span class="fw-bold text-secondary"><i class="bi bi-eye"></i> Impressions</span>
+                    <span class="fw-bold text-secondary"><i class="bi bi-eye"></i> Jangkauan</span>
                     <span class="fw-bold">{{ number_format($funnelImpressions, 0, ',', '.') }}</span>
                 </div>
                 <div class="progress" style="height: 25px; border-radius: 8px;">
@@ -153,7 +153,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Nama Kampanye</th>
-                            <th class="text-end">Impresi</th>
+                            <th class="text-end">Jangkauan</th>
                             <th class="text-end">CTR</th>
                             <th class="text-end">Spend</th>
                         </tr>

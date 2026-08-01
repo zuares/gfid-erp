@@ -51,7 +51,7 @@
             <thead class="table-light">
                 <tr>
                     <th>Segmen Audiens (Tipe Iklan)</th>
-                    <th class="text-end">Impresi</th>
+                    <th class="text-end">Jangkauan</th>
                     <th class="text-end">Klik</th>
                     <th class="text-end">CTR</th>
                     <th class="text-end">Spend</th>

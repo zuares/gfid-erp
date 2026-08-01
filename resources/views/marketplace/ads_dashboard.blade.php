@@ -1035,14 +1035,19 @@ body[data-theme="dark"] .ads-chip{
 
 .ads-tabs-wrap{
     margin:0 0 .65rem;
-    position:sticky;
-    top:3.1rem;
-    z-index:300;
+    position:relative;
+    top:auto;
+    z-index:auto;
     padding:.25rem 0 .35rem;
     background:var(--card-bg,#fff);
     border-bottom:1px solid var(--card-border,rgba(148,163,184,.18));
     overflow-x:auto;
     scrollbar-width:none;
+}
+.ads-tabs-wrap .dash-tabs-modern{
+    position:relative;
+    top:auto;
+    z-index:auto;
 }
 .ads-tabs-wrap::-webkit-scrollbar{display:none;}
 body[data-theme="dark"] .ads-tabs-wrap{background:var(--card-bg,#0f172a);}
@@ -1702,7 +1707,7 @@ function sortTrafficTable(col) {
                             <button class="dash-tab-sm active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
                             <button class="dash-tab-sm" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
                             <button class="dash-tab-sm" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
-                            <button class="dash-tab-sm" data-val="impressions"><i class="bi bi-eye"></i> Impresi</button>
+                            <button class="dash-tab-sm" data-val="impressions"><i class="bi bi-eye"></i> Jangkauan</button>
                             <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
                             <button class="dash-tab-sm" data-val="ctr"><i class="bi bi-hand-index"></i> CTR</button>
                             <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
@@ -1776,7 +1781,7 @@ function sortTrafficTable(col) {
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
                                     <div style="font-weight: 650; font-size: 0.82rem; color: var(--dsh-muted);">Trafik</div>
-                                    <div class="mt-1" style="font-size: 0.7rem; color: var(--dsh-muted); opacity: 0.85;">Impresi, klik, dan CVR.</div>
+                                    <div class="mt-1" style="font-size: 0.7rem; color: var(--dsh-muted); opacity: 0.85;">Jangkauan, klik, dan CVR.</div>
                                 </div>
                                 <div id="trafficSummary" style="font-size: 0.78rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                             </div>
@@ -1804,7 +1809,7 @@ function sortTrafficTable(col) {
                 {{-- CHART IMPRESI --}}
                 <div class="dpanel p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Impresi</div>
+                        <div class="text-muted small fw-bold mt-0 mb-0"><i class="bi bi-eye text-info"></i> Jangkauan</div>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--dsh-muted); opacity: 0.85; margin-bottom: 0.5rem;">
                         Top 5.
@@ -1965,7 +1970,7 @@ function sortTrafficTable(col) {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-stoplights text-primary"></i> Analisa Traffic</div>
-                        <div class="ads-tab-panel-note">Impresi → klik → pesanan, plus efisiensi biaya iklan.</div>
+                        <div class="ads-tab-panel-note">Jangkauan → klik → pesanan, plus efisiensi biaya iklan.</div>
                     </div>
                 </div>
                 
@@ -1993,7 +1998,7 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trSpend, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-eye me-1"></i> Impressions</div>
+                        <div class="kpi-label"><i class="bi bi-eye me-1"></i> Jangkauan</div>
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trImp, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
@@ -2013,7 +2018,7 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpm, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-bag-check me-1"></i> Omzet</div>
+                        <div class="kpi-label"><i class="bi bi-bag-check me-1"></i> Gross Sales</div>
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trGmv, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
@@ -2088,7 +2093,7 @@ function sortTrafficTable(col) {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Campaign (Traffic)</div>
-                        <div class="ads-tab-panel-note">Impresi, klik, pesanan, konversi, dan efisiensi biaya per campaign.</div>
+                        <div class="ads-tab-panel-note">Jangkauan, klik, pesanan, konversi, dan efisiensi biaya per campaign.</div>
                     </div>
                 </div>
                 
@@ -2099,7 +2104,7 @@ function sortTrafficTable(col) {
                                 <th>Platform</th>
                                 <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Spend <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Impressions <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Jangkauan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Clicks <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Orders <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
@@ -2293,7 +2298,7 @@ function sortTrafficTable(col) {
                         ['title' => 'Net Profit', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
                         ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-box-seam'],
                         ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'roas', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'Impresi', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-eye'],
+                        ['title' => 'Jangkauan', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-eye'],
                         ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cursor'],
                         ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'roas', 'icon' => 'bi-hand-index-thumb'],
                         ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'profit', 'icon' => 'bi-funnel'],
@@ -2849,7 +2854,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let avgDailyCtr = totalDailyImpressions > 0 ? ((totalDailyClicks / totalDailyImpressions) * 100).toFixed(2) : "0.00";
     let tsEl = document.getElementById('trafficSummary');
     if(tsEl) {
-        tsEl.innerHTML = `<span style="color:#f59e0b">${formatShortIDR(totalDailyImpressions)} Impresi</span> &bull; <span style="color:#3b82f6">${formatShortIDR(totalDailyClicks)} Klik</span> &bull; <span style="color:#8b5cf6">${avgDailyCtr}% CTR</span>`;
+        tsEl.innerHTML = `<span style="color:#f59e0b">${formatShortIDR(totalDailyImpressions)} Jangkauan</span> &bull; <span style="color:#3b82f6">${formatShortIDR(totalDailyClicks)} Klik</span> &bull; <span style="color:#8b5cf6">${avgDailyCtr}% CTR</span>`;
     }
 
     // --- AI INSIGHTS GENERATOR (ULTRA SMART EDITION) ---
@@ -3279,7 +3284,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         yAxisID: 'y1'
                     },
                     {
-                        label: 'Impression',
+                        label: 'Jangkauan',
                         data: dailyData.map(d => parseInt(d.impressions || 0)),
                         borderColor: '#f59e0b',
                         backgroundColor: gradImp,
@@ -3532,7 +3537,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 labels: dailyData.map(d => formatIndoDate(d.date)),
                 datasets: [
                     {
-                        label: 'Impressions',
+                        label: 'Jangkauan',
                         data: dailyData.map(d => parseInt(d.impressions) || 0),
                         backgroundColor: 'rgba(59, 130, 246, 0.7)',
                         borderRadius: 4,
@@ -3561,7 +3566,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 },
                 scales: {
                     x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
-                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: true, text: 'Impressions', font: {size:10} } },
+                    y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: true, text: 'Jangkauan', font: {size:10} } },
                     y1: { type: 'linear', display: true, position: 'right', grid: { display: false }, title: { display: true, text: 'Clicks', font: {size:10} } }
                 }
             }
@@ -4221,7 +4226,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV Paruh-2 melampaui Paruh-1. Algoritma optimal pada <b>${formatIndoDate(bestDay)}</b>. 🔗 <b>Korelasi AI:</b> ${cause} 💡 <b>Saran:</b> Jangan ubah Target ROAS saat ini.</div>`;
                             trendColor = '#16a34a';
                         } else if (secondHalfGmv < firstHalfGmv * 0.8) {
-                            let cause = isImpressionLeak ? "Penyebab utamanya terlihat di <b>Trafik (Kebocoran Impresi Ekstrem)</b>; iklan tayang tapi orang malas klik." : "Trafik melemah, kemungkinan karena kalah bersaing harga dengan kompetitor.";
+                            let cause = isImpressionLeak ? "Penyebab utamanya terlihat di <b>Trafik (Kebocoran Jangkauan Ekstrem)</b>; iklan tayang tapi orang malas klik." : "Trafik melemah, kemungkinan karena kalah bersaing harga dengan kompetitor.";
                             trendHtml = `<div style="font-weight: 700; color: #f59e0b; font-size: 0.8rem; margin-bottom: 0.2rem;">📉 Peringatan Downtrend</div>
                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">GMV merosot perlahan (puncak anjlok di <b>${formatIndoDate(worstDay)}</b>). 🔗 <b>Korelasi AI:</b> ${cause} 💡 <b>Saran:</b> Segera evaluasi harga atau perbarui foto produk di GMV Max.</div>`;
                             trendColor = '#f59e0b';
@@ -4244,8 +4249,8 @@ document.addEventListener("DOMContentLoaded", function() {
                             
                             if (isImpressionLeak) {
                                 let impact = (secondHalfGmv < firstHalfGmv * 0.8) ? "Sistem akhirnya menghukum Anda dengan <b>Downtrend Finansial</b> di grafik atas." : "Hati-hati, lambat laun ini akan menyeret ROAS Anda ke bawah.";
-                                tfHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🚨 Kebocoran Impresi Ekstrem</div>
-                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxImpressionsDay.date)}</b>, ada <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> impresi tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 🔗 <b>Dampak Finansial:</b> ${impact} 💡 <b>Saran:</b> Iklan tayang tapi diabaikan. Cek harga/thumbnail segera!</div>`;
+                                tfHtml = `<div style="font-weight: 700; color: #dc2626; font-size: 0.8rem; margin-bottom: 0.2rem;">🚨 Kebocoran Jangkauan Ekstrem</div>
+                                          <div style="font-size: 0.7rem; color: var(--dsh-muted);">Pada <b>${formatIndoDate(maxImpressionsDay.date)}</b>, ada <b>${parseInt(maxImpressionsDay.impressions).toLocaleString('id-ID')}</b> jangkauan tapi CTR hanya <b>${impCtr.toFixed(2)}%</b>. 🔗 <b>Dampak Finansial:</b> ${impact} 💡 <b>Saran:</b> Iklan tayang tapi diabaikan. Cek harga/thumbnail segera!</div>`;
                                 tfColor = '#dc2626';
                             } else if (isBounceAnomaly) {
                                 let impact = isVolatile ? "Inilah alasan mengapa grafik <b>Finansial Anda sangat fluktuatif (Volatile)</b>." : "Budget Anda habis dimakan klik tanpa omzet.";
