@@ -532,7 +532,7 @@ window.__profitView = function (mode) {
         <div class="modal-content" style="border-radius:18px;border:1px solid var(--dsh-border);background:var(--card-bg,#fff);color:var(--text,#0f172a);">
             <div class="modal-header" style="border-bottom:1px solid var(--dsh-border);">
                 <div>
-                    <h5 class="modal-title" style="font-size:1rem;font-weight:800;">Pilih item untuk HPP</h5>
+                    <h5 class="modal-title" style="font-size:1rem;font-weight:800;">Pilih item utama untuk HPP</h5>
                     <div id="profitMapCampaignLabel" style="font-size:.7rem;color:var(--dsh-muted);margin-top:.2rem;"></div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
@@ -581,7 +581,7 @@ window.__profitView = function (mode) {
                         : 'HPP item utama';
                     return `<button type="button" class="profit-map-option" data-id="${item.id}" data-code="${esc(item.code || '')}" data-name="${esc(item.name || '')}" style="display:block;width:100%;text-align:left;padding:.55rem .65rem;margin-bottom:.35rem;border:1px solid var(--dsh-border);border-radius:10px;background:transparent;color:var(--text);cursor:pointer;"><b style="font-size:.76rem;">${esc(item.name || 'Produk tanpa nama')}</b><span style="display:block;font-size:.7rem;color:var(--dsh-muted);margin-top:.12rem;">Item utama: ${esc(item.code || 'Tanpa kode')}</span><span style="display:block;font-size:.66rem;color:var(--dsh-muted);margin-top:.15rem;">${hppNote} · ${window.__profitFmtRp ? window.__profitFmtRp(item.hpp) : ('Rp ' + Number(item.hpp || 0).toLocaleString('id-ID'))}</span></button>`;
                 }).join('')
-                : '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Item tidak ditemukan.</div>';
+                : '<div style="padding:.7rem;color:var(--dsh-muted);font-size:.75rem;">Item utama tidak ditemukan. Pastikan produk sudah memiliki mapping variant ke item internal.</div>';
             resultsEl.querySelectorAll('.profit-map-option').forEach((button) => {
                 button.addEventListener('click', () => {
                     state.itemId = Number(button.dataset.id);

@@ -839,6 +839,91 @@ class AdsModuleTest extends TestCase
             ->assertJsonPath('0.variant_count', 2);
     }
 
+    public function test_campaign_profit_uses_average_hpp_after_product_mapping()
+    {
+        $store = $this->createStore('MAPAVGPROFIT');
+        $parent = \App\Models\Item::create([
+            'code' => 'ITEM-AVG-PARENT',
+            'name' => 'Parent Average Ads',
+            'type' => 'finished',
+            'hpp' => 0,
+            'active' => true,
+        ]);
+        $variantOne = \App\Models\Item::create([
+            'code' => 'ITEM-AVG-V1',
+            'name' => 'Variant Average Ads 1',
+            'type' => 'finished',
+            'hpp' => 10000,
+            'active' => true,
+        ]);
+        $variantTwo = \App\Models\Item::create([
+            'code' => 'ITEM-AVG-V2',
+            'name' => 'Variant Average Ads 2',
+            'type' => 'finished',
+            'hpp' => 30000,
+            'active' => true,
+        ]);
+        $product = \App\Models\StorefrontProduct::create([
+            'slug' => 'parent-average-ads',
+            'name' => 'Parent Average Ads',
+            'base_price' => 100000,
+            'item_id' => $parent->id,
+        ]);
+        $size = \App\Models\StorefrontProductSize::create([
+            'product_id' => $product->id,
+            'size_label' => 'M',
+        ]);
+        foreach ([['Merah', $variantOne], ['Biru', $variantTwo]] as [$color, $variantItem]) {
+            $variant = \App\Models\StorefrontProductVariant::create([
+                'product_id' => $product->id,
+                'color_name' => $color,
+            ]);
+            \App\Models\StorefrontVariantItemMapping::create([
+                'product_id' => $product->id,
+                'variant_id' => $variant->id,
+                'size_id' => $size->id,
+                'item_id' => $variantItem->id,
+            ]);
+        }
+
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPAVGPROFIT',
+            'channel_item_id' => 987654399,
+            'campaign_name' => 'Campaign Average HPP',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPAVGPROFIT',
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/api/marketplace/ad-campaigns/' . $campaign->id . '/map-item', [
+                'internal_item_id' => $parent->id,
+            ]);
+        $response->assertOk();
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $mappedCampaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-MAPAVGPROFIT');
+
+        $this->assertSame(20000.0, (float) $mappedCampaign->unit_cogs);
+        $this->assertSame(20000.0, (float) $mappedCampaign->total_cogs);
+    }
+
     public function test_historical_comparison_uses_selected_compare_mode()
     {
         $store = $this->createStore('HISTMODE');

@@ -5862,9 +5862,7 @@ class MarketplaceController extends Controller
         // sudah dirata-ratakan dari seluruh item variant yang terkait.
         if ($request->boolean('group_products')) {
             $products = app(ItemHppResolver::class)->searchProducts($q, $limit);
-            if ($products->isNotEmpty()) {
-                return response()->json($products->values());
-            }
+            return response()->json($products->values());
         }
 
         $items = Item::query()
