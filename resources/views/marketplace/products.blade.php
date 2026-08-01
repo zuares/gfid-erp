@@ -108,6 +108,26 @@
     .prd-caret{ cursor:pointer; user-select:none; color:#64748b; font-size:.8rem; }
     .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
 
+    /* Autosuggest item untuk SKU varian di tab Bermasalah */
+    .variant-sku-suggest{ position:relative; width:180px; }
+    .variant-sku-suggest .input-group{ width:100%; }
+    .variant-sku-results{
+        display:none; position:absolute; left:0; right:0; top:calc(100% + 3px); z-index:10050;
+        max-height:210px; overflow-y:auto; background:var(--card,#fff);
+        border:1px solid rgba(148,163,184,.35); border-radius:7px;
+        box-shadow:0 8px 18px rgba(15,23,42,.16);
+    }
+    body[data-theme="dark"] .variant-sku-results{ background:#1e293b; border-color:rgba(51,65,85,.9); }
+    .variant-sku-option{
+        display:block; width:100%; padding:.42rem .55rem; border:0; border-bottom:1px solid rgba(148,163,184,.14);
+        background:transparent; color:inherit; text-align:left; cursor:pointer; font-size:.7rem;
+    }
+    .variant-sku-option:last-child{ border-bottom:0; }
+    .variant-sku-option:hover{ background:rgba(59,130,246,.12); }
+    .variant-sku-option-code{ display:block; font-weight:750; }
+    .variant-sku-option-name{ display:block; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body[data-theme="dark"] .variant-sku-option-name{ color:#cbd5e1; }
+
     /* ── Tabs (Produk / Boost) ── */
     .store-tab { 
         background: transparent; border: none; padding: .4rem .8rem; font-size: .8rem; font-weight: 600; 
@@ -657,9 +677,12 @@
                 <tr class="model-row mr-${p.id}" style="${isModelOpened ? '' : 'display:none'}">
                     <td></td><td></td>
                     <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} 
-                        <div class="input-group input-group-sm mt-1" style="max-width:180px;">
-                            <input type="text" class="form-control px-2" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" placeholder="Kode Variasi">
-                            <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveSkuInline(${p.id}, '${m.model_id}')" style="padding:1px 8px;" title="Simpan SKU">💾</button>
+                        <div class="variant-sku-suggest mt-1">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control px-2 js-variant-sku-input" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" placeholder="Kode Variasi" autocomplete="off">
+                                <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveSkuInline(${p.id}, '${m.model_id}')" style="padding:1px 8px;" title="Simpan SKU">💾</button>
+                            </div>
+                            <div class="variant-sku-results" role="listbox"></div>
                         </div>
                     </td>
                     <td></td>
@@ -684,6 +707,107 @@
         if (show) openedModels.add(pid);
         else openedModels.delete(pid);
     };
+
+    // ── Autosuggest item untuk input SKU varian ─────────────────────────────
+    // Input dirender ulang setiap kali tabel di-render, jadi gunakan event delegation.
+    function closeVariantSuggestions(except = null) {
+        document.querySelectorAll('.variant-sku-results').forEach(box => {
+            if (!except || box !== except) box.style.display = 'none';
+        });
+    }
+
+    function renderVariantSuggestions(input, items) {
+        const box = input.closest('.variant-sku-suggest')?.querySelector('.variant-sku-results');
+        if (!box) return;
+
+        box.innerHTML = '';
+        if (!items.length) {
+            box.innerHTML = '<div class="p-2 text-muted" style="font-size:.7rem">Item tidak ditemukan</div>';
+            box.style.display = 'block';
+            return;
+        }
+
+        items.slice(0, 8).forEach(item => {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'variant-sku-option';
+            option.dataset.code = item.code || '';
+            option.innerHTML = `<span class="variant-sku-option-code"></span><span class="variant-sku-option-name"></span>`;
+            option.querySelector('.variant-sku-option-code').textContent = (item.code || '').toUpperCase();
+            option.querySelector('.variant-sku-option-name').textContent = item.name || '';
+            box.appendChild(option);
+        });
+
+        closeVariantSuggestions(box);
+        box.style.display = 'block';
+    }
+
+    async function loadVariantSuggestions(input) {
+        const box = input.closest('.variant-sku-suggest')?.querySelector('.variant-sku-results');
+        if (!box) return;
+
+        const q = input.value.trim();
+        if (q.length < 2) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const requestId = String(Number(input.dataset.suggestRequest || 0) + 1);
+        input.dataset.suggestRequest = requestId;
+        box.innerHTML = '<div class="p-2 text-muted" style="font-size:.7rem">Mencari item…</div>';
+        closeVariantSuggestions(box);
+        box.style.display = 'block';
+
+        try {
+            const result = await api('/api/v1/items/suggest?q=' + encodeURIComponent(q) + '&limit=8');
+            if (input.dataset.suggestRequest !== requestId) return;
+            renderVariantSuggestions(input, Array.isArray(result?.data) ? result.data : []);
+        } catch (e) {
+            if (input.dataset.suggestRequest !== requestId) return;
+            box.innerHTML = '<div class="p-2 text-danger" style="font-size:.7rem">Autosuggest gagal dimuat</div>';
+            box.style.display = 'block';
+        }
+    }
+
+    let variantSuggestTimer = null;
+    document.addEventListener('focusin', e => {
+        const input = e.target.closest('.js-variant-sku-input');
+        if (!input) return;
+
+        // Memudahkan mengganti SKU varian yang sudah ada.
+        input.select();
+        clearTimeout(variantSuggestTimer);
+        variantSuggestTimer = setTimeout(() => loadVariantSuggestions(input), 80);
+    });
+
+    document.addEventListener('input', e => {
+        const input = e.target.closest('.js-variant-sku-input');
+        if (!input) return;
+
+        clearTimeout(variantSuggestTimer);
+        variantSuggestTimer = setTimeout(() => loadVariantSuggestions(input), 220);
+    });
+
+    document.addEventListener('mousedown', e => {
+        const option = e.target.closest('.variant-sku-option');
+        if (option) {
+            e.preventDefault();
+            const input = option.closest('.variant-sku-suggest')?.querySelector('.js-variant-sku-input');
+            if (!input) return;
+            input.value = option.dataset.code || '';
+            input.focus();
+            input.select();
+            closeVariantSuggestions();
+            return;
+        }
+
+        if (!e.target.closest('.variant-sku-suggest')) closeVariantSuggestions();
+    });
+
+    document.addEventListener('keydown', e => {
+        const input = e.target.closest('.js-variant-sku-input');
+        if (input && e.key === 'Escape') closeVariantSuggestions();
+    });
 
     // ── Aksi stok / harga / unlist ──────────────────────────────────────────
     window.saveStock = async function (pid, modelId) {

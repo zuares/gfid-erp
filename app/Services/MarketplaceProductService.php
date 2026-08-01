@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Log;
 
 class MarketplaceProductService
 {
-    public function __construct(protected MarketplaceApiGateway $gateway) {}
+    public function __construct(
+        protected MarketplaceApiGateway $gateway,
+        protected ?ChannelManager $manager = null,
+    ) {}
 
     /**
      * Sync semua produk sebuah toko (status NORMAL + UNLIST).
@@ -250,7 +253,7 @@ class MarketplaceProductService
      */
     public function updateStock(MarketplaceProduct $product, array $stockList): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
         $res = $driver->updateProductStock($product->store, $product->item_id, $stockList);
 
         if (! empty($res['error'])) {
@@ -276,7 +279,7 @@ class MarketplaceProductService
      */
     public function updatePrice(MarketplaceProduct $product, array $priceList): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
 
         $originalPriceList = array_map(function ($p) {
             return [
@@ -359,7 +362,7 @@ class MarketplaceProductService
      */
     public function setUnlist(MarketplaceProduct $product, bool $unlist): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
         $res = $driver->unlistItems($product->store, [
             ['item_id' => $product->item_id, 'unlist' => $unlist],
         ]);
@@ -500,7 +503,7 @@ class MarketplaceProductService
 
     public function updateSku(MarketplaceProduct $product, string $newSku): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
         $res = $driver->updateItemBaseInfo($product->store, (int)$product->item_id, ['item_sku' => $newSku]);
 
         if (!empty($res['error'])) {
@@ -514,7 +517,7 @@ class MarketplaceProductService
     public function updateModelSku(MarketplaceProductModel $model, string $newSku): array
     {
         $product = $model->product;
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
 
         $modelsParam = [
             [
@@ -531,6 +534,16 @@ class MarketplaceProductService
 
         $model->update(['model_sku' => $newSku]);
         return $res;
+    }
+
+    /** Resolve channel driver for product mutations.
+     *
+     * The nullable fallback keeps direct/unit construction with only the
+     * gateway working while the application container injects ChannelManager.
+     */
+    private function channelDriver(Store $store)
+    {
+        return ($this->manager ??= app(ChannelManager::class))->driver($store);
     }
 
     /**
