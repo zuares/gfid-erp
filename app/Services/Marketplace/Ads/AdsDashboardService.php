@@ -24,6 +24,25 @@ class AdsDashboardService
     {
     }
 
+    /**
+     * Rasio dana cair yang dipakai seluruh tampilan dan endpoint Ads.
+     * Mode manual selalu menjadi override; mode otomatis memakai settlement
+     * item bila tersedia lalu fallback ke rasio default.
+     *
+     * @return array{0: float, 1: string}
+     */
+    public function resolveConfiguredNetRevenueRatio(?string $channelItemId, ?int $storeId = null): array
+    {
+        $adsSetting = $storeId !== null
+            ? MarketplaceAdsSetting::where('store_id', $storeId)->first()
+            : null;
+        if ($adsSetting && ($adsSetting->admin_fee_mode ?? 'auto') === 'manual' && $adsSetting->admin_fee_pct !== null) {
+            return [max(0.0, 1 - ((float) $adsSetting->admin_fee_pct / 100)), 'manual'];
+        }
+
+        return $this->deriveNetRevenueRatioWithSource($channelItemId, $storeId);
+    }
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,

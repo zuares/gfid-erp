@@ -2197,6 +2197,14 @@ function sortTrafficTable(col) {
 
         <!-- TAB PENGATURAN -->
         <div class="tab-pane" id="tab-settings">
+            @php
+                $settingsCurrentGmv = (float) data_get($kpi ?? [], 'current.gmv', 0);
+                $settingsCurrentNetRevenue = (float) data_get($kpi ?? [], 'current.net_revenue', 0);
+                $settingsAutoFee = $settingsCurrentGmv > 0
+                    ? max(0, (1 - ($settingsCurrentNetRevenue / $settingsCurrentGmv)) * 100)
+                    : 21.9;
+            @endphp
+            @include('marketplace.partials._ads_fee_setting', ['autoFeeValue' => $settingsAutoFee])
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>

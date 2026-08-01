@@ -287,138 +287,6 @@ window.__profitChartData = {
 </div>
 @endif
 
-<!-- ── Pengaturan admin fee: otomatis (settlement) / manual ── -->
-@if(($storeId ?? null) !== 'all')
-<div class="ads-tab-panel mb-3 profit-fee-panel">
-    <div class="ads-tab-panel-head">
-        <div>
-            <div class="ads-tab-panel-title">
-                <i class="bi bi-gear" style="color: var(--dsh-accent);"></i> Pengaturan Fee
-            </div>
-        </div>
-    </div>
-    <div class="p-3">
-        <form id="profitAdminFeeForm" method="POST" action="{{ route('marketplace.ads.fee.setting') }}" class="profit-fee-form">
-            @csrf
-            <input type="hidden" name="store_id" value="{{ $storeId }}">
-            <div>
-                <label class="profit-fee-label">Mode Admin Fee</label>
-                <div class="profit-fee-switch-row">
-                    <span>Manual</span>
-                    <label class="profit-fee-switch">
-                        <input id="profitAdminFeeModeToggle" type="checkbox" {{ $feeMode !== 'manual' ? 'checked' : '' }}>
-                        <span class="profit-fee-switch-slider"></span>
-                    </label>
-                    <span>Otomatis</span>
-                    <input id="profitAdminFeeMode" type="hidden" name="admin_fee_mode" value="{{ $feeMode !== 'manual' ? 'auto' : 'manual' }}">
-                </div>
-            </div>
-            <div class="profit-fee-field">
-                <label class="profit-fee-label">Admin Fee %</label>
-                <div id="profitAdminFeeDisplay" class="profit-fee-display" role="button" tabindex="0" style="display:inline-flex; align-items:center; gap:.35rem; min-height:38px; padding:.35rem .7rem; border:1px solid var(--dsh-border); border-radius:10px; color:var(--text); background:var(--bg); font-size:1rem; font-weight:800; font-variant-numeric:tabular-nums; cursor:pointer;">
-                    {{ number_format($activeFeeValue, 1, ',', '.') }}%
-                </div>
-                <div id="profitAdminFeeEditor" class="input-group profit-fee-editor" style="display:none;">
-                    <input id="profitAdminFeePct" type="number" name="admin_fee_pct" step="0.1" min="0" max="99" value="{{ number_format($activeFeeValue, 1, '.', '') }}" class="form-control" style="border-radius:10px 0 0 10px; font-size:.85rem; background:var(--bg); color:var(--text); border-color:var(--dsh-border);">
-                    <span class="input-group-text" style="border-radius:0 10px 10px 0; background:var(--bg); color:var(--dsh-muted); border-color:var(--dsh-border);">%</span>
-                </div>
-                <div id="profitAdminFeeStatus" aria-live="polite" style="display:none; font-size:.64rem; color:var(--dsh-muted); margin-top:.2rem;"></div>
-            </div>
-        </form>
-    </div>
-</div>
-@endif
-
-@if(($storeId ?? null) !== 'all')
-<script>
-(function () {
-    const form = document.getElementById('profitAdminFeeForm');
-    const display = document.getElementById('profitAdminFeeDisplay');
-    const editor = document.getElementById('profitAdminFeeEditor');
-    const modeToggle = document.getElementById('profitAdminFeeModeToggle');
-    const modeInput = document.getElementById('profitAdminFeeMode');
-    const input = document.getElementById('profitAdminFeePct');
-    const status = document.getElementById('profitAdminFeeStatus');
-    if (!form || !display || !editor || !modeToggle || !modeInput || !input || !status) return;
-    let timer = null;
-    let saving = false;
-    const autoFeeValue = Number({{ (float) $autoFeeValue }});
-    let manualFeeValue = Number({{ (float) $manualFeeValue }});
-
-    function setStatus(message, color) {
-        status.textContent = message;
-        status.style.color = color || 'var(--dsh-muted)';
-        status.style.display = message ? 'block' : 'none';
-    }
-
-    function syncModeState() {
-        const mode = modeToggle.checked ? 'auto' : 'manual';
-        modeInput.value = mode;
-        if (mode === 'auto') {
-            input.value = autoFeeValue.toFixed(1);
-            display.textContent = autoFeeValue.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
-        } else {
-            input.value = manualFeeValue.toFixed(1);
-            display.textContent = manualFeeValue.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
-        }
-        input.disabled = mode !== 'manual';
-        input.style.opacity = mode === 'manual' ? '1' : '.6';
-        display.style.cursor = mode === 'manual' ? 'pointer' : 'default';
-    }
-
-    function openEditor() {
-        const mode = modeToggle.checked ? 'auto' : 'manual';
-        if (mode !== 'manual') return;
-        display.style.display = 'none';
-        editor.style.display = 'flex';
-        input.focus();
-        input.select();
-    }
-
-    async function saveFee() {
-        if (saving) return;
-        const value = Number(input.value);
-        if (!Number.isFinite(value) || value < 0 || value > 99) {
-            setStatus('Masukkan fee 0–99%.', '#b91c1c');
-            return;
-        }
-        saving = true;
-        setStatus('Menyimpan…', '#2563eb');
-        try {
-            const response = await fetch(form.action, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': form.querySelector('input[name="_token"]')?.value || '', 'Accept': 'application/json' },
-                body: new URLSearchParams(new FormData(form))
-            });
-            if (!response.ok) throw new Error('Gagal menyimpan fee.');
-            setStatus('', '#15803d');
-            setTimeout(() => window.location.reload(), 350);
-        } catch (error) {
-            setStatus(error.message, '#b91c1c');
-        } finally {
-            saving = false;
-        }
-    }
-
-    form.addEventListener('submit', (event) => { event.preventDefault(); saveFee(); });
-    display.addEventListener('click', openEditor);
-    display.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') openEditor();
-    });
-    input.addEventListener('change', () => {
-        manualFeeValue = Number(input.value);
-        saveFee();
-    });
-    modeToggle.addEventListener('change', () => {
-        syncModeState();
-        clearTimeout(timer);
-        timer = setTimeout(saveFee, 120);
-    });
-    syncModeState();
-})();
-</script>
-@endif
-
 <!-- ── KPI — urutan alur hitung: Omzet − HPP − Iklan = Net Profit ── -->
 @php
     $profitMarginPct = $totalGmv > 0 ? ($totalProfit / $totalGmv) * 100 : 0;
@@ -841,7 +709,10 @@ window.__profitChartData = {
     .profit-fee-switch input:checked + .profit-fee-switch-slider::before { transform:translateX(17px); }
     .profit-fee-field { min-width:0; display:flex; flex-direction:column; }
     .profit-fee-display, .profit-fee-editor { width:max-content; max-width:100%; box-sizing:border-box; }
-    .profit-fee-display { justify-content:space-between; min-height:38px; padding:.3rem .6rem; font-size:.9rem; }
+    .profit-fee-display { display:inline-flex; align-items:center; gap:.35rem; justify-content:space-between; min-height:38px; padding:.3rem .6rem; border:1px solid var(--dsh-border); border-radius:10px; color:var(--text); background:var(--bg); font-size:.9rem; font-weight:800; font-variant-numeric:tabular-nums; cursor:pointer; }
+    .profit-fee-editor .form-control { width:72px; flex:0 0 72px; border-radius:10px 0 0 10px; font-size:.85rem; background:var(--bg); color:var(--text); border-color:var(--dsh-border); }
+    .profit-fee-editor .input-group-text { border-radius:0 10px 10px 0; background:var(--bg); color:var(--dsh-muted); border-color:var(--dsh-border); }
+    #profitAdminFeeStatus { display:none; min-height:1rem; font-size:.64rem; color:var(--dsh-muted); margin-top:.2rem; }
     .profit-fee-editor input { width:72px; flex:0 0 72px; }
     @media (max-width:768px) {
         .profit-fee-form { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.55rem; }
@@ -934,6 +805,20 @@ window.__profitChartData = {
     .profit-kpi-compare.is-bad { color:#b91c1c; }
     .profit-kpi-compare.is-neutral { color:var(--dsh-muted); font-weight:700; }
     .profit-kpi-compare-label { color:var(--dsh-muted); font-weight:600; }
+    .profit-row-compare {
+        display:flex;
+        flex-direction:column;
+        align-items:flex-end;
+        gap:.08rem;
+        line-height:1.1;
+    }
+    .profit-row-compare-prev {
+        color:var(--dsh-muted);
+        font-size:.56rem;
+        font-weight:650;
+        white-space:nowrap;
+    }
+    .profit-roas-compare-mobile { display:none; }
     .profit-recon-label {
         color:var(--dsh-muted);
         font-size:.63rem;
@@ -970,26 +855,24 @@ window.__profitChartData = {
         #profitViewCategory .profit-table-compact td:nth-child(3),
         #profitViewCategory .profit-table-compact th:nth-child(5),
         #profitViewCategory .profit-table-compact td:nth-child(5),
-        #profitViewCategory .profit-table-compact th:nth-child(6),
-        #profitViewCategory .profit-table-compact td:nth-child(6),
-        #profitViewCategory .profit-table-compact th:nth-child(8),
-        #profitViewCategory .profit-table-compact td:nth-child(8),
+        #profitViewCategory .profit-table-compact th:nth-child(7),
+        #profitViewCategory .profit-table-compact td:nth-child(7),
         #profitViewCampaign .profit-table-compact th:nth-child(4),
         #profitViewCampaign .profit-table-compact td:nth-child(4),
         #profitViewCampaign .profit-table-compact th:nth-child(5),
         #profitViewCampaign .profit-table-compact td:nth-child(5),
         #profitViewCampaign .profit-table-compact th:nth-child(6),
         #profitViewCampaign .profit-table-compact td:nth-child(6),
-        #profitViewCampaign .profit-table-compact th:nth-child(10),
-        #profitViewCampaign .profit-table-compact td:nth-child(10),
+        #profitViewCampaign .profit-table-compact th:nth-child(9),
+        #profitViewCampaign .profit-table-compact td:nth-child(9),
         #profitViewGms .profit-table-compact th:nth-child(4),
         #profitViewGms .profit-table-compact td:nth-child(4),
         #profitViewGms .profit-table-compact th:nth-child(5),
         #profitViewGms .profit-table-compact td:nth-child(5),
         #profitViewGms .profit-table-compact th:nth-child(6),
         #profitViewGms .profit-table-compact td:nth-child(6),
-        #profitViewGms .profit-table-compact th:nth-child(8),
-        #profitViewGms .profit-table-compact td:nth-child(8),
+        #profitViewGms .profit-table-compact th:nth-child(7),
+        #profitViewGms .profit-table-compact td:nth-child(7),
         #profitViewProductUnmapped .product-unmapped-api-table th:nth-child(4),
         #profitViewProductUnmapped .product-unmapped-api-table td:nth-child(4) {
             display: none;
@@ -1009,22 +892,22 @@ window.__profitChartData = {
 
         #profitViewCategory .profit-table-compact th:nth-child(2),
         #profitViewCategory .profit-table-compact td:nth-child(2),
-        #profitViewCategory .profit-table-compact th:nth-child(7),
-        #profitViewCategory .profit-table-compact td:nth-child(7),
-        #profitViewCategory .profit-table-compact th:nth-child(10),
-        #profitViewCategory .profit-table-compact td:nth-child(10),
+        #profitViewCategory .profit-table-compact th:nth-child(6),
+        #profitViewCategory .profit-table-compact td:nth-child(6),
+        #profitViewCategory .profit-table-compact th:nth-child(9),
+        #profitViewCategory .profit-table-compact td:nth-child(9),
         #profitViewCampaign .profit-table-compact th:nth-child(2),
         #profitViewCampaign .profit-table-compact td:nth-child(2),
+        #profitViewCampaign .profit-table-compact th:nth-child(6),
+        #profitViewCampaign .profit-table-compact td:nth-child(6),
         #profitViewCampaign .profit-table-compact th:nth-child(8),
         #profitViewCampaign .profit-table-compact td:nth-child(8),
-        #profitViewCampaign .profit-table-compact th:nth-child(9),
-        #profitViewCampaign .profit-table-compact td:nth-child(9),
         #profitViewGms .profit-table-compact th:nth-child(2),
         #profitViewGms .profit-table-compact td:nth-child(2),
-        #profitViewGms .profit-table-compact th:nth-child(7),
-        #profitViewGms .profit-table-compact td:nth-child(7),
-        #profitViewGms .profit-table-compact th:nth-child(10),
-        #profitViewGms .profit-table-compact td:nth-child(10),
+        #profitViewGms .profit-table-compact th:nth-child(6),
+        #profitViewGms .profit-table-compact td:nth-child(6),
+        #profitViewGms .profit-table-compact th:nth-child(8),
+        #profitViewGms .profit-table-compact td:nth-child(8),
         #profitViewProductUnmapped .product-unmapped-table th:nth-child(2),
         #profitViewProductUnmapped .product-unmapped-table td:nth-child(2),
         #profitViewProductUnmapped .product-unmapped-table th:nth-child(6),
@@ -1039,7 +922,16 @@ window.__profitChartData = {
         #profitViewProductUnmapped .product-unmapped-api-table td:nth-child(6) {
             display: table-cell;
         }
+        #profitViewCategory .profit-drilldown-row td,
+        #profitViewCampaign .profit-drilldown-row td,
+        #profitViewGms .profit-drilldown-row td {
+            display:table-cell !important;
+        }
         #profitViewGms .gms-profit-compare-mobile {
+            display:block;
+            margin-top:.12rem;
+        }
+        #profitViewCampaign .profit-roas-compare-mobile {
             display:block;
             margin-top:.12rem;
         }
@@ -1110,7 +1002,7 @@ window.__profitChartData = {
                                     @if($camp->items_sold > 0)<div style="font-size:.62rem;color:var(--dsh-muted);">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs{{ ($camp->items_sold_source ?? 'api') === 'order_fallback' ? ' · estimasi' : '' }}</div>@endif
                                 </td>
                                 <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
-                                <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">sebelum PPN {{ $fmt($camp->spend) }}</div></td>
+                                <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;" title="Biaya iklan setelah PPN"><b>−{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);" title="Biaya iklan sebelum PPN">−{{ $fmt($camp->spend) }}</div></td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($itemName) }}" data-profit-map-item="{{ e((string) $camp->channel_item_id) }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
                                         <i class="bi bi-link-45deg"></i> Pilih item HPP
@@ -1143,9 +1035,8 @@ window.__profitChartData = {
                     <th class="text-end">Kampanye</th>
                     <th class="text-end">Pesanan</th>
                     <th class="text-end">Terjual</th>
-                    <th class="text-end">AOV</th>
+                    <th class="text-end">Omzet</th>
                     <th class="text-end">Iklan</th>
-                    <th class="text-end">Dana Cair</th>
                     <th class="text-end">HPP</th>
                     <th class="text-end">Laba Bersih</th>
                 </tr>
@@ -1166,14 +1057,13 @@ window.__profitChartData = {
                         <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">{{ $cat->campaigns }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; color:var(--text); vertical-align:middle;">{{ number_format($cat->orders, 0, ',', '.') }}</td>
                         <td class="text-end" style="font-variant-numeric:tabular-nums; color:var(--text); vertical-align:middle;">{{ number_format($cat->items, 0, ',', '.') }} pcs</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">{{ $cat->orders > 0 ? $fmt($cat->gmv / $cat->orders) : '—' }}</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:#dc2626; vertical-align:middle;">−{{ $fmt($cat->topup) }}<div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;">sebelum PPN {{ $fmt($cat->spend) }}</div></td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; color:#0369a1; vertical-align:middle;">{{ $fmt($cat->netRevenue) }}</td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;">&minus;{{ $fmt($cat->cogs) }}<div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;">{{ $cat->items > 0 && $cat->cogs > 0 ? $fmt($cat->cogs / $cat->items) . '/pcs' : 'HPP/pcs —' }}</div></td>
-                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:800; font-size:.95rem; color:{{ $cat->unknownCount > 0 && $cat->profit == 0 ? '#b45309' : ($cat->profit >= 0 ? '#16a34a' : '#dc2626') }}; vertical-align:middle;">{{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'N/A' : (($cat->profit < 0 ? '-' : '') . $fmt($cat->profit)) }}</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; vertical-align:middle;" title="Gross: omzet kotor · Net: estimasi dana cair setelah fee marketplace"><div style="font-weight:700; color:var(--text);" title="Gross / omzet kotor">{{ $fmt($cat->gmv) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="AOV / rata-rata omzet per pesanan">{{ $cat->orders > 0 ? $fmt($cat->gmv / $cat->orders) : '—' }}</div><div style="font-size:.62rem;color:#0369a1;font-weight:650;" title="Net / estimasi dana cair setelah fee marketplace">{{ $fmt($cat->netRevenue) }}</div></td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:#dc2626; vertical-align:middle;" title="Biaya iklan setelah PPN"><div>−{{ $fmt($cat->topup) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="Biaya iklan sebelum PPN">−{{ $fmt($cat->spend) }}</div></td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); vertical-align:middle;" title="Total HPP produk"><div title="Total HPP">&minus;{{ $fmt($cat->cogs) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="HPP rata-rata per pcs">{{ $cat->items > 0 && $cat->cogs > 0 ? $fmt($cat->cogs / $cat->items) : '—' }}</div></td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums; font-weight:700; font-size:.95rem; color:{{ $cat->unknownCount > 0 && $cat->profit == 0 ? '#b45309' : ($cat->profit >= 0 ? '#16a34a' : '#dc2626') }}; vertical-align:middle;">{{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'N/A' : (($cat->profit < 0 ? '-' : '') . $fmt($cat->profit)) }}</td>
                     </tr>
             @empty
-                <tr><td colspan="10" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
+                <tr><td colspan="9" class="text-center py-4" style="color:var(--dsh-muted); font-size:.8rem;">Belum ada data.</td></tr>
             @endforelse
             </tbody>
             </table>
@@ -1413,11 +1303,10 @@ window.__profitView = function (mode) {
                 <th onclick="sortProfitTable('campaign')" style="cursor:pointer">Kampanye / Produk <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end" onclick="sortProfitTable('orders')" style="cursor:pointer">Pesanan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end">Terjual</th>
-                <th class="text-end">AOV</th>
-                <th class="text-end" onclick="sortProfitTable('net_revenue')" style="cursor:pointer">Dana Cair <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                <th class="text-end" onclick="sortProfitTable('hpp')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> HPP <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end">Omzet</th>
                 <th class="text-end" onclick="sortProfitTable('ad_spend')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                <th class="text-end" onclick="sortProfitTable('net_profit')" style="cursor:pointer; border-left: 2px solid var(--dsh-border);"><span style="color:var(--dsh-muted); font-weight:600;">=</span> Net Profit <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('hpp')" style="cursor:pointer"><span style="color:var(--dsh-muted); font-weight:600;">&minus;</span> HPP <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                <th class="text-end" onclick="sortProfitTable('net_profit')" style="cursor:pointer; border-left: 2px solid var(--dsh-border);"><span style="color:var(--dsh-muted); font-weight:600;">=</span> Laba Bersih <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-end">Vs {{ $comparisonLabel }}</th>
                 <th class="text-end" onclick="sortProfitTable('acos')" style="cursor:pointer">ACOS <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                 <th class="text-center">Rekomendasi</th>
@@ -1465,6 +1354,7 @@ window.__profitView = function (mode) {
                         <div class="profit-campaign-meta" title="{{ $camp->channel_item_id ? 'SKU ' . ($camp->marketplace_item_sku ?: '-') : 'GMV Max Auto · semua item' }}">
                             {{ $camp->channel_item_id ? 'SKU ' . ($camp->marketplace_item_sku ?: '-') : 'GMV Max Auto · semua item' }}
                         </div>
+                        <div class="profit-campaign-meta">ROAS {{ $camp->target_roas !== null ? number_format((float) $camp->target_roas, 2, ',', '.') . 'x' : 'Auto' }}</div>
                         <span class="profit-drilldown-hint" title="Detail harian"><i class="bi bi-graph-up"></i></span>
                     </td>
 
@@ -1472,15 +1362,16 @@ window.__profitView = function (mode) {
                         <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($camp->orders, 0, ',', '.') }}</div>
                     </td>
                     <td class="text-end" style="vertical-align: middle; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs</td>
-                    <td class="text-end" style="vertical-align: middle; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;">{{ $r->aov > 0 ? $fmt($r->aov) : '—' }}</td>
+                    <td class="text-end" style="vertical-align: middle; font-variant-numeric:tabular-nums;" title="Gross: omzet kotor · Net: estimasi dana cair setelah fee marketplace"><div style="font-weight:700; color:var(--text);" title="Gross / omzet kotor">{{ $fmt($camp->gmv) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="AOV / rata-rata omzet per pesanan">{{ $r->aov > 0 ? $fmt($r->aov) : '—' }}</div><div style="font-size:.62rem;color:#0369a1;font-weight:650;" title="Net / estimasi dana cair setelah fee marketplace">{{ $fmt($r->netRevenue) }}</div></td>
 
-                    <td class="text-end" style="vertical-align: middle;">
-                        <div style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;" @if($r->feeIsEstimate) title="Estimasi dana cair" @endif>{{ $fmt($r->netRevenue) }}</div>
+                    <td class="text-end" style="vertical-align: middle; color:#dc2626;" title="Biaya iklan setelah PPN">
+                        <div style="font-weight: 700; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($r->spendAfterTax) }}</div>
+                        <div style="font-size:.65rem;color:var(--dsh-muted);font-variant-numeric:tabular-nums;" title="Biaya iklan sebelum PPN">&minus;{{ $fmt($camp->spend) }}</div>
                     </td>
 
-                        <td class="text-end" style="vertical-align: middle;">
-                        <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{!! $r->totalCogs > 0 ? '&minus;' . $fmt($r->totalCogs) : '<span style="color:#b45309;">&mdash;</span>' !!}</div>
-                        <div style="font-size: .65rem; color: {{ $r->totalCogs !== null ? 'var(--dsh-muted)' : '#b45309' }}; margin-top: 2px;" title="{{ $r->totalCogs === null ? 'HPP belum tersedia, profit tidak dihitung' : ($r->cogsExact ? 'Eksak: HPP × pcs terjual' : 'Estimasi dari rasio harga (pcs belum tercatat)') }}">{{ $r->totalCogs === null ? 'belum diisi' : ($r->cogsExact ? $fmt($r->unitCogs) . '/pcs × ' . $r->itemsSold : $fmt($r->unitCogs) . '/pcs · estimasi') }}</div>
+                    <td class="text-end" style="vertical-align: middle;">
+                        <div style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;" title="Total HPP produk">{!! $r->totalCogs > 0 ? '&minus;' . $fmt($r->totalCogs) : '<span style="color:#b45309;">&mdash;</span>' !!}</div>
+                        <div style="font-size: .65rem; color: {{ $r->totalCogs !== null ? 'var(--dsh-muted)' : '#b45309' }}; margin-top: 2px; font-variant-numeric: tabular-nums;" title="{{ $r->totalCogs === null ? 'HPP belum tersedia' : ($r->cogsExact ? 'HPP per pcs × pcs terjual' : 'HPP per pcs estimasi') }}">{{ $r->totalCogs === null ? '—' : $fmt($r->unitCogs) }}</div>
                         @if($r->totalCogs === null && ($camp->channel_item_id || str_starts_with((string) $camp->channel_campaign_id, 'GMS-')))
                             <button type="button" class="btn btn-sm mt-1" style="font-size:.62rem; padding:.16rem .45rem; border-radius:999px; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->marketplace_item_name ?: ($camp->campaign_name ?: 'Kampanye')) }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" data-profit-map-store="{{ $camp->store_id }}" data-profit-map-channel-item="{{ e((string) ($camp->channel_item_id ?? '')) }}" onclick="openProfitCampaignMapping(this)">
                                 <i class="bi bi-link-45deg"></i> {{ str_starts_with((string) $camp->channel_campaign_id, 'GMS-') ? 'Atur HPP acuan' : 'Pilih item HPP' }}
@@ -1488,23 +1379,31 @@ window.__profitView = function (mode) {
                         @endif
                     </td>
 
-                    <td class="text-end" style="vertical-align: middle;">
-                        <div style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($r->spendAfterTax) }}</div>
-                        <div style="font-size:.65rem;color:var(--dsh-muted);margin-top:2px;">sebelum PPN {{ $fmt($camp->spend) }}</div>
-                    </td>
-
                     <td class="text-end" style="vertical-align: middle; border-left: 2px solid var(--dsh-border); background: rgba({{ !$profitKnown ? '217, 119, 6' : ($r->isProfitable ? '22, 163, 74' : '220, 38, 38') }}, 0.05);">
-                        <div style="font-weight: 800; font-size: .95rem; color: {{ $profitColor }}; font-variant-numeric: tabular-nums;" @if(!$profitKnown || $r->feeIsEstimate) title="{{ !$profitKnown ? 'Tidak dihitung — HPP belum tersedia' : 'Estimasi — belum ada data pencairan' }}" @endif>{{ !$profitKnown ? 'N/A' : (($r->feeIsEstimate ? '±' : '') . ($r->profit < 0 ? '−' : '') . $fmt($r->profit)) }}</div>
+                        <div style="font-weight: 700; font-size: .95rem; color: {{ $profitColor }}; font-variant-numeric: tabular-nums;" @if(!$profitKnown || $r->feeIsEstimate) title="{{ !$profitKnown ? 'Tidak dihitung — HPP belum tersedia' : 'Estimasi — belum ada data pencairan' }}" @endif>{{ !$profitKnown ? 'N/A' : (($r->feeIsEstimate ? '±' : '') . ($r->profit < 0 ? '−' : '') . $fmt($r->profit)) }}</div>
+                        <div class="profit-roas-compare-mobile">
+                            @if($profitChangeRow !== null)
+                                <span style="font-size:.62rem;font-weight:800;color:{{ $profitChangeGood ? '#15803d' : '#b91c1c' }};white-space:nowrap;"><i class="bi bi-arrow-{{ $profitChangeRow >= 0 ? 'up-right' : 'down-right' }}"></i> {{ number_format(abs($profitChangeRow), 1, ',', '.') }}%</span>
+                            @else
+                                <span style="color:var(--dsh-muted);font-size:.62rem;">—</span>
+                            @endif
+                            @if($previousProfitRow !== null)
+                                <div class="profit-row-compare-prev">{{ $previousProfitRow < 0 ? '−' : '' }}{{ $fmt($previousProfitRow) }}</div>
+                            @endif
+                        </div>
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
-                        @if($profitChangeRow !== null)
-                            <span style="font-size:.68rem;font-weight:800;color:{{ $profitChangeGood ? '#15803d' : '#b91c1c' }};white-space:nowrap;">
-                                <i class="bi bi-arrow-{{ $profitChangeRow >= 0 ? 'up-right' : 'down-right' }}"></i> {{ number_format(abs($profitChangeRow), 1, ',', '.') }}%
-                            </span>
-                        @else
-                            <span style="color:var(--dsh-muted);font-size:.68rem;">—</span>
-                        @endif
+                        <div class="profit-row-compare">
+                            @if($profitChangeRow !== null)
+                                <span style="font-size:.68rem;font-weight:800;color:{{ $profitChangeGood ? '#15803d' : '#b91c1c' }};white-space:nowrap;"><i class="bi bi-arrow-{{ $profitChangeRow >= 0 ? 'up-right' : 'down-right' }}"></i> {{ number_format(abs($profitChangeRow), 1, ',', '.') }}%</span>
+                            @else
+                                <span style="color:var(--dsh-muted);font-size:.68rem;">—</span>
+                            @endif
+                            @if($previousProfitRow !== null)
+                                <div class="profit-row-compare-prev">{{ $previousProfitRow < 0 ? '−' : '' }}{{ $fmt($previousProfitRow) }}</div>
+                            @endif
+                        </div>
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
@@ -1524,7 +1423,7 @@ window.__profitView = function (mode) {
                 </tr>
             @empty
                 <tr>
-                        <td colspan="12" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                        <td colspan="11" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
                         Belum ada data kampanye yang memiliki pengeluaran atau pendapatan.
                     </td>
                 </tr>
@@ -1537,11 +1436,10 @@ window.__profitView = function (mode) {
                 <td style="padding: .7rem .5rem; font-weight: 800; font-size: .75rem; color: var(--text); text-transform: uppercase;">Total</td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($displayRows->sum(fn ($r) => $r->camp->orders), 0, ',', '.') }} order</td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($displayRows->sum(fn ($r) => $r->camp->items_sold), 0, ',', '.') }} pcs</td>
-                <td class="text-end" style="font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;">{{ $displayRows->sum(fn ($r) => $r->camp->orders) > 0 ? $fmt($displayRows->sum(fn ($r) => $r->camp->gmv) / $displayRows->sum(fn ($r) => $r->camp->orders)) : '—' }}</td>
-                <td class="text-end" style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;">{{ $fmt($roasKnownRows->sum('netRevenue')) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($roasTotalGmv) }}</div></td>
-                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">&minus;{{ $fmt($roasTotalCogs) }}</td>
-                <td class="text-end" style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($roasTotalSpend * 1.11) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">sebelum PPN {{ $fmt($roasTotalSpend) }}</div></td>
-                <td class="text-end" style="font-weight: 800; font-size: .95rem; color: {{ $roasTotalProfit >= 0 ? '#16a34a' : '#dc2626' }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $roasTotalProfit >= 0 ? '22, 163, 74' : '220, 38, 38' }}, 0.05);">{{ $roasTotalProfit < 0 ? '−' : '' }}{{ $fmt($roasTotalProfit) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">{{ $roasUnknownCount > 0 ? $roasUnknownCount . ' campaign belum dihitung' : 'HPP tersedia' }}</div></td>
+                <td class="text-end" style="font-variant-numeric:tabular-nums;" title="Gross: omzet kotor · Net: estimasi dana cair setelah fee marketplace"><div style="font-weight:700; color:var(--text);" title="Gross / omzet kotor">{{ $fmt($roasTotalGmv) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="AOV / rata-rata omzet per pesanan">{{ $displayRows->sum(fn ($r) => $r->camp->orders) > 0 ? $fmt($displayRows->sum(fn ($r) => $r->camp->gmv) / $displayRows->sum(fn ($r) => $r->camp->orders)) : '—' }}</div><div style="font-size:.62rem;color:#0369a1;font-weight:650;" title="Net / estimasi dana cair setelah fee marketplace">{{ $fmt($roasKnownRows->sum('netRevenue')) }}</div></td>
+                <td class="text-end" style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;" title="Biaya iklan setelah PPN"><div>&minus;{{ $fmt($roasTotalSpend * 1.11) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="Biaya iklan sebelum PPN">&minus;{{ $fmt($roasTotalSpend) }}</div></td>
+                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;" title="Total HPP produk"><div title="Total HPP">&minus;{{ $fmt($roasTotalCogs) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="HPP rata-rata per pcs">{{ $displayRows->sum(fn ($r) => $r->camp->items_sold) > 0 ? $fmt($roasTotalCogs / $displayRows->sum(fn ($r) => $r->camp->items_sold)) : '—' }}</div></td>
+                <td class="text-end" style="font-weight: 700; font-size: .95rem; color: {{ $roasTotalProfit >= 0 ? '#16a34a' : '#dc2626' }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $roasTotalProfit >= 0 ? '22, 163, 74' : '220, 38, 38' }}, 0.05);">{{ $roasTotalProfit < 0 ? '−' : '' }}{{ $fmt($roasTotalProfit) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">{{ $roasUnknownCount > 0 ? $roasUnknownCount . ' campaign belum dihitung' : 'HPP tersedia' }}</div></td>
                 <td class="text-end" style="font-weight:700;color:var(--dsh-muted);">—</td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ $roasTotalGmv > 0 ? number_format(($roasTotalSpend / $roasTotalGmv) * 100, 1, ',', '.') : '0,0' }}%</td>
                 <td></td>
@@ -1626,34 +1524,41 @@ window.__profitView = function (mode) {
         const rows = payload.data.map(function (item, index) {
             const mapped = item.mapped;
             const profit = item.profit_after_ads;
-            const profitText = profit === null ? 'N/A' : (profit < 0 ? '−' : '') + fmtRp(profit);
+            const estimatedProfit = profit === null
+                ? Number(item.net_revenue || 0) - (Number(item.spend || 0) * 1.11)
+                : Number(profit);
+            const profitText = (profit === null ? '±' : (estimatedProfit < 0 ? '−' : '')) + fmtRp(Math.abs(estimatedProfit));
             const previousProfit = item.previous_profit_after_ads;
             const profitChange = profit !== null && previousProfit !== null && previousProfit !== undefined && Number(previousProfit) !== 0
                 ? ((Number(profit) - Number(previousProfit)) / Math.abs(Number(previousProfit))) * 100
                 : null;
-            const comparisonText = profitChange === null
-                ? '<span style="color:var(--dsh-muted);font-size:.68rem;">—</span>'
-                : '<span style="font-size:.68rem;font-weight:800;color:' + (profitChange >= 0 ? '#15803d' : '#b91c1c') + ';white-space:nowrap;"><i class="bi bi-arrow-' + (profitChange >= 0 ? 'up-right' : 'down-right') + '"></i> ' + Math.abs(profitChange).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + '%</span>';
+            const previousProfitText = previousProfit === null || previousProfit === undefined
+                ? ''
+                : '<div class="profit-row-compare-prev">' + (Number(previousProfit) < 0 ? '−' : '') + fmtRp(Math.abs(Number(previousProfit))) + '</div>';
+            const comparisonText = '<div class="profit-row-compare">'
+                + (profitChange === null
+                    ? '<span style="color:var(--dsh-muted);font-size:.68rem;">—</span>'
+                    : '<span style="font-size:.68rem;font-weight:800;color:' + (profitChange >= 0 ? '#15803d' : '#b91c1c') + ';white-space:nowrap;"><i class="bi bi-arrow-' + (profitChange >= 0 ? 'up-right' : 'down-right') + '"></i> ' + Math.abs(profitChange).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + '%</span>')
+                + previousProfitText
+                + '</div>';
             const itemName = item.item_name || 'Produk tanpa nama';
             const mappingStatus = mapped
                 ? '<span style="color:#15803d;font-weight:700;"><i class="bi bi-check-circle"></i> HPP tersedia</span>'
                 : '<button type="button" class="btn btn-sm" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Mapping HPP</button>';
             return '<tr class="profit-drilldown-trigger" data-drilldown-kind="gms_item" data-drilldown-store="' + esc(storeId) + '" data-drilldown-id="' + esc(item.channel_item_id) + '" data-drilldown-label="' + esc(itemName) + '">' +
                 '<td class="profit-index-cell">' + (index + 1) + '</td>' +
-                '<td><div class="profit-table-item-name" style="font-weight:700;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div><span class="profit-drilldown-hint" title="Detail harian"><i class="bi bi-graph-up"></i></span></td>' +
+                '<td><div class="profit-table-item-name" style="font-weight:700;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div><div style="font-size:.58rem;color:var(--dsh-muted);">ROAS ' + (item.target_roas === null || item.target_roas === undefined ? 'Auto' : Number(item.target_roas).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + 'x') + '</div><span class="profit-drilldown-hint" title="Detail harian"><i class="bi bi-graph-up"></i></span></td>' +
                 '<td class="text-end"><div style="font-weight:700;">' + Number(item.orders || 0).toLocaleString('id-ID') + '</div></td>' +
                 '<td class="text-end"><div style="font-weight:700;">' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div></td>' +
-                '<td class="text-end"><div style="font-weight:700;">' + (Number(item.orders || 0) > 0 ? fmtRp(Number(item.gmv || 0) / Number(item.orders || 0)) : '—') + '</div></td>' +
-                '<td class="text-end"><div style="font-weight:700;">' + fmtRp(item.gmv) + '</div></td>' +
-                '<td class="text-end" style="color:#dc2626;"><div style="font-weight:700;">−' + fmtRp(Number(item.spend || 0) * 1.11) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">sebelum PPN ' + fmtRp(Number(item.spend || 0)) + '</div></td>' +
-                '<td class="text-end">' + (mapped ? fmtRp(item.unit_cogs) : '<span style="color:#b45309;">—</span>') + '</td>' +
-                '<td class="text-end">' + (item.hpp_total !== null ? '−' + fmtRp(item.hpp_total) : '<span style="color:#b45309;">—</span>') + '</td>' +
-                '<td class="text-end" style="font-weight:800;color:' + (profit === null ? '#b45309' : (profit >= 0 ? '#15803d' : '#b91c1c')) + ';"><div>' + profitText + '</div><div class="gms-profit-compare-mobile">' + comparisonText + '</div></td>' +
+                '<td class="text-end" title="Gross: omzet kotor · Net: estimasi dana cair setelah fee marketplace"><div style="font-weight:700;" title="Gross / omzet kotor">' + fmtRp(item.gmv) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);" title="AOV / rata-rata omzet per pesanan">' + (Number(item.orders || 0) > 0 ? fmtRp(Number(item.gmv || 0) / Number(item.orders || 0)) : '—') + '</div><div style="font-size:.62rem;color:#0369a1;font-weight:650;" title="Net / estimasi dana cair setelah fee marketplace">' + fmtRp(item.net_revenue) + '</div></td>' +
+                '<td class="text-end" style="color:#dc2626;" title="Biaya iklan setelah PPN"><div style="font-weight:700;">−' + fmtRp(Number(item.spend || 0) * 1.11) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);" title="Biaya iklan sebelum PPN">−' + fmtRp(Number(item.spend || 0)) + '</div></td>' +
+                '<td class="text-end" title="Total HPP produk"><div style="font-weight:700;" title="Total HPP">' + (item.hpp_total !== null && Number(item.hpp_total || 0) > 0 ? '−' + fmtRp(item.hpp_total) : '<span style="color:#b45309;">—</span>') + '</div><div style="font-size:.62rem;color:var(--dsh-muted);" title="HPP rata-rata per pcs">' + (mapped ? fmtRp(item.unit_cogs) : '—') + '</div></td>' +
+                '<td class="text-end" title="' + (profit === null ? 'Estimasi karena HPP belum tersedia' : '') + '" style="font-weight:700;color:' + (profit === null ? '#b45309' : (estimatedProfit >= 0 ? '#15803d' : '#b91c1c')) + ';"><div>' + profitText + '</div><div class="gms-profit-compare-mobile">' + comparisonText + '</div></td>' +
                 '<td class="text-end">' + comparisonText + '</td>' +
                 '<td>' + mappingStatus + '</td>' +
                 '</tr>';
         }).join('');
-        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th class="profit-index-cell">#</th><th>Item</th><th class="text-end">Pesanan</th><th class="text-end">Terjual</th><th class="text-end">AOV</th><th class="text-end">GMV</th><th class="text-end">Iklan</th><th class="text-end">HPP/pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit</th><th class="text-end">Vs ' + esc(comparisonLabel) + '</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive profit-table-wrap"><table class="dpanel-table dpanel-table-sm w-100 profit-table-compact"><thead><tr><th class="profit-index-cell">#</th><th>Item</th><th class="text-end">Pesanan</th><th class="text-end">Terjual</th><th class="text-end">Omzet</th><th class="text-end">Iklan</th><th class="text-end">HPP</th><th class="text-end">Laba Bersih</th><th class="text-end">Vs ' + esc(comparisonLabel) + '</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
     window.loadGmsItemsTab = async function () {
@@ -1710,7 +1615,7 @@ window.__profitView = function (mode) {
                 + '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>'
                 + '<td class="text-end"><b>' + Number(item.orders || 0).toLocaleString('id-ID') + ' order</b><div style="font-size:.62rem;color:var(--dsh-muted);">' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div></td>'
                 + '<td class="text-end">' + fmtRp(item.gmv) + '<div style="font-size:.62rem;color:var(--dsh-muted);">dana cair ± ' + fmtRp(item.net_revenue) + '</div></td>'
-                + '<td class="text-end" style="color:#dc2626;"><b>−' + fmtRp(Number(item.spend || 0) * 1.11) + '</b><div style="font-size:.62rem;color:var(--dsh-muted);">sebelum PPN ' + fmtRp(Number(item.spend || 0)) + '</div></td>'
+            + '<td class="text-end" style="color:#dc2626;" title="Biaya iklan setelah PPN"><b>−' + fmtRp(Number(item.spend || 0) * 1.11) + '</b><div style="font-size:.62rem;color:var(--dsh-muted);" title="Biaya iklan sebelum PPN">−' + fmtRp(Number(item.spend || 0)) + '</div></td>'
                 + '<td class="text-center"><span style="color:#b45309;font-weight:700;"><i class="bi bi-exclamation-circle"></i> HPP belum ada</span><button type="button" class="btn btn-sm d-block mt-1" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Pilih item HPP</button></td>'
                 + '</tr>';
         }).join('');
@@ -1817,6 +1722,19 @@ window.__profitView = function (mode) {
                         backgroundColor: 'rgba(59,130,246,.20)',
                         borderColor: 'rgba(59,130,246,.50)',
                         borderWidth: 1,
+                        barPercentage: .72,
+                        categoryPercentage: .62,
+                        yAxisID: 'money',
+                    },
+                    {
+                        label: 'Biaya Iklan +PPN',
+                        type: 'bar',
+                        data: rows.map((row) => Number(row.spend_after_tax || 0)),
+                        backgroundColor: 'rgba(220,38,38,.18)',
+                        borderColor: 'rgba(220,38,38,.55)',
+                        borderWidth: 1,
+                        barPercentage: .72,
+                        categoryPercentage: .62,
                         yAxisID: 'money',
                     },
                     {
@@ -1833,13 +1751,13 @@ window.__profitView = function (mode) {
                     {
                         label: 'ROAS',
                         type: 'line',
-                        data: rows.map((row) => row.roas === null ? null : Number(row.roas)),
-                        borderColor: '#eab308',
-                        backgroundColor: '#eab308',
+                        data: rows.map((row) => row.roas === null || row.roas === undefined ? null : Number(row.roas)),
+                        borderColor: '#f59e0b',
+                        backgroundColor: '#f59e0b',
                         borderWidth: 2,
+                        borderDash: [5, 3],
                         tension: .3,
                         pointRadius: 2,
-                        pointHoverRadius: 4,
                         yAxisID: 'ratio',
                     },
                 ],
@@ -1863,7 +1781,10 @@ window.__profitView = function (mode) {
                             },
                             afterBody: (items) => {
                                 const row = rows[items[0]?.dataIndex] || {};
-                                return ['AOV: ' + (row.aov ? fmtRp(row.aov) : '—')];
+                                return [
+                                    'ROAS: ' + (row.roas === null || row.roas === undefined ? '—' : Number(row.roas).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + 'x'),
+                                    'AOV: ' + (row.aov ? fmtRp(row.aov) : '—'),
+                                ];
                             },
                         },
                     },
@@ -1890,7 +1811,7 @@ window.__profitView = function (mode) {
                 '<div class="profit-drilldown-kpis">' +
                     metricCard('GMV', fmtRp(totals.gmv), '#15803d') +
                     metricCard('Iklan +PPN', '−' + fmtRp(totals.spend_after_tax), '#dc2626') +
-                    metricCard('Net Profit', signedRp(totals.profit_after_ads), profitColor) +
+                    metricCard('Net Profit' + (Number(payload.unit_cogs || 0) > 0 ? '' : ' (Est.)'), signedRp(totals.profit_after_ads), profitColor) +
                     metricCard('ROAS', totals.roas === null ? '—' : Number(totals.roas).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + 'x', '#b45309') +
                 '</div>' +
                 '<div class="profit-drilldown-chart"><canvas></canvas></div>' +

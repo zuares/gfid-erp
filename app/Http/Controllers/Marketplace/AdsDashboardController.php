@@ -399,15 +399,19 @@ class AdsDashboardController extends Controller
      * Detail harian untuk drilldown campaign GMV Max ROAS atau item GMV Max Auto.
      * Sumbernya adalah fakta harian hasil sync agar grafik mengikuti filter dashboard.
      */
-    public function drilldown(Request $request, Store $store, ItemHppResolver $hppResolver): JsonResponse
+    public function drilldown(Request $request, string $store, ItemHppResolver $hppResolver, AdsDashboardService $dashboardService): JsonResponse
     {
         $kind = $request->input('kind', 'campaign');
         $entityId = trim((string) $request->input('id', ''));
         $from = $request->input('date_from', now()->subDays(6)->toDateString());
         $to = $request->input('date_to', now()->toDateString());
+        $storeId = strtolower($store) === 'all' ? null : (ctype_digit($store) ? (int) $store : null);
 
-        if (!in_array($kind, ['campaign', 'gms_item'], true) || $entityId === '') {
+        if (!in_array($kind, ['campaign', 'gms_item', 'category'], true) || $entityId === '') {
             return response()->json(['message' => 'Target drilldown tidak valid.'], 422);
+        }
+        if (in_array($kind, ['campaign', 'gms_item'], true) && $storeId === null) {
+            return response()->json(['message' => 'Toko drilldown tidak valid.'], 422);
         }
 
         try {
@@ -422,32 +426,38 @@ class AdsDashboardController extends Controller
         }
 
         $unitCogs = 0.0;
-        $label = $kind === 'gms_item' ? 'Item GMV Max Auto' : 'Kampanye GMV Max ROAS';
+        $netRevenueRatio = AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+        $label = match ($kind) {
+            'gms_item' => 'Item GMV Max Auto',
+            'category' => $entityId,
+            default => 'Kampanye GMV Max ROAS',
+        };
         if ($kind === 'campaign') {
             $campaign = \App\Models\MarketplaceAdCampaign::query()
                 ->with('internalItem:id,name,code,hpp,base_unit_cost')
-                ->where('store_id', $store->id)
+                ->where('store_id', $storeId)
                 ->where('channel_campaign_id', $entityId)
                 ->first();
             if (!$campaign) {
                 return response()->json(['message' => 'Kampanye tidak ditemukan.'], 404);
             }
             $unitCogs = $campaign->internalItem ? $hppResolver->resolve($campaign->internalItem) : 0.0;
+            [$netRevenueRatio] = $dashboardService->resolveConfiguredNetRevenueRatio($entityId, $storeId);
             $label = $campaign->campaign_name ?: $label;
             $rows = \App\Models\MarketplaceAdCampaignDaily::query()
-                ->where('store_id', $store->id)
+                ->where('store_id', $storeId)
                 ->where('channel_campaign_id', $entityId)
                 ->whereBetween('date', [$fromDate, $toDate])
                 ->orderBy('date')
                 ->get();
-        } else {
+        } elseif ($kind === 'gms_item') {
             if (!ctype_digit($entityId)) {
                 return response()->json(['message' => 'ID item GMV Max tidak valid.'], 422);
             }
 
             $manualMap = \App\Models\MarketplaceAdItemMap::query()
                 ->with('item:id,name,code,hpp,base_unit_cost')
-                ->where('store_id', $store->id)
+                ->where('store_id', $storeId)
                 ->where('channel_code', 'shopee')
                 ->where('channel_item_id', (int) $entityId)
                 ->first();
@@ -456,7 +466,7 @@ class AdsDashboardController extends Controller
             }
 
             $product = \App\Models\MarketplaceProduct::query()
-                ->where('store_id', $store->id)
+                ->where('store_id', $storeId)
                 ->where('item_id', $entityId)
                 ->with('models:id,marketplace_product_id,model_sku,model_name,price,raw_json')
                 ->first();
@@ -478,40 +488,113 @@ class AdsDashboardController extends Controller
                     ->filter(fn ($hpp) => $hpp > 0);
                 $unitCogs = $hppValues->isNotEmpty() ? (float) $hppValues->avg() : 0.0;
             }
+            [$netRevenueRatio] = $dashboardService->resolveConfiguredNetRevenueRatio($entityId, $storeId);
 
             $rows = \App\Models\MarketplaceAdsItemDaily::query()
-                ->where('store_id', $store->id)
-                ->where('channel_campaign_id', 'GMS-' . $store->id)
+                ->where('store_id', $storeId)
+                ->where('channel_campaign_id', 'GMS-' . $storeId)
                 ->where('channel_item_id', $entityId)
+                ->whereBetween('date', [$fromDate, $toDate])
+                ->orderBy('date')
+                ->get();
+        } else {
+            $categoryCampaigns = \App\Models\MarketplaceAdCampaign::query()
+                ->with('internalItem:id,item_category_id,hpp,base_unit_cost', 'internalItem.category:id,name')
+                ->when($storeId !== null, fn ($query) => $query->where('store_id', $storeId))
+                ->where(function ($query) {
+                    $query->whereNull('channel_campaign_id')
+                        ->orWhere('channel_campaign_id', 'not like', 'GMS-%');
+                })
+                ->get()
+                ->filter(function ($campaign) use ($entityId) {
+                    $categoryName = $campaign->internalItem?->category?->name ?: 'Belum termapping';
+                    return $categoryName === $entityId;
+                });
+
+            $categoryCampaignIds = $categoryCampaigns->pluck('channel_campaign_id')->filter()->values();
+            $categoryUnitCogs = $categoryCampaigns->mapWithKeys(function ($campaign) use ($hppResolver) {
+                return [
+                    (string) $campaign->channel_campaign_id => $campaign->internalItem
+                        ? $hppResolver->resolve($campaign->internalItem)
+                        : 0.0,
+                ];
+            });
+            $rows = \App\Models\MarketplaceAdCampaignDaily::query()
+                ->when($storeId !== null, fn ($query) => $query->where('store_id', $storeId))
+                ->whereIn('channel_campaign_id', $categoryCampaignIds->all())
                 ->whereBetween('date', [$fromDate, $toDate])
                 ->orderBy('date')
                 ->get();
         }
 
-        $rowsByDate = $rows->keyBy(fn ($row) => Carbon::parse($row->date)->toDateString());
+        // GMV Max Auto menyimpan biaya pada dua level: item detail dan campaign
+        // parent. Tabel sebelum drilldown sudah menormalkan item ke total parent;
+        // gunakan skala yang sama agar angka iklan, estimasi cair, dan laba tetap
+        // konsisten ketika detail harian dibuka.
+        $gmsItemSpendScale = 1.0;
+        if ($kind === 'gms_item' && $storeId !== null) {
+            $parentSpend = (float) DB::table('marketplace_ad_campaign_dailies')
+                ->where('store_id', $storeId)
+                ->where('channel_campaign_id', 'GMS-' . $storeId)
+                ->whereBetween('date', [$fromDate, $toDate])
+                ->sum('expense');
+            $itemSpendTotal = (float) DB::table('marketplace_ads_item_dailies')
+                ->where('store_id', $storeId)
+                ->where('channel_campaign_id', 'GMS-' . $storeId)
+                ->whereBetween('date', [$fromDate, $toDate])
+                ->sum('expense');
+            if ($parentSpend >= 0 && $itemSpendTotal > 0 && abs($parentSpend - $itemSpendTotal) > 0.001) {
+                $gmsItemSpendScale = $parentSpend / $itemSpendTotal;
+            }
+        }
+
+        $rowsByDate = $kind === 'category'
+            ? $rows->groupBy(fn ($row) => Carbon::parse($row->date)->toDateString())
+            : $rows->keyBy(fn ($row) => Carbon::parse($row->date)->toDateString());
         $daily = [];
         $cursor = Carbon::parse($fromDate);
         $end = Carbon::parse($toDate);
         while ($cursor->lte($end)) {
             $date = $cursor->toDateString();
-            $row = $rowsByDate->get($date);
-            $spend = (float) ($row?->expense ?? 0);
-            $gmv = (float) ($row?->broad_gmv ?? 0);
-            $orders = (int) ($row?->broad_order ?? 0);
-            $rawPcs = (float) data_get($row?->raw_json, 'broad_order_amount', 0);
-            $pcs = $rawPcs > 0 ? $rawPcs : (float) ($row?->broad_order_amount ?? $orders);
+            $dayRows = $kind === 'category' ? $rowsByDate->get($date, collect()) : collect([$rowsByDate->get($date)])->filter();
+            $spend = (float) $dayRows->sum('expense');
+            if ($kind === 'gms_item') {
+                $spend *= $gmsItemSpendScale;
+            }
+            $gmv = (float) $dayRows->sum('broad_gmv');
+            $orders = (int) $dayRows->sum('broad_order');
+            $pcs = (float) $dayRows->sum(fn ($row) => (($rawPcs = (float) data_get($row->raw_json, 'broad_order_amount', 0)) > 0)
+                ? $rawPcs
+                : (float) ($row->broad_order_amount ?? $row->broad_order ?? 0));
             $spendAfterTax = $spend * 1.11;
-            $netRevenue = $gmv * AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+            $netRevenue = $gmv * $netRevenueRatio;
             $hasSales = $gmv > 0 || $orders > 0 || $pcs > 0;
-            $hpp = !$hasSales ? 0.0 : ($unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null);
-            $profit = !$hasSales
-                ? round(-$spendAfterTax, 2)
-                : ($hpp !== null ? round($netRevenue - $hpp - $spendAfterTax, 2) : null);
+            $hpp = $kind === 'category'
+                ? null
+                : (!$hasSales ? 0.0 : ($unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null));
+            $profit = $kind === 'category'
+                ? $dayRows->map(function ($row) use ($categoryUnitCogs, $netRevenueRatio) {
+                    $rowSpend = (float) $row->expense * 1.11;
+                    $rowGmv = (float) $row->broad_gmv;
+                    $rowOrders = (int) $row->broad_order;
+                    $rowRawPcs = (float) data_get($row->raw_json, 'broad_order_amount', 0);
+                    $rowPcs = $rowRawPcs > 0 ? $rowRawPcs : (float) ($row->broad_order_amount ?? $rowOrders);
+                    $rowHasSales = $rowGmv > 0 || $rowOrders > 0 || $rowPcs > 0;
+                    $rowHpp = !$rowHasSales ? 0.0 : (($categoryUnitCogs[(string) $row->channel_campaign_id] ?? 0) > 0 && $rowPcs > 0
+                        ? $categoryUnitCogs[(string) $row->channel_campaign_id] * $rowPcs
+                        : null);
+                    return !$rowHasSales
+                        ? round(-$rowSpend, 2)
+                        : ($rowHpp !== null ? round(($rowGmv * $netRevenueRatio) - $rowHpp - $rowSpend, 2) : null);
+                })->filter(fn ($value) => $value !== null)->sum()
+                : (!$hasSales
+                    ? round(-$spendAfterTax, 2)
+                    : ($hpp !== null ? round($netRevenue - $hpp - $spendAfterTax, 2) : round($netRevenue - $spendAfterTax, 2)));
 
             $daily[] = [
                 'date' => $date,
-                'impressions' => (int) ($row?->impressions ?? 0),
-                'clicks' => (int) ($row?->clicks ?? 0),
+                'impressions' => (int) $dayRows->sum('impressions'),
+                'clicks' => (int) $dayRows->sum('clicks'),
                 'spend' => round($spend, 2),
                 'spend_after_tax' => round($spendAfterTax, 2),
                 'gmv' => round($gmv, 2),
@@ -555,7 +638,7 @@ class AdsDashboardController extends Controller
      * Sumber utama adalah data item performance hasil sync, bukan campaign
      * parent "GMV Max (Semua Produk)" yang hanya menyimpan total agregat.
      */
-    public function gmsItems(Request $request, Store $store, ItemHppResolver $hppResolver): JsonResponse
+    public function gmsItems(Request $request, Store $store, ItemHppResolver $hppResolver, AdsDashboardService $dashboardService): JsonResponse
     {
         $from = $request->input('date_from', now()->subDays(6)->toDateString());
         $to = $request->input('date_to', now()->toDateString());
@@ -595,6 +678,10 @@ class AdsDashboardController extends Controller
             ->whereBetween('date', [$fromDate, $toDate])
             ->orderBy('date')
             ->get();
+        $gmsTargetRoas = \App\Models\MarketplaceAdCampaign::query()
+            ->where('store_id', $store->id)
+            ->where('channel_campaign_id', 'GMS-' . $store->id)
+            ->value('target_roas');
 
         $grouped = $rows->groupBy(fn ($row) => (string) $row->channel_item_id);
         $itemIds = $grouped->keys()->filter()->values();
@@ -640,7 +727,7 @@ class AdsDashboardController extends Controller
             ->get()
             ->keyBy(fn ($mapping) => (string) $mapping->channel_item_id);
 
-        $items = $grouped->map(function ($dailyRows, string $channelItemId) use ($products, $skuMappings, $manualMaps, $hppResolver, $previousGrouped, $profitForMetrics) {
+        $items = $grouped->map(function ($dailyRows, string $channelItemId) use ($products, $skuMappings, $manualMaps, $hppResolver, $previousGrouped, $profitForMetrics, $gmsTargetRoas, $dashboardService, $store) {
             $product = $products->get($channelItemId);
             $manual = $manualMaps->get($channelItemId);
             $modelMappings = $product
@@ -667,7 +754,8 @@ class AdsDashboardController extends Controller
             $directGmv = (float) $dailyRows->sum('direct_gmv');
             $apiPcs = (float) $dailyRows->sum(fn ($row) => (float) data_get($row->raw_json, 'broad_order_amount', 0));
             $pcs = $apiPcs > 0 ? $apiPcs : (float) $orders;
-            $netRevenue = $gmv * \App\Services\Marketplace\Ads\AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+            [$netRevenueRatio] = $dashboardService->resolveConfiguredNetRevenueRatio($channelItemId, $store->id);
+            $netRevenue = $gmv * $netRevenueRatio;
             $hasSales = $gmv > 0 || $orders > 0 || $pcs > 0;
             $hppTotal = !$hasSales ? 0.0 : ($unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null);
             $profit = $profitForMetrics($spend, $netRevenue, $hppTotal, $hasSales);
@@ -678,7 +766,7 @@ class AdsDashboardController extends Controller
             $previousGmv = (float) $previousDailyRows->sum('broad_gmv');
             $previousApiPcs = (float) $previousDailyRows->sum(fn ($row) => (float) data_get($row->raw_json, 'broad_order_amount', 0));
             $previousPcs = $previousApiPcs > 0 ? $previousApiPcs : (float) $previousOrders;
-            $previousNetRevenue = $previousGmv * \App\Services\Marketplace\Ads\AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+            $previousNetRevenue = $previousGmv * $netRevenueRatio;
             $previousHasSales = $previousGmv > 0 || $previousOrders > 0 || $previousPcs > 0;
             $previousHppTotal = !$previousHasSales ? 0.0 : ($unitCogs > 0 && $previousPcs > 0 ? $unitCogs * $previousPcs : null);
             $previousProfit = $profitForMetrics($previousSpend, $previousNetRevenue, $previousHppTotal, $previousHasSales);
@@ -687,6 +775,7 @@ class AdsDashboardController extends Controller
                 'channel_item_id' => $channelItemId,
                 'item_name' => $product?->item_name ?: ($mappedItem?->name ?: 'Produk GMV Max'),
                 'item_sku' => $product?->item_sku,
+                'target_roas' => $gmsTargetRoas !== null ? round((float) $gmsTargetRoas, 2) : null,
                 'image_url' => $product?->image_url,
                 'impressions' => $impressions,
                 'clicks' => $clicks,
@@ -701,6 +790,7 @@ class AdsDashboardController extends Controller
                 'unit_cogs' => round($unitCogs, 2),
                 'hpp_total' => $hppTotal !== null ? round($hppTotal, 2) : null,
                 'net_revenue' => round($netRevenue, 2),
+                'net_revenue_ratio' => round($netRevenueRatio, 6),
                 'profit_after_ads' => $profit,
                 'previous_spend' => round($previousSpend, 2),
                 'previous_orders' => $previousOrders,
@@ -754,7 +844,7 @@ class AdsDashboardController extends Controller
                     || (float) ($item['previous_pcs'] ?? 0) > 0;
                 $item['previous_profit_after_ads'] = $profitForMetrics(
                     (float) $item['previous_spend'],
-                    (float) ($item['previous_gmv'] ?? 0) * \App\Services\Marketplace\Ads\AdsDashboardService::DEFAULT_NET_REVENUE_RATIO,
+                    (float) ($item['previous_gmv'] ?? 0) * (float) ($item['net_revenue_ratio'] ?? \App\Services\Marketplace\Ads\AdsDashboardService::DEFAULT_NET_REVENUE_RATIO),
                     $item['previous_hpp_total'] !== null ? (float) $item['previous_hpp_total'] : null,
                     $previousHasSales
                 );
