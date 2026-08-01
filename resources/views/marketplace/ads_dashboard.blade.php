@@ -950,7 +950,9 @@ body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
 }
 
 .ads-hero{
+    position:relative;
     top:0;
+    z-index:auto;
     align-items:center;
     padding:.4rem .7rem;
     margin-bottom:.55rem;
@@ -1987,7 +1989,7 @@ function sortTrafficTable(col) {
                         $trPoas = $trSpendAfterTax > 0 ? $trNetProfit / $trSpendAfterTax : 0;
                     @endphp
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> Ad Spend</div>
+                        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> Belanja Iklan</div>
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trSpend, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
