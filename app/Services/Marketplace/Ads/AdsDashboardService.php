@@ -339,6 +339,27 @@ class AdsDashboardService
             return $camp;
         });
 
+        // Label produk marketplace untuk daftar campaign/SKU yang belum
+        // termapping. Ini hanya satu query tambahan dan tidak mengubah angka.
+        $campaignItemIds = $campaigns->pluck('channel_item_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+        $productLabels = $campaignItemIds->isNotEmpty()
+            ? MarketplaceProduct::query()
+                ->whereIn('store_id', $storeIds)
+                ->whereIn('item_id', $campaignItemIds->all())
+                ->get(['store_id', 'item_id', 'item_name', 'item_sku'])
+                ->keyBy(fn ($product) => $product->store_id . '|' . $product->item_id)
+            : collect();
+        $campaigns = $campaigns->map(function ($camp) use ($productLabels) {
+            $product = $productLabels->get($camp->store_id . '|' . $camp->channel_item_id);
+            $camp->marketplace_item_name = $product?->item_name;
+            $camp->marketplace_item_sku = $product?->item_sku;
+            return $camp;
+        });
+
         // -------------------------------------------------------------
         // KPI CALCULATION
         // Directly aggregate from $campaigns so that top KPI 

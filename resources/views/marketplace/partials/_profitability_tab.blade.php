@@ -59,9 +59,12 @@
 
     // Kampanye paling rugi ditaruh paling atas — itu yang butuh perhatian duluan.
     $rows = $rows->sortBy(fn ($r) => $r->profit === null ? INF : $r->profit)->values();
+    // Parent GMV Max adalah agregat, bukan produk/SKU. Tetap dipakai untuk
+    // KPI profit di atas, tetapi tidak ditampilkan sebagai baris campaign.
+    $displayRows = $rows->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))->values();
 
     // ── Group by KATEGORI (hasil mapping SKU produk marketplace → item internal) ──
-    $byCategory = $rows
+    $byCategory = $displayRows
         ->groupBy(fn ($r) => $r->camp->item_category ?? 'Belum termapping')
         ->map(function ($grp, $name) {
             $known = $grp->filter(fn ($r) => $r->profit !== null);
@@ -117,8 +120,11 @@
         $campaignId = (string) ($r->camp->channel_campaign_id ?? '');
         $isGms = str_starts_with($campaignId, 'GMS-');
         return $r->totalCogs === null && (!empty($r->camp->channel_item_id) || $isGms);
-    });
+    })->sortByDesc(fn ($r) => (float) ($r->camp->spend ?? 0))->values();
     $gmsProfitRows = $rows->filter(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'));
+    $mappableProfitRows = $mappableProfitRows
+        ->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))
+        ->values();
     
     $feeMode         = $adsSetting->admin_fee_mode ?? 'auto';
     $feeManualPct    = $adsSetting->admin_fee_pct ?? null;
@@ -288,13 +294,75 @@ window.__profitChartData = {
 <div style="display:flex; gap:.35rem; margin-bottom:.75rem;">
     <button type="button" id="btnViewCategory" class="btn fw-bold" onclick="__profitView('category')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);">Per Kategori</button>
     <button type="button" id="btnViewCampaign" class="btn fw-bold" onclick="__profitView('campaign')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;">Per Kampanye</button>
+    @if($mappableProfitRows->isNotEmpty())
+        <button type="button" id="btnViewUnmapped" class="btn fw-bold" onclick="__profitView('unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#92400e; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Belum Mapping ({{ $mappableProfitRows->count() }})</button>
+    @endif
+    @if($gmsProfitRows->isNotEmpty())
+        <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">Produk GMV Max</button>
+    @endif
 </div>
 @if($mappableProfitRows->isNotEmpty())
     <div class="mb-3" style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;padding:.65rem .8rem;border:1px dashed rgba(180,83,9,.35);border-radius:12px;background:rgba(217,119,6,.05);font-size:.72rem;color:var(--dsh-muted);">
         <i class="bi bi-info-circle" style="color:#b45309;"></i>
         <span><b style="color:#b45309;">{{ $mappableProfitRows->count() }} campaign</b> belum punya HPP/mapping item.</span>
-        <button type="button" class="btn btn-sm" style="font-size:.68rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:transparent;" onclick="__profitView('campaign')">Tampilkan &amp; perbaiki</button>
+        <button type="button" class="btn btn-sm" style="font-size:.68rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:transparent;" onclick="__profitView('unmapped')">Tampilkan &amp; perbaiki</button>
     </div>
+@endif
+
+@if($mappableProfitRows->isNotEmpty())
+<div id="profitViewUnmapped" style="display:none;">
+    <div class="ads-tab-panel mb-3">
+        <div class="ads-tab-panel-head">
+            <div>
+                <div class="ads-tab-panel-title"><i class="bi bi-link-45deg" style="color:#b45309;"></i> Produk / SKU Belum Mapping</div>
+                <div class="ads-tab-panel-note">Mapping item internal agar HPP dan Net Profit dapat dihitung. Diurutkan dari biaya iklan terbesar.</div>
+            </div>
+            <span style="font-size:.7rem;font-weight:800;color:#92400e;background:rgba(217,119,6,.1);padding:.3rem .6rem;border-radius:999px;">{{ $mappableProfitRows->count() }} perlu tindakan</span>
+        </div>
+        <div class="table-responsive">
+            <table class="dpanel-table dpanel-table-sm table-hover w-100" style="white-space:nowrap;">
+                <thead>
+                    <tr>
+                        <th>Produk / SKU</th>
+                        <th>Kampanye</th>
+                        <th class="text-end">Penjualan</th>
+                        <th class="text-end">Omzet</th>
+                        <th class="text-end">Biaya Iklan</th>
+                        <th class="text-center">Tindakan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach($mappableProfitRows as $r)
+                    @php
+                        $camp = $r->camp;
+                        $isGms = str_starts_with((string) ($camp->channel_campaign_id ?? ''), 'GMS-');
+                        $itemName = $camp->marketplace_item_name ?: ($isGms ? 'GMV Max (Semua Produk)' : 'Produk belum ditemukan');
+                        $itemSku = $camp->marketplace_item_sku ?: ($camp->channel_item_id ? 'Item ID ' . $camp->channel_item_id : 'Semua produk');
+                    @endphp
+                    <tr style="border-bottom:1px solid var(--dsh-border);">
+                        <td style="padding:.65rem .5rem;max-width:260px;">
+                            <div style="font-weight:750;color:var(--text);overflow:hidden;text-overflow:ellipsis;" title="{{ $itemName }}">{{ $itemName }}</div>
+                            <div style="font-size:.64rem;color:var(--dsh-muted);">{{ $itemSku }}</div>
+                        </td>
+                        <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;" title="{{ $camp->campaign_name ?: 'Kampanye' }}">{{ $camp->campaign_name ?: 'Kampanye' }}</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums;">
+                            <b>{{ number_format($camp->orders, 0, ',', '.') }} order</b>
+                            @if($camp->items_sold > 0)<div style="font-size:.62rem;color:var(--dsh-muted);">{{ number_format($camp->items_sold, 0, ',', '.') }} pcs{{ ($camp->items_sold_source ?? 'api') === 'order_fallback' ? ' · estimasi' : '' }}</div>@endif
+                        </td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $fmt($camp->gmv) }}</td>
+                        <td class="text-end" style="font-variant-numeric:tabular-nums;color:#dc2626;"><b>{{ $fmt($camp->spend * 1.11) }}</b><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN</div></td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm" style="font-size:.64rem;padding:.2rem .55rem;border-radius:999px;color:#92400e;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-profit-map-campaign="{{ $camp->id }}" data-profit-map-name="{{ e($camp->campaign_name ?: $itemName) }}" data-profit-map-item="{{ e($camp->channel_item_id ? (string) $camp->channel_item_id : 'Semua Produk (GMV Max)') }}" onclick="openProfitCampaignMapping(this)">
+                                <i class="bi bi-link-45deg"></i> {{ $isGms ? 'Atur HPP acuan' : 'Pilih item HPP' }}
+                            </button>
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 @endif
 
 <!-- ── Tabel per KATEGORI ── -->
@@ -345,21 +413,33 @@ window.__profitChartData = {
 window.__profitView = function (mode) {
     const cat = document.getElementById('profitViewCategory');
     const camp = document.getElementById('profitViewCampaign');
+    const unmapped = document.getElementById('profitViewUnmapped');
+    const gms = document.getElementById('profitViewGms');
     const bCat = document.getElementById('btnViewCategory');
     const bCamp = document.getElementById('btnViewCampaign');
+    const bUnmapped = document.getElementById('btnViewUnmapped');
+    const bGms = document.getElementById('btnViewGms');
     const on  = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
     const off = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;';
     const isCat = mode === 'category';
+    const isUnmapped = mode === 'unmapped';
+    const isGms = mode === 'gms';
     cat.style.display = isCat ? 'block' : 'none';
-    camp.style.display = isCat ? 'none' : 'block';
+    camp.style.display = isCat || isUnmapped || isGms ? 'none' : 'block';
+    if (unmapped) unmapped.style.display = isUnmapped ? 'block' : 'none';
+    if (gms) gms.style.display = isGms ? 'block' : 'none';
     bCat.style.cssText = isCat ? on : off;
-    bCamp.style.cssText = isCat ? off : on;
+    bCamp.style.cssText = !isCat && !isUnmapped && !isGms ? on : off;
+    if (bUnmapped) bUnmapped.style.cssText = isUnmapped ? on : off;
+    if (bGms) bGms.style.cssText = isGms ? on : off;
+    if (isGms && window.loadGmsItemsTab) window.loadGmsItemsTab();
     try { localStorage.setItem('profitViewMode', mode); } catch (e) {}
 };
 (function () {
     try { 
-        if (localStorage.getItem('profitViewMode') === 'campaign') {
-            window.__profitView('campaign'); 
+        const savedMode = localStorage.getItem('profitViewMode');
+        if (savedMode === 'campaign' || savedMode === 'unmapped') {
+            window.__profitView(savedMode);
         } else {
             window.__profitView('category'); 
         }
@@ -515,7 +595,7 @@ window.__profitView = function (mode) {
             </tr>
         </thead>
         <tbody>
-            @forelse($rows as $r)
+            @forelse($displayRows as $r)
                 @php
                     $camp = $r->camp;
                     $reco = $camp->reco ?? ['label' => 'Optimize', 'color' => '#ca8a04', 'icon' => '⚡'];
@@ -579,11 +659,6 @@ window.__profitView = function (mode) {
                                 <i class="bi bi-link-45deg"></i> {{ str_starts_with((string) $camp->channel_campaign_id, 'GMS-') ? 'Atur HPP acuan' : 'Pilih item HPP' }}
                             </button>
                         @endif
-                        @if(str_starts_with((string) $camp->channel_campaign_id, 'GMS-'))
-                            <button type="button" class="btn btn-sm mt-1" style="font-size:.62rem; padding:.16rem .45rem; border-radius:999px; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);" data-gms-store="{{ $camp->store_id }}" onclick="openGmsItems(this)">
-                                <i class="bi bi-list-ul"></i> Lihat produk &amp; HPP
-                            </button>
-                        @endif
                     </td>
 
                     <td class="text-end" style="vertical-align: middle;">
@@ -619,11 +694,11 @@ window.__profitView = function (mode) {
                 </tr>
             @endforelse
         </tbody>
-        @if($rows->isNotEmpty())
+        @if($displayRows->isNotEmpty())
         <tfoot>
             <tr style="border-top: 2px solid var(--dsh-border);">
                 <td style="padding: .7rem .5rem; font-weight: 800; font-size: .75rem; color: var(--text); text-transform: uppercase;">Total</td>
-                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($rows->sum(fn ($r) => $r->camp->orders), 0, ',', '.') }} order</td>
+                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ number_format($displayRows->sum(fn ($r) => $r->camp->orders), 0, ',', '.') }} order</td>
                 <td class="text-end" style="font-weight: 800; color: #0369a1; font-variant-numeric: tabular-nums;">{{ $fmt($totalNetRevenue) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">Omzet {{ $fmt($totalGmv) }} · adm {{ $fmt($totalFeeAmt) }} ({{ number_format($avgFeePct, 1, ',', '.') }}%)</div></td>
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">&minus;{{ $fmt($totalCogsAll) }}</td>
                 <td class="text-end" style="font-weight: 700; color: #dc2626; font-variant-numeric: tabular-nums;">&minus;{{ $fmt($totalTopup) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">iklan {{ $fmt($totalSpend) }}</div></td>
@@ -639,85 +714,92 @@ window.__profitView = function (mode) {
 </div>
 
 @if($gmsProfitRows->isNotEmpty())
-<div class="modal fade" id="gmsItemsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content" style="border-radius:18px;border:1px solid var(--dsh-border);background:var(--card-bg,#fff);color:var(--text,#0f172a);">
-            <div class="modal-header" style="border-bottom:1px solid var(--dsh-border);">
-                <div>
-                    <h5 class="modal-title" style="font-size:1rem;font-weight:800;">Rincian produk GMV Max</h5>
-                    <div style="font-size:.72rem;color:var(--dsh-muted);margin-top:.2rem;">Mapping HPP dilakukan per produk agar profit campaign tidak membingungkan.</div>
-                    <div id="gmsItemsPeriod" style="font-size:.7rem;color:var(--dsh-muted);margin-top:.2rem;"></div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+<div id="profitViewGms" style="display:none;">
+    <div class="ads-tab-panel">
+        <div class="ads-tab-panel-head">
+            <div>
+                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#0369a1;"></i> Produk GMV Max</div>
+                <div class="ads-tab-panel-note">Rincian produk di dalam campaign GMV Max. Parent “GMV Max (Semua Produk)” tidak ditampilkan sebagai SKU.</div>
+                <div id="gmsItemsPeriod" style="font-size:.68rem;color:var(--dsh-muted);margin-top:.2rem;"></div>
             </div>
-            <div class="modal-body">
-                <div style="padding:.7rem .8rem;margin-bottom:.75rem;border-radius:12px;background:rgba(3,105,161,.06);border:1px solid rgba(3,105,161,.14);font-size:.72rem;color:var(--dsh-muted);">
-                    <i class="bi bi-info-circle" style="color:#0369a1;"></i>
-                    <b style="color:var(--text);">GMV Max adalah campaign agregat.</b> Angka di bawah memecahnya menjadi produk. Jika ada produk yang belum punya HPP, klik <b style="color:var(--text);">Pilih item HPP</b> pada baris tersebut.
-                </div>
-                <div id="gmsItemsSummary" style="display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.8rem;"></div>
-                <div id="gmsItemsBody" class="table-responsive">
-                    <div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Memuat produk GMV Max…</div>
-                </div>
+        </div>
+        <div class="p-3">
+            <div style="padding:.7rem .8rem;margin-bottom:.75rem;border-radius:12px;background:rgba(3,105,161,.06);border:1px solid rgba(3,105,161,.14);font-size:.72rem;color:var(--dsh-muted);">
+                <i class="bi bi-info-circle" style="color:#0369a1;"></i>
+                Mapping HPP dilakukan per produk. Jika HPP belum ada, pilih item internal pada baris tersebut agar profit produk dapat dihitung.
+            </div>
+            <div id="gmsItemsSummary" style="display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.8rem;"></div>
+            <div id="gmsItemsBody">
+                <div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Pilih tab Produk GMV Max untuk memuat data…</div>
             </div>
         </div>
     </div>
 </div>
 <script>
 (function () {
-    const modalEl = document.getElementById('gmsItemsModal');
     const bodyEl = document.getElementById('gmsItemsBody');
     const summaryEl = document.getElementById('gmsItemsSummary');
     const periodEl = document.getElementById('gmsItemsPeriod');
     const endpointBase = @json(url('/marketplace/ads-dashboard/gms-items'));
     const fromDate = @json($dateFrom ?? now()->subDays(6)->toDateString());
     const toDate = @json($dateTo ?? now()->toDateString());
+    const storeIds = @json($gmsProfitRows->pluck('camp.store_id')->filter()->unique()->values()->all());
+    const storeNames = @json($gmsProfitRows->mapWithKeys(fn ($r) => [$r->camp->store_id => $r->camp->store?->name ?: ('Toko #' . $r->camp->store_id)])->all());
     const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
     const fmtRp = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
 
-    window.openGmsItems = async function (button) {
-        const storeId = button.dataset.gmsStore;
+    const summaryCard = (label, value, color, note) => '<div style="flex:1 1 150px;min-width:145px;padding:.65rem .75rem;border:1px solid var(--dsh-border);border-radius:12px;background:var(--card-bg,#fff);"><div style="font-size:.65rem;color:var(--dsh-muted);">' + label + '</div><div style="font-size:1rem;font-weight:800;color:' + color + ';margin-top:.15rem;">' + value + '</div><div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.1rem;">' + note + '</div></div>';
+
+    function renderStore(storeId, payload) {
+        if (!payload.data || !payload.data.length) return '<div style="padding:1rem;color:var(--dsh-muted);font-size:.75rem;">Belum ada data produk untuk ' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '.</div>';
+        const rows = payload.data.map(function (item) {
+            const mapped = item.mapped;
+            const profit = item.profit_after_ads;
+            const profitText = profit === null ? 'N/A' : (profit < 0 ? '−' : '') + fmtRp(profit);
+            const itemName = item.item_name || 'Produk tanpa nama';
+            const pcsNote = item.pcs_source === 'api' ? 'pcs dari data penjualan' : 'pcs estimasi dari order';
+            const mappingStatus = mapped
+                ? '<span style="color:#15803d;font-weight:700;"><i class="bi bi-check-circle"></i> HPP tersedia</span><div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.15rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;">' + esc(item.internal_item_code || item.internal_item_name || item.mapping_source || 'Item internal') + '</div>'
+                : '<span style="color:#b45309;font-weight:700;"><i class="bi bi-exclamation-circle"></i> HPP belum ada</span><button type="button" class="btn btn-sm d-block mt-1" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Pilih item HPP</button>';
+            return '<tr>' +
+                '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>' +
+                '<td class="text-end"><div style="font-weight:700;">' + Number(item.orders || 0).toLocaleString('id-ID') + ' order · ' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div><div style="font-size:.62rem;color:var(--dsh-muted);">' + pcsNote + '</div></td>' +
+                '<td class="text-end"><div style="font-weight:700;">' + fmtRp(item.gmv) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">Dana cair ± ' + fmtRp(item.net_revenue) + '</div></td>' +
+                '<td class="text-end" style="color:#dc2626;"><div style="font-weight:700;">−' + fmtRp(Number(item.spend || 0) * 1.11) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN 11%</div></td>' +
+                '<td class="text-end">' + (mapped ? fmtRp(item.unit_cogs) + '<div style="font-size:.62rem;color:var(--dsh-muted);">per pcs</div>' : '<span style="color:#b45309;">—</span>') + '</td>' +
+                '<td class="text-end">' + (item.hpp_total !== null ? '−' + fmtRp(item.hpp_total) : '<span style="color:#b45309;">—</span>') + '</td>' +
+                '<td class="text-end" style="font-weight:800;color:' + (profit === null ? '#b45309' : (profit >= 0 ? '#15803d' : '#b91c1c')) + ';">' + profitText + (profit === null ? '<div style="font-size:.62rem;font-weight:500;color:var(--dsh-muted);">menunggu HPP</div>' : '') + '</td>' +
+                '<td>' + mappingStatus + '</td>' +
+                '</tr>';
+        }).join('');
+        return '<div style="font-size:.75rem;font-weight:800;color:var(--text);margin:1rem 0 .45rem;">' + esc(storeNames[storeId] || ('Toko #' + storeId)) + '</div><div class="table-responsive"><table class="dpanel-table dpanel-table-sm w-100" style="white-space:nowrap;min-width:1120px;"><thead><tr><th>Produk</th><th class="text-end">Penjualan</th><th class="text-end">Omzet kotor<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">dana cair</span></th><th class="text-end">Biaya iklan<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">setelah PPN</span></th><th class="text-end">HPP / pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit setelah iklan</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    window.loadGmsItemsTab = async function () {
         periodEl.textContent = 'Periode ' + fromDate + ' s/d ' + toDate;
         bodyEl.innerHTML = '<div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Memuat produk GMV Max…</div>';
         summaryEl.textContent = '';
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
         try {
-            const response = await fetch(endpointBase + '/' + storeId + '?date_from=' + encodeURIComponent(fromDate) + '&date_to=' + encodeURIComponent(toDate), { headers: { Accept: 'application/json' } });
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.message || 'Gagal memuat item GMV Max.');
-            const summaryCard = (label, value, color, note) => '<div style="flex:1 1 150px;min-width:145px;padding:.65rem .75rem;border:1px solid var(--dsh-border);border-radius:12px;background:var(--card-bg,#fff);"><div style="font-size:.65rem;color:var(--dsh-muted);">' + label + '</div><div style="font-size:1rem;font-weight:800;color:' + color + ';margin-top:.15rem;">' + value + '</div><div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.1rem;">' + note + '</div></div>';
-            summaryEl.innerHTML = summaryCard('Produk GMV Max', Number(payload.total_items || 0).toLocaleString('id-ID'), 'var(--text)', 'terjual pada periode ini')
-                + summaryCard('HPP sudah tersedia', Number(payload.mapped_items || 0).toLocaleString('id-ID'), '#15803d', 'profit dapat dihitung')
-                + summaryCard('Perlu mapping', Number(payload.unmapped_items || 0).toLocaleString('id-ID'), payload.unmapped_items > 0 ? '#b45309' : '#15803d', payload.unmapped_items > 0 ? 'pilih item internal' : 'semua sudah siap');
-            if (!payload.data || !payload.data.length) {
-                bodyEl.innerHTML = '<div style="padding:1.2rem;text-align:center;color:var(--dsh-muted);font-size:.75rem;">Belum ada data item GMV Max. Jalankan sync GMS terlebih dahulu.</div>';
-                return;
-            }
-            const rows = payload.data.map(function (item) {
-                const mapped = item.mapped;
-                const profit = item.profit_after_ads;
-                const profitText = profit === null ? 'N/A' : (profit < 0 ? '−' : '') + fmtRp(profit);
-                const itemName = item.item_name || 'Produk tanpa nama';
-                const pcsNote = item.pcs_source === 'api' ? 'pcs dari data penjualan' : 'pcs estimasi dari order';
-                const mappingStatus = mapped
-                    ? '<span style="color:#15803d;font-weight:700;"><i class="bi bi-check-circle"></i> HPP tersedia</span><div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.15rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;">' + esc(item.internal_item_code || item.internal_item_name || item.mapping_source || 'Item internal') + '</div>'
-                    : '<span style="color:#b45309;font-weight:700;"><i class="bi bi-exclamation-circle"></i> HPP belum ada</span><button type="button" class="btn btn-sm d-block mt-1" style="font-size:.62rem;padding:.16rem .48rem;border-radius:999px;color:#b45309;border:1px solid rgba(180,83,9,.35);background:rgba(217,119,6,.06);" data-gms-map-store="' + esc(storeId) + '" data-gms-map-item="' + esc(item.channel_item_id) + '" data-gms-map-name="' + esc(itemName) + '" onclick="openGmsItemMapping(this)"><i class="bi bi-link-45deg"></i> Pilih item HPP</button>';
-                return '<tr>' +
-                    '<td><div style="font-weight:700;max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(itemName) + '">' + esc(itemName) + '</div><div style="font-size:.64rem;color:var(--dsh-muted);">SKU ' + esc(item.item_sku || '-') + ' · ID ' + esc(item.channel_item_id) + '</div></td>' +
-                    '<td class="text-end"><div style="font-weight:700;">' + Number(item.orders || 0).toLocaleString('id-ID') + ' order · ' + Number(item.pcs || 0).toLocaleString('id-ID') + ' pcs</div><div style="font-size:.62rem;color:var(--dsh-muted);">' + pcsNote + '</div></td>' +
-                    '<td class="text-end"><div style="font-weight:700;">' + fmtRp(item.gmv) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">Dana cair ± ' + fmtRp(item.net_revenue) + '</div></td>' +
-                    '<td class="text-end" style="color:#dc2626;"><div style="font-weight:700;">−' + fmtRp(Number(item.spend || 0) * 1.11) + '</div><div style="font-size:.62rem;color:var(--dsh-muted);">termasuk PPN 11%</div></td>' +
-                    '<td class="text-end">' + (mapped ? fmtRp(item.unit_cogs) + '<div style="font-size:.62rem;color:var(--dsh-muted);">per pcs</div>' : '<span style="color:#b45309;">—</span>') + '</td>' +
-                    '<td class="text-end">' + (item.hpp_total !== null ? '−' + fmtRp(item.hpp_total) : '<span style="color:#b45309;">—</span>') + '</td>' +
-                    '<td class="text-end" style="font-weight:800;color:' + (profit === null ? '#b45309' : (profit >= 0 ? '#15803d' : '#b91c1c')) + ';">' + profitText + (profit === null ? '<div style="font-size:.62rem;font-weight:500;color:var(--dsh-muted);">menunggu HPP</div>' : '') + '</td>' +
-                    '<td>' + mappingStatus + '</td>' +
-                    '</tr>';
-            }).join('');
-            bodyEl.innerHTML = '<table class="dpanel-table dpanel-table-sm w-100" style="white-space:nowrap;min-width:1120px;"><thead><tr><th>Produk</th><th class="text-end">Penjualan</th><th class="text-end">Omzet kotor<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">dana cair</span></th><th class="text-end">Biaya iklan<br><span style="font-size:.6rem;font-weight:500;text-transform:none;">setelah PPN</span></th><th class="text-end">HPP / pcs</th><th class="text-end">Total HPP</th><th class="text-end">Profit setelah iklan</th><th>Status HPP</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            const payloads = await Promise.all(storeIds.map(async function (storeId) {
+                const response = await fetch(endpointBase + '/' + storeId + '?date_from=' + encodeURIComponent(fromDate) + '&date_to=' + encodeURIComponent(toDate), { headers: { Accept: 'application/json' } });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.message || 'Gagal memuat item GMV Max.');
+                return { storeId: storeId, payload: payload };
+            }));
+            const totals = payloads.reduce((sum, entry) => ({
+                items: sum.items + Number(entry.payload.total_items || 0),
+                mapped: sum.mapped + Number(entry.payload.mapped_items || 0),
+                unmapped: sum.unmapped + Number(entry.payload.unmapped_items || 0),
+            }), { items: 0, mapped: 0, unmapped: 0 });
+            summaryEl.innerHTML = summaryCard('Produk GMV Max', totals.items.toLocaleString('id-ID'), 'var(--text)', 'terjual pada periode ini')
+                + summaryCard('HPP sudah tersedia', totals.mapped.toLocaleString('id-ID'), '#15803d', 'profit dapat dihitung')
+                + summaryCard('Perlu mapping', totals.unmapped.toLocaleString('id-ID'), totals.unmapped > 0 ? '#b45309' : '#15803d', totals.unmapped > 0 ? 'pilih item internal' : 'semua sudah siap');
+            bodyEl.innerHTML = payloads.map((entry) => renderStore(entry.storeId, entry.payload)).join('');
         } catch (error) {
             bodyEl.innerHTML = '<div style="padding:1rem;color:#b91c1c;font-size:.75rem;">' + esc(error.message) + '</div>';
         }
     };
+    try { if (localStorage.getItem('profitViewMode') === 'gms') window.loadGmsItemsTab(); } catch (e) {}
 })();
 </script>
 @endif

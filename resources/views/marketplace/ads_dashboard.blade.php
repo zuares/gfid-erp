@@ -2307,13 +2307,15 @@ function sortTrafficTable(col) {
                         } else {
                             $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
                         }
+
+                        $valueDecimals = in_array($m['key'], ['gmv', 'spend', 'net_profit', 'cpc', 'orders', 'impressions', 'clicks']) ? 0 : 2;
                     @endphp
                     <div class="dpanel ads-kpi kpi-{{ $m['cls'] }}">
                         <div class="ads-kpi-label">
                             <i class="bi {{ $m['icon'] }}"></i> {{ $m['title'] }}
                         </div>
                         <div class="ads-kpi-value" style="font-variant-numeric: tabular-nums;">
-                            {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
+                            {{ $m['prefix'] }}{{ number_format($val, $valueDecimals, ',', '.') }}{{ $m['suffix'] }}
                         </div>
                         <div class="ads-kpi-sub">
                             @if($m['key'] === 'net_profit')
