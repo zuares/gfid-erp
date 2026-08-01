@@ -4,8 +4,7 @@ namespace App\Services\Marketplace\Ads;
 
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
-use App\Services\Channels\ChannelManager;
-use App\Services\Channels\Shopee\ShopeeChannel;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Log;
 
 class ShopeeAdsApiService
@@ -26,22 +25,21 @@ class ShopeeAdsApiService
     protected function execute(Store $store, string $endpoint, callable $callable)
     {
         try {
-            // Redis Throttle Proaktif (Maksimal 100 request / 60 detik per toko)
-            // Mencegah API Shopee memblokir aplikasi dengan 429 Too Many Requests
-            $response = \Illuminate\Support\Facades\Redis::throttle('shopee_api_store_' . $store->id)
-                ->allow(100)->every(60)
-                ->then(
-                    function () use ($callable) {
-                        return $callable();
-                    },
-                    function () {
-                        // Limit tercapai. Melemparkan exception dengan retry_after 60s
-                        throw new \App\Exceptions\ShopeeAdsRateLimitException(
-                            60, 
-                            "Proactive Rate Limiting (Redis Throttle) reached. Menunda API call untuk menghindari blokir Shopee."
-                        );
-                    }
+            // Rate limit berbasis cache Laravel (database di Web Hosting), bukan Redis.
+            // Maksimal 100 request / 60 detik per toko.
+            $response = RateLimiter::attempt(
+                'shopee_api_store_' . $store->id,
+                100,
+                $callable,
+                60
+            );
+
+            if ($response === false) {
+                throw new \App\Exceptions\ShopeeAdsRateLimitException(
+                    60,
+                    'Proactive rate limiting reached. Menunda API call untuk menghindari blokir Shopee.'
                 );
+            }
 
             // Tangkap 429 Rate Limit
             if (isset($response['_meta']['http_status']) && $response['_meta']['http_status'] == 429) {

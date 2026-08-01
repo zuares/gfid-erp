@@ -5,7 +5,7 @@ namespace App\Services\Marketplace;
 use App\Models\Store;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Gateway terpusat untuk semua pemanggilan API Marketplace.
@@ -30,19 +30,18 @@ class MarketplaceApiGateway
     {
         // Max 10 requests per 1 second per store
         // Bisa disesuaikan jika ingin membedakan per channel (Shopee vs TikTok)
-        Redis::throttle('marketplace_api_gw_store_' . $store->id)
-            ->allow(10)
-            ->every(1)
-            ->then(
-                function () {
-                    // Allowed
-                },
-                function () use ($store) {
-                    Log::warning("[ApiGateway] Rate limit exceeded for store {$store->id}");
-                    // Fallback to brief sleep to smooth out bursts instead of failing immediately
-                    usleep(200000); // 200ms delay
-                }
-            );
+        $allowed = RateLimiter::attempt(
+            'marketplace_api_gw_store_' . $store->id,
+            10,
+            static fn () => true,
+            1
+        );
+
+        if ($allowed === false) {
+            Log::warning("[ApiGateway] Rate limit exceeded for store {$store->id}");
+            // Fallback to brief sleep to smooth out bursts instead of failing immediately.
+            usleep(200000); // 200ms delay
+        }
     }
 
     protected function logApiCall(Store $store, string $method, array $args, mixed $result, float $duration): void

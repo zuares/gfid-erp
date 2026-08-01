@@ -116,6 +116,51 @@ class AdsModuleTest extends TestCase
         $this->assertSame($renderedView, $result);
     }
 
+    public function test_ads_throttle_uses_database_rate_limiter_without_redis()
+    {
+        config(['cache.limiter' => 'database']);
+
+        \Illuminate\Support\Facades\Redis::shouldReceive('throttle')->never();
+
+        $store = $this->createStore('DBLIMITER');
+        $gateway = \Mockery::mock(\App\Services\Marketplace\MarketplaceApiGateway::class);
+        $gateway->shouldReceive('getAdsTotalBalance')
+            ->once()
+            ->with($store)
+            ->andReturn(['response' => ['total_balance' => 0]]);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsApiService($gateway);
+
+        $this->assertSame(
+            ['response' => ['total_balance' => 0]],
+            $service->getAdsTotalBalance($store)
+        );
+    }
+
+    public function test_marketplace_gateway_throttle_uses_database_rate_limiter_without_redis()
+    {
+        config(['cache.limiter' => 'database']);
+
+        \Illuminate\Support\Facades\Redis::shouldReceive('throttle')->never();
+
+        $store = $this->createStore('GWDBLIMITER');
+        $driver = \Mockery::mock(\App\Services\Channels\Contracts\MarketplaceChannel::class);
+        $driver->shouldReceive('getAdsTotalBalance')
+            ->once()
+            ->with($store)
+            ->andReturn(['response' => ['total_balance' => 0]]);
+
+        $manager = \Mockery::mock(\App\Services\Channels\ChannelManager::class);
+        $manager->shouldReceive('driver')->once()->with($store)->andReturn($driver);
+
+        $gateway = new \App\Services\Marketplace\MarketplaceApiGateway($manager);
+
+        $this->assertSame(
+            ['response' => ['total_balance' => 0]],
+            $gateway->getAdsTotalBalance($store)
+        );
+    }
+
     // 4. User non-owner/non-admin tidak dapat melakukan backfill
     // 5. Owner/admin dapat melakukan backfill
     public function test_backfill_authorization()
