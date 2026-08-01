@@ -224,13 +224,26 @@ class AdsDashboardService
                 $camp->clicks = $camp->sum_clicks ?? 0;
                 $camp->impressions = $camp->sum_impressions ?? 0;
                 $camp->orders = $camp->sum_orders ?? 0;
-                $camp->items_sold = $camp->sum_broad_order_amount ?? 0;
+                // Pada report harian tertentu Shopee tidak mengisi
+                // broad_order_amount (pcs). Jangan langsung mengubahnya
+                // menjadi 0 lalu menghitung HPP berdasarkan rasio GMV/harga,
+                // karena pada filter satu hari hasilnya bisa sangat melenceng.
+                // Gunakan order sebagai fallback yang jelas berstatus estimasi.
+                $camp->items_sold = $camp->sum_broad_order_amount > 0
+                    ? $camp->sum_broad_order_amount
+                    : $camp->sum_broad_orders;
+                $camp->items_sold_source = $camp->sum_broad_order_amount > 0
+                    ? 'api'
+                    : ($camp->sum_broad_orders > 0 ? 'order_fallback' : 'unknown');
                 
                 $camp->prev_spend = $camp->sum_prev_expense ?? 0;
                 $camp->prev_gmv = $camp->sum_prev_gmv ?? 0;
                 $camp->prev_clicks = $camp->sum_prev_clicks ?? 0;
                 $camp->prev_impressions = $camp->sum_prev_impressions ?? 0;
                 $camp->prev_orders = $camp->sum_prev_orders ?? 0;
+                $camp->prev_items_sold = $camp->sum_prev_broad_order_amount > 0
+                    ? $camp->sum_prev_broad_order_amount
+                    : $camp->sum_prev_broad_orders;
 
                 $acos = $camp->gmv > 0 && $camp->spend > 0 ? round($camp->spend / $camp->gmv, 4) : null;
                 $camp->acos_pct = $acos !== null ? round($acos * 100, 1) : null;
@@ -291,8 +304,8 @@ class AdsDashboardService
 
                 // Kalkulasi Previous Net & Profit
                 $prevNetRevenue = $camp->prev_gmv * $netRevRatio;
-                $prevTotalCogs = ($camp->unit_cogs > 0 && ($camp->sum_prev_broad_order_amount ?? 0) > 0)
-                    ? $camp->unit_cogs * ($camp->sum_prev_broad_order_amount ?? 0)
+                $prevTotalCogs = ($camp->unit_cogs > 0 && ($camp->prev_items_sold ?? 0) > 0)
+                    ? $camp->unit_cogs * ($camp->prev_items_sold ?? 0)
                     : $camp->prev_gmv * ($camp->cogs_ratio ?? 0);
                 $camp->prev_net_revenue = $prevNetRevenue;
                 $camp->prev_total_cogs = $prevTotalCogs;
@@ -355,8 +368,16 @@ class AdsDashboardService
 
         // Profit hanya dijumlahkan dari campaign yang punya HPP; campaign tanpa
         // HPP tidak boleh dianggap sebagai profit 0 atau rugi.
-        $kpi['current']->net_profit = $campaigns->filter(fn ($camp) => $camp->profit_after_ads !== null)->sum('profit_after_ads');
+        $knownProfitCampaigns = $campaigns->filter(fn ($camp) => ($camp->spend > 0 || $camp->gmv > 0) && $camp->profit_after_ads !== null);
+        $unknownProfitCampaigns = $campaigns->filter(fn ($camp) => ($camp->spend > 0 || $camp->gmv > 0) && $camp->profit_after_ads === null);
+        $kpi['current']->net_profit = $knownProfitCampaigns->sum('profit_after_ads');
         $kpi['previous']->net_profit = $campaigns->filter(fn ($camp) => $camp->prev_profit_after_ads !== null)->sum('prev_profit_after_ads');
+        $kpi['current']->profit_campaign_count = $knownProfitCampaigns->count();
+        $kpi['current']->profit_unknown_campaign_count = $unknownProfitCampaigns->count();
+        $kpi['current']->profit_estimated_campaign_count = $knownProfitCampaigns
+            ->where('items_sold_source', 'order_fallback')
+            ->count();
+        $kpi['current']->profit_gmv = $knownProfitCampaigns->sum('gmv');
 
         // Hitung AOV Net
         $kpi['current']->aov_net = $kpi['current']->orders > 0 ? $kpi['current']->net_revenue / $kpi['current']->orders : 0;
@@ -371,6 +392,18 @@ class AdsDashboardService
                 $kpi['changes'][$m] = round((($c - $p) / abs($p)) * 100, 2);
             }
         }
+
+        // ROAS adalah metrik turunan, jadi harus dihitung eksplisit agar kartu
+        // Ringkasan tidak selalu menampilkan "0% vs lalu".
+        $currentRoas = $kpi['current']->spend > 0
+            ? $kpi['current']->gmv / $kpi['current']->spend
+            : 0;
+        $previousRoas = $kpi['previous']->spend > 0
+            ? $kpi['previous']->gmv / $kpi['previous']->spend
+            : 0;
+        $kpi['changes']['roas'] = $previousRoas == 0
+            ? ($currentRoas > 0 ? null : 0)
+            : round((($currentRoas - $previousRoas) / abs($previousRoas)) * 100, 2);
 
         $syncRuns = MarketplaceAdsSyncRun::whereIn('store_id', $storeIds)
             ->select([

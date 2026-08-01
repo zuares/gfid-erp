@@ -2316,6 +2316,17 @@ function sortTrafficTable(col) {
                             {{ $m['prefix'] }}{{ is_float($val) ? number_format($val, 2, ',', '.') : number_format($val, 0, ',', '.') }}{{ $m['suffix'] }}
                         </div>
                         <div class="ads-kpi-sub">
+                            @if($m['key'] === 'net_profit')
+                                <div style="font-size:.65rem;color:var(--dsh-muted);margin-bottom:.15rem;">
+                                    {{ $kpi['current']->profit_campaign_count ?? 0 }} campaign punya HPP
+                                    @if(($kpi['current']->profit_unknown_campaign_count ?? 0) > 0)
+                                        · <span style="color:#b45309;">{{ $kpi['current']->profit_unknown_campaign_count }} belum dihitung</span>
+                                    @endif
+                                    @if(($kpi['current']->profit_estimated_campaign_count ?? 0) > 0)
+                                        · <span style="color:#b45309;">{{ $kpi['current']->profit_estimated_campaign_count }} estimasi pcs</span>
+                                    @endif
+                                </div>
+                            @endif
                             <span style="font-weight:900; {{ $colorClass }}">
                                 @if($hasComparison)<i class="bi bi-arrow-{{ $isUp ? 'up-right' : 'down-right' }}"></i> {{ abs($change) }}%@else<span>Baru</span>@endif
                             </span> 

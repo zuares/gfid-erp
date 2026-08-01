@@ -25,7 +25,7 @@
         $netRevenue    = (float) ($camp->net_revenue ?? ($camp->gmv * $netRevRatio));
         $itemsSold     = (int) ($camp->items_sold ?? 0);
         $unitCogsRow   = (float) ($camp->unit_cogs ?? 0);
-        $cogsExact     = $unitCogsRow > 0 && $itemsSold > 0;
+        $cogsExact     = $unitCogsRow > 0 && $itemsSold > 0 && ($camp->items_sold_source ?? 'api') === 'api';
         $totalCogsRow  = $camp->total_cogs !== null
             ? (float) $camp->total_cogs
             : null;

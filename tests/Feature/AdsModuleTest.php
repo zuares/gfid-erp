@@ -572,6 +572,69 @@ class AdsModuleTest extends TestCase
         $this->assertSame(-23000.0, (float) $data['kpi']['current']->net_profit);
     }
 
+    public function test_single_day_profit_falls_back_to_orders_when_pcs_is_missing()
+    {
+        $store = $this->createStore('PROFITPCS');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-PROFITPCS',
+            'name' => 'Item Profit Pcs Fallback',
+            'type' => 'finished',
+            'hpp' => 90000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654322',
+            'item_name' => 'Product Profit Pcs Fallback',
+            'price_min' => 100000,
+            'price_max' => 100000,
+        ]);
+        \App\Models\MarketplaceProductModel::create([
+            'marketplace_product_id' => $product->id,
+            'model_id' => '1',
+            'model_sku' => 'SKU-PROFITPCS',
+            'price' => 100000,
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'SKU-PROFITPCS',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITPCS',
+            'channel_item_id' => 987654322,
+            'campaign_name' => 'Campaign Profit Pcs Fallback',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITPCS',
+            'date' => '2026-07-01',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 0,
+            'broad_gmv' => 50000,
+            'direct_order' => 1,
+            'direct_order_amount' => 0,
+            'direct_gmv' => 50000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-01', '2026-07-01', 'prev_period', app(AdsAnalyticsService::class));
+
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-PROFITPCS');
+
+        // HPP memakai 1 order sebagai estimasi pcs, bukan rasio GMV/harga.
+        // 39.050 - 90.000 - 11.100 = -62.050.
+        $this->assertSame('order_fallback', $campaign->items_sold_source);
+        $this->assertSame(-62050.0, (float) $campaign->profit_after_ads);
+    }
+
     public function test_unmapped_ads_campaign_can_be_mapped_from_dashboard()
     {
         $store = $this->createStore('MAPFROMADS');
@@ -775,6 +838,32 @@ class AdsModuleTest extends TestCase
 
         $this->assertSame(15000.0, (float) $data['kpi']['current']->spend);
         $this->assertSame(150000.0, (float) $data['kpi']['current']->gmv);
+    }
+
+    public function test_summary_roas_change_is_not_always_zero()
+    {
+        $store = $this->createStore('ROASCHANGE');
+        $now = now();
+
+        foreach ([
+            ['date' => '2026-07-30', 'spend' => 10000, 'gmv' => 100000],
+            ['date' => '2026-07-29', 'spend' => 20000, 'gmv' => 100000],
+        ] as $row) {
+            \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+                'store_id' => $store->id,
+                'date' => $row['date'],
+                'spend' => $row['spend'],
+                'gmv' => $row['gmv'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        // ROAS saat ini 10x, sebelumnya 5x, jadi naik 100%.
+        $this->assertSame(100.0, (float) $data['kpi']['changes']['roas']);
     }
 
     // 19. Sync overlap dicegah
