@@ -15,6 +15,21 @@ Semua jadwal ads didefinisikan di `bootstrap/app.php` → `withSchedule()` (Lara
 Menit 30 untuk hourly dipilih supaya tidak tabrakan dengan `sync-ads-main` yang jalan di menit 0.
 Output kedua jadwal ditulis ke `storage/logs/sync-ads.log`.
 
+## Worker queue ads
+
+Job `ShopeeAdsSyncJob` dan chain backfill dikirim ke queue `ads`. Queue ini
+diproses oleh jadwal `queue-work-ads` di `routes/console.php` setiap menit,
+dengan timeout worker 30 menit dan maksimal 10 percobaan. Karena worker ini
+dijalankan oleh scheduler, production tetap harus memiliki satu cron:
+`php artisan schedule:run` setiap menit.
+
+Verifikasi worker:
+
+```bash
+php artisan schedule:list | grep queue-work-ads
+php artisan queue:monitor ads
+```
+
 ## PENTING: kenapa sebelumnya tidak jalan
 
 Jadwalnya sudah benar didefinisikan, tapi **tidak ada yang memanggil `schedule:run`**.

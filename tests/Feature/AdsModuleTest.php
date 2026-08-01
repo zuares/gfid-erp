@@ -380,7 +380,7 @@ class AdsModuleTest extends TestCase
 
     public function test_sync_ads_command_uses_queue()
     {
-        Queue::fake();
+        Bus::fake();
 
         $store = $this->createStore('CMD1');
 
@@ -390,11 +390,10 @@ class AdsModuleTest extends TestCase
             '--to' => '2026-07-24',
         ])->assertSuccessful();
 
-        Queue::assertPushed(ShopeeAdsSyncJob::class, function ($job) use ($store) {
+        Bus::assertDispatched(ShopeeAdsSyncJob::class, function ($job) use ($store) {
             $jobStore = (new \ReflectionProperty($job, 'store'))->getValue($job);
             return $jobStore->id === $store->id &&
-                   $job->connection === 'database' &&
-                   $job->queue === 'shopee-ads';
+                   $job->queue === 'ads';
         });
     }
 

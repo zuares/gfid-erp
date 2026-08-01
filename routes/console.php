@@ -127,6 +127,21 @@ Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'default,label
     ->name('queue-work')
     ->withoutOverlapping();
 
+// Antrean 'ads' khusus sinkronisasi Shopee Ads. Job ini sengaja dipisah dari
+// default/labels karena satu rentang tanggal dapat melakukan banyak panggilan
+// API dan memiliki timeout job sampai 30 menit.
+Schedule::call(fn () => Artisan::call('queue:work', [
+    '--queue' => 'ads',
+    '--stop-when-empty' => true,
+    '--max-time' => 280,
+    '--timeout' => 1800,
+    '--tries' => 10,
+    '--sleep' => 2,
+]))
+    ->everyMinute()
+    ->name('queue-work-ads')
+    ->withoutOverlapping();
+
 // Antrean 'heavy' KHUSUS pekerjaan lama (backfill histori, sync rentang >7 hari).
 // Dipisah supaya job berat berjam-jam TIDAK menyumbat webhook/resi di queue default.
 // withoutOverlapping: hanya satu worker heavy pada satu waktu.

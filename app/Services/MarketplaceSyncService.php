@@ -640,10 +640,20 @@ class MarketplaceSyncService
                 $validation = $this->validateEscrowIncome($response);
 
                 if ($validation['status'] === 'skipped') {
-                    // Kondisi bisnis (mis. response kosong / belum eligible di sisi Shopee)
-                    // — bukan error, dan TIDAK membuat settlement kosong/nol.
+                    // Kondisi bisnis (mis. response kosong / belum eligible di sisi Shopee).
+                    // Dibuatkan settlement pending agar mendapat cooldown, sehingga
+                    // tidak ditarik berulang-ulang dalam batch yang sama setiap kueri.
                     $skipped++;
                     Log::info("[sync-settlements] Order {$order->channel_order_id} dilewati: {$validation['message']}");
+                    
+                    $dummyMapped = $this->mapEscrowSettlement($store, $order, [], []);
+                    DB::transaction(function () use ($order, $dummyMapped) {
+                        MarketplaceOrderSettlement::updateOrCreate(
+                            ['channel_order_id' => $order->channel_order_id],
+                            $dummyMapped['values']
+                        );
+                    });
+                    
                     continue;
                 }
 
@@ -652,12 +662,13 @@ class MarketplaceSyncService
                     $failedOrderIds[] = $order->channel_order_id;
                     Log::warning("[sync-settlements] Order {$order->channel_order_id} gagal validasi ({$validation['reason']}): {$validation['message']}");
                     
-                    if ($validation['reason'] === 'order_not_found') {
-                        $order->update([
-                            'settlement_sync_error_code' => 'order_not_found',
-                            'settlement_sync_failed_at' => now(),
-                        ]);
-                    }
+                    // Tandai error code untuk semua error yang lolos retry agar order
+                    // bermasalah tidak terus-menerus memblokir limit batch.
+                    $order->update([
+                        'settlement_sync_error_code' => $validation['reason'] ?? 'api_error',
+                        'settlement_sync_failed_at' => now(),
+                    ]);
+                    
                     continue;
                 }
 

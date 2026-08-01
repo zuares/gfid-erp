@@ -15,7 +15,7 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
  *     inventory:recalc-ads-from-daily, marketplace:sync-ads (daily + hourly)
  *   - routes/console.php → sync-orders, sync-bookings, sync-returns,
  *     sync-settlements, sync-finance, sync-chats, snapshot-products,
- *     run-boosts, queue-work, audit-inventory-allocated, cleanup-labels, dll.
+ *     run-boosts, queue-work, queue-work-ads, audit-inventory-allocated, cleanup-labels, dll.
  *
  * Jangan tambahkan jadwal baru di sini. File ini boleh dihapus sepenuhnya
  * (git rm app/Console/Kernel.php) — dipertahankan hanya sebagai penanda.
