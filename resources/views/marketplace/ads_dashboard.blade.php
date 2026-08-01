@@ -2169,9 +2169,11 @@ function sortTrafficTable(col) {
                             $latestRun = $syncRuns->first();
                             $lastSuccess = $lastSuccessRun ?? null;
                         @endphp
-                        @if($latestRun->status === 'error')
-                            <div class="ads-hero-meta ads-hero-error" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3);">
-                                <i class="bi bi-exclamation-triangle-fill"></i> Sync gagal: {{ Str::limit($latestRun->error_message, 60) }}
+                        @if(in_array($latestRun->status, ['error', 'partial_success'], true))
+                            @php($isPartial = $latestRun->status === 'partial_success')
+                            <div class="ads-hero-meta {{ $isPartial ? '' : 'ads-hero-error' }}" style="background: {{ $isPartial ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}; color: {{ $isPartial ? '#ca8a04' : '#ef4444' }}; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid {{ $isPartial ? 'rgba(234, 179, 8, 0.3)' : 'rgba(239, 68, 68, 0.3)' }};">
+                                <i class="bi {{ $isPartial ? 'bi-exclamation-circle-fill' : 'bi-exclamation-triangle-fill' }}"></i>
+                                {{ $isPartial ? 'Sync sebagian' : 'Sync gagal' }}: {{ Str::limit($latestRun->error_message, 60) }}
                             </div>
                         @endif
                         <div class="ads-hero-meta" style="font-size: 0.85rem; font-weight: 600;">
@@ -4260,6 +4262,14 @@ function pollSyncProgress(storeId) {
                     progressBar.classList.remove('progress-bar-animated', 'bg-primary');
                     progressBar.classList.add('bg-danger');
                     progressLabel.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2" style="color: #dc2626;"></i> ${data.label}`;
+                } else if (data.status === 'partial_success') {
+                    clearInterval(interval);
+                    progressPercent.textContent = '100%';
+                    progressBar.style.width = '100%';
+                    progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+                    progressBar.style.backgroundColor = '#ca8a04';
+                    progressLabel.innerHTML = `<i class="bi bi-exclamation-circle-fill me-2" style="color: #ca8a04;"></i> ${data.label || 'Sinkronisasi selesai sebagian.'}`;
+                    setTimeout(() => window.location.reload(), 2500);
                 } else {
                     // Idle state
                     idleTicks++;

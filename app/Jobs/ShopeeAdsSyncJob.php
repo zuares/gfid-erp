@@ -104,6 +104,7 @@ class ShopeeAdsSyncJob implements ShouldQueue
         };
         
         $updateUIProgress(5, "Memulai koneksi");
+        $componentFailures = [];
 
         try {
             // Hormati cooldown rate-limit toko: jangan buang percobaan selagi
@@ -159,24 +160,39 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 // 3. Sync Shop Daily
                 $syncService->syncShopDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
                 $updateUIProgress(50, "Menyinkronkan Performa Harian");
-                
+
                 // 4. Sync Campaign Daily (CPC)
-                $syncService->syncCampaignDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
+                if (! $syncService->syncCampaignDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run)) {
+                    $componentFailures[] = 'CPC';
+                }
                 $updateUIProgress(80, "Menyinkronkan Performa Iklan CPC");
 
                 // 5. Sync GMS Campaign & Item Daily
-                $syncService->syncGmsDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
+                if (! $syncService->syncGmsDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run)) {
+                    $componentFailures[] = 'GMS';
+                }
                 $updateUIProgress(95, "Menyinkronkan Performa Iklan Otomatis (GMS)");
             }
 
             $updateUIProgress(100, "Menyimpan data");
-            
+
+            $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+            $allComponentFailures = array_values(array_unique(array_merge(
+                $payload['component_failures'] ?? [],
+                $componentFailures
+            )));
+            $finalStatus = empty($allComponentFailures) ? 'success' : 'partial_success';
+            $finalMessage = empty($allComponentFailures)
+                ? null
+                : 'Komponen sinkronisasi gagal: ' . implode(', ', $allComponentFailures);
+
             $run->update([
-                'status' => 'success',
+                'status' => $finalStatus,
+                'error_message' => $finalMessage,
                 'finished_at' => now(),
             ]);
-            
-            $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+
+            $payload['component_failures'] = $allComponentFailures;
             $payload['completed_jobs'] = ($payload['completed_jobs'] ?? 0) + 1;
             
             $payload['stats'] = [
@@ -187,8 +203,10 @@ class ShopeeAdsSyncJob implements ShouldQueue
             
             if ($payload['completed_jobs'] >= ($payload['total_jobs'] ?? 1)) {
                 $payload['percent'] = 100;
-                $payload['status'] = 'success';
-                $payload['label'] = 'Semua tahap selesai!';
+                $payload['status'] = $finalStatus;
+                $payload['label'] = $finalStatus === 'partial_success'
+                    ? 'Selesai sebagian — gagal: ' . implode(', ', $allComponentFailures)
+                    : 'Semua tahap selesai!';
             } else {
                 $payload['status'] = 'processing';
                 $payload['label'] = 'Tahap selesai, melanjutkan tahap berikutnya...';

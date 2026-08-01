@@ -218,7 +218,7 @@ class ShopeeAdsSyncService
         }
     }
 
-    public function syncCampaignDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
+    public function syncCampaignDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): bool
     {
         // PENTING: buang pseudo-ID non-numerik (mis. 'GMS-5' milik GMV Max).
         // Satu ID non-numerik membuat Shopee menolak SELURUH request
@@ -229,16 +229,26 @@ class ShopeeAdsSyncService
             ->map(fn ($id) => (int) $id)
             ->values()
             ->toArray();
-        if (empty($campaigns)) return;
+        if (empty($campaigns)) return true;
         
         $chunks = array_chunk($campaigns, 100);
+        $hasFailure = false;
         
         foreach ($chunks as $chunk) {
             usleep(250000); // Rate limiter: 0.25 detik
-            $res = $this->api->getCampaignDailyPerformance($store, $chunk, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
-            $run->total_requests++;
+            try {
+                $res = $this->api->getCampaignDailyPerformance($store, $chunk, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
+                $run->total_requests++;
+            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                $hasFailure = true;
+                Log::warning("[ShopeeAdsSync] Exception sync campaign daily: " . $e->getMessage());
+                continue;
+            }
             
             if (!empty($res['error'])) {
+                $hasFailure = true;
                 Log::warning("[ShopeeAdsSync] Error sync campaign daily: " . ($res['message'] ?? $res['error']));
                 continue;
             }
@@ -282,6 +292,8 @@ class ShopeeAdsSyncService
                 }
             }
         }
+
+        return ! $hasFailure;
     }
 
     public function syncShopHourlyPerformance(Store $store, string $date, MarketplaceAdsSyncRun $run): void
@@ -327,7 +339,7 @@ class ShopeeAdsSyncService
         }
     }
 
-    public function syncGmsDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
+    public function syncGmsDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): bool
     {
         // Hanya sync kampanye yang AKTIF (status ongoing/paused, bukan ended/deleted)
         // Ini mengurangi 405 kampanye menjadi hanya ~10-30 yang relevan
@@ -346,22 +358,22 @@ class ShopeeAdsSyncService
         
         if (empty($campaigns)) {
             Log::info("[ShopeeAdsSync] No active GMS campaigns for store {$store->id}, skipping.");
-            return;
+            return true;
         }
         
         Log::info("[ShopeeAdsSync] GMS sync for store {$store->id}: {$dateFrom} to {$dateTo}, " . count($campaigns) . " active campaigns.");
         
-        $dFrom = Carbon::parse($dateFrom)->format('d-m-Y');
-        $dTo = Carbon::parse($dateTo)->format('d-m-Y');
         $dbDateFrom = Carbon::parse($dateFrom)->format('Y-m-d');
         $dbDateTo = Carbon::parse($dateTo)->format('Y-m-d');
         $start = Carbon::parse($dateFrom);
         $end = Carbon::parse($dateTo);
         $days = $start->diffInDays($end) + 1;
+        $hasFailure = false;
         
         for ($i = 0; $i < $days; $i++) {
             $currentCarbon = $start->copy()->addDays($i);
-            $dCurrent = $currentCarbon->format('d-m-Y');
+            // Endpoint GMS hanya menerima format ISO YYYY-MM-DD.
+            $dCurrent = $currentCarbon->format('Y-m-d');
             $dbCurrent = $currentCarbon->format('Y-m-d');
 
             // Resume-aware: hari historis yang BARU SAJA ditarik (≤2 jam lalu)
@@ -385,7 +397,10 @@ class ShopeeAdsSyncService
                 $res = $this->api->getGmsCampaignPerformance($store, [], $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
-                if (empty($res['error']) && !empty($res['response']['report'])) {
+                if (!empty($res['error'])) {
+                    $hasFailure = true;
+                    Log::warning("[ShopeeAdsSync] GMS Campaign API error: " . ($res['message'] ?? $res['error']));
+                } elseif (!empty($res['response']['report'])) {
                     $report = $res['response']['report'];
                     
                     // Pastikan ada parent campaign untuk GMS agar muncul di Daftar Kampanye
@@ -421,7 +436,10 @@ class ShopeeAdsSyncService
                         ]
                     );
                 }
+            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                throw $e;
             } catch (\Throwable $e) {
+                $hasFailure = true;
                 Log::warning("[ShopeeAdsSync] GMS Campaign Sync failed: " . $e->getMessage());
             }
 
@@ -431,7 +449,10 @@ class ShopeeAdsSyncService
                 $resItem = $this->api->getGmsItemPerformance($store, [], $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
-                if (empty($resItem['error']) && !empty($resItem['response']['result_list'])) {
+                if (!empty($resItem['error'])) {
+                    $hasFailure = true;
+                    Log::warning("[ShopeeAdsSync] GMS Item API error: " . ($resItem['message'] ?? $resItem['error']));
+                } elseif (!empty($resItem['response']['result_list'])) {
                     $itemList = $resItem['response']['result_list'];
                     
                     foreach ($itemList as $item) {
@@ -461,9 +482,14 @@ class ShopeeAdsSyncService
                         );
                     }
                 }
+            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                throw $e;
             } catch (\Throwable $e) {
+                $hasFailure = true;
                 Log::warning("[ShopeeAdsSync] GMS Item Sync failed: " . $e->getMessage());
             }
         }
+
+        return ! $hasFailure;
     }
 }

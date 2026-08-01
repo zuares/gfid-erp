@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsActionService;
 use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\Ads\AdsAnalyticsService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
@@ -33,21 +34,59 @@ class AdsDashboardController extends Controller
                 ->with('error', 'Tidak ada toko Shopee aktif dengan token valid.');
         }
 
-        // Auto-sync data hari ini TANPA ANTRIAN (Synchronous) dengan cooldown 15 menit
-        $autoSyncKey = 'ads_dashboard_autosync_today_' . $storeId;
-        if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {
-            $syncParams = [
-                '--from' => now()->toDateString(),
-                '--to'   => now()->toDateString(),
-            ];
-            if ($storeId !== 'all') {
-                $syncParams['--store'] = $storeId;
+        // Auto-sync mengikuti range yang sedang dipilih. Hanya range recent
+        // maksimal 7 hari yang dijalankan otomatis agar membuka range historis
+        // panjang tidak memicu backfill/API request besar.
+        $today = now()->startOfDay();
+        $selectedFrom = $request->input('date_from');
+        $selectedTo = $request->input('date_to');
+        $autoSyncRange = null;
+
+        try {
+            $selectedFrom = $selectedFrom
+                ? Carbon::parse($selectedFrom)->startOfDay()
+                : $today->copy()->subDays(6);
+            $selectedTo = $selectedTo
+                ? Carbon::parse($selectedTo)->startOfDay()
+                : $today->copy();
+
+            $days = $selectedFrom->lte($selectedTo)
+                ? $selectedFrom->diffInDays($selectedTo) + 1
+                : 0;
+
+            if (
+                $days >= 1
+                && $days <= 7
+                && $selectedFrom->gte($today->copy()->subDays(6))
+                && $selectedTo->lte($today)
+            ) {
+                $autoSyncRange = [
+                    'from' => $selectedFrom->toDateString(),
+                    'to' => $selectedTo->toDateString(),
+                ];
             }
-            
-            // Eksekusi artisan command secara asinkron (dikirim ke queue, page load instan)
-            \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', $syncParams);
-            
-            \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addMinutes(15));
+        } catch (\Throwable) {
+            // Range invalid: biarkan dashboard menampilkan data sesuai fallback,
+            // tetapi jangan membuat job auto-sync dengan tanggal yang tidak valid.
+        }
+
+        if ($autoSyncRange) {
+            $autoSyncKey = 'ads_dashboard_autosync:' . $storeId . ':' . $autoSyncRange['from'] . ':' . $autoSyncRange['to'];
+            if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {
+                $syncParams = [
+                    '--from' => $autoSyncRange['from'],
+                    '--to'   => $autoSyncRange['to'],
+                ];
+                if ($storeId !== 'all') {
+                    $syncParams['--store'] = $storeId;
+                }
+
+                // Kirim command wrapper ke queue ads; job sync-nya juga memakai queue ads.
+                $queued = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', $syncParams);
+                $queued->onQueue('ads');
+
+                \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addMinutes(15));
+            }
         }
 
         $dashboard = $dashboardService->buildDashboardData(

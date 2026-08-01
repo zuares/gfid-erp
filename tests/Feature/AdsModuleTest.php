@@ -75,6 +75,47 @@ class AdsModuleTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_dashboard_auto_sync_uses_selected_recent_range()
+    {
+        $store = $this->createStore('AUTODATE');
+        $store->update(['token_expires_at' => now()->addHour()]);
+
+        $pending = \Mockery::mock();
+        $pending->shouldReceive('onQueue')->once()->with('ads');
+
+        \Illuminate\Support\Facades\Artisan::shouldReceive('queue')
+            ->once()
+            ->with('marketplace:sync-ads', \Mockery::on(function (array $params) use ($store) {
+                return ($params['--from'] ?? null) === '2026-07-30'
+                    && ($params['--to'] ?? null) === '2026-07-30'
+                    && ($params['--store'] ?? null) == $store->id;
+            }))
+            ->andReturn($pending);
+
+        $dashboardService = \Mockery::mock(\App\Services\Marketplace\Ads\AdsDashboardService::class);
+        $dashboardService->shouldReceive('buildDashboardData')->once()->andReturn([
+            'dateFrom' => '2026-07-30',
+            'dateTo' => '2026-07-30',
+            'compareMode' => 'prev_period',
+        ]);
+
+        $renderedView = \Mockery::mock(\Illuminate\Contracts\View\View::class);
+        $view = \Mockery::mock(\Illuminate\Contracts\View\Factory::class);
+        $view->shouldReceive('make')->once()->andReturn($renderedView);
+        $this->app->instance(\Illuminate\Contracts\View\Factory::class, $view);
+
+        $request = \Illuminate\Http\Request::create('/marketplace/ads-dashboard', 'GET', [
+            'store_id' => $store->id,
+            'date_from' => '2026-07-30',
+            'date_to' => '2026-07-30',
+        ]);
+
+        $result = app(\App\Http\Controllers\Marketplace\AdsDashboardController::class)
+            ->index($request, app(\App\Services\Marketplace\Ads\AdsAnalyticsService::class), $dashboardService);
+
+        $this->assertSame($renderedView, $result);
+    }
+
     // 4. User non-owner/non-admin tidak dapat melakukan backfill
     // 5. Owner/admin dapat melakukan backfill
     public function test_backfill_authorization()
@@ -215,6 +256,94 @@ class AdsModuleTest extends TestCase
         }
 
         $this->assertTrue(true);
+    }
+
+    public function test_gms_api_uses_iso_date_format()
+    {
+        $store = $this->createStore('GMSDATE');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+            'campaign_status' => 'ongoing',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getGmsCampaignPerformance')
+            ->once()
+            ->with($store, [], '2026-07-30', '2026-07-30')
+            ->andReturn(['response' => []]);
+        $api->shouldReceive('getGmsItemPerformance')
+            ->once()
+            ->with($store, [], '2026-07-30', '2026-07-30')
+            ->andReturn(['response' => []]);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertTrue($service->syncGmsDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+    }
+
+    public function test_cpc_api_error_is_reported_to_caller()
+    {
+        $store = $this->createStore('CPCFAIL');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getCampaignDailyPerformance')
+            ->once()
+            ->andReturn(['error' => 'API_ERROR', 'message' => 'CPC unavailable']);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertFalse($service->syncCampaignDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+    }
+
+    public function test_gms_api_error_is_reported_to_caller()
+    {
+        $store = $this->createStore('GMSFAIL');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+            'campaign_status' => 'ongoing',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getGmsCampaignPerformance')
+            ->once()
+            ->andReturn(['error' => 'API_ERROR', 'message' => 'GMS campaign unavailable']);
+        $api->shouldReceive('getGmsItemPerformance')
+            ->once()
+            ->andReturn(['error' => 'API_ERROR', 'message' => 'GMS item unavailable']);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertFalse($service->syncGmsDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+    }
+
+    public function test_cpc_failure_marks_job_partial_success()
+    {
+        $store = $this->createStore('PARTIAL');
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:' . $store->id);
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:all');
+
+        $service = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
+        $service->shouldReceive('syncBalance')->once();
+        $service->shouldReceive('syncCampaignsAndSettings')->once();
+        $service->shouldReceive('syncShopDailyPerformance')->once();
+        $service->shouldReceive('syncCampaignDailyPerformance')->once()->andReturn(false);
+        $service->shouldReceive('syncGmsDailyPerformance')->once()->andReturn(true);
+
+        $job = new ShopeeAdsSyncJob($store, Carbon::parse('2026-07-30'), Carbon::parse('2026-07-30'));
+        $job->handle($service);
+
+        $run = MarketplaceAdsSyncRun::latest()->first();
+        $this->assertEquals('partial_success', $run->status);
+        $this->assertStringContainsString('CPC', $run->error_message);
     }
 
     // 13. API error membuat sync run failed
