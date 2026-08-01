@@ -1982,7 +1982,9 @@ function sortTrafficTable(col) {
                         $trCpm = $trImp > 0 ? ($trSpend / $trImp) * 1000 : 0;
                         $trCvr = $trClicks > 0 ? ($trOrders / $trClicks) * 100 : 0;
                         $trCpa = $trOrders > 0 ? $trSpend / $trOrders : 0;
-                        $trRoas = $trSpend > 0 ? $trGmv / $trSpend : 0;
+                        $trNetProfit = $kpi['current']->net_profit ?? 0;
+                        $trSpendAfterTax = $trSpend * 1.11;
+                        $trPoas = $trSpendAfterTax > 0 ? $trNetProfit / $trSpendAfterTax : 0;
                     @endphp
                     <div class="kpi-card">
                         <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> Ad Spend</div>
@@ -2009,8 +2011,8 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpm, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-cart-check me-1"></i> Pesanan</div>
-                        <div class="kpi-value fw-bold text-dark">{{ number_format($trOrders, 0, ',', '.') }}</div>
+                        <div class="kpi-label"><i class="bi bi-bag-check me-1"></i> Omzet</div>
+                        <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trGmv, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label"><i class="bi bi-funnel me-1"></i> CVR</div>
@@ -2021,8 +2023,8 @@ function sortTrafficTable(col) {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpa, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-lightning-charge me-1"></i> ROAS</div>
-                        <div class="kpi-value fw-bold text-dark">{{ number_format($trRoas, 2, ',', '.') }}x</div>
+                        <div class="kpi-label" title="Laba bersih setelah iklan ÷ biaya iklan setelah PPN"><i class="bi bi-graph-up-arrow me-1"></i> POAS</div>
+                        <div class="kpi-value fw-bold text-dark">{{ number_format($trPoas, 2, ',', '.') }}x</div>
                     </div>
                 </div>
 
