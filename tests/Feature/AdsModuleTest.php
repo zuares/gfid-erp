@@ -507,6 +507,205 @@ class AdsModuleTest extends TestCase
         $this->assertSame(4, (int) $summary['current']->orders);
     }
 
+    public function test_profit_is_calculated_even_when_campaign_is_already_below_break_even()
+    {
+        $store = $this->createStore('PROFITLOSS');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-PROFITLOSS',
+            'name' => 'Item Profit Loss',
+            'type' => 'finished',
+            'hpp' => 90000,
+            'active' => true,
+        ]);
+
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654321',
+            'item_name' => 'Product Profit Loss',
+            'price_min' => 100000,
+            'price_max' => 100000,
+        ]);
+        \App\Models\MarketplaceProductModel::create([
+            'marketplace_product_id' => $product->id,
+            'model_id' => '1',
+            'model_sku' => 'SKU-PROFITLOSS',
+            'price' => 100000,
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'SKU-PROFITLOSS',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITLOSS',
+            'channel_item_id' => 987654321,
+            'campaign_name' => 'Campaign Profit Loss',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITLOSS',
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-PROFITLOSS');
+
+        // Net revenue 78.1k - HPP 90k - iklan 11.1k = -23k.
+        $this->assertNotNull($campaign->profit_after_ads);
+        $this->assertSame(-23000.0, (float) $campaign->profit_after_ads);
+        $this->assertSame(-23000.0, (float) $data['kpi']['current']->net_profit);
+    }
+
+    public function test_unmapped_ads_campaign_can_be_mapped_from_dashboard()
+    {
+        $store = $this->createStore('MAPFROMADS');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPFROMADS',
+            'channel_item_id' => 123456789,
+            'campaign_name' => 'Campaign Map From Ads',
+            'campaign_status' => 'ongoing',
+        ]);
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-MAPFROMADS',
+            'name' => 'Item Map From Ads',
+            'type' => 'finished',
+            'hpp' => 25000,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/api/marketplace/ad-campaigns/' . $campaign->id . '/map-item', [
+                'internal_item_id' => $item->id,
+            ]);
+
+        $response->assertOk()->assertJsonPath('internal_item_id', $item->id);
+        $this->assertDatabaseHas('marketplace_ad_campaigns', [
+            'id' => $campaign->id,
+            'internal_item_id' => $item->id,
+            'mapping_status' => 'manual',
+        ]);
+    }
+
+    public function test_gmv_max_campaign_without_item_id_can_be_mapped()
+    {
+        $store = $this->createStore('GMSMAP');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => null,
+            'campaign_name' => 'GMV Max (Semua Produk)',
+            'campaign_status' => 'ongoing',
+        ]);
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMSMAP',
+            'name' => 'Item GMV Max Acuan',
+            'type' => 'finished',
+            'hpp' => 30000,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/api/marketplace/ad-campaigns/' . $campaign->id . '/map-item', [
+                'internal_item_id' => $item->id,
+            ]);
+
+        $response->assertOk()->assertJsonPath('internal_item_id', $item->id);
+        $this->assertDatabaseHas('marketplace_ad_item_maps', [
+            'store_id' => $store->id,
+            'channel_code' => 'shopee',
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'internal_item_id' => $item->id,
+        ]);
+    }
+
+    public function test_gmv_max_items_endpoint_returns_products_and_hpp_status()
+    {
+        $store = $this->createStore('GMSITEMS');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMSITEMS',
+            'name' => 'Item GMV Max Detail',
+            'type' => 'finished',
+            'hpp' => 3000,
+            'active' => true,
+        ]);
+        \App\Models\MarketplaceAdItemMap::create([
+            'store_id' => $store->id,
+            'channel_code' => 'shopee',
+            'channel_item_id' => 7654321,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'internal_item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => 7654321,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 1000,
+            'broad_order' => 2,
+            'broad_gmv' => 10000,
+            'direct_order' => 2,
+            'direct_gmv' => 10000,
+            'raw_json' => ['broad_order_amount' => 2],
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '?date_from=2026-07-30&date_to=2026-07-30');
+
+        $response->assertOk()
+            ->assertJsonPath('total_items', 1)
+            ->assertJsonPath('mapped_items', 1)
+            ->assertJsonPath('data.0.channel_item_id', '7654321')
+            ->assertJsonPath('data.0.pcs', 2)
+            ->assertJsonPath('data.0.unit_cogs', 3000);
+    }
+
+    public function test_gmv_max_product_can_be_mapped_from_product_detail()
+    {
+        $store = $this->createStore('GMSMAPITEM');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMSMAPITEM',
+            'name' => 'Item Mapping GMV Max',
+            'type' => 'finished',
+            'hpp' => 4500,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '/7654321/map', [
+                'internal_item_id' => $item->id,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('mapping.internal_item_id', $item->id);
+        $this->assertDatabaseHas('marketplace_ad_item_maps', [
+            'store_id' => $store->id,
+            'channel_code' => 'shopee',
+            'channel_item_id' => 7654321,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'internal_item_id' => $item->id,
+        ]);
+    }
+
     public function test_historical_comparison_uses_selected_compare_mode()
     {
         $store = $this->createStore('HISTMODE');

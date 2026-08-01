@@ -8,6 +8,7 @@ use App\Services\Marketplace\Ads\AdsActionService;
 use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\Ads\AdsAnalyticsService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
@@ -384,6 +385,165 @@ class AdsDashboardController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Daftar produk yang benar-benar muncul di GMV Max pada periode terpilih.
+     * Sumber utama adalah data item performance hasil sync, bukan campaign
+     * parent "GMV Max (Semua Produk)" yang hanya menyimpan total agregat.
+     */
+    public function gmsItems(Request $request, Store $store): JsonResponse
+    {
+        $from = $request->input('date_from', now()->subDays(6)->toDateString());
+        $to = $request->input('date_to', now()->toDateString());
+
+        try {
+            $fromDate = Carbon::parse($from)->toDateString();
+            $toDate = Carbon::parse($to)->toDateString();
+        } catch (\Throwable) {
+            return response()->json(['message' => 'Format tanggal tidak valid.'], 422);
+        }
+
+        if ($fromDate > $toDate) {
+            [$fromDate, $toDate] = [$toDate, $fromDate];
+        }
+
+        $rows = \App\Models\MarketplaceAdsItemDaily::query()
+            ->where('store_id', $store->id)
+            ->where('channel_campaign_id', 'GMS-' . $store->id)
+            ->whereBetween('date', [$fromDate, $toDate])
+            ->orderBy('date')
+            ->get();
+
+        $grouped = $rows->groupBy(fn ($row) => (string) $row->channel_item_id);
+        $itemIds = $grouped->keys()->filter()->values();
+
+        $products = \App\Models\MarketplaceProduct::query()
+            ->where('store_id', $store->id)
+            ->whereIn('item_id', $itemIds->all())
+            ->with('models:id,marketplace_product_id,model_sku,model_name,price,raw_json')
+            ->get()
+            ->keyBy(fn ($product) => (string) $product->item_id);
+
+        $modelSkus = $products->flatMap(fn ($product) => $product->models->pluck('model_sku'))
+            ->filter()->map(fn ($sku) => (string) $sku)->unique()->values();
+
+        $skuMappings = \App\Models\SkuMapping::query()
+            ->with('item:id,code,name,hpp,base_unit_cost')
+            ->whereIn('marketplace_sku', $modelSkus->all())
+            ->where(function ($query) {
+                $query->whereNull('channel_code')->orWhere('channel_code', 'shopee');
+            })
+            ->get()
+            ->groupBy(fn ($mapping) => (string) $mapping->marketplace_sku);
+
+        $manualMaps = \App\Models\MarketplaceAdItemMap::query()
+            ->with('item:id,code,name,hpp,base_unit_cost')
+            ->where('store_id', $store->id)
+            ->where('channel_code', 'shopee')
+            ->whereIn('channel_item_id', $itemIds->map(fn ($id) => (int) $id)->all())
+            ->get()
+            ->keyBy(fn ($mapping) => (string) $mapping->channel_item_id);
+
+        $resolveCogs = static function ($item): float {
+            if (! $item) return 0.0;
+            $hpp = (float) ($item->hpp ?? 0);
+            return $hpp > 0 ? $hpp : (float) ($item->base_unit_cost ?? 0);
+        };
+
+        $items = $grouped->map(function ($dailyRows, string $channelItemId) use ($products, $skuMappings, $manualMaps, $resolveCogs) {
+            $product = $products->get($channelItemId);
+            $manual = $manualMaps->get($channelItemId);
+            $productMappings = $product
+                ? $product->models->flatMap(fn ($model) => $skuMappings->get((string) $model->model_sku, collect()))
+                    ->filter(fn ($mapping) => $mapping->item)
+                : collect();
+            $mappedItem = $manual?->item ?? $productMappings->first()?->item;
+            $hppCandidates = $productMappings->map(fn ($mapping) => $resolveCogs($mapping->item))->filter(fn ($hpp) => $hpp > 0);
+            $unitCogs = $manual?->item ? $resolveCogs($manual->item) : ($hppCandidates->isNotEmpty() ? (float) $hppCandidates->avg() : 0.0);
+
+            $impressions = (int) $dailyRows->sum('impressions');
+            $clicks = (int) $dailyRows->sum('clicks');
+            $spend = (float) $dailyRows->sum('expense');
+            $orders = (int) $dailyRows->sum('broad_order');
+            $gmv = (float) $dailyRows->sum('broad_gmv');
+            $directOrders = (int) $dailyRows->sum('direct_order');
+            $directGmv = (float) $dailyRows->sum('direct_gmv');
+            $apiPcs = (float) $dailyRows->sum(fn ($row) => (float) data_get($row->raw_json, 'broad_order_amount', 0));
+            $pcs = $apiPcs > 0 ? $apiPcs : (float) $orders;
+            $netRevenue = $gmv * \App\Services\Marketplace\Ads\AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+            $hppTotal = $unitCogs > 0 && $pcs > 0 ? $unitCogs * $pcs : null;
+            $profit = $hppTotal !== null ? round($netRevenue - $hppTotal - ($spend * 1.11), 2) : null;
+
+            return [
+                'channel_item_id' => $channelItemId,
+                'item_name' => $product?->item_name ?: ($mappedItem?->name ?: 'Produk GMV Max'),
+                'item_sku' => $product?->item_sku,
+                'image_url' => $product?->image_url,
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'spend' => round($spend, 2),
+                'orders' => $orders,
+                'pcs' => round($pcs, 2),
+                'pcs_source' => $apiPcs > 0 ? 'api' : 'order_fallback',
+                'gmv' => round($gmv, 2),
+                'direct_orders' => $directOrders,
+                'direct_gmv' => round($directGmv, 2),
+                'roas' => $spend > 0 ? round($gmv / $spend, 4) : null,
+                'unit_cogs' => round($unitCogs, 2),
+                'hpp_total' => $hppTotal !== null ? round($hppTotal, 2) : null,
+                'net_revenue' => round($netRevenue, 2),
+                'profit_after_ads' => $profit,
+                'mapped' => $unitCogs > 0,
+                'mapping_source' => $manual?->item ? 'manual_item' : ($productMappings->isNotEmpty() ? 'sku_mapping' : null),
+                'internal_item_id' => $mappedItem?->id,
+                'internal_item_code' => $mappedItem?->code,
+                'internal_item_name' => $mappedItem?->name,
+            ];
+        })->sortByDesc('spend')->values();
+
+        return response()->json([
+            'status' => 'success',
+            'store_id' => $store->id,
+            'campaign_id' => 'GMS-' . $store->id,
+            'date_from' => $fromDate,
+            'date_to' => $toDate,
+            'total_items' => $items->count(),
+            'mapped_items' => $items->where('mapped', true)->count(),
+            'unmapped_items' => $items->where('mapped', false)->count(),
+            'data' => $items->values(),
+        ]);
+    }
+
+    /** Simpan mapping item marketplace tertentu di dalam GMV Max. */
+    public function mapGmsItem(Request $request, Store $store, string $channelItemId): JsonResponse
+    {
+        $data = $request->validate([
+            'internal_item_id' => ['required', 'integer', 'exists:items,id'],
+        ]);
+
+        if (! ctype_digit($channelItemId)) {
+            return response()->json(['message' => 'Item GMV Max tidak valid.'], 422);
+        }
+
+        $mapping = \App\Models\MarketplaceAdItemMap::updateOrCreate(
+            [
+                'store_id' => $store->id,
+                'channel_code' => 'shopee',
+                'channel_item_id' => (int) $channelItemId,
+            ],
+            [
+                'channel_campaign_id' => 'GMS-' . $store->id,
+                'internal_item_id' => $data['internal_item_id'],
+                'created_by' => $request->user()?->id,
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Item GMV Max berhasil di-mapping.',
+            'mapping' => $mapping->load('item:id,code,name,hpp,base_unit_cost'),
+        ]);
     }
 
     // Example transformation block for Campaign objects (assuming inside a controller method)

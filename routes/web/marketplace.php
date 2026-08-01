@@ -84,6 +84,11 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.realtime.status');
         Route::get('ads-dashboard/campaign-hourly', [AdsDashboardController::class, 'campaignHourly'])
             ->name('ads.campaign.hourly');
+        Route::get('ads-dashboard/gms-items/{store}', [AdsDashboardController::class, 'gmsItems'])
+            ->name('ads.gms.items');
+        Route::patch('ads-dashboard/gms-items/{store}/{channelItemId}/map', [AdsDashboardController::class, 'mapGmsItem'])
+            ->name('ads.gms.items.map')
+            ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
         Route::post('ads-dashboard/gms-item-action', [AdsDashboardController::class, 'actionGmsItem'])
             ->name('ads.gms.action');
         Route::post('ads-dashboard/gms-campaign-edit', [AdsDashboardController::class, 'actionGmsCampaign'])

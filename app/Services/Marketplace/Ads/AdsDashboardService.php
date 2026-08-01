@@ -236,7 +236,8 @@ class AdsDashboardService
                 $camp->acos_pct = $acos !== null ? round($acos * 100, 1) : null;
 
                 $campaignKey = $camp->store_id . '|' . (string) $camp->channel_item_id;
-                $camp->unit_cogs = (float) ($unitCogsByKey[$campaignKey] ?? ($camp->internalItem?->hpp ?? $camp->internalItem?->base_unit_cost ?? 0));
+                $internalUnitCogs = $this->resolveItemUnitCogs($camp->internalItem);
+                $camp->unit_cogs = (float) ($unitCogsByKey[$campaignKey] ?? $internalUnitCogs);
 
                 $trueAvgPrice = (float) ($avgPriceByKey[$campaignKey] ?? 0);
                 if (! $trueAvgPrice || $trueAvgPrice <= 0) {
@@ -270,7 +271,10 @@ class AdsDashboardService
 
                 $hasCogsData = $camp->unit_cogs > 0
                     && (($camp->items_sold ?? 0) > 0 || $trueAvgPrice > 0);
-                if ($beAcos !== null && $hasCogsData) {
+                // Profit aktual tetap harus dihitung walaupun produk sudah
+                // melewati titik break-even. Break-even hanya metrik batas
+                // aman ACOS; ia bukan syarat agar profit bisa dihitung.
+                if ($hasCogsData) {
                     $netRevenue = $camp->gmv * $netRevRatio;
                     $totalCogs = ($camp->unit_cogs > 0 && ($camp->items_sold ?? 0) > 0)
                         ? $camp->unit_cogs * $camp->items_sold
@@ -282,7 +286,7 @@ class AdsDashboardService
                 } else {
                     $camp->profit_after_ads = null;
                     $camp->net_revenue = $camp->gmv * $netRevRatio;
-                    $camp->total_cogs = 0;
+                    $camp->total_cogs = null;
                 }
 
                 // Kalkulasi Previous Net & Profit
@@ -292,7 +296,7 @@ class AdsDashboardService
                     : $camp->prev_gmv * ($camp->cogs_ratio ?? 0);
                 $camp->prev_net_revenue = $prevNetRevenue;
                 $camp->prev_total_cogs = $prevTotalCogs;
-                $camp->prev_profit_after_ads = $beAcos !== null && $hasCogsData
+                $camp->prev_profit_after_ads = $hasCogsData
                     ? round($prevNetRevenue - $prevTotalCogs - ($camp->prev_spend * 1.11), 2)
                     : null;
 
@@ -656,7 +660,7 @@ class AdsDashboardService
 
                 $mapping = $mappingBySku[$sku][$channelCode] ?? $mappingBySku[$sku]['__global'] ?? null;
                 if ($mapping && $mapping->item) {
-                    $hpp = (float) ($mapping->item->hpp ?? $mapping->item->base_unit_cost ?? 0);
+                    $hpp = $this->resolveItemUnitCogs($mapping->item);
                     if ($hpp > 0) {
                         $hpps[] = $hpp;
                     }
@@ -762,7 +766,7 @@ class AdsDashboardService
             return null;
         }
 
-        $hpp = (float) ($item->hpp ?? $item->base_unit_cost ?? 0);
+        $hpp = $this->resolveItemUnitCogs($item);
         if ($hpp <= 0) {
             return null;
         }
@@ -774,6 +778,16 @@ class AdsDashboardService
         }
 
         return round(($netPerUnit - $hpp) / $avgPrice, 6);
+    }
+
+    private function resolveItemUnitCogs(?Item $item): float
+    {
+        if (! $item) {
+            return 0.0;
+        }
+
+        $hpp = (float) ($item->hpp ?? 0);
+        return $hpp > 0 ? $hpp : (float) ($item->base_unit_cost ?? 0);
     }
 
     private function adsRecommendation(float $spend, ?float $acos, ?float $breakEvenAcos, int $orders): array
