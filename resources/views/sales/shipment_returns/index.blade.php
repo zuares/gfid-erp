@@ -409,7 +409,7 @@
             return match ($status) {
                 'draft' => 'Draft',
                 'submitted' => 'Submitted',
-                'posted' => 'Posted',
+                'posted' => 'Diterima WH-RTS',
                 default => ucfirst((string) $status),
             };
         };
@@ -424,7 +424,7 @@
     <div class="ship-topbar">
         <div>
             <div class="title">Retur Shipment</div>
-            <div class="sub">Barang retur dari store kembali ke WH-RTS.</div>
+            <div class="sub">Pencatatan retur dan penerimaan barang ke WH-RTS.</div>
 
             <div class="kpis">
                 <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($returns->total(), 0, ',', '.') }}</span></span>

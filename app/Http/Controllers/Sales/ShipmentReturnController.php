@@ -637,41 +637,17 @@ class ShipmentReturnController extends Controller
         return redirect()
             ->route('sales.shipment_returns.show', $shipmentReturn)
             ->with('status', 'success')
-            ->with('message', 'Retur disubmit. Siap diposting ke WH-RTS.');
+            ->with('message', 'Pencatatan dikunci. Siap diterima ke WH-RTS.');
     }
 
     /**
-     * Posting retur → stock in ke WH-RTS.
+     * Terima retur ke WH-RTS → stock in.
+     *
+     * Marketplace/store tidak diperlukan di tahap ini. Yang menjadi sumber
+     * kebenaran adalah dokumen retur dan item yang sudah direkam di dalamnya.
      */
-    public function post(Request $request, ShipmentReturn $shipmentReturn)
+    public function receive(Request $request, ShipmentReturn $shipmentReturn)
     {
-        if ($shipmentReturn->status === 'posted') {
-            return back()
-                ->with('status', 'error')
-                ->with('message', 'Shipment retur sudah diposting sebelumnya.');
-        }
-
-        if ($shipmentReturn->status !== 'submitted') {
-            return back()
-                ->with('status', 'error')
-                ->with('message', 'Shipment retur harus berstatus submitted sebelum diposting.');
-        }
-
-        if (!$shipmentReturn->store_id) {
-            return back()
-                ->with('status', 'error')
-                ->with('message', 'Pencatatan mandiri belum terhubung ke marketplace/store. Posting inventory belum tersedia.');
-        }
-
-        $shipmentReturn->load(['lines.item', 'store']);
-
-        if ($shipmentReturn->lines->isEmpty()) {
-            return back()
-                ->with('status', 'error')
-                ->with('message', 'Tidak ada item di shipment retur ini.');
-        }
-
-        // ✅ Ambil WH-RTS (gudang FG untuk channel)
         $warehouse = Warehouse::where('code', 'WH-RTS')->first();
 
         if (!$warehouse) {
@@ -680,10 +656,36 @@ class ShipmentReturnController extends Controller
                 ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
         }
 
-        DB::transaction(function () use ($shipmentReturn, $warehouse) {
+        $result = DB::transaction(function () use ($shipmentReturn, $warehouse) {
+            $lockedReturn = ShipmentReturn::query()
+                ->with(['lines.item'])
+                ->lockForUpdate()
+                ->findOrFail($shipmentReturn->id);
+
+            if ($lockedReturn->status === 'posted') {
+                return [
+                    'status' => 'already_posted',
+                    'shipment_return' => $lockedReturn,
+                ];
+            }
+
+            if ($lockedReturn->status !== 'submitted') {
+                return [
+                    'status' => 'error',
+                    'message' => 'Pencatatan harus berstatus submitted sebelum diterima ke WH-RTS.',
+                ];
+            }
+
+            if ($lockedReturn->lines->isEmpty()) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Tidak ada item di pencatatan retur ini.',
+                ];
+            }
+
             $totalQty = 0;
 
-            foreach ($shipmentReturn->lines as $line) {
+            foreach ($lockedReturn->lines as $line) {
                 $qty = (int) $line->qty;
 
                 if ($qty <= 0) {
@@ -703,36 +705,64 @@ class ShipmentReturnController extends Controller
                     }
                 }
 
-                // ✅ Nambah stok FG ke WH-RTS dengan HPP dari item
                 $this->inventory->stockIn(
                     warehouseId: $warehouse->id,
                     itemId: $line->item_id,
                     qty: $qty,
-                    date: $shipmentReturn->date,
+                    date: $lockedReturn->date,
                     sourceType: 'shipment_return',
-                    sourceId: $shipmentReturn->id,
-                    notes: 'Retur shipment ' . ($shipmentReturn->code ?? $shipmentReturn->id) .
-                    ' dari store ' . ($shipmentReturn->store->code ?? '-'),
-                    lotId: null, // FG tidak pakai LOT
-                    unitCost: $unitCost, // ⬅️ sekarang pakai kolom items.hpp
-                    affectLotCost: false, // tetap jangan sentuh LotCost kain
+                    sourceId: $lockedReturn->id,
+                    sourceLineId: $line->id,
+                    notes: 'Penerimaan retur ' . ($lockedReturn->code ?? $lockedReturn->id) . ' ke WH-RTS',
+                    lotId: null,
+                    unitCost: $unitCost,
+                    affectLotCost: false,
                 );
             }
 
-            $shipmentReturn->status = 'posted';
-            $shipmentReturn->total_qty = $totalQty;
+            if ($totalQty <= 0) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Total qty retur harus lebih dari 0.',
+                ];
+            }
 
-            // Kalau nanti ada kolom posted_at / posted_by:
-            // $shipmentReturn->posted_at = now();
-            // $shipmentReturn->posted_by = auth()->id();
+            $lockedReturn->status = 'posted';
+            $lockedReturn->total_qty = $totalQty;
+            $lockedReturn->posted_at = now();
+            $lockedReturn->posted_by = auth()->id();
+            $lockedReturn->save();
 
-            $shipmentReturn->save();
+            return [
+                'status' => 'ok',
+                'shipment_return' => $lockedReturn,
+            ];
         });
 
+        if ($result['status'] === 'already_posted') {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Retur ini sudah diterima ke WH-RTS sebelumnya.');
+        }
+
+        if ($result['status'] !== 'ok') {
+            return back()
+                ->with('status', 'error')
+                ->with('message', $result['message']);
+        }
+
         return redirect()
-            ->route('sales.shipment_returns.show', $shipmentReturn)
+            ->route('sales.shipment_returns.show', $result['shipment_return'])
             ->with('status', 'success')
-            ->with('message', 'Shipment retur berhasil diposting & stok bertambah di WH-RTS.');
+            ->with('message', 'Retur diterima ke WH-RTS dan stok berhasil ditambahkan.');
+    }
+
+    /**
+     * Alias kompatibilitas untuk endpoint lama.
+     */
+    public function post(Request $request, ShipmentReturn $shipmentReturn)
+    {
+        return $this->receive($request, $shipmentReturn);
     }
 
     /**

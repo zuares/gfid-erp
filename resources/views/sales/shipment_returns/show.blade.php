@@ -369,6 +369,11 @@
         'posted' => 'sr-status-posted',
         default => '',
     };
+    $statusLabel = match ($status) {
+        'submitted' => 'Submitted',
+        'posted' => 'Diterima WH-RTS',
+        default => ucfirst($status),
+    };
 
     $lines = $shipmentReturn->lines ?? collect();
     $totalQty = (int) $lines->sum('qty');
@@ -433,7 +438,7 @@
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Status</div>
                         <div class="sr-meta-value">
-                            <span class="sr-status {{ $statusClass }}">{{ ucfirst($status) }}</span>
+                            <span class="sr-status {{ $statusClass }}">{{ $statusLabel }}</span>
                         </div>
                     </div>
                     <div class="sr-meta-item">
@@ -559,15 +564,10 @@
                         <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Submit</button>
                     </form>
                 @elseif ($status === 'submitted')
-                    @if ($shipmentReturn->store_id)
-                        <form action="{{ route('sales.shipment_returns.post', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Posting retur ini dan tambah stok ke WH-RTS?');">
-                            @csrf
-                            <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Posting WH-RTS</button>
-                        </form>
-                    @else
-                        <span class="sr-note">Pencatatan tersimpan. Posting inventory menunggu koneksi marketplace.</span>
-                        <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>
-                    @endif
+                    <form action="{{ route('sales.shipment_returns.receive', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Terima retur ini ke WH-RTS dan tambah stok?');">
+                        @csrf
+                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Terima ke WH-RTS</button>
+                    </form>
                 @else
                     <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>
                 @endif

@@ -101,6 +101,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::post('{shipmentReturn}/orders/clear', 'clearOrders')->name('clear_orders');
                 Route::post('{shipmentReturn}/scan-item', 'scanItem')->name('scan_item');
                 Route::post('{shipmentReturn}/submit', 'submit')->name('submit');
+                Route::post('{shipmentReturn}/receive', 'receive')->name('receive');
                 Route::post('{shipmentReturn}/post', 'post')->name('post');
                 Route::post('{shipmentReturn}/sync-scans', 'syncScans')->name('sync_scans');
             });
