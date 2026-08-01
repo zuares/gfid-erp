@@ -667,19 +667,19 @@
                 <td>${stockCell(p.stock_total)}</td>
                 <td class="muted">${p.sales ?? '—'}</td>
                 <td>${stats}</td>
-                <td>${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
+                <td data-product-mapping="${p.id}">${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
                 <td>
                     ${aksiContent}
                 </td>
             </tr>`;
 
             const modelRows = multiModel ? models.map(m => `
-                <tr class="model-row mr-${p.id}" style="${isModelOpened ? '' : 'display:none'}">
+                <tr class="model-row mr-${p.id}" data-model-id="${esc(m.model_id)}" style="${isModelOpened ? '' : 'display:none'}">
                     <td></td><td></td>
                     <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} 
                         <div class="variant-sku-suggest mt-1">
                             <div class="input-group input-group-sm">
-                                <input type="text" class="form-control px-2 js-variant-sku-input" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" placeholder="Kode Variasi" autocomplete="off">
+                                <input type="text" class="form-control px-2 js-variant-sku-input" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" data-product-id="${p.id}" data-model-id="${esc(m.model_id)}" placeholder="Kode Variasi" autocomplete="off">
                                 <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveSkuInline(${p.id}, '${m.model_id}')" style="padding:1px 8px;" title="Simpan SKU">💾</button>
                             </div>
                             <div class="variant-sku-results" role="listbox"></div>
@@ -690,7 +690,7 @@
                     <td>${stockCell(m.stock)}</td>
                     <td></td>
                     <td></td>
-                    <td>${mappingBadge(m)}</td>
+                    <td class="variant-mapping-cell">${mappingBadge(m)}</td>
                     <td><div class="d-flex align-items-center gap-1">${inlineEditors(p.id, m)}<button class="btn btn-outline-secondary btn-mini" onclick="showHistory(${p.id})" style="padding:1px 5px" title="Riwayat">📈</button></div></td>
                 </tr>`).join('') : '';
 
@@ -732,6 +732,8 @@
             option.type = 'button';
             option.className = 'variant-sku-option';
             option.dataset.code = item.code || '';
+            option.dataset.itemId = item.id || '';
+            option.dataset.itemName = item.name || '';
             option.innerHTML = `<span class="variant-sku-option-code"></span><span class="variant-sku-option-name"></span>`;
             option.querySelector('.variant-sku-option-code').textContent = (item.code || '').toUpperCase();
             option.querySelector('.variant-sku-option-name').textContent = item.name || '';
@@ -794,10 +796,19 @@
             e.preventDefault();
             const input = option.closest('.variant-sku-suggest')?.querySelector('.js-variant-sku-input');
             if (!input) return;
+            clearTimeout(variantSuggestTimer);
             input.value = option.dataset.code || '';
             input.focus();
             input.select();
+            clearTimeout(variantSuggestTimer);
             closeVariantSuggestions();
+            if (option.dataset.itemId) {
+                autoMapVariantSelection(input, {
+                    id: Number(option.dataset.itemId),
+                    code: option.dataset.code || '',
+                    name: option.dataset.itemName || '',
+                });
+            }
             return;
         }
 
@@ -927,6 +938,94 @@
             inp.disabled = false;
         }
     };
+
+    function updateVariantMappingUi(pid, modelId, model) {
+        const row = [...document.querySelectorAll(`tr.mr-${pid}`)]
+            .find(el => String(el.dataset.modelId) === String(modelId));
+        const mappingCell = row?.querySelector('.variant-mapping-cell');
+        if (mappingCell) mappingCell.innerHTML = mappingBadge(model);
+
+        const product = products.find(p => String(p.id) === String(pid));
+        const productCell = document.querySelector(`tr[data-pid="${pid}"] [data-product-mapping="${pid}"]`);
+        if (product && productCell) {
+            productCell.innerHTML = product.has_model
+                ? mappingSummary(product.models || [])
+                : (product.models?.length ? mappingBadge(product.models[0]) : '—');
+        }
+    }
+
+    async function autoMapVariantSelection(input, item) {
+        const pid = input.dataset.productId;
+        const modelId = input.dataset.modelId;
+        const product = products.find(p => String(p.id) === String(pid));
+        const model = product?.models?.find(m => String(m.model_id) === String(modelId));
+        const sku = (item.code || '').trim();
+        const saveButton = input.closest('.variant-sku-suggest')?.querySelector('button[title="Simpan SKU"]');
+
+        if (!product || !model || !sku || !item.id) return;
+
+        const previousSku = model.model_sku || '';
+        const previousMapping = model.mapping || null;
+        const originalButtonText = saveButton?.innerHTML || '💾';
+        let skuSaved = false;
+
+        input.disabled = true;
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.innerHTML = '⏳';
+        }
+
+        try {
+            // Pilihan autosuggest juga langsung menyimpan SKU varian ke marketplace.
+            if (previousSku !== sku) {
+                const skuResponse = await fetch(`/api/marketplace/products/${pid}/model-sku`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ model_id: modelId, new_sku: sku })
+                });
+                const skuData = await skuResponse.json().catch(() => ({}));
+                if (!skuResponse.ok) throw new Error(skuData.message || 'Gagal update SKU');
+
+                model.model_sku = sku;
+                model.mapping = null;
+                skuSaved = true;
+            }
+
+            // Buat/update mapping tanpa memuat ulang seluruh tabel.
+            const mapping = await api('/api/sku-mappings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    marketplace_sku: sku,
+                    channel_code: null,
+                    item_id: Number(item.id),
+                    notes: 'auto-map dari autosuggest SKU varian'
+                })
+            });
+
+            model.mapping = {
+                id: mapping.id,
+                item_id: mapping.item_id ?? mapping.item?.id ?? Number(item.id),
+                item_code: mapping.item?.code ?? item.code,
+                item_name: mapping.item?.name ?? item.name,
+            };
+            updateVariantMappingUi(pid, modelId, model);
+            input.value = sku;
+            toast(`Varian ${sku} tersimpan & auto-map ✔`);
+        } catch (e) {
+            if (!skuSaved) {
+                input.value = previousSku;
+                model.mapping = previousMapping;
+            }
+            updateVariantMappingUi(pid, modelId, model);
+            toast(skuSaved ? `SKU tersimpan, mapping gagal: ${e.message}` : `Gagal auto-map: ${e.message}`, 'error');
+        } finally {
+            input.disabled = false;
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalButtonText;
+            }
+        }
+    }
 
     window.saveIndukSkuInline = async function (pid) {
         const inp = document.getElementById(`isku-${pid}`);
