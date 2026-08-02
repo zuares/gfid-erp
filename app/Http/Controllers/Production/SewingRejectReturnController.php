@@ -61,94 +61,7 @@ class SewingRejectReturnController extends Controller
             'totalFromFinishing' => (int) $rows->where('source_kind', 'finishing')->count(),
             'totalFromSewing' => (int) $rows->where('source_kind', 'sewing_return')->count(),
             'totalRows' => (int) $rows->count(),
-            'recoverableConversions' => $this->recoverableConversions(),
         ]);
-    }
-
-    public function recover(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'conversion_id' => ['required', 'integer', 'exists:sewing_reject_conversions,id'],
-            'qty' => ['required', 'numeric', 'min:0.001'],
-            'date' => ['required', 'date'],
-            'notes' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $qty = (float) $validated['qty'];
-        $date = Carbon::parse($validated['date'])->toDateString();
-
-        return DB::transaction(function () use ($validated, $qty, $date): RedirectResponse {
-            $conversion = SewingRejectConversion::query()
-                ->with(['item:id,code,name', 'rejectItem:id,code,name'])
-                ->lockForUpdate()
-                ->findOrFail((int) $validated['conversion_id']);
-
-            $rejSew = Warehouse::query()->where('code', 'REJ-SEW')->first();
-            $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
-            if (!$rejSew || !$whRts) {
-                throw ValidationException::withMessages(['qty' => 'Gudang REJ-SEW / WH-RTS belum tersedia.']);
-            }
-
-            $remainingDoc = max((float) $conversion->qty - (float) ($conversion->recovered_qty ?? 0), 0.0);
-            $rtsStock = (float) DB::table('inventory_stocks')
-                ->where('warehouse_id', $whRts->id)
-                ->where('item_id', $conversion->reject_item_id)
-                ->lockForUpdate()
-                ->value('qty');
-
-            if ($qty > $remainingDoc + 0.000001) {
-                throw ValidationException::withMessages(['qty' => "Qty melebihi sisa konversi. Sisa dokumen: {$remainingDoc} pcs."]);
-            }
-            if ($qty > $rtsStock + 0.000001) {
-                throw ValidationException::withMessages(['qty' => "Stok {$conversion->rejectItem?->code} di WH-RTS tidak cukup. Stok: {$rtsStock} pcs."]);
-            }
-
-            $unitCost = (float) $this->inventory->getItemIncomingUnitCost($whRts->id, (int) $conversion->reject_item_id);
-
-            $this->inventory->stockOut(
-                warehouseId: (int) $whRts->id,
-                itemId: (int) $conversion->reject_item_id,
-                qty: $qty,
-                date: $date,
-                sourceType: 'sewing_reject_conversion_recover',
-                sourceId: (int) $conversion->id,
-                notes: "Kembalikan {$conversion->code} dari WH-RTS ke REJ-SEW",
-                allowNegative: false,
-                lotId: null,
-                unitCostOverride: $unitCost > 0 ? $unitCost : null,
-                affectLotCost: false,
-                cuttingJobBundleId: (int) $conversion->cutting_job_bundle_id ?: null,
-            );
-
-            $this->inventory->stockIn(
-                warehouseId: (int) $rejSew->id,
-                itemId: (int) $conversion->item_id,
-                qty: $qty,
-                date: $date,
-                sourceType: 'sewing_reject_conversion_recover',
-                sourceId: (int) $conversion->id,
-                notes: "Kembalikan {$conversion->code} ke REJ-SEW sebagai {$conversion->item?->code}",
-                lotId: null,
-                unitCost: $unitCost > 0 ? $unitCost : null,
-                affectLotCost: false,
-                cuttingJobBundleId: (int) $conversion->cutting_job_bundle_id ?: null,
-            );
-
-            $conversion->recovered_qty = (float) ($conversion->recovered_qty ?? 0) + $qty;
-            $conversion->status = $conversion->recovered_qty + 0.000001 >= (float) $conversion->qty
-                ? 'recovered'
-                : 'partially_recovered';
-            $conversion->notes = trim(implode(' | ', array_filter([
-                $conversion->notes,
-                trim((string) ($validated['notes'] ?? '')),
-                "Recovered {$qty} pcs",
-            ])));
-            $conversion->save();
-
-            return redirect()
-                ->route('production.sewing.reject_returns.index')
-                ->with('status', "{$qty} pcs {$conversion->rejectItem?->code} dikembalikan ke REJ-SEW untuk rework.");
-        });
     }
 
     public function convert(Request $request): RedirectResponse
@@ -274,13 +187,13 @@ class SewingRejectReturnController extends Controller
             ->where('status', 'posted')
             ->whereNotNull('source_reject_return_line_id')
             ->groupBy('source_reject_return_line_id')
-            ->selectRaw('source_reject_return_line_id, SUM(qty - COALESCE(recovered_qty,0)) as qty_converted');
+            ->selectRaw('source_reject_return_line_id, SUM(qty) as qty_converted');
 
         $finishingConvertedSub = DB::table('sewing_reject_conversions')
             ->where('status', 'posted')
             ->whereNotNull('source_finishing_job_line_id')
             ->groupBy('source_finishing_job_line_id')
-            ->selectRaw('source_finishing_job_line_id, SUM(qty - COALESCE(recovered_qty,0)) as qty_converted');
+            ->selectRaw('source_finishing_job_line_id, SUM(qty) as qty_converted');
 
         $rows = DB::table('sewing_return_lines as rl')
             ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
@@ -432,44 +345,13 @@ class SewingRejectReturnController extends Controller
         return $row;
     }
 
-    private function recoverableConversions(): \Illuminate\Support\Collection
-    {
-        $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
-        if (!$whRts) {
-            return collect();
-        }
-
-        return SewingRejectConversion::query()
-            ->with(['item:id,code,name', 'rejectItem:id,code,name'])
-            ->leftJoin('inventory_stocks as st', function ($join) use ($whRts) {
-                $join->on('st.item_id', '=', 'sewing_reject_conversions.reject_item_id')
-                    ->where('st.warehouse_id', '=', $whRts->id);
-            })
-            ->whereIn('sewing_reject_conversions.status', ['posted', 'partially_recovered'])
-            ->select('sewing_reject_conversions.*')
-            ->selectRaw('COALESCE(st.qty,0) as stock_rts')
-            ->orderByDesc('sewing_reject_conversions.date')
-            ->orderByDesc('sewing_reject_conversions.id')
-            ->get()
-            ->map(function (SewingRejectConversion $conversion) {
-                $conversion->remaining_qty = min(
-                    max((float) $conversion->qty - (float) ($conversion->recovered_qty ?? 0), 0.0),
-                    max((float) ($conversion->stock_rts ?? 0), 0.0)
-                );
-
-                return $conversion;
-            })
-            ->filter(fn($conversion) => (float) $conversion->remaining_qty > 0.000001)
-            ->values();
-    }
-
     private function resolveConversionSource(int $sourceRejectLineId, int $sourceFinishingLineId, int $rejSewWarehouseId, bool $lock = false): ?object
     {
         if ($sourceRejectLineId > 0) {
             $convertedSub = DB::table('sewing_reject_conversions')
                 ->where('status', 'posted')
                 ->where('source_reject_return_line_id', $sourceRejectLineId)
-                ->selectRaw('source_reject_return_line_id, SUM(qty - COALESCE(recovered_qty,0)) as qty_converted')
+                ->selectRaw('source_reject_return_line_id, SUM(qty) as qty_converted')
                 ->groupBy('source_reject_return_line_id');
 
             $reworkedSub = DB::table('sewing_return_lines as rw')
@@ -514,7 +396,7 @@ class SewingRejectReturnController extends Controller
             $convertedSub = DB::table('sewing_reject_conversions')
                 ->where('status', 'posted')
                 ->where('source_finishing_job_line_id', $sourceFinishingLineId)
-                ->selectRaw('source_finishing_job_line_id, SUM(qty - COALESCE(recovered_qty,0)) as qty_converted')
+                ->selectRaw('source_finishing_job_line_id, SUM(qty) as qty_converted')
                 ->groupBy('source_finishing_job_line_id');
 
             $reworkedSub = DB::table('sewing_return_lines as rw')

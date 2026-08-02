@@ -572,6 +572,28 @@ class StorefrontWebsiteSettingsController extends Controller
             ->with('success', 'Pengaturan operasional penjualan berhasil disimpan.');
     }
 
+    public function resetOperationalScanSettings(): RedirectResponse
+    {
+        abort_unless(auth()->user()?->isOwner(), 403);
+
+        $this->resetShipmentScanSettings();
+
+        return redirect()
+            ->route('sales.settings.operational')
+            ->with('success', 'Pengaturan suara scan berhasil dikembalikan ke default GFID.');
+    }
+
+    public function resetOperationalLookupSettings(): RedirectResponse
+    {
+        abort_unless(auth()->user()?->isOwner(), 403);
+
+        $this->resetSalesOperationalSettings();
+
+        return redirect()
+            ->route('sales.settings.operational')
+            ->with('success', 'Pengaturan lookup dan tautan order dikembalikan ke default aman.');
+    }
+
     public function deleteShipmentRingtone(ShipmentScanRingtone $ringtone): RedirectResponse
     {
         abort_unless(auth()->user()?->isOwner(), 403);

@@ -347,49 +347,6 @@
             </form>
 
             <div class="gf-card rj-table-card mt-3">
-                @if (($recoverableConversions ?? collect())->isNotEmpty())
-                    <div class="rj-table-head">
-                        <h2 class="h6 mb-0" style="font-weight:600;">Konversi Reject yang Bisa Dikembalikan</h2>
-                        <div class="small muted mono">WH-RTS → REJ-SEW</div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Konversi</th>
-                                    <th>SKU Asal</th>
-                                    <th>SKU Reject</th>
-                                    <th class="text-end">Sisa</th>
-                                    <th class="text-end">Qty Kembali</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($recoverableConversions as $conversion)
-                                    <tr>
-                                        <td class="mono">{{ $conversion->code }}<br><span class="small muted">{{ optional($conversion->date)->format('d M Y') }}</span></td>
-                                        <td><strong class="mono">{{ $conversion->item?->code }}</strong><br><span class="small muted">{{ $conversion->item?->name }}</span></td>
-                                        <td><strong class="mono">{{ $conversion->rejectItem?->code }}</strong><br><span class="small muted">WH-RTS</span></td>
-                                        <td class="text-end mono fw-bold text-danger">{{ $fmt($conversion->remaining_qty) }}</td>
-                                        <td class="text-end">
-                                            <form method="POST" action="{{ route('production.sewing.reject_returns.recover') }}" class="d-flex justify-content-end gap-1">
-                                                @csrf
-                                                <input type="hidden" name="conversion_id" value="{{ $conversion->id }}">
-                                                <input type="hidden" name="date" value="{{ now()->toDateString() }}">
-                                                <input type="number" name="qty" class="form-control form-control-sm mono text-end" style="max-width:110px" min="0.001" max="{{ (float) $conversion->remaining_qty }}" step="0.001" value="{{ (float) $conversion->remaining_qty }}" required>
-                                                <button type="submit" class="btn btn-sm btn-warning">Kembalikan</button>
-                                            </form>
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
-
-            <div class="gf-card rj-table-card mt-3">
                 <div class="rj-table-head">
                     <h2 class="h6 mb-0" style="font-weight:600;">Sisa Reject</h2>
                     <div class="small muted mono d-none d-md-block">{{ $fmt($totalReworked) }} sudah setor</div>

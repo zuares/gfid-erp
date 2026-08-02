@@ -703,7 +703,6 @@ class QcController extends Controller
             'operator',
             'lines.pickupLine.bundle.finishedItem',
             'lines.pickupLine.bundle.cuttingJob',
-            'lines.resultItem',
         ]);
 
         // QC yang sudah tersimpan untuk return ini
@@ -722,8 +721,6 @@ class QcController extends Controller
             }
 
             $qc = $existingQc->get($bundle->id);
-
-            $resultItem = $line->resultItem ?: $bundle->finishedItem;
 
             // Qty maksimal = total yang disetor penjahit. Setelah QC, line dipecah OK + reject.
             $maxQty = (float) ($line->qty_ok ?? 0) + (float) ($line->qty_reject ?? 0);
@@ -746,15 +743,13 @@ class QcController extends Controller
                 'bundle_id'        => $bundle->id,
                 'bundle_code'      => $bundle->bundle_code,
                 'item_id'          => $bundle->finished_item_id,
-                'item_code'        => $resultItem?->code,
-                'item_name'        => $resultItem?->name,
+                'item_code'        => $bundle->finishedItem?->code,
+                'item_name'        => $bundle->finishedItem?->name,
                 'cutting_job_code' => $bundle->cuttingJob?->code,
                 'qty_max'          => $maxQty,
                 'qty_ok'           => $qc?->qty_ok ?? $maxQty,
                 'qty_reject_jahit' => $qtyRejectJahit,
                 'qty_reject_bahan' => $qtyRejectBahan,
-                'reject_bahan_action' => $line->reject_bahan_action,
-                'result_item_id'   => $line->result_item_id,
                 'notes'            => $qc?->notes,
             ];
 
@@ -794,7 +789,6 @@ class QcController extends Controller
             'results.*.qty_ok'           => ['nullable', 'numeric', 'min:0'],
             'results.*.qty_reject_jahit' => ['nullable', 'numeric', 'min:0'],
             'results.*.qty_reject_bahan' => ['nullable', 'numeric', 'min:0'],
-            'results.*.reject_bahan_action' => ['nullable', 'in:rework,final'],
             'results.*.notes'            => ['nullable', 'string'],
         ]);
 

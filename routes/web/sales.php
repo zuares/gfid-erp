@@ -54,6 +54,10 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 ->name('operational.documents');
             Route::post('operational', [StorefrontWebsiteSettingsController::class, 'updateOperational'])
                 ->name('operational.update');
+            Route::post('operational/reset-scan', [StorefrontWebsiteSettingsController::class, 'resetOperationalScanSettings'])
+                ->name('operational.reset-scan');
+            Route::post('operational/reset-lookup', [StorefrontWebsiteSettingsController::class, 'resetOperationalLookupSettings'])
+                ->name('operational.reset-lookup');
             Route::delete('operational/ringtones/{ringtone}', [StorefrontWebsiteSettingsController::class, 'deleteOperationalRingtone'])
                 ->name('operational.ringtones.delete');
             Route::post('operational/ringtones/{ringtone}/trim', [StorefrontWebsiteSettingsController::class, 'trimOperationalRingtone'])

@@ -7,7 +7,6 @@ use App\Models\CuttingJobBundle;
 use App\Models\FinishingJob;
 use App\Models\QcResult;
 use App\Models\SewingReturn;
-use App\Models\SewingRejectConversion;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
 use App\Services\Costing\FinishingRmHppService;
@@ -168,11 +167,10 @@ class QcService
             // ===========================
             $wipSewWarehouseId = Warehouse::where('code', 'WIP-SEW')->value('id');
             $whPrdWarehouseId  = Warehouse::where('code', 'WH-PRD')->value('id');
-            $whRtsWarehouseId  = Warehouse::where('code', 'WH-RTS')->value('id');
             $rejSewWarehouseId = Warehouse::where('code', 'REJ-SEW')->value('id');
 
-            if (!$wipSewWarehouseId || !$whPrdWarehouseId || !$whRtsWarehouseId || !$rejSewWarehouseId) {
-                throw new \RuntimeException('Warehouse WIP-SEW / WH-PRD / WH-RTS / REJ-SEW belum dikonfigurasi.');
+            if (!$wipSewWarehouseId || !$whPrdWarehouseId || !$rejSewWarehouseId) {
+                throw new \RuntimeException('Warehouse WIP-SEW / WH-PRD / REJ-SEW belum dikonfigurasi.');
             }
 
             $returnLines = $sewingReturn->lines()
@@ -197,9 +195,7 @@ class QcService
             // membawa cutting_job_bundle_id (readiness ledger butuh atribusi per bundle).
             $processedByBundleItem = []; // [bundle_id => [item_id => qty (OK+Reject)]]
             $okByBundleItem = []; // [bundle_id => [item_id => qty OK]]
-            $sourceItemByOutputBundleItem = []; // [bundle_id][output_item_id] => source item id
             $rejectJahitByBundleItem = []; // [bundle_id => [item_id => qty Reject Jahit]]
-            $rejectBahanReworkByBundleItem = []; // [bundle_id => [item_id => qty Reject Bahan yang masih bisa diperbaiki]]
             $rejectBahanByBundleItem = []; // [bundle_id => [item_id => qty Reject Bahan]]
             $hasAnyMovement = false;
             $touchedPickupIds = [];
@@ -231,10 +227,6 @@ class QcService
                 $qtyRejectJahit = (float) ($row['qty_reject_jahit'] ?? 0);
                 $qtyRejectBahan = (float) ($row['qty_reject_bahan'] ?? 0);
                 $qtyReject = $qtyRejectJahit + $qtyRejectBahan;
-                $rejectBahanAction = (string) ($row['reject_bahan_action'] ?? $returnLine?->reject_bahan_action ?? 'final');
-                if (!in_array($rejectBahanAction, ['rework', 'final'], true)) {
-                    $rejectBahanAction = 'final';
-                }
 
                 if ($qtyOk < 0) { $qtyOk = 0; }
                 if ($qtyRejectJahit < 0) { $qtyRejectJahit = 0; }
@@ -293,28 +285,7 @@ class QcService
 
                     $returnLine->qty_ok = $qtyOk;
                     $returnLine->qty_reject = $qtyReject;
-                    $returnLine->reject_bahan_action = $qtyRejectBahan > 0.000001 ? $rejectBahanAction : null;
                     $returnLine->save();
-
-                    // Simpan dokumen konversi juga untuk Reject Bahan final
-                    // yang diposting langsung dari QC, sehingga nantinya masih
-                    // bisa dipulihkan secara audit ke proses rework.
-                    if ($qtyRejectBahan > 0.000001 && $rejectBahanAction === 'final') {
-                        $rejectItem = $this->resolveRejectItem((int) $bundle->finished_item_id);
-                        SewingRejectConversion::create([
-                            'code' => SewingRejectConversion::generateCode($qcDate),
-                            'date' => $qcDate,
-                            'status' => 'posted',
-                            'source_reject_return_line_id' => $returnLine->id,
-                            'source_finishing_job_line_id' => null,
-                            'item_id' => (int) $bundle->finished_item_id,
-                            'reject_item_id' => (int) $rejectItem->id,
-                            'cutting_job_bundle_id' => (int) $bundle->id,
-                            'qty' => $qtyRejectBahan,
-                            'created_by_user_id' => auth()->id(),
-                            'notes' => "QC Sewing Reject Bahan final {$sewingReturn->code}",
-                        ]);
-                    }
 
                     $pickupLine = $returnLine->pickupLine;
                     if ($pickupLine) {
@@ -339,7 +310,6 @@ class QcService
                 // 1.b Akumulasi untuk mutasi stok
                 if ($bundle->finished_item_id) {
                     $itemId = $bundle->finished_item_id;
-                    $outputItemId = $returnLine?->result_item_id ?: $itemId;
                     $processedQty = $qtyOk + $qtyReject;
 
                     if ($processedQty > 0) {
@@ -351,24 +321,18 @@ class QcService
                     }
 
                     if ($qtyOk > 0) {
-                        $totalOkByItem[$outputItemId] =
-                            ($totalOkByItem[$outputItemId] ?? 0) + $qtyOk;
-                        $okByBundleItem[$bundleId][$outputItemId] =
-                            ($okByBundleItem[$bundleId][$outputItemId] ?? 0) + $qtyOk;
-                        $sourceItemByOutputBundleItem[$bundleId][$outputItemId] = $itemId;
+                        $totalOkByItem[$itemId] =
+                            ($totalOkByItem[$itemId] ?? 0) + $qtyOk;
+                        $okByBundleItem[$bundleId][$itemId] =
+                            ($okByBundleItem[$bundleId][$itemId] ?? 0) + $qtyOk;
                     }
 
                     if ($qtyReject > 0) {
                         $totalRejectByItem[$itemId] =
                             ($totalRejectByItem[$itemId] ?? 0) + $qtyReject;
                         if ($qtyRejectBahan > 0) {
-                            if ($rejectBahanAction === 'rework') {
-                                $rejectBahanReworkByBundleItem[$bundleId][$itemId] =
-                                    ($rejectBahanReworkByBundleItem[$bundleId][$itemId] ?? 0) + $qtyRejectBahan;
-                            } else {
-                                $rejectBahanByBundleItem[$bundleId][$itemId] =
-                                    ($rejectBahanByBundleItem[$bundleId][$itemId] ?? 0) + $qtyRejectBahan;
-                            }
+                            $rejectBahanByBundleItem[$bundleId][$itemId] =
+                                ($rejectBahanByBundleItem[$bundleId][$itemId] ?? 0) + $qtyRejectBahan;
                         }
                         if ($qtyRejectJahit > 0) {
                             $rejectJahitByBundleItem[$bundleId][$itemId] =
@@ -436,7 +400,7 @@ class QcService
                         sourceId: $sewingReturn->id,
                         notes: "QC Sewing IN WH-PRD {$qtyOkItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
-                        unitCost: $unitCostWipSewPerItem[$sourceItemByOutputBundleItem[$bundleId][$itemId] ?? $itemId] ?? null,
+                        unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,
                         cuttingJobBundleId: $bundleId,
                     );
@@ -466,30 +430,7 @@ class QcService
                 }
             }
 
-            // 2.d IN ke REJ-SEW (Reject Bahan yang masih bisa diperbaiki).
-            foreach ($rejectBahanReworkByBundleItem as $bundleId => $byItem) {
-                foreach ($byItem as $itemId => $qtyRejectItem) {
-                    if ($qtyRejectItem <= 0) {
-                        continue;
-                    }
-
-                    $this->inventory->stockIn(
-                        warehouseId: $rejSewWarehouseId,
-                        itemId: $itemId,
-                        qty: $qtyRejectItem,
-                        date: $qcDate,
-                        sourceType: 'sewing_qc_reject_rework',
-                        sourceId: $sewingReturn->id,
-                        notes: "QC Sewing REJECT BAHAN REWORK {$qtyRejectItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
-                        lotId: null,
-                        unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
-                        affectLotCost: false,
-                        cuttingJobBundleId: $bundleId,
-                    );
-                }
-            }
-
-            // 2.e IN ke WH-RTS (Reject Bahan final, dikonversi jadi REJ-kategori, per bundle)
+            // 2.d IN ke WH-PRD (Reject Bahan, dikonversi jadi REJ-kategori, per bundle)
             foreach ($rejectBahanByBundleItem as $bundleId => $byItem) {
                 foreach ($byItem as $itemId => $qtyRejectItem) {
                     if ($qtyRejectItem <= 0) {
@@ -499,13 +440,13 @@ class QcService
                     $rejectItem = $this->resolveRejectItem($itemId);
 
                     $this->inventory->stockIn(
-                        warehouseId: $whRtsWarehouseId,
+                        warehouseId: $whPrdWarehouseId,
                         itemId: $rejectItem->id,
                         qty: $qtyRejectItem,
                         date: $qcDate,
                         sourceType: 'sewing_qc_reject',
                         sourceId: $sewingReturn->id,
-                        notes: "QC Sewing REJECT BAHAN FINAL {$qtyRejectItem} pcs dikonversi ke {$rejectItem->code} untuk return {$sewingReturn->code} (bundle #{$bundleId})",
+                        notes: "QC Sewing REJECT BAHAN {$qtyRejectItem} pcs dikonversi ke {$rejectItem->code} untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
                         unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,
@@ -515,24 +456,19 @@ class QcService
             }
 
             foreach ($okByBundleItem as $bundleId => $byItem) {
+                $qtyOkBundle = array_sum($byItem);
+                if ($qtyOkBundle <= 0) {
+                    continue;
+                }
+
                 $bundle = $bundleMap->get((int) $bundleId);
                 if (!$bundle) {
                     continue;
                 }
 
-                // Bundle tetap menunjuk ke SKU hasil cutting. Jika hasil rework
-                // dikonversi ke SKU lain, stok target tetap dicatat di inventory
-                // tetapi tidak menimpa tracker bundle SKU asal.
-                foreach ($byItem as $outputItemId => $qtyOkItem) {
-                    $sourceItemId = (int) ($sourceItemByOutputBundleItem[$bundleId][$outputItemId] ?? $outputItemId);
-                    if ((int) $bundle->finished_item_id !== $sourceItemId || (int) $bundle->finished_item_id !== (int) $outputItemId) {
-                        continue;
-                    }
-
-                    $bundle->wip_warehouse_id = (int) $whPrdWarehouseId;
-                    $bundle->wip_qty = (float) ($bundle->wip_qty ?? 0) + (float) $qtyOkItem;
-                    $bundle->save();
-                }
+                $bundle->wip_warehouse_id = (int) $whPrdWarehouseId;
+                $bundle->wip_qty = (float) ($bundle->wip_qty ?? 0) + (float) $qtyOkBundle;
+                $bundle->save();
             }
 
             if (!empty($touchedPickupIds)) {

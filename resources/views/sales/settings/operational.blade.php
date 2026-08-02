@@ -99,7 +99,7 @@
                 </div>
 
                 <div class="sos-actions">
-                    <button type="submit" name="reset_shipment_scan_defaults" value="1" id="sos-reset" class="sos-button sos-button-light">Reset Default GFID</button>
+                    <button type="submit" formaction="{{ route('sales.settings.operational.reset-scan') }}" formmethod="POST" name="reset_shipment_scan_defaults" value="1" id="sos-reset" class="sos-button sos-button-light">Reset Default GFID</button>
                     <button type="submit" class="sos-button">Simpan Pengaturan</button>
                 </div>
 
@@ -247,7 +247,7 @@
                 </select>
 
                 <div class="sos-actions">
-                    <button type="submit" name="reset_sales_operational_defaults" value="1" id="sos-reset-lookup" class="sos-button sos-button-light">Reset Default Lookup</button>
+                    <button type="submit" formaction="{{ route('sales.settings.operational.reset-lookup') }}" formmethod="POST" name="reset_sales_operational_defaults" value="1" id="sos-reset-lookup" class="sos-button sos-button-light">Reset Default Lookup</button>
                     <button type="submit" class="sos-button">Simpan Lookup</button>
                 </div>
             </form>
@@ -306,7 +306,14 @@
     reset?.addEventListener('click', function (event) {
         if (this.dataset.confirmed === '1') return;
         event.preventDefault();
-        const submit = () => { this.dataset.confirmed = '1'; form.requestSubmit(this); };
+        const submit = () => {
+            this.dataset.confirmed = '1';
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit(this);
+                return;
+            }
+            HTMLFormElement.prototype.submit.call(form);
+        };
         if (!window.Swal) { if (window.confirm('Kembalikan semua mapping ke default GFID?')) submit(); return; }
         window.Swal.fire({ icon:'question', title:'Reset default suara?', text:'Mapping kembali ke preset bawaan dan suara diaktifkan.', showCancelButton:true, confirmButtonText:'Ya, reset', cancelButtonText:'Batal', confirmButtonColor:'#0f172a' }).then(result => { if (result.isConfirmed) submit(); });
     });
@@ -525,7 +532,14 @@
     resetLookup?.addEventListener('click', function (event) {
         if (this.dataset.confirmed === '1') return;
         event.preventDefault();
-        const submit = () => { this.dataset.confirmed = '1'; lookupForm.requestSubmit(this); };
+        const submit = () => {
+            this.dataset.confirmed = '1';
+            if (typeof lookupForm.requestSubmit === 'function') {
+                lookupForm.requestSubmit(this);
+                return;
+            }
+            HTMLFormElement.prototype.submit.call(lookupForm);
+        };
         if (!window.Swal) { if (window.confirm('Kembalikan pengaturan lookup ke default aman?')) submit(); return; }
         window.Swal.fire({ icon:'question', title:'Reset default lookup?', text:'Mode kembali ke record-only dan status marketplace diubah saat posting.', showCancelButton:true, confirmButtonText:'Ya, reset', cancelButtonText:'Batal', confirmButtonColor:'#0f172a' }).then(result => { if (result.isConfirmed) submit(); });
     });

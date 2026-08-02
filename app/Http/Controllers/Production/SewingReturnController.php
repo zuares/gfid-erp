@@ -281,18 +281,11 @@ class SewingReturnController extends Controller
 
         $lines = collect();
         $wipStockByItemId = [];
-        $reworkTargetItems = collect();
 
         if ($isRejectReworkMode) {
             $rejectWarehouse = Warehouse::query()->where('code', 'REJ-SEW')->first();
 
             $lines = $this->buildRejectReworkLines($operatorId, $selectedRejectLineId, $rejectWarehouse?->id, $selectedFinishingLineId);
-            $reworkTargetItems = Item::query()
-                ->where('active', true)
-                ->where('type', 'finished_good')
-                ->where('code', 'not like', '%-RJCT')
-                ->orderBy('code')
-                ->get(['id', 'code', 'name']);
 
             return view('production.sewing_returns.create', compact(
                 'operators',
@@ -305,7 +298,6 @@ class SewingReturnController extends Controller
                 'defaultDestWarehouseId',
                 'canChooseDestination',
                 'isRejectReworkMode',
-                'reworkTargetItems',
             ));
         }
 
@@ -321,7 +313,6 @@ class SewingReturnController extends Controller
                 'defaultDestWarehouseId',
                 'canChooseDestination',
                 'isRejectReworkMode',
-                'reworkTargetItems',
             ));
         }
 
@@ -960,7 +951,6 @@ class SewingReturnController extends Controller
             'results.*.sewing_pickup_line_id' => ['required', 'integer', 'exists:sewing_pickup_lines,id'],
             'results.*.qty_ok' => ['nullable', 'numeric', 'min:0'],
             'results.*.qty_reject' => ['nullable', 'numeric', 'min:0'],
-            'results.*.result_item_id' => ['nullable', 'integer', 'exists:items,id'],
             'results.*.notes' => ['nullable', 'string', 'max:500'],
             'results.*.source_reject_return_line_id' => ['nullable', 'integer', 'exists:sewing_return_lines,id'],
             'results.*.source_finishing_job_line_id' => ['nullable', 'integer', 'exists:finishing_job_lines,id'],
@@ -1023,7 +1013,6 @@ class SewingReturnController extends Controller
                         'sewing_pickup_line_id' => (int) ($r['sewing_pickup_line_id'] ?? 0),
                         'qty_ok' => $ok,
                         'qty_reject' => $rj,
-                        'result_item_id' => (int) ($r['result_item_id'] ?? 0),
                         'notes' => trim((string) ($r['notes'] ?? '')),
                         'source_reject_return_line_id' => (int) ($r['source_reject_return_line_id'] ?? 0),
                         'source_finishing_job_line_id' => (int) ($r['source_finishing_job_line_id'] ?? 0),
@@ -1055,28 +1044,6 @@ class SewingReturnController extends Controller
             $rejectReworkRows = $rawResults
                 ->filter(fn($r) => (int) ($r['source_reject_return_line_id'] ?? 0) > 0 || (int) ($r['source_finishing_job_line_id'] ?? 0) > 0)
                 ->values();
-
-            $requestedResultItemIds = $rejectReworkRows
-                ->pluck('result_item_id')
-                ->filter(fn($id) => (int) $id > 0)
-                ->map(fn($id) => (int) $id)
-                ->unique()
-                ->values();
-
-            if ($requestedResultItemIds->isNotEmpty()) {
-                $validResultItemCount = Item::query()
-                    ->whereIn('id', $requestedResultItemIds->all())
-                    ->where('active', true)
-                    ->where('type', 'finished_good')
-                    ->where('code', 'not like', '%-RJCT')
-                    ->count();
-
-                if ($validResultItemCount !== $requestedResultItemIds->count()) {
-                    throw ValidationException::withMessages([
-                        'results' => 'SKU hasil rework harus berupa finished good aktif dan bukan SKU reject.',
-                    ]);
-                }
-            }
 
             $normalRows = $rawResults
                 ->filter(fn($r) => (int) ($r['source_reject_return_line_id'] ?? 0) <= 0 && (int) ($r['source_finishing_job_line_id'] ?? 0) <= 0)
@@ -1262,17 +1229,12 @@ class SewingReturnController extends Controller
             // create lines + update pickup line counters
             foreach ($rawResults as $r) {
                 $pl = $pickupLines->get((int) $r['sewing_pickup_line_id']);
-                $isRejectReworkLine = (int) ($r['source_reject_return_line_id'] ?? 0) > 0
-                    || (int) ($r['source_finishing_job_line_id'] ?? 0) > 0;
 
                 SewingReturnLine::create([
                     'sewing_return_id' => $sewingReturn->id,
                     'sewing_pickup_line_id' => $pl->id,
                     'qty_ok' => (float) $r['qty_ok'],
                     'qty_reject' => (float) $r['qty_reject'],
-                    'result_item_id' => $isRejectReworkLine && (int) ($r['result_item_id'] ?? 0) > 0
-                        ? (int) $r['result_item_id']
-                        : null,
                     'notes' => $r['notes'] !== '' ? $r['notes'] : null,
                     'finished_qty' => (int) round((float) $r['qty_ok']),
                     'source_type' => ((int) ($r['source_finishing_job_line_id'] ?? 0) > 0)
@@ -1297,14 +1259,12 @@ class SewingReturnController extends Controller
 
                 $bundleId = (int) $pl->cutting_job_bundle_id;
                 $itemId = (int) $pl->finished_item_id;
-                $sourceRejectLineId = (int) ($r['source_reject_return_line_id'] ?? 0);
-                $sourceFinishingLineId = (int) ($r['source_finishing_job_line_id'] ?? 0);
-                $resultItemId = (($sourceRejectLineId > 0 || $sourceFinishingLineId > 0) && (int) ($r['result_item_id'] ?? 0) > 0)
-                    ? (int) $r['result_item_id']
-                    : $itemId;
 
                 $qtyOk = (float) $r['qty_ok'];
                 $qtyRj = (float) $r['qty_reject'];
+
+                $sourceRejectLineId = (int) ($r['source_reject_return_line_id'] ?? 0);
+                $sourceFinishingLineId = (int) ($r['source_finishing_job_line_id'] ?? 0);
 
                 // Semua return menunggu QC. Stok tetap di gudang asal sampai QC approve.
                 if ($sewingQcFlowActive) {
@@ -1380,7 +1340,7 @@ class SewingReturnController extends Controller
 
                     $this->inventory->stockIn(
                         warehouseId: $destWarehouse->id,
-                        itemId: $resultItemId,
+                        itemId: $itemId,
                         qty: $qtyOk,
                         date: $date,
                         sourceType: 'sewing_reject_rework_ok',

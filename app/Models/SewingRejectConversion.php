@@ -17,7 +17,6 @@ class SewingRejectConversion extends Model
         'reject_item_id',
         'cutting_job_bundle_id',
         'qty',
-        'recovered_qty',
         'created_by_user_id',
         'notes',
     ];
@@ -25,7 +24,6 @@ class SewingRejectConversion extends Model
     protected $casts = [
         'date' => 'date',
         'qty' => 'decimal:3',
-        'recovered_qty' => 'decimal:3',
     ];
 
     public function item(): BelongsTo

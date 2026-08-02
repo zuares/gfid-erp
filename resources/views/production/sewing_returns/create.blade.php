@@ -573,7 +573,6 @@
     // - $canChooseDestination (bool)
     $destinationWarehouses = $destinationWarehouses ?? collect();
     $defaultDestWarehouseId = (int) ($defaultDestWarehouseId ?? 0);
-    $reworkTargetItems = $reworkTargetItems ?? collect();
 
     $selectedDestId = (int) old('destination_warehouse_id', $defaultDestWarehouseId);
     $canChooseDestination = (bool) ($canChooseDestination ?? false);
@@ -1200,18 +1199,6 @@
                                                 <div class="form-control form-control-sm mono" style="border-radius:8px; font-weight:900; text-align:center;">
                                                     {{ $line->reject_code ?? 'REJ-SEW' }}
                                                 </div>
-                                            </div>
-                                            <div class="field" style="grid-column:1/-1;">
-                                                <label>SKU Hasil Setelah Repair</label>
-                                                <select name="results[{{ $idx }}][result_item_id]" class="form-select form-select-sm">
-                                                    @foreach($reworkTargetItems as $targetItem)
-                                                        <option value="{{ $targetItem->id }}"
-                                                            @selected((int) old("results.$idx.result_item_id", $line->finished_item_id) === (int) $targetItem->id)>
-                                                            {{ $targetItem->code }} — {{ $targetItem->name }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                <div class="small text-muted mt-1">Pilih SKU yang akan dipakai setelah QC ulang. Default mengikuti SKU asal.</div>
                                             </div>
                                         @else
                                             <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
