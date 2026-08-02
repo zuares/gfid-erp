@@ -22,6 +22,19 @@ use Illuminate\Support\Facades\Log;
 
 class MarketplaceSyncService
 {
+    private const PROCESSED_API_ADVANCED_STATUSES = [
+        'READY_TO_HANDOVER',
+        'SHIPPED',
+        'TO_CONFIRM_RECEIVE',
+        'COMPLETED',
+        'CANCELLED',
+        'IN_CANCEL',
+        'TO_RETURN',
+        'RETURNING',
+        'RETURNED',
+        'REFUNDED',
+    ];
+
     public function __construct(
         protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
@@ -166,7 +179,15 @@ class MarketplaceSyncService
 
         if (empty($orderSnList)) {
             $this->log($store, 'sync_orders', 'success', 'Tidak ada order ditemukan.', ['time_from' => $timeFrom, 'time_to' => $timeTo]);
-            return ['found' => 0, 'synced' => 0, 'order_sn_list' => [], 'message' => 'Tidak ada order ditemukan di rentang tanggal ini.'];
+            $verification = $dryRun ? [] : $this->verifyProcessedOrdersAfterSync($store);
+
+            return [
+                'found' => 0,
+                'synced' => 0,
+                'order_sn_list' => [],
+                'processed_verification' => $verification,
+                'message' => 'Tidak ada order ditemukan di rentang tanggal ini.',
+            ];
         }
 
         // 2. Ambil detail order per chunk
@@ -208,6 +229,11 @@ class MarketplaceSyncService
             $this->autoCreateFulfillments($store);
         }
 
+        // Sync utama hanya mengembalikan order yang masuk daftar API. Cek
+        // ulang antrean PROCESSED lokal agar order tanpa booking_sn atau yang
+        // tidak muncul di daftar status tetap selaras dengan platform.
+        $verification = $dryRun ? [] : $this->verifyProcessedOrdersAfterSync($store);
+
         $found = count($orderSnList);
         $logType = $dryRun ? 'sync_orders_dry_run' : 'sync_orders';
         $this->log($store, $logType, 'success', "Synced {$stats['new']} baru + {$stats['updated']} update dari {$found} order.", [
@@ -222,6 +248,7 @@ class MarketplaceSyncService
             'ready'             => $stats['ready'],
             'incomplete'        => $stats['incomplete'],
             'order_sn_list'     => $orderSnList,
+            'processed_verification' => $verification,
         ]);
 
         $total_issues = $stats['sku_empty'] + $stats['mapping_not_found'] + $stats['missing_hpp'];
@@ -237,6 +264,7 @@ class MarketplaceSyncService
             'incomplete'        => $stats['incomplete'],
             'total_issues'      => $total_issues,
             'order_sn_list'     => $orderSnList,
+            'processed_verification' => $verification,
             'message'           => ($dryRun ? "[DRY RUN] " : "") . "Berhasil sync {$found} order ({$stats['new']} baru, {$stats['updated']} update).",
         ];
     }
@@ -1787,6 +1815,153 @@ class MarketplaceSyncService
         catch (\Throwable $e) { return null; }
     }
 
+    /**
+     * Cek ulang order PROCESSED yang masih tersimpan lokal setelah sync utama.
+     * Kandidat tidak dibatasi booking_sn sehingga order biasa dan order booking
+     * diperlakukan sama. Dipanggil saat sync agar status lokal selaras dengan API.
+     */
+    private function verifyProcessedOrdersAfterSync(Store $store, int $limit = 50): array
+    {
+        $stats = [
+            'checked' => 0,
+            'moved' => 0,
+            'unchanged' => 0,
+            'not_found' => 0,
+            'unknown_status' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+        ];
+
+        $orders = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->where('order_status', 'PROCESSED')
+            ->where(function ($query) {
+                $query->whereNull('processed_api_checked_at')
+                    ->orWhere('processed_api_checked_at', '<=', now()->subMinutes(10));
+            })
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return $stats;
+        }
+
+        if ($store->connection_status !== 'CONNECTED') {
+            $stats['skipped'] = $orders->count();
+            Log::warning('Sync order: verifikasi PROCESSED dilewati karena toko tidak terhubung.', [
+                'store_id' => $store->id,
+                'connection_status' => $store->connection_status,
+                'orders' => $orders->count(),
+            ]);
+            return $stats;
+        }
+
+        $detailsByOrder = [];
+        foreach (array_chunk($orders->pluck('channel_order_id')->filter()->unique()->values()->all(), 50) as $chunk) {
+            try {
+                $response = $this->gateway->getOrderDetail($store, $chunk);
+
+                if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
+                    throw new \RuntimeException($response['message'] ?? $response['error'] ?? 'API mengembalikan error.');
+                }
+
+                $details = data_get($response, 'response.order_list');
+                if (! is_array($details)) {
+                    $details = data_get($response, 'data.orders', data_get($response, 'data.order_list', []));
+                }
+
+                foreach (is_array($details) ? $details : [] as $detail) {
+                    if (! is_array($detail)) {
+                        continue;
+                    }
+
+                    $id = $detail['order_sn'] ?? $detail['order_id'] ?? $detail['id'] ?? null;
+                    if ($id !== null && $id !== '') {
+                        $detailsByOrder[(string) $id] = $detail;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $stats['errors']++;
+                Log::warning('Sync order: verifikasi PROCESSED gagal.', [
+                    'store_id' => $store->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        foreach ($orders as $order) {
+            $stats['checked']++;
+            $detail = $detailsByOrder[(string) $order->channel_order_id] ?? null;
+
+            if (! $detail) {
+                $stats['not_found']++;
+                $order->update(['processed_api_checked_at' => now()]);
+                continue;
+            }
+
+            $status = $this->canonicalProcessedApiStatus($detail['order_status'] ?? $detail['status'] ?? null);
+            if ($status === null) {
+                $stats['unknown_status']++;
+                $order->update(['processed_api_checked_at' => now()]);
+                continue;
+            }
+
+            if (! in_array($status, self::PROCESSED_API_ADVANCED_STATUSES, true)) {
+                $stats['unchanged']++;
+                $order->update([
+                    'processed_api_checked_at' => now(),
+                    'raw_json' => $detail,
+                    'synced_at' => now(),
+                ]);
+                continue;
+            }
+
+            $stats['moved']++;
+            $order->update([
+                'order_status' => $status,
+                'status' => $this->legacyStatusForProcessedApi($status, $order->status),
+                'raw_json' => $detail,
+                'synced_at' => now(),
+                'processed_api_checked_at' => now(),
+            ]);
+        }
+
+        return $stats;
+    }
+
+    private function canonicalProcessedApiStatus(mixed $status): ?string
+    {
+        if (! is_string($status) || trim($status) === '') {
+            return null;
+        }
+
+        $status = strtoupper(trim($status));
+
+        return [
+            'AWAITING_SHIPMENT' => 'READY_TO_SHIP',
+            'AWAITING_COLLECTION' => 'READY_TO_HANDOVER',
+            'IN_TRANSIT' => 'SHIPPED',
+            'DELIVERED' => 'COMPLETED',
+        ][$status] ?? $status;
+    }
+
+    private function legacyStatusForProcessedApi(string $status, ?string $current): string
+    {
+        return [
+            'READY_TO_HANDOVER' => 'packed',
+            'SHIPPED' => 'shipped',
+            'TO_CONFIRM_RECEIVE' => 'shipped',
+            'COMPLETED' => 'completed',
+            'CANCELLED' => 'cancelled',
+            'IN_CANCEL' => 'cancelled',
+            'TO_RETURN' => 'shipped',
+            'RETURNING' => 'shipped',
+            'RETURNED' => 'shipped',
+            'REFUNDED' => 'cancelled',
+        ][$status] ?? ($current ?: 'packed');
+    }
+
     private function upsertOrders(Store $store, array $details, bool $dryRun = false): array
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
@@ -1943,6 +2118,7 @@ class MarketplaceSyncService
                         // Status
                         'order_status'  => $orderStatus,
                         'status'        => $statusLegacy,
+                        'processed_api_checked_at' => $orderStatus === 'PROCESSED' ? now() : null,
 
                         // Buyer
                         'buyer_username' => $detail['buyer_username'] ?? null,
@@ -2144,13 +2320,14 @@ class MarketplaceSyncService
 
     private function autoCreateFulfillments(Store $store): void
     {
-        // Hanya buat fulfillment draft untuk order yang SEMUA item-nya data_status = valid
-        // PROCESSED ikut: order bisa masuk GFID sudah berstatus PROCESSED
-        // (resi diproses langsung di Seller Centre sebelum GFID sempat sync)
+        // Buat draft untuk semua order aktif, termasuk yang item-nya belum
+        // mapping. Mapping tetap divalidasi sebelum stok dipotong, tetapi
+        // masalah mapping tidak boleh membuat order tertahan di status lokal.
+        // PROCESSED ikut karena resi bisa diproses langsung di Seller Centre
+        // sebelum GFID sempat sync.
         $orders = MarketplaceOrder::where('store_id', $store->id)
             ->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])
             ->whereDoesntHave('fulfillment')
-            ->whereDoesntHave('items', fn ($q) => $q->where('data_status', 'incomplete'))
             ->get();
 
         foreach ($orders as $order) {

@@ -4,10 +4,15 @@ namespace Tests\Feature\Console;
 
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
 use App\Models\OrderFulfillment;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\MarketplaceSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class MarketplaceRepairStuckOrdersCommandTest extends TestCase
@@ -101,6 +106,143 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertDatabaseHas('order_fulfillments', [
             'id' => $fulfillment->id,
             'status' => OrderFulfillment::STATUS_CONFIRMED,
+        ]);
+    }
+
+    public function test_repair_terdaftar_di_scheduler(): void
+    {
+        Artisan::call('schedule:list');
+
+        $this->assertStringContainsString('repair-stuck-orders', Artisan::output());
+    }
+
+    public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
+    {
+        $order = $this->createOrder('REPAIR-MOVE-READY', 'PROCESSED');
+
+        OrderFulfillment::create([
+            'marketplace_order_id' => $order->id,
+            'status' => OrderFulfillment::STATUS_PENDING_REVIEW,
+        ]);
+
+        $this->artisan('marketplace:repair-stuck-orders', [
+            '--apply' => true,
+            '--move-to-ready' => true,
+        ])->expectsOutputToContain('MOVE_TO_READY')
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'READY_TO_HANDOVER',
+            'status' => 'packed',
+        ]);
+    }
+
+    public function test_verifikasi_api_memindahkan_processed_yang_sudah_shipped(): void
+    {
+        $order = $this->createOrder('VERIFY-SHIPPED', 'PROCESSED');
+
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'Belum Mapping',
+            'model_sku' => 'SKU-BELUM-MAPPING',
+            'mapping_status' => 'mapping_not_found',
+            'data_status' => 'incomplete',
+            'qty' => 1,
+        ]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->withArgs(function (Store $store, array $orderSns) use ($order) {
+                    return $store->id === $order->store_id && $orderSns === [$order->channel_order_id];
+                })
+                ->andReturn([
+                    'response' => [
+                        'order_list' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'order_status' => 'SHIPPED',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $this->artisan('marketplace:verify-processed-orders', ['--apply' => true])
+            ->expectsOutputToContain('[MOVE]')
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
+        ]);
+    }
+
+    public function test_verifikasi_api_tidak_memindahkan_jika_api_masih_processed(): void
+    {
+        $order = $this->createOrder('VERIFY-STILL-PROCESSED', 'PROCESSED');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getOrderDetail')->once()->andReturn([
+                'response' => [
+                    'order_list' => [[
+                        'order_sn' => $order->channel_order_id,
+                        'order_status' => 'PROCESSED',
+                    ]],
+                ],
+            ]);
+        });
+
+        $this->artisan('marketplace:verify-processed-orders', ['--apply' => true])
+            ->expectsOutputToContain('[UNCHANGED]')
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'PROCESSED',
+        ]);
+    }
+
+    public function test_sync_juga_memverifikasi_order_tanpa_booking_sn(): void
+    {
+        $order = $this->createOrder('SYNC-NO-BOOKING', 'PROCESSED');
+        $order->update([
+            'booking_sn' => null,
+            'processed_api_checked_at' => now()->subMinutes(20),
+        ]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getOrders')
+                ->times(7)
+                ->andReturn(['response' => ['order_list' => []]]);
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->withArgs(function (Store $store, array $orderSns) use ($order) {
+                    return $store->id === $order->store_id && $orderSns === [$order->channel_order_id];
+                })
+                ->andReturn([
+                    'response' => [
+                        'order_list' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'order_status' => 'SHIPPED',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncOrders(
+            $this->store,
+            now()->subMinutes(5)->timestamp,
+            now()->timestamp,
+        );
+
+        $this->assertSame(1, $result['processed_verification']['moved']);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'booking_sn' => null,
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
         ]);
     }
 }

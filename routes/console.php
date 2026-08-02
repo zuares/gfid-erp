@@ -77,6 +77,27 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->name('sync-orders')
     ->withoutOverlapping();
 
+// Verifikasi status PROCESSED ke API setelah sync order. Hanya status API yang
+// sudah maju yang boleh memindahkan order keluar dari tab Sedang Dikemas.
+Schedule::command('marketplace:verify-processed-orders', [
+        '--apply' => true,
+        '--limit' => 50,
+    ])
+    ->cron('2-59/5 * * * *')
+    ->name('verify-processed-orders')
+    ->withoutOverlapping();
+
+// Repair data lokal yang rusak tanpa memajukan status order berdasarkan
+// fulfillment lokal saja. Pemindahan status ditangani verifier API di atas.
+Schedule::command('marketplace:repair-stuck-orders', [
+        '--apply' => true,
+        '--limit' => 500,
+        '--only-missing-fulfillment' => true,
+    ])
+    ->cron('3-59/5 * * * *')
+    ->name('repair-stuck-orders')
+    ->withoutOverlapping();
+
 // Pesanan Kilat (booking) + enrichment order_sn tiap jam
 // (dipindahkan dari app/Console/Kernel.php yang tidak dipakai Laravel 12)
 Schedule::call(fn () => Artisan::call('marketplace:sync-bookings'))

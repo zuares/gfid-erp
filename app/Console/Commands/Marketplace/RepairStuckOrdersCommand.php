@@ -14,7 +14,9 @@ class RepairStuckOrdersCommand extends Command
         {--store= : Hanya toko tertentu (stores.id)}
         {--order= : Hanya channel_order_id tertentu}
         {--limit=500 : Maksimum order yang diperiksa}
-        {--apply : Terapkan perbaikan (default hanya preview)}';
+        {--apply : Terapkan perbaikan (default hanya preview)}
+        {--only-missing-fulfillment : Hanya buat fulfillment yang hilang, jangan mengubah status order}
+        {--move-to-ready : Pindahkan order PROCESSED dengan fulfillment aktif ke READY_TO_HANDOVER}';
 
     protected $description = 'Deteksi dan repair order marketplace yang status fulfillment-nya tidak sinkron.';
 
@@ -24,6 +26,8 @@ class RepairStuckOrdersCommand extends Command
         $storeId = $this->option('store');
         $orderSn = trim((string) ($this->option('order') ?? ''));
         $limit = max(1, min(2000, (int) $this->option('limit')));
+        $moveToReady = (bool) $this->option('move-to-ready');
+        $onlyMissingFulfillment = (bool) $this->option('only-missing-fulfillment');
 
         $query = MarketplaceOrder::query()
             ->with([
@@ -66,6 +70,8 @@ class RepairStuckOrdersCommand extends Command
             'already_ok' => 0,
             'waiting_manual' => 0,
             'cancelled_fulfillment' => 0,
+            'errors' => 0,
+            'moved_to_ready' => 0,
         ];
 
         foreach ($orders as $order) {
@@ -80,14 +86,33 @@ class RepairStuckOrdersCommand extends Command
                         $fulfillmentService->createDraft($order);
                     } catch (\Throwable $e) {
                         $this->error("Gagal membuat draft order #{$order->id}: {$e->getMessage()}");
-                        return self::FAILURE;
+                        $stats['errors']++;
                     }
                 }
 
                 continue;
             }
 
-            if ($fulfillment->status === OrderFulfillment::STATUS_CONFIRMED
+            if (! $onlyMissingFulfillment
+                && $moveToReady
+                && $order->order_status === 'PROCESSED'
+                && $fulfillment->status !== OrderFulfillment::STATUS_CANCELLED) {
+                $stats['moved_to_ready']++;
+                $this->line($this->formatLine($order, 'MOVE_TO_READY', 'status → READY_TO_HANDOVER'));
+
+                if ($apply) {
+                    $order->update([
+                        'order_status' => 'READY_TO_HANDOVER',
+                        'status' => 'packed',
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                continue;
+            }
+
+            if (! $onlyMissingFulfillment
+                && $fulfillment->status === OrderFulfillment::STATUS_CONFIRMED
                 && in_array($order->order_status, ['READY_TO_SHIP', 'PROCESSED'], true)) {
                 $stats['restored_handover']++;
                 $this->line($this->formatLine($order, 'RESTORE_HANDOVER', 'status → READY_TO_HANDOVER'));
@@ -129,6 +154,8 @@ class RepairStuckOrdersCommand extends Command
         $this->line('Status handover dipulihkan: ' . $stats['restored_handover']);
         $this->line('Menunggu tindakan manual  : ' . $stats['waiting_manual']);
         $this->line('Fulfillment cancelled     : ' . $stats['cancelled_fulfillment']);
+        $this->line('Gagal direpair            : ' . $stats['errors']);
+        $this->line('Dipindahkan ke Siap Kirim : ' . $stats['moved_to_ready']);
         $this->line('Sudah sesuai              : ' . $stats['already_ok']);
 
         if (! $apply) {
@@ -137,7 +164,7 @@ class RepairStuckOrdersCommand extends Command
             $this->info('Repair selesai.');
         }
 
-        return self::SUCCESS;
+        return $stats['errors'] > 0 ? self::FAILURE : self::SUCCESS;
     }
 
     private function formatLine(MarketplaceOrder $order, string $action, string $detail): string
