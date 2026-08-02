@@ -1334,8 +1334,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
-    <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
-
     <a href="/marketplace/orders" class="btn btn-shp-outline btn-sm" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
         📦 List Order
     </a>
@@ -1718,7 +1716,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const lastScanQtyEl     = document.getElementById('lastScanQty');
     const lastScanPacking   = document.getElementById('lastScanPacking');
     const lastScanAvailable = document.getElementById('lastScanAvailable');
-    window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
     const scanErrorBox      = document.getElementById('scanErrorBox');
     const scanErrorMsg      = document.getElementById('scanErrorMsg');
     const sessionCounterEl  = document.getElementById('sessionCounter');

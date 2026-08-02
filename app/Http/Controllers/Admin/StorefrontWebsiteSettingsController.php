@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 class StorefrontWebsiteSettingsController extends Controller
@@ -61,22 +62,30 @@ class StorefrontWebsiteSettingsController extends Controller
 
     private function mediaBinary(string $name): string
     {
-        $configured = config('services.ffmpeg.' . ($name === 'ffprobe' ? 'ffprobe_binary' : 'binary'));
-        $candidates = array_filter([
+        $configured = trim((string) config('services.ffmpeg.' . ($name === 'ffprobe' ? 'ffprobe_binary' : 'binary'), ''));
+        $finder = new ExecutableFinder();
+        $candidates = array_values(array_unique(array_filter([
             $configured,
+            $finder->find($name),
             '/opt/homebrew/bin/' . $name,
             '/usr/local/bin/' . $name,
             '/usr/bin/' . $name,
-            $name,
-        ]);
+            '/bin/' . $name,
+        ])));
 
         foreach ($candidates as $candidate) {
-            if (! str_starts_with((string) $candidate, '/') || is_executable((string) $candidate)) {
-                return (string) $candidate;
+            $candidate = (string) $candidate;
+            if (str_starts_with($candidate, '/') && is_executable($candidate)) {
+                return $candidate;
+            }
+
+            $resolved = $finder->find($candidate);
+            if ($resolved && is_executable($resolved)) {
+                return $resolved;
             }
         }
 
-        return $name;
+        throw new \RuntimeException(strtoupper($name) . ' tidak ditemukan pada server.');
     }
 
     private function normalizedScanSoundMap(?iterable $ringtones = null): array
@@ -741,12 +750,21 @@ class StorefrontWebsiteSettingsController extends Controller
         ]);
 
         $input = $request->file('shipment_scan_ringtone_audio');
-        $source = $input->getRealPath();
-        $temporaryOutput = tempnam(storage_path('app'), 'gfid-ringtone-');
-        @unlink($temporaryOutput);
-        $temporaryOutput .= '.mp3';
+        $temporaryOutput = null;
 
         try {
+            $source = $input?->getRealPath();
+            if (! $input || ! $input->isValid() || ! $source || ! is_readable($source)) {
+                throw new \RuntimeException('File upload audio tidak dapat dibaca oleh server.');
+            }
+
+            $temporaryOutput = tempnam(sys_get_temp_dir(), 'gfid-ringtone-');
+            if ($temporaryOutput === false) {
+                throw new \RuntimeException('Folder temporary server tidak dapat ditulis.');
+            }
+            @unlink($temporaryOutput);
+            $temporaryOutput .= '.mp3';
+
             $process = new Process([
                 $this->mediaBinary('ffmpeg'), '-y', '-hide_banner', '-loglevel', 'error',
                 '-i', $source,
@@ -757,7 +775,7 @@ class StorefrontWebsiteSettingsController extends Controller
             $process->setTimeout(30);
             $process->run();
 
-            if (! $process->isSuccessful() || ! is_file($temporaryOutput)) {
+            if (! $process->isSuccessful() || ! is_file($temporaryOutput) || (int) filesize($temporaryOutput) <= 0) {
                 $errorOutput = trim($process->getErrorOutput());
                 $message = str_contains(strtolower($errorOutput), 'not found')
                     ? 'FFmpeg tidak ditemukan di server.'
@@ -766,21 +784,36 @@ class StorefrontWebsiteSettingsController extends Controller
             }
 
             $durationMs = null;
-            $probe = new Process([
-                $this->mediaBinary('ffprobe'), '-v', 'error', '-show_entries', 'format=duration',
-                '-of', 'default=noprint_wrappers=1:nokey=1', $temporaryOutput,
-            ]);
-            $probe->setTimeout(10);
-            $probe->run();
-            if ($probe->isSuccessful() && is_numeric(trim($probe->getOutput()))) {
-                $durationMs = min(5000, (int) round((float) trim($probe->getOutput()) * 1000));
+            try {
+                $probe = new Process([
+                    $this->mediaBinary('ffprobe'), '-v', 'error', '-show_entries', 'format=duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1', $temporaryOutput,
+                ]);
+                $probe->setTimeout(10);
+                $probe->run();
+                if ($probe->isSuccessful() && is_numeric(trim($probe->getOutput()))) {
+                    $durationMs = min(5000, (int) round((float) trim($probe->getOutput()) * 1000));
+                }
+            } catch (\Throwable) {
+                // ffprobe hanya untuk metadata; upload tetap valid tanpa durasi.
             }
 
             $path = 'shipment-ringtones/' . Str::uuid() . '.mp3';
             $stream = fopen($temporaryOutput, 'rb');
-            Storage::disk('public')->put($path, $stream);
+            if (! $stream || ! Storage::disk('public')->put($path, $stream)) {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+                throw new \RuntimeException('Disk public tidak dapat menyimpan file ringtone.');
+            }
             if (is_resource($stream)) {
                 fclose($stream);
+            }
+
+            $compressedSize = (int) Storage::disk('public')->size($path);
+            if ($compressedSize <= 0) {
+                Storage::disk('public')->delete($path);
+                throw new \RuntimeException('File ringtone tersimpan dengan ukuran 0 byte.');
             }
 
             ShipmentScanRingtone::create([
@@ -791,7 +824,7 @@ class StorefrontWebsiteSettingsController extends Controller
                 'mime_type' => 'audio/mpeg',
                 'extension' => 'mp3',
                 'size_bytes' => (int) $input->getSize(),
-                'compressed_size_bytes' => (int) Storage::disk('public')->size($path),
+                'compressed_size_bytes' => $compressedSize,
                 'duration_ms' => $durationMs,
                 'uploaded_by' => auth()->id(),
             ]);
@@ -803,15 +836,17 @@ class StorefrontWebsiteSettingsController extends Controller
             report($e);
 
             $errorMessage = strtolower($e->getMessage());
-            $userMessage = str_contains($errorMessage, 'ffmpeg tidak ditemukan')
+            $userMessage = str_contains($errorMessage, 'ffmpeg tidak ditemukan') || str_contains($errorMessage, 'ffmpeg tidak ditemukan pada server')
                 ? 'FFmpeg tidak ditemukan pada server. Isi FFMPEG_BINARY di .env atau install FFmpeg.'
-                : 'File audio tidak dapat diproses. Pastikan formatnya valid dan durasinya tidak bermasalah.';
+                : (str_contains($errorMessage, 'disk public') || str_contains($errorMessage, 'temporary server')
+                    ? 'Server tidak dapat menyimpan file ringtone. Pastikan folder storage dan temporary dapat ditulis oleh PHP-FPM.'
+                    : 'File audio tidak dapat diproses. Pastikan formatnya valid dan durasinya tidak bermasalah.');
 
             return redirect()
                 ->route($redirectRoute)
                 ->with('error', $userMessage);
         } finally {
-            if (is_file($temporaryOutput)) {
+            if ($temporaryOutput && is_file($temporaryOutput)) {
                 @unlink($temporaryOutput);
             }
         }
