@@ -714,14 +714,22 @@
             filterOpt.textContent = label;
             filterSel.appendChild(filterOpt);
 
-            const syncOpt = document.createElement('option');
-            syncOpt.value = s.id;
-            syncOpt.textContent = label;
-            syncSel.appendChild(syncOpt);
+            const isActiveShopee = ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
+                && s.status === 'active'
+                && s.is_active === true;
+            if (isActiveShopee) {
+                const syncOpt = document.createElement('option');
+                syncOpt.value = s.id;
+                syncOpt.textContent = label;
+                syncSel.appendChild(syncOpt);
+            }
         });
 
-        if (stores.length === 1) {
-            syncSel.value = String(stores[0].id);
+        const syncStores = stores.filter(s => ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
+            && s.status === 'active'
+            && s.is_active === true);
+        if (syncStores.length === 1) {
+            syncSel.value = String(syncStores[0].id);
         }
     }
 
@@ -815,8 +823,18 @@
 
         try {
             const storeId = getSyncStoreId() || $('filterStore').value;
+            if (!storeId) {
+                syncLogs = [];
+                setSyncState('warn', 'Pilih toko');
+                updateSyncDot(false);
+                renderSyncConsole();
+                renderSyncLogs();
+                return syncLogs;
+            }
+
+            const logParams = new URLSearchParams({ action: 'sync_settlements', store_id: String(storeId) });
             const [logs, progress] = await Promise.all([
-                api('/api/marketplace/sync-logs').catch(() => []),
+                api('/api/marketplace/sync-logs?' + logParams.toString()).catch(() => []),
                 storeId ? api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress').catch(() => null) : Promise.resolve(null),
             ]);
 
@@ -943,7 +961,10 @@
         }
 
         if (syncStore) {
-            syncStore.value = stores.length === 1 ? String(stores[0].id) : '';
+            const activeSyncStores = stores.filter(s => ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
+                && s.status === 'active'
+                && s.is_active === true);
+            syncStore.value = activeSyncStores.length === 1 ? String(activeSyncStores[0].id) : '';
         }
 
         restoreSettlementFilterState();
@@ -1335,13 +1356,52 @@
     }
 
     window.runSettlementSync = async function () {
-        await queueSettlementSyncRequest({
-            btnId: 'runSettlementBtn',
-            payload: {},
-            busyText: 'Mengantre sync…',
-            idleText: 'Tarik Settlement',
-            ackTitle: 'Settlement dikirim ke antrian',
-        });
+        const storeId = getSyncStoreId() || $('filterStore').value;
+        if (!storeId) {
+            alert('Pilih toko Shopee dulu di tab Sync sebelum memulai settlement sync.');
+            return;
+        }
+
+        const btn = $('runSettlementBtn');
+        if (!btn || btn.disabled) return;
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menarik…';
+        hideSyncFeedback();
+        setSyncState('running', 'Berjalan');
+        updateSyncDot(true);
+
+        try {
+            const d = await api('/api/marketplace/stores/' + storeId + '/sync-settlements', {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            const hasErrors = Number(d.errors || 0) > 0;
+            const hasWarnings = hasErrors || Number(d.skipped || 0) > 0;
+            showSyncFeedback(hasWarnings ? 'warn' : 'success', hasWarnings ? 'Sync selesai dengan catatan' : 'Sync selesai', d.message || 'Settlement berhasil diproses.', [
+                d.found !== undefined ? `Found: ${d.found}` : null,
+                d.processed !== undefined ? `Processed: ${d.processed}` : null,
+                d.synced !== undefined ? `Synced: ${d.synced}` : null,
+                d.skipped !== undefined ? `Skipped: ${d.skipped}` : null,
+                d.errors !== undefined ? `Errors: ${d.errors}` : null,
+            ].filter(Boolean));
+            setSyncState(hasWarnings ? 'warn' : 'success', hasWarnings ? 'Parsial' : 'Siap');
+            updateSyncDot(false);
+            currentPage = 1;
+            await loadSettlements();
+            await refreshSettlementSyncLogs();
+        } catch (e) {
+            const action = e.data?.action && e.data.action.type === 'redirect'
+                ? { url: e.data.action.url, label: e.data.action.label }
+                : null;
+            showSyncFeedback('error', 'Gagal menarik settlement', e.data?.message || e.message || 'Sync settlement gagal.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean), action);
+            setSyncState('error', 'Gagal');
+            updateSyncDot(false);
+            refreshSettlementSyncLogs();
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
     };
 
     window.runSettlementBackfill = async function (months, btnId = 'runSettlementBackfillBtn') {

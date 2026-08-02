@@ -30,6 +30,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
@@ -2410,6 +2411,30 @@ class MarketplaceController extends Controller
         return $response['message'] ?? $response['error'] ?? $fallback;
     }
 
+    private function ensureSettlementStoreSyncable(Store $store): ?JsonResponse
+    {
+        $store->loadMissing('channel');
+        $channelCode = strtolower(trim((string) $store->channel?->code));
+
+        if (! in_array($channelCode, ['shopee', 'shp'], true)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'SETTLEMENT_CHANNEL_UNSUPPORTED',
+                'message' => "Sync settlement saat ini hanya tersedia untuk Shopee. Toko {$store->name} memakai channel " . ($store->channel?->name ?? 'tidak dikenal') . '.',
+            ], 422);
+        }
+
+        if ($store->status !== 'active' || ! $store->is_active) {
+            return response()->json([
+                'success' => false,
+                'code' => 'STORE_INACTIVE',
+                'message' => "Toko {$store->name} sedang nonaktif. Aktifkan toko terlebih dahulu sebelum menjalankan sync settlement.",
+            ], 409);
+        }
+
+        return null;
+    }
+
     /**
      * Cek connection_status toko SEBELUM meng-queue job latar belakang (force-sync-background,
      * sync-orders-background, sync-historical) — supaya tidak diam-diam gagal di worker tanpa
@@ -3035,9 +3060,13 @@ class MarketplaceController extends Controller
         set_time_limit($isBackfill ? 0 : 180);
         $store->loadMissing('channel');
 
+        if ($response = $this->ensureSettlementStoreSyncable($store)) {
+            return $response;
+        }
+
         $channelName = $store->channel?->name ?? 'channel marketplace';
         $channelCode = $store->channel?->code;
-        $connectUrl = $channelCode === 'shopee'
+        $connectUrl = in_array(strtolower((string) $channelCode), ['shopee', 'shp'], true)
             ? url('/marketplace/shopee/connect')
             : url('/marketplace/settings');
 
@@ -3056,7 +3085,7 @@ class MarketplaceController extends Controller
 
         if ($status === 'TOKEN_EXPIRED') {
             try {
-                if ($channelCode === 'shopee') {
+                if (in_array(strtolower((string) $channelCode), ['shopee', 'shp'], true)) {
                     /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
                     $shopee = app(\App\Services\Marketplace\MarketplaceApiGateway::class);
                     $shopee->refreshToken($store);
@@ -3064,7 +3093,7 @@ class MarketplaceController extends Controller
                     $store->loadMissing('channel');
                     $channelName = $store->channel?->name ?? $channelName;
                     $channelCode = $store->channel?->code ?? $channelCode;
-                    $connectUrl = $channelCode === 'shopee'
+                    $connectUrl = in_array(strtolower((string) $channelCode), ['shopee', 'shp'], true)
                         ? url('/marketplace/shopee/connect')
                         : url('/marketplace/settings');
                     $status = $store->connection_status;
@@ -3115,6 +3144,9 @@ class MarketplaceController extends Controller
             $timeFrom = $timeFrom ?: now()->subMonthsNoOverflow($backfillMonths)->startOfDay()->timestamp;
         }
 
+        $progressKey = "marketplace:settlement_sync_progress:{$store->id}";
+        Cache::forget($progressKey);
+
         try {
             if ($isBackfill) {
                 $result = $this->sync->syncSettlementsBackfill(
@@ -3129,6 +3161,16 @@ class MarketplaceController extends Controller
                     $timeTo,
                 );
             }
+
+            Cache::put($progressKey, array_merge([
+                'status' => ($result['errors'] ?? 0) > 0
+                    ? (($result['synced'] ?? 0) > 0 ? 'warn' : 'error')
+                    : (($result['skipped'] ?? 0) > 0 ? 'warn' : 'success'),
+                'phase' => 'store_done',
+                'percent' => 100,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+            ], $result), 1800);
         } catch (\Throwable $e) {
             // Detail exception (bisa memuat pesan driver HTTP, query, dsb) HANYA masuk log —
             // TIDAK dikirim ke client. Response ke UI selalu pesan generik yang ramah,
@@ -3139,6 +3181,14 @@ class MarketplaceController extends Controller
                 'error'      => $e->getMessage(),
                 'exception'  => get_class($e),
             ]);
+            Cache::put($progressKey, [
+                'status' => 'error',
+                'phase' => 'error',
+                'percent' => 100,
+                'label' => 'Sinkronisasi settlement gagal.',
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+            ], 1800);
 
             return response()->json([
                 'success' => false,
@@ -3176,6 +3226,10 @@ class MarketplaceController extends Controller
         ]);
 
         @set_time_limit(0);
+
+        if ($response = $this->ensureSettlementStoreSyncable($store)) {
+            return $response;
+        }
 
         $backfillMonths = (int) ($data['backfill_months'] ?? 0);
         $isBackfill = $backfillMonths > 0;
@@ -3221,14 +3275,34 @@ class MarketplaceController extends Controller
             $options['--all'] = true;
         }
 
-        // Dispatch ke queue — TIDAK dieksekusi sekarang. Lock per toko
-        // (sync_settlements_store_{id}) tetap ditegakkan di DALAM command saat job ini
-        // benar-benar dijalankan worker, jadi aman kalau di-klik berkali-kali atau
-        // bertabrakan dengan scheduler/CLI manual — yang belakangan cuma akan dilewati
-        // (bukan dobel proses), bukan gagal.
-        $pending = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', $options);
-        if ($isBackfill || $isAll) {
-            $pending->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
+        // Dispatch ke queue — TIDAK dieksekusi sekarang. Kalau dispatch gagal,
+        // jangan tinggalkan progress palsu berstatus queued selama 30 menit.
+        try {
+            $pending = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', $options);
+            if ($isBackfill || $isAll) {
+                $pending->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
+            }
+        } catch (\Throwable $e) {
+            Cache::put($progressKey, [
+                'status'     => 'error',
+                'phase'      => 'dispatch_failed',
+                'percent'    => 100,
+                'label'      => 'Gagal memasukkan settlement sync ke queue.',
+                'store_id'   => $store->id,
+                'store_name' => $store->name,
+                'mode'       => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
+                'updated_at' => now()->toISOString(),
+            ], 1800);
+            Log::error('Settlement background sync gagal di-queue', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'code' => 'SETTLEMENT_QUEUE_ERROR',
+                'message' => 'Settlement sync gagal dimasukkan ke antrian. Periksa queue worker/server lalu coba lagi.',
+            ], 503);
         }
 
         $queuedMessage = $isBackfill
@@ -3884,6 +3958,7 @@ class MarketplaceController extends Controller
                 ->update([
                     'settlement_sync_error_code' => null,
                     'settlement_sync_failed_at' => null,
+                    'settlement_sync_last_attempt_at' => null,
                 ]);
         });
 
@@ -3987,6 +4062,19 @@ class MarketplaceController extends Controller
                     ->whereIn('marketplace_order_id', $legacyOrderIds)
                     ->delete();
             }
+
+            DB::table('marketplace_orders')
+                ->where(function ($q) use ($store, $legacyOrderIds) {
+                    $q->where('store_id', $store->id);
+                    if (! empty($legacyOrderIds)) {
+                        $q->orWhereIn('id', $legacyOrderIds);
+                    }
+                })
+                ->update([
+                    'settlement_sync_error_code' => null,
+                    'settlement_sync_failed_at' => null,
+                    'settlement_sync_last_attempt_at' => null,
+                ]);
 
             $deleted['sync_logs'] = DB::table('marketplace_sync_logs')
                 ->where('store_id', $store->id)
@@ -5428,9 +5516,29 @@ class MarketplaceController extends Controller
         return ['label' => 'Stop / Kurangi Bid', 'color' => '#b91c1c', 'icon' => '🔴'];
     }
 
-    public function syncLogs(): JsonResponse
+    public function syncLogs(Request $request): JsonResponse
     {
-        $logs = MarketplaceSyncLog::with('store:id,name')
+        $data = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'action' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $query = MarketplaceSyncLog::with('store:id,name');
+
+        if (! empty($data['store_id'])) {
+            $query->where('store_id', $data['store_id']);
+        }
+        if (! empty($data['action'])) {
+            $query->where('action', $data['action']);
+        }
+
+        // Settlement history is store-specific. Do not fall back to exposing
+        // every store's settlement log when the page has no selected store.
+        if (($data['action'] ?? null) === 'sync_settlements' && empty($data['store_id'])) {
+            return response()->json([]);
+        }
+
+        $logs = $query
             ->latest()
             ->limit(100)
             ->get()

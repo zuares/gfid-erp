@@ -832,6 +832,104 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame('regular', $progress['mode'] ?? null);
     }
 
+    public function test_settlement_sync_menolak_channel_non_shopee_sebelum_membuat_progress()
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TT-' . rand(1000, 9999),
+            'name' => 'TikTok Test Store',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy-token'],
+            'token_expires_at' => now()->addDay(),
+        ]);
+
+        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST');
+        $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('SETTLEMENT_CHANNEL_UNSUPPORTED', $response->getData(true)['code']);
+        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:' . $store->id));
+    }
+
+    public function test_settlement_sync_menolak_toko_nonaktif_sebelum_membuat_progress()
+    {
+        $store = $this->createStore();
+        $store->update(['is_active' => false]);
+
+        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST');
+        $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store->fresh());
+
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame('STORE_INACTIVE', $response->getData(true)['code']);
+        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:' . $store->id));
+    }
+
+    public function test_sync_settlement_reguler_menyimpan_status_terminal_di_progress()
+    {
+        $store = $this->createStore();
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('syncSettlements')
+                ->once()
+                ->andReturn([
+                    'found' => 1,
+                    'processed' => 1,
+                    'synced' => 0,
+                    'new' => 0,
+                    'updated' => 0,
+                    'skipped' => 1,
+                    'errors' => 0,
+                    'last_processed_id' => 1,
+                    'failed_order_ids' => [],
+                    'message' => 'skipped',
+                ]);
+        });
+
+        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements', 'POST');
+        $response = app(MarketplaceController::class)->syncSettlements($request, $store);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('warn', Cache::get('marketplace:settlement_sync_progress:' . $store->id)['status']);
+    }
+
+    public function test_riwayat_settlement_hanya_mengembalikan_log_toko_yang_diminta()
+    {
+        $store = $this->createStore();
+        $otherStore = $this->createStore();
+
+        MarketplaceSyncLog::create([
+            'store_id' => $store->id,
+            'action' => 'sync_settlements',
+            'status' => 'success',
+            'message' => 'Store A',
+            'payload' => [],
+        ]);
+        MarketplaceSyncLog::create([
+            'store_id' => $otherStore->id,
+            'action' => 'sync_settlements',
+            'status' => 'success',
+            'message' => 'Store B',
+            'payload' => [],
+        ]);
+
+        $request = Request::create('/api/marketplace/sync-logs', 'GET', [
+            'action' => 'sync_settlements',
+            'store_id' => $store->id,
+        ]);
+        $response = app(MarketplaceController::class)->syncLogs($request);
+
+        $payload = $response->getData(true);
+        $this->assertCount(1, $payload);
+        $this->assertSame('Store A', $payload[0]['message']);
+
+        $emptyRequest = Request::create('/api/marketplace/sync-logs', 'GET', [
+            'action' => 'sync_settlements',
+        ]);
+        $this->assertSame([], app(MarketplaceController::class)->syncLogs($emptyRequest)->getData(true));
+    }
+
     public function test_backfill_settlement_background_menggunakan_mode_backfill()
     {
         $store = $this->createStore();

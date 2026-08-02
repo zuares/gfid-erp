@@ -6,6 +6,7 @@ use App\Models\Store;
 use App\Services\MarketplaceSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class MarketplaceSyncFinanceCommand extends Command
@@ -176,51 +177,63 @@ class MarketplaceSyncFinanceCommand extends Command
             if ($dryRun) {
                 $this->info("   [DRY-RUN] Simulasi sinkronisasi settlement dilewati.");
             } else {
-                $afterId = 0;
-                $batchCount = 1;
-                $storeSettlementSynced = 0;
-
-                while (true) {
-                    $this->line(" Menarik batch settlement ke-{$batchCount}...");
+                // Jalur ini berbagi service settlement dengan scheduler
+                // marketplace:sync-settlements. Gunakan lock yang sama agar
+                // finance tidak menarik order settlement yang sama bersamaan.
+                $settlementLock = Cache::lock("sync_settlements_store_{$store->id}", 900);
+                if (! $settlementLock->get()) {
+                    $this->warn("   Settlement dilewati: toko {$store->name} sedang diproses auto-sync settlement lain.");
+                } else {
+                    $afterId = 0;
+                    $batchCount = 1;
+                    $storeSettlementSynced = 0;
 
                     try {
-                        // Hanya tarik settlement untuk order dalam rentang N bulan
-                        $res = $syncService->syncSettlements(
-                            store: $store,
-                            timeFrom: $targetDate,
-                            timeTo: time(),
-                            orderSn: null,
-                            // Mode MISSING: hanya order yang settlement-nya belum ada/belum final
-                            // (logika bawaan syncSettlements). Mode FULL: paksa resync semua.
-                            resync: !$missingOnly,
-                            limit: 200,
-                            afterId: $afterId
-                        );
+                        while (true) {
+                            $this->line(" Menarik batch settlement ke-{$batchCount}...");
 
-                        $synced = $res['synced'] ?? 0;
-                        $skipped = $res['skipped'] ?? 0;
-                        $errors = $res['errors'] ?? 0;
-                        $storeSettlementSynced += $synced;
+                            try {
+                                // Hanya tarik settlement untuk order dalam rentang N bulan
+                                $res = $syncService->syncSettlements(
+                                    store: $store,
+                                    timeFrom: $targetDate,
+                                    timeTo: time(),
+                                    orderSn: null,
+                                    // Mode MISSING: hanya order yang settlement-nya belum ada/belum final
+                                    // (logika bawaan syncSettlements). Mode FULL: paksa resync semua.
+                                    resync: !$missingOnly,
+                                    limit: 200,
+                                    afterId: $afterId
+                                );
 
-                        $this->info("   ✓ Batch {$batchCount}: {$synced} settlement tersinkron (Skipped: {$skipped}, Errors: {$errors}).");
+                                $synced = $res['synced'] ?? 0;
+                                $skipped = $res['skipped'] ?? 0;
+                                $errors = $res['errors'] ?? 0;
+                                $storeSettlementSynced += $synced;
 
-                        $afterId = $res['last_processed_id'] ?? null;
+                                $this->info("   ✓ Batch {$batchCount}: {$synced} settlement tersinkron (Skipped: {$skipped}, Errors: {$errors}).");
 
-                        // Stop if no more records processed or afterId is null
-                        if (!$afterId || ($res['processed'] ?? 0) < 200) {
-                            break;
+                                $afterId = $res['last_processed_id'] ?? null;
+
+                                // Stop if no more records processed or afterId is null
+                                if (!$afterId || ($res['processed'] ?? 0) < 200) {
+                                    break;
+                                }
+
+                                $batchCount++;
+                                sleep(1); // Mencegah rate limit
+
+                            } catch (\Exception $e) {
+                                $this->error("   Gagal pull settlement batch {$batchCount}: " . $e->getMessage());
+                                break;
+                            }
                         }
-
-                        $batchCount++;
-                        sleep(1); // Mencegah rate limit
-
-                    } catch (\Exception $e) {
-                        $this->error("   Gagal pull settlement batch {$batchCount}: " . $e->getMessage());
-                        break;
+                    } finally {
+                        $settlementLock->release();
                     }
+
+                    $totalSyncedToFinance += $storeSettlementSynced;
                 }
-                
-                $totalSyncedToFinance += $storeSettlementSynced;
             }
 
             // 3. PULL DATA RETUR / REFUND

@@ -185,9 +185,17 @@
 <script>
 window.mpHelpers = (function () {
     function api(url, opts = {}) {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+        const method = String(opts.method || 'GET').toUpperCase();
+        const headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            ...(method !== 'GET' && method !== 'HEAD' && csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+            ...(opts.headers || {}),
+        };
         return fetch(url, {
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', ...(opts.headers || {}) },
             ...opts,
+            headers,
         }).then(async r => {
             const p = await r.json().catch(() => ({ message: 'Response tidak valid.' }));
             if (!r.ok) {

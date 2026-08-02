@@ -95,7 +95,10 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-settlements'))
     ->withoutOverlapping();
 
 // Finance: sync order → settlement → COGS setiap 4 jam (profit per order)
-Schedule::call(fn () => Artisan::call('marketplace:sync-finance', ['--months' => 1]))
+Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
+        '--months' => 1,
+        '--mode' => 'missing',
+    ]))
     ->cron('37 */4 * * *') // tiap 4 jam di menit :37 (sebelumnya :00, tabrakan dengan sync-settlements)
     ->name('sync-finance')
     ->withoutOverlapping();

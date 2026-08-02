@@ -66,7 +66,7 @@ class SyncSettlementsCommand extends Command
         {--all : Ulangi batch berbasis cursor id sampai tidak ada order tersisa, tidak ada kemajuan, atau batas pengaman tercapai}
         {--inspect : Tampilkan struktur field raw response (masked) — hanya valid bersama --order}';
 
-    protected $description = 'Sinkronisasi settlement/escrow Shopee (get_escrow_detail). Tidak membuat jurnal accounting. Dijalankan manual — belum dijadwalkan.';
+    protected $description = 'Sinkronisasi settlement/escrow Shopee (get_escrow_detail). Tidak membuat jurnal accounting. Bisa dijalankan scheduler atau manual.';
 
     private function progressKey(Store $store): string
     {
@@ -134,7 +134,7 @@ class SyncSettlementsCommand extends Command
             $resolvedStoreId = $distinctStores->first();
 
             $orderModel = $matches->first();
-            $eligibleStatuses = ['COMPLETED', 'SHIPPED', 'TO_CONFIRM_RECEIVE'];
+            $eligibleStatuses = MarketplaceSyncService::SETTLEMENT_ELIGIBLE_ORDER_STATUSES;
             if (! in_array($orderModel->order_status, $eligibleStatuses, true)) {
                 $this->warn(
                     "Order '{$orderOpt}': status saat ini '{$orderModel->order_status}', BELUM eligible untuk settlement " .
@@ -147,7 +147,7 @@ class SyncSettlementsCommand extends Command
         // ── Resolusi toko yang akan diproses ────────────────────────────────────
         $storesQuery = Store::where('status', 'active')
             ->where('is_active', true)
-            ->whereHas('channel', fn ($q) => $q->where('code', 'shopee'));
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['shopee', 'shp']));
 
         if ($resolvedStoreId) {
             $storesQuery->where('id', $resolvedStoreId);
@@ -273,7 +273,7 @@ class SyncSettlementsCommand extends Command
                     $this->writeProgress($store, [
                         'status'   => ($storeResult['errors'] ?? 0) > 0
                             ? (($storeResult['synced'] ?? 0) > 0 ? 'warn' : 'error')
-                            : 'success',
+                            : (($storeResult['skipped'] ?? 0) > 0 ? 'warn' : 'success'),
                         'phase'    => 'store_done',
                         'percent'  => 100,
                         'label'    => isset($storeResult['message']) ? (string) $storeResult['message'] : 'Selesai',
@@ -416,7 +416,9 @@ class SyncSettlementsCommand extends Command
         if ($progressCallback) {
             try {
                 $progressCallback([
-                    'status'  => $totals['errors'] > 0 ? ($totals['synced'] > 0 ? 'warn' : 'error') : 'success',
+                    'status'  => $totals['errors'] > 0
+                        ? ($totals['synced'] > 0 ? 'warn' : 'error')
+                        : ($totals['skipped'] > 0 ? 'warn' : 'success'),
                     'phase'   => 'store_done',
                     'percent' => 100,
                     'label'   => 'Selesai',

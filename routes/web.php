@@ -228,15 +228,11 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
     Route::get('/stores/{store}/sync-settlements-progress', [MarketplaceController::class, 'syncSettlementsProgress']);
     Route::post('/settlements/purge',                [MarketplaceController::class, 'purgeSettlements'])
-        ->middleware('role:owner')
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+        ->middleware('role:owner');
     Route::post('/stores/{store}/purge-marketplace-data', [MarketplaceController::class, 'purgeMarketplaceData'])
-        ->middleware('role:owner')
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/stores/{store}/sync-settlements',  [MarketplaceController::class, 'syncSettlements'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+        ->middleware('role:owner');
+    Route::post('/stores/{store}/sync-settlements', [MarketplaceController::class, 'syncSettlements']);
+    Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground']);
     Route::get('/order-profits',                     [MarketplaceController::class, 'orderProfits']);
     
     // Returns Module
