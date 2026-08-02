@@ -1948,7 +1948,13 @@
             // (mis. FLC280BLK → BLK, J7BLK → BLK, K5ABT → ABT).
             function wcColorCode(code) {
                 if (!code) return '';
-                const m = String(code).toUpperCase().trim().match(/[A-Z]+$/);
+                let normalized = String(code).toUpperCase().trim();
+
+                // Kode item jadi bisa memiliki suffix ukuran setelah warna,
+                // misalnya CFP-BLK-L atau CFP-BLK-XL. Suffix ukuran bukan warna.
+                normalized = normalized.replace(/[-_\s](?:XXXS|XXS|XXXL|XXL|3XL|2XL|XL|XS|S|M|L)$/, '');
+
+                const m = normalized.match(/[A-Z]+$/);
                 return m ? m[0] : '';
             }
 
@@ -2203,8 +2209,11 @@
                     itemInput.addEventListener('input', () => {
                         handleItemFocus();
                         if (hiddenItemId) hiddenItemId.value = '';
-                        itemInput.classList.add('is-invalid');
-                        refreshSubmitStateForBom(true);
+                        // Saat user masih mengetik dan dropdown hasil pencarian
+                        // terbuka, jangan tampilkan error sebelum item dipilih.
+                        // Tombol simpan tetap disabled karena hidden ID masih kosong.
+                        itemInput.classList.remove('is-invalid');
+                        refreshSubmitStateForBom(false);
                     });
                     itemInput.addEventListener('blur', () => {
                         if (!hiddenItemId?.value) {
