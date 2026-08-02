@@ -2943,12 +2943,20 @@ class MarketplaceController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
             $knownSns = $orders->pluck('channel_order_id')
                 ->merge($orders->pluck('external_order_id'))
+                ->merge($orders->pluck('booking_sn'))
                 ->filter()->flip();
 
             $pureBookings = \App\Models\MarketplaceBooking::with('store.channel')
                 ->whereIn('booking_status', ['PENDING', 'READY_TO_SHIP', 'PROCESSED'])
                 ->get()
-                ->reject(fn ($b) => $b->order_sn && $knownSns->has($b->order_sn));
+                ->reject(function ($b) use ($knownSns) {
+                    // Setelah booking berhasil dibuat sebagai order lokal,
+                    // booking_sn bisa tetap menjadi channel_order_id dan
+                    // order_sn masih kosong. Jangan tampilkan pseudo-order
+                    // kedua untuk booking yang sama.
+                    return $knownSns->has($b->booking_sn)
+                        || (! empty($b->order_sn) && $knownSns->has($b->order_sn));
+                });
 
             $allSkus = [];
             foreach ($pureBookings as $b) {

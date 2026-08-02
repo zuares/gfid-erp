@@ -12,6 +12,7 @@ use App\Jobs\SyncMarketplaceBookings;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceSyncService;
 use App\Services\Channels\ChannelManager;
+use App\Http\Controllers\MarketplaceController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
@@ -339,6 +340,30 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
             'order_status' => 'READY_TO_SHIP',
             'status' => 'packed',
         ]);
+    }
+
+    public function test_local_orders_tidak_menduplikasi_booking_yang_sudah_menjadi_order(): void
+    {
+        $order = $this->createOrder('BOOKING-DUPLICATE', 'READY_TO_SHIP');
+        $order->update([
+            'booking_sn' => 'BOOKING-DUPLICATE',
+            'external_order_id' => 'BOOKING-DUPLICATE',
+        ]);
+
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => 'BOOKING-DUPLICATE',
+            'booking_status' => 'READY_TO_SHIP',
+            'items' => [],
+        ]);
+
+        $response = app(MarketplaceController::class)->localOrders();
+        $rows = collect($response->getData(true))
+            ->where('booking_sn', 'BOOKING-DUPLICATE')
+            ->values();
+
+        $this->assertCount(1, $rows);
+        $this->assertFalse((bool) ($rows->first()['is_booking'] ?? false));
     }
 
     public function test_sync_tidak_mempertahankan_processed_untuk_order_booking_ready_to_ship(): void
