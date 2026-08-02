@@ -3015,8 +3015,9 @@ class MarketplaceController extends Controller
                     'channel_order_id'            => $b->order_sn ?: $b->booking_sn,
                     'external_order_id'           => $b->order_sn,
                     'booking_sn'                  => $b->booking_sn,
-                    // PROCESSED → tab "Sedang Dikemas"; PENDING/READY_TO_SHIP → "Perlu Dikirim" (sub-tab ⚡).
-                    'order_status'                => $b->booking_status === 'PROCESSED' ? 'PROCESSED' : 'READY_TO_SHIP',
+                    // Booking tanpa bukti pengaturan kirim tetap di Perlu Dikirim,
+                    // termasuk PROCESSED yang belum punya resi/package/document.
+                    'order_status'                => $b->needsShipping() ? 'READY_TO_SHIP' : ($b->booking_status === 'PROCESSED' ? 'PROCESSED' : 'READY_TO_SHIP'),
                     'ordered_at'                  => $b->create_time
                         ? \Carbon\Carbon::createFromTimestamp($b->create_time)->toIso8601String()
                         : optional($b->created_at)->toIso8601String(),

@@ -2039,7 +2039,7 @@ class MarketplaceSyncService
                 // "Sedang Dikemas".
                 $existingOrder = MarketplaceOrder::where('store_id', $store->id)
                     ->where('channel_order_id', $detail['order_sn'])
-                    ->first(['id', 'order_status', 'status']);
+                    ->first(['id', 'order_status', 'status', 'booking_sn']);
 
                 if ($existingOrder?->order_status === 'READY_TO_HANDOVER'
                     && in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED', 'MATCHED'], true)) {
@@ -2057,6 +2057,7 @@ class MarketplaceSyncService
                 // PROCESSED; jangan downgrade hanya karena API mengembalikan
                 // READY_TO_SHIP pada response berikutnya.
                 if ($existingOrder?->order_status === 'PROCESSED'
+                    && blank($existingOrder?->booking_sn)
                     && $orderStatus === 'READY_TO_SHIP') {
                     $orderStatus = 'PROCESSED';
                 }

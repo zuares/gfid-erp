@@ -5,8 +5,10 @@ namespace Tests\Feature\Console;
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceBooking;
 use App\Models\OrderFulfillment;
 use App\Models\Store;
+use App\Jobs\SyncMarketplaceBookings;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -244,5 +246,74 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
             'order_status' => 'SHIPPED',
             'status' => 'shipped',
         ]);
+    }
+
+    public function test_booking_ready_to_ship_tidak_masuk_ke_processed_saat_backfill(): void
+    {
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => 'BOOKING-READY-1',
+            'booking_status' => 'READY_TO_SHIP',
+            'items' => [],
+        ]);
+
+        $this->invokeBookingJobMethod('backfillMissingOrders');
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'channel_order_id' => 'BOOKING-READY-1',
+            'booking_sn' => 'BOOKING-READY-1',
+            'order_status' => 'READY_TO_SHIP',
+        ]);
+    }
+
+    public function test_booking_ready_to_ship_mengembalikan_order_lama_dari_processed(): void
+    {
+        $order = $this->createOrder('BOOKING-ORDER-1', 'PROCESSED');
+        $order->update(['booking_sn' => 'BOOKING-READY-2']);
+
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => 'BOOKING-READY-2',
+            'order_sn' => $order->channel_order_id,
+            'booking_status' => 'PROCESSED',
+            'items' => [],
+        ]);
+
+        $this->invokeBookingJobMethod('normalizeUnarrangedOrders');
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'READY_TO_SHIP',
+            'status' => 'packed',
+        ]);
+    }
+
+    public function test_sync_tidak_mempertahankan_processed_untuk_order_booking_ready_to_ship(): void
+    {
+        $order = $this->createOrder('BOOKING-ORDER-3', 'PROCESSED');
+        $order->update(['booking_sn' => 'BOOKING-READY-3']);
+
+        $method = new \ReflectionMethod(\App\Services\MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(\App\Services\MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $order->channel_order_id,
+            'booking_sn' => $order->booking_sn,
+            'order_status' => 'READY_TO_SHIP',
+            'total_amount' => 100000,
+            'item_list' => [],
+        ]]);
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'READY_TO_SHIP',
+        ]);
+    }
+
+    private function invokeBookingJobMethod(string $method): void
+    {
+        $job = new SyncMarketplaceBookings($this->store);
+        $reflection = new \ReflectionMethod($job, $method);
+        $reflection->setAccessible(true);
+        $reflection->invoke($job);
     }
 }

@@ -101,6 +101,11 @@ class SyncMarketplaceBookings implements ShouldQueue
             // Backfill: tarik order kilat yang belum ada di marketplace_orders supaya
             // muncul di halaman Orders (halaman itu hanya membaca marketplace_orders).
             $this->backfillMissingOrders();
+
+            // Booking READY_TO_SHIP yang sudah terlanjur tersimpan sebagai
+            // PROCESSED harus dikembalikan ke tab Perlu Dikirim sampai
+            // pengirimannya benar-benar diatur.
+            $this->normalizeUnarrangedOrders();
         } catch (\Throwable $e) {
             Log::error("Exception in SyncMarketplaceBookings [{$this->store->id}]: " . $e->getMessage());
         }
@@ -303,12 +308,13 @@ class SyncMarketplaceBookings implements ShouldQueue
                     $orderStatus   = match ($bkStatusUpper) {
                         'SHIPPED', 'READY_TO_HANDOVER' => 'SHIPPED',
                         'COMPLETED'                    => 'COMPLETED',
-                        default                        => 'PROCESSED',
+                        'PROCESSED'                    => 'PROCESSED',
+                        default                        => 'READY_TO_SHIP',
                     };
                     $legacyStatus = match ($orderStatus) {
                         'SHIPPED'   => 'shipped',
                         'COMPLETED' => 'completed',
-                        default     => 'processed',
+                        default     => 'packed',
                     };
 
                     try {
@@ -389,6 +395,56 @@ class SyncMarketplaceBookings implements ShouldQueue
                 ]);
                 Log::info("SyncMarketplaceBookings propagate: {$order->channel_order_id} PROCESSED → {$targetStatus} (booking {$bk->booking_sn})");
             }
+        }
+    }
+
+    /**
+     * Sinkronkan order yang sudah punya booking tetapi booking-nya masih
+     * READY_TO_SHIP/PENDING/PROCESSED tanpa bukti kirim. Ini mencegah status lama PROCESSED membuat order
+     * masuk ke Sedang Dikemas sebelum tombol Atur Pengiriman dijalankan.
+     */
+    protected function normalizeUnarrangedOrders(): void
+    {
+        $bookings = MarketplaceBooking::where('store_id', $this->store->id)
+            ->where(function ($query) {
+                $query->whereNull('booking_status')
+                    ->orWhereIn('booking_status', ['PENDING', 'READY_TO_SHIP', 'PROCESSED', '']);
+            })
+            ->where(function ($query) {
+                $query->whereNull('tracking_number')->orWhere('tracking_number', '');
+            })
+            ->where(function ($query) {
+                $query->whereNull('package_number')->orWhere('package_number', '');
+            })
+            ->where(function ($query) {
+                $query->whereNull('shipping_document_status')->orWhere('shipping_document_status', '');
+            })
+            ->get(['booking_sn', 'order_sn', 'booking_status']);
+
+        foreach ($bookings as $booking) {
+            $order = MarketplaceOrder::where('store_id', $this->store->id)
+                ->where('order_status', 'PROCESSED')
+                ->where(function ($query) use ($booking) {
+                    $query->where('booking_sn', $booking->booking_sn)
+                        ->orWhere('channel_order_id', $booking->booking_sn);
+
+                    if (! empty($booking->order_sn)) {
+                        $query->orWhere('channel_order_id', $booking->order_sn);
+                    }
+                })
+                ->first();
+
+            if (! $order) {
+                continue;
+            }
+
+            $order->update([
+                'order_status' => 'READY_TO_SHIP',
+                'status' => 'packed',
+                'booking_sn' => $booking->booking_sn,
+            ]);
+
+            Log::info("SyncMarketplaceBookings: {$order->channel_order_id} PROCESSED → READY_TO_SHIP karena booking {$booking->booking_sn} belum diatur pengirimannya.");
         }
     }
 
