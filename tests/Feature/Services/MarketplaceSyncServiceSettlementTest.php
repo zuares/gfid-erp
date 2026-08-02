@@ -1355,4 +1355,71 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
             'status' => 'failed',
         ]);
     }
+
+    public function test_sync_order_tidak_membuat_duplikat_untuk_settlement_final()
+    {
+        $orderSn = '260726PFTRAJ2Q';
+        $finalTime = now()->subHour();
+
+        $existingOrder = $this->createOrder([
+            'channel_order_id' => $orderSn,
+            'order_status' => 'COMPLETED',
+        ]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $this->store->id,
+            'order_id' => $existingOrder->id,
+            'channel_order_id' => $orderSn,
+            'buyer_payment_amount' => 86417,
+            'final_income' => 80000,
+            'settlement_time' => $finalTime,
+            'raw_json' => ['escrow_amount' => 80000],
+        ]);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $orderSn,
+            'order_status' => 'COMPLETED',
+            'total_amount' => 86417,
+            'item_list' => [[
+                'model_original_price' => 100000,
+                'model_discounted_price' => 58000,
+                'model_quantity_purchased' => 1,
+            ]],
+        ]]);
+
+        $settlement = MarketplaceOrderSettlement::where('store_id', $this->store->id)
+            ->where('channel_order_id', $orderSn)
+            ->firstOrFail();
+
+        $this->assertSame(1, MarketplaceOrderSettlement::where('store_id', $this->store->id)
+            ->where('channel_order_id', $orderSn)
+            ->count());
+        $this->assertEquals($finalTime->timestamp, $settlement->settlement_time->timestamp);
+        $this->assertSame(['escrow_amount' => 80000], $settlement->raw_json);
+    }
+
+    public function test_sync_order_tidak_mendowngrade_status_ready_to_handover()
+    {
+        $orderSn = 'ORDER-READY-HANDOVER';
+        $order = $this->createOrder([
+            'channel_order_id' => $orderSn,
+            'order_status' => 'READY_TO_HANDOVER',
+        ]);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $orderSn,
+            'order_status' => 'PROCESSED',
+            'total_amount' => 100000,
+            'item_list' => [],
+        ]]);
+
+        $order->refresh();
+
+        $this->assertSame('READY_TO_HANDOVER', $order->order_status);
+        $this->assertSame('packed', $order->status);
+    }
 }

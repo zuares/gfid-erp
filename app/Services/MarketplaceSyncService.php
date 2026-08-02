@@ -1857,10 +1857,40 @@ class MarketplaceSyncService
                         * (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0);
                 });
 
+                // Status lokal READY_TO_HANDOVER adalah hasil workflow scan/packing
+                // GFID, bukan status yang dikirim balik oleh API Shopee. Ambil order
+                // lama sebelum update supaya sync berikutnya tidak menurunkannya lagi
+                // ke PROCESSED/READY_TO_SHIP dan membuat order tampak nyangkut di
+                // "Sedang Dikemas".
+                $existingOrder = MarketplaceOrder::where('store_id', $store->id)
+                    ->where('channel_order_id', $detail['order_sn'])
+                    ->first(['id', 'order_status', 'status']);
+
+                if ($existingOrder?->order_status === 'READY_TO_HANDOVER'
+                    && in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED', 'MATCHED'], true)) {
+                    $orderStatus = 'READY_TO_HANDOVER';
+                }
+
+                // Status return dari webhook juga lebih authoritative daripada
+                // response detail order yang terlambat dari Shopee.
+                if ($existingOrder?->order_status === 'TO_RETURN'
+                    && in_array($orderStatus, ['SHIPPED', 'COMPLETED'], true)) {
+                    $orderStatus = 'TO_RETURN';
+                }
+
+                // Acknowledge/arrange shipment lokal sudah memajukan order ke
+                // PROCESSED; jangan downgrade hanya karena API mengembalikan
+                // READY_TO_SHIP pada response berikutnya.
+                if ($existingOrder?->order_status === 'PROCESSED'
+                    && $orderStatus === 'READY_TO_SHIP') {
+                    $orderStatus = 'PROCESSED';
+                }
+
                 // ── Status legacy mapping ─────────────────────────────────────
                 $statusMap  = [
                     'READY_TO_SHIP' => 'packed',
                     'PROCESSED'     => 'packed',
+                    'READY_TO_HANDOVER' => 'packed',
                     'SHIPPED'       => 'shipped',
                     'COMPLETED'     => 'completed',
                     'CANCELLED'     => 'cancelled',
@@ -1868,7 +1898,7 @@ class MarketplaceSyncService
                     'UNPAID'        => 'new',
                     'TO_CONFIRM_RECEIVE' => 'shipped',
                 ];
-                $statusLegacy = $statusMap[$orderStatus] ?? 'new';
+                $statusLegacy = $statusMap[$orderStatus] ?? ($existingOrder?->status ?? 'new');
 
                 if ($dryRun) {
                     $existingOrder = MarketplaceOrder::where('store_id', $store->id)->where('channel_order_id', $detail['order_sn'])->first();
@@ -1964,14 +1994,34 @@ class MarketplaceSyncService
                         }
                     }
 
-                    MarketplaceOrderSettlement::updateOrCreate(
-                        ['store_id' => $store->id, 'channel_order_id' => $detail['order_sn'], 'settlement_time' => null],
-                        [
+                    // Settlement bersifat satu baris per (store, order). Jangan
+                    // memasukkan settlement_time=null ke lookup: settlement yang
+                    // sudah final memiliki timestamp sehingga lookup tersebut tidak
+                    // menemukannya dan mencoba INSERT baris kedua, yang ditolak oleh
+                    // unique index.
+                    $settlement = MarketplaceOrderSettlement::where([
+                        'store_id'          => $store->id,
+                        'channel_order_id'  => $detail['order_sn'],
+                    ])->first();
+
+                    // Placeholder hanya boleh membuat/memperbarui settlement yang
+                    // belum final. Data settlement final berasal dari escrow detail
+                    // dan tidak boleh ditimpa oleh sync order biasa.
+                    if (! $settlement) {
+                        MarketplaceOrderSettlement::create([
+                            'store_id'             => $store->id,
+                            'channel_order_id'     => $detail['order_sn'],
                             'order_id'             => $order->id,
                             'buyer_payment_amount' => $totalAmount,
                             'raw_json'             => ['seller_discount' => $calcSellerDiscount],
-                        ]
-                    );
+                        ]);
+                    } elseif ($settlement->settlement_time === null) {
+                        $settlement->update([
+                            'order_id'             => $order->id,
+                            'buyer_payment_amount' => $totalAmount,
+                            'raw_json'             => ['seller_discount' => $calcSellerDiscount],
+                        ]);
+                    }
                 }
 
                 // Pre-download resi: HANYA order segar (≤7 hari — backfill histori tidak
@@ -1996,24 +2046,6 @@ class MarketplaceSyncService
 
                 // Channel code untuk SKU Mapping lookup
                 $channelCode = $store->channel?->code;
-                $orderStatus = $detail['order_status'] ?? '';
-                
-                // --- PATCH: Preserve Webhook "TO_RETURN" Status ---
-                // GetOrderDetail API often lags behind the logistics webhook. 
-                // If the webhook already promoted this to TO_RETURN, prevent GetOrderDetail from downgrading it to SHIPPED.
-                $existingOrder = MarketplaceOrder::where('store_id', $store->id)
-                    ->where('channel_order_id', $detail['order_sn'])
-                    ->first(['id', 'order_status']);
-                    
-                if ($existingOrder && $existingOrder->order_status === 'TO_RETURN' && $orderStatus === 'SHIPPED') {
-                    $orderStatus = 'TO_RETURN';
-                }
-                
-                // Jika status dari Shopee adalah READY_TO_SHIP, tetapi order lokal sudah PROCESSED
-                // (biasanya karena Acknowledge manual di GFID), cegah downgrade
-                if ($existingOrder && $existingOrder->order_status === 'PROCESSED' && $orderStatus === 'READY_TO_SHIP') {
-                    $orderStatus = 'PROCESSED';
-                }
                 
                 $orderHasIncomplete = false;
 
