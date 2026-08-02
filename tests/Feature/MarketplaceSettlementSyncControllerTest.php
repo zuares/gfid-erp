@@ -1384,4 +1384,82 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(1, (int) $payload['paginator']['total']);
         $this->assertSame('ORDER-SEARCH-001', $payload['paginator']['data'][0]['channel_order_id']);
     }
+
+    public function test_filter_belum_cair_mencakup_record_pending_dan_order_tanpa_record_settlement()
+    {
+        $store = $this->createStore();
+
+        $pendingOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-PENDING-SETTLEMENT',
+            'channel_order_id' => 'ORDER-PENDING-SETTLEMENT',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDays(2),
+            'order_date' => now()->subDays(2),
+            'subtotal_items' => 125000,
+            'total_paid_customer' => 125000,
+        ]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $pendingOrder->id,
+            'channel_order_id' => $pendingOrder->channel_order_id,
+            'buyer_payment_amount' => 125000,
+            'final_income' => 0,
+            'settlement_time' => null,
+        ]);
+
+        $missingOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-MISSING-SETTLEMENT',
+            'channel_order_id' => 'ORDER-MISSING-SETTLEMENT',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 99000,
+            'total_paid_customer' => 99000,
+        ]);
+
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-CANCELLED-NO-SETTLEMENT',
+            'channel_order_id' => 'ORDER-CANCELLED-NO-SETTLEMENT',
+            'order_status' => 'CANCELLED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 50000,
+            'total_paid_customer' => 50000,
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'settlement_status' => 'belum_cair',
+            'status' => 'COMPLETED',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $response = app(MarketplaceController::class)->settlements($request);
+        $payload = $response->getData(true);
+        $rows = $payload['paginator']['data'];
+
+        $this->assertSame(2, $payload['paginator']['total']);
+        $this->assertSame(2, $payload['meta']['kpi_count_unsettled']);
+        $this->assertEqualsCanonicalizing([
+            'ORDER-PENDING-SETTLEMENT',
+            'ORDER-MISSING-SETTLEMENT',
+        ], array_column($rows, 'channel_order_id'));
+        $this->assertContains($missingOrder->id, array_column(array_column($rows, 'order'), 'id'));
+        $this->assertContains(null, array_column($rows, 'settlement_time'));
+
+        $cairRequest = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'settlement_status' => 'cair',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $cairPayload = app(MarketplaceController::class)->settlements($cairRequest)->getData(true);
+        $this->assertSame(0, $cairPayload['paginator']['total']);
+    }
 }

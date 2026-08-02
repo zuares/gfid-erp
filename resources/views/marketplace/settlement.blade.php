@@ -218,12 +218,104 @@
             border-radius:12px;
             background:rgba(148,163,184,.03);
         }
+        .settlement-store-health{
+            margin-top:.85rem;
+            padding:.85rem;
+            border:1px solid var(--shp-border);
+            border-radius:12px;
+            background:rgba(148,163,184,.025);
+        }
+        .settlement-store-health-head{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:.75rem;
+            flex-wrap:wrap;
+            margin-bottom:.65rem;
+        }
+        .settlement-store-health-title{
+            font-size:.75rem;
+            font-weight:900;
+            color:var(--shp-text);
+        }
+        .settlement-store-health-subtitle{
+            margin-top:.16rem;
+            font-size:.7rem;
+            color:var(--shp-muted);
+        }
+        .settlement-store-health-summary{
+            display:flex;
+            gap:.35rem;
+            flex-wrap:wrap;
+        }
+        .settlement-store-health-summary span{
+            display:inline-flex;
+            align-items:center;
+            gap:.25rem;
+            border-radius:999px;
+            padding:.18rem .5rem;
+            font-size:.67rem;
+            font-weight:800;
+            background:rgba(148,163,184,.12);
+            color:#475569;
+        }
+        .settlement-store-health-summary .ready{ background:rgba(34,197,94,.14); color:#166534; }
+        .settlement-store-health-summary .attention{ background:rgba(245,158,11,.16); color:#b45309; }
+        .settlement-store-health-summary .inactive{ background:rgba(100,116,139,.14); color:#475569; }
+        .settlement-store-health-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+            gap:.5rem;
+        }
+        .settlement-store-health-card{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:.55rem;
+            padding:.65rem .7rem;
+            border:1px solid var(--shp-border);
+            border-radius:10px;
+            background:var(--card,#fff);
+        }
+        .settlement-store-health-card strong{
+            display:block;
+            font-size:.74rem;
+            color:var(--shp-text);
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+        .settlement-store-health-card small{
+            display:block;
+            margin-top:.16rem;
+            font-size:.67rem;
+            color:var(--shp-muted);
+        }
+        .settlement-store-health-status{
+            flex:none;
+            display:inline-flex;
+            align-items:center;
+            gap:.25rem;
+            border-radius:999px;
+            padding:.18rem .42rem;
+            font-size:.63rem;
+            font-weight:900;
+            white-space:nowrap;
+        }
+        .settlement-store-health-status.ready{ background:rgba(34,197,94,.14); color:#166534; }
+        .settlement-store-health-status.refresh{ background:rgba(59,130,246,.14); color:#1d4ed8; }
+        .settlement-store-health-status.attention{ background:rgba(245,158,11,.16); color:#b45309; }
+        .settlement-store-health-status.inactive{ background:rgba(100,116,139,.14); color:#475569; }
         body[data-theme="dark"] .settlement-sync-feedback,
         body[data-theme="dark"] .settlement-sync-action-strip,
         body[data-theme="dark"] .settlement-sync-details{
             background:rgba(15,23,42,.92);
         }
         body[data-theme="dark"] .settlement-sync-advanced{
+            background:rgba(15,23,42,.78);
+        }
+        body[data-theme="dark"] .settlement-store-health,
+        body[data-theme="dark"] .settlement-store-health-card{
             background:rgba(15,23,42,.78);
         }
         .settlement-sync-log-ok{ color:#4ade80; }
@@ -433,7 +525,20 @@
 
             </div>
 
-            <details class="settlement-sync-details">
+            <div id="settlementStoreHealth" class="settlement-store-health" aria-live="polite">
+                <div class="settlement-store-health-head">
+                    <div>
+                        <div class="settlement-store-health-title"><i class="bi bi-shield-check me-1"></i>Kesiapan toko</div>
+                        <div class="settlement-store-health-subtitle">Toko nonaktif dan credential bermasalah tidak akan diproses.</div>
+                    </div>
+                    <div id="settlementStoreHealthSummary" class="settlement-store-health-summary"></div>
+                </div>
+                <div id="settlementStoreHealthGrid" class="settlement-store-health-grid">
+                    <div style="font-size:.72rem; color:var(--shp-muted);">Memuat status toko…</div>
+                </div>
+            </div>
+
+            <details id="settlementSyncDetails" class="settlement-sync-details">
                 <summary>
                     <span><i class="bi bi-activity me-1"></i> Riwayat</span>
                 </summary>
@@ -578,6 +683,103 @@
 
     function getSyncStoreId() {
         return $('syncStore') ? $('syncStore').value : '';
+    }
+
+    function isShopeeStore(store) {
+        return ['shopee', 'shp'].includes(String(store?.channel?.code || '').toLowerCase());
+    }
+
+    function isActiveStore(store) {
+        return store?.status === 'active' && store?.is_active === true;
+    }
+
+    function getStoreSyncState(store) {
+        if (!isActiveStore(store)) {
+            return { key: 'inactive', label: 'Nonaktif', icon: 'bi-pause-circle', note: 'Aktifkan toko untuk sync.' };
+        }
+        if (!isShopeeStore(store)) {
+            return { key: 'attention', label: 'Tidak didukung', icon: 'bi-question-circle', note: 'Settlement saat ini hanya untuk Shopee.' };
+        }
+
+        const connection = String(store.connection_status || '').toUpperCase();
+        if (connection === 'CONNECTED') {
+            return { key: 'ready', label: 'Siap sync', icon: 'bi-check-circle', note: 'Credential aktif.' };
+        }
+        if (connection === 'TOKEN_EXPIRED') {
+            return { key: 'refresh', label: 'Refresh token', icon: 'bi-arrow-repeat', note: 'Akan dicoba refresh otomatis.' };
+        }
+        if (connection === 'NOT_CONNECTED') {
+            return { key: 'attention', label: 'Belum terhubung', icon: 'bi-plug', note: 'Hubungkan toko terlebih dahulu.' };
+        }
+        if (connection === 'INVALID_APP_KEY') {
+            return { key: 'attention', label: 'APP_KEY invalid', icon: 'bi-shield-exclamation', note: 'Periksa APP_KEY/config server.' };
+        }
+        return { key: 'attention', label: 'Perlu perhatian', icon: 'bi-exclamation-triangle', note: 'Koneksi toko belum siap.' };
+    }
+
+    function getStoreAction(store, state) {
+        if (state.key !== 'attention' || !isShopeeStore(store)) return null;
+        if (String(store.connection_status || '').toUpperCase() === 'NOT_CONNECTED') {
+            return { url: '/marketplace/shopee/connect', label: 'Hubungkan' };
+        }
+        return { url: '/marketplace/settings', label: 'Buka pengaturan' };
+    }
+
+    function renderStoreHealth() {
+        const summary = $('settlementStoreHealthSummary');
+        const grid = $('settlementStoreHealthGrid');
+        if (!summary || !grid) return;
+
+        if (!stores.length) {
+            summary.innerHTML = '';
+            grid.innerHTML = '<div style="font-size:.72rem; color:var(--shp-muted);">Tidak ada data toko.</div>';
+            return;
+        }
+
+        const states = stores.map(store => ({ store, state: getStoreSyncState(store) }));
+        const ready = states.filter(row => ['ready', 'refresh'].includes(row.state.key)).length;
+        const attention = states.filter(row => row.state.key === 'attention').length;
+        const inactive = states.filter(row => row.state.key === 'inactive').length;
+        summary.innerHTML = `
+            <span class="ready"><i class="bi bi-check-circle"></i>${ready} siap</span>
+            <span class="attention"><i class="bi bi-exclamation-triangle"></i>${attention} perhatian</span>
+            <span class="inactive"><i class="bi bi-pause-circle"></i>${inactive} nonaktif</span>
+        `;
+
+        grid.innerHTML = states.map(({ store, state }) => {
+            const action = getStoreAction(store, state);
+            const actionHtml = action
+                ? `<a href="${esc(action.url)}" class="btn btn-sm btn-ship-outline btn-pill" style="font-size:.64rem; padding:.2rem .45rem; margin-top:.35rem;">${esc(action.label)}</a>`
+                : '';
+            return `
+                <div class="settlement-store-health-card">
+                    <div style="min-width:0;">
+                        <strong title="${esc(store.name || '')}">${esc(store.name || 'Toko tanpa nama')}</strong>
+                        <small>${esc(store.channel?.name || 'Channel tidak dikenal')} · ${esc(state.note)}</small>
+                        ${actionHtml}
+                    </div>
+                    <span class="settlement-store-health-status ${esc(state.key)}"><i class="bi ${esc(state.icon)}"></i>${esc(state.label)}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function presentSyncError(error, fallbackTitle = 'Sync gagal') {
+        const code = String(error?.data?.code || '').toUpperCase();
+        const fallback = error?.data?.message || error?.message || 'Proses settlement belum berhasil.';
+        const map = {
+            STORE_INACTIVE: { level: 'warn', title: 'Toko nonaktif', message: 'Aktifkan toko terlebih dahulu sebelum menjalankan settlement sync.' },
+            STORE_NOT_CONNECTED: { level: 'warn', title: 'Toko belum terhubung', message: fallback },
+            SHOPEE_AUTH_REQUIRED: { level: 'warn', title: 'Login ulang diperlukan', message: fallback },
+            SETTLEMENT_CHANNEL_UNSUPPORTED: { level: 'warn', title: 'Channel belum didukung', message: fallback },
+            SETTLEMENT_QUEUE_ERROR: { level: 'error', title: 'Queue tidak tersedia', message: 'Sync belum masuk antrian. Pastikan queue worker berjalan, lalu coba lagi.' },
+            SETTLEMENT_SYNC_ERROR: { level: 'error', title: 'Sync settlement gagal', message: fallback },
+        };
+        const item = map[code] || { level: 'error', title: fallbackTitle, message: fallback };
+        const action = error?.data?.action?.type === 'redirect'
+            ? { url: error.data.action.url, label: error.data.action.label }
+            : (code === 'SETTLEMENT_QUEUE_ERROR' ? { url: '#settlementSyncDetails', label: 'Cek status queue' } : null);
+        return { ...item, code, action };
     }
 
     function setSyncState(status, text) {
@@ -731,6 +933,7 @@
         if (syncStores.length === 1) {
             syncSel.value = String(syncStores[0].id);
         }
+        renderStoreHealth();
     }
 
     function startSyncPolling() {
@@ -919,7 +1122,12 @@
     };
 
     async function init() {
-        stores = await api('/api/marketplace/stores').catch(() => []);
+        try {
+            stores = await api('/api/marketplace/stores');
+        } catch (error) {
+            stores = [];
+            showSyncFeedback('error', 'Daftar toko gagal dimuat', 'UI belum bisa menentukan toko mana yang aman untuk diproses. Muat ulang halaman atau periksa koneksi server.', [error?.data?.code ? `Kode: ${error.data.code}` : null].filter(Boolean));
+        }
         populateStoreSelects();
 
         if (window.GFID && window.GFID.initDateRange) {
@@ -1131,6 +1339,7 @@
 
                     <td style="font-size:.75rem;color:var(--shp-muted);">
                         ${s.settlement_time ? fmtDateTime(s.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem">Belum Cair</span>'}
+                        ${s.settlement_recorded === false ? '<div style="font-size:.63rem;color:#b45309;margin-top:3px;">Belum ada data payout</div>' : ''}
                     </td>
 
                     <td class="text-end">
@@ -1340,14 +1549,11 @@
                 }
             }
 
-            const level = e.status === 401 || e.status === 422 ? 'warn' : 'error';
-            const action = e.data?.action && e.data.action.type === 'redirect'
-                ? { url: e.data.action.url, label: e.data.action.label }
-                : null;
-            showSyncFeedback(level, 'Gagal mengirim', e.data?.message || e.message || 'Gagal mengirim settlement sync ke latar belakang.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean), action);
+            const presentation = presentSyncError(e, 'Gagal mengirim');
+            showSyncFeedback(presentation.level, presentation.title, presentation.message, [presentation.code ? `Kode: ${presentation.code}` : null].filter(Boolean), presentation.action);
             setSyncState('error', 'Gagal');
             updateSyncDot(false);
-            renderSettlementProgress({ status: 'error', percent: 100, label: e.data?.message || e.message || 'Gagal mengirim.' });
+            renderSettlementProgress({ status: 'error', percent: 100, label: presentation.message });
             refreshSettlementSyncLogs();
         } finally {
             btn.disabled = false;
@@ -1391,11 +1597,9 @@
             await loadSettlements();
             await refreshSettlementSyncLogs();
         } catch (e) {
-            const action = e.data?.action && e.data.action.type === 'redirect'
-                ? { url: e.data.action.url, label: e.data.action.label }
-                : null;
-            showSyncFeedback('error', 'Gagal menarik settlement', e.data?.message || e.message || 'Sync settlement gagal.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean), action);
-            setSyncState('error', 'Gagal');
+            const presentation = presentSyncError(e, 'Gagal menarik settlement');
+            showSyncFeedback(presentation.level, presentation.title, presentation.message, [presentation.code ? `Kode: ${presentation.code}` : null].filter(Boolean), presentation.action);
+            setSyncState(presentation.level === 'warn' ? 'warn' : 'error', presentation.level === 'warn' ? 'Perlu tindakan' : 'Gagal');
             updateSyncDot(false);
             refreshSettlementSyncLogs();
         } finally {
@@ -1463,11 +1667,15 @@
             const queued = results.filter(result => result.status === 'fulfilled').length;
             const failed = results.length - queued;
             const skipped = skippedStores.length;
+            const failedNames = results
+                .map((result, index) => result.status === 'rejected' ? targetStores[index].name : null)
+                .filter(Boolean);
+            const skippedNames = skippedStores.map(store => store.name).filter(Boolean);
             const meta = [
                 `Toko aktif: ${targetStores.length + skipped}`,
                 `Masuk antrean: ${queued}`,
-                failed ? `Gagal dikirim: ${failed}` : null,
-                skipped ? `Dilewati credential/status: ${skipped}` : null,
+                failed ? `Gagal dikirim: ${failed} (${failedNames.slice(0, 3).join(', ')})` : null,
+                skipped ? `Dilewati credential/status: ${skipped} (${skippedNames.slice(0, 3).join(', ')})` : null,
             ].filter(Boolean);
 
             showSyncFeedback(failed || skipped ? 'warn' : 'info',
@@ -1480,8 +1688,9 @@
             updateSyncDot(true);
             await refreshSettlementSyncLogs();
         } catch (e) {
-            showSyncFeedback('error', 'Gagal mengirim sync semua toko', e.data?.message || e.message || 'Gagal mengirim settlement sync.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean));
-            setSyncState('error', 'Gagal');
+            const presentation = presentSyncError(e, 'Gagal mengirim sync semua toko');
+            showSyncFeedback(presentation.level, presentation.title, presentation.message, [presentation.code ? `Kode: ${presentation.code}` : null].filter(Boolean), presentation.action);
+            setSyncState(presentation.level === 'warn' ? 'warn' : 'error', presentation.level === 'warn' ? 'Perlu tindakan' : 'Gagal');
             updateSyncDot(false);
         } finally {
             btn.disabled = false;

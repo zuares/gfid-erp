@@ -3343,6 +3343,8 @@ class MarketplaceController extends Controller
 
         $sortBy = $request->input('sort_by', 'settlement_time');
         $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $settlementStatus = strtolower((string) $request->input('settlement_status', ''));
+        $includeMissingPending = $settlementStatus === 'belum_cair';
 
         if ($sortBy === 'ordered_at') {
             $query->orderBy(
@@ -3359,6 +3361,12 @@ class MarketplaceController extends Controller
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->store_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->whereHas('order', function ($q) use ($request) {
+                $q->where('order_status', $request->status);
+            });
         }
 
         if ($request->input('cogs_zero') === '1') {
@@ -3383,6 +3391,8 @@ class MarketplaceController extends Controller
                 $q->whereDate('ordered_at', '<=', $request->order_date_to);
             });
         }
+
+        $isUnsettledFilter = $request->input('tab') === 'belum_cair' || $includeMissingPending;
 
         if ($request->tab === 'semua') {
             if ($request->filled('settlement_date_from')) {
@@ -3410,7 +3420,7 @@ class MarketplaceController extends Controller
                       });
                 });
             }
-        } elseif ($request->tab !== 'belum_cair') {
+        } elseif (! $isUnsettledFilter) {
             if ($request->filled('settlement_date_from')) {
                 $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
             }
@@ -3470,6 +3480,27 @@ class MarketplaceController extends Controller
             }
         }
 
+        // Filter dropdown pada halaman settlement menggunakan settlement_status.
+        // Tetap pisahkan dari tab lama agar keduanya dapat dipakai tanpa
+        // mengubah perilaku filter tab yang sudah ada.
+        if ($settlementStatus === 'cair') {
+            $query->whereNotNull('settlement_time')
+                ->where(function ($q) {
+                    $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
+                })
+                ->whereDoesntHave('order', function ($q) {
+                    $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                });
+        } elseif ($settlementStatus === 'belum_cair') {
+            $query->whereNull('settlement_time')
+                ->where(function ($q) {
+                    $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
+                })
+                ->whereDoesntHave('order', function ($q) {
+                    $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                });
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -3490,9 +3521,80 @@ class MarketplaceController extends Controller
             });
         }
 
-        $metaQuery = clone $query;
+        $pendingRows = collect();
+        if ($includeMissingPending) {
+            $pendingOrdersQuery = MarketplaceOrder::with([
+                'store:id,name,channel_id',
+                'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
+            ])
+                ->whereDoesntHave('settlement')
+                ->whereNotIn('order_status', ['UNPAID', 'CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
 
-        $paginator = $query->paginate($request->input('per_page', 50))->through(function ($s) {
+            if ($request->filled('store_id')) {
+                $pendingOrdersQuery->where('store_id', $request->store_id);
+            }
+            if ($request->filled('status')) {
+                $pendingOrdersQuery->where('order_status', $request->status);
+            }
+            if ($request->input('cogs_zero') === '1') {
+                $pendingOrdersQuery->where(function ($q) {
+                    $q->doesntHave('items')->orWhereHas('items', function ($q2) {
+                        $q2->whereNull('hpp_snapshot')->orWhere('hpp_snapshot', '<=', 0);
+                    });
+                });
+            }
+            if ($request->filled('order_date_from')) {
+                $pendingOrdersQuery->whereDate('ordered_at', '>=', $request->order_date_from);
+            }
+            if ($request->filled('order_date_to')) {
+                $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->order_date_to);
+            }
+            if ($request->input('tab') === 'semua') {
+                if ($request->filled('settlement_date_from')) {
+                    $pendingOrdersQuery->whereDate('ordered_at', '>=', $request->settlement_date_from);
+                }
+                if ($request->filled('settlement_date_to')) {
+                    $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->settlement_date_to);
+                }
+            }
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $pendingOrdersQuery->where(function ($q) use ($search) {
+                    $q->where('channel_order_id', 'like', "%{$search}%")
+                        ->orWhereHas('items', function ($itemQuery) use ($search) {
+                            $itemQuery->where(function ($itemFilter) use ($search) {
+                                $itemFilter->where('item_name', 'like', "%{$search}%")
+                                    ->orWhere('variant_name', 'like', "%{$search}%")
+                                    ->orWhere('model_sku', 'like', "%{$search}%")
+                                    ->orWhere('item_sku', 'like', "%{$search}%")
+                                    ->orWhere('marketplace_sku', 'like', "%{$search}%")
+                                    ->orWhere('external_sku', 'like', "%{$search}%");
+                            });
+                        });
+                });
+            }
+
+            $pendingRows = $pendingOrdersQuery->get()->map(function (MarketplaceOrder $order) {
+                $settlement = new MarketplaceOrderSettlement([
+                    'store_id' => $order->store_id,
+                    'order_id' => $order->id,
+                    'channel_order_id' => $order->channel_order_id,
+                    'buyer_payment_amount' => $order->total_paid_customer ?? $order->subtotal_items ?? $order->total_amount ?? 0,
+                    'final_income' => 0,
+                    'settlement_time' => null,
+                    'synced_at' => null,
+                    'raw_json' => [],
+                ]);
+                $settlement->setRelation('store', $order->store);
+                $settlement->setRelation('order', $order);
+                $settlement->setAttribute('is_missing_settlement', true);
+
+                return $settlement;
+            });
+        }
+
+        $metaQuery = clone $query;
+        $formatSettlement = function ($s) {
             $breakdown = $s->marketplaceFeeBreakdown();
             $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
             $sellerBurdenTotal = (float) ($feeTotals['seller'] ?? 0);
@@ -3601,15 +3703,53 @@ class MarketplaceController extends Controller
                 'fee_breakdown'         => $breakdown,
                 'fee_percent'           => $feePercent,
                 'fee_percent_toko'      => $feePercentToko,
+                'settlement_status'    => $s->settlement_time ? 'cair' : 'belum_cair',
+                'settlement_recorded'  => ! (bool) $s->getAttribute('is_missing_settlement'),
                 'settlement_time'       => $s->settlement_time?->toISOString(),
                 'synced_at'             => $s->synced_at?->toISOString(),
                 'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
             ];
-        });
+        };
+
+        if ($includeMissingPending) {
+            $allRows = $query->get()->concat($pendingRows);
+            $sortValue = function ($s) use ($sortBy) {
+                if ($sortBy === 'ordered_at') {
+                    return $s->order?->ordered_at?->timestamp ?? 0;
+                }
+                if ($sortBy === 'final_income') {
+                    return (float) $s->final_income;
+                }
+                if ($sortBy === 'buyer_payment_amount') {
+                    return (float) $s->buyer_payment_amount;
+                }
+
+                return $s->settlement_time?->timestamp ?? $s->order?->ordered_at?->timestamp ?? 0;
+            };
+            $allRows = ($sortDir === 'asc' ? $allRows->sortBy($sortValue) : $allRows->sortByDesc($sortValue))->values();
+
+            $perPage = (int) $request->input('per_page', 50);
+            $page = max((int) $request->input('page', 1), 1);
+            $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+                $allRows->forPage($page, $perPage)->values()->map($formatSettlement),
+                $allRows->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+            $metaRowsForSettlement = $allRows;
+        } else {
+            $paginator = $query->paginate($request->input('per_page', 50));
+            $paginator->setCollection($paginator->getCollection()->map($formatSettlement));
+            $metaRowsForSettlement = null;
+        }
 
         if ($request->input('page', 1) == 1) {
-            $metaQuery->with('order.items:id,marketplace_order_id,hpp_snapshot,qty');
-            $metaRows = $metaQuery->get([
+            if ($includeMissingPending) {
+                $metaRows = $metaRowsForSettlement;
+            } else {
+                $metaQuery->with('order.items:id,marketplace_order_id,hpp_snapshot,qty');
+                $metaRows = $metaQuery->get([
                 'id',
                 'buyer_payment_amount',
                 'order_id',
@@ -3630,7 +3770,8 @@ class MarketplaceController extends Controller
                 'ad_cost',
                 'final_income',
                 'raw_json',
-            ]);
+                ]);
+            }
             $feeTotals = $metaRows->reduce(function (array $carry, MarketplaceOrderSettlement $settlement) {
                 $totals = $settlement->marketplaceFeeCategoryTotals($settlement->marketplaceFeeBreakdown());
                 $carry['seller'] += (float) ($totals['seller'] ?? 0);
