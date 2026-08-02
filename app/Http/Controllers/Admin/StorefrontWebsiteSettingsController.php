@@ -593,12 +593,33 @@ class StorefrontWebsiteSettingsController extends Controller
         $data = $request->validate([
             'trim_start' => ['required', 'numeric', 'min:0', 'max:300'],
             'trim_duration' => ['required', 'numeric', 'min:0.1', 'max:30'],
+            'trim_audio' => ['nullable', 'file', 'mimes:mp3,wav,ogg,m4a,aac,flac,webm', 'max:20480'],
         ]);
 
         $temporaryOutput = null;
 
         try {
             $disk = Storage::disk('public');
+
+            // Fallback browser: hasil potongan WAV dikirim kembali saat
+            // server tidak memiliki FFmpeg/FFprobe.
+            if ($request->hasFile('trim_audio')) {
+                $trimmed = $request->file('trim_audio');
+                $durationMs = min(30000, (int) round((float) $data['trim_duration'] * 1000));
+                $this->replaceShipmentRingtoneFile($ringtone, $trimmed, $durationMs, $disk);
+
+                $message = 'Durasi ringtone berhasil dipotong dan file library diperbarui.';
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'status' => 'ok',
+                        'message' => $message,
+                        'duration_ms' => $durationMs,
+                    ]);
+                }
+
+                return redirect()->route('sales.settings.operational')->with('success', $message);
+            }
+
             if (!$disk->exists($ringtone->path)) {
                 throw new \RuntimeException('File ringtone asli tidak ditemukan di storage.');
             }
@@ -700,6 +721,52 @@ class StorefrontWebsiteSettingsController extends Controller
                 @unlink($temporaryOutput);
             }
         }
+    }
+
+    private function replaceShipmentRingtoneFile(ShipmentScanRingtone $ringtone, $input, int $durationMs, $disk): void
+    {
+        if (! $input || ! $input->isValid() || ! $input->getRealPath()) {
+            throw new \RuntimeException('File hasil potong tidak dapat dibaca oleh server.');
+        }
+
+        $extension = strtolower((string) ($input->getClientOriginalExtension() ?: 'wav'));
+        $mimeTypes = [
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'm4a' => 'audio/mp4',
+            'aac' => 'audio/aac',
+            'flac' => 'audio/flac',
+            'webm' => 'audio/webm',
+        ];
+        $path = 'shipment-ringtones/' . Str::uuid() . '.' . $extension;
+        $stream = fopen($input->getRealPath(), 'rb');
+
+        if (! $stream || ! $disk->put($path, $stream)) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            throw new \RuntimeException('Disk public tidak dapat menyimpan hasil potong ringtone.');
+        }
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
+
+        $size = (int) $disk->size($path);
+        if ($size <= 0) {
+            $disk->delete($path);
+            throw new \RuntimeException('Hasil potong ringtone tersimpan dengan ukuran 0 byte.');
+        }
+
+        $oldPath = $ringtone->path;
+        $ringtone->update([
+            'path' => $path,
+            'mime_type' => $mimeTypes[$extension] ?? ((string) $input->getClientMimeType() ?: 'audio/wav'),
+            'extension' => $extension,
+            'compressed_size_bytes' => $size,
+            'duration_ms' => $durationMs,
+        ]);
+        $disk->delete($oldPath);
     }
 
     private function removeShipmentRingtone(ShipmentScanRingtone $ringtone, string $redirectRoute, bool $asJson = false): RedirectResponse|\Illuminate\Http\JsonResponse

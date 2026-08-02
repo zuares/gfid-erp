@@ -162,7 +162,7 @@
                             </div>
                             <div style="display:flex;align-items:center;gap:.4rem">
                                 <audio controls preload="none" style="width:150px;height:28px" src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($ringtone->path) }}"></audio>
-                                <button type="button" class="sos-delete sos-trim" data-trim-id="{{ $ringtone->id }}" data-trim-name="{{ $ringtone->name }}" data-trim-duration="{{ (float) (($ringtone->duration_ms ?? 0) / 1000) }}">Potong</button>
+                                <button type="button" class="sos-delete sos-trim" data-trim-id="{{ $ringtone->id }}" data-trim-name="{{ $ringtone->name }}" data-trim-duration="{{ (float) (($ringtone->duration_ms ?? 0) / 1000) }}" data-trim-audio-url="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($ringtone->path) }}">Potong</button>
                                 <button type="button" class="sos-delete" data-ringtone-id="{{ $ringtone->id }}" data-ringtone-name="{{ $ringtone->name }}">Hapus</button>
                             </div>
                         </div>
@@ -341,6 +341,89 @@
         });
     });
 
+    function writeWavString(view, offset, value) {
+        for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
+    }
+
+    function encodeWav(audioBuffer, start, duration) {
+        const sampleRate = audioBuffer.sampleRate;
+        const channels = Math.min(2, audioBuffer.numberOfChannels || 1);
+        const startSample = Math.max(0, Math.floor(start * sampleRate));
+        const endSample = Math.min(audioBuffer.length, Math.ceil((start + duration) * sampleRate));
+        const frameCount = Math.max(1, endSample - startSample);
+        const dataSize = frameCount * channels * 2;
+        const output = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(output);
+
+        writeWavString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        writeWavString(view, 8, 'WAVE');
+        writeWavString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, channels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * channels * 2, true);
+        view.setUint16(32, channels * 2, true);
+        view.setUint16(34, 16, true);
+        writeWavString(view, 36, 'data');
+        view.setUint32(40, dataSize, true);
+
+        const channelData = Array.from({ length: channels }, (_, index) => audioBuffer.getChannelData(index));
+        let offset = 44;
+        for (let frame = 0; frame < frameCount; frame++) {
+            const sourceIndex = Math.min(audioBuffer.length - 1, startSample + frame);
+            for (let channel = 0; channel < channels; channel++) {
+                const sample = Math.max(-1, Math.min(1, channelData[channel][sourceIndex] || 0));
+                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+                offset += 2;
+            }
+        }
+
+        return {
+            blob: new Blob([output], { type: 'audio/wav' }),
+            duration: frameCount / sampleRate,
+        };
+    }
+
+    async function trimAudioInBrowser(url, start, duration) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) throw new Error('Browser tidak mendukung pemotongan audio tanpa FFmpeg.');
+        const response = await fetch(url, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('File ringtone tidak dapat dibaca browser.');
+        const context = new AudioContext();
+        try {
+            const audioBuffer = await context.decodeAudioData(await response.arrayBuffer());
+            if (start >= audioBuffer.duration) throw new Error('Waktu mulai berada di luar durasi ringtone.');
+            return encodeWav(audioBuffer, start, Math.min(duration, audioBuffer.duration - start));
+        } finally {
+            context.close?.().catch(() => {});
+        }
+    }
+
+    async function submitBrowserTrim(button, values) {
+        const result = await trimAudioInBrowser(button.dataset.trimAudioUrl, values.start, values.duration);
+        const body = new FormData();
+        body.append('_token', csrf);
+        body.append('trim_start', String(values.start));
+        body.append('trim_duration', String(result.duration));
+        body.append('trim_audio', result.blob, 'ringtone-trim.wav');
+
+        const response = await fetch(trimUrl.replace('__RINGTONE__', encodeURIComponent(button.dataset.trimId)), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== 'ok') {
+            throw new Error(payload.message || `Ringtone gagal dipotong (HTTP ${response.status}).`);
+        }
+    }
+
     document.querySelectorAll('[data-trim-id]').forEach((button) => {
         button.addEventListener('click', async function () {
             const name = this.dataset.trimName || 'ringtone ini';
@@ -402,8 +485,18 @@
                 }
                 window.location.reload();
             } catch (error) {
-                if (window.GFID?.errorAlert) window.GFID.errorAlert(error.message || 'Ringtone gagal dipotong.');
-                else window.alert(error.message || 'Ringtone gagal dipotong.');
+                let finalError = error;
+                if (/ffmpeg|ffprobe/i.test(error.message || '') && button.dataset.trimAudioUrl) {
+                    try {
+                        await submitBrowserTrim(button, values);
+                        window.location.reload();
+                        return;
+                    } catch (fallbackError) {
+                        finalError = fallbackError;
+                    }
+                }
+                if (window.GFID?.errorAlert) window.GFID.errorAlert(finalError.message || 'Ringtone gagal dipotong.');
+                else window.alert(finalError.message || 'Ringtone gagal dipotong.');
             }
         });
     });
