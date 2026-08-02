@@ -739,6 +739,56 @@ class StorefrontWebsiteSettingsController extends Controller
             ->with('success', $message);
     }
 
+    private function storeUncompressedShipmentRingtone($input, array $data): void
+    {
+        if (! $input || ! $input->isValid()) {
+            throw new \RuntimeException('File upload audio tidak dapat dibaca oleh server.');
+        }
+
+        $extension = strtolower((string) ($input->getClientOriginalExtension() ?: $input->extension() ?: 'audio'));
+        $mimeTypes = [
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'm4a' => 'audio/mp4',
+            'aac' => 'audio/aac',
+            'flac' => 'audio/flac',
+            'webm' => 'audio/webm',
+        ];
+        $mimeType = $mimeTypes[$extension] ?? ((string) $input->getClientMimeType() ?: 'application/octet-stream');
+        $path = 'shipment-ringtones/' . Str::uuid() . '.' . $extension;
+        $stream = fopen($input->getRealPath(), 'rb');
+
+        if (! $stream || ! Storage::disk('public')->put($path, $stream)) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            throw new \RuntimeException('Disk public tidak dapat menyimpan file ringtone.');
+        }
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
+
+        $size = (int) Storage::disk('public')->size($path);
+        if ($size <= 0) {
+            Storage::disk('public')->delete($path);
+            throw new \RuntimeException('File ringtone tersimpan dengan ukuran 0 byte.');
+        }
+
+        ShipmentScanRingtone::create([
+            'name' => trim($data['shipment_scan_ringtone_name'] ?? '')
+                ?: pathinfo($input->getClientOriginalName(), PATHINFO_FILENAME),
+            'original_name' => $input->getClientOriginalName(),
+            'path' => $path,
+            'mime_type' => $mimeType,
+            'extension' => $extension,
+            'size_bytes' => (int) $input->getSize(),
+            'compressed_size_bytes' => $size,
+            'duration_ms' => null,
+            'uploaded_by' => auth()->id(),
+        ]);
+    }
+
     private function uploadShipmentRingtone(Request $request, string $redirectRoute = 'admin.website.settings'): RedirectResponse
     {
         $data = $request->validate([
@@ -836,11 +886,22 @@ class StorefrontWebsiteSettingsController extends Controller
             report($e);
 
             $errorMessage = strtolower($e->getMessage());
-            $userMessage = str_contains($errorMessage, 'ffmpeg tidak ditemukan') || str_contains($errorMessage, 'ffmpeg tidak ditemukan pada server')
-                ? 'FFmpeg tidak ditemukan pada server. Isi FFMPEG_BINARY di .env atau install FFmpeg.'
-                : (str_contains($errorMessage, 'disk public') || str_contains($errorMessage, 'temporary server')
-                    ? 'Server tidak dapat menyimpan file ringtone. Pastikan folder storage dan temporary dapat ditulis oleh PHP-FPM.'
-                    : 'File audio tidak dapat diproses. Pastikan formatnya valid dan durasinya tidak bermasalah.');
+            if (str_contains($errorMessage, 'ffmpeg tidak ditemukan') || str_contains($errorMessage, 'ffmpeg tidak ditemukan pada server')) {
+                try {
+                    $this->storeUncompressedShipmentRingtone($input, $data);
+
+                    return redirect()
+                        ->route($redirectRoute)
+                        ->with('success', 'Ringtone berhasil ditambahkan tanpa kompresi. FFmpeg belum tersedia di server.');
+                } catch (\Throwable $fallbackError) {
+                    report($fallbackError);
+                    $errorMessage = strtolower($fallbackError->getMessage());
+                }
+            }
+
+            $userMessage = str_contains($errorMessage, 'disk public') || str_contains($errorMessage, 'temporary server')
+                ? 'Server tidak dapat menyimpan file ringtone. Pastikan folder storage dan temporary dapat ditulis oleh PHP-FPM.'
+                : 'File audio tidak dapat diproses. Pastikan formatnya valid dan durasinya tidak bermasalah.';
 
             return redirect()
                 ->route($redirectRoute)

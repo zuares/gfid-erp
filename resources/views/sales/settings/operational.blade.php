@@ -136,7 +136,7 @@
 
                 <div class="sos-box">
                     <div class="sos-box-title">Tambah ringtone ke library</div>
-                    <div style="margin-top:.2rem;color:#94a3b8;font-size:.67rem;line-height:1.45">MP3, WAV, OGG, M4A, AAC, FLAC, atau WEBM · maksimal 20 MB · dipotong maksimal 5 detik dan dikompres menjadi MP3 mono 64 kbps.</div>
+                    <div style="margin-top:.2rem;color:#94a3b8;font-size:.67rem;line-height:1.45">MP3, WAV, OGG, M4A, AAC, FLAC, atau WEBM · maksimal 20 MB · dipotong maksimal 5 detik dan dikompres menjadi MP3 mono 64 kbps. Jika FFmpeg tidak tersedia, file disimpan tanpa kompresi.</div>
                     <div class="sos-upload-grid">
                         <div>
                             <label class="sos-event-help" for="sos-name">Nama ringtone</label>
