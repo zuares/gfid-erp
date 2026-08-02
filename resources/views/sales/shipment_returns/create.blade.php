@@ -105,6 +105,46 @@
         color: #fff;
     }
 
+    .sret-mode-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .55rem;
+    }
+
+    .sret-mode-card {
+        min-height: 92px;
+        padding: .7rem .75rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        border-radius: 8px;
+        background: transparent;
+        color: #475569;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .sret-mode-card:hover {
+        background: rgba(148, 163, 184, .06);
+    }
+
+    .sret-mode-card.active {
+        border-color: #334155;
+        background: rgba(148, 163, 184, .1);
+        box-shadow: 0 0 0 1px #334155;
+    }
+
+    .sret-mode-title {
+        margin-bottom: .25rem;
+        color: #334155;
+        font-size: .82rem;
+        font-weight: 850;
+    }
+
+    .sret-mode-sub {
+        color: #64748b;
+        font-size: .72rem;
+        line-height: 1.45;
+    }
+
     @media (max-width: 680px) {
         .sret-wrap {
             padding: .5rem .5rem 4rem;
@@ -120,6 +160,10 @@
         }
 
         .sret-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .sret-mode-grid {
             grid-template-columns: 1fr;
         }
 
@@ -144,7 +188,7 @@
     <div class="sret-topbar">
         <div>
             <h1 class="sret-title">Buat Draft Retur</h1>
-            <div class="sret-sub">Pilih marketplace/store dulu, scanner dibuka setelah draft dibuat.</div>
+            <div class="sret-sub">Pilih mode scanner terlebih dahulu. Marketplace dan shipment asal bisa dihubungkan kemudian.</div>
         </div>
         <a href="{{ route('sales.shipment_returns.index') }}" class="sret-btn">Kembali</a>
     </div>
@@ -161,13 +205,14 @@
         @csrf
         <input type="hidden" name="shipment_id" value="{{ old('shipment_id', $shipment?->id) }}">
         <input type="hidden" name="order_number" value="{{ old('order_number', $shipment?->code) }}">
+        <input type="hidden" name="scan_mode" id="shipmentReturnScanMode" value="{{ old('scan_mode', 'item_first') }}">
 
         <div class="sret-card">
             <div class="sret-grid">
                 <div>
                     <label class="sret-label">Marketplace / Store</label>
-                    <select name="store_id" class="form-select" required autofocus>
-                        <option value="">Pilih marketplace / store</option>
+                    <select name="store_id" class="form-select" autofocus>
+                        <option value="">Belum dihubungkan</option>
                         @foreach ($channelOrder as $channel)
                             @php($channelStores = $storeGroups->get($channel, collect()))
                             @continue($channelStores->isEmpty())
@@ -197,6 +242,20 @@
                     <label class="sret-label">Catatan</label>
                     <input type="text" name="notes" class="form-control" value="{{ old('notes') }}" placeholder="Opsional">
                 </div>
+
+                <div class="sret-field-full">
+                    <label class="sret-label">Mode Scanner</label>
+                    <div class="sret-mode-grid" role="radiogroup" aria-label="Mode Scanner Retur">
+                        <button type="button" class="sret-mode-card {{ old('scan_mode', 'item_first') === 'order_first' ? 'active' : '' }}" data-scan-mode="order_first" role="radio" aria-checked="{{ old('scan_mode', 'item_first') === 'order_first' ? 'true' : 'false' }}">
+                            <div class="sret-mode-title">Scan Order Dulu</div>
+                            <div class="sret-mode-sub">Scan nomor order/resi, lalu scan item untuk pencatatan.</div>
+                        </button>
+                        <button type="button" class="sret-mode-card {{ old('scan_mode', 'item_first') === 'item_first' ? 'active' : '' }}" data-scan-mode="item_first" role="radio" aria-checked="{{ old('scan_mode', 'item_first') === 'item_first' ? 'true' : 'false' }}">
+                            <div class="sret-mode-title">Scan Item Dulu</div>
+                            <div class="sret-mode-sub">Scan semua item dahulu, lalu scan order tanpa menghapus pencatatan item.</div>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="sret-actions">
@@ -207,3 +266,21 @@
     </form>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const input = document.getElementById('shipmentReturnScanMode');
+    const buttons = document.querySelectorAll('[data-scan-mode]');
+    buttons.forEach(button => button.addEventListener('click', function () {
+        const mode = this.dataset.scanMode === 'order_first' ? 'order_first' : 'item_first';
+        if (input) input.value = mode;
+        buttons.forEach(candidate => {
+            const active = candidate === this;
+            candidate.classList.toggle('active', active);
+            candidate.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+    }));
+})();
+</script>
+@endpush

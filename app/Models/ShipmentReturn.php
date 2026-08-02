@@ -17,6 +17,7 @@ class ShipmentReturn extends Model
         'shipment_id',
         'date',
         'status',
+        'scan_mode',
         'reason',
         'notes',
         'total_qty',

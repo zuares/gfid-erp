@@ -12,6 +12,7 @@ class ShipmentReturnOrderScan extends Model
     protected $fillable = [
         'shipment_return_id',
         'order_number',
+        'scanned_at',
         'matched_order_id',
         'match_status',
         'source',
@@ -23,6 +24,7 @@ class ShipmentReturnOrderScan extends Model
     protected $casts = [
         'raw_payload' => 'array',
         'matched_at' => 'datetime',
+        'scanned_at' => 'datetime',
     ];
 
     public function shipmentReturn()

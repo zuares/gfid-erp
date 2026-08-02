@@ -9,6 +9,7 @@ use App\Models\ShipmentReturn;
 use App\Models\ShipmentReturnLine;
 use App\Models\ShipmentReturnOrderScan;
 use App\Models\ShipmentReturnOrderScanItem;
+use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\Request;
@@ -55,23 +56,12 @@ class ShipmentReturnController extends Controller
      */
     public function create(Request $request)
     {
-        // Draft dibuat tanpa marketplace/shipment agar scanner menjadi entry point
-        // pencatatan yang mandiri. Relasi bisa ditambahkan di fase berikutnya.
-        // SQLite dengan transaksi DEFERRED dapat gagal saat transaksi yang
-        // sudah membaca sequence code berubah menjadi INSERT. Retry membantu
-        // ketika ada proses lain yang sedang menyelesaikan write singkat.
-        $shipmentReturn = DB::transaction(function () {
-            return ShipmentReturn::create([
-                'code' => ShipmentReturn::generateCode('RTP'),
-                'store_id' => null,
-                'shipment_id' => null,
-                'date' => now()->toDateString(),
-                'status' => 'draft',
-                'created_by' => Auth::id(),
-            ]);
-        }, 5);
+        $stores = Store::query()->orderBy('return_channel')->orderBy('code')->get();
+        $shipment = $request->filled('shipment_id')
+            ? Shipment::with('store')->find($request->integer('shipment_id'))
+            : null;
 
-        return redirect()->route('sales.shipment_returns.edit', $shipmentReturn);
+        return view('sales.shipment_returns.create', compact('stores', 'shipment'));
     }
 
     public function edit(ShipmentReturn $shipmentReturn)
@@ -85,6 +75,18 @@ class ShipmentReturnController extends Controller
         ]);
 
         return view('sales.shipment_returns.edit', compact('shipmentReturn'));
+    }
+
+    public function editItemFirst(ShipmentReturn $shipmentReturn)
+    {
+        $shipmentReturn->load([
+            'store',
+            'shipment',
+            'lines.item',
+            'orderScans.items.item',
+        ]);
+
+        return view('sales.shipment_returns.edit_item_first', compact('shipmentReturn'));
     }
 
     public function scanLookup(Request $request, ShipmentReturn $shipmentReturn)
@@ -146,6 +148,7 @@ class ShipmentReturnController extends Controller
                 $scan = ShipmentReturnOrderScan::create([
                     'shipment_return_id' => $shipmentReturn->id,
                     'order_number' => $orderNumber,
+                    'scanned_at' => now(),
                     'match_status' => 'pending',
                     'source' => 'scanner',
                     'raw_payload' => [
@@ -153,6 +156,9 @@ class ShipmentReturnController extends Controller
                         'label' => 'Pencatatan order',
                     ],
                 ]);
+            } else {
+                $scan->scanned_at = now();
+                $scan->save();
             }
 
             return $scan;
@@ -167,6 +173,7 @@ class ShipmentReturnController extends Controller
             'order' => [
                 'code' => $orderNumber,
                 'label' => 'Pencatatan order',
+                'scanned_at' => optional($scan->scanned_at)->toISOString(),
             ],
         ]);
     }
@@ -219,6 +226,7 @@ class ShipmentReturnController extends Controller
                     $scan = ShipmentReturnOrderScan::create([
                         'shipment_return_id' => $shipmentReturn->id,
                         'order_number' => $code,
+                        'scanned_at' => now(),
                         'match_status' => 'pending',
                         'source' => 'dev_command',
                         'raw_payload' => [
@@ -226,11 +234,15 @@ class ShipmentReturnController extends Controller
                             'label' => 'Pencatatan order',
                         ],
                     ]);
+                } else {
+                    $scan->scanned_at = now();
+                    $scan->save();
                 }
 
                 return [
                     'code' => $code,
                     'label' => 'Pencatatan order',
+                    'scanned_at' => optional($scan->scanned_at)->toISOString(),
                     'items' => [],
                 ];
             })->values();
@@ -320,6 +332,7 @@ class ShipmentReturnController extends Controller
             'date'          => ['required', 'date'],
             'reason'        => ['nullable', 'string'],
             'notes'         => ['nullable', 'string'],
+            'scan_mode'     => ['nullable', 'in:item_first,order_first'],
             'order_numbers' => ['nullable', 'array'],
             'order_numbers.*' => ['nullable', 'string', 'max:100'],
             'lines'         => ['nullable', 'array'],
@@ -360,6 +373,7 @@ class ShipmentReturnController extends Controller
                 'shipment_id' => $shipmentId,
                 'date'        => $data['date'],
                 'status'      => 'draft',
+                'scan_mode'   => $data['scan_mode'] ?? 'item_first',
                 'reason'      => $data['reason'] ?? null,
                 'notes'       => $notes !== '' ? $notes : null,
                 'created_by'  => Auth::id(),
@@ -385,12 +399,18 @@ class ShipmentReturnController extends Controller
             }
 
             return $ret;
-        });
+        }, 5);
+
+        $nextRoute = ($data['scan_mode'] ?? 'item_first') === 'item_first'
+            ? 'sales.shipment_returns.scan_items'
+            : 'sales.shipment_returns.edit';
 
         return redirect()
-            ->route('sales.shipment_returns.edit', $ret)
+            ->route($nextRoute, $ret)
             ->with('status', 'success')
-            ->with('message', 'Draft retur dibuat. Silakan scan order dan item retur.');
+            ->with('message', ($data['scan_mode'] ?? 'item_first') === 'item_first'
+                ? 'Draft retur dibuat. Silakan scan semua item terlebih dahulu.'
+                : 'Draft retur dibuat. Silakan scan order dan item retur.');
     }
 
     /**
@@ -513,6 +533,7 @@ class ShipmentReturnController extends Controller
                     $orderScan = ShipmentReturnOrderScan::create([
                         'shipment_return_id' => $shipmentReturn->id,
                         'order_number' => $orderNumber,
+                        'scanned_at' => now(),
                         'match_status' => 'pending',
                         'source' => 'scanner',
                         'raw_payload' => [
@@ -544,6 +565,7 @@ class ShipmentReturnController extends Controller
 
             if ($line) {
                 $line->qty = (int) $line->qty + $qty;
+                $line->scanned_at = now();
                 if ($shipmentLineId && !$line->shipment_line_id) {
                     $line->shipment_line_id = $shipmentLineId;
                 }
@@ -554,6 +576,7 @@ class ShipmentReturnController extends Controller
                     'item_id' => $item->id,
                     'shipment_line_id' => $shipmentLineId,
                     'qty' => $qty,
+                    'scanned_at' => now(),
                     'remarks' => $orderNumber !== '' ? $orderNumber : null,
                 ]);
             }
@@ -602,6 +625,7 @@ class ShipmentReturnController extends Controller
                     'order_number' => $line->remarks ?? null,
                     'remarks' => $line->remarks ?? null,
                     'qty' => (int) $line->qty,
+                    'scanned_at' => optional($line->scanned_at)->toISOString(),
                     'update_qty_url' => route('sales.shipment_returns.update_line_qty', $line),
                 ],
                 'totals' => [

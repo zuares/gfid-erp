@@ -91,6 +91,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
                 Route::post('{shipmentReturn}/scan-order', 'scanOrder')->name('scan_order');
                 Route::get('{shipmentReturn}/scan-lookup', 'scanLookup')->name('scan_lookup');
+                Route::get('{shipmentReturn}/scan-items', 'editItemFirst')->name('scan_items');
                 Route::get('{shipmentReturn}/edit', 'edit')->name('edit');
 
                 // ✅ Cetak barcode (qty label default = qty retur, bisa disesuaikan)

@@ -16,6 +16,7 @@ class ShipmentReturnLine extends Model
         'item_id',
         'shipment_line_id',
         'qty',
+        'scanned_at',
         'remarks',
     ];
 
@@ -37,6 +38,10 @@ class ShipmentReturnLine extends Model
     {
         return $this->belongsTo(Item::class);
     }
+
+    protected $casts = [
+        'scanned_at' => 'datetime',
+    ];
 
     public function shipmentLine()
     {

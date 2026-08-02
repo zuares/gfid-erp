@@ -315,6 +315,32 @@
         text-transform: uppercase;
     }
 
+    .sr-mode-switch {
+        display: inline-flex;
+        gap: .25rem;
+        padding: .2rem;
+        border: 1px solid var(--sr-border);
+        border-radius: 7px;
+        background: rgba(248, 250, 252, .9);
+    }
+
+    .sr-mode-switch-btn {
+        min-height: 30px;
+        padding: .25rem .55rem;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--sr-muted);
+        font-size: .68rem;
+        font-weight: 650;
+        cursor: pointer;
+    }
+
+    .sr-mode-switch-btn.active {
+        background: var(--sr-accent);
+        color: #fff;
+    }
+
     .sr-current {
         color: var(--sr-muted);
         font-size: .77rem;
@@ -1124,31 +1150,21 @@
 
 @section('content')
 @php
-    $initialLines = $shipmentReturn->orderScans->isNotEmpty()
-        ? $shipmentReturn->orderScans->flatMap(function ($scan) {
-            return $scan->items->map(fn ($scanItem) => [
-                'id' => $scanItem->shipment_return_line_id ?: $scanItem->id,
-                'order_number' => $scan->order_number ?: 'MANUAL',
-                'item_id' => $scanItem->item_id,
-                'code' => $scanItem->item->code ?? '-',
-                'name' => $scanItem->item->name ?? '',
-                'qty' => (int) $scanItem->qty_scanned,
-                'update_url' => $scanItem->shipment_return_line_id
-                    ? route('sales.shipment_returns.update_line_qty', $scanItem->shipment_return_line_id)
-                    : null,
-            ]);
-        })->values()
-        : $shipmentReturn->lines
-            ->map(fn ($line) => [
-                'id' => $line->id,
-                'order_number' => $line->remarks ?: 'MANUAL',
-                'item_id' => $line->item_id,
-                'code' => $line->item->code ?? '-',
-                'name' => $line->item->name ?? '',
-                'qty' => (int) $line->qty,
-                'update_url' => route('sales.shipment_returns.update_line_qty', $line),
-            ])
-            ->values();
+    // Selalu tampilkan semua line retur, termasuk item yang discan sebelum
+    // order. Order scan hanya menjadi grouping tambahan dan tidak menghapus
+    // pencatatan item yang belum terhubung.
+    $initialLines = $shipmentReturn->lines
+        ->map(fn ($line) => [
+            'id' => $line->id,
+            'order_number' => $line->remarks ?: 'MANUAL',
+            'item_id' => $line->item_id,
+            'code' => $line->item->code ?? '-',
+            'name' => $line->item->name ?? '',
+            'qty' => (int) $line->qty,
+            'scanned_at' => optional($line->scanned_at)->toISOString(),
+            'update_url' => route('sales.shipment_returns.update_line_qty', $line),
+        ])
+        ->values();
     $initialOrders = $shipmentReturn->orderScans
         ->map(function ($scan) {
             $payload = is_array($scan->raw_payload ?? null) ? $scan->raw_payload : [];
@@ -1160,9 +1176,13 @@
             return [
                 'code' => $scan->order_number ?: 'MANUAL',
                 'label' => $payload['label'] ?? ($label !== '' ? $label : 'Pencatatan order'),
+                'scanned_at' => optional($scan->scanned_at)->toISOString(),
             ];
         })
         ->values();
+    $initialScanFlow = in_array($shipmentReturn->scan_mode, ['item_first', 'order_first'], true)
+        ? $shipmentReturn->scan_mode
+        : 'order_first';
     $canUseDevOrderCommands = (auth()->user()?->role === 'owner')
         && (
             app()->environment(['local', 'development', 'testing'])
@@ -1176,7 +1196,7 @@
     <div class="sr-topbar">
         <div class="sr-top-main">
             <h1 class="sr-title">{{ $shipmentReturn->code }}</h1>
-            <div class="sr-sub">Pencatatan retur mandiri · scan order untuk mulai.</div>
+            <div class="sr-sub">Pencatatan retur mandiri · pilih urutan scan sesuai proses kerja.</div>
         </div>
         <div class="sr-top-actions">
             @if ($shipmentReturn->status === 'draft' && $canUseDevOrderCommands)
@@ -1251,6 +1271,10 @@
                 <div class="sr-panel-body">
                     <div class="sr-scan-card">
                         <div class="sr-mode-row">
+                            <div class="sr-mode-switch" role="radiogroup" aria-label="Urutan scan retur">
+                                <button type="button" class="sr-mode-switch-btn active" data-scan-flow="order_first" role="radio" aria-checked="true">Order Dulu</button>
+                                <button type="button" class="sr-mode-switch-btn" data-scan-flow="item_first" role="radio" aria-checked="false">Item Dulu</button>
+                            </div>
                             <span class="sr-mode" id="modeBadge">SCAN ORDER</span>
                             <span class="sr-current" id="currentLabel">Belum ada pesanan aktif</span>
                         </div>
@@ -1301,11 +1325,13 @@
     const isDraft = @json($shipmentReturn->status === 'draft');
     const initialLines = @json($initialLines);
     const initialOrders = @json($initialOrders);
+    const initialScanFlow = @json($initialScanFlow);
     const canUseDevOrderCommands = @json($canUseDevOrderCommands);
 
-    const state = { mode: 'order', current: null, expanded: null, search: '', orders: [] };
+    const state = { mode: 'order', flow: 'order_first', autoAdvance: true, current: null, expanded: null, search: '', orders: [] };
     const scanInput = document.getElementById('scanInput');
     const modeBadge = document.getElementById('modeBadge');
+    const scanFlowButtons = document.querySelectorAll('[data-scan-flow]');
     const currentLabel = document.getElementById('currentLabel');
     const workflowStepper = document.getElementById('returnWorkflowStepper');
     const nextOrderBtn = document.getElementById('nextOrderBtn');
@@ -1331,6 +1357,11 @@
     let audioCtx = null;
 
     function normalize(value) { return String(value || '').trim().toUpperCase(); }
+    function formatScanTime(value) {
+        if (!value) return 'Belum ada timestamp';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' });
+    }
     function isNextOrderCommand(code) {
         return ['ORDER BARU', 'BARU', 'NEXT', 'NEXT ORDER', 'ORDER NEXT'].includes(normalize(code));
     }
@@ -1407,6 +1438,20 @@
         };
         (tones[kind] || tones.error).forEach(([freq, dur, vol, type, delay]) => beep(freq, dur, vol, type, delay));
     }
+    function unlockScanAudio() {
+        audioContext();
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx || !window.GFID) return;
+            window.GFID.scanAudioContext = window.GFID.scanAudioContext || new Ctx();
+            if (window.GFID.scanAudioContext.state === 'suspended') {
+                window.GFID.scanAudioContext.resume().catch(() => {});
+            }
+        } catch (e) {}
+    }
+    ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, unlockScanAudio, { once: true, passive: true });
+    });
     function toast(type, message) {
         toastEl.className = 'sr-toast ' + (type === 'ok' ? 'sr-toast-ok' : 'sr-toast-err');
         toastEl.textContent = message;
@@ -1459,6 +1504,21 @@
         }
         render();
     }
+    function hasManualItems() {
+        const manual = findOrder('MANUAL');
+        return Boolean(manual && Object.keys(manual.items).length);
+    }
+    function setFlow(flow) {
+        state.flow = flow === 'item_first' ? 'item_first' : 'order_first';
+        state.current = null;
+        state.autoAdvance = state.flow === 'order_first' && !hasManualItems();
+        scanFlowButtons.forEach(button => {
+            const active = button.dataset.scanFlow === state.flow;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        setMode(state.flow === 'item_first' ? 'item' : 'order');
+    }
     function activeOrder() {
         return state.orders.find(order => order.code === state.current) || null;
     }
@@ -1498,7 +1558,11 @@
                 qty += item.qty;
             });
         });
-        return { orders: state.orders.length, items: itemIds.size, qty };
+        return {
+            orders: state.orders.filter(order => order.code !== 'MANUAL').length,
+            items: itemIds.size,
+            qty,
+        };
     }
     function setSubmitDisabled(disabled) {
         if (!submitBtn) return;
@@ -1545,10 +1609,11 @@
         code = normalize(code) || 'MANUAL';
         let order = state.orders.find(row => row.code === code);
         if (!order) {
-            order = { code, info: info.label || (code === 'MANUAL' ? 'Tanpa order' : 'Manual'), items: {} };
+            order = { code, info: info.label || (code === 'MANUAL' ? 'Tanpa order' : 'Manual'), scanned_at: info.scannedAt || null, items: {} };
             state.orders.push(order);
         }
         if (info.label) order.info = info.label;
+        if (info.scannedAt) order.scanned_at = info.scannedAt;
         state.current = code;
         state.expanded = code;
         state.search = '';
@@ -1564,6 +1629,7 @@
             code: item.code,
             name: item.name || '',
             qty: Number(item.qty || 0),
+            scanned_at: item.scanned_at || null,
             update_url: item.update_url || null,
         };
         lastScannedLineId = String(order.items[key].line_id);
@@ -1627,7 +1693,7 @@
                         <div>
                             <div class="sr-order-no">No Order</div>
                             <div class="sr-order-code">${esc(order.code)}</div>
-                            <div class="sr-order-info">${esc(order.info || 'Manual')}</div>
+                            <div class="sr-order-info">${esc(order.info || 'Manual')} · Scan: ${esc(formatScanTime(order.scanned_at))}</div>
                         </div>
                         <div class="sr-order-head-right">
                             <span class="sr-order-count">${empty ? 'Kosong' : `${items.length} item`}</span>
@@ -1653,6 +1719,7 @@
                                             <td>
                                                 <div class="item-code">${esc(item.code)}</div>
                                                 <div class="item-name">${esc(item.name)}</div>
+                                                <div class="item-name">Scan: ${esc(formatScanTime(item.scanned_at))}</div>
                                             </td>
                                             <td class="text-end">
                                                 <input type="number" class="form-control form-control-sm qty-edit-input sr-qty-input" min="0" value="${item.qty}" data-line-id="${item.line_id}" aria-label="Qty ${esc(item.code)}">
@@ -1787,7 +1854,7 @@
         state.current = null;
         playTone('next');
         toast('ok', 'Order baru');
-        setMode('order');
+        setMode(state.flow === 'item_first' ? 'item' : 'order');
     }
     function resetActiveOrderCommand() {
         const order = latestOrder();
@@ -1864,7 +1931,7 @@
             scrollTarget = { orderCode: existingOrder.code, lineId: null };
             playTone('orderRepeat');
             toast('ok', `Kembali ke order ${existingOrder.code}`);
-            setMode('item');
+            setMode(state.autoAdvance ? 'item' : 'order');
             return;
         }
 
@@ -1884,11 +1951,11 @@
         }).then(payload => {
             if (requestSequence !== orderScanSequence) return;
             const orderCode = normalize(payload.order?.code || code);
-            const order = ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
+            const order = ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order', scannedAt: payload.order?.scanned_at || null });
             scrollTarget = { orderCode: order.code, lineId: null };
             playTone('order');
             toast('ok', payload.message || `Order ${order.code} dicatat`);
-            setMode('item');
+            setMode(state.autoAdvance ? 'item' : 'order');
         }).catch(() => {
             if (requestSequence !== orderScanSequence) return;
             alertError('Gagal mencatat nomor order. Coba scan ulang.', 'errorNetwork');
@@ -1908,7 +1975,9 @@
             undoLastItemCommand();
             return;
         }
-        const order = activeOrder();
+        const order = state.flow === 'item_first'
+            ? ensureOrder('MANUAL', { label: 'Belum dihubungkan' })
+            : activeOrder();
         if (!order) {
             alertError('Scan nomor order dulu sebelum scan item.', 'errorNoOrder');
             setMode('order');
@@ -1939,6 +2008,7 @@
                     code: payload.line.item_code,
                     name: payload.line.item_name,
                     qty: payload.line.qty,
+                    scanned_at: payload.line.scanned_at,
                     update_url: payload.line.update_qty_url,
                 });
                 playTone('item');
@@ -2055,7 +2125,7 @@
     }
 
     initialOrders.forEach(order => {
-        ensureOrder(order.code, { label: order.label || 'Manual' });
+        ensureOrder(order.code, { label: order.label || 'Manual', scannedAt: order.scanned_at || null });
     });
     initialLines.forEach(line => {
         const orderCode = normalize(line.order_number || 'MANUAL') || 'MANUAL';
@@ -2065,6 +2135,7 @@
             code: line.code,
             name: line.name,
             qty: line.qty,
+            scanned_at: line.scanned_at,
             update_url: line.update_url,
         });
     });
@@ -2075,9 +2146,12 @@
         state.search = this.value;
         render();
     });
+    scanFlowButtons.forEach(button => {
+        button.addEventListener('click', () => setFlow(button.dataset.scanFlow));
+    });
 
     if (isDraft) {
-        setMode('order');
+        setFlow(initialScanFlow);
         scanInput?.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
         scanInput?.addEventListener('keydown', function (event) {
             if (event.key !== 'Enter') return;
@@ -2129,7 +2203,12 @@
                 addBulkOrders(this.value);
             });
         }
-        window.addEventListener('load', () => focusScan());
+        const refocusScanner = () => {
+            if (!devOrderCommand || devOrderCommand.hidden) focusScan({ preventScroll: true });
+        };
+        window.addEventListener('load', refocusScanner);
+        window.addEventListener('focus', refocusScanner);
+        document.addEventListener('visibilitychange', refocusScanner);
     }
 })();
 </script>
