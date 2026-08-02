@@ -11,8 +11,10 @@ use App\Models\Store;
 use App\Jobs\SyncMarketplaceBookings;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceSyncService;
+use App\Services\Channels\ChannelManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -116,6 +118,31 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         Artisan::call('schedule:list');
 
         $this->assertStringContainsString('repair-stuck-orders', Artisan::output());
+    }
+
+    public function test_sync_orders_otomatis_menjadwalkan_sync_booking(): void
+    {
+        $this->store->update(['connection_status' => 'CONNECTED']);
+        Bus::fake();
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('syncOrders')->once()->andReturn([
+                'new' => 0,
+                'updated' => 0,
+                'sku_empty' => 0,
+                'mapping_not_found' => 0,
+                'missing_hpp' => 0,
+            ]);
+        });
+
+        $this->artisan('marketplace:sync-orders', [
+            '--store' => $this->store->id,
+            '--days' => 3,
+        ])->assertSuccessful();
+
+        Bus::assertDispatched(SyncMarketplaceBookings::class, function (SyncMarketplaceBookings $job): bool {
+            return $job->store->id === $this->store->id;
+        });
     }
 
     public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
@@ -280,6 +307,32 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         ]);
 
         $this->invokeBookingJobMethod('normalizeUnarrangedOrders');
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'READY_TO_SHIP',
+            'status' => 'packed',
+        ]);
+    }
+
+    public function test_sync_booking_tetap_menormalisasi_jika_request_api_gagal(): void
+    {
+        $order = $this->createOrder('BOOKING-API-FAIL', 'PROCESSED');
+        $order->update(['booking_sn' => 'BOOKING-API-FAIL']);
+
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => 'BOOKING-API-FAIL',
+            'booking_status' => 'READY_TO_SHIP',
+            'items' => [],
+        ]);
+
+        $this->mock(ChannelManager::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('driver')->once()->andThrow(new \RuntimeException('API unavailable'));
+        });
+
+        $job = new SyncMarketplaceBookings($this->store);
+        $job->handle($this->app->make(ChannelManager::class));
 
         $this->assertDatabaseHas('marketplace_orders', [
             'id' => $order->id,

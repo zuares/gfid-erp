@@ -102,12 +102,18 @@ class SyncMarketplaceBookings implements ShouldQueue
             // muncul di halaman Orders (halaman itu hanya membaca marketplace_orders).
             $this->backfillMissingOrders();
 
-            // Booking READY_TO_SHIP yang sudah terlanjur tersimpan sebagai
-            // PROCESSED harus dikembalikan ke tab Perlu Dikirim sampai
-            // pengirimannya benar-benar diatur.
-            $this->normalizeUnarrangedOrders();
         } catch (\Throwable $e) {
             Log::error("Exception in SyncMarketplaceBookings [{$this->store->id}]: " . $e->getMessage());
+        } finally {
+            // Status READY_TO_SHIP yang sudah tersimpan tetap harus
+            // menormalisasi marketplace_orders walaupun request API terbaru
+            // gagal. Sebelumnya exception sebelum akhir proses membuat order
+            // lama PROCESSED tidak pernah dipindahkan.
+            try {
+                $this->normalizeUnarrangedOrders();
+            } catch (\Throwable $e) {
+                Log::error("Gagal menormalisasi order booking [{$this->store->id}]: " . $e->getMessage());
+            }
         }
     }
 

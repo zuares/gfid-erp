@@ -2676,8 +2676,11 @@ class MarketplaceController extends Controller
                 (bool) $request->dry_run
             );
 
-            // Sinkronisasi pesanan kilat (bookings) agar statusnya ter-update di UI
-            if (class_exists(\App\Jobs\SyncMarketplaceBookings::class)) {
+            // Sinkronisasi pesanan kilat (bookings) agar statusnya ter-update di UI.
+            // Dry-run harus benar-benar read-only.
+            if (! $request->boolean('dry_run')
+                && $request->boolean('sync_bookings', true)
+                && class_exists(\App\Jobs\SyncMarketplaceBookings::class)) {
                 dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, null, null, false));
             }
 

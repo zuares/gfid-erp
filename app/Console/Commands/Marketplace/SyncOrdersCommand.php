@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Marketplace;
 
+use App\Jobs\SyncMarketplaceBookings;
 use App\Models\Store;
 use App\Services\MarketplaceSyncService;
 use Illuminate\Console\Command;
@@ -131,6 +132,11 @@ class SyncOrdersCommand extends Command
                         }
                     );
 
+                    // Sinkronkan booking dalam siklus yang sama. Scheduler utama
+                    // berjalan tiap 5 menit; booking tidak boleh menunggu jadwal
+                    // hourly agar order READY_TO_SHIP segera keluar dari Dikemas.
+                    $this->syncBookings($store, $timeFrom, $timeTo);
+
                     Cache::put($progressKey, [
                         'percent' => 100,
                         'label'   => "Selesai · {$totals['new']} baru, {$totals['updated']} update",
@@ -196,6 +202,13 @@ class SyncOrdersCommand extends Command
                     }
                 );
 
+                // Jalur scheduler ini sebelumnya hanya menarik order reguler.
+                // Jalankan booking setelah sync agar status booking Shopee ikut
+                // menormalisasi marketplace_orders.PROCESSED yang belum diatur kirim.
+                if (! $isDryRun) {
+                    $this->syncBookings($store, $timeFrom, $timeTo);
+                }
+
                 $duration = round((microtime(true) - $start) * 1000);
 
                 $new = $result['new'] ?? 0;
@@ -252,5 +265,20 @@ class SyncOrdersCommand extends Command
         $this->line("Gagal: {$failedCount} toko");
 
         return $failedCount > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    private function syncBookings(Store $store, int $timeFrom, int $timeTo): void
+    {
+        try {
+            dispatch_sync(new SyncMarketplaceBookings($store, $timeFrom, $timeTo, false));
+            $this->line('Booking: disinkronkan');
+        } catch (\Throwable $e) {
+            Log::warning('Marketplace booking sync after order sync failed', [
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'error' => $e->getMessage(),
+            ]);
+            $this->warn('Booking: gagal disinkronkan (' . $e->getMessage() . ')');
+        }
     }
 }

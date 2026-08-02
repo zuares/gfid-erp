@@ -3830,7 +3830,11 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             active.forEach(s => qsAddStoreCard(s));
 
             // Hitung total langkah
-            const totalSteps = active.length * (doOrders ? 1 : 0) + active.length * (doBookings ? 1 : 0);
+            // Endpoint sync-orders sudah menjalankan sync booking dalam siklus
+            // yang sama. Hindari memanggil endpoint booking dua kali ketika
+            // kedua checkbox dipilih.
+            const bookingsOnly = doBookings && !doOrders;
+            const totalSteps = active.length * (doOrders ? 1 : 0) + active.length * (bookingsOnly ? 1 : 0);
             let doneSteps = 0;
             let hasAuthError = false;
 
@@ -3845,7 +3849,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     try {
                         const d = await api('/api/marketplace/stores/' + s.id + '/sync-orders', {
                             method: 'POST',
-                            body: JSON.stringify({ time_from: from, time_to: now, page_size: 50, dry_run: dryRun ? 1 : 0 }),
+                            body: JSON.stringify({
+                                time_from: from,
+                                time_to: now,
+                                page_size: 50,
+                                dry_run: dryRun ? 1 : 0,
+                                sync_bookings: doBookings ? 1 : 0,
+                            }),
                         });
                         const newN = d.new || d.synced || 0;
                         const updN = d.updated || 0;
@@ -3885,7 +3895,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             }
 
             // ── Sync Bookings (Kilat) ─────────────────────────────────────
-            if (doBookings && !hasAuthError) {
+            if (bookingsOnly && !hasAuthError) {
                 for (let i = 0; i < active.length; i++) {
                     const s = active[i];
                     const pct = Math.round(5 + ((doneSteps / totalSteps) * 88));
