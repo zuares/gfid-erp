@@ -90,7 +90,9 @@ class AdsDashboardController extends Controller
                 $queued = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', $syncParams);
                 $queued->onQueue('ads');
 
-                \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addMinutes(15));
+                // Satu kali per jam per toko + rentang agar membuka dashboard
+                // berulang tidak memicu panggilan API berlebihan.
+                \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addHour());
             }
         }
 

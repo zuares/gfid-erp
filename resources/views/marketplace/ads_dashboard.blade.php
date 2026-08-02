@@ -1623,6 +1623,11 @@ function sortTrafficTable(col) {
         <div>
             <h1 class="title" style="margin-bottom: 0.2rem;"><i class="bi bi-megaphone text-primary me-1"></i> Iklan Shopee</h1>
             <div class="sub" style="font-size: .8rem; margin: 0;">Pantau efisiensi, biaya, dan margin profit kampanye.</div>
+            <div id="globalSyncStatus" data-last-sync="{{ $lastSyncTime ?? '' }}" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.35rem;font-size:.68rem;color:var(--dsh-muted);">
+                <span class="global-sync-dot" style="width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block;"></span>
+                <span class="global-sync-label">Sync terakhir: {{ $lastSyncTime ?: 'Belum pernah' }}</span>
+                <span style="opacity:.65;">· otomatis tiap jam</span>
+            </div>
         </div>
         
         <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" id="filterForm" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin:0;">
@@ -4407,5 +4412,52 @@ function pollSyncProgress(storeId) {
         setTimeout(() => window.location.reload(), 1500);
     }
 }
+</script>
+<script>
+(function () {
+    const statusEl = document.getElementById('globalSyncStatus');
+    if (!statusEl) return;
+
+    const labelEl = statusEl.querySelector('.global-sync-label');
+    const dotEl = statusEl.querySelector('.global-sync-dot');
+    const lastSync = statusEl.dataset.lastSync || 'Belum pernah';
+    const endpoint = `{{ route('marketplace.ads.syncProgress') }}?store_id=all`;
+
+    function setStatus(color, icon, text) {
+        if (dotEl) {
+            dotEl.style.background = color;
+            dotEl.style.boxShadow = color === '#2563eb' ? '0 0 0 3px rgba(37,99,235,.15)' : 'none';
+        }
+        if (labelEl) labelEl.innerHTML = `<i class="bi ${icon}" style="margin-right:.15rem;"></i>${text}`;
+    }
+
+    function pollGlobalSync() {
+        fetch(endpoint, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'queued' || data.status === 'processing') {
+                    const percent = Number(data.percent || 0);
+                    setStatus('#2563eb', 'bi-arrow-repeat spin-icon', `Sync berjalan ${percent}%`);
+                    statusEl.title = data.label || 'Sinkronisasi iklan sedang diproses.';
+                } else if (data.status === 'error') {
+                    setStatus('#dc2626', 'bi-exclamation-circle-fill', 'Sync gagal');
+                    statusEl.title = data.label || 'Sinkronisasi iklan gagal.';
+                } else if (data.status === 'partial_success') {
+                    setStatus('#d97706', 'bi-exclamation-triangle-fill', 'Sync sebagian');
+                    statusEl.title = data.label || 'Sinkronisasi iklan selesai sebagian.';
+                } else {
+                    setStatus('#16a34a', 'bi-check-circle-fill', `Sync terakhir: ${lastSync}`);
+                    statusEl.title = 'Auto-sync berjalan setiap jam.';
+                }
+            })
+            .catch(() => {
+                setStatus('#64748b', 'bi-dash-circle', `Sync terakhir: ${lastSync}`);
+                statusEl.title = 'Status sync belum dapat diperbarui.';
+            });
+    }
+
+    pollGlobalSync();
+    setInterval(pollGlobalSync, 30000);
+})();
 </script>
 @endpush
