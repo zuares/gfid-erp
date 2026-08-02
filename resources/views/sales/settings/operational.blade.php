@@ -63,6 +63,16 @@
 @endpush
 
 @section('content')
+@php
+    $ringtoneLibraryAvailable = $ringtoneLibraryAvailable ?? \Illuminate\Support\Facades\Schema::hasTable('shipment_scan_ringtones');
+    $operationalUpdateRoute = route('sales.settings.operational.update');
+    $resetScanRoute = \Illuminate\Support\Facades\Route::has('sales.settings.operational.reset-scan')
+        ? route('sales.settings.operational.reset-scan')
+        : $operationalUpdateRoute;
+    $resetLookupRoute = \Illuminate\Support\Facades\Route::has('sales.settings.operational.reset-lookup')
+        ? route('sales.settings.operational.reset-lookup')
+        : $operationalUpdateRoute;
+@endphp
 <div class="container-fluid py-4">
     <div class="sos-page">
         <div class="sos-head">
@@ -99,7 +109,7 @@
                 </div>
 
                 <div class="sos-actions">
-                    <button type="submit" formaction="{{ route('sales.settings.operational.reset-scan') }}" formmethod="POST" name="reset_shipment_scan_defaults" value="1" id="sos-reset" class="sos-button sos-button-light">Reset Default GFID</button>
+                    <button type="submit" formaction="{{ $resetScanRoute }}" formmethod="POST" name="reset_shipment_scan_defaults" value="1" id="sos-reset" class="sos-button sos-button-light">Reset Default GFID</button>
                     <button type="submit" class="sos-button">Simpan Pengaturan</button>
                 </div>
 
@@ -251,7 +261,7 @@
                 </select>
 
                 <div class="sos-actions">
-                    <button type="submit" formaction="{{ route('sales.settings.operational.reset-lookup') }}" formmethod="POST" name="reset_sales_operational_defaults" value="1" id="sos-reset-lookup" class="sos-button sos-button-light">Reset Default Lookup</button>
+                    <button type="submit" formaction="{{ $resetLookupRoute }}" formmethod="POST" name="reset_sales_operational_defaults" value="1" id="sos-reset-lookup" class="sos-button sos-button-light">Reset Default Lookup</button>
                     <button type="submit" class="sos-button">Simpan Lookup</button>
                 </div>
             </form>
