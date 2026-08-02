@@ -156,6 +156,14 @@
 
     .sr-status-submitted::before { background: #3b82f6; }
 
+    .sr-status-cancelled {
+        color: #991b1b;
+        background: rgba(239, 68, 68, .10);
+        border-color: rgba(239, 68, 68, .28);
+    }
+
+    .sr-status-cancelled::before { background: #ef4444; }
+
     .sr-status-posted {
         color: #166534;
         background: rgba(34, 197, 94, .10);
@@ -365,13 +373,14 @@
 @php
     $status = $shipmentReturn->status ?? 'draft';
     $statusClass = match ($status) {
-        'submitted' => 'sr-status-submitted',
+        'cancelled' => 'sr-status-cancelled',
         'posted' => 'sr-status-posted',
         default => '',
     };
     $statusLabel = match ($status) {
-        'submitted' => 'Submitted',
+        'submitted', 'draft' => 'Draft',
         'posted' => 'Diterima WH-RTS',
+        'cancelled' => 'Dibatalkan',
         default => ucfirst($status),
     };
 
@@ -472,7 +481,7 @@
             </div>
         </div>
 
-        @if ($shipmentReturn->reason || $shipmentReturn->notes || $shipmentReturn->submitted_at || $shipmentReturn->posted_at)
+        @if ($shipmentReturn->reason || $shipmentReturn->notes || $shipmentReturn->submitted_at || $shipmentReturn->posted_at || $shipmentReturn->cancelled_at)
             <div class="sr-panel">
                 <div class="sr-panel-body">
                     <div class="sr-meta">
@@ -500,6 +509,17 @@
                                     {{ optional($shipmentReturn->posted_at)->format('d M Y H:i') }}
                                     @if ($shipmentReturn->postedBy)
                                         <div class="sr-order-info">{{ $shipmentReturn->postedBy->name }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                        @if ($shipmentReturn->cancelled_at)
+                            <div class="sr-meta-item">
+                                <div class="sr-meta-label">Dibatalkan</div>
+                                <div class="sr-meta-value">
+                                    {{ optional($shipmentReturn->cancelled_at)->format('d M Y H:i') }}
+                                    @if ($shipmentReturn->cancelledBy)
+                                        <div class="sr-order-info">{{ $shipmentReturn->cancelledBy->name }}</div>
                                     @endif
                                 </div>
                             </div>
@@ -557,16 +577,17 @@
             </div>
 
             <div class="sr-actions-group">
-                @if ($status === 'draft')
-                    <a href="{{ route('sales.shipment_returns.edit', $shipmentReturn) }}" class="sr-btn">Scan Retur</a>
-                    <form action="{{ route('sales.shipment_returns.submit', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Submit retur ini?');">
-                        @csrf
-                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Submit</button>
-                    </form>
-                @elseif ($status === 'submitted')
+                @if (in_array($status, ['draft', 'submitted'], true))
+                    @if ($status === 'draft')
+                        <a href="{{ route('sales.shipment_returns.edit', $shipmentReturn) }}" class="sr-btn">Scan Retur</a>
+                    @endif
                     <form action="{{ route('sales.shipment_returns.receive', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Terima retur ini ke WH-RTS dan tambah stok?');">
                         @csrf
                         <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Terima ke WH-RTS</button>
+                    </form>
+                    <form action="{{ route('sales.shipment_returns.cancel', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Batalkan retur ini? Data tetap disimpan sebagai histori.');">
+                        @csrf
+                        <button type="submit" class="sr-btn sr-btn-danger">Batalkan Retur</button>
                     </form>
                 @else
                     <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>

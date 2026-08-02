@@ -1327,6 +1327,7 @@
     let toastTimer = null;
     let scrollTarget = null;
     let lastScannedLineId = null;
+    let orderScanSequence = 0;
     let audioCtx = null;
 
     function normalize(value) { return String(value || '').trim().toUpperCase(); }
@@ -1369,7 +1370,26 @@
             osc.stop(start + dur);
         } catch (e) {}
     }
-    function playTone(kind) {
+    function playTone(kind, fromConfig = false) {
+        const eventMap = {
+            order: 'order_success',
+            orderRepeat: 'order_duplicate',
+            item: 'item_success',
+            next: 'navigation',
+            reset: 'reset',
+            undo: 'undo',
+            error: 'error_general',
+            errorGuard: 'item_duplicate',
+            errorNoOrder: 'order_not_found',
+            errorItem: 'error_general',
+            errorNetwork: 'error_network',
+            errorQty: 'error_general',
+            errorEmpty: 'error_general',
+        };
+        if (!fromConfig && window.GFID && typeof window.GFID.playScanSound === 'function') {
+            return window.GFID.playScanSound(eventMap[kind] || kind, () => playTone(kind, true));
+        }
+        if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
         const tones = {
             order: [[660, .07, .13, 'sine', 0], [880, .11, .13, 'sine', .08]],
             orderRepeat: [[784, .08, .12, 'triangle', 0], [784, .08, .1, 'triangle', .11]],
@@ -1833,9 +1853,14 @@
         code = normalize(code);
         if (!code) return;
 
+        // Scanner dapat mengirim scan berikutnya sebelum request sebelumnya selesai.
+        // Hanya response dari scan paling terakhir yang boleh mengubah order aktif.
+        const requestSequence = ++orderScanSequence;
+
         const existingOrder = findOrder(code);
         if (existingOrder) {
             state.current = existingOrder.code;
+            state.expanded = existingOrder.code;
             scrollTarget = { orderCode: existingOrder.code, lineId: null };
             playTone('orderRepeat');
             toast('ok', `Kembali ke order ${existingOrder.code}`);
@@ -1857,6 +1882,7 @@
             if (!response.ok) throw new Error(payload.message || 'Gagal mencatat order');
             return payload;
         }).then(payload => {
+            if (requestSequence !== orderScanSequence) return;
             const orderCode = normalize(payload.order?.code || code);
             const order = ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
             scrollTarget = { orderCode: order.code, lineId: null };
@@ -1864,6 +1890,7 @@
             toast('ok', payload.message || `Order ${order.code} dicatat`);
             setMode('item');
         }).catch(() => {
+            if (requestSequence !== orderScanSequence) return;
             alertError('Gagal mencatat nomor order. Coba scan ulang.', 'errorNetwork');
         });
     }

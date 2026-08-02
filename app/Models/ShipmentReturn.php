@@ -24,6 +24,8 @@ class ShipmentReturn extends Model
         'submitted_by',
         'posted_at',
         'posted_by',
+        'cancelled_at',
+        'cancelled_by',
         'created_by',
     ];
 
@@ -31,6 +33,7 @@ class ShipmentReturn extends Model
         'date' => 'date',
         'submitted_at' => 'datetime',
         'posted_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     /* ==========================
@@ -70,6 +73,11 @@ class ShipmentReturn extends Model
     public function postedBy()
     {
         return $this->belongsTo(User::class, 'posted_by');
+    }
+
+    public function cancelledBy()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     /* ==========================

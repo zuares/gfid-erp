@@ -57,6 +57,9 @@ class ShipmentReturnController extends Controller
     {
         // Draft dibuat tanpa marketplace/shipment agar scanner menjadi entry point
         // pencatatan yang mandiri. Relasi bisa ditambahkan di fase berikutnya.
+        // SQLite dengan transaksi DEFERRED dapat gagal saat transaksi yang
+        // sudah membaca sequence code berubah menjadi INSERT. Retry membantu
+        // ketika ada proses lain yang sedang menyelesaikan write singkat.
         $shipmentReturn = DB::transaction(function () {
             return ShipmentReturn::create([
                 'code' => ShipmentReturn::generateCode('RTP'),
@@ -66,7 +69,7 @@ class ShipmentReturnController extends Controller
                 'status' => 'draft',
                 'created_by' => Auth::id(),
             ]);
-        });
+        }, 5);
 
         return redirect()->route('sales.shipment_returns.edit', $shipmentReturn);
     }
@@ -404,6 +407,7 @@ class ShipmentReturnController extends Controller
             'creator',
             'submittedBy',
             'postedBy',
+            'cancelledBy',
         ]);
 
         return view('sales.shipment_returns.show', compact('shipmentReturn'));
@@ -617,10 +621,10 @@ class ShipmentReturnController extends Controller
      */
     public function submit(Request $request, ShipmentReturn $shipmentReturn)
     {
-        if ($shipmentReturn->status !== 'draft') {
+        if (!in_array($shipmentReturn->status, ['draft', 'submitted'], true)) {
             return back()
                 ->with('status', 'error')
-                ->with('message', 'Hanya retur draft yang bisa di-submit.');
+                ->with('message', 'Hanya retur draft yang bisa disimpan.');
         }
 
         if ($shipmentReturn->lines()->count() === 0) {
@@ -629,15 +633,17 @@ class ShipmentReturnController extends Controller
                 ->with('message', 'Tidak ada item di retur ini.');
         }
 
-        $shipmentReturn->status = 'submitted';
-        $shipmentReturn->submitted_at = now();
-        $shipmentReturn->submitted_by = auth()->id();
+        // Endpoint lama dipertahankan, tetapi Submit tidak lagi membuat status
+        // baru. Pencatatan tetap berada di draft sampai diterima ke WH-RTS.
+        $shipmentReturn->status = 'draft';
+        $shipmentReturn->submitted_at = null;
+        $shipmentReturn->submitted_by = null;
         $shipmentReturn->save();
 
         return redirect()
             ->route('sales.shipment_returns.show', $shipmentReturn)
             ->with('status', 'success')
-            ->with('message', 'Pencatatan dikunci. Siap diterima ke WH-RTS.');
+            ->with('message', 'Draft retur tersimpan.');
     }
 
     /**
@@ -669,10 +675,10 @@ class ShipmentReturnController extends Controller
                 ];
             }
 
-            if ($lockedReturn->status !== 'submitted') {
+            if (!in_array($lockedReturn->status, ['draft', 'submitted'], true)) {
                 return [
                     'status' => 'error',
-                    'message' => 'Pencatatan harus berstatus submitted sebelum diterima ke WH-RTS.',
+                    'message' => 'Hanya draft retur yang bisa diterima ke WH-RTS.',
                 ];
             }
 
@@ -766,6 +772,67 @@ class ShipmentReturnController extends Controller
     }
 
     /**
+     * Batalkan draft retur tanpa menghapus histori pencatatan.
+     * Retur yang sudah diterima ke WH-RTS harus melalui proses reversal terpisah.
+     */
+    public function cancel(Request $request, ShipmentReturn $shipmentReturn)
+    {
+        $result = DB::transaction(function () use ($shipmentReturn) {
+            $lockedReturn = ShipmentReturn::query()
+                ->lockForUpdate()
+                ->findOrFail($shipmentReturn->id);
+
+            if ($lockedReturn->status === 'cancelled') {
+                return [
+                    'status' => 'already_cancelled',
+                    'shipment_return' => $lockedReturn,
+                ];
+            }
+
+            if ($lockedReturn->status === 'posted') {
+                return [
+                    'status' => 'error',
+                    'message' => 'Retur yang sudah diterima ke WH-RTS tidak bisa dibatalkan dari sini.',
+                ];
+            }
+
+            if (!in_array($lockedReturn->status, ['draft', 'submitted'], true)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Status retur tidak dapat dibatalkan.',
+                ];
+            }
+
+            $lockedReturn->status = 'cancelled';
+            $lockedReturn->cancelled_at = now();
+            $lockedReturn->cancelled_by = auth()->id();
+            $lockedReturn->save();
+
+            return [
+                'status' => 'ok',
+                'shipment_return' => $lockedReturn,
+            ];
+        });
+
+        if ($result['status'] === 'already_cancelled') {
+            return back()
+                ->with('status', 'error')
+                ->with('message', 'Retur ini sudah dibatalkan.');
+        }
+
+        if ($result['status'] !== 'ok') {
+            return back()
+                ->with('status', 'error')
+                ->with('message', $result['message']);
+        }
+
+        return redirect()
+            ->route('sales.shipment_returns.show', $result['shipment_return'])
+            ->with('status', 'success')
+            ->with('message', 'Retur berhasil dibatalkan.');
+    }
+
+    /**
      * Inline update qty line retur (support AJAX).
      */
     public function updateLineQty(Request $request, ShipmentReturnLine $line)
@@ -812,7 +879,6 @@ class ShipmentReturnController extends Controller
                 $line->save();
 
                 if ($scanItem) {
-                    $scanItem->qty = $qty;
                     $scanItem->qty_scanned = $qty;
                     $scanItem->save();
                 }
