@@ -2800,7 +2800,16 @@ class MarketplaceController extends Controller
             }
         }
 
-        $mapped = $orders->map(function ($o) use ($hasScanLog, $kilatMap) {
+        // Halaman Orders perlu menampilkan posisi terbaru di marketplace, bukan
+        // hanya status terakhir yang tersimpan di database. Endpoint lain tetap
+        // memakai data lokal agar tidak menambah traffic API secara tidak perlu.
+        // Letakkan setelah order kilat tambahan digabung agar order lama juga ikut
+        // diverifikasi bila masih berada di salah satu tab aktif.
+        $liveOrderStatuses = request()->boolean('live_status')
+            ? $this->fetchLiveOrderStatuses($orders, $kilatMap)
+            : [];
+
+        $mapped = $orders->map(function ($o) use ($hasScanLog, $kilatMap, $liveOrderStatuses) {
             $arr = $o->toArray();
             // Kilat = punya booking DAN BUKAN Instan (same-day). Keduanya berbeda:
             // Instan dideteksi dari nama kurir, ditangani di tab "Instan" tersendiri.
@@ -2809,6 +2818,15 @@ class MarketplaceController extends Controller
             $bookingSn = $o->booking_sn ?? ($kilatMap[$o->channel_order_id] ?? ($kilatMap[$o->external_order_id] ?? null));
             $arr['is_kilat']               = (!empty($bookingSn)) && ! $isInstant;
             $arr['booking_sn']             = $bookingSn ?: null;
+            $liveStatus = $liveOrderStatuses[$o->id]['status'] ?? null;
+            $liveNeedsShipping = $liveOrderStatuses[$o->id]['needs_shipping'] ?? null;
+            $arr['api_order_status']       = $liveStatus;
+            $arr['status_source']          = $liveStatus ? 'api' : 'database';
+            if ($liveStatus) {
+                $arr['order_status'] = ($liveNeedsShipping === true)
+                    ? 'READY_TO_SHIP'
+                    : $liveStatus;
+            }
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
             $arr['print_count']            = $o->print_count ?? 0;
@@ -2816,7 +2834,7 @@ class MarketplaceController extends Controller
             $arr['has_unresolved_lines']   = $o->fulfillment
                 ? $o->fulfillment->lines->whereNull('item_id')->isNotEmpty()
                 : false;
-            $arr['needs_shipping_arrangement'] = $o->needs_shipping_arrangement;
+            $arr['needs_shipping_arrangement'] = $liveNeedsShipping ?? $o->needs_shipping_arrangement;
             // Issues: ada item dengan data_status != 'valid' (sama seperti halaman /marketplace/issues)
             $arr['has_data_issues'] = $o->items->contains(
                 fn ($item) => ($item->data_status ?? 'incomplete') !== 'valid'
@@ -2987,7 +3005,11 @@ class MarketplaceController extends Controller
                 ->unique('marketplace_sku')
                 ->keyBy('marketplace_sku');
 
-            $bookingRows = $pureBookings->map(function ($b) use ($mappedItems, $skuMapped) {
+            $liveBookingStatuses = request()->boolean('live_status')
+                ? $this->fetchLiveBookingStatuses($pureBookings)
+                : [];
+
+            $bookingRows = $pureBookings->map(function ($b) use ($mappedItems, $skuMapped, $liveBookingStatuses) {
                 $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) use ($mappedItems, $skuMapped) {
                     // Tampilkan SKU marketplace (bukan judul produk); judul hanya fallback.
                     $sku = $i['model_sku'] ?? $i['item_sku'] ?? null;
@@ -3012,6 +3034,11 @@ class MarketplaceController extends Controller
                     ];
                 })->values()->all();
 
+                $liveStatus = $liveBookingStatuses[$b->id]['status'] ?? null;
+                $bookingStatus = $liveStatus ?: (string) $b->booking_status;
+                $needsShipping = $liveBookingStatuses[$b->id]['needs_shipping']
+                    ?? $b->needsShipping();
+
                 return [
                     'id'                          => -$b->id, // negatif = baris booking (bukan order)
                     'store_id'                    => $b->store_id,
@@ -3028,7 +3055,9 @@ class MarketplaceController extends Controller
                     'booking_sn'                  => $b->booking_sn,
                     // Booking tanpa bukti pengaturan kirim tetap di Perlu Dikirim,
                     // termasuk PROCESSED yang belum punya resi/package/document.
-                    'order_status'                => $b->needsShipping() ? 'READY_TO_SHIP' : ($b->booking_status === 'PROCESSED' ? 'PROCESSED' : 'READY_TO_SHIP'),
+                    'order_status'                => $needsShipping ? 'READY_TO_SHIP' : $bookingStatus,
+                    'api_order_status'            => $liveStatus,
+                    'status_source'               => $liveStatus ? 'api' : 'database',
                     'ordered_at'                  => $b->create_time
                         ? \Carbon\Carbon::createFromTimestamp($b->create_time)->toIso8601String()
                         : optional($b->created_at)->toIso8601String(),
@@ -3037,7 +3066,7 @@ class MarketplaceController extends Controller
                     'shipping_awb_no'             => $b->tracking_number,
                     'is_kilat'                    => true,
                     'is_booking'                  => true,
-                    'needs_shipping_arrangement'  => $b->needsShipping(),
+                    'needs_shipping_arrangement'  => $needsShipping,
                     'fulfillment_id'              => null,
                     'fulfillment_status'          => null,
                     'print_count'                 => $b->print_count ?? 0,
@@ -3056,6 +3085,276 @@ class MarketplaceController extends Controller
         }
 
         return response()->json($mapped->values());
+    }
+
+    /**
+     * Ambil status terbaru untuk order yang sedang berada di tab aktif.
+     * Kegagalan API sengaja tidak menghilangkan order; UI akan memakai status DB.
+     */
+    private function fetchLiveOrderStatuses($orders, array $kilatMap = []): array
+    {
+        $candidateStatuses = [
+            'UNPAID',
+            'READY_TO_SHIP',
+            'MATCHED',
+            'PROCESSED',
+            'READY_TO_HANDOVER',
+            'SHIPPED',
+            'TO_CONFIRM_RECEIVE',
+            'COMPLETED',
+        ];
+        $candidates = $orders->filter(fn ($order) =>
+            in_array(strtoupper((string) $order->order_status), $candidateStatuses, true)
+            || filled($order->booking_sn)
+        );
+        $result = [];
+
+        foreach ($candidates->groupBy('store_id') as $storeOrders) {
+            $store = $storeOrders->first()?->store;
+            if (! $this->canReadLiveMarketplaceStatus($store)) {
+                continue;
+            }
+
+            $bookingKeys = [];
+            $regularKeys = [];
+            $keyToOrderIds = [];
+
+            foreach ($storeOrders as $order) {
+                // Sebagian order kilat baru hanya tertaut melalui marketplace_bookings
+                // (booking_sn di order lokal masih kosong). Jangan salah kirim order_sn
+                // ke get_order_detail; gunakan booking detail API bila map mengetahuinya.
+                $bookingSn = $order->booking_sn
+                    ?: ($kilatMap[$order->channel_order_id] ?? ($kilatMap[$order->external_order_id] ?? null));
+                $keys = array_filter([
+                    $order->channel_order_id,
+                    $order->external_order_id,
+                    $bookingSn,
+                ], fn ($key) => filled($key));
+                foreach ($keys as $key) {
+                    $key = (string) $key;
+                    $keyToOrderIds[$key][] = $order->id;
+                }
+
+                if (filled($bookingSn)) {
+                    $bookingKeys[] = (string) $bookingSn;
+                } elseif (filled($order->channel_order_id)) {
+                    $regularKeys[] = (string) $order->channel_order_id;
+                }
+            }
+
+            foreach (array_chunk(array_values(array_unique($bookingKeys)), 50) as $chunk) {
+                try {
+                    $response = $this->gateway->getBookingDetail($store, implode(',', $chunk));
+                    $this->assertMarketplaceApiResponse($response);
+
+                    foreach ($this->extractMarketplaceBookingDetails($response) as $detail) {
+                        $status = $this->canonicalLiveMarketplaceStatus(
+                            $detail['booking_status'] ?? $detail['order_status'] ?? $detail['status'] ?? null
+                        );
+                        if (! $status) {
+                            continue;
+                        }
+
+                        $keys = array_filter([$detail['booking_sn'] ?? null, $detail['order_sn'] ?? null]);
+                        $package = data_get($detail, 'package_list.0', []);
+                        $hasShippingArtifact = filled($detail['tracking_number'] ?? null)
+                            || filled($detail['package_number'] ?? null)
+                            || filled($detail['shipping_document_status'] ?? null)
+                            || filled(data_get($package, 'tracking_number'))
+                            || filled(data_get($package, 'tracking_no'))
+                            || filled(data_get($package, 'package_number'));
+                        $needsShipping = ! $hasShippingArtifact
+                            && in_array($status, ['PENDING', 'READY_TO_SHIP', 'PROCESSED'], true);
+                        foreach ($keys as $key) {
+                            foreach ($keyToOrderIds[(string) $key] ?? [] as $orderId) {
+                                $result[$orderId] = [
+                                    'status' => $status,
+                                    'needs_shipping' => $needsShipping,
+                                ];
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Gagal membaca status live booking untuk halaman Orders.', [
+                        'store_id' => $store->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            foreach (array_chunk(array_values(array_unique($regularKeys)), 50) as $chunk) {
+                try {
+                    $response = $this->gateway->getOrderDetail($store, $chunk);
+                    $this->assertMarketplaceApiResponse($response);
+
+                    foreach ($this->extractMarketplaceOrderDetails($response) as $detail) {
+                        $id = $detail['order_sn'] ?? $detail['order_id'] ?? $detail['id'] ?? null;
+                        $status = $this->canonicalLiveMarketplaceStatus(
+                            $detail['order_status'] ?? $detail['status'] ?? null
+                        );
+                        if (! filled($id) || ! $status) {
+                            continue;
+                        }
+
+                        foreach ($keyToOrderIds[(string) $id] ?? [] as $orderId) {
+                            $result[$orderId] = ['status' => $status];
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Gagal membaca status live order untuk halaman Orders.', [
+                        'store_id' => $store->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /** @param iterable<\App\Models\MarketplaceBooking> $bookings */
+    private function fetchLiveBookingStatuses($bookings): array
+    {
+        $result = [];
+
+        foreach ($bookings->groupBy('store_id') as $storeBookings) {
+            $store = $storeBookings->first()?->store;
+            if (! $this->canReadLiveMarketplaceStatus($store)) {
+                continue;
+            }
+
+            $bookingIds = $storeBookings->pluck('booking_sn')->filter()->unique()->values()->all();
+            $idMap = $storeBookings->keyBy('booking_sn');
+
+            foreach (array_chunk($bookingIds, 50) as $chunk) {
+                try {
+                    $response = $this->gateway->getBookingDetail($store, implode(',', $chunk));
+                    $this->assertMarketplaceApiResponse($response);
+
+                    foreach ($this->extractMarketplaceBookingDetails($response) as $detail) {
+                        $bookingSn = $detail['booking_sn'] ?? null;
+                        $booking = $bookingSn ? $idMap->get((string) $bookingSn) : null;
+                        if (! $booking) {
+                            continue;
+                        }
+
+                        $status = $this->canonicalLiveMarketplaceStatus(
+                            $detail['booking_status'] ?? $detail['order_status'] ?? $detail['status'] ?? null
+                        );
+                        if (! $status) {
+                            continue;
+                        }
+
+                        $package = data_get($detail, 'package_list.0', []);
+                        $hasShippingArtifact = filled($detail['tracking_number'] ?? null)
+                            || filled($detail['package_number'] ?? null)
+                            || filled($detail['shipping_document_status'] ?? null)
+                            || filled(data_get($package, 'tracking_number'))
+                            || filled(data_get($package, 'tracking_no'))
+                            || filled(data_get($package, 'package_number'));
+
+                        $result[$booking->id] = [
+                            'status' => $status,
+                            // Booking PROCESSED tanpa bukti pengaturan kirim tetap
+                            // diperlakukan sebagai READY_TO_SHIP di UI.
+                            'needs_shipping' => ! $hasShippingArtifact
+                                && in_array($status, ['PENDING', 'READY_TO_SHIP', 'PROCESSED'], true),
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Gagal membaca status live booking murni untuk halaman Orders.', [
+                        'store_id' => $store->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function canReadLiveMarketplaceStatus(?Store $store): bool
+    {
+        return $store
+            && $store->is_active
+            && $store->status === 'active'
+            && $store->connection_status === 'CONNECTED'
+            && in_array(strtolower((string) $store->channel?->code), ['shopee', 'shp', 'tiktok', 'ttk', 'tt'], true);
+    }
+
+    private function assertMarketplaceApiResponse(array $response): void
+    {
+        if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
+            throw new \RuntimeException($response['message'] ?? $response['error'] ?? 'API mengembalikan error.');
+        }
+    }
+
+    private function extractMarketplaceOrderDetails(array $response): array
+    {
+        foreach ([
+            data_get($response, 'response.order_list'),
+            data_get($response, 'data.orders'),
+            data_get($response, 'data.order_list'),
+        ] as $details) {
+            if (is_array($details)) {
+                return array_values(array_filter($details, 'is_array'));
+            }
+        }
+
+        return [];
+    }
+
+    private function extractMarketplaceBookingDetails(array $response): array
+    {
+        foreach ([
+            data_get($response, 'response.booking_list'),
+            data_get($response, 'response.order_list'),
+            data_get($response, 'data.booking_list'),
+        ] as $details) {
+            if (is_array($details)) {
+                return array_values(array_filter($details, 'is_array'));
+            }
+        }
+
+        return [];
+    }
+
+    private function canonicalLiveMarketplaceStatus(mixed $status): ?string
+    {
+        if (! is_string($status) || trim($status) === '') {
+            return null;
+        }
+
+        $status = strtoupper(trim($status));
+
+        $canonical = [
+            'AWAITING_SHIPMENT' => 'READY_TO_SHIP',
+            'AWAITING_COLLECTION' => 'READY_TO_HANDOVER',
+            'IN_TRANSIT' => 'SHIPPED',
+            'DELIVERED' => 'COMPLETED',
+        ][$status] ?? $status;
+
+        // Jangan pernah memasukkan nilai status API yang tidak dikenal ke
+        // filter tab. Lebih aman memakai fallback lokal daripada memindahkan
+        // order ke tab yang salah karena respons API berubah/korup.
+        return in_array($canonical, [
+            'PENDING',
+            'UNPAID',
+            'READY_TO_SHIP',
+            'MATCHED',
+            'PROCESSED',
+            'READY_TO_HANDOVER',
+            'SHIPPED',
+            'TO_CONFIRM_RECEIVE',
+            'COMPLETED',
+            'CANCELLED',
+            'CANCELLED_BEFORE_SHIPPING',
+            'IN_CANCEL',
+            'TO_RETURN',
+            'RETURNING',
+            'RETURNED',
+            'REFUNDED',
+        ], true) ? $canonical : null;
     }
 
     public function syncSettlements(Request $request, Store $store): JsonResponse

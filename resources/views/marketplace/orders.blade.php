@@ -2018,6 +2018,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
         if (getFrom()) lp.set('date_from', getFrom());
         if (getTo())   lp.set('date_to', getTo());
+        // Status tab Perlu Dikirim/Sedang Dikemas harus mengikuti status live
+        // marketplace; backend tetap menyediakan fallback database bila API gagal.
+        lp.set('live_status', '1');
         const url = '/api/marketplace/local-orders' + (lp.toString() ? ('?' + lp.toString()) : '');
         orders = await api(url).catch(() => []);
 
@@ -2673,6 +2676,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (tab === 'issues') return rows.filter(TAB_FILTERS.issues);
 
         const isPacked = o => fulfilledOrderIds.has(o.id);
+        // Jika status live API tersedia, status API menjadi sumber kebenaran
+        // untuk posisi tab. Fulfillment lokal tidak boleh menggeser order
+        // READY_TO_SHIP ke Sedang Dikemas hanya karena pernah dipacking lokal.
+        const hasLiveStatus = o => o.status_source === 'api';
 
         if (tab === 'shipped') {
             return rows.filter(o => ['SHIPPED', 'TO_CONFIRM_RECEIVE'].includes(o.order_status));
@@ -2685,6 +2692,20 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             };
 
             return rows.filter(o => {
+                if (hasLiveStatus(o)) {
+                    if (tab === 'ready') {
+                        if (o.is_kilat) return ['READY_TO_SHIP', 'MATCHED'].includes(o.order_status);
+                        return ['UNPAID', 'READY_TO_SHIP', 'MATCHED'].includes(o.order_status) && !isInstant(o);
+                    }
+
+                    if (tab === 'processed') {
+                        if (o.is_kilat) return o.order_status === 'PROCESSED' && !kilatNeedsArrange(o);
+                        return ['PROCESSED', 'READY_TO_HANDOVER'].includes(o.order_status);
+                    }
+
+                    return false;
+                }
+
                 if (tab === 'ready') {
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';

@@ -14,6 +14,7 @@ use App\Services\MarketplaceSyncService;
 use App\Services\Channels\ChannelManager;
 use App\Http\Controllers\MarketplaceController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -364,6 +365,70 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
 
         $this->assertCount(1, $rows);
         $this->assertFalse((bool) ($rows->first()['is_booking'] ?? false));
+    }
+
+    public function test_local_orders_memakai_status_live_api_saat_diminta_halaman_orders(): void
+    {
+        $order = $this->createOrder('LIVE-STATUS-ORDER', 'PROCESSED');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->withArgs(function (Store $store, array $orderSns) use ($order): bool {
+                    return $store->id === $order->store_id
+                        && $orderSns === [$order->channel_order_id];
+                })
+                ->andReturn([
+                    'response' => [
+                        'order_list' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'order_status' => 'SHIPPED',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1',
+            'GET',
+            ['live_status' => '1'],
+        ));
+
+        $rows = collect(app(MarketplaceController::class)->localOrders()->getData(true));
+        $row = $rows->firstWhere('id', $order->id);
+
+        $this->assertSame('SHIPPED', $row['order_status']);
+        $this->assertSame('SHIPPED', $row['api_order_status']);
+        $this->assertSame('api', $row['status_source']);
+    }
+
+    public function test_local_orders_mengabaikan_status_api_yang_tidak_dikenal(): void
+    {
+        $order = $this->createOrder('LIVE-UNKNOWN-STATUS', 'PROCESSED');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getOrderDetail')->once()->andReturn([
+                'response' => [
+                    'order_list' => [[
+                        'order_sn' => 'LIVE-UNKNOWN-STATUS',
+                        'order_status' => 'STATUS_BARU_YANG_BELUM_DIKENAL',
+                    ]],
+                ],
+            ]);
+        });
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1',
+            'GET',
+            ['live_status' => '1'],
+        ));
+
+        $row = collect(app(MarketplaceController::class)->localOrders()->getData(true))
+            ->firstWhere('id', $order->id);
+
+        $this->assertSame('PROCESSED', $row['order_status']);
+        $this->assertNull($row['api_order_status']);
+        $this->assertSame('database', $row['status_source']);
     }
 
     public function test_sync_tidak_mempertahankan_processed_untuk_order_booking_ready_to_ship(): void
