@@ -217,6 +217,9 @@ Route::middleware(['web', 'auth', 'access:production'])
 
             Route::post('/reject-returns/convert', [SewingRejectReturnController::class, 'convert'])
                 ->name('reject_returns.convert');
+
+            Route::post('/reject-returns/recover', [SewingRejectReturnController::class, 'recover'])
+                ->name('reject_returns.recover');
         });
 
         /*

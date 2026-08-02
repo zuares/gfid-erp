@@ -14,6 +14,8 @@ class SewingReturnLine extends Model
         'sewing_pickup_line_id',
         'qty_ok',
         'qty_reject',
+        'reject_bahan_action',
+        'result_item_id',
         'notes',
         'source_type',
         'source_reject_return_line_id',
@@ -23,6 +25,7 @@ class SewingReturnLine extends Model
     protected $casts = [
         'qty_ok' => 'float',
         'qty_reject' => 'float',
+        'result_item_id' => 'integer',
     ];
 
     /*
@@ -76,5 +79,10 @@ class SewingReturnLine extends Model
     public function sourceFinishingJobLine()
     {
         return $this->belongsTo(FinishingJobLine::class, 'source_finishing_job_line_id');
+    }
+
+    public function resultItem()
+    {
+        return $this->belongsTo(Item::class, 'result_item_id');
     }
 }

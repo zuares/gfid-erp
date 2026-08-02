@@ -704,9 +704,25 @@
                                                    oninput="syncQty('bahan', {{ $i }}, {{ $row['qty_max'] }})">
                                         </div>
                                     </div>
+
+                                    <div class="field" style="margin-top:.45rem;">
+                                        <label>Tindak Lanjut Reject Bahan</label>
+                                        <select name="results[{{ $i }}][reject_bahan_action]" class="form-select form-select-sm">
+                                            <option value="rework" @selected(old("results.{$i}.reject_bahan_action", $row['reject_bahan_action'] ?: 'rework') === 'rework')>
+                                                Bisa diperbaiki — masuk REWORK
+                                            </option>
+                                            <option value="final" @selected(old("results.{$i}.reject_bahan_action", $row['reject_bahan_action'] ?: 'rework') === 'final')>
+                                                Tidak bisa diperbaiki — reject final
+                                            </option>
+                                        </select>
+                                        <div class="small text-muted mt-1">Pilihan ini hanya dipakai jika Qty Rj. Bahan diisi.</div>
+                                    </div>
                                     
                                     <input type="hidden" name="results[{{ $i }}][sewing_return_line_id]" value="{{ $row['sewing_return_line_id'] }}">
                                     <input type="hidden" name="results[{{ $i }}][bundle_id]" value="{{ $row['bundle_id'] }}">
+                                    @if (!empty($row['result_item_id']))
+                                        <div class="small text-muted mt-1">SKU hasil rework: <strong class="mono">{{ $row['item_code'] }}</strong></div>
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
