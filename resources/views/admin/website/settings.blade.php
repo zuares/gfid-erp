@@ -2591,5 +2591,6 @@ function wsUploadImg(key, input) {
             if (prog) { prog.textContent = 'Gagal upload, coba lagi.'; }
         });
 }
+
 </script>
 @endpush

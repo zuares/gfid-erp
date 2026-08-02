@@ -329,6 +329,7 @@
     $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
     $hasSalesShipmentReturnsIndex = $router->has('sales.shipment_returns.index');
     $hasSalesShipmentReturnsCreate = $router->has('sales.shipment_returns.create');
+    $hasSalesOperationalSettings = $isOwner && $router->has('sales.settings.operational');
     $hasSalesShipmentsReport = $router->has('sales.shipments.report');
 
     // Sales reports (opsional—kamu punya beberapa, tapi bukan index)
@@ -435,6 +436,7 @@
         $hasSalesInvoicesIndex = $hasSalesInvoicesCreate = false;
         $hasSalesShipmentsIndex = $hasSalesShipmentsCreate = false;
         $hasSalesShipmentReturnsIndex = $hasSalesShipmentReturnsCreate = false;
+        $hasSalesOperationalSettings = false;
         $hasSalesShipmentsReport = false;
         $hasSalesReportItemProfit = $hasSalesReportChannelProfit = $hasSalesReportShipmentAnalytics = false;
     }
@@ -519,8 +521,9 @@
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
     $salesShipmentReturnOpen = request()->routeIs('sales.shipment_returns.*');
+    $salesOperationalSettingsOpen = request()->routeIs('sales.settings.*');
     $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.shipments.report');
-    $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesReportOpen;
+    $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesOperationalSettingsOpen || $salesReportOpen;
 
     $invStocksOpen = request()->routeIs('inventory.stocks.*');
     $invOpnameOpen = request()->routeIs('inventory.stock_opnames.*');
@@ -1178,6 +1181,16 @@
                         </li>
                     @endif
 
+                    @if ($router->has('settings.system.index'))
+                        <li>
+                            <a href="{{ route('settings.system.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('settings.system.*') ? 'active' : '' }}">
+                                <span class="icon">⚙️</span><span>Pengaturan Sistem</span>
+                            </a>
+                        </li>
+                    @endif
+
+
                     @if ($hasAdminCatalogProducts || $hasAdminCatalogCategories)
                         <div class="mobile-sidebar-section-label">Website</div>
                         <li class="mb-1">
@@ -1634,6 +1647,14 @@
                                 <a href="{{ route('sales.shipment_returns.create') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.create') ? 'active' : '' }}">
                                     <span class="icon">＋</span><span>Retur Pengiriman Baru</span>
+                                </a>
+                            @endif
+
+                            @if ($hasSalesOperationalSettings)
+                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Pengaturan</div>
+                                <a href="{{ route('sales.settings.operational') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.settings.operational*') ? 'active' : '' }}">
+                                    <span class="icon">⚙️</span><span>Pengaturan Operasional</span>
                                 </a>
                             @endif
 

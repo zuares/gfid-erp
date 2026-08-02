@@ -729,9 +729,11 @@
                 body: JSON.stringify(payload),
             });
 
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.ok) {
-                throw new Error(data.message || 'Gagal memproses permintaan.');
+                const error = new Error(data.message || 'Gagal memproses permintaan.');
+                error.status = res.status || data.status || 0;
+                throw error;
             }
 
             pushMessage('ai', data.reply || '-', data.task || null);
@@ -751,7 +753,7 @@
                 pushMessage('ai', error.message || 'Terjadi error saat memanggil AI.');
             }
             statusEl.textContent = error.message || 'Terjadi error.';
-            if (markAuto) {
+            if (markAuto && error.status !== 429) {
                 console.warn('Auto insight gagal:', error);
             }
         } finally {

@@ -17,6 +17,7 @@ Route::middleware(['auth'])->prefix('settings')->name('settings.')->group(functi
         Route::get('system',               [SystemSettingController::class, 'index'])->name('system.index');
         Route::post('system/cutoff',       [SystemSettingController::class, 'storeCutoff'])->name('system.cutoff.store');
         Route::post('system/cutoff/clear', [SystemSettingController::class, 'clearCutoff'])->name('system.cutoff.clear');
+
     });
 
 });

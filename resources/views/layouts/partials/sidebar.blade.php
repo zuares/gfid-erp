@@ -59,6 +59,7 @@
     $hasSalesShipmentsIndex = $router->has('sales.shipments.index');
     $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
     $hasSalesShipmentReturnsIndex = $router->has('sales.shipment_returns.index');
+    $hasSalesOperationalSettings = $isOwner && $router->has('sales.settings.operational');
 
     $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
     $hasSalesInvoicesCreate = $router->has('sales.invoices.create');
@@ -217,6 +218,7 @@
 
     if (!$canModule('sales')) {
         $hasSalesShipmentsIndex = $hasSalesShipmentsCreate = $hasSalesShipmentReturnsIndex = false;
+        $hasSalesOperationalSettings = false;
         $hasSalesInvoicesIndex = $hasSalesInvoicesCreate = $hasSalesShipmentsReport = false;
         $hasSalesReportPerformance = $hasSalesReportItemProfit = false;
         $hasSalesReportChannelProfit = $hasSalesReportShipmentAnalytics = false;
@@ -323,6 +325,7 @@
         $open('sales.invoices.*') ||
         $open('sales.shipments.*') ||
         $open('sales.shipment_returns.*') ||
+        $open('sales.settings.*') ||
         $open('sales.reports.*') ||
         $open('sales.shipments.report');
 
@@ -737,7 +740,7 @@
             @endif
             @if ($isOwner && $router->has('settings.system.index'))
                 <li>
-                    <x-sidebar.simple-link href="{{ route('settings.system.index') }}" icon="bi bi-gear" :active="request()->routeIs('settings.*')">
+                    <x-sidebar.simple-link href="{{ route('settings.system.index') }}" icon="bi bi-gear" :active="request()->routeIs('settings.system.*')">
                         Pengaturan Sistem
                     </x-sidebar.simple-link>
                 </li>
@@ -1519,6 +1522,7 @@
                 $hasSalesShipmentsIndex,
                 $hasSalesShipmentsCreate,
                 $hasSalesShipmentReturnsIndex,
+                $hasSalesOperationalSettings,
                 $hasSalesReportPerformance,
                 $hasSalesShipmentsReport,
                 $hasSalesReportItemProfit,
@@ -1574,6 +1578,14 @@
                             <x-sidebar.sub-link href="{{ route('sales.shipment_returns.index') }}" icon="bi bi-arrow-repeat"
                                 :active="request()->routeIs('sales.shipment_returns.index')">
                                 Daftar Retur
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasSalesOperationalSettings)
+                            @php $subhead('Pengaturan'); @endphp
+                            <x-sidebar.sub-link href="{{ route('sales.settings.operational') }}" icon="bi bi-sliders"
+                                :active="request()->routeIs('sales.settings.operational*')">
+                                Pengaturan Operasional
                             </x-sidebar.sub-link>
                         @endif
 

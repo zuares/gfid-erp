@@ -409,9 +409,15 @@ if (app()->environment(['local', 'testing'])) {
 // API endpoint for tracking
 Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'store'])->name('activity-logs.store')->middleware('auth')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 Route::post('/api/marketplace/sync-finance-all', function (\Illuminate\Http\Request $request) {
-    // Dedupe: kalau masih ada run 'processing' yang belum 15 menit, jangan antre lagi.
-    $active = \App\Models\MarketplaceFinanceSyncRun::where('status', 'processing')
-        ->where('started_at', '>=', now()->subMinutes(15))
+    // Dedupe: jangan membuat antrean kedua ketika run masih queued/processing.
+    $active = \App\Models\MarketplaceFinanceSyncRun::whereIn('status', ['queued', 'processing'])
+        ->where(function ($q) {
+            $q->where('started_at', '>=', now()->subMinutes(15))
+              ->orWhere(function ($queued) {
+                  $queued->whereNull('started_at')
+                         ->where('created_at', '>=', now()->subMinutes(15));
+              });
+        })
         ->exists();
     if ($active) {
         return response()->json(['status' => 'busy', 'message' => 'Sync finance masih berjalan — tunggu sampai selesai.'], 409);
@@ -469,10 +475,25 @@ Route::post('/api/marketplace/sync-finance-all', function (\Illuminate\Http\Requ
         }
     }
 
-    \App\Jobs\SyncFinanceJob::dispatch($trigger, $months, $days, $mode);
+    $run = \App\Models\MarketplaceFinanceSyncRun::create([
+        'trigger' => $trigger,
+        'status' => 'queued',
+    ]);
+
+    try {
+        \App\Jobs\SyncFinanceJob::dispatch($trigger, $months, $days, $mode, $run->id);
+    } catch (\Throwable $e) {
+        $run->update([
+            'status' => 'error',
+            'error_message' => substr($e->getMessage(), 0, 1000),
+            'finished_at' => now(),
+        ]);
+        throw $e;
+    }
     return response()->json([
-        'status'  => 'success',
-        'message' => "Sync finance {$label} (" . ($mode === 'missing' ? 'hanya yang belum ada' : 'tarik ulang semua') . ") berjalan di background.",
+        'status'  => 'queued',
+        'message' => "Sync finance {$label} (" . ($mode === 'missing' ? 'hanya yang belum ada' : 'tarik ulang semua') . ") masuk antrean.",
+        'run_id'  => $run->id,
         'days'    => $days,
         'months'  => $months,
         'mode'    => $mode,

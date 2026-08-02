@@ -47,6 +47,11 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-5.6-terra'),
     ],
 
+    'ffmpeg' => [
+        'binary' => env('FFMPEG_BINARY'),
+        'ffprobe_binary' => env('FFPROBE_BINARY'),
+    ],
+
     'oauth' => [
         'default_role' => env('OAUTH_DEFAULT_ROLE', env('GOOGLE_OAUTH_DEFAULT_ROLE', 'operating')),
         'providers' => [

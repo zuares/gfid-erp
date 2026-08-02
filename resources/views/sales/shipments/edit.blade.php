@@ -1334,6 +1334,8 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
+    <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
+
     <a href="/marketplace/orders" class="btn btn-shp-outline btn-sm" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
         📦 List Order
     </a>
@@ -1353,11 +1355,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
 
     {{-- ═════════════════ FLASH ═════════════════ --}}
-    @if (session('status') === 'error')
-        <div class="shp-flash alert alert-danger js-auto-hide-alert" role="alert">
-            {{ session('message') }}
-        </div>
-    @elseif (session('status') === 'success')
+    @if (session('status') === 'success')
         <div class="shp-flash alert alert-success js-auto-hide-alert" role="alert">
             {{ session('message') }}
         </div>
@@ -1720,6 +1718,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const lastScanQtyEl     = document.getElementById('lastScanQty');
     const lastScanPacking   = document.getElementById('lastScanPacking');
     const lastScanAvailable = document.getElementById('lastScanAvailable');
+    window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
     const scanErrorBox      = document.getElementById('scanErrorBox');
     const scanErrorMsg      = document.getElementById('scanErrorMsg');
     const sessionCounterEl  = document.getElementById('sessionCounter');
@@ -1857,6 +1856,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     }
 
     function beep(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
+        if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
         try {
             const ctx = getAudioContext();
             if (!ctx) return;
@@ -1875,22 +1875,28 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         } catch (e) {}
     }
     /* scan item OK — 2-nada pendek naik */
-    const beepOk  = () => {
+    const playConfiguredSound = (eventKey, fallback) => {
+        if (window.GFID && typeof window.GFID.playScanSound === 'function') {
+            return window.GFID.playScanSound(eventKey, fallback);
+        }
+        fallback();
+    };
+    const beepOk  = () => playConfiguredSound('item_success', () => {
         beep(1900, 0.07, 0.55, 0,    'square');
         beep(2600, 0.07, 0.50, 0.08, 'square');
-    };
+    });
     /* scan item GAGAL — 3-nada turun sawtooth */
-    const beepErr = () => {
+    const beepErr = () => playConfiguredSound('error_general', () => {
         beep(240,  0.16, 0.72, 0,    'sawtooth');
         beep(150,  0.20, 0.72, 0.16, 'sawtooth');
         beep(110,  0.24, 0.70, 0.36, 'sawtooth');
-    };
+    });
     /* pindah mode (NEXT) — 3-nada sweep naik halus */
-    const beepNav = () => {
+    const beepNav = () => playConfiguredSound('navigation', () => {
         beep(700,  0.06, 0.38, 0,    'sine');
         beep(1100, 0.06, 0.38, 0.07, 'sine');
         beep(1700, 0.10, 0.38, 0.14, 'sine');
-    };
+    });
 
     ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
         document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
@@ -2067,6 +2073,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             rekonBtn.setAttribute('aria-disabled', 'true');
         }
     }
+
+    rekonBtn?.addEventListener('click', function (event) {
+        if (this.classList.contains('is-disabled') || this.getAttribute('aria-disabled') === 'true') {
+            event.preventDefault();
+            beepErr();
+            return;
+        }
+
+        unlockAudio();
+        beepNav();
+    });
 
     /* ── scroll + highlight row ── */
     function scrollToRow(lineId, flash = true) {
@@ -2703,45 +2720,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (!window.Swal) return;
     const items = @json(session('stock_insufficient'));
-    const rows = items.map(r => `
-        <tr>
-            <td style="padding:6px 8px;font-weight:700;font-family:monospace;font-size:.8rem;white-space:nowrap">${r.code}</td>
-            <td style="padding:6px 8px;font-size:.8rem;text-align:left">${r.name}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;color:#dc2626">${r.stock.toLocaleString('id')}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem">${r.needed.toLocaleString('id')}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;font-weight:700;color:#dc2626">-${r.short.toLocaleString('id')}</td>
-        </tr>`).join('');
-    Swal.fire({
-        icon: 'error',
-        title: 'Barang Belum Siap Dikirim',
-        html: `
-            <p style="margin-bottom:8px;font-size:.85rem;font-weight:700">Shipment ditolak — stok WH-RTS tidak mencukupi.</p>
-            <ul style="text-align:left;font-size:.8rem;color:#475569;margin:0 0 12px;padding-left:18px;line-height:1.9">
-                <li>Ada <strong>return barang</strong> yang belum masuk WH-RTS</li>
-                <li>Barang masih proses <strong>produksi</strong></li>
-                <li><strong>PO pembelian</strong> belum dibuat / belum di-approve</li>
-                <li>GRN belum diposting</li>
-            </ul>
-            <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse">
-                <thead>
-                    <tr style="background:#fef2f2;border-bottom:2px solid #fecaca">
-                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase">Kode</th>
-                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase">Item</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Stok</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Perlu</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#dc2626;text-transform:uppercase">Kurang</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-            </div>`,
-        confirmButtonText: 'Mengerti',
-        confirmButtonColor: '#dc2626',
-        width: 600,
-    });
+    if (!window.GFID || typeof window.GFID.errorAlert !== 'function') return;
+    const codes = items.map(item => item.code).filter(Boolean).join(', ');
+    window.GFID.errorAlert(
+        codes
+            ? `Stok WH-RTS belum cukup untuk: ${codes}.`
+            : 'Stok WH-RTS belum cukup untuk shipment ini.'
+    );
 });
 </script>
 @endpush

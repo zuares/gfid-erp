@@ -436,7 +436,7 @@
         // Status sync finance terakhir (chip di header); kalau masih berjalan,
         // langsung ikut memantau sampai selesai.
         refreshFinanceSyncStatus().then(latest => {
-            if (latest && latest.status === 'processing') startFinancePolling();
+            if (latest && ['queued', 'processing'].includes(latest.status)) startFinancePolling();
         });
 
         stores = await api('/api/marketplace/stores').catch(() => []);
@@ -595,6 +595,7 @@
     })();
 
     function statusBadgeSync(status) {
+        if (status === 'queued')     return '<span class="sync-pill" style="color:#b45309; background:rgba(245,158,11,.14);"><i class="bi bi-hourglass-split"></i> antrean</span>';
         if (status === 'processing') return '<span class="sync-pill" style="color:#1d4ed8; background:rgba(59,130,246,.12);"><i class="bi bi-arrow-repeat spin"></i> berjalan</span>';
         if (status === 'success')    return '<span class="sync-pill" style="color:#15803d; background:rgba(22,163,74,.12);">✓ selesai</span>';
         return '<span class="sync-pill" style="color:#b91c1c; background:rgba(220,38,38,.12);">✕ gagal</span>';
@@ -613,11 +614,14 @@
     let openLogRunId = null;   // run yang sedang dibuka lognya di panel
     let autoOpenLog  = false;  // buka log otomatis saat sync baru dimulai
     let syncTabTimer = null;   // poll pelan selama ada run berjalan & tab sync terbuka
+    let financeSyncPending = false;
 
     function fillLogPanel(r) {
-        const running = r.status === 'processing';
+        const running = ['queued', 'processing'].includes(r.status);
         const out = r.output || (running
-            ? 'Berjalan sejak ' + (r.started_at || '—') + ' — menunggu output…\n(Kalau terus kosong: restart queue worker → php artisan queue:restart)'
+            ? (r.status === 'queued'
+                ? 'Menunggu queue worker lokal…\nJalankan: php artisan queue:work'
+                : 'Berjalan sejak ' + (r.started_at || '—') + ' — menunggu output…\n(Kalau terus kosong: restart queue worker → php artisan queue:restart)')
             : 'Tidak ada output tercatat.');
         const pre = $('financeLogContent');
         const nearBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 60;
@@ -631,7 +635,7 @@
         syncRunsCache = runs || [];
 
         // Sync baru dimulai → konsol langsung mengikuti run teratas
-        if (autoOpenLog && syncRunsCache.length && syncRunsCache[0].status === 'processing') {
+        if (autoOpenLog && syncRunsCache.length && ['queued', 'processing'].includes(syncRunsCache[0].status)) {
             autoOpenLog = false;
             openLogRunId = syncRunsCache[0].id;
         }
@@ -644,7 +648,7 @@
 
         // Selama ada run berjalan & tab sync terlihat, poll pelan (tiap 5 dtk)
         clearTimeout(syncTabTimer);
-        if (syncRunsCache.some(r => r.status === 'processing') && $('profitTabSync').style.display !== 'none') {
+        if (syncRunsCache.some(r => ['queued', 'processing'].includes(r.status)) && $('profitTabSync').style.display !== 'none') {
             syncTabTimer = setTimeout(refreshFinanceSyncStatus, 5000);
         }
         const body = $('syncRunsBody');
@@ -664,7 +668,7 @@
                 <td style="padding:.5rem .9rem; text-align:center;">${r.output ? '<button type="button" onclick="showRunLog(' + i + ')" style="border:none; background:none; color:var(--shp-primary,#2563eb); cursor:pointer; font-size:.72rem; font-weight:600;">lihat</button>' : '<span style="color:#cbd5e1;">—</span>'}</td>
             </tr>`).join('');
         // Dot indikator di tab saat ada run yang sedang berjalan
-        $('syncTabDot').style.display = syncRunsCache.some(r => r.status === 'processing') ? 'inline-block' : 'none';
+        $('syncTabDot').style.display = syncRunsCache.some(r => ['queued', 'processing'].includes(r.status)) ? 'inline-block' : 'none';
     }
 
     window.showRunLog = function (i) {
@@ -682,7 +686,12 @@
             const data = await res.json();
             renderSyncRuns(data.runs || []);
             const latest = (data.runs || [])[0] || null;
-            if (!latest) return null;
+            if (!latest) {
+                if (financeSyncPending) {
+                    setFinanceChip('<i class="bi bi-hourglass-split"></i> Menunggu queue worker lokal…', '#b45309', 'rgba(245,158,11,.14)');
+                }
+                return null;
+            }
 
             const logLink = $('financeLogToggle');
             if (logLink) logLink.style.display = 'inline';
@@ -693,7 +702,7 @@
             }
 
             // Strip status ala tab Sync Ads Dashboard
-            const running = data.runs.some(r => r.status === 'processing');
+            const running = data.runs.some(r => ['queued', 'processing'].includes(r.status));
             const chipEl = $('syncStateChip'), valEl = $('syncStateValue');
             if (chipEl && valEl) {
                 if (running) {
@@ -711,11 +720,15 @@
             const lastOk = data.runs.find(r => r.status === 'success');
             if ($('syncLastSuccess')) $('syncLastSuccess').textContent = lastOk ? (lastOk.finished_at || '—') : '—';
 
-            if (latest.status === 'processing') {
+            if (latest.status === 'queued') {
+                setFinanceChip('<i class="bi bi-hourglass-split"></i> Menunggu queue worker lokal…', '#b45309', 'rgba(245,158,11,.14)');
+            } else if (latest.status === 'processing') {
                 setFinanceChip('<i class="bi bi-arrow-repeat spin"></i> Sync berjalan di background…', '#1d4ed8', 'rgba(59,130,246,.12)');
             } else if (latest.status === 'success') {
+                financeSyncPending = false;
                 setFinanceChip('✓ ' + triggerLabel(latest.trigger) + ' selesai ' + (latest.finished_at || '') + (latest.duration ? ' (' + latest.duration + ' dtk)' : ''), '#15803d', 'rgba(22,163,74,.12)');
             } else {
+                financeSyncPending = false;
                 setFinanceChip('✕ Sync gagal — ' + String(latest.error || 'lihat log').slice(0, 80), '#b91c1c', 'rgba(220,38,38,.12)');
             }
             return latest;
@@ -728,10 +741,11 @@
         financePollTimer = setInterval(async () => {
             polls++;
             const latest = await refreshFinanceSyncStatus();
-            if (!latest || polls > 180) { clearInterval(financePollTimer); financePollTimer = null; return; }
-            if (latest.status !== 'processing') {
+            if (polls > 180) { clearInterval(financePollTimer); financePollTimer = null; financeSyncPending = false; return; }
+            if (latest && !['queued', 'processing'].includes(latest.status)) {
                 clearInterval(financePollTimer);
                 financePollTimer = null;
+                financeSyncPending = false;
                 if (latest.status === 'success') loadProfits(); // muat ulang data begitu selesai
             }
         }, 5000);
@@ -769,12 +783,14 @@
                 // Data sudah lengkap → tidak ada job background yang dibuat
                 setFinanceChip('✓ ' + (data.message || 'Data sudah lengkap — tidak perlu sync.'), '#15803d', 'rgba(22,163,74,.12)');
             } else if (res.status === 409) {
+                financeSyncPending = true;
                 switchProfitTab('sync');
                 setFinanceChip('⏳ ' + (data.message || 'Sync masih berjalan — tunggu sampai selesai.'), '#b45309', 'rgba(245,158,11,.14)');
                 startFinancePolling();
             } else if (!res.ok) {
                 setFinanceChip('✕ Gagal memulai sync (' + res.status + ')', '#b91c1c', 'rgba(220,38,38,.12)');
             } else {
+                financeSyncPending = true;
                 switchProfitTab('sync'); // perlihatkan progres di tab Sync
                 setFinanceChip('<i class="bi bi-arrow-repeat spin"></i> Sync ' + label + (payload.mode === 'missing' ? ' (hanya yang belum ada)' : '') + ' berjalan di background…', '#1d4ed8', 'rgba(59,130,246,.12)');
                 autoOpenLog = true; // log detail langsung dibuka begitu run muncul

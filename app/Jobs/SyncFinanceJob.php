@@ -37,7 +37,8 @@ class SyncFinanceJob implements ShouldQueue
         public string $trigger = 'manual',
         public int $months = 1,
         public ?int $days = null,       // 1-183 — mengalahkan months jika diisi
-        public string $mode = 'full'    // 'full' | 'missing' (cek DB, ambil yang belum ada saja)
+        public string $mode = 'full',   // 'full' | 'missing' (cek DB, ambil yang belum ada saja)
+        public ?int $runId = null
     ) {
     }
 
@@ -45,10 +46,22 @@ class SyncFinanceJob implements ShouldQueue
     {
         // Run-tracking (pola sama dengan sync ads): status selalu difinalisasi,
         // tidak ada run yang tertinggal 'processing' selamanya.
-        $run = \App\Models\MarketplaceFinanceSyncRun::create([
+        // Run dibuat oleh endpoint saat job masuk antrean supaya UI lokal bisa
+        // langsung menampilkan status queued walaupun queue:work belum mengambilnya.
+        $run = $this->runId
+            ? \App\Models\MarketplaceFinanceSyncRun::find($this->runId)
+            : null;
+        $run ??= \App\Models\MarketplaceFinanceSyncRun::create([
             'trigger'    => $this->trigger,
             'status'     => 'processing',
             'started_at' => now(),
+        ]);
+        $run->update([
+            'trigger'    => $this->trigger,
+            'status'     => 'processing',
+            'started_at' => now(),
+            'finished_at' => null,
+            'error_message' => null,
         ]);
 
         /*
@@ -111,8 +124,14 @@ class SyncFinanceJob implements ShouldQueue
 
     public function failed(\Throwable $exception)
     {
-        \App\Models\MarketplaceFinanceSyncRun::where('status', 'processing')
-            ->where('started_at', '<', now()->subMinutes(1))
+        $query = \App\Models\MarketplaceFinanceSyncRun::query()
+            ->whereIn('status', ['queued', 'processing']);
+        if ($this->runId) {
+            $query->whereKey($this->runId);
+        } else {
+            $query->where('started_at', '<', now()->subMinutes(1));
+        }
+        $query
             ->update([
                 'status'        => 'error',
                 'error_message' => substr($exception->getMessage(), 0, 1000),

@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Cache;
  * Keys baku:
  *  - system_cutoff_date  : YYYY-MM-DD — tanggal cut-off (semua modul)
  *  - system_cutoff_notes : teks bebas keterangan cut-off
+ *  - shipment_scan_sound_enabled : 1/0 — default suara scan pengiriman
+ *  - shipment_scan_sound_map : JSON mapping event scan ke preset/ringtone
+ *  - sales_lookup_* : kebijakan lookup dan tautan order operasional penjualan
  *
  * @property string      $key
  * @property string|null $value
@@ -33,6 +36,17 @@ class SystemSetting extends Model
 
     public const KEY_CUTOFF_DATE  = 'system_cutoff_date';
     public const KEY_CUTOFF_NOTES = 'system_cutoff_notes';
+    public const KEY_SHIPMENT_SCAN_SOUND = 'shipment_scan_sound_enabled';
+    public const KEY_SHIPMENT_SCAN_SOUND_MAP = 'shipment_scan_sound_map';
+    public const KEY_SALES_LOOKUP_MODE = 'sales_lookup_mode';
+    public const KEY_SALES_LOOKUP_SOURCES = 'sales_lookup_sources';
+    public const KEY_SALES_LOOKUP_IDENTIFIERS = 'sales_lookup_identifiers';
+    public const KEY_SALES_LOOKUP_SAME_STORE = 'sales_lookup_same_store';
+    public const KEY_SALES_LOOKUP_BLOCK_DUPLICATE = 'sales_lookup_block_duplicate';
+    public const KEY_SALES_ALLOW_UNLINKED_SUBMIT = 'sales_allow_unlinked_submit';
+    public const KEY_SALES_ALLOW_MIXED_LINKAGE = 'sales_allow_mixed_linkage';
+    public const KEY_SALES_STATUS_TIMING = 'sales_marketplace_status_timing';
+    public const KEY_SALES_RECORD_ONLY_DAILY_SALES = 'sales_record_only_daily_sales';
 
     // ──────────────────────────────────────────────────────
     // RELATIONS

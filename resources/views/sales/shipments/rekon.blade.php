@@ -1120,6 +1120,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
     <span class="shp-topbar-spacer"></span>
+    <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
     <span class="shp-pill">Batch <b>{{ $totalLines }}</b> SKU</span>
     <span class="shp-pill shp-pill-accent">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     <span class="shp-pill" id="topPillOrders" style="display:none">Pesanan <b id="topOrderCount">0</b></span>
@@ -1327,6 +1328,8 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 <script>
 (function () {
 'use strict';
+
+window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
 
 /* ── URLs ── */
 const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -1653,6 +1656,7 @@ function unlockAudio() {
 }
 
 function tone(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
+    if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
     try {
         const ctx = getAudioContext();
         if (!ctx) return;
@@ -1681,18 +1685,24 @@ function tone(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
 }
 
 /* ── Named sounds ── */
+function playConfiguredSound(eventKey, fallback) {
+    if (window.GFID && typeof window.GFID.playScanSound === 'function') {
+        return window.GFID.playScanSound(eventKey, fallback);
+    }
+    fallback();
+}
 /* order ditemukan, semua stok cukup — 3-nada arpeggio naik, nyaring */
-function sndOrderReady()   { tone(880, 0.13, 0.80, 0, 'square'); tone(1100, 0.13, 0.78, 0.14, 'square'); tone(1320, 0.16, 0.75, 0.28, 'square'); }
+function sndOrderReady()   { playConfiguredSound('order_ready', () => { tone(880, 0.13, 0.80, 0, 'square'); tone(1100, 0.13, 0.78, 0.14, 'square'); tone(1320, 0.16, 0.75, 0.28, 'square'); }); }
 /* order ditemukan, stok kurang — ok lalu turun (waspada) */
-function sndOrderPartial() { tone(880, 0.13, 0.78, 0, 'square'); tone(660,  0.16, 0.75, 0.14, 'triangle'); }
+function sndOrderPartial() { playConfiguredSound('order_partial', () => { tone(880, 0.13, 0.78, 0, 'square'); tone(660,  0.16, 0.75, 0.14, 'triangle'); }); }
 /* order tidak ditemukan di batch — 2-nada rendah agak nyaring */
-function sndOrderNoMatch() { tone(660, 0.18, 0.72, 0, 'triangle'); tone(500, 0.18, 0.70, 0.19, 'triangle'); }
+function sndOrderNoMatch() { playConfiguredSound('order_no_match', () => { tone(660, 0.18, 0.72, 0, 'triangle'); tone(500, 0.18, 0.70, 0.19, 'triangle'); }); }
 /* duplikat / blocked — buzz pendek double */
-function sndGuard()        { tone(450, 0.09, 0.72, 0, 'square'); tone(380,  0.11, 0.70, 0.10, 'square'); }
+function sndGuard()        { playConfiguredSound('item_duplicate', () => { tone(450, 0.09, 0.72, 0, 'square'); tone(380,  0.11, 0.70, 0.10, 'square'); }); }
 /* server / network error — 3-nada turun sawtooth */
-function sndErr()          { tone(240, 0.16, 0.72, 0, 'sawtooth'); tone(150, 0.20, 0.72, 0.16, 'sawtooth'); tone(110, 0.24, 0.70, 0.36, 'sawtooth'); }
+function sndErr()          { playConfiguredSound('error_network', () => { tone(240, 0.16, 0.72, 0, 'sawtooth'); tone(150, 0.20, 0.72, 0.16, 'sawtooth'); tone(110, 0.24, 0.70, 0.36, 'sawtooth'); }); }
 /* pindah mode (NEXT) — 3-nada sweep naik halus */
-function sndNav()          { tone(700, 0.06, 0.38, 0, 'sine'); tone(1100, 0.06, 0.38, 0.07, 'sine'); tone(1700, 0.10, 0.38, 0.14, 'sine'); }
+function sndNav()          { playConfiguredSound('navigation', () => { tone(700, 0.06, 0.38, 0, 'sine'); tone(1100, 0.06, 0.38, 0.07, 'sine'); tone(1700, 0.10, 0.38, 0.14, 'sine'); }); }
 /* compat shim */
 function beep(ok) { ok ? sndOrderReady() : sndErr(); }
 
@@ -1821,7 +1831,14 @@ async function processOrder(no) {
             if (s === 'ready')        sndOrderReady();
             else if (s === 'partial') sndOrderPartial();
             else                      sndOrderNoMatch();
-            toast(s === 'ready' ? 'ok' : 'warn', no + (data.order?.source === 'manual_scan' ? ' dicatat' : (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch')));
+            const scanMessage = data.order?.source === 'manual_scan'
+                ? `${no} dicatat`
+                : s === 'ready'
+                    ? `${no} tercatat`
+                    : s === 'partial'
+                        ? `${no} tercatat, cek rincian item`
+                        : `${no} tercatat tanpa item yang cocok`;
+            toast(s === 'partial' || s === 'ready' ? 'ok' : 'warn', scanMessage);
         } else {
             saveState();
             if (SHIPMENT_TYPE === 'manual') {
@@ -2451,6 +2468,8 @@ window.resetRekon = function () {
 
 topConfirmBtn.addEventListener('click', function () {
     if (this.disabled) return;
+    unlockAudio();
+    sndNav();
     saveState();
     window.location.href = CONFIRM_URL;
 });

@@ -95,6 +95,10 @@ class AiAgentController extends Controller
             $request->user()
         );
 
+        if (($result['ok'] ?? true) === false) {
+            return response()->json($result, (int) ($result['status'] ?? 422));
+        }
+
         return response()->json($result);
     }
 

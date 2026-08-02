@@ -624,6 +624,7 @@ body[data-theme="dark"] .shp-topbar {
     <span class="shp-topbar-code" id="topShipCode">Shipment Baru</span>
     <span class="shp-badge" id="topStatus">Buat Draft</span>
     <span class="shp-topbar-spacer"></span>
+    <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
     <a href="{{ route('sales.shipments.index') }}" class="btn-shp-outline" style="text-decoration:none">
         Daftar Shipment
     </a>
@@ -941,6 +942,7 @@ body[data-theme="dark"] .shp-topbar {
               || @json(csrf_token());
 
     let _ship = null; // shipment JSON from server after create
+    window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
     let selectedScanMode = 'item_first';
     const pickingLines = new Map();
     const orderScanner = {
@@ -973,6 +975,7 @@ body[data-theme="dark"] .shp-topbar {
     // ── Audio feedback ─────────────────────────────────────────────────────
 
     function playBeep(freq, dur = 0.14, vol = 0.18) {
+        if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) return;
@@ -986,8 +989,14 @@ body[data-theme="dark"] .shp-topbar {
             osc.start(); osc.stop(ctx.currentTime + dur);
         } catch {}
     }
-    const beepOk  = () => playBeep(1046);
-    const beepErr = () => playBeep(220, 0.18, 0.25);
+    const playConfiguredSound = (eventKey, fallback) => {
+        if (window.GFID && typeof window.GFID.playScanSound === 'function') {
+            return window.GFID.playScanSound(eventKey, fallback);
+        }
+        fallback();
+    };
+    const beepOk  = () => playConfiguredSound('item_success', () => playBeep(1046));
+    const beepErr = () => playConfiguredSound('error_general', () => playBeep(220, 0.18, 0.25));
 
     // ── Toast ──────────────────────────────────────────────────────────────
 
