@@ -392,7 +392,7 @@
                     <div style="position:relative; min-width:125px; width:125px;">
                         <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSettlementStatus" onchange="loadSettlements()">
                             <option value="">Semua Dana</option>
-                            <option value="cair">Sudah Cair</option>
+                            <option value="cair" selected>Sudah Cair</option>
                             <option value="belum_cair">Belum Cair</option>
                         </select>
                         <i class="bi bi-wallet2" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
@@ -606,7 +606,7 @@
     let lastSettlementProgressStatus = 'idle';
     let settlementSyncLastPercent = 0;
     let settlementSyncRefreshInFlight = false;
-    const settlementFiltersStorageKey = 'marketplace:settlement_filters:v1';
+    const settlementFiltersStorageKey = 'marketplace:settlement_filters:v2';
     const $ = id => document.getElementById(id);
 
     function getSettlementFilterState() {
@@ -643,7 +643,11 @@
 
         if ($('filterStore')) $('filterStore').value = state.store_id || '';
         if ($('filterStatus')) $('filterStatus').value = state.status || '';
-        if ($('filterSettlementStatus')) $('filterSettlementStatus').value = state.settlement_status || '';
+        if ($('filterSettlementStatus')) {
+            $('filterSettlementStatus').value = Object.prototype.hasOwnProperty.call(state, 'settlement_status')
+                ? state.settlement_status
+                : 'cair';
+        }
         if ($('filterSearch')) $('filterSearch').value = state.search || '';
 
         if (fpOrderDate) {
@@ -1188,6 +1192,7 @@
 
     window.resetFilters = function() {
         document.querySelectorAll('.filter-select').forEach(el => el.value = '');
+        if ($('filterSettlementStatus')) $('filterSettlementStatus').value = 'cair';
         if (fpOrderDate) fpOrderDate.clear();
         if (fpSettlementDate) fpSettlementDate.clear();
         try {
