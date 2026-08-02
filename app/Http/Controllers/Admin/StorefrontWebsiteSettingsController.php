@@ -9,6 +9,7 @@ use App\Models\ShipmentScanRingtone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -133,7 +134,9 @@ class StorefrontWebsiteSettingsController extends Controller
         }
 
         $map = $request->input('shipment_scan_sound_map', []);
-        $allowedRingtones = ShipmentScanRingtone::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $allowedRingtones = Schema::hasTable('shipment_scan_ringtones')
+            ? ShipmentScanRingtone::query()->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : [];
         $map = is_array($map) ? $map : [];
         $normalized = $this->defaultScanSoundMap();
 
@@ -341,7 +344,10 @@ class StorefrontWebsiteSettingsController extends Controller
             SystemSetting::KEY_SHIPMENT_SCAN_SOUND,
             '1'
         ) !== '0';
-        $ringtones = ShipmentScanRingtone::query()->latest()->get();
+        $ringtoneLibraryAvailable = Schema::hasTable('shipment_scan_ringtones');
+        $ringtones = $ringtoneLibraryAvailable
+            ? ShipmentScanRingtone::query()->latest()->get()
+            : collect();
         $soundEvents = $this->scanSoundEvents();
         $soundMap = $this->normalizedScanSoundMap($ringtones);
         $builtinSounds = self::SCAN_SOUND_BUILTINS;
@@ -370,7 +376,8 @@ class StorefrontWebsiteSettingsController extends Controller
             'soundMap',
             'builtinSounds',
             'lookupSettings',
-            'scanDocuments'
+            'scanDocuments',
+            'ringtoneLibraryAvailable'
         ));
     }
 
@@ -880,6 +887,12 @@ class StorefrontWebsiteSettingsController extends Controller
 
     private function uploadShipmentRingtone(Request $request, string $redirectRoute = 'admin.website.settings'): RedirectResponse
     {
+        if (! Schema::hasTable('shipment_scan_ringtones')) {
+            return redirect()
+                ->route($redirectRoute)
+                ->with('error', 'Library ringtone belum siap. Jalankan migration shipment_scan_ringtones di server.');
+        }
+
         $data = $request->validate([
             'shipment_scan_ringtone_name' => ['nullable', 'string', 'max:120'],
             'shipment_scan_ringtone_audio' => ['required', 'file', 'mimes:mp3,wav,ogg,m4a,aac,flac,webm', 'max:20480'],

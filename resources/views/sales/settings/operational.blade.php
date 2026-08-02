@@ -134,6 +134,7 @@
                     @endforeach
                 </div>
 
+                @if($ringtoneLibraryAvailable)
                 <div class="sos-box">
                     <div class="sos-box-title">Tambah ringtone ke library</div>
                     <div style="margin-top:.2rem;color:#94a3b8;font-size:.67rem;line-height:1.45">MP3, WAV, OGG, M4A, AAC, FLAC, atau WEBM · maksimal 20 MB · dipotong maksimal 5 detik dan dikompres menjadi MP3 mono 64 kbps. Jika FFmpeg tidak tersedia, file disimpan tanpa kompresi.</div>
@@ -172,6 +173,9 @@
                 @endif
 
                 <div class="sos-note">Default GFID mengaktifkan suara dan mengembalikan mapping ke preset bawaan. Ringtone custom yang sudah di-upload tidak dihapus.</div>
+                @else
+                <div class="sos-note" style="border-color:#fed7aa;background:#fff7ed;color:#9a3412">Library ringtone belum tersedia di server. Jalankan migration <code>shipment_scan_ringtones</code> terlebih dahulu; pengaturan suara bawaan tetap dapat digunakan.</div>
+                @endif
             </div>
         </form>
 
