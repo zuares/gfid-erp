@@ -1427,14 +1427,66 @@
     };
 
     window.runSettlementSyncBackground = async function () {
-        await queueSettlementSyncRequest({
-            btnId: 'runSettlementBgBtn',
-            payload: { all: 1 },
-            busyText: 'Mengantre sync semua batch…',
-            idleText: 'Sync Latar Belakang (Semua Order)',
-            confirmText: 'Tarik SEMUA settlement yang belum tersinkron untuk {store} di latar belakang?\n\nProses ini bisa berjalan beberapa menit dan TIDAK bisa dibatalkan dari sini. Anda tetap bisa menutup/pindah halaman.',
-            ackTitle: 'Settlement background sync dikirim ke antrian',
+        const targetStores = stores.filter(s => {
+            const channelCode = String(s.channel?.code || '').toLowerCase();
+            const active = s.status === 'active' && s.is_active === true;
+            const tokenReady = ['CONNECTED', 'TOKEN_EXPIRED'].includes(String(s.connection_status || '').toUpperCase());
+            return active && ['shopee', 'shp'].includes(channelCode) && tokenReady;
         });
+        const skippedStores = stores.filter(s => {
+            const channelCode = String(s.channel?.code || '').toLowerCase();
+            return s.status === 'active'
+                && s.is_active === true
+                && ['shopee', 'shp'].includes(channelCode)
+                && !targetStores.includes(s);
+        });
+
+        if (!targetStores.length) {
+            alert('Tidak ada toko Shopee aktif dengan credential yang siap digunakan.');
+            return;
+        }
+
+        const btn = $('runSettlementBgBtn');
+        if (!btn || btn.disabled) return;
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Mengantre semua toko…';
+        hideSyncFeedback();
+        setSyncState('running', 'Antre');
+        updateSyncDot(true);
+
+        try {
+            const results = await Promise.allSettled(targetStores.map(store => api('/api/marketplace/stores/' + store.id + '/sync-settlements-background', {
+                method: 'POST',
+                body: JSON.stringify({ all: 1 }),
+            })));
+            const queued = results.filter(result => result.status === 'fulfilled').length;
+            const failed = results.length - queued;
+            const skipped = skippedStores.length;
+            const meta = [
+                `Toko aktif: ${targetStores.length + skipped}`,
+                `Masuk antrean: ${queued}`,
+                failed ? `Gagal dikirim: ${failed}` : null,
+                skipped ? `Dilewati credential/status: ${skipped}` : null,
+            ].filter(Boolean);
+
+            showSyncFeedback(failed || skipped ? 'warn' : 'info',
+                failed ? 'Sebagian toko gagal diantrekan' : 'Sync semua toko dikirim',
+                failed || skipped
+                    ? 'Toko valid tetap diproses; toko invalid/nonaktif dilewati.'
+                    : 'Semua toko Shopee aktif berhasil dikirim ke background queue.',
+                meta);
+            setSyncState(failed ? 'warn' : 'running', failed ? 'Parsial' : 'Antre');
+            updateSyncDot(true);
+            await refreshSettlementSyncLogs();
+        } catch (e) {
+            showSyncFeedback('error', 'Gagal mengirim sync semua toko', e.data?.message || e.message || 'Gagal mengirim settlement sync.', [e.data?.code ? `Kode: ${e.data.code}` : null].filter(Boolean));
+            setSyncState('error', 'Gagal');
+            updateSyncDot(false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
     };
 
     init();
