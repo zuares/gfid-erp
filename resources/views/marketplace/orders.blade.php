@@ -2021,6 +2021,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         // Status tab Perlu Dikirim/Sedang Dikemas harus mengikuti status live
         // marketplace; backend tetap menyediakan fallback database bila API gagal.
         lp.set('live_status', '1');
+        // Sementara fokus verifikasi hanya order MATCHED agar halaman tetap cepat.
+        lp.set('live_status_scope', 'matched');
         const url = '/api/marketplace/local-orders' + (lp.toString() ? ('?' + lp.toString()) : '');
         orders = await api(url).catch(() => []);
 

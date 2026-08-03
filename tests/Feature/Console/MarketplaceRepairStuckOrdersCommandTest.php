@@ -369,7 +369,7 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
 
     public function test_local_orders_memakai_status_live_api_saat_diminta_halaman_orders(): void
     {
-        $order = $this->createOrder('LIVE-STATUS-ORDER', 'PROCESSED');
+        $order = $this->createOrder('LIVE-STATUS-ORDER', 'MATCHED');
 
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
             $mock->shouldReceive('getOrderDetail')
@@ -389,9 +389,9 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         });
 
         $this->app->instance('request', Request::create(
-            '/api/marketplace/local-orders?live_status=1',
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=matched',
             'GET',
-            ['live_status' => '1'],
+            ['live_status' => '1', 'live_status_scope' => 'matched'],
         ));
 
         $rows = collect(app(MarketplaceController::class)->localOrders()->getData(true));
@@ -404,7 +404,7 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
 
     public function test_local_orders_mengabaikan_status_api_yang_tidak_dikenal(): void
     {
-        $order = $this->createOrder('LIVE-UNKNOWN-STATUS', 'PROCESSED');
+        $order = $this->createOrder('LIVE-UNKNOWN-STATUS', 'MATCHED');
 
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getOrderDetail')->once()->andReturn([
@@ -418,16 +418,34 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         });
 
         $this->app->instance('request', Request::create(
-            '/api/marketplace/local-orders?live_status=1',
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=matched',
             'GET',
-            ['live_status' => '1'],
+            ['live_status' => '1', 'live_status_scope' => 'matched'],
+        ));
+
+        $row = collect(app(MarketplaceController::class)->localOrders()->getData(true))
+            ->firstWhere('id', $order->id);
+
+        $this->assertSame('MATCHED', $row['order_status']);
+        $this->assertNull($row['api_order_status']);
+        $this->assertSame('database', $row['status_source']);
+    }
+
+    public function test_live_status_scope_matched_tidak_memanggil_api_untuk_processed(): void
+    {
+        $order = $this->createOrder('LIVE-SCOPE-PROCESSED', 'PROCESSED');
+        $this->mock(MarketplaceApiGateway::class);
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=matched',
+            'GET',
+            ['live_status' => '1', 'live_status_scope' => 'matched'],
         ));
 
         $row = collect(app(MarketplaceController::class)->localOrders()->getData(true))
             ->firstWhere('id', $order->id);
 
         $this->assertSame('PROCESSED', $row['order_status']);
-        $this->assertNull($row['api_order_status']);
         $this->assertSame('database', $row['status_source']);
     }
 
