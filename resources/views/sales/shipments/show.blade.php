@@ -58,6 +58,16 @@
 .sd-meta-box{border:1px solid rgba(148,163,184,.16);border-radius:8px;padding:.55rem .65rem}
 .sd-order-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:6px;background:rgba(148,163,184,.12);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;font-size:.78rem;flex-shrink:0}
 .sd-order-lead{display:flex;align-items:flex-start;gap:.55rem;min-width:0}
+.sd-order-group{display:block;padding:.58rem .65rem}
+.sd-order-group .sd-order-lead{justify-content:space-between}
+.sd-order-qty{margin-left:auto;min-width:42px;text-align:center;border-radius:999px;padding:.2rem .45rem;background:rgba(148,163,184,.12);color:#334155;font-size:.76rem;font-weight:900}
+.sd-order-items{margin:.55rem 0 0 2.05rem;padding:.2rem .6rem 0;border-top:1px solid rgba(148,163,184,.14)}
+.sd-order-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.48rem 0;border-bottom:1px solid rgba(148,163,184,.1)}
+.sd-order-item:last-child{border-bottom:0}
+.sd-order-item-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}
+.sd-order-item-name{color:#64748b;font-size:.76rem;margin-top:.06rem}
+.sd-order-item-qty{color:#334155;font-size:.8rem;font-weight:900}
+.sd-order-group>.sd-badge{margin:.5rem 0 0 2.05rem}
 .sd-tabs{display:flex;gap:.25rem;margin-bottom:.65rem;border-bottom:1px solid rgba(148,163,184,.18);flex-wrap:wrap}
 .sd-tab{appearance:none;display:inline-flex;align-items:center;gap:.4rem;border:none;background:transparent;color:#64748b;font-weight:800;font-size:.82rem;padding:.55rem .8rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .sd-tab:hover{color:#334155}
@@ -106,6 +116,8 @@
     ][$statusKey] ?? ucfirst($shipment->status ?? '-');
     $shipDateTxt = $shipment->date ? \Illuminate\Support\Carbon::parse($shipment->date)->format('d M Y') : '-';
     $orderScans = $shipment->orderScans ?? collect();
+    $ungroupedLines = $shipment->lines->filter(fn ($line) => !$line->shipment_order_scan_id)->values();
+    $singleOrderFallbackLines = $orderScans->count() === 1 ? $ungroupedLines : collect();
     $pendingOrders = $orderScans->where('status', 'pending')->count();
     $skippedOrders = $orderScans->where('status', 'skip')->count();
     $flowStage = $statusKey === 'draft'
@@ -206,8 +218,12 @@
                         @php
                             $scanStatus = $scan->status ?: 'pending';
                             $scanLabel = $scanStatus === 'skip' ? 'Diabaikan' : 'Ditunda';
+                            $orderLines = $scan->lines
+                                ->merge($singleOrderFallbackLines)
+                                ->values();
+                            $orderQty = (int) $orderLines->sum('qty_scanned');
                         @endphp
-                        <div class="sd-order">
+                        <div class="sd-order sd-order-group">
                             <div class="sd-order-lead">
                                 <span class="sd-order-num">{{ $loop->iteration }}</span>
                                 <div>
@@ -224,10 +240,47 @@
                                         @endif
                                     </div>
                                 </div>
+                                <span class="sd-order-qty">x{{ number_format($orderQty,0,',','.') }}</span>
+                            </div>
+                            <div class="sd-order-items">
+                                @forelse($orderLines as $line)
+                                    <div class="sd-order-item">
+                                        <div>
+                                            <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
+                                            <div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div>
+                                        </div>
+                                        <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned,0,',','.') }}</div>
+                                    </div>
+                                @empty
+                                    <div class="sd-muted" style="padding:.45rem 0">Belum ada item di order ini.</div>
+                                @endforelse
                             </div>
                             <span class="sd-badge {{ $scanStatus }}">{{ $scanLabel }}</span>
                         </div>
                     @endforeach
+                    @if($orderScans->count() > 1 && $ungroupedLines->isNotEmpty())
+                        <div class="sd-order sd-order-group">
+                            <div class="sd-order-lead">
+                                <span class="sd-order-num">—</span>
+                                <div>
+                                    <div class="sd-order-no">BELUM DIKELOMPOKKAN</div>
+                                    <div class="sd-muted">Item lama atau scan tanpa order</div>
+                                </div>
+                                <span class="sd-order-qty">x{{ number_format((int) $ungroupedLines->sum('qty_scanned'),0,',','.') }}</span>
+                            </div>
+                            <div class="sd-order-items">
+                                @foreach($ungroupedLines as $line)
+                                    <div class="sd-order-item">
+                                        <div>
+                                            <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
+                                            <div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div>
+                                        </div>
+                                        <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned,0,',','.') }}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
@@ -381,41 +434,14 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (!window.Swal) return;
     const items = @json(session('stock_insufficient'));
-    const rows = items.map(r => `
-        <tr>
-            <td style="padding:6px 8px;font-weight:700;font-family:monospace;font-size:.8rem;white-space:nowrap;">${r.code}</td>
-            <td style="padding:6px 8px;font-size:.8rem;text-align:left;">${r.name}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;color:#dc2626;">${r.stock.toLocaleString('id')}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;">${r.needed.toLocaleString('id')}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;font-weight:700;color:#dc2626;">-${r.short.toLocaleString('id')}</td>
-        </tr>`).join('');
-    Swal.fire({
-        icon: 'error',
-        title: 'Barang Belum Siap Dikirim',
-        html: `
-            <p style="margin-bottom:8px;font-size:.85rem;color:#0f172a;font-weight:700;">
-                Shipment ditolak karena stok WH-RTS tidak mencukupi.
-            </p>
-            <div style="overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-                <thead>
-                    <tr style="background:#fef2f2;border-bottom:2px solid #fecaca;">
-                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Kode</th>
-                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Item</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Stok</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Perlu</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;">Kurang</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-            </div>`,
-        confirmButtonText: 'Mengerti',
-        confirmButtonColor: '#334155',
-        width: 600,
-    });
+    if (!window.GFID || typeof window.GFID.errorAlert !== 'function') return;
+    const codes = items.map(item => item.code).filter(Boolean).join(', ');
+    window.GFID.errorAlert(
+        codes
+            ? `Stok WH-RTS belum cukup untuk: ${codes}.`
+            : 'Stok WH-RTS belum cukup untuk shipment ini.'
+    );
 });
 </script>
 @endpush

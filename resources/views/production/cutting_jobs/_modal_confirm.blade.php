@@ -368,10 +368,13 @@
                         if (textInput && textInput.value.trim() !== '') {
                             const display = textInput.value.trim();
 
-                            // Ambil hanya kode barang (sebelum "—" atau "-")
-                            let codeOnly = display.split('—')[0];
-                            codeOnly = codeOnly.split('-')[0];
-                            codeOnly = codeOnly.trim();
+                            // Ambil kode lengkap. Tanda minus adalah bagian dari
+                            // kode item (contoh: CFP-BLK-XXL), jadi jangan dipotong.
+                            // Format code-name desktop dipisahkan dengan em dash.
+                            const displayParts = display.split('—');
+                            let codeOnly = displayParts.length > 1
+                                ? displayParts[displayParts.length - 1].trim()
+                                : display.trim();
 
                             label = codeOnly || display;
                         }

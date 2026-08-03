@@ -36,6 +36,15 @@ class OrderFulfillment extends Model
         return $this->belongsTo(MarketplaceOrder::class, 'marketplace_order_id');
     }
 
+    /**
+     * Alias yang dipakai oleh tampilan shipment untuk relasi marketplace order.
+     * Tetap pertahankan `order()` karena itu nama relasi utama yang sudah ada.
+     */
+    public function marketplaceOrder(): BelongsTo
+    {
+        return $this->belongsTo(MarketplaceOrder::class, 'marketplace_order_id');
+    }
+
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);

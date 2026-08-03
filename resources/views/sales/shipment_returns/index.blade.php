@@ -249,6 +249,16 @@
         background:rgba(59,130,246,.95);
     }
 
+    .st-cancelled{
+        background:rgba(239,68,68,.10);
+        color:#991b1b;
+        border-color:rgba(239,68,68,.30);
+    }
+
+    .st-cancelled::before{
+        background:rgba(239,68,68,.95);
+    }
+
     .st-posted{
         background:rgba(34,197,94,.10);
         color:#166534;
@@ -279,6 +289,12 @@
         background:rgba(34,197,94,.20);
         color:#dcfce7;
         border-color:rgba(34,197,94,.55);
+    }
+
+    body[data-theme="dark"] .st-cancelled{
+        background:rgba(239,68,68,.20);
+        color:#fecaca;
+        border-color:rgba(239,68,68,.55);
     }
 
     .empty{
@@ -400,6 +416,7 @@
             return match ($status) {
                 'draft' => 'st-draft',
                 'submitted' => 'st-submitted',
+                'cancelled' => 'st-cancelled',
                 'posted' => 'st-posted',
                 default => 'st-draft',
             };
@@ -407,9 +424,9 @@
 
         $statusLabel = function ($status) {
             return match ($status) {
-                'draft' => 'Draft',
-                'submitted' => 'Submitted',
-                'posted' => 'Posted',
+                'draft', 'submitted' => 'Draft',
+                'cancelled' => 'Dibatalkan',
+                'posted' => 'Diterima WH-RTS',
                 default => ucfirst((string) $status),
             };
         };
@@ -424,7 +441,7 @@
     <div class="ship-topbar">
         <div>
             <div class="title">Retur Shipment</div>
-            <div class="sub">Barang retur dari store kembali ke WH-RTS.</div>
+            <div class="sub">Pencatatan retur dan penerimaan barang ke WH-RTS.</div>
 
             <div class="kpis">
                 <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($returns->total(), 0, ',', '.') }}</span></span>

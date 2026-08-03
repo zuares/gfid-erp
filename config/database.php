@@ -43,7 +43,9 @@ return [
             'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
             'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
             'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
-            'transaction_mode' => 'DEFERRED',
+            // IMMEDIATE mengambil write lock sejak awal transaksi sehingga
+            // read-then-write tidak gagal saat upgrade lock di SQLite.
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

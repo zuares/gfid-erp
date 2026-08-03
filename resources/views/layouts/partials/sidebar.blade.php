@@ -13,6 +13,7 @@
     $isOwner = $role === 'owner' || $isDev;  // developer = akses owner (semua menu)
     $isOperating = $role === 'operating';
     $isAdmin = $role === 'admin' && !$isDev; // developer TIDAK masuk branch admin agar masuk branch owner
+    $canOpenAiAgent = $isOwner || $isAdmin || $isOperating;
 
     // ✅ capability flags
     $canViewRts = $isOwner || $isAdmin || $isOperating;
@@ -24,6 +25,9 @@
     // ROUTE GUARDS (biar tidak error kalau route belum ada)
     // =========================================================
     $hasDashboardRoute = $router->has('dashboard');
+    $hasAiIndexRoute = $router->has('ai.index');
+    $hasAiAgentRoute = $router->has('ai.agent');
+    $hasAiOpenAiRoute = $router->has('ai.openai.index');
     $hasOwnerAccessControl = $router->has('owner.access-control.index');
 
     // Persediaan
@@ -55,6 +59,7 @@
     $hasSalesShipmentsIndex = $router->has('sales.shipments.index');
     $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
     $hasSalesShipmentReturnsIndex = $router->has('sales.shipment_returns.index');
+    $hasSalesOperationalSettings = $isOwner && $router->has('sales.settings.operational');
 
     $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
     $hasSalesInvoicesCreate = $router->has('sales.invoices.create');
@@ -95,7 +100,10 @@
     $hasMarketplacePickingBarang     = $router->has('marketplace.picking');
     $hasMarketplaceSkuMapping  = $router->has('marketplace.sku-mapping');
     $hasMarketplaceSync        = $router->has('marketplace.sync');
+    $hasMarketplacePromotions  = $router->has('marketplace.promotions');
+    $hasMarketplacePromotionsSummary  = $router->has('marketplace.promotions.summary');
     $hasMarketplacePencairanDana  = $router->has('marketplace.settlement');
+    $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -111,6 +119,10 @@
     // Toko Online Laporan
     $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
     $hasMarketplaceSalesExport = $router->has('marketplace.reports.sales.export');
+    $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
+    $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
+    $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
+    $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
 
     // Toko Online Reconcile
     $hasMarketplaceReconcileQueue = !$isAdmin && $router->has('marketplace.reconcile.queue');
@@ -210,6 +222,7 @@
 
     if (!$canModule('sales')) {
         $hasSalesShipmentsIndex = $hasSalesShipmentsCreate = $hasSalesShipmentReturnsIndex = false;
+        $hasSalesOperationalSettings = false;
         $hasSalesInvoicesIndex = $hasSalesInvoicesCreate = $hasSalesShipmentsReport = false;
         $hasSalesReportPerformance = $hasSalesReportItemProfit = false;
         $hasSalesReportChannelProfit = $hasSalesReportShipmentAnalytics = false;
@@ -294,7 +307,11 @@
         $open('marketplace.picking') ||
         $open('marketplace.sku-mapping') ||
         $open('marketplace.sync') ||
+        $open('marketplace.promotions') ||
+        $open('marketplace.promotions.*') ||
+        $open('marketplace.promotions.summary') ||
         $open('marketplace.settlement') ||
+        $open('marketplace.income-detail') ||
         $open('marketplace.profit') ||
         $open('marketplace.ads') ||
         $open('marketplace.analytics') ||
@@ -312,6 +329,7 @@
         $open('sales.invoices.*') ||
         $open('sales.shipments.*') ||
         $open('sales.shipment_returns.*') ||
+        $open('sales.settings.*') ||
         $open('sales.reports.*') ||
         $open('sales.shipments.report');
 
@@ -373,6 +391,7 @@
         $open('admin.website.*');
 
     $openCrm = $open('admin.crm.*');
+    $openAi = $open('ai.*');
 
     // =========================================================
     // BADGE COUNTERS (dot-only, cached)
@@ -689,6 +708,26 @@
                     Beranda
                 </x-sidebar.simple-link>
             </li>
+            @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
+                <x-sidebar.label text="AI" />
+                <li>
+                    <x-sidebar.simple-link href="{{ route('ai.index') }}" icon="bi bi-stars" :active="request()->routeIs('ai.index')">
+                        AI Studio
+                    </x-sidebar.simple-link>
+                </li>
+                @if ($hasAiOpenAiRoute)
+                    <li>
+                        <x-sidebar.simple-link href="{{ route('ai.openai.index') }}" icon="bi bi-plug" :active="request()->routeIs('ai.openai.*')">
+                            Connect OpenAI
+                        </x-sidebar.simple-link>
+                    </li>
+                @endif
+                <li>
+                    <x-sidebar.simple-link href="{{ route('ai.agent') }}" icon="bi bi-chat-square-dots" :active="$openAi">
+                        AI Agent
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
             @if ($isOwner && $hasOwnerAccessControl)
                 <li>
                     <x-sidebar.simple-link href="{{ route('owner.access-control.index') }}" icon="bi bi-shield-lock" :active="request()->routeIs('owner.access-control.*')">
@@ -705,7 +744,7 @@
             @endif
             @if ($isOwner && $router->has('settings.system.index'))
                 <li>
-                    <x-sidebar.simple-link href="{{ route('settings.system.index') }}" icon="bi bi-gear" :active="request()->routeIs('settings.*')">
+                    <x-sidebar.simple-link href="{{ route('settings.system.index') }}" icon="bi bi-gear" :active="request()->routeIs('settings.system.*')">
                         Pengaturan Sistem
                     </x-sidebar.simple-link>
                 </li>
@@ -910,7 +949,20 @@
                         </x-sidebar.simple-link>
                     @endif
 
-                    @if ($router->has('marketplace.chat'))
+                    @if ($router->has('marketplace.promotions'))
+                        <x-sidebar.simple-link href="{{ route('marketplace.promotions') }}" icon="bi bi-percent"
+                            :active="request()->routeIs('marketplace.promotions')">
+                            Promosi
+                        </x-sidebar.simple-link>
+                    @endif
+                    @if ($hasMarketplacePromotionsSummary)
+                        <x-sidebar.simple-link href="{{ route('marketplace.promotions.summary') }}" icon="bi bi-grid-3x3-gap"
+                            :active="request()->routeIs('marketplace.promotions.summary')">
+                            Summary Promosi
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($router->has('marketplace.chat') && $canModule('marketplace'))
                         <x-sidebar.simple-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
                             :active="request()->routeIs('marketplace.chat')">
                             Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none;"></span>
@@ -921,6 +973,13 @@
                         <x-sidebar.simple-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                             :active="request()->routeIs('marketplace.reports.sales')">
                             Laporan Penjualan
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasMarketplaceFinancialQuality)
+                        <x-sidebar.simple-link href="{{ route('marketplace.reports.financial-quality') }}" icon="bi bi-clipboard2-data"
+                            :active="request()->routeIs('marketplace.reports.financial-quality*')">
+                            Audit Keuangan (Owner)
                         </x-sidebar.simple-link>
                     @endif
 
@@ -1321,7 +1380,12 @@
                 $hasMarketplaceSkuMapping,
                 $hasMarketplaceSync,
                 $hasMarketplacePencairanDana,
+                $hasMarketplaceIncomeDetail,
                 $hasMarketplaceProfit,
+                $hasMarketplaceSalesReport,
+                $hasMarketplaceProfitReport,
+                $hasMarketplaceFinancialStatement,
+                $hasMarketplaceFinancialQuality,
                 $hasMarketplaceAds,
                 $hasMarketplaceAnalytics,
                 $hasMarketplaceIssues
@@ -1377,7 +1441,19 @@
                                 Naikkan Produk
                             </x-sidebar.sub-link>
                         @endif
-                        @if ($router->has('marketplace.chat'))
+                        @if ($router->has('marketplace.promotions'))
+                            <x-sidebar.sub-link href="{{ route('marketplace.promotions') }}" icon="bi bi-percent"
+                                :active="request()->routeIs('marketplace.promotions')">
+                                Promosi
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplacePromotionsSummary)
+                            <x-sidebar.sub-link href="{{ route('marketplace.promotions.summary') }}" icon="bi bi-grid-3x3-gap"
+                                :active="request()->routeIs('marketplace.promotions.summary')">
+                                Summary Promosi
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($router->has('marketplace.chat') && $canModule('marketplace'))
                             <x-sidebar.sub-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
                                 :active="request()->routeIs('marketplace.chat')">
                                 Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none;"></span>
@@ -1423,10 +1499,49 @@
                                 Pencairan Dana
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($hasMarketplaceIncomeDetail)
+                            <x-sidebar.sub-link href="{{ route('marketplace.income-detail') }}" icon="bi bi-journal-text"
+                                :active="request()->routeIs('marketplace.income-detail')">
+                                Rincian Penghasilan
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasMarketplaceProfit)
                             <x-sidebar.sub-link href="{{ route('marketplace.profit') }}" icon="bi bi-graph-up"
                                 :active="request()->routeIs('marketplace.profit')">
                                 Laba Pesanan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceProfitReport)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.profit') }}" icon="bi bi-graph-up-arrow"
+                                :active="request()->routeIs('marketplace.reports.profit*')">
+                                Laporan Keuntungan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFinancialStatement)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.financial-statement') }}" icon="bi bi-file-earmark-spreadsheet"
+                                :active="request()->routeIs('marketplace.reports.financial-statement*')">
+                                Laporan Keuangan
+                                <span class="badge rounded-pill text-bg-info ms-1">Owner</span>
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFinancialClosing)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.financial-closing') }}" icon="bi bi-lock-fill"
+                                :active="request()->routeIs('marketplace.reports.financial-closing*')">
+                                Closing & Audit
+                                <span class="badge rounded-pill text-bg-warning ms-1">Owner</span>
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceSalesReport)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-bar-chart-line"
+                                :active="request()->routeIs('marketplace.reports.sales')">
+                                Laporan Penjualan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFinancialQuality)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.financial-quality') }}" icon="bi bi-clipboard2-data"
+                                :active="request()->routeIs('marketplace.reports.financial-quality*')">
+                                Audit Keuangan
+                                <span class="badge rounded-pill text-bg-warning ms-1">Owner</span>
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceAds)
@@ -1441,7 +1556,52 @@
                                 Analisa Penjualan
                             </x-sidebar.sub-link>
                         @endif
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee-api-logs') }}" icon="bi bi-hdd-network"
+                                :active="request()->routeIs('marketplace.shopee-api-logs')">
+                                Log API Shopee
+                            </x-sidebar.sub-link>
                     </div>
+                </li>
+            @endif
+
+            {{-- IMPOR --}}
+            @if ($canShow(
+                $hasImportMarketplaceIndex,
+                $hasImportMarketplaceDraft,
+                $hasImportMarketplaceCreate,
+                $hasImportMarketplaceExport,
+                $hasImportMarketplaceIncomeCreate,
+                $hasImportMarketplaceIncomeIndex
+            ))
+                <x-sidebar.label text="Impor" />
+                <li class="simple-group">
+                    @if ($hasImportMarketplaceIndex)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace.index') }}" icon="bi bi-upload"
+                            :active="request()->routeIs('imports.marketplace.*')">
+                            Impor Pengiriman
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportMarketplaceDraft)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace.draft') }}" icon="bi bi-clock-history"
+                            :active="request()->routeIs('imports.marketplace.draft')">
+                            Draft Pengiriman
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportMarketplaceIncomeIndex)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.index') }}" icon="bi bi-cash-stack"
+                            :active="request()->routeIs('imports.marketplace_income.*')">
+                            Import Toko Online Income
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportMarketplaceIncomeDraft)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.draft') }}" icon="bi bi-clock-history"
+                            :active="request()->routeIs('imports.marketplace_income.draft')">
+                            Draft Income
+                        </x-sidebar.simple-link>
+                    @endif
                 </li>
             @endif
 
@@ -1452,6 +1612,7 @@
                 $hasSalesShipmentsIndex,
                 $hasSalesShipmentsCreate,
                 $hasSalesShipmentReturnsIndex,
+                $hasSalesOperationalSettings,
                 $hasSalesReportPerformance,
                 $hasSalesShipmentsReport,
                 $hasSalesReportItemProfit,
@@ -1507,6 +1668,14 @@
                             <x-sidebar.sub-link href="{{ route('sales.shipment_returns.index') }}" icon="bi bi-arrow-repeat"
                                 :active="request()->routeIs('sales.shipment_returns.index')">
                                 Daftar Retur
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasSalesOperationalSettings)
+                            @php $subhead('Pengaturan'); @endphp
+                            <x-sidebar.sub-link href="{{ route('sales.settings.operational') }}" icon="bi bi-sliders"
+                                :active="request()->routeIs('sales.settings.operational*')">
+                                Pengaturan Operasional
                             </x-sidebar.sub-link>
                         @endif
 

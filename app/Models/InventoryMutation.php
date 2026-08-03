@@ -74,22 +74,38 @@ class InventoryMutation extends Model
      */
     public function getSourceLabelAttribute(): string
     {
+        if (array_key_exists('source_label', $this->attributes)) {
+            $label = trim((string) ($this->attributes['source_label'] ?? ''));
+            if ($label !== '') {
+                return $label;
+            }
+        }
+
         if (!$this->source_type) {
             return '-';
         }
 
-        // contoh: purchase_receipt -> PURCHASE RECEIPT
-        $label = strtoupper(str_replace('_', ' ', $this->source_type));
+        $label = str_contains($this->source_type, '\\')
+            ? class_basename($this->source_type)
+            : $this->source_type;
+        $label = preg_replace('/([a-z])([A-Z])/', '$1 $2', $label) ?? $label;
+        $label = str_replace(['_', '-'], ' ', $label);
+        $label = trim(preg_replace('/\s+/', ' ', $label) ?? $label);
 
         if ($this->source_id) {
             $label .= ' #' . $this->source_id;
         }
 
-        return $label;
+        return \Illuminate\Support\Str::headline($label);
     }
     public function lot()
     {
         return $this->belongsTo(\App\Models\Lot::class, 'lot_id');
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
 }

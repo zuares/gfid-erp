@@ -6,12 +6,12 @@
 @push('head')
 <style>
     :root {
-        --sr-accent: #2563eb;
-        --sr-accent-2: #1d4ed8;
-        --sr-accent-bg: rgba(37, 99, 235, .12);
-        --sr-text: #0f172a;
+        --sr-accent: #334155;
+        --sr-accent-2: #1f2937;
+        --sr-accent-bg: rgba(148, 163, 184, .08);
+        --sr-text: #111827;
         --sr-muted: #64748b;
-        --sr-mobile-nav-offset: 0px;
+        --sr-mobile-nav-offset: calc(78px + env(safe-area-inset-bottom, 0px));
     }
 
     .sr-scan-page {
@@ -624,8 +624,8 @@
     $initialOrders = collect($savedOrderScans ?? [])
         ->map(function ($scan) {
             return [
-                'code' => strtoupper((string) ($scan['code'] ?? $scan['order_number'] ?? $scan['order_no'] ?? '')),
-                'label' => $scan['label'] ?? $scan['status'] ?? 'Tersimpan',
+                'code' => strtoupper((string) ($scan['code'] ?? $scan['order_no'] ?? '')),
+                'label' => $scan['label'] ?? 'Pencatatan order',
                 'items' => $scan['items'] ?? [],
             ];
         })
@@ -635,6 +635,7 @@
     $initialLines = $shipment->lines
         ->map(fn ($line) => [
             'id' => $line->id,
+            'order_scan_id' => $line->shipment_order_scan_id,
             'item_id' => $line->item_id,
             'code' => $line->item->code ?? '-',
             'name' => $line->item->name ?? '',
@@ -647,10 +648,14 @@
     <div class="sr-topbar">
         <div class="sr-top-main">
             <h1 class="sr-title">{{ $shipment->code }}</h1>
-            <div class="sr-sub">Scan order, scan item, NEXT untuk order baru. RESET/UNDO tersedia.</div>
+            <div class="sr-sub">Pencatatan shipment mandiri · scan order untuk mulai.</div>
         </div>
         <div class="sr-top-actions">
-            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sr-btn">Scan Item Dulu</a>
+            <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
+            @if ($shipment->status === 'draft')
+                <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="sr-btn sr-btn-danger">Batalkan</a>
+            @endif
+            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sr-btn">Scan Item</a>
             <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn">Detail</a>
         </div>
     </div>
@@ -661,7 +666,7 @@
             <span class="sr-flow-sep">-&gt;</span>
             <span class="sr-flow-step" data-flow-step="item">Scan Item</span>
             <span class="sr-flow-sep">-&gt;</span>
-            <span class="sr-flow-step" data-flow-step="review">Review</span>
+            <span class="sr-flow-step" data-flow-step="review">Cek Shipment</span>
             <span class="sr-flow-sep">-&gt;</span>
             <span class="sr-flow-step" data-flow-step="confirm">Submit</span>
         </div>
@@ -674,8 +679,8 @@
                         <div class="sr-meta-value">{{ ucfirst($shipment->shipment_type ?? 'manual') }}</div>
                     </div>
                     <div class="sr-meta-item sr-meta-store">
-                        <div class="sr-meta-label">Marketplace</div>
-                        <div class="sr-meta-value">{{ $shipment->store->code ?? '-' }} - {{ $shipment->store->name ?? '-' }}</div>
+                        <div class="sr-meta-label">Channel</div>
+                        <div class="sr-meta-value">{{ $shipment->store ? (($shipment->store->code ?? '-') . ' - ' . ($shipment->store->name ?? '-')) : 'Belum dihubungkan' }}</div>
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Tanggal</div>
@@ -740,7 +745,8 @@
                 <button type="button" class="sr-btn" id="nextOrderBtn">Order Baru</button>
                 <a href="{{ route('sales.shipments.confirm_orders', $shipment) }}"
                    class="sr-btn sr-btn-primary"
-                   id="submitBtn">Review</a>
+                   id="submitBtn"
+                   aria-disabled="true">Cek Shipment</a>
             @else
                 <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn">Detail</a>
                 <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary">Daftar Shipment</a>
@@ -756,7 +762,8 @@
 <script>
 (function () {
     const scanUrl = @json(route('sales.shipments.scan_item', $shipment));
-    const scanLookupUrl = @json(route('sales.shipments.scan_lookup', $shipment));
+    const recordOrderUrl = @json(route('sales.shipments.scan_order_store', $shipment));
+    const deleteOrderUrl = @json(route('sales.shipments.delete_order_scan', $shipment));
     const updateQtyUrlTemplate = @json(route('sales.shipments.update_line_qty', '__LINE_ID__'));
     const deleteLineUrlTemplate = @json(route('sales.shipments.destroy_line', '__LINE_ID__'));
     const csrf = @json(csrf_token());
@@ -777,7 +784,10 @@
     const sumOrders = document.getElementById('sumOrders');
     const sumItems = document.getElementById('sumItems');
     const sumQty = document.getElementById('sumQty');
+    const submitBtn = document.getElementById('submitBtn');
     const toastEl = document.getElementById('toast');
+
+    window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
 
     let toastTimer = null;
     let audioCtx = null;
@@ -818,7 +828,25 @@
     }
 
 
-    function playTone(type = 'ok') {
+    function playTone(type = 'ok', fromConfig = false) {
+        const eventMap = {
+            ok: 'item_success',
+            item: 'item_success',
+            order: 'order_success',
+            orderRepeat: 'order_duplicate',
+            next: 'navigation',
+            undo: 'undo',
+            reset: 'reset',
+            errorGuard: 'item_duplicate',
+            errorNoOrder: 'order_not_found',
+            errorNetwork: 'error_network',
+            errorItem: 'error_general',
+            error: 'error_general',
+        };
+        if (!fromConfig && window.GFID && typeof window.GFID.playScanSound === 'function') {
+            return window.GFID.playScanSound(eventMap[type] || type, () => playTone(type, true));
+        }
+        if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
         if (!window.AudioContext && !window.webkitAudioContext) return;
 
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -925,8 +953,20 @@
     }
 
     function alertError(message, toneType = 'error') {
+        const errorMessage = message || 'Terjadi kesalahan.';
         playTone(toneType || 'error');
-        toast('error', message || 'Terjadi kesalahan.');
+
+        if (window.GFID && typeof window.GFID.errorAlert === 'function') {
+            const alertPromise = window.GFID.errorAlert(errorMessage);
+            if (alertPromise && typeof alertPromise.then === 'function') {
+                alertPromise.then(() => {
+                    focusScan({ preventScroll: true });
+                });
+                return;
+            }
+        }
+
+        toast('error', errorMessage);
         focusScan({ preventScroll: true });
     }
 
@@ -956,7 +996,7 @@
             order = {
                 code,
                 label: meta.label || 'Manual',
-                items: []
+                items: Array.isArray(meta.items) ? meta.items : []
             };
             state.orders.push(order);
         }
@@ -971,15 +1011,6 @@
         return state.current ? findOrder(state.current) : null;
     }
 
-
-    function lookupScanCode(code) {
-        return fetch(`${scanLookupUrl}?code=${encodeURIComponent(code)}`, {
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        }).then(response => response.ok ? response.json() : Promise.reject(new Error('lookup_failed')));
-    }
 
     function latestOrder() {
         if (state.current) return activeOrder();
@@ -1075,11 +1106,19 @@
             });
         });
 
-        if (sumOrders) sumOrders.textContent = state.orders.length;
+        if (sumOrders) {
+            sumOrders.textContent = state.orders.filter(order => order.code !== 'BELUM DIKELOMPOKKAN').length;
+        }
         if (sumItems) sumItems.textContent = totalItems || initialLines.length || 0;
         if (sumQty) {
             const initialQty = (initialLines || []).reduce((total, line) => total + Number(line.qty || 0), 0);
             sumQty.textContent = totalQty || initialQty || 0;
+        }
+
+        if (submitBtn) {
+            const hasItems = totalQty > 0 || (initialLines || []).some(line => Number(line.qty || 0) > 0);
+            submitBtn.setAttribute('aria-disabled', hasItems ? 'false' : 'true');
+            submitBtn.title = hasItems ? 'Cek shipment sebelum submit' : 'Scan item terlebih dahulu';
         }
 
         if (!ordersWrap) return;
@@ -1295,6 +1334,23 @@
         });
     }
 
+    function deleteOrderScan(orderNo) {
+        return fetch(deleteOrderUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ order_no: orderNo })
+        }).then(async response => {
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.message || 'Gagal hapus pencatatan order');
+            return payload;
+        });
+    }
+
 
 
 
@@ -1354,9 +1410,6 @@
         code = normalize(code);
         if (!code) return;
 
-        const shipmentType = '{{ $shipment->shipment_type ?? 'manual' }}';
-        const fallbackLabel = shipmentType === 'marketplace' ? 'Marketplace' : 'Manual';
-
         const existingOrder = findOrder(code);
         if (existingOrder) {
             state.current = existingOrder.code;
@@ -1367,38 +1420,28 @@
             return;
         }
 
-        const addManualOrder = function () {
-            ensureOrder(code, { label: fallbackLabel });
-            playTone('order');
-            toast('ok', `Order ${code}`);
-            setMode('item');
-        };
-
-        if (typeof lookupScanCode !== 'function') {
-            addManualOrder();
-            return;
-        }
-
-        lookupScanCode(code).then(data => {
-            if (data?.type === 'item') {
-                playTone('errorGuard');
-                alertError(`Yang discan adalah item ${data.item?.code || code}. Scan nomor order dulu.`, 'errorGuard');
-                setMode('order');
-                return;
-            }
-
-            const orderCode = normalize(data?.order?.code || code);
-            const label = data?.type === 'order'
-                ? [data.order?.store_code, data.order?.store_name].filter(Boolean).join(' - ')
-                : fallbackLabel;
-
-            ensureOrder(orderCode, { label: label || fallbackLabel });
-            playTone('order');
-            toast('ok', `Order ${orderCode}`);
+        fetch(recordOrderUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ order_no: code })
+        }).then(async response => {
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.message || 'Gagal mencatat nomor order');
+            return payload;
+        }).then(payload => {
+            const orderCode = normalize(payload.order?.code || code);
+            ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
+            playTone(payload.created ? 'order' : 'orderRepeat');
+            toast('ok', payload.message || `Order ${orderCode} tercatat`);
             setMode('item');
         }).catch(error => {
-            console.warn('scan lookup gagal, pakai manual order:', error);
-            addManualOrder();
+            playTone('errorNetwork');
+            alertError(error.message || 'Gagal mencatat nomor order.', 'errorNetwork');
         });
     }
 
@@ -1514,13 +1557,17 @@
                 .filter(Boolean);
 
             if (!lineIds.length) {
-                state.orders = state.orders.filter(row => row.code !== order.code);
-                state.current = null;
-                state.expanded = null;
-                render();
-                playTone('reset');
-                toast('ok', `Order ${order.code} di-reset`);
-                setMode('order');
+                deleteOrderScan(order.code)
+                    .then(() => {
+                        state.orders = state.orders.filter(row => row.code !== order.code);
+                        state.current = null;
+                        state.expanded = null;
+                        render();
+                        playTone('reset');
+                        toast('ok', `Order ${order.code} di-reset`);
+                        setMode('order');
+                    })
+                    .catch(error => alertError(error.message || 'Gagal reset order.', 'errorNetwork'));
                 return;
             }
 
@@ -1533,20 +1580,24 @@
                         return;
                     }
 
-                    state.orders = state.orders.filter(row => row.code !== order.code);
-                    state.current = null;
-                    state.expanded = null;
+                    deleteOrderScan(order.code)
+                        .then(() => {
+                            state.orders = state.orders.filter(row => row.code !== order.code);
+                            state.current = null;
+                            state.expanded = null;
 
-                    for (let i = lastScanStack.length - 1; i >= 0; i--) {
-                        if (lastScanStack[i].orderCode === order.code) {
-                            lastScanStack.splice(i, 1);
-                        }
-                    }
+                            for (let i = lastScanStack.length - 1; i >= 0; i--) {
+                                if (lastScanStack[i].orderCode === order.code) {
+                                    lastScanStack.splice(i, 1);
+                                }
+                            }
 
-                    render();
-                    playTone('reset');
-                    toast('ok', `Order ${order.code} di-reset`);
-                    setMode('order');
+                            render();
+                            playTone('reset');
+                            toast('ok', `Order ${order.code} di-reset`);
+                            setMode('order');
+                        })
+                        .catch(error => alertError(error.message || 'Gagal reset order.', 'errorNetwork'));
                 });
         };
 
@@ -1625,15 +1676,20 @@
     }
 
     initialOrders.forEach(order => {
-        ensureOrder(order.code, { label: order.label || 'Tersimpan' });
+        ensureOrder(order.code, {
+            label: order.label || 'Pencatatan order',
+            items: order.items || [],
+        });
     });
 
-    if (!state.orders.length && initialLines.length) {
-        ensureOrder('MANUAL', { label: 'Item existing' });
+    const ungroupedLines = initialLines.filter(line => !line.order_scan_id);
+
+    if (ungroupedLines.length) {
+        ensureOrder('BELUM DIKELOMPOKKAN', { label: 'Item existing' });
     }
 
-    initialLines.forEach(line => {
-        upsertItem(state.orders[0]?.code || 'MANUAL', {
+    ungroupedLines.forEach(line => {
+        upsertItem('BELUM DIKELOMPOKKAN', {
             line_id: line.id,
             item_id: line.item_id,
             code: line.code,
@@ -1713,6 +1769,16 @@
 
         nextOrderBtn?.addEventListener('click', function () {
             nextOrderCommand();
+        });
+
+        submitBtn?.addEventListener('click', function (event) {
+            if (this.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
+                alertError('Scan minimal satu item sebelum cek shipment.', 'errorGuard');
+                return;
+            }
+
+            playTone('next');
         });
 
         window.addEventListener('load', function () {

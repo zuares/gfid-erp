@@ -13,6 +13,8 @@ use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
 use App\Models\SkuMapping;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
@@ -21,11 +23,41 @@ use Illuminate\Support\Facades\Log;
 
 class MarketplaceSyncService
 {
+    private const PROCESSED_API_ADVANCED_STATUSES = [
+        'READY_TO_HANDOVER',
+        'SHIPPED',
+        'TO_CONFIRM_RECEIVE',
+        'COMPLETED',
+        'CANCELLED',
+        'IN_CANCEL',
+        'TO_RETURN',
+        'RETURNING',
+        'RETURNED',
+        'REFUNDED',
+    ];
+
     public function __construct(
-        protected ChannelManager $manager,
+        protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
         protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
+        protected MarketplaceFinancialDataQualityService $financialQuality = new MarketplaceFinancialDataQualityService(),
     ) {}
+
+    /**
+     * Kirim update progress ke callback jika tersedia.
+     */
+    private function reportProgress(?callable $progress, array $payload): void
+    {
+        if (! $progress) {
+            return;
+        }
+
+        try {
+            $progress($payload);
+        } catch (\Throwable) {
+            // Observabilitas tidak boleh memutus sinkronisasi inti.
+        }
+    }
 
     /**
      * Seed channel default (Shopee, TikTok, dst).
@@ -77,7 +109,7 @@ class MarketplaceSyncService
      * Mengembalikan array: found, synced, order_sn_list, message.
      * Melempar \RuntimeException jika API error.
      */
-    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false, ?callable $onProgress = null): array
+    public function syncOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 50, bool $dryRun = false, ?callable $onProgress = null, string $timeRangeField = 'update_time'): array
     {
         // Pelaporan progres bersifat opsional — dipakai untuk sync latar belakang
         // agar UI bisa menampilkan persentase. Aman jika callback null / melempar.
@@ -88,7 +120,7 @@ class MarketplaceSyncService
         };
         $report(3, 'Menyiapkan sinkronisasi…');
 
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         $orderSnList = [];
         
@@ -109,7 +141,7 @@ class MarketplaceSyncService
 
             // 1. Ambil daftar order per status
             while ($hasMore) {
-                $listResponse = $driver->getOrders($store, $windowFrom, $windowTo, $pageSize, $cursor, $status);
+                $listResponse = $driver->getOrders($store, $windowFrom, $windowTo, $pageSize, $cursor, $status, $timeRangeField);
 
                 if (! empty($listResponse['error'])) {
                     $this->log($store, 'sync_orders', 'failed', $listResponse['message'] ?? $listResponse['error'], $listResponse);
@@ -149,7 +181,15 @@ class MarketplaceSyncService
 
         if (empty($orderSnList)) {
             $this->log($store, 'sync_orders', 'success', 'Tidak ada order ditemukan.', ['time_from' => $timeFrom, 'time_to' => $timeTo]);
-            return ['found' => 0, 'synced' => 0, 'order_sn_list' => [], 'message' => 'Tidak ada order ditemukan di rentang tanggal ini.'];
+            $verification = $dryRun ? [] : $this->verifyProcessedOrdersAfterSync($store);
+
+            return [
+                'found' => 0,
+                'synced' => 0,
+                'order_sn_list' => [],
+                'processed_verification' => $verification,
+                'message' => 'Tidak ada order ditemukan di rentang tanggal ini.',
+            ];
         }
 
         // 2. Ambil detail order per chunk
@@ -191,6 +231,11 @@ class MarketplaceSyncService
             $this->autoCreateFulfillments($store);
         }
 
+        // Sync utama hanya mengembalikan order yang masuk daftar API. Cek
+        // ulang antrean PROCESSED lokal agar order tanpa booking_sn atau yang
+        // tidak muncul di daftar status tetap selaras dengan platform.
+        $verification = $dryRun ? [] : $this->verifyProcessedOrdersAfterSync($store);
+
         $found = count($orderSnList);
         $logType = $dryRun ? 'sync_orders_dry_run' : 'sync_orders';
         $this->log($store, $logType, 'success', "Synced {$stats['new']} baru + {$stats['updated']} update dari {$found} order.", [
@@ -205,6 +250,7 @@ class MarketplaceSyncService
             'ready'             => $stats['ready'],
             'incomplete'        => $stats['incomplete'],
             'order_sn_list'     => $orderSnList,
+            'processed_verification' => $verification,
         ]);
 
         $total_issues = $stats['sku_empty'] + $stats['mapping_not_found'] + $stats['missing_hpp'];
@@ -220,6 +266,7 @@ class MarketplaceSyncService
             'incomplete'        => $stats['incomplete'],
             'total_issues'      => $total_issues,
             'order_sn_list'     => $orderSnList,
+            'processed_verification' => $verification,
             'message'           => ($dryRun ? "[DRY RUN] " : "") . "Berhasil sync {$found} order ({$stats['new']} baru, {$stats['updated']} update).",
         ];
     }
@@ -232,6 +279,165 @@ class MarketplaceSyncService
      *
      * @return array{found: int, new: int, updated: int}
      */
+    /**
+     * Pastikan toko siap dipanggil API: coba refresh token bila kedaluwarsa.
+     * SATU-SATUNYA pre-check koneksi sisi console/service — dipakai
+     * marketplace:sync-orders & shopee:sync-historical-orders (sebelumnya blok
+     * refresh TOKEN_EXPIRED yang sama persis terduplikasi di kedua command).
+     */
+    public function ensureStoreConnected(Store $store): bool
+    {
+        if ($store->connection_status === 'TOKEN_EXPIRED') {
+            try {
+                $driver = $this->gateway;
+                if (method_exists($driver, 'refreshToken')) {
+                    $driver->refreshToken($store);
+                    $store->refresh();
+                }
+            } catch (\Throwable $e) {
+                Log::warning('ensureStoreConnected: token refresh gagal', [
+                    'store_id' => $store->id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $store->connection_status === 'CONNECTED';
+    }
+
+    /**
+     * Sync order rentang PANJANG secara berjendela (per <=14 hari) dengan lock
+     * per-jendela — kunci yang SAMA dengan sync 5-menit (sync_store_{id}) supaya
+     * tidak tabrakan, tapi dilepas di tiap jendela agar cron tidak terblokir lama.
+     *
+     * SATU-SATUNYA implementasi loop berjendela: dipakai marketplace:sync-orders
+     * (--days > 14) dan shopee:sync-historical-orders. Sebelumnya logika ini
+     * terduplikasi di dua command dengan perilaku lock berbeda (command sync-orders
+     * memegang satu lock TTL 240 dtk yang kedaluwarsa di tengah rentang panjang).
+     *
+     * @param callable|null $onWindow fn(int $index, int $total, int $wFrom, int $wTo, ?array $result, ?\Throwable $error): void
+     * @return array{windows:int, new:int, updated:int, failed:int, skipped_locked:int}
+     */
+    public function syncOrdersWindowed(
+        Store $store,
+        int $timeFrom,
+        int $timeTo,
+        int $pageSize = 50,
+        string $timeRangeField = 'update_time',
+        bool $newestFirst = false,
+        ?callable $onWindow = null,
+        int $pauseSeconds = 1,
+    ): array {
+        $windows = $this->splitTimeWindows($timeFrom, $timeTo);
+        if ($newestFirst) {
+            $windows = array_reverse($windows); // backfill: data terbaru masuk duluan
+        }
+
+        $totals = ['windows' => count($windows), 'new' => 0, 'updated' => 0, 'failed' => 0, 'skipped_locked' => 0];
+
+        foreach ($windows as $i => [$wFrom, $wTo]) {
+            $lock   = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
+            $result = null;
+            $error  = null;
+
+            try {
+                $lock->block(120); // tunggu maks 2 menit bila proses lain sedang sync toko ini
+                $result = $this->syncOrders($store, $wFrom, $wTo, $pageSize, false, null, $timeRangeField);
+                $totals['new']     += (int) ($result['new'] ?? 0);
+                $totals['updated'] += (int) ($result['updated'] ?? 0);
+            } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
+                $totals['skipped_locked']++;
+                $error = $e;
+            } catch (\Throwable $e) {
+                $totals['failed']++;
+                $error = $e;
+                Log::warning('syncOrdersWindowed: jendela gagal', [
+                    'store_id' => $store->id,
+                    'from'     => date('Y-m-d', $wFrom),
+                    'to'       => date('Y-m-d', $wTo),
+                    'error'    => $e->getMessage(),
+                ]);
+            } finally {
+                optional($lock)->release();
+            }
+
+            if ($onWindow) {
+                try { $onWindow($i + 1, $totals['windows'], $wFrom, $wTo, $result, $error); } catch (\Throwable $e) { /* abaikan */ }
+            }
+
+            if ($pauseSeconds > 0 && $i + 1 < $totals['windows']) {
+                sleep($pauseSeconds); // jeda antar jendela, jaring pengaman rate limit
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Promosi booking Pesanan Kilat → order bernomor pesanan.
+     *
+     * Alur API Shopee: setelah pengiriman diatur (v2.logistics.ship_booking),
+     * Shopee mencocokkan booking ke order buyer secara ASINKRON. Begitu MATCHED,
+     * v2.order.get_booking_detail mengembalikan order_sn untuk booking_sn tsb.
+     * Method ini: lengkapi order_sn dari get_booking_detail bila belum tercatat,
+     * tarik order-nya via syncOrdersBySn() bila belum ada di marketplace_orders,
+     * lalu tautkan booking_sn ke order lokal.
+     *
+     * @return string|null order_sn bila sudah MATCHED & tertaut, null bila belum.
+     */
+    public function promoteBookingToOrder(Store $store, string $bookingSn): ?string
+    {
+        $booking = \App\Models\MarketplaceBooking::where('store_id', $store->id)
+            ->where('booking_sn', $bookingSn)
+            ->first();
+        if (! $booking) {
+            return null;
+        }
+
+        // order_sn belum tercatat → ambil dari get_booking_detail (muncul saat MATCHED).
+        if (blank($booking->order_sn)) {
+            $driver = $this->gateway;
+            if (method_exists($driver, 'getBookingDetail')) {
+                $det  = $driver->getBookingDetail($store, $bookingSn);
+                $list = data_get($det, 'response.booking_list') ?? data_get($det, 'response.order_list', []);
+                $d    = collect($list)->firstWhere('booking_sn', $bookingSn) ?? ($list[0] ?? null);
+                // Dua bentuk response yang terlihat di production: order_sn langsung,
+                // atau bersarang di order_list[0].order_sn.
+                $orderSn = $d['order_sn'] ?? data_get($d, 'order_list.0.order_sn');
+                if (! empty($orderSn)) {
+                    $booking->order_sn = $orderSn;
+                    if (! empty($d['booking_status'])) {
+                        $booking->booking_status = $d['booking_status'];
+                    }
+                    $booking->save();
+                }
+            }
+        }
+
+        if (blank($booking->order_sn)) {
+            return null; // belum MATCHED
+        }
+
+        // Order lokal belum ada → backfill via detail order (idempotent).
+        $exists = MarketplaceOrder::where('channel_order_id', $booking->order_sn)
+            ->orWhere('external_order_id', $booking->order_sn)
+            ->exists();
+        if (! $exists) {
+            $this->syncOrdersBySn($store, [$booking->order_sn]);
+        }
+
+        // Tautkan booking_sn ke order lokal (channel_order_id ATAU external_order_id).
+        MarketplaceOrder::where('store_id', $store->id)
+            ->where(function ($q) use ($booking) {
+                $q->where('channel_order_id', $booking->order_sn)
+                  ->orWhere('external_order_id', $booking->order_sn);
+            })
+            ->whereNull('booking_sn')
+            ->update(['booking_sn' => $bookingSn]);
+
+        return $booking->order_sn;
+    }
+
     public function syncOrdersBySn(Store $store, array $orderSnList): array
     {
         $orderSnList = array_values(array_unique(array_filter($orderSnList)));
@@ -239,7 +445,7 @@ class MarketplaceSyncService
             return ['found' => 0, 'new' => 0, 'updated' => 0];
         }
 
-        $driver  = $this->manager->driver($store);
+        $driver  = $this->gateway;
         $details = [];
         foreach (array_chunk($orderSnList, 50) as $chunk) {
             try {
@@ -272,17 +478,6 @@ class MarketplaceSyncService
     }
 
     /**
-     * Maksimal percobaan panggilan get_escrow_detail (1 percobaan awal + 2 retry).
-     */
-    private const ESCROW_MAX_ATTEMPTS = 3;
-
-    /**
-     * Maksimal detik menunggu antar-retry, dibatasi supaya Retry-After yang besar
-     * dari Shopee tidak menahan proses batch terlalu lama.
-     */
-    private const ESCROW_MAX_RETRY_SLEEP_SECONDS = 10;
-
-    /**
      * Cooldown minimum (menit) sebelum settlement yang BELUM final
      * (settlement_time NULL) di-refresh ulang otomatis oleh batch reguler (bukan
      * --resync). Mencegah order yang sama diminta ulang ke API Shopee di setiap
@@ -292,14 +487,18 @@ class MarketplaceSyncService
      */
     private const PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES = 60;
 
+    /** Status order yang memang sudah boleh ditarik detail settlement-nya. */
+    public const SETTLEMENT_ELIGIBLE_ORDER_STATUSES = ['COMPLETED'];
+
     /**
      * Field settlement yang dianggap "material" untuk keperluan logging perubahan
      * saat --resync (BUKAN untuk tabel histori — histori sengaja belum dibuat di Fase 1,
      * lihat AUDIT_FASE1_RANCANGAN_FINAL.md Bagian 10).
      */
     private const MATERIAL_SETTLEMENT_FIELDS = [
-        'commission_fee', 'service_fee', 'transaction_fee', 'seller_voucher',
-        'shipping_fee_subsidy', 'escrow_tax', 'final_income', 'settlement_time',
+        'commission_fee', 'service_fee', 'transaction_fee', 'affiliate_fee',
+        'seller_voucher', 'shipping_fee_subsidy', 'shipping_insurance_fee',
+        'escrow_tax', 'final_income', 'settlement_time',
     ];
 
     /**
@@ -321,10 +520,10 @@ class MarketplaceSyncService
      * @param  string|null  $orderSn  Kalau diisi, batasi ke satu channel_order_id
      * @param  bool  $resync  Kalau true, SEMUA order (termasuk yang settlement-nya sudah
      *                        final) diproses ulang (updateOrCreate). Kalau false (default),
-     *                        order tetap eligible bila: belum ada settlement sama sekali,
-     *                        ATAU settlement ada tapi belum final (settlement_time NULL)
-     *                        dan sudah lewat cooldown — lihat
-     *                        PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES.
+     *                        order tetap eligible bila: belum ada settlement sama sekali
+     *                        dan percobaan terakhir sudah lewat cooldown, ATAU settlement
+     *                        ada tapi belum final (settlement_time NULL) dan sudah lewat
+     *                        cooldown — lihat PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES.
      * @param  int  $limit  Maks order yang diambil dalam satu pemanggilan (satu batch)
      * @param  int  $afterId  Cursor — hanya ambil order dengan id > afterId (untuk mode --all di command)
      * @return array{found:int, processed:int, synced:int, new:int, updated:int, skipped:int, errors:int, last_processed_id:int|null, failed_order_ids:array<int,string>, last_call_meta:array|null, message:string}
@@ -337,12 +536,14 @@ class MarketplaceSyncService
         bool $resync = false,
         int $limit = 200,
         int $afterId = 0,
+        bool $waitForRateLimit = false,
+        ?callable $progress = null,
     ): array {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         $query = MarketplaceOrder::where('store_id', $store->id)
             ->where('id', '>', $afterId)
-            ->where('order_status', 'COMPLETED')
+            ->whereIn('order_status', self::SETTLEMENT_ELIGIBLE_ORDER_STATUSES)
             ->orderBy('id');
 
         if (! $resync) {
@@ -355,19 +556,28 @@ class MarketplaceSyncService
             //     setiap batch/scheduler tick untuk order yang sama.
             // Settlement yang SUDAH final (settlement_time terisi) TIDAK PERNAH masuk
             // cabang (b) — hanya bisa diperbarui lagi lewat --resync eksplisit.
-            $query->where(function ($eligible) use ($store) {
-                $eligible->whereNotExists(function ($q) use ($store) {
-                    $q->select(DB::raw(1))
-                      ->from('marketplace_order_settlements')
-                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
-                      ->where('marketplace_order_settlements.store_id', $store->id);
-                })->orWhereExists(function ($q) use ($store) {
+            $cooldownAt = now()->subMinutes(self::PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES);
+            $query->where(function ($eligible) use ($store, $cooldownAt) {
+                $eligible->where(function ($missing) use ($store, $cooldownAt) {
+                    $missing->whereNotExists(function ($q) use ($store) {
+                        $q->select(DB::raw(1))
+                          ->from('marketplace_order_settlements')
+                          ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                          ->where('marketplace_order_settlements.store_id', $store->id);
+                    })->where(function ($attempt) use ($cooldownAt) {
+                        $attempt->whereNull('marketplace_orders.settlement_sync_last_attempt_at')
+                            ->orWhere('marketplace_orders.settlement_sync_last_attempt_at', '<=', $cooldownAt);
+                    });
+                })->orWhereExists(function ($q) use ($store, $cooldownAt) {
                     $q->select(DB::raw(1))
                       ->from('marketplace_order_settlements')
                       ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
                       ->where('marketplace_order_settlements.store_id', $store->id)
                       ->whereNull('marketplace_order_settlements.settlement_time')
-                      ->where('marketplace_order_settlements.synced_at', '<=', now()->subMinutes(self::PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES));
+                      ->where(function ($synced) use ($cooldownAt) {
+                          $synced->whereNull('marketplace_order_settlements.synced_at')
+                              ->orWhere('marketplace_order_settlements.synced_at', '<=', $cooldownAt);
+                      });
                 });
             });
         }
@@ -400,15 +610,55 @@ class MarketplaceSyncService
         // metadata order terakhir (bukan agregat) — cukup untuk kebutuhan --inspect yang
         // memang dibatasi hanya valid bersama --order (satu order).
         $lastCallMeta = null;
+        $safeFound = max(1, $found);
+
+        $this->reportProgress($progress, [
+            'status'            => 'running',
+            'phase'             => 'batch_start',
+            'percent'           => $found > 0 ? 5 : 100,
+            'label'             => $found > 0
+                ? "Menyiapkan batch settlement ({$found} order)…"
+                : 'Tidak ada settlement eligible untuk batch ini.',
+            'store_id'          => $store->id,
+            'store_name'        => $store->name,
+            'found'             => $found,
+            'processed'         => 0,
+            'synced'            => 0,
+            'new'               => 0,
+            'updated'           => 0,
+            'skipped'           => 0,
+            'errors'            => 0,
+            'last_processed_id' => null,
+        ]);
 
         foreach ($orders as $order) {
             $processed++;
             $lastProcessedId = $order->id;
 
+            $this->reportProgress($progress, [
+                'status'            => 'running',
+                'phase'             => 'fetching',
+                'percent'           => $found > 0
+                    ? min(95, 5 + (int) floor((max(0, $processed - 1) / $safeFound) * 90))
+                    : 100,
+                'label'             => "Mengambil detail settlement {$processed}/{$found}…",
+                'store_id'          => $store->id,
+                'store_name'        => $store->name,
+                'found'             => $found,
+                'processed'         => $processed - 1,
+                'synced'            => $synced,
+                'new'               => $new,
+                'updated'           => $updated,
+                'skipped'           => $skipped,
+                'errors'            => $errors,
+                'last_processed_id' => $lastProcessedId,
+                'current_order'     => $order->channel_order_id,
+            ]);
+
             try {
                 // Revalidasi status order tepat sebelum API dipanggil
                 $order->refresh();
-                if ($order->order_status !== 'COMPLETED') {
+                if (! in_array($order->order_status, self::SETTLEMENT_ELIGIBLE_ORDER_STATUSES, true)) {
                     $skipped++;
                     Log::info("[sync-settlements] Order {$order->channel_order_id} berubah status menjadi {$order->order_status} (bukan COMPLETED), API batal dipanggil.");
                     continue;
@@ -417,7 +667,13 @@ class MarketplaceSyncService
                 // 1) Panggil API dulu (di luar transaction — request jaringan tidak boleh
                 //    menahan transaction database, apalagi di SQLite yang rawan "database
                 //    is locked" kalau transaction dibiarkan terbuka lama).
-                $retryResult = $this->getEscrowDetailWithRetry($driver, $store, $order->channel_order_id);
+                $retryResult = $this->getEscrowDetailWithRetry(
+                    $driver,
+                    $store,
+                    $order->channel_order_id,
+                    $waitForRateLimit,
+                    $progress,
+                );
                 $response = $retryResult['payload'];
                 $lastCallMeta = $retryResult['meta'];
 
@@ -426,10 +682,14 @@ class MarketplaceSyncService
                 $validation = $this->validateEscrowIncome($response);
 
                 if ($validation['status'] === 'skipped') {
-                    // Kondisi bisnis (mis. response kosong / belum eligible di sisi Shopee)
-                    // — bukan error, dan TIDAK membuat settlement kosong/nol.
+                    // Kondisi bisnis (mis. response kosong / belum eligible di sisi Shopee).
+                    // Jangan membuat row settlement dummy: nominal 0 dan timestamp order
+                    // bukan bukti dana sudah cair. Timestamp percobaan disimpan di order
+                    // agar tetap ada cooldown tanpa mencemari laporan settlement.
                     $skipped++;
                     Log::info("[sync-settlements] Order {$order->channel_order_id} dilewati: {$validation['message']}");
+
+                    $order->update(['settlement_sync_last_attempt_at' => now()]);
                     continue;
                 }
 
@@ -438,12 +698,13 @@ class MarketplaceSyncService
                     $failedOrderIds[] = $order->channel_order_id;
                     Log::warning("[sync-settlements] Order {$order->channel_order_id} gagal validasi ({$validation['reason']}): {$validation['message']}");
                     
-                    if ($validation['reason'] === 'order_not_found') {
-                        $order->update([
-                            'settlement_sync_error_code' => 'order_not_found',
-                            'settlement_sync_failed_at' => now(),
-                        ]);
-                    }
+                    // Tandai error code untuk semua error yang lolos retry agar order
+                    // bermasalah tidak terus-menerus memblokir limit batch.
+                    $order->update([
+                        'settlement_sync_error_code' => $validation['reason'] ?? 'api_error',
+                        'settlement_sync_failed_at' => now(),
+                    ]);
+                    
                     continue;
                 }
 
@@ -465,15 +726,19 @@ class MarketplaceSyncService
                 //    boleh rollback order lain, dan transaction panjang berbahaya untuk SQLite.
                 $wasNew = true;
 
-                DB::transaction(function () use ($order, $mapped, $resync, &$wasNew) {
+                DB::transaction(function () use ($store, $order, $mapped, &$wasNew) {
                     // Dicek terlepas dari $resync — dipakai untuk breakdown baru vs
                     // diperbarui di response (kebutuhan UI tombol Sync Settlement),
                     // TIDAK mengubah perilaku upsert/histori yang sudah ada.
-                    $existing = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->first();
+                    $lookup = [
+                        'store_id' => $store->id,
+                        'channel_order_id' => $order->channel_order_id,
+                    ];
+                    $existing = MarketplaceOrderSettlement::where($lookup)->first();
                     $wasNew   = $existing === null;
 
                     MarketplaceOrderSettlement::updateOrCreate(
-                        ['channel_order_id' => $order->channel_order_id],
+                        $lookup,
                         $mapped['values']
                     );
 
@@ -492,7 +757,12 @@ class MarketplaceSyncService
                             'settlement_sync_failed_at' => null,
                         ]);
                     }
+                    $order->update(['settlement_sync_last_attempt_at' => null]);
                 });
+
+                // Simpan status kesiapan finansial order secara eksplisit. Ini hanya
+                // penanda kualitas data; belum membuat jurnal accounting.
+                $this->financialQuality->refreshOrder($order->fresh());
 
                 $synced++;
                 if ($wasNew) {
@@ -500,6 +770,26 @@ class MarketplaceSyncService
                 } else {
                     $updated++;
                 }
+
+                $this->reportProgress($progress, [
+                    'status'            => 'running',
+                    'phase'             => 'processing',
+                    'percent'           => $found > 0
+                        ? min(95, 5 + (int) floor(($processed / $safeFound) * 90))
+                        : 100,
+                    'label'             => "Memproses settlement {$processed}/{$found}…",
+                    'store_id'          => $store->id,
+                    'store_name'        => $store->name,
+                    'found'             => $found,
+                    'processed'         => $processed,
+                    'synced'            => $synced,
+                    'new'               => $new,
+                    'updated'           => $updated,
+                    'skipped'           => $skipped,
+                    'errors'            => $errors,
+                    'last_processed_id' => $lastProcessedId,
+                    'current_order'     => $order->channel_order_id,
+                ]);
 
             } catch (\Throwable $e) {
                 Log::error("[sync-settlements] Exception order {$order->channel_order_id}: " . $e->getMessage());
@@ -513,7 +803,27 @@ class MarketplaceSyncService
         $logStatus = 'success';
         if ($errors > 0) {
             $logStatus = $synced > 0 ? 'partial_success' : 'failed';
+        } elseif ($skipped > 0) {
+            $logStatus = 'partial_success';
         }
+
+        $this->reportProgress($progress, [
+            'status'            => $logStatus === 'success' ? 'success' : ($logStatus === 'partial_success' ? 'warn' : 'error'),
+            'phase'             => 'batch_done',
+            'percent'           => 100,
+            'label'             => $message,
+            'store_id'          => $store->id,
+            'store_name'        => $store->name,
+            'found'             => $found,
+            'processed'         => $processed,
+            'synced'            => $synced,
+            'new'               => $new,
+            'updated'           => $updated,
+            'skipped'           => $skipped,
+            'errors'            => $errors,
+            'last_processed_id' => $lastProcessedId,
+            'failed_order_ids'  => array_slice($failedOrderIds, 0, 20),
+        ]);
 
         $this->log($store, 'sync_settlements', $logStatus, $message, [
             'found'              => $found,
@@ -544,6 +854,167 @@ class MarketplaceSyncService
     }
 
     /**
+     * Backfill settlement secara synchronous untuk rentang panjang.
+     *
+     * Dipakai controller UI agar 1-3 bulan ke belakang bisa dijalankan langsung
+     * di request biasa, tanpa queue/background, sambil tetap menghormati cooldown
+     * rate limit Shopee dan melanjutkan dari cursor batch berikutnya.
+     *
+     * @return array{
+     *   found:int, processed:int, synced:int, new:int, updated:int, skipped:int, errors:int,
+     *   batches:int, last_processed_id:int|null, failed_order_ids:array<int,string>,
+     *   duration_ms:float, message:string, status:string
+     * }
+     */
+    public function syncSettlementsBackfill(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        ?string $orderSn = null,
+        bool $resync = false,
+        int $limit = 200,
+        int $maxBatches = 20,
+        int $pauseSeconds = 1,
+        ?callable $progress = null,
+    ): array {
+        $totals = [
+            'found'           => 0,
+            'processed'       => 0,
+            'synced'          => 0,
+            'new'             => 0,
+            'updated'         => 0,
+            'skipped'         => 0,
+            'errors'          => 0,
+            'batches'         => 0,
+            'last_processed_id' => null,
+            'failed_order_ids'=> [],
+        ];
+
+        $afterId = 0;
+        $noProgressStreak = 0;
+        $startedAt = microtime(true);
+        $maxRuntimeSeconds = max(900, (int) config('shopee.settlement_backfill_max_runtime_seconds', 7200));
+        $orderMode = $orderSn !== null && $orderSn !== '';
+
+        $this->reportProgress($progress, [
+            'status'     => 'running',
+            'phase'      => 'backfill_start',
+            'percent'    => 3,
+            'label'      => 'Menyiapkan backfill settlement…',
+            'store_id'   => $store->id,
+            'store_name' => $store->name,
+            'batches'    => 0,
+            'max_batches'=> $maxBatches,
+        ]);
+
+        for ($batch = 1; $batch <= $maxBatches; $batch++) {
+            $batchProgress = function (array $payload) use ($progress, $batch, $maxBatches): void {
+                if (! $progress) {
+                    return;
+                }
+
+                $batchPercent = (float) ($payload['percent'] ?? 0);
+                $overall = (($batch - 1) / max(1, $maxBatches)) * 100 + ($batchPercent / max(1, $maxBatches));
+                $payload['percent'] = (int) min(99, round($overall));
+                $payload['batch'] = $batch;
+                $payload['max_batches'] = $maxBatches;
+                $payload['phase'] = $payload['phase'] ?? 'batch_running';
+                $progress($payload);
+            };
+
+            $result = $this->syncSettlements(
+                $store,
+                $timeFrom,
+                $timeTo,
+                $orderSn,
+                $resync,
+                $limit,
+                $afterId,
+                true, // backfill harus menunggu cooldown rate limit, bukan gagal cepat
+                $batchProgress,
+            );
+
+            $totals['batches'] = $batch;
+            $totals['found']     += (int) ($result['found'] ?? 0);
+            $totals['processed'] += (int) ($result['processed'] ?? 0);
+            $totals['synced']    += (int) ($result['synced'] ?? 0);
+            $totals['new']       += (int) ($result['new'] ?? 0);
+            $totals['updated']   += (int) ($result['updated'] ?? 0);
+            $totals['skipped']   += (int) ($result['skipped'] ?? 0);
+            $totals['errors']    += (int) ($result['errors'] ?? 0);
+            $totals['failed_order_ids'] = array_values(array_unique(array_merge(
+                $totals['failed_order_ids'],
+                $result['failed_order_ids'] ?? []
+            )));
+            $totals['last_processed_id'] = $result['last_processed_id'] ?? $totals['last_processed_id'];
+
+            if (($result['processed'] ?? 0) === 0) {
+                break;
+            }
+
+            if ($orderMode) {
+                break;
+            }
+
+            $madeProgress = (($result['synced'] ?? 0) > 0) || (($result['last_processed_id'] ?? 0) > $afterId);
+            $noProgressStreak = $madeProgress ? 0 : ($noProgressStreak + 1);
+            $afterId = max($afterId, (int) ($result['last_processed_id'] ?? $afterId));
+
+            if ($noProgressStreak >= 2) {
+                break;
+            }
+
+            if ((microtime(true) - $startedAt) >= $maxRuntimeSeconds) {
+                break;
+            }
+
+            if ($batch < $maxBatches && $pauseSeconds > 0) {
+                sleep($pauseSeconds);
+            }
+        }
+
+        $durationMs = (microtime(true) - $startedAt) * 1000;
+        $message = "Settlement backfill — found: {$totals['found']}, processed: {$totals['processed']}, synced: {$totals['synced']} (new: {$totals['new']}, updated: {$totals['updated']}), skipped: {$totals['skipped']}, errors: {$totals['errors']}, batches: {$totals['batches']}.";
+        $status = $totals['errors'] > 0 ? ($totals['synced'] > 0 ? 'partial_success' : 'failed') : 'success';
+
+        $this->reportProgress($progress, [
+            'status'            => $status === 'success' ? 'success' : ($status === 'partial_success' ? 'warn' : 'error'),
+            'phase'             => 'backfill_done',
+            'percent'           => 100,
+            'label'             => $message,
+            'store_id'          => $store->id,
+            'store_name'        => $store->name,
+            'found'             => $totals['found'],
+            'processed'         => $totals['processed'],
+            'synced'            => $totals['synced'],
+            'new'               => $totals['new'],
+            'updated'           => $totals['updated'],
+            'skipped'           => $totals['skipped'],
+            'errors'            => $totals['errors'],
+            'batches'           => $totals['batches'],
+            'max_batches'       => $maxBatches,
+            'last_processed_id' => $totals['last_processed_id'],
+            'failed_order_ids'  => array_slice($totals['failed_order_ids'], 0, 20),
+        ]);
+
+        return [
+            'found'              => $totals['found'],
+            'processed'          => $totals['processed'],
+            'synced'             => $totals['synced'],
+            'new'                => $totals['new'],
+            'updated'            => $totals['updated'],
+            'skipped'            => $totals['skipped'],
+            'errors'             => $totals['errors'],
+            'batches'            => $totals['batches'],
+            'last_processed_id'  => $totals['last_processed_id'],
+            'failed_order_ids'   => array_slice($totals['failed_order_ids'], 0, 20),
+            'duration_ms'        => round($durationMs, 2),
+            'status'             => $status,
+            'message'            => $message,
+        ];
+    }
+
+    /**
      * Panggil getEscrowDetail() dengan retry terbatas — HANYA untuk kegagalan
      * transient (ConnectionException, HTTP 429, HTTP 5xx). Tidak retry untuk error
      * 4xx lain (dianggap permanen: validasi/permission/order tidak valid).
@@ -557,14 +1028,30 @@ class MarketplaceSyncService
     /**
      * @return array{payload:array, meta:array{attempts:int, http_status:mixed, retry_after:mixed, token_refreshed:null, duration_ms:float}}
      */
-    private function getEscrowDetailWithRetry(MarketplaceChannel $driver, Store $store, string $orderSn): array
+    private function getEscrowDetailWithRetry(
+        MarketplaceApiGateway $driver,
+        Store $store,
+        string $orderSn,
+        bool $waitForRateLimit = false,
+        ?callable $progress = null,
+    ): array
     {
-        $attempt = 0;
-        $response = [];
+        // CATATAN KONSOLIDASI: loop retry transien (429/5xx/koneksi putus) yang dulu
+        // ada di sini DIHAPUS — sekarang ditangani SATU kali di lapisan channel
+        // (ShopeeChannel::resilientRequest: backoff + cooldown 429 global per toko).
+        // Dobel retry di dua lapis = hingga 9 panggilan API untuk satu order gagal.
+        // Wrapper ini dipertahankan hanya untuk instrumentasi (durasi, http_status)
+        // dengan BENTUK RETURN yang sama persis (payload + meta) supaya
+        // validateEscrowIncome()/mapEscrowSettlement()/laporan --inspect tidak berubah.
         $startedAt = hrtime(true);
+        $attempts = 0;
+        $maxAttempts = $waitForRateLimit ? 13 : 2;
+        $maxCooldownWaits = $waitForRateLimit ? 12 : 0;
+        $cooldownWaits = 0;
+        $response = [];
 
-        while ($attempt < self::ESCROW_MAX_ATTEMPTS) {
-            $attempt++;
+        do {
+            $attempts++;
 
             try {
                 $response = $driver->getEscrowDetail($store, $orderSn);
@@ -576,22 +1063,44 @@ class MarketplaceSyncService
                 ];
             }
 
-            $httpStatus = $response['_meta']['http_status'] ?? null;
-            $isConnectionIssue = ($response['error'] ?? null) === 'connection_exception';
-            $isTransient = $isConnectionIssue || $httpStatus === 429 || ($httpStatus !== null && $httpStatus >= 500);
+            $status = $response['_meta']['http_status'] ?? null;
+            $error  = (string) ($response['error'] ?? '');
+            $msg    = strtolower((string) ($response['message'] ?? ''));
+            $isRateLimited = $status === 429
+                || str_contains(strtolower($error), 'rate_limit')
+                || str_contains($msg, 'rate limit');
+            $isConnectionException = $error === 'connection_exception';
+            $isServerError = is_int($status) && $status >= 500;
+            $shouldRetry = ($isRateLimited || $isConnectionException || $isServerError) && $attempts < $maxAttempts;
 
-            if (! $isTransient || $attempt >= self::ESCROW_MAX_ATTEMPTS) {
+            if (! $shouldRetry) {
                 break;
             }
 
-            $retryAfter = $response['_meta']['retry_after'] ?? null;
-            $sleepSeconds = is_numeric($retryAfter) ? (int) $retryAfter : (2 * $attempt);
-            $sleepSeconds = min($sleepSeconds, self::ESCROW_MAX_RETRY_SLEEP_SECONDS);
+            if ($isRateLimited && $waitForRateLimit && $cooldownWaits < $maxCooldownWaits) {
+                $retryAfter = (int) ($response['_meta']['retry_after'] ?? 0);
+                if ($retryAfter <= 0) {
+                    $retryAfter = (int) config('shopee.rate_limit_cooldown', 30);
+                }
 
-            if ($sleepSeconds > 0) {
+                $sleepSeconds = max(1, $retryAfter + random_int(1, 3));
+                $cooldownWaits++;
+                Log::warning("[sync-settlements] Rate limit cooldown untuk order {$orderSn} di toko {$store->id}; menunggu {$sleepSeconds}s lalu retry (attempt {$attempts}).");
+                $this->reportProgress($progress, [
+                    'status'        => 'running',
+                    'phase'         => 'retry_wait',
+                    'percent'       => null,
+                    'label'         => "Rate limit, menunggu {$sleepSeconds}s untuk order {$orderSn}…",
+                    'store_id'      => $store->id,
+                    'store_name'    => $store->name,
+                    'current_order' => $orderSn,
+                    'retry_after'   => $sleepSeconds,
+                    'attempts'      => $attempts,
+                ]);
+                set_time_limit(max(180, $sleepSeconds + 60));
                 sleep($sleepSeconds);
             }
-        }
+        } while (true);
 
         $durationMs = (hrtime(true) - $startedAt) / 1_000_000;
 
@@ -602,7 +1111,7 @@ class MarketplaceSyncService
             // ke raw_json (mapEscrowSettlement() hanya mengambil node order_income).
             'payload' => $response,
             'meta'    => [
-                'attempts'    => $attempt,
+                'attempts'    => $attempts,
                 'http_status' => $response['_meta']['http_status'] ?? null,
                 'retry_after' => $response['_meta']['retry_after'] ?? null,
                 // SENGAJA null ("tidak diketahui"), BUKAN false. ShopeeChannel belum
@@ -680,8 +1189,10 @@ class MarketplaceSyncService
      * pernah diverifikasi) DIPERTAHANKAN sebagai compatibility guard untuk kemungkinan
      * variasi response order/versi API lain — bukan dihapus, hanya diberi prioritas
      * lebih rendah dari field yang sudah terbukti nyata. Ringkasan keputusan:
-     *  - buyer_payment_amount: `buyer_total_amount` TERVERIFIKASI ada (81912 di UAT).
-     *    `buyer_payment_amount`/`buyer_paid_amount` tidak pernah muncul di response.
+     *  - buyer_payment_amount: `buyer_total_amount` TERVERIFIKASI ada (81912 di UAT)
+     *    dan harus jadi prioritas utama. Field lama seperti `buyer_payment_amount`
+     *    / `buyer_paid_amount` hanya fallback kompatibilitas bila response lama
+     *    belum mengirim `buyer_total_amount`.
      *  - seller_voucher: `voucher_from_seller` TERVERIFIKASI ada (200 di UAT).
      *  - transaction_fee: Kombinasi `seller_transaction_fee` (beban seller) dan 
      *    `seller_order_processing_fee` (Biaya Penanganan Pesanan). SENGAJA TIDAK
@@ -693,6 +1204,9 @@ class MarketplaceSyncService
      *    fase berikutnya (TIDAK dibuat di koreksi ini).
      *  - final_income: `escrow_amount` TERVERIFIKASI ada (68456 di UAT). `final_income`
      *    tidak pernah muncul di response nyata — fallback ini pada dasarnya jadi primary.
+     *  - affiliate_fee & shipping_insurance_fee: disimpan dari field pengganti yang
+     *    umum dipakai API/response mentah bila tersedia, supaya kolom baru tetap terisi
+     *    tanpa merusak backward compatibility kalau field belum ada.
      *  - seller_coin_cash_back: `seller_coin_cash_back` sendiri TERVERIFIKASI ada di UAT
      *    (field asli persis nama kolom lokal) — diprioritaskan di atas fallback lama.
      *  - commission_fee, service_fee, actual_shipping_fee, shopee_shipping_rebate,
@@ -719,12 +1233,6 @@ class MarketplaceSyncService
             ?? $this->normalizeShopeeTimestamp($rootResponse['escrow_release_time'] ?? null)
             ?? $this->normalizeShopeeTimestamp($income['settlement_time'] ?? null);
 
-        // Fallback: Jika Shopee sama sekali tidak mengirimkan escrow_release_time di API escrow (sering terjadi 
-        // di versi API baru), kita gunakan update_time dari order detail saat statusnya sudah COMPLETED.
-        if (! $settlementTime && $order->order_status === 'COMPLETED' && !empty($order->raw_json['update_time'])) {
-            $settlementTime = $this->normalizeShopeeTimestamp($order->raw_json['update_time']);
-        }
-
         // Melacak kolom mana yang nilainya "field tidak tersedia dari API" (BUKAN
         // "field dikirim bernilai 0") — dipakai untuk observability (missing_financial_fields
         // di sync log), supaya dua kondisi ini tidak tercampur padahal keduanya sama-sama
@@ -737,13 +1245,15 @@ class MarketplaceSyncService
             return $this->nn($decimal);
         };
 
+        $quality = $this->financialQuality->assessSettlement($income);
+
         $values = [
             'store_id'   => $store->id,
             'order_id'   => $order->id,
 
             // Pembayaran customer (Subtotal Pesanan / Harga Produk yg diakui seller sbg gross)
             'buyer_payment_amount'  => $val('buyer_payment_amount', $this->decimalValue(
-                $income['cost_of_goods_sold'] ?? $income['order_selling_price'] ?? $income['buyer_total_amount'] ?? $income['buyer_payment_amount'] ?? null
+                $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? $income['buyer_payment_amount'] ?? $income['order_selling_price'] ?? null
             )),
 
             // Fee marketplace
@@ -751,6 +1261,9 @@ class MarketplaceSyncService
             'service_fee'           => $val('service_fee', $this->decimalValue($income['service_fee'] ?? null)),
             'transaction_fee'       => $val('transaction_fee', $this->decimalValue(
                 ($income['seller_transaction_fee'] ?? 0) + ($income['seller_order_processing_fee'] ?? 0) ?: ($income['transaction_fee'] ?? null)
+            )),
+            'affiliate_fee'         => $val('affiliate_fee', $this->decimalValue(
+                $income['affiliate_fee'] ?? $income['affiliate_commission_fee'] ?? $income['affiliate_commission'] ?? $income['seller_affiliate_fee'] ?? null
             )),
 
             // Voucher & diskon
@@ -765,6 +1278,9 @@ class MarketplaceSyncService
             'actual_shipping_fee'   => $val('actual_shipping_fee', $this->decimalValue($income['actual_shipping_fee'] ?? $income['estimated_shipping_fee'] ?? null)),
             'shipping_fee_subsidy'  => $val('shipping_fee_subsidy', $this->decimalValue($income['shopee_shipping_rebate'] ?? $income['shipping_fee_rebate'] ?? null)),
             'reverse_shipping_fee'  => $val('reverse_shipping_fee', $this->decimalValue($income['reverse_shipping_fee'] ?? null)),
+            'shipping_insurance_fee' => $val('shipping_insurance_fee', $this->decimalValue(
+                $income['shipping_insurance_fee'] ?? $income['shipping_insurance'] ?? $income['insurance_fee'] ?? null
+            )),
 
             // Campaign & lainnya — activity_fee = AMS commission SAJA (lihat docblock).
             'activity_fee'          => $val('activity_fee', $this->decimalValue(
@@ -779,6 +1295,11 @@ class MarketplaceSyncService
 
             'synced_at' => now(),
             'raw_json'  => $income, // murni payload Shopee, TANPA _meta
+            'data_status' => $quality['status'],
+            'data_quality_flags' => array_merge($quality['flags'], [
+                'source' => 'escrow_detail',
+            ]),
+            'data_checked_at' => now(),
         ];
 
         return [
@@ -788,7 +1309,7 @@ class MarketplaceSyncService
     }
 
     /**
-     * "Not-null guard" — SEMUA 13 kolom fee/nominal di marketplace_order_settlements
+     * "Not-null guard" — SEMUA 15 kolom fee/nominal di marketplace_order_settlements
      * (buyer_payment_amount s/d final_income) adalah NOT NULL di skema saat ini
      * (default '0', TANPA ->nullable() — lihat migration
      * 2026_06_09_013006_create_marketplace_order_settlements_table.php). Insert NULL
@@ -802,7 +1323,7 @@ class MarketplaceSyncService
      *
      * TECHNICAL DEBT (dicatat, bukan diperbaiki di Fase 1 — di luar scope migration
      * yang disetujui): kalau distingsi "field tidak tersedia" vs "fee memang 0"
-     * benar-benar dibutuhkan untuk rekonsiliasi, ke-13 kolom ini perlu migration
+     * benar-benar dibutuhkan untuk rekonsiliasi, ke-15 kolom ini perlu migration
      * terpisah untuk dijadikan nullable, disertai keputusan bisnis dulu.
      */
     private function nn(?string $value): string
@@ -932,7 +1453,7 @@ class MarketplaceSyncService
      */
     public function syncAdCampaigns(Store $store, string $dateFrom, string $dateTo): array
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $synced = $skipped = $errors = 0;
 
         // Shopee Ads API pakai format tanggal DD-MM-YYYY
@@ -1307,6 +1828,153 @@ class MarketplaceSyncService
         catch (\Throwable $e) { return null; }
     }
 
+    /**
+     * Cek ulang order PROCESSED yang masih tersimpan lokal setelah sync utama.
+     * Kandidat tidak dibatasi booking_sn sehingga order biasa dan order booking
+     * diperlakukan sama. Dipanggil saat sync agar status lokal selaras dengan API.
+     */
+    private function verifyProcessedOrdersAfterSync(Store $store, int $limit = 50): array
+    {
+        $stats = [
+            'checked' => 0,
+            'moved' => 0,
+            'unchanged' => 0,
+            'not_found' => 0,
+            'unknown_status' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+        ];
+
+        $orders = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->where('order_status', 'PROCESSED')
+            ->where(function ($query) {
+                $query->whereNull('processed_api_checked_at')
+                    ->orWhere('processed_api_checked_at', '<=', now()->subMinutes(10));
+            })
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return $stats;
+        }
+
+        if ($store->connection_status !== 'CONNECTED') {
+            $stats['skipped'] = $orders->count();
+            Log::warning('Sync order: verifikasi PROCESSED dilewati karena toko tidak terhubung.', [
+                'store_id' => $store->id,
+                'connection_status' => $store->connection_status,
+                'orders' => $orders->count(),
+            ]);
+            return $stats;
+        }
+
+        $detailsByOrder = [];
+        foreach (array_chunk($orders->pluck('channel_order_id')->filter()->unique()->values()->all(), 50) as $chunk) {
+            try {
+                $response = $this->gateway->getOrderDetail($store, $chunk);
+
+                if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
+                    throw new \RuntimeException($response['message'] ?? $response['error'] ?? 'API mengembalikan error.');
+                }
+
+                $details = data_get($response, 'response.order_list');
+                if (! is_array($details)) {
+                    $details = data_get($response, 'data.orders', data_get($response, 'data.order_list', []));
+                }
+
+                foreach (is_array($details) ? $details : [] as $detail) {
+                    if (! is_array($detail)) {
+                        continue;
+                    }
+
+                    $id = $detail['order_sn'] ?? $detail['order_id'] ?? $detail['id'] ?? null;
+                    if ($id !== null && $id !== '') {
+                        $detailsByOrder[(string) $id] = $detail;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $stats['errors']++;
+                Log::warning('Sync order: verifikasi PROCESSED gagal.', [
+                    'store_id' => $store->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        foreach ($orders as $order) {
+            $stats['checked']++;
+            $detail = $detailsByOrder[(string) $order->channel_order_id] ?? null;
+
+            if (! $detail) {
+                $stats['not_found']++;
+                $order->update(['processed_api_checked_at' => now()]);
+                continue;
+            }
+
+            $status = $this->canonicalProcessedApiStatus($detail['order_status'] ?? $detail['status'] ?? null);
+            if ($status === null) {
+                $stats['unknown_status']++;
+                $order->update(['processed_api_checked_at' => now()]);
+                continue;
+            }
+
+            if (! in_array($status, self::PROCESSED_API_ADVANCED_STATUSES, true)) {
+                $stats['unchanged']++;
+                $order->update([
+                    'processed_api_checked_at' => now(),
+                    'raw_json' => $detail,
+                    'synced_at' => now(),
+                ]);
+                continue;
+            }
+
+            $stats['moved']++;
+            $order->update([
+                'order_status' => $status,
+                'status' => $this->legacyStatusForProcessedApi($status, $order->status),
+                'raw_json' => $detail,
+                'synced_at' => now(),
+                'processed_api_checked_at' => now(),
+            ]);
+        }
+
+        return $stats;
+    }
+
+    private function canonicalProcessedApiStatus(mixed $status): ?string
+    {
+        if (! is_string($status) || trim($status) === '') {
+            return null;
+        }
+
+        $status = strtoupper(trim($status));
+
+        return [
+            'AWAITING_SHIPMENT' => 'READY_TO_SHIP',
+            'AWAITING_COLLECTION' => 'READY_TO_HANDOVER',
+            'IN_TRANSIT' => 'SHIPPED',
+            'DELIVERED' => 'COMPLETED',
+        ][$status] ?? $status;
+    }
+
+    private function legacyStatusForProcessedApi(string $status, ?string $current): string
+    {
+        return [
+            'READY_TO_HANDOVER' => 'packed',
+            'SHIPPED' => 'shipped',
+            'TO_CONFIRM_RECEIVE' => 'shipped',
+            'COMPLETED' => 'completed',
+            'CANCELLED' => 'cancelled',
+            'IN_CANCEL' => 'cancelled',
+            'TO_RETURN' => 'shipped',
+            'RETURNING' => 'shipped',
+            'RETURNED' => 'shipped',
+            'REFUNDED' => 'cancelled',
+        ][$status] ?? ($current ?: 'packed');
+    }
+
     private function upsertOrders(Store $store, array $details, bool $dryRun = false): array
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
@@ -1354,6 +2022,23 @@ class MarketplaceSyncService
                     ?? $detail['shipping_carrier']
                     ?? $detail['checkout_shipping_carrier']
                     ?? null;
+
+                // Canonical timeline. Tidak mengarang tanggal dari status; hanya
+                // menyimpan timestamp yang benar-benar dikirim API.
+                $eventDates = array_filter([
+                    'paid_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['pay_time'] ?? $detail['payment_time'] ?? $detail['paid_time'] ?? null
+                    ),
+                    'shipped_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['ship_time'] ?? $firstPkg['ship_time'] ?? $firstPkg['shipping_time'] ?? null
+                    ),
+                    'delivered_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['delivered_time'] ?? $firstPkg['delivered_time'] ?? null
+                    ),
+                    'completed_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['completed_time'] ?? null
+                    ),
+                ], static fn ($value) => $value !== null);
                 
                 $logisticsStatus = $firstPkg['logistics_status'] ?? '';
                 
@@ -1377,10 +2062,41 @@ class MarketplaceSyncService
                         * (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0);
                 });
 
+                // Status lokal READY_TO_HANDOVER adalah hasil workflow scan/packing
+                // GFID, bukan status yang dikirim balik oleh API Shopee. Ambil order
+                // lama sebelum update supaya sync berikutnya tidak menurunkannya lagi
+                // ke PROCESSED/READY_TO_SHIP dan membuat order tampak nyangkut di
+                // "Sedang Dikemas".
+                $existingOrder = MarketplaceOrder::where('store_id', $store->id)
+                    ->where('channel_order_id', $detail['order_sn'])
+                    ->first(['id', 'order_status', 'status', 'booking_sn']);
+
+                if ($existingOrder?->order_status === 'READY_TO_HANDOVER'
+                    && in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED', 'MATCHED'], true)) {
+                    $orderStatus = 'READY_TO_HANDOVER';
+                }
+
+                // Status return dari webhook juga lebih authoritative daripada
+                // response detail order yang terlambat dari Shopee.
+                if ($existingOrder?->order_status === 'TO_RETURN'
+                    && in_array($orderStatus, ['SHIPPED', 'COMPLETED'], true)) {
+                    $orderStatus = 'TO_RETURN';
+                }
+
+                // Acknowledge/arrange shipment lokal sudah memajukan order ke
+                // PROCESSED; jangan downgrade hanya karena API mengembalikan
+                // READY_TO_SHIP pada response berikutnya.
+                if ($existingOrder?->order_status === 'PROCESSED'
+                    && blank($existingOrder?->booking_sn)
+                    && $orderStatus === 'READY_TO_SHIP') {
+                    $orderStatus = 'PROCESSED';
+                }
+
                 // ── Status legacy mapping ─────────────────────────────────────
                 $statusMap  = [
                     'READY_TO_SHIP' => 'packed',
                     'PROCESSED'     => 'packed',
+                    'READY_TO_HANDOVER' => 'packed',
                     'SHIPPED'       => 'shipped',
                     'COMPLETED'     => 'completed',
                     'CANCELLED'     => 'cancelled',
@@ -1388,7 +2104,7 @@ class MarketplaceSyncService
                     'UNPAID'        => 'new',
                     'TO_CONFIRM_RECEIVE' => 'shipped',
                 ];
-                $statusLegacy = $statusMap[$orderStatus] ?? 'new';
+                $statusLegacy = $statusMap[$orderStatus] ?? ($existingOrder?->status ?? 'new');
 
                 if ($dryRun) {
                     $existingOrder = MarketplaceOrder::where('store_id', $store->id)->where('channel_order_id', $detail['order_sn'])->first();
@@ -1429,10 +2145,12 @@ class MarketplaceSyncService
                         'booking_sn'        => $detail['booking_sn'] ?? null,
                         'order_date'        => $orderDate,
                         'ordered_at'        => $orderedAt,
+                        ...$eventDates,
 
                         // Status
                         'order_status'  => $orderStatus,
                         'status'        => $statusLegacy,
+                        'processed_api_checked_at' => $orderStatus === 'PROCESSED' ? now() : null,
 
                         // Buyer
                         'buyer_username' => $detail['buyer_username'] ?? null,
@@ -1468,8 +2186,83 @@ class MarketplaceSyncService
                     $outerStats['updated']++;
                 }
 
+                // ── [FEATURE] Placeholder Settlement ──────────────────────────
+                // Supaya order yang belum COMPLETED tetap masuk ke tab "Belum Cair" 
+                // dengan estimasi nominal sementara (dan settlement_time = null).
+                if (!in_array($orderStatus, ['CANCELLED', 'BATAL', 'RETURNED'])) {
+                    $calcSellerDiscount = 0;
+                    if (!empty($detail['item_list'])) {
+                        foreach ($detail['item_list'] as $itm) {
+                            $orig = $itm['model_original_price'] ?? $itm['original_price'] ?? 0;
+                            $disc = $itm['model_discounted_price'] ?? $itm['discounted_price'] ?? $orig;
+                            $qty = $itm['model_quantity_purchased'] ?? $itm['quantity_purchased'] ?? 1;
+                            if ($disc > 0 && $orig > $disc) {
+                                $calcSellerDiscount += ($orig - $disc) * $qty;
+                            }
+                        }
+                    }
+
+                    // Settlement bersifat satu baris per (store, order). Jangan
+                    // memasukkan settlement_time=null ke lookup: settlement yang
+                    // sudah final memiliki timestamp sehingga lookup tersebut tidak
+                    // menemukannya dan mencoba INSERT baris kedua, yang ditolak oleh
+                    // unique index.
+                    $settlement = MarketplaceOrderSettlement::where([
+                        'store_id'          => $store->id,
+                        'channel_order_id'  => $detail['order_sn'],
+                    ])->first();
+
+                    // Placeholder hanya boleh membuat/memperbarui settlement yang
+                    // belum final. Data settlement final berasal dari escrow detail
+                    // dan tidak boleh ditimpa oleh sync order biasa.
+                    if (! $settlement) {
+                        MarketplaceOrderSettlement::create([
+                            'store_id'             => $store->id,
+                            'channel_order_id'     => $detail['order_sn'],
+                            'order_id'             => $order->id,
+                            'buyer_payment_amount' => $totalAmount,
+                            'raw_json'             => ['seller_discount' => $calcSellerDiscount],
+                            'data_status'          => MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+                            'data_quality_flags'   => [
+                                'source' => 'order_detail_placeholder',
+                                'reason' => 'settlement_not_final',
+                            ],
+                            'data_checked_at'      => now(),
+                        ]);
+                    } elseif (
+                        $settlement->settlement_time === null
+                        && $settlement->data_status !== MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
+                        && ! array_key_exists('final_income', (array) $settlement->raw_json)
+                        && ! array_key_exists('escrow_amount', (array) $settlement->raw_json)
+                    ) {
+                        $settlement->update([
+                            'order_id'             => $order->id,
+                            'buyer_payment_amount' => $totalAmount,
+                            'data_status'          => MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+                            'data_quality_flags'   => [
+                                'source' => 'order_detail_placeholder',
+                                'reason' => 'settlement_not_final',
+                            ],
+                            'data_checked_at'      => now(),
+                            'raw_json'             => ['seller_discount' => $calcSellerDiscount],
+                        ]);
+                    }
+                }
+
+                // Pre-download resi: HANYA order segar (≤7 hari — backfill histori tidak
+                // butuh label) dan yang label-nya belum ter-cache. Job-nya sendiri unik
+                // per (store, order_sn), jadi sync berulang tidak menumpuk duplikat.
                 if (in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
-                    \App\Jobs\DownloadMarketplaceShippingDocumentJob::dispatch($store->id, $detail['order_sn']);
+                    $orderedTs = isset($detail['create_time']) ? (int) $detail['create_time'] : null;
+                    $isFresh = $orderedTs === null || $orderedTs >= now()->subDays(7)->timestamp;
+                    if ($isFresh) {
+                        $labelDisk = \Illuminate\Support\Facades\Storage::disk('local');
+                        $sn = $detail['order_sn'];
+                        if (! $labelDisk->exists("shipping_labels/{$store->id}/{$sn}.pdf.gz")
+                            && ! $labelDisk->exists("shipping_labels/{$store->id}/{$sn}_nocard.pdf.gz")) {
+                            \App\Jobs\DownloadMarketplaceShippingDocumentJob::dispatch($store->id, $sn);
+                        }
+                    }
                 }
 
                 $existingItems = $order->items->keyBy(function ($item) {
@@ -1478,7 +2271,7 @@ class MarketplaceSyncService
 
                 // Channel code untuk SKU Mapping lookup
                 $channelCode = $store->channel?->code;
-                $orderStatus = $detail['order_status'] ?? '';
+                
                 $orderHasIncomplete = false;
 
                 // Penomoran baris per pasangan item+model: bundle/add-on deal bisa
@@ -1574,15 +2367,42 @@ class MarketplaceSyncService
         return $outerStats;
     }
 
+    private function normalizeOrderEventTimestamp(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value);
+        }
+
+        if (is_numeric($value)) {
+            $timestamp = (int) $value;
+            if ($timestamp <= 0) {
+                return null;
+            }
+
+            return Carbon::createFromTimestamp($timestamp, config('app.timezone'));
+        }
+
+        try {
+            return Carbon::parse((string) $value, config('app.timezone'));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function autoCreateFulfillments(Store $store): void
     {
-        // Hanya buat fulfillment draft untuk order yang SEMUA item-nya data_status = valid
-        // PROCESSED ikut: order bisa masuk GFID sudah berstatus PROCESSED
-        // (resi diproses langsung di Seller Centre sebelum GFID sempat sync)
+        // Buat draft untuk semua order aktif, termasuk yang item-nya belum
+        // mapping. Mapping tetap divalidasi sebelum stok dipotong, tetapi
+        // masalah mapping tidak boleh membuat order tertahan di status lokal.
+        // PROCESSED ikut karena resi bisa diproses langsung di Seller Centre
+        // sebelum GFID sempat sync.
         $orders = MarketplaceOrder::where('store_id', $store->id)
             ->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])
             ->whereDoesntHave('fulfillment')
-            ->whereDoesntHave('items', fn ($q) => $q->where('data_status', 'incomplete'))
             ->get();
 
         foreach ($orders as $order) {

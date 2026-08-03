@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -175,6 +176,12 @@ class InventoryStockController extends Controller
 
         COALESCE(SUM(s.qty),0) AS total_qty,
         COALESCE(SUM(s.allocated_qty),0) AS allocated_qty,
+        COALESCE(SUM(
+            CASE
+                WHEN UPPER(TRIM(s.wh_code)) <> \'RM\' THEN s.qty
+                ELSE 0
+            END
+        ),0) AS value_qty,
 
         COALESCE(SUM(
             CASE
@@ -190,7 +197,12 @@ class InventoryStockController extends Controller
         ),0) AS wip_qty,
 
         COALESCE(items.hpp,0) AS hpp_per_unit,
-        COALESCE(SUM(s.qty),0) * COALESCE(items.hpp,0) AS stock_value,
+        COALESCE(SUM(
+            CASE
+                WHEN UPPER(TRIM(s.wh_code)) <> \'RM\' THEN s.qty
+                ELSE 0
+            END
+        ),0) * COALESCE(items.hpp,0) AS stock_value,
 
         COALESCE(items.avg_daily_sales,0) AS ads,
 
@@ -245,11 +257,13 @@ class InventoryStockController extends Controller
             $summaryRows = (clone $q)->get();
             $totalQty = (float) $summaryRows->sum('total_qty');
             $totalValue = (float) $summaryRows->sum('stock_value');
+            $valueQty = (float) $summaryRows->sum('value_qty');
 
             $hppSummary = [
                 'total_qty' => $totalQty,
                 'total_value' => $totalValue,
-                'avg_hpp_weighted' => $totalQty > 0 ? ($totalValue / $totalQty) : 0.0,
+                'value_qty' => $valueQty,
+                'avg_hpp_weighted' => $valueQty > 0 ? ($totalValue / $valueQty) : 0.0,
                 'avg_ads' => $summaryRows->count() ? (float) $summaryRows->avg(fn($r) => (float) ($r->ads ?? 0)) : 0.0,
             ];
 
@@ -258,11 +272,13 @@ class InventoryStockController extends Controller
                 ->map(function ($grp, $catName) {
                     $qty = (float) $grp->sum('total_qty');
                     $val = (float) $grp->sum('stock_value');
+                    $valueQty = (float) $grp->sum('value_qty');
                     return [
                         'category' => (string) $catName,
                         'total_qty' => $qty,
                         'total_value' => $val,
-                        'avg_hpp_weighted' => $qty > 0 ? ($val / $qty) : 0.0,
+                        'value_qty' => $valueQty,
+                        'avg_hpp_weighted' => $valueQty > 0 ? ($val / $valueQty) : 0.0,
                     ];
                 })
                 ->values()
@@ -290,6 +306,8 @@ class InventoryStockController extends Controller
                     ],
                     'total_qty' => (float) $r->total_qty,
                     'allocated_qty' => (float) $r->allocated_qty,
+                    'available_qty' => (float) $r->total_qty - (float) $r->allocated_qty,
+                    'available_stock' => (float) $r->total_qty - (float) $r->allocated_qty,
                     'fg_qty' => (float) $r->fg_qty,
                     'wip_qty' => (float) $r->wip_qty,
 
@@ -337,6 +355,92 @@ class InventoryStockController extends Controller
             'warehouses' => $warehouses,
             'hppSummary' => $hppSummary,
             'hppByCategory' => $hppByCategory,
+        ]);
+    }
+
+    /**
+     * JSON cek stok tersedia untuk 1 item.
+     *
+     * Query:
+     * - item_id atau item_code
+     * - warehouse_id opsional
+     */
+    public function available(Request $request): JsonResponse
+    {
+        $itemId = $request->integer('item_id');
+        $itemCode = trim((string) $request->input('item_code', ''));
+        $warehouseId = $request->filled('warehouse_id')
+            ? (int) $request->input('warehouse_id')
+            : null;
+
+        $itemQuery = Item::query()->with('category');
+
+        if ($itemId) {
+            $itemQuery->whereKey($itemId);
+        } elseif ($itemCode !== '') {
+            $itemQuery->where('code', $itemCode);
+        } else {
+            return response()->json([
+                'ok' => false,
+                'message' => 'item_id atau item_code wajib diisi.',
+            ], 422);
+        }
+
+        $item = $itemQuery->first();
+
+        if (! $item) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Item tidak ditemukan.',
+            ], 404);
+        }
+
+        $stockQuery = DB::table('inventory_stocks as s')
+            ->where('s.item_id', $item->id);
+
+        if ($warehouseId) {
+            $warehouse = Warehouse::select('id', 'code', 'name')->find($warehouseId);
+
+            if (! $warehouse) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Warehouse tidak ditemukan.',
+                ], 404);
+            }
+
+            $stockQuery->where('s.warehouse_id', $warehouseId);
+        } else {
+            $warehouse = null;
+        }
+
+        $totals = $stockQuery->selectRaw('
+            COALESCE(SUM(s.qty), 0) AS qty,
+            COALESCE(SUM(s.allocated_qty), 0) AS allocated_qty,
+            COALESCE(SUM(s.qty - s.allocated_qty), 0) AS available_qty
+        ')->first();
+
+        $qty = (float) ($totals->qty ?? 0);
+        $allocatedQty = (float) ($totals->allocated_qty ?? 0);
+        $availableQty = (float) ($totals->available_qty ?? ($qty - $allocatedQty));
+
+        return response()->json([
+            'ok' => true,
+            'item' => [
+                'id' => (int) $item->id,
+                'code' => (string) $item->code,
+                'name' => (string) $item->name,
+                'category' => $item->category?->name,
+            ],
+            'warehouse' => $warehouse ? [
+                'id' => (int) $warehouse->id,
+                'code' => (string) $warehouse->code,
+                'name' => (string) $warehouse->name,
+            ] : null,
+            'stock' => [
+                'qty' => $qty,
+                'allocated_qty' => $allocatedQty,
+                'available_qty' => $availableQty,
+            ],
         ]);
     }
 

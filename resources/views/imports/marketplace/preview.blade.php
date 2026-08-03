@@ -62,7 +62,7 @@
   $rowsTotal   = (int)($stats['rows'] ?? $stats['rows_parsed'] ?? count($rows));
   $ordersTotal = $stats['orders'] ?? $stats['orders_parsed'] ?? null;
 
-  $itemsTotal  = $stats['items'] ?? $stats['item_lines'] ?? null;
+  $itemsTotal  = $stats['items'] ?? $stats['item_lines'] ?? $stats['items_parsed'] ?? null;
   $qtyTotal    = $stats['qty'] ?? $stats['sum_qty'] ?? null;
   $grandTotal  = $stats['grand_total'] ?? $stats['sum_grand_total'] ?? null;
 
@@ -135,6 +135,10 @@
 
   if ($dupOrder === null)    $dupOrder = $dupO;
   if ($dupTracking === null) $dupTracking = $dupT;
+
+  $newTotal = (int) ($stats['new_shipments'] ?? 0);
+  $existingTotal = (int) ($stats['existing_shipments'] ?? 0);
+  $warnings = is_array($stats['warnings'] ?? null) ? $stats['warnings'] : [];
 
   // UI message
   $actionHint = $hasErrors ? 'Perbaiki error sebelum commit.' : 'Cek singkat lalu commit.';
@@ -360,8 +364,31 @@
         <div class="sum-val">{{ $num($dupOrder) }}</div>
         <div class="sum-sub">Duplikat di file</div>
       </div>
+
+      <div class="cardx sum-card" style="grid-column: span 3;">
+        <div class="sum-title">Data Baru</div>
+        <div class="sum-val">{{ $num($newTotal) }}</div>
+        <div class="sum-sub">Shipment baru</div>
+      </div>
+
+      <div class="cardx sum-card" style="grid-column: span 3;">
+        <div class="sum-title">Akan Di-update</div>
+        <div class="sum-val">{{ $num($existingTotal) }}</div>
+        <div class="sum-sub">Idempotent import</div>
+      </div>
     </div>
   </div>
+
+  @if(!empty($warnings))
+    <div class="alert alert-warning py-2 mb-3">
+      <strong>Catatan:</strong>
+      <ul class="mb-0 ps-3">
+        @foreach($warnings as $warning)
+          <li>{{ $warning }}</li>
+        @endforeach
+      </ul>
+    </div>
+  @endif
 
   {{-- =========================
     ERROR LIST

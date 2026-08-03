@@ -333,6 +333,177 @@
     function fmtQty(n)   { return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     function fmtPrice(n) { return n.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 
+    function normalizeText(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/[_\-\/]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function itemSignature(item) {
+        const text = normalizeText(`${item?.code || ''} ${item?.name || ''}`);
+        const colorMap = {
+            hitam: 'hitam',
+            black: 'hitam',
+            blk: 'hitam',
+            navy: 'navy',
+            biru: 'biru',
+            blue: 'biru',
+            blu: 'biru',
+            putih: 'putih',
+            white: 'putih',
+            wht: 'putih',
+            abu: 'abu',
+            grey: 'abu',
+            gray: 'abu',
+            gry: 'abu',
+            cream: 'cream',
+            krem: 'cream',
+            crm: 'cream',
+            maroon: 'maroon',
+            merah: 'merah',
+            red: 'merah',
+            kuning: 'kuning',
+            yellow: 'kuning',
+            yel: 'kuning',
+            orange: 'orange',
+            oren: 'orange',
+            hijau: 'hijau',
+            green: 'hijau',
+            grn: 'hijau',
+            olive: 'olive',
+            army: 'army',
+            khaki: 'khaki',
+            coklat: 'coklat',
+            brown: 'coklat',
+            mocca: 'coklat',
+            pink: 'pink',
+            ungu: 'ungu',
+            purple: 'ungu',
+            lilac: 'ungu',
+            taro: 'ungu',
+        };
+
+        const colorToken = Object.keys(colorMap).find(token =>
+            new RegExp(`(?:^|\\s)${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'i').test(text)
+        ) || null;
+
+        const color = colorToken ? colorMap[colorToken] : null;
+        const sizeMatch = text.match(/\b(10xl|9xl|8xl|7xl|6xl|5xl|4xl|3xl|xxxl|xxl|xl|xs|s|m|l|\d{1,2}l)\b/i);
+        const size = sizeMatch ? sizeMatch[1].toLowerCase() : null;
+
+        let base = text;
+        if (colorToken) {
+            Object.keys(colorMap).forEach(token => {
+                base = base.replace(new RegExp(`(?:^|\\s)${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'ig'), ' ');
+            });
+        }
+        if (size) {
+            base = base.replace(/\b(10xl|9xl|8xl|7xl|6xl|5xl|4xl|3xl|xxxl|xxl|xl|xs|s|m|l|\d{1,2}l)\b/ig, ' ');
+        }
+
+        base = normalizeText(base);
+
+        return { color, size, base };
+    }
+
+    function itemCategoryKind(item) {
+        return String(item?.item_category_kind || item?.product_category_kind || '').toLowerCase();
+    }
+
+    function sameFamily(target, candidate) {
+        if (!target || !candidate) return false;
+
+        if (target.item_category_id && candidate.item_category_id && String(target.item_category_id) === String(candidate.item_category_id)) {
+            return true;
+        }
+
+        if (target.product_category_id && candidate.product_category_id && String(target.product_category_id) === String(candidate.product_category_id)) {
+            return true;
+        }
+
+        const targetKind = itemCategoryKind(target);
+        const candidateKind = itemCategoryKind(candidate);
+        return !!targetKind && targetKind === candidateKind;
+    }
+
+    function scoreItemMatch(target, candidate) {
+        let score = 0;
+        if (target.item_category_id && candidate.item_category_id && String(target.item_category_id) === String(candidate.item_category_id)) {
+            score += 80;
+        }
+        if (target.product_category_id && candidate.product_category_id && String(target.product_category_id) === String(candidate.product_category_id)) {
+            score += 60;
+        }
+        const targetKind = itemCategoryKind(target);
+        const candidateKind = itemCategoryKind(candidate);
+        if (targetKind && candidateKind && targetKind === candidateKind) {
+            score += 40;
+        }
+
+        const targetSig = itemSignature(target);
+        const candidateSig = itemSignature(candidate);
+        if (targetSig.color && candidateSig.color && targetSig.color === candidateSig.color) {
+            score += 30;
+        }
+        if (targetSig.size && candidateSig.size && targetSig.size === candidateSig.size) {
+            score += 30;
+        }
+        if (targetSig.base && candidateSig.base && targetSig.base === candidateSig.base) {
+            score += 15;
+        }
+        return score;
+    }
+
+    function findSuggestedPrice(item, items) {
+        if (!item) return null;
+
+        const directPrice = Number(item.last_purchase_price ?? 0);
+        if (Number.isFinite(directPrice) && directPrice > 0) {
+            return directPrice;
+        }
+
+        let best = null;
+        let bestScore = 0;
+
+        items.forEach(candidate => {
+            if (String(candidate.id) === String(item.id)) return;
+            const price = Number(candidate.last_purchase_price ?? 0);
+            if (!Number.isFinite(price) || price <= 0) return;
+            if (!sameFamily(item, candidate)) return;
+
+            const score = scoreItemMatch(item, candidate);
+            if (score > bestScore) {
+                bestScore = score;
+                best = candidate;
+            }
+        });
+
+        const fallbackPrice = Number(best?.last_purchase_price ?? 0);
+        return Number.isFinite(fallbackPrice) && fallbackPrice > 0 ? fallbackPrice : null;
+    }
+
+    function getItemLastPrice(tr) {
+        const itemId = (tr.querySelector('.js-item-suggest-id')?.value || '').toString().trim();
+        if (!itemId) return null;
+
+        const input = tr.querySelector('.js-item-suggest-input');
+        if (!input) return null;
+
+        let items = [];
+        try {
+            items = JSON.parse(input.dataset.items || '[]');
+        } catch (e) {
+            items = [];
+        }
+
+        const item = items.find(it => String(it.id) === String(itemId));
+        if (!item) return null;
+
+        return findSuggestedPrice(item, items);
+    }
+
     // ─── SYNC DISPLAY → RAW ──────────────────────────────────
     function syncRaw(tr) {
         const qtyDisp  = tr.querySelector('.pr-qty-display');
@@ -352,6 +523,22 @@
         }
     }
 
+    function applyItemLastPrice(tr) {
+        if (!hasMoney) return;
+
+        const priceDisp = tr.querySelector('.pr-price-display');
+        const priceRaw = tr.querySelector('.pr-price-raw');
+        if (!priceDisp || !priceRaw) return;
+
+        if (priceRaw.value && Number(priceRaw.value) > 0) return;
+
+        const lastPrice = getItemLastPrice(tr);
+        if (lastPrice == null) return;
+
+        priceDisp.value = fmtPrice(lastPrice);
+        priceRaw.value = String(Math.round(lastPrice));
+    }
+
     // ─── FORMAT SAAT BLUR ────────────────────────────────────
     tbody.addEventListener('blur', function (e) {
         const el = e.target;
@@ -368,6 +555,14 @@
             if (raw) raw.value = n > 0 ? n : '';
         }
     }, true);
+
+    tbody.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('js-item-suggest-id')) return;
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+
+        applyItemLastPrice(tr);
+    });
 
     // ─── TAMBAH BARIS ────────────────────────────────────────
     function addLine() {

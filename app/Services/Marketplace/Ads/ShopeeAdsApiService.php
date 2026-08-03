@@ -3,34 +3,43 @@
 namespace App\Services\Marketplace\Ads;
 
 use App\Models\Store;
-use App\Services\Channels\ChannelManager;
-use App\Services\Channels\Shopee\ShopeeChannel;
+use App\Services\Marketplace\MarketplaceApiGateway;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Log;
 
 class ShopeeAdsApiService
 {
-    protected ChannelManager $channelManager;
+    protected MarketplaceApiGateway $gateway;
 
-    public function __construct(ChannelManager $channelManager)
+    public function __construct(MarketplaceApiGateway $gateway)
     {
-        $this->channelManager = $channelManager;
+        $this->gateway = $gateway;
     }
 
-    protected function driver(Store $store): ShopeeChannel
+    protected function driver(Store $store)
     {
-        $driver = $this->channelManager->driver($store);
-        if (!$driver instanceof ShopeeChannel) {
-            throw new \Exception("Toko {$store->name} tidak menggunakan driver Shopee.");
-        }
-        return $driver;
+        // MarketplaceApiGateway handles the routing
+        return $this->gateway;
     }
 
     protected function execute(Store $store, string $endpoint, callable $callable)
     {
         try {
-            usleep(500000); // Centralized rate limiting pace: 0.5 detik
+            // Rate limit berbasis cache Laravel (database di Web Hosting), bukan Redis.
+            // Maksimal 100 request / 60 detik per toko.
+            $response = RateLimiter::attempt(
+                'shopee_api_store_' . $store->id,
+                100,
+                $callable,
+                60
+            );
 
-            $response = $callable();
+            if ($response === false) {
+                throw new \App\Exceptions\ShopeeAdsRateLimitException(
+                    60,
+                    'Proactive rate limiting reached. Menunda API call untuk menghindari blokir Shopee.'
+                );
+            }
 
             // Tangkap 429 Rate Limit
             if (isset($response['_meta']['http_status']) && $response['_meta']['http_status'] == 429) {
@@ -39,6 +48,15 @@ class ShopeeAdsApiService
                     $retryAfter = 300; // fallback aman 5 menit
                 }
                 $retryAfter += random_int(15, 60); // jitter
+
+                // Cooldown global per toko: SEMUA proses sync ads (queue, cron,
+                // manual) menunda diri sampai jendela rate limit berlalu,
+                // supaya tidak membuang percobaan selagi Shopee masih menolak.
+                \Illuminate\Support\Facades\Cache::put(
+                    'shopee-ads-cooldown:' . $store->id,
+                    now()->addSeconds($retryAfter)->timestamp,
+                    $retryAfter
+                );
 
                 Log::warning("[ShopeeAdsApiService] Rate limit (429) {$endpoint} untuk toko {$store->id}. Delay: {$retryAfter}s.");
                 throw new \App\Exceptions\ShopeeAdsRateLimitException($retryAfter, "Shopee Ads API rate limit reached pada endpoint {$endpoint}");
@@ -103,15 +121,13 @@ class ShopeeAdsApiService
         return $this->execute($store, 'get_campaign_hourly_performance', fn() => $this->driver($store)->getCampaignHourlyPerformance($store, $campaignIds, $performanceDate));
     }
 
-    public function getGmsCampaignPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    public function getGmsCampaignPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate): array
     {
-        return $this->execute($store, 'get_gms_campaign_performance', fn() => $this->driver($store)->getGmsCampaignPerformance($store, $campaignIds, $startDate, $endDate));
+        return $this->execute($store, 'get_gms_campaign_performance', fn() => $this->driver($store)->getGmsCampaignPerformance($store, $campaignId, $startDate, $endDate));
     }
 
-    public function getGmsItemPerformance(Store $store, array $campaignIds, string $startDate, string $endDate): array
+    public function getGmsItemPerformance(Store $store, ?int $campaignId, string $startDate, string $endDate): array
     {
-        // For GMS item performance, it takes a single campaign ID or null. We'll pass null to get store-wide, or the first ID if available.
-        $campaignId = !empty($campaignIds) ? (int)$campaignIds[0] : null;
         return $this->execute($store, 'get_gms_item_performance', fn() => $this->driver($store)->getGmsItemPerformance($store, $campaignId, $startDate, $endDate));
     }
 }

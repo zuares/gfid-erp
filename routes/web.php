@@ -74,8 +74,13 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/orders',      [MarketplaceController::class, 'orders'])->name('marketplace.orders');
     Route::get('/marketplace/webhook-tests', [MarketplaceController::class, 'webhookTests'])->name('marketplace.webhook-tests');
     Route::get('/marketplace/chat',        [\App\Http\Controllers\MarketplaceChatController::class, 'page'])->name('marketplace.chat');
+    Route::get('/marketplace/chat/audit',  [\App\Http\Controllers\MarketplaceChatController::class, 'audit'])->name('marketplace.chat.audit');
     Route::get('/marketplace/products',    [\App\Http\Controllers\MarketplaceProductController::class, 'page'])->name('marketplace.products');
     Route::get('/marketplace/boost',       [\App\Http\Controllers\MarketplaceBoostController::class, 'page'])->name('marketplace.boost');
+    Route::get('/marketplace/promotions',  [MarketplaceController::class, 'promotions'])->name('marketplace.promotions');
+    Route::get('/marketplace/promotions/create', [MarketplaceController::class, 'promotionCreatePage'])->name('marketplace.promotions.create');
+    Route::get('/marketplace/promotions/{store}/{discountId}/edit', [MarketplaceController::class, 'promotionEdit'])->name('marketplace.promotions.edit');
+    Route::get('/marketplace/promotions/summary',  [MarketplaceController::class, 'promotionsSummary'])->name('marketplace.promotions.summary');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
@@ -83,6 +88,8 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
     Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
     Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
+    Route::get('/marketplace/penghasilan',  [MarketplaceController::class, 'incomeDetail'])->name('marketplace.income-detail');
+    Route::get('/marketplace/penghasilan/produk', [MarketplaceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
     Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
     Route::get('/marketplace/cache-monitor', [MarketplaceController::class, 'cacheMonitor'])->name('marketplace.cache-monitor');
@@ -170,6 +177,25 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
 
+    // Promosi / Diskon
+    Route::get('/promotions',                         [MarketplaceController::class, 'promotionsIndex']);
+    Route::get('/promotions/summary',                 [MarketplaceController::class, 'promotionsSummaryData']);
+    Route::get('/promotions/{store}/{discountId}',    [MarketplaceController::class, 'promotionDetail']);
+    Route::post('/promotions',                        [MarketplaceController::class, 'promotionCreate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/update', [MarketplaceController::class, 'promotionUpdate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/activate', [MarketplaceController::class, 'promotionActivate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/deactivate', [MarketplaceController::class, 'promotionDeactivate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/end', [MarketplaceController::class, 'promotionEnd'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/delete', [MarketplaceController::class, 'promotionDelete'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/promotions/{store}/{discountId}/delete-item', [MarketplaceController::class, 'promotionDeleteItem'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
     // Naikkan Produk (boost)
     $noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
     Route::get('/boost/status',            [\App\Http\Controllers\MarketplaceBoostController::class, 'status']);
@@ -191,6 +217,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/chat/test-shopee-chat',                     [\App\Http\Controllers\MarketplaceChatController::class, 'diagnoseChat']);
     Route::get('/chat/conversations',                        [\App\Http\Controllers\MarketplaceChatController::class, 'conversations']);
     Route::get('/chat/conversations/{conversation}/messages', [\App\Http\Controllers\MarketplaceChatController::class, 'messages']);
+    Route::get('/chat/messages/{message}/raw',               [\App\Http\Controllers\MarketplaceChatController::class, 'messageRaw']);
     Route::post('/chat/conversations/{conversation}/send',    [\App\Http\Controllers\MarketplaceChatController::class, 'send'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/chat/conversations/{conversation}/read',    [\App\Http\Controllers\MarketplaceChatController::class, 'markRead'])
@@ -199,10 +226,13 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
-    Route::post('/stores/{store}/sync-settlements',  [MarketplaceController::class, 'syncSettlements'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/stores/{store}/sync-settlements-progress', [MarketplaceController::class, 'syncSettlementsProgress']);
+    Route::post('/settlements/purge',                [MarketplaceController::class, 'purgeSettlements'])
+        ->middleware('role:owner');
+    Route::post('/stores/{store}/purge-marketplace-data', [MarketplaceController::class, 'purgeMarketplaceData'])
+        ->middleware('role:owner');
+    Route::post('/stores/{store}/sync-settlements', [MarketplaceController::class, 'syncSettlements']);
+    Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground']);
     Route::get('/order-profits',                     [MarketplaceController::class, 'orderProfits']);
     
     // Returns Module
@@ -282,6 +312,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     Route::get('/warehouses',                  [MarketplaceController::class, 'warehouses']);
+    Route::post('/stores',                     [MarketplaceController::class, 'storeStore'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::patch('/stores/{store}',            [MarketplaceController::class, 'updateStore'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::delete('/stores/{store}',           [MarketplaceController::class, 'deleteStore'])
@@ -374,9 +406,121 @@ if (app()->environment(['local', 'testing'])) {
 
 // API endpoint for tracking
 Route::post('activity-logs', [App\Http\Controllers\Owner\ActivityLogController::class, 'store'])->name('activity-logs.store')->middleware('auth')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-Route::post('/api/marketplace/sync-finance-all', function () {
-    \App\Jobs\SyncFinanceJob::dispatch();
-    return response()->json(['status' => 'success', 'message' => 'Sync finance (omzet, ads, hpp) sedang berjalan di background.']);
-})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+Route::post('/api/marketplace/sync-finance-all', function (\Illuminate\Http\Request $request) {
+    // Dedupe: jangan membuat antrean kedua ketika run masih queued/processing.
+    $active = \App\Models\MarketplaceFinanceSyncRun::whereIn('status', ['queued', 'processing'])
+        ->where(function ($q) {
+            $q->where('started_at', '>=', now()->subMinutes(15))
+              ->orWhere(function ($queued) {
+                  $queued->whereNull('started_at')
+                         ->where('created_at', '>=', now()->subMinutes(15));
+              });
+        })
+        ->exists();
+    if ($active) {
+        return response()->json(['status' => 'busy', 'message' => 'Sync finance masih berjalan — tunggu sampai selesai.'], 409);
+    }
 
+    // Rentang: days (1-183 hari) ATAU months (1/3/6). Mode: missing = cek DB
+    // dulu, ambil yang belum ada saja; full = tarik ulang semua.
+    $days = $request->filled('days') ? max(1, min(183, (int) $request->input('days'))) : null;
+    $months = (int) $request->input('months', 1);
+    if (!in_array($months, [1, 3, 6], true)) $months = 1;
+    $mode = $request->input('mode') === 'full' ? 'full' : 'missing';
 
+    $label = $days !== null ? "{$days} hr" : "{$months} bln";
+    $trigger = "manual {$label}" . ($mode === 'missing' ? ' · cek dulu' : ' · full');
+
+    /*
+    | Pre-check untuk rentang pendek (≤ 2 bulan) mode "cek dulu": kalau tidak
+    | ada satu pun order COMPLETED di rentang itu yang settlement-nya masih
+    | bolong / pending lewat cooldown, TIDAK usah antre job background sama
+    | sekali — langsung jawab "sudah lengkap". Kriteria bolong = persis
+    | eligibility syncSettlements (cooldown 60 mnt, ikut
+    | MarketplaceSyncService::PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES).
+    */
+    $rangeDays = $days ?? ($months * 31);
+    if ($mode === 'missing' && $rangeDays <= 62) {
+        $from     = now()->subDays($rangeDays - 1)->startOfDay();
+        $cooldown = now()->subMinutes(60);
+
+        $needsSync = \App\Models\MarketplaceOrder::query()
+            ->where('order_status', 'COMPLETED')
+            ->whereNull('settlement_sync_error_code')
+            ->where('ordered_at', '>=', $from)
+            ->where(function ($q) use ($cooldown) {
+                $q->whereNotExists(function ($s) {
+                    $s->select(\Illuminate\Support\Facades\DB::raw(1))
+                      ->from('marketplace_order_settlements')
+                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                      ->whereColumn('marketplace_order_settlements.store_id', 'marketplace_orders.store_id');
+                })->orWhereExists(function ($s) use ($cooldown) {
+                    $s->select(\Illuminate\Support\Facades\DB::raw(1))
+                      ->from('marketplace_order_settlements')
+                      ->whereColumn('marketplace_order_settlements.channel_order_id', 'marketplace_orders.channel_order_id')
+                      ->whereColumn('marketplace_order_settlements.store_id', 'marketplace_orders.store_id')
+                      ->whereNull('marketplace_order_settlements.settlement_time')
+                      ->where('marketplace_order_settlements.synced_at', '<=', $cooldown);
+                });
+            })
+            ->exists();
+
+        if (!$needsSync) {
+            return response()->json([
+                'status'  => 'no_change',
+                'message' => "Data {$label} sudah lengkap — tidak ada yang perlu di-sync.",
+            ]);
+        }
+    }
+
+    $run = \App\Models\MarketplaceFinanceSyncRun::create([
+        'trigger' => $trigger,
+        'status' => 'queued',
+    ]);
+
+    try {
+        \App\Jobs\SyncFinanceJob::dispatch($trigger, $months, $days, $mode, $run->id);
+    } catch (\Throwable $e) {
+        $run->update([
+            'status' => 'error',
+            'error_message' => substr($e->getMessage(), 0, 1000),
+            'finished_at' => now(),
+        ]);
+        throw $e;
+    }
+    return response()->json([
+        'status'  => 'queued',
+        'message' => "Sync finance {$label} (" . ($mode === 'missing' ? 'hanya yang belum ada' : 'tarik ulang semua') . ") masuk antrean.",
+        'run_id'  => $run->id,
+        'days'    => $days,
+        'months'  => $months,
+        'mode'    => $mode,
+    ]);
+})->middleware(['auth', 'access:marketplace']) // tanpa ini endpoint bisa dipicu siapa pun (URL ngrok publik!)
+  ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+Route::get('/api/marketplace/sync-finance-status', function () {
+    // Run yang masih berjalan: baca tail file log live per-run supaya detail
+    // progres tampil di UI secara real-time, tidak menunggu selesai.
+    $liveTail = function (int $runId): ?string {
+        $p = storage_path("logs/sync-finance-run-{$runId}.log");
+        if (!is_file($p)) return null;
+        $c = @file_get_contents($p);
+        return $c !== false && $c !== '' ? mb_substr($c, -4000) : null;
+    };
+
+    $runs = \App\Models\MarketplaceFinanceSyncRun::orderByDesc('id')->limit(15)->get()
+        ->map(fn ($r) => [
+            'id'          => $r->id,
+            'trigger'     => $r->trigger,
+            'status'      => $r->status,
+            'error'       => $r->error_message,
+            'started_at'  => optional($r->started_at)->format('d/m H:i:s'),
+            'finished_at' => optional($r->finished_at)->format('d/m H:i:s'),
+            'duration'    => ($r->started_at && $r->finished_at) ? abs($r->finished_at->diffInSeconds($r->started_at)) : null,
+            'output'      => $r->status === 'processing'
+                ? ($liveTail($r->id) ?? ($r->output ? mb_substr($r->output, -4000) : null))
+                : ($r->output ? mb_substr($r->output, -4000) : $liveTail($r->id)),
+        ]);
+    return response()->json(['runs' => $runs, 'server_time' => now()->format('H:i:s')]);
+})->middleware(['auth', 'access:marketplace']);

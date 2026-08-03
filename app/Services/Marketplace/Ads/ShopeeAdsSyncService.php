@@ -66,8 +66,23 @@ class ShopeeAdsSyncService
 
         $run->total_received += count($campaignIds);
 
-        // 2. Ambil Settings per chunk (API max 100)
-        $chunks = array_chunk($campaignIds, 100);
+        // Hemat kuota: kampanye yang SUDAH tutup/berakhir dan settingnya pernah
+        // tersimpan tidak perlu di-fetch ulang — settingnya tidak akan berubah.
+        // (Toko dengan ratusan kampanye lama turun dari ~5 call jadi ~1 call.)
+        $knownClosed = MarketplaceAdCampaign::where('store_id', $store->id)
+            ->whereIn('campaign_status', ['closed', 'ended', 'deleted'])
+            ->whereNotNull('setting_synced_at')
+            ->pluck('channel_campaign_id')
+            ->map(fn ($v) => (string) $v)
+            ->all();
+
+        $idsToFetch = array_values(array_diff(
+            array_map('strval', $campaignIds),
+            $knownClosed
+        ));
+
+        // 2. Ambil Settings per chunk (API max 100) — kembalikan ke int untuk API
+        $chunks = array_chunk(array_map('intval', $idsToFetch), 100);
         foreach ($chunks as $chunk) {
             $retry = 0;
             $res = null;
@@ -203,19 +218,37 @@ class ShopeeAdsSyncService
         }
     }
 
-    public function syncCampaignDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
+    public function syncCampaignDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): bool
     {
-        $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)->pluck('channel_campaign_id')->toArray();
-        if (empty($campaigns)) return;
+        // PENTING: buang pseudo-ID non-numerik (mis. 'GMS-5' milik GMV Max).
+        // Satu ID non-numerik membuat Shopee menolak SELURUH request
+        // ("campaign_id_list is invalid") sehingga data CPC tidak pernah tersimpan.
+        $campaigns = MarketplaceAdCampaign::where('store_id', $store->id)
+            ->pluck('channel_campaign_id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->toArray();
+        if (empty($campaigns)) return true;
         
         $chunks = array_chunk($campaigns, 100);
+        $hasFailure = false;
         
         foreach ($chunks as $chunk) {
             usleep(250000); // Rate limiter: 0.25 detik
-            $res = $this->api->getCampaignDailyPerformance($store, $chunk, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
-            $run->total_requests++;
+            try {
+                $res = $this->api->getCampaignDailyPerformance($store, $chunk, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
+                $run->total_requests++;
+            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                $hasFailure = true;
+                Log::warning("[ShopeeAdsSync] Exception sync campaign daily: " . $e->getMessage());
+                continue;
+            }
             
             if (!empty($res['error'])) {
+                $hasFailure = true;
                 Log::warning("[ShopeeAdsSync] Error sync campaign daily: " . ($res['message'] ?? $res['error']));
                 continue;
             }
@@ -245,9 +278,12 @@ class ShopeeAdsSyncService
                             'clicks'       => $d['clicks'] ?? $d['click'] ?? 0,
                             'expense'      => $d['expense'] ?? 0,
                             'broad_order'  => $d['broad_order'] ?? 0,
-                            'broad_gmv'    => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? 0,
+                            // broad_order_amount = JUMLAH ITEM TERJUAL (pcs), bukan rupiah
+                            'broad_order_amount'  => $d['broad_order_amount'] ?? 0,
+                            'direct_order_amount' => $d['direct_order_amount'] ?? 0,
+                            'broad_gmv'    => $d['broad_gmv'] ?? 0,
                             'direct_order' => $d['direct_order'] ?? 0,
-                            'direct_gmv'   => $d['direct_gmv'] ?? (isset($d['expense'], $d['direct_roi']) ? $d['expense'] * $d['direct_roi'] : ($d['direct_order_amount'] ?? 0)),
+                            'direct_gmv'   => $d['direct_gmv'] ?? (isset($d['expense'], $d['direct_roi']) ? $d['expense'] * $d['direct_roi'] : 0),
                             'cpc'          => $d['cpc'] ?? null,
                             'raw_json'     => $d,
                         ]
@@ -256,6 +292,8 @@ class ShopeeAdsSyncService
                 }
             }
         }
+
+        return ! $hasFailure;
     }
 
     public function syncShopHourlyPerformance(Store $store, string $date, MarketplaceAdsSyncRun $run): void
@@ -301,7 +339,7 @@ class ShopeeAdsSyncService
         }
     }
 
-    public function syncGmsDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
+    public function syncGmsDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): bool
     {
         // Hanya sync kampanye yang AKTIF (status ongoing/paused, bukan ended/deleted)
         // Ini mengurangi 405 kampanye menjadi hanya ~10-30 yang relevan
@@ -320,32 +358,48 @@ class ShopeeAdsSyncService
         
         if (empty($campaigns)) {
             Log::info("[ShopeeAdsSync] No active GMS campaigns for store {$store->id}, skipping.");
-            return;
+            return true;
         }
         
         Log::info("[ShopeeAdsSync] GMS sync for store {$store->id}: {$dateFrom} to {$dateTo}, " . count($campaigns) . " active campaigns.");
         
-        $dFrom = Carbon::parse($dateFrom)->format('d-m-Y');
-        $dTo = Carbon::parse($dateTo)->format('d-m-Y');
-        $dbDateFrom = Carbon::parse($dateFrom)->format('Y-m-d');
-        $dbDateTo = Carbon::parse($dateTo)->format('Y-m-d');
         $start = Carbon::parse($dateFrom);
         $end = Carbon::parse($dateTo);
         $days = $start->diffInDays($end) + 1;
+        $hasFailure = false;
         
         for ($i = 0; $i < $days; $i++) {
             $currentCarbon = $start->copy()->addDays($i);
+            // Endpoint GMS menerima format DD-MM-YYYY.
             $dCurrent = $currentCarbon->format('d-m-Y');
             $dbCurrent = $currentCarbon->format('Y-m-d');
-            
-            usleep(300000); // 3 req/sec pace
+
+            // Resume-aware: hari historis yang BARU SAJA ditarik (≤2 jam lalu)
+            // dilewati — retry setelah rate limit tidak mengulang dari nol.
+            // 7 hari terakhir selalu ditarik (jendela revisi atribusi Shopee).
+            if ($currentCarbon->lt(now()->subDays(7)->startOfDay())) {
+                $freshGms = MarketplaceAdCampaignDaily::where('store_id', $store->id)
+                    ->where('channel_campaign_id', 'GMS-' . $store->id)
+                    ->where('date', $dbCurrent)
+                    ->where('updated_at', '>=', now()->subHours(2))
+                    ->exists();
+                if ($freshGms) {
+                    continue;
+                }
+            }
+
+            usleep(120000); // jeda kecil antar hari (pace utama sudah di ShopeeAdsApiService)
             
             // 1. Campaign Performance (1 API call per day for global GMS)
             try {
-                $res = $this->api->getGmsCampaignPerformance($store, [], $dCurrent, $dCurrent);
+                // campaign_id bersifat opsional untuk mengambil performa GMS tingkat toko.
+                $res = $this->api->getGmsCampaignPerformance($store, null, $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
-                if (empty($res['error']) && !empty($res['response']['report'])) {
+                if (!empty($res['error'])) {
+                    $hasFailure = true;
+                    Log::warning("[ShopeeAdsSync] GMS Campaign API error: " . ($res['message'] ?? $res['error']));
+                } elseif (!empty($res['response']['report'])) {
                     $report = $res['response']['report'];
                     
                     // Pastikan ada parent campaign untuk GMS agar muncul di Daftar Kampanye
@@ -371,25 +425,33 @@ class ShopeeAdsSyncService
                             'clicks'       => $report['clicks'] ?? $report['click'] ?? 0,
                             'expense'      => $report['expense'] ?? 0,
                             'broad_order'  => $report['broad_order'] ?? 0,
-                            'broad_gmv'    => $report['broad_gmv'] ?? $report['broad_order_amount'] ?? 0,
+                            'broad_order_amount'  => $report['broad_order_amount'] ?? 0,
+                            'direct_order_amount' => $report['direct_order_amount'] ?? 0,
+                            'broad_gmv'    => $report['broad_gmv'] ?? 0,
                             'direct_order' => $report['direct_order'] ?? 0,
-                            'direct_gmv'   => $report['direct_gmv'] ?? (isset($report['expense'], $report['direct_roi']) ? $report['expense'] * $report['direct_roi'] : ($report['direct_order_amount'] ?? 0)),
+                            'direct_gmv'   => $report['direct_gmv'] ?? (isset($report['expense'], $report['direct_roi']) ? $report['expense'] * $report['direct_roi'] : 0),
                             'cpc'          => $report['cpc'] ?? null,
                             'raw_json'     => $report,
                         ]
                     );
                 }
+            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                throw $e;
             } catch (\Throwable $e) {
+                $hasFailure = true;
                 Log::warning("[ShopeeAdsSync] GMS Campaign Sync failed: " . $e->getMessage());
             }
 
             // 2. Item Performance
-            usleep(300000);
+            usleep(120000);
             try {
-                $resItem = $this->api->getGmsItemPerformance($store, [], $dCurrent, $dCurrent);
+                $resItem = $this->api->getGmsItemPerformance($store, null, $dCurrent, $dCurrent);
                 $run->total_requests++;
                 
-                if (empty($resItem['error']) && !empty($resItem['response']['result_list'])) {
+                if (!empty($resItem['error'])) {
+                    $hasFailure = true;
+                    Log::warning("[ShopeeAdsSync] GMS Item API error: " . ($resItem['message'] ?? $resItem['error']));
+                } elseif (!empty($resItem['response']['result_list'])) {
                     $itemList = $resItem['response']['result_list'];
                     
                     foreach ($itemList as $item) {
@@ -419,9 +481,14 @@ class ShopeeAdsSyncService
                         );
                     }
                 }
+            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                throw $e;
             } catch (\Throwable $e) {
+                $hasFailure = true;
                 Log::warning("[ShopeeAdsSync] GMS Item Sync failed: " . $e->getMessage());
             }
         }
+
+        return ! $hasFailure;
     }
 }

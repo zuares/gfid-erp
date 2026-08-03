@@ -49,6 +49,8 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         // ================== WAREHOUSE INTELLIGENCE ==================
         Route::get('warehouse-intelligence', [WarehouseIntelligenceController::class, 'index'])
             ->name('warehouse_intelligence');
+        Route::get('warehouse-intelligence/insights', [WarehouseIntelligenceController::class, 'insights'])
+            ->name('warehouse_intelligence.insights');
         Route::get('warehouse-intelligence/data', [WarehouseIntelligenceController::class, 'tabData'])
             ->name('warehouse_intelligence.data');
         Route::post('warehouse-intelligence/limits', [WarehouseIntelligenceController::class, 'updateLimits'])
@@ -84,6 +86,7 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         // ================== STOCKS (ITEM & LOT) ==================
         Route::prefix('stocks')->name('stocks.')->group(function () {
             Route::get('/items', [InventoryStockController::class, 'items'])->name('items');
+            Route::get('/items/available', [InventoryStockController::class, 'available'])->name('items.available');
             Route::get('/lots', [InventoryStockController::class, 'lots'])->name('lots');
 
             // Sync HPP master → kolom items.hpp (owner only, cost-neutral)
@@ -140,6 +143,7 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
             Route::post('/items', [InventoryAdjustmentController::class, 'storeQuickItem'])->name('items.quick_store');
 
             Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])->name('show');
+            Route::post('/{inventoryAdjustment}/post', [InventoryAdjustmentController::class, 'post'])->name('post');
             Route::post('/{inventoryAdjustment}/approve', [InventoryAdjustmentController::class, 'approve'])->name('approve');
             Route::post('/{inventoryAdjustment}/void', [InventoryAdjustmentController::class, 'void'])->name('void');
         });

@@ -35,6 +35,11 @@ class ShipmentOrderScan extends Model
         return $this->belongsTo(OrderFulfillment::class, 'fulfillment_id');
     }
 
+    public function lines()
+    {
+        return $this->hasMany(ShipmentLine::class, 'shipment_order_scan_id');
+    }
+
     public function confirmer()
     {
         return $this->belongsTo(User::class, 'confirmed_by');

@@ -4,6 +4,7 @@
 use App\Http\Controllers\Api\AccountSuggestController;
 use App\Http\Controllers\Api\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\ItemController;
+use App\Http\Controllers\Api\StockApiController;
 
 Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('/items', [ItemController::class, 'index']);
@@ -14,6 +15,13 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('/accounts/suggest', AccountSuggestController::class);
 
 });
+
+Route::prefix('v1')
+    ->middleware('throttle:stock-read')
+    ->group(function () {
+        Route::post('/stocks/ready', [StockApiController::class, 'readyBatch'])
+            ->name('stocks.ready');
+    });
 
 Route::prefix('api')
     ->name('api.')
@@ -30,6 +38,7 @@ Route::prefix('webhooks')->group(function () {
     Route::post('/shopee', [\App\Http\Controllers\WebhookController::class, 'shopee']);
     Route::post('/simulate', [\App\Http\Controllers\WebhookController::class, 'simulate']);
     Route::get('/logs', [\App\Http\Controllers\WebhookController::class, 'logs']);
+    Route::get('/logs/{log}', [\App\Http\Controllers\WebhookController::class, 'show']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

@@ -255,6 +255,7 @@
     $isOwner = $role === 'owner' || $isDev;
     $isAdmin = $role === 'admin' && !$isDev;
     $isOperating = $role === 'operating';
+    $canOpenAiAgent = $isOwner || $isAdmin || $isOperating;
 
     // operator lapangan
     $isOperatorRole = in_array($role, ['sewing', 'cutting']);
@@ -267,6 +268,9 @@
 
     // ROUTE GUARDS
     $hasDashboardRoute = $router->has('dashboard');
+    $hasAiIndexRoute = $router->has('ai.index');
+    $hasAiAgentRoute = $router->has('ai.agent');
+    $hasAiOpenAiRoute = $router->has('ai.openai.index');
     $hasOwnerAccessControl = $router->has('owner.access-control.index');
     $hasAdminCatalogProducts = $router->has('admin.catalog.products.index');
     $hasAdminCatalogCategories = $router->has('admin.catalog.categories.index');
@@ -305,13 +309,20 @@
     $hasMarketplacePickingBarang = $router->has('marketplace.picking');
     $hasMarketplaceSkuMapping = $router->has('marketplace.sku-mapping');
     $hasMarketplaceSync = $router->has('marketplace.sync');
+    $hasMarketplacePromotions = $router->has('marketplace.promotions');
+    $hasMarketplacePromotionsSummary = $router->has('marketplace.promotions.summary');
     $hasMarketplacePencairanDana = $router->has('marketplace.settlement');
+    $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
+    $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
+    $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
+    $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
+    $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
     $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
     $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
 
@@ -322,6 +333,7 @@
     $hasSalesShipmentsCreate = $router->has('sales.shipments.create');
     $hasSalesShipmentReturnsIndex = $router->has('sales.shipment_returns.index');
     $hasSalesShipmentReturnsCreate = $router->has('sales.shipment_returns.create');
+    $hasSalesOperationalSettings = $isOwner && $router->has('sales.settings.operational');
     $hasSalesShipmentsReport = $router->has('sales.shipments.report');
 
     // Sales reports (opsional—kamu punya beberapa, tapi bukan index)
@@ -428,6 +440,7 @@
         $hasSalesInvoicesIndex = $hasSalesInvoicesCreate = false;
         $hasSalesShipmentsIndex = $hasSalesShipmentsCreate = false;
         $hasSalesShipmentReturnsIndex = $hasSalesShipmentReturnsCreate = false;
+        $hasSalesOperationalSettings = false;
         $hasSalesShipmentsReport = false;
         $hasSalesReportItemProfit = $hasSalesReportChannelProfit = $hasSalesReportShipmentAnalytics = false;
     }
@@ -497,17 +510,25 @@
         request()->routeIs('marketplace.picking') ||
         request()->routeIs('marketplace.sku-mapping') ||
         request()->routeIs('marketplace.sync') ||
+        request()->routeIs('marketplace.promotions') ||
+        request()->routeIs('marketplace.promotions.*') ||
+        request()->routeIs('marketplace.promotions.summary') ||
         request()->routeIs('marketplace.settlement') ||
+        request()->routeIs('marketplace.income-detail') ||
         request()->routeIs('marketplace.profit') ||
+        request()->routeIs('marketplace.reports.*') ||
         request()->routeIs('marketplace.ads') ||
         request()->routeIs('marketplace.analytics') ||
         request()->routeIs('marketplace.issues');
 
+    $openAi = request()->routeIs('ai.*');
+
     $salesInvoiceOpen = request()->routeIs('sales.invoices.*');
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
     $salesShipmentReturnOpen = request()->routeIs('sales.shipment_returns.*');
+    $salesOperationalSettingsOpen = request()->routeIs('sales.settings.*');
     $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.shipments.report');
-    $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesReportOpen;
+    $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesOperationalSettingsOpen || $salesReportOpen;
 
     $invStocksOpen = request()->routeIs('inventory.stocks.*');
     $invOpnameOpen = request()->routeIs('inventory.stock_opnames.*');
@@ -669,6 +690,34 @@
                         </li>
                     @endif
 
+                    @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
+                        <div class="mobile-sidebar-section-label">AI</div>
+                        @if ($hasAiIndexRoute)
+                            <li>
+                                <a href="{{ route('ai.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('ai.index') ? 'active' : '' }}">
+                                    <span class="icon">✨</span><span>AI Studio</span>
+                                </a>
+                            </li>
+                        @endif
+                        @if ($hasAiOpenAiRoute)
+                            <li>
+                                <a href="{{ route('ai.openai.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('ai.openai.*') ? 'active' : '' }}">
+                                    <span class="icon">🔌</span><span>Connect OpenAI</span>
+                                </a>
+                            </li>
+                        @endif
+                        @if ($hasAiAgentRoute)
+                            <li>
+                                <a href="{{ route('ai.agent') }}"
+                                   class="mobile-sidebar-link {{ $openAi ? 'active' : '' }}">
+                                    <span class="icon">💬</span><span>AI Agent</span>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
+
                     @if ($isAdmin && ($hasAdminCrmDashboard || $hasAdminCrmOrders || $hasAdminCrmCustomers || $hasAdminCrmProspects || $hasAdminCrmVisitors || $hasAdminCrmSegments))
                         <div class="mobile-sidebar-section-label">CRM Storefront</div>
                         <li class="mb-1">
@@ -754,7 +803,21 @@
                                     </a>
                                 @endif
 
-                                @if ($router->has('marketplace.chat'))
+                                @if ($hasMarketplacePromotions)
+                                    <a href="{{ route('marketplace.promotions') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions') ? 'active' : '' }}">
+                                        <span class="icon">🏷️</span><span>Promosi</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasMarketplacePromotionsSummary)
+                                    <a href="{{ route('marketplace.promotions.summary') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions.summary') ? 'active' : '' }}">
+                                        <span class="icon">📊</span><span>Summary Promosi</span>
+                                    </a>
+                                @endif
+
+                                @if ($router->has('marketplace.chat') && $canModule('marketplace'))
                                     <a href="{{ route('marketplace.chat') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.chat') ? 'active' : '' }}">
                                         <span class="icon">💬</span><span>Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none; font-size:.65rem; padding:.2rem .4rem;"></span></span>
@@ -1094,6 +1157,26 @@
                         </li>
                     @endif
 
+                    @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
+                        <div class="mobile-sidebar-section-label">AI</div>
+                        @if ($hasAiIndexRoute)
+                            <li>
+                                <a href="{{ route('ai.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('ai.index') ? 'active' : '' }}">
+                                    <span class="icon">✨</span><span>AI Studio</span>
+                                </a>
+                            </li>
+                        @endif
+                        @if ($hasAiAgentRoute)
+                            <li>
+                                <a href="{{ route('ai.agent') }}"
+                                   class="mobile-sidebar-link {{ $openAi ? 'active' : '' }}">
+                                    <span class="icon">💬</span><span>AI Agent</span>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
+
                     @if ($hasOwnerAccessControl)
                         <li>
                             <a href="{{ route('owner.access-control.index') }}"
@@ -1102,6 +1185,16 @@
                             </a>
                         </li>
                     @endif
+
+                    @if ($router->has('settings.system.index'))
+                        <li>
+                            <a href="{{ route('settings.system.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('settings.system.*') ? 'active' : '' }}">
+                                <span class="icon">⚙️</span><span>Pengaturan Sistem</span>
+                            </a>
+                        </li>
+                    @endif
+
 
                     @if ($hasAdminCatalogProducts || $hasAdminCatalogCategories)
                         <div class="mobile-sidebar-section-label">Website</div>
@@ -1372,7 +1465,7 @@
                     {{-- SALES & MARKETPLACE --}}
                     <div class="mobile-sidebar-section-label">Penjualan & Toko Online</div>
 
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues)
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
                                 type="button"
@@ -1401,6 +1494,20 @@
                                 <a href="{{ route('marketplace.orders') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.orders') ? 'active' : '' }}">
                                     <span class="icon">📋</span><span>Order Lokal</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplacePromotions)
+                                <a href="{{ route('marketplace.promotions') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions') ? 'active' : '' }}">
+                                    <span class="icon">🏷️</span><span>Promosi</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplacePromotionsSummary)
+                                <a href="{{ route('marketplace.promotions.summary') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions.summary') ? 'active' : '' }}">
+                                    <span class="icon">📊</span><span>Summary Promosi</span>
                                 </a>
                             @endif
 
@@ -1457,10 +1564,45 @@
                                 </a>
                             @endif
 
+                            @if ($hasMarketplaceIncomeDetail)
+                                <a href="{{ route('marketplace.income-detail') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.income-detail') ? 'active' : '' }}">
+                                    <span class="icon">🧾</span><span>Rincian Penghasilan</span>
+                                </a>
+                            @endif
+
                             @if ($hasMarketplaceProfit)
                                 <a href="{{ route('marketplace.profit') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.profit') ? 'active' : '' }}">
                                     <span class="icon">📈</span><span>Laba Order</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceProfitReport)
+                                <a href="{{ route('marketplace.reports.profit') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.profit*') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Laporan Keuntungan · Owner</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinancialStatement)
+                                <a href="{{ route('marketplace.reports.financial-statement') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-statement*') ? 'active' : '' }}">
+                                    <span class="icon">🧾</span><span>Laporan Keuangan · Owner</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinancialClosing)
+                                <a href="{{ route('marketplace.reports.financial-closing') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-closing*') ? 'active' : '' }}">
+                                    <span class="icon">🔒</span><span>Closing & Audit · Owner</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinancialQuality)
+                                <a href="{{ route('marketplace.reports.financial-quality') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-quality*') ? 'active' : '' }}">
+                                    <span class="icon">✅</span><span>Audit Keuangan · Owner</span>
                                 </a>
                             @endif
 
@@ -1538,6 +1680,14 @@
                                 <a href="{{ route('sales.shipment_returns.create') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipment_returns.create') ? 'active' : '' }}">
                                     <span class="icon">＋</span><span>Retur Pengiriman Baru</span>
+                                </a>
+                            @endif
+
+                            @if ($hasSalesOperationalSettings)
+                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Pengaturan</div>
+                                <a href="{{ route('sales.settings.operational') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.settings.operational*') ? 'active' : '' }}">
+                                    <span class="icon">⚙️</span><span>Pengaturan Operasional</span>
                                 </a>
                             @endif
 

@@ -7,12 +7,13 @@ use App\Models\MarketplaceChatMessage;
 use App\Models\MarketplaceConversation;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
 
 class MarketplaceChatService
 {
-    public function __construct(protected ChannelManager $manager) {}
+    public function __construct(protected MarketplaceApiGateway $gateway) {}
 
     /**
      * Tarik daftar percakapan dari Shopee dan upsert ke DB lokal.
@@ -27,7 +28,7 @@ class MarketplaceChatService
             return 0;
         }
 
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $synced = 0;
         $cursor = '';
 
@@ -43,8 +44,14 @@ class MarketplaceChatService
             if (empty($conversations)) break;
 
             foreach ($conversations as $c) {
-                $this->upsertConversation($store, $c);
+                $conversation = $this->upsertConversation($store, $c);
                 $synced++;
+
+                // Percakapan yang baru / berubah biasanya punya pesan baru yang
+                // perlu dibackfill juga agar audit chat tidak bolong.
+                if ($this->shouldBackfillConversationMessages($conversation)) {
+                    $this->syncMessages($conversation, pageSize: 50, maxPages: 2);
+                }
             }
 
             $cursor = (string) (data_get($res, 'response.page_result.next_cursor.next_timestamp_nano') ?? '');
@@ -58,25 +65,54 @@ class MarketplaceChatService
     /**
      * Tarik pesan sebuah percakapan dan upsert. Mengembalikan jumlah pesan baru.
      */
-    public function syncMessages(MarketplaceConversation $conversation, int $pageSize = 50): int
+    public function syncMessages(
+        MarketplaceConversation $conversation,
+        int $pageSize = 50,
+        int $maxPages = 10,
+        ?int $triggerWebhookLogId = null
+    ): int
     {
         $store  = $conversation->store;
-        $driver = $this->manager->driver($store);
-
-        $res = $driver->getChatMessages($store, $conversation->conversation_id, $pageSize);
-
-        if (! empty($res['error'])) {
-            Log::warning("Chat: gagal ambil pesan conversation {$conversation->conversation_id}: " . ($res['message'] ?? $res['error']));
-            return 0;
-        }
-
-        $messages = data_get($res, 'response.messages', []);
+        $driver = $this->gateway;
         $new = 0;
 
-        foreach ($messages as $m) {
-            if ($this->upsertMessage($store, $conversation, $m)) {
-                $new++;
+        $offset = '';
+
+        for ($page = 0; $page < max(1, $maxPages); $page++) {
+            $res = $driver->getChatMessages($store, $conversation->conversation_id, $pageSize, $offset);
+
+            if (! empty($res['error'])) {
+                Log::warning("Chat: gagal ambil pesan conversation {$conversation->conversation_id}: " . ($res['message'] ?? $res['error']));
+                break;
             }
+
+            $messages = data_get($res, 'response.messages', []);
+            if (empty($messages)) {
+                break;
+            }
+
+            foreach ($messages as $m) {
+                if ($this->upsertMessage(
+                    $store,
+                    $conversation,
+                    $m,
+                    'sync_api',
+                    $m,
+                    array_merge($res, $triggerWebhookLogId ? ['trigger_webhook_log_id' => $triggerWebhookLogId] : []),
+                    $triggerWebhookLogId
+                )) {
+                    $new++;
+                }
+            }
+
+            $nextOffset = $this->resolveChatMessageOffset($res, $offset);
+            $hasMore    = $this->chatMessagesHasMore($res, $messages, $nextOffset, $offset, $pageSize);
+
+            if (! $hasMore || $nextOffset === '' || $nextOffset === $offset) {
+                break;
+            }
+
+            $offset = $nextOffset;
         }
 
         return $new;
@@ -193,7 +229,7 @@ class MarketplaceChatService
             }
         }
 
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $toId   = $toId ?: $conversation?->buyer_user_id;
 
         if (! $toId) {
@@ -224,21 +260,32 @@ class MarketplaceChatService
                 ? now()->setTimestamp((int) $data['created_timestamp'])
                 : now();
 
-            MarketplaceChatMessage::updateOrCreate(
+            $messagePayload = array_merge($data, [
+                'message_type' => 'text',
+                'content'      => ['text' => $text],
+                'from_id'      => (string) $store->external_shop_id,
+                'to_id'        => (string) $toId,
+            ]);
+
+            if (empty($messagePayload['message_id'])) {
+                $messagePayload['message_id'] = 'local_' . uniqid('', true);
+            }
+
+            if (empty($messagePayload['created_timestamp'])) {
+                $messagePayload['created_timestamp'] = $sentAt->timestamp;
+            }
+
+            $this->upsertMessage(
+                $store,
+                $conversation,
+                $messagePayload,
+                'send_api',
                 [
-                    'store_id'            => $store->id,
-                    'external_message_id' => (string) (data_get($data, 'message_id') ?? ('local_' . uniqid())),
-                ],
-                [
-                    'marketplace_conversation_id' => $conversation->id,
-                    'from_role'    => 'seller',
-                    'from_id'      => (string) $store->external_shop_id,
+                    'to_id'        => (int) $toId,
                     'message_type' => 'text',
-                    'text'         => $text,
                     'content'      => ['text' => $text],
-                    'sent_at'      => $sentAt,
-                    'is_read'      => true,
-                ]
+                ],
+                $res
             );
 
             $conversation->update([
@@ -312,14 +359,17 @@ class MarketplaceChatService
      * Handler pesan masuk dari webhook webchat push.
      * $content = payload['data']['content'] dari Shopee.
      */
-    public function handleIncomingWebhookMessage(Store $store, array $content): void
+    public function handleIncomingWebhookMessage(Store $store, array $content, array $rawContext = [], ?int $webhookLogId = null): void
     {
-        $extConvId   = (string) (data_get($content, 'conversation_id') ?? '');
+        $extConvId   = $this->resolveConversationId($content, $rawContext);
         $messageId   = (string) (data_get($content, 'message_id') ?? '');
         $messageType = (string) (data_get($content, 'message_type') ?? '');
 
         if ($extConvId === '') {
-            Log::info('Chat webhook: payload tanpa conversation_id, di-skip.', $content);
+            Log::info('Chat webhook: payload tanpa conversation_id, di-skip.', [
+                'content' => $content,
+                'raw_context' => $rawContext,
+            ]);
             return;
         }
 
@@ -328,10 +378,18 @@ class MarketplaceChatService
             []
         );
 
+        if ($messageType === 'notification') {
+            // Notification tidak membawa pesan baru, tetapi bisa mengubah status
+            // percakapan. Refresh daftar percakapan agar unread/answered ikut sinkron.
+            $this->syncConversations($store, pages: 1);
+            return;
+        }
+
         // bundle_message (FAQ/chatbot): hanya berisi daftar message_id →
         // tarik isi lengkapnya via API get_message
-        if ($messageType === 'bundle_message' || $messageId === '') {
-            $new = $this->syncMessages($conversation);
+        if ($messageType === 'bundle_message' || $messageId === '' || empty($content)) {
+            $this->syncConversations($store, pages: 1);
+            $new = $this->syncMessages($conversation, triggerWebhookLogId: $webhookLogId);
             if ($new > 0) {
                 $conversation->refresh();
                 $conversation->increment('unread_count');
@@ -354,7 +412,7 @@ class MarketplaceChatService
         if (! $conversation->buyer_username && $buyerName) $updates['buyer_username'] = $buyerName;
         if ($updates) $conversation->update($updates);
 
-        $isNew = $this->upsertMessage($store, $conversation, $content, fromWebhook: true);
+        $isNew = $this->upsertMessage($store, $conversation, $content, 'webhook', $content, $rawContext, $webhookLogId);
 
         if ($isNew) {
             $conversation->refresh();
@@ -411,6 +469,72 @@ class MarketplaceChatService
         }
 
         return 'buyer';
+    }
+
+    private function resolveConversationId(array $content, array $rawContext = []): string
+    {
+        foreach ([
+            data_get($content, 'conversation_id'),
+            data_get($rawContext, 'conversation_id'),
+            data_get($rawContext, 'data.conversation_id'),
+            data_get($rawContext, 'data.content.conversation_id'),
+            data_get($rawContext, 'data.content.0.conversation_id'),
+        ] as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+
+    private function resolveChatMessageOffset(array $response, string $currentOffset): string
+    {
+        foreach ([
+            data_get($response, 'response.page_result.next_offset'),
+            data_get($response, 'response.next_offset'),
+            data_get($response, 'response.page_result.next_cursor.next_offset'),
+            data_get($response, 'response.page_result.next_cursor.offset'),
+            data_get($response, 'response.offset'),
+        ] as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return $currentOffset;
+    }
+
+    private function chatMessagesHasMore(array $response, array $messages, string $nextOffset, string $currentOffset, int $pageSize): bool
+    {
+        $explicit = data_get($response, 'response.page_result.more');
+        if ($explicit === null) {
+            $explicit = data_get($response, 'response.more');
+        }
+        if ($explicit === null) {
+            $explicit = data_get($response, 'response.has_more');
+        }
+        if ($explicit === null) {
+            $explicit = data_get($response, 'response.page_result.has_more');
+        }
+
+        if ($explicit !== null) {
+            return (bool) $explicit;
+        }
+
+        // Fallback aman: kalau API tidak memberi flag, lanjut hanya jika halaman
+        // penuh dan offset berikutnya benar-benar berubah.
+        return count($messages) >= $pageSize && $nextOffset !== '' && $nextOffset !== $currentOffset;
+    }
+
+    private function shouldBackfillConversationMessages(MarketplaceConversation $conversation): bool
+    {
+        return $conversation->wasRecentlyCreated
+            || $conversation->wasChanged('unread_count')
+            || $conversation->wasChanged('last_message_at')
+            || $conversation->wasChanged('last_message_text');
     }
 
     private function upsertConversation(Store $store, array $c): MarketplaceConversation
@@ -473,7 +597,15 @@ class MarketplaceChatService
      * Upsert satu pesan (dari API get_message maupun webhook).
      * Return true jika pesan baru dibuat.
      */
-    private function upsertMessage(Store $store, MarketplaceConversation $conversation, array $m, bool $fromWebhook = false): bool
+    private function upsertMessage(
+        Store $store,
+        MarketplaceConversation $conversation,
+        array $m,
+        string $source = 'sync_api',
+        ?array $rawPayload = null,
+        ?array $rawContext = null,
+        ?int $webhookLogId = null
+    ): bool
     {
         $messageId = (string) (data_get($m, 'message_id') ?? '');
         if ($messageId === '') return false;
@@ -495,33 +627,53 @@ class MarketplaceChatService
         $text = data_get($content, 'text');
         $type = (string) (data_get($m, 'message_type') ?? 'text');
 
-        $row = MarketplaceChatMessage::firstOrCreate(
-            ['store_id' => $store->id, 'external_message_id' => $messageId],
-            [
-                'marketplace_conversation_id' => $conversation->id,
-                'from_role'    => $fromRole,
-                'from_id'      => $fromId ?: null,
-                'message_type' => $type,
-                'text'         => $text,
-                'content'      => $content,
-                'sent_at'      => $sentAt,
-                'is_read'      => $fromRole === 'seller',
-            ]
+        $rawPayload = $rawPayload ?: $m;
+        $rawContext = $rawContext ?: $rawPayload;
+        $externalConversationId = (string) (data_get($m, 'conversation_id') ?? $conversation->conversation_id);
+
+        $row = MarketplaceChatMessage::firstOrNew(
+            ['store_id' => $store->id, 'external_message_id' => $messageId]
         );
 
-        if ($row->wasRecentlyCreated) {
-            // Update ringkasan percakapan bila pesan ini yang terbaru
-            if (! $conversation->last_message_at || $sentAt->gte($conversation->last_message_at)) {
-                $conversation->update([
-                    'last_message_type' => $type,
-                    'last_message_text' => $text ?: "[{$type}]",
-                    'last_message_at'   => $sentAt,
-                    'is_answered'       => $fromRole === 'seller',
-                ]);
-            }
-            return true;
+        $isNew = ! $row->exists;
+
+        $existingContext = $row->raw_context;
+        if (is_string($existingContext)) {
+            $decoded = json_decode($existingContext, true);
+            $existingContext = is_array($decoded) ? $decoded : [];
+        }
+        $existingContext = is_array($existingContext) ? $existingContext : [];
+
+        $existingContext[$source] = $rawContext ?: $rawPayload;
+        if ($webhookLogId) {
+            $existingContext['webhook_log_id'] = $webhookLogId;
         }
 
-        return false;
+        $row->marketplace_conversation_id = $row->marketplace_conversation_id ?: $conversation->id;
+        $row->external_conversation_id    = $row->external_conversation_id ?: $externalConversationId;
+        $row->source                      = $row->source ?: $source;
+        $row->from_role                   = $fromRole;
+        $row->from_id                     = $fromId ?: null;
+        $row->message_type                = $type;
+        $row->text                        = $text;
+        $row->content                     = $content;
+        $row->raw_payload                 = $row->raw_payload ?: $rawPayload;
+        $row->raw_context                 = $existingContext;
+        $row->webhook_log_id              = $row->webhook_log_id ?: $webhookLogId;
+        $row->sent_at                     = $sentAt;
+        $row->is_read                     = $fromRole === 'seller';
+        $row->save();
+
+        // Update ringkasan percakapan bila pesan ini yang terbaru
+        if ($isNew && (! $conversation->last_message_at || $sentAt->gte($conversation->last_message_at))) {
+            $conversation->update([
+                'last_message_type' => $type,
+                'last_message_text' => $text ?: "[{$type}]",
+                'last_message_at'   => $sentAt,
+                'is_answered'       => $fromRole === 'seller',
+            ]);
+        }
+
+        return $isNew;
     }
 }

@@ -30,7 +30,8 @@ class MpImportService
         string $path,
         int $storeId,
         string $sourceFile,
-        bool $dryRun = false
+        bool $dryRun = false,
+        ?string $batchId = null
     ): array {
         $channel = strtolower(trim($channel));
 
@@ -39,7 +40,7 @@ class MpImportService
         }
 
         $adapter = $this->adapters[$channel];
-        $batchId = (string) Str::uuid();
+        $batchId = $batchId ?: (string) Str::uuid();
         $now = now();
 
         $normalized = $adapter->parse($path, $storeId, $sourceFile);
@@ -49,13 +50,38 @@ class MpImportService
             'store_id' => $storeId,
             'source_file' => $sourceFile,
             'import_batch_id' => $batchId,
+            'rows' => count($normalized),
             'shipments_parsed' => count($normalized),
             'items_parsed' => array_sum(array_map(fn($s) => count($s['items'] ?? []), $normalized)),
             'inserted_shipments' => 0,
             'updated_shipments' => 0,
             'inserted_items' => 0,
+            'new_shipments' => 0,
+            'existing_shipments' => 0,
+            'warnings' => [],
             'dry_run' => $dryRun,
         ];
+
+        foreach ($normalized as $s) {
+            $existing = MpShipment::query()
+                ->where('store_id', $s['store_id'] ?? $storeId)
+                ->where('channel', $s['channel'])
+                ->where('platform_order_id', $s['platform_order_id'])
+                ->where(function ($q) use ($s) {
+                    if (! empty($s['platform_shipment_id'])) {
+                        $q->where('platform_shipment_id', $s['platform_shipment_id']);
+                    } else {
+                        $q->whereNull('platform_shipment_id');
+                    }
+                })
+                ->exists();
+
+            $stats[$existing ? 'existing_shipments' : 'new_shipments']++;
+        }
+
+        if ($stats['shipments_parsed'] === 0) {
+            $stats['warnings'][] = 'Tidak ada shipment yang berhasil dinormalisasi dari file.';
+        }
 
         if ($dryRun) {
             return compact('stats', 'normalized');
@@ -130,8 +156,19 @@ class MpImportService
                     'import_batch_id' => $batchId,
                     'source_file' => $s['source_file'] ?? null,
                     'imported_at' => $now,
+                    'source_type' => 'import',
+                    'source_updated_at' => $s['source_updated_at'] ?? null,
                     'raw_payload' => $s['raw_payload'] ?? null,
                 ];
+
+                $linkedOrderId = \App\Models\MarketplaceOrder::query()
+                    ->where('store_id', $payload['store_id'])
+                    ->where('channel_order_id', $payload['platform_order_id'])
+                    ->value('id');
+
+                if ($linkedOrderId) {
+                    $payload['marketplace_order_id'] = $linkedOrderId;
+                }
 
                 if (!$mp) {
                     $mp = MpShipment::create($payload);
@@ -153,6 +190,10 @@ class MpImportService
 
                     if (empty($update['raw_payload'])) {
                         unset($update['raw_payload']);
+                    }
+
+                    if (empty($update['marketplace_order_id'])) {
+                        unset($update['marketplace_order_id']);
                     }
 
                     $mp->fill($update)->save();
@@ -180,6 +221,13 @@ class MpImportService
                     ]);
                     $stats['inserted_items']++;
                 }
+
+                $stats['warnings'] = array_values(array_unique(array_merge(
+                    $stats['warnings'],
+                    collect($items)
+                        ->filter(fn ($it) => trim((string) ($it['sku_code'] ?? '')) === '')
+                        ->isNotEmpty() ? ['Ada item tanpa Seller SKU.'] : []
+                )));
 
                 /**
                  * ======================================

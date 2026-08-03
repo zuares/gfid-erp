@@ -72,7 +72,30 @@ php artisan db:backup:list --limit=10
 php artisan db:restore backup_20251120_163501.sqlite
 
 
-5) Backup otomatis sebelum migrate:fresh
+5) Ambil database production ke development (SQLite)
+------------------------------------------------------------
+# Dari file backup production yang sudah ada di komputer:
+php artisan db:pull-prod --source=/path/ke/production.sqlite
+
+# Langsung dari server production melalui SSH:
+php artisan db:pull-prod \
+  --ssh=deploy@example.com \
+  --remote-path=/var/www/gfid/database/database.sqlite
+
+# Jika target dev bukan database aktif:
+php artisan db:pull-prod \
+  --source=/path/ke/production.sqlite \
+  --target=database/database_dev.sqlite
+
+Perintah ini membuat backup database dev di storage/backups/ sebelum overwrite,
+lalu membersihkan cache Laravel. Untuk snapshot via SSH, server harus memiliki
+sqlite3 dan user SSH harus dapat membaca file database production.
+
+Gunakan --force untuk melewati konfirmasi. Gunakan --no-backup hanya jika
+database dev sudah dibackup dengan cara lain.
+
+
+6) Backup otomatis sebelum migrate:fresh
 ------------------------------------------------------------
 php artisan migrate:fresh
 
@@ -296,5 +319,4 @@ Ini mencegah duplikasi kode jika ada bug di luar helper.
 - Pastikan kolom "code" di tabel tujuan bersifat UNIQUE
 
 Selesai.
-
 

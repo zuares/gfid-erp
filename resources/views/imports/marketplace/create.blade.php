@@ -8,6 +8,8 @@
   $channels = $channels ?? [];
   $stores   = $stores ?? [];
   $draft    = $draft ?? session('mp_import_preview');
+  $selectedChannelId = $selectedChannelId ?? null;
+  $selectedStoreId = $selectedStoreId ?? null;
 
   $canResume = false;
   if (!empty($draft) && !empty($draft['disk']) && !empty($draft['stored_path']) && !empty($draft['channel_key'])) {
@@ -160,7 +162,7 @@
         <select name="channel_id" id="channelSelect" class="form-select" required>
           <option value="">— pilih channel —</option>
           @foreach($channels as $ch)
-            <option value="{{ $ch->id }}">{{ $ch->name }}</option>
+            <option value="{{ $ch->id }}" @selected((string) $selectedChannelId === (string) $ch->id)>{{ $ch->name }}</option>
           @endforeach
         </select>
         <div class="form-help mt-1">Pilih channel terlebih dahulu</div>
@@ -169,10 +171,10 @@
       {{-- Store (filtered by channel_id) --}}
       <div class="col-md-4">
         <label class="form-label small" style="color:var(--muted)">Store</label>
-        <select name="store_id" id="storeSelect" class="form-select" required disabled>
+        <select name="store_id" id="storeSelect" class="form-select" required disabled data-selected-store-id="{{ $selectedStoreId ?? '' }}">
           <option value="">— pilih store —</option>
           @foreach($stores as $st)
-            <option value="{{ $st->id }}" data-channel-id="{{ (string)($st->channel_id ?? '') }}">
+            <option value="{{ $st->id }}" data-channel-id="{{ (string)($st->channel_id ?? '') }}" @selected((string) $selectedStoreId === (string) $st->id)>
               {{ $st->name }}
             </option>
           @endforeach
@@ -208,7 +210,7 @@
 
   function norm(v){ return String(v ?? '').trim(); }
 
-  function applyStoreFilter(){
+  function applyStoreFilter(preserveInitialStore = false){
     const channelId = norm(ch.value);
 
     if (!channelId){
@@ -220,7 +222,6 @@
     }
 
     st.disabled = false;
-    st.value = '';
     let visible = 0;
 
     allOptions.forEach(opt => {
@@ -230,6 +231,12 @@
       opt.disabled = !ok;
       if (ok) visible++;
     });
+
+    const preferredStoreId = preserveInitialStore ? norm(st.dataset.selectedStoreId) : '';
+    const preferredOption = preferredStoreId
+      ? allOptions.find(opt => opt.value === preferredStoreId && !opt.disabled)
+      : null;
+    st.value = preferredOption ? preferredStoreId : '';
 
     if (hint){
       if (visible === 0){
@@ -242,8 +249,8 @@
     }
   }
 
-  ch.addEventListener('change', applyStoreFilter);
-  applyStoreFilter();
+  ch.addEventListener('change', () => applyStoreFilter(false));
+  applyStoreFilter(true);
 })();
 </script>
 @endpush

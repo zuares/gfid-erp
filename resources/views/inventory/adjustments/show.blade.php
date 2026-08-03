@@ -22,6 +22,85 @@
             box-shadow: 0 10px 26px rgba(15, 23, 42, .06), 0 0 0 1px rgba(15, 23, 42, .03)
         }
 
+        .hero-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, .08), rgba(14, 165, 233, .04));
+        }
+
+        body[data-theme="dark"] .hero-shell {
+            background: linear-gradient(135deg, rgba(30, 41, 59, .9), rgba(15, 23, 42, .88));
+        }
+
+        .hero-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: .2rem;
+        }
+
+        .hero-sub {
+            font-size: .86rem;
+            color: #64748b;
+            max-width: 62ch;
+        }
+
+        body[data-theme="dark"] .hero-sub {
+            color: #9ca3af;
+        }
+
+        .hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .45rem;
+            margin-top: .85rem;
+        }
+
+        .hero-meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .24rem .55rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, .28);
+            background: rgba(255, 255, 255, .55);
+            font-size: .74rem;
+            color: #475569;
+        }
+
+        body[data-theme="dark"] .hero-meta-pill {
+            background: rgba(15, 23, 42, .45);
+            color: #cbd5e1;
+        }
+
+        .hero-action {
+            min-width: min(360px, 100%);
+            padding: .9rem;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, .18);
+            background: rgba(255, 255, 255, .55);
+        }
+
+        body[data-theme="dark"] .hero-action {
+            background: rgba(15, 23, 42, .5);
+            border-color: rgba(51, 65, 85, .75);
+        }
+
+        .hero-action-note {
+            margin-top: .5rem;
+            font-size: .78rem;
+            color: #64748b;
+            line-height: 1.35;
+        }
+
+        body[data-theme="dark"] .hero-action-note {
+            color: #94a3b8;
+        }
+
         .badge-status {
             font-size: .7rem;
             padding: .18rem .5rem;
@@ -351,10 +430,8 @@
 
         $canApprove = $isOwnerAdmin && method_exists($adjustment, 'canApprove') && $adjustment->canApprove();
         $canVoid = $isOwnerAdmin && in_array($adjustment->status, [InventoryAdjustment::STATUS_DRAFT, InventoryAdjustment::STATUS_PENDING], true);
-
-        // Overproduction flow: draft -> POST/VOID
-        $canPostOverproduction =
-            $isOwnerAdmin && $isOverproduction && $adjustment->status === InventoryAdjustment::STATUS_DRAFT;
+        $canPostDraft = $isOwnerAdmin && $adjustment->status === InventoryAdjustment::STATUS_DRAFT;
+        $showReasonBlock = (bool) $adjustment->reason && !in_array($adjustment->reason, ['Adjustment Manual Draft', 'Draft Adjustment Manual'], true);
 
         $summary = $summary ?? [
             'total_in_qty' => 0,
@@ -415,80 +492,97 @@
     @endphp
 
     <div class="page-wrap">
-        {{-- HEADER --}}
-        <div class="d-flex justify-content-between align-items-start mb-3 gap-3">
-            <div>
-                <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-link px-0 mb-1">← Kembali ke
-                    daftar</a>
-                <h1 class="h5 mb-1">
-                    Inventory Adjustment • {{ $adjustment->code }}
-                    @if ($isOverproduction)
-                        <span class="ref-chip ms-2" title="Dokumen koreksi stok untuk overproduction cutting">
-                            ⚙️ <b>Cutting Overproduction</b>
-                        </span>
-                    @endif
-                </h1>
-                <p class="text-muted mb-0" style="font-size:.86rem;">
-                    {{ $isOverproduction ? 'Dokumen koreksi stok untuk hasil cutting lebih (overproduction).' : 'Dokumen penyesuaian stok gudang.' }}
-                </p>
-            </div>
+        {{-- HERO --}}
+        <div class="card card-main mb-3">
+            <div class="card-body">
+                <div class="hero-shell">
+                    <div class="flex-grow-1">
+                        <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-link px-0 mb-2">← Kembali ke daftar</a>
 
-            <div class="text-end">
-                <div class="d-flex flex-column align-items-end gap-2">
-                    <div>
-                        <span class="{{ $statusClass }}">{{ ucfirst($adjustment->status) }}</span>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <span class="{{ $statusClass }}">{{ ucfirst($adjustment->status) }}</span>
 
-                        @if ($approverBadgeText)
-                            <span class="{{ $approverBadgeClass }} ms-1">
-                                <span class="badge-approver-dot"></span>
-                                {{ $approverBadgeText }}
-                            </span>
-                        @endif
-                    </div>
+                            @if ($approverBadgeText)
+                                <span class="{{ $approverBadgeClass }}">
+                                    <span class="badge-approver-dot"></span>
+                                    {{ $approverBadgeText }}
+                                </span>
+                            @endif
 
-                    {{-- ACTIONS: Overproduction POST/VOID OR Normal Approve --}}
-                    <div class="action-bar">
-                        @if ($canPostOverproduction)
-                            <form action="{{ route('production.cutting_overproduction.post', $adjustment) }}" method="POST"
-                                onsubmit="return confirm('POST Overproduction Adjustment ini? Stok akan bertambah sesuai baris (IN) di bawah.');">
-                                @csrf
-                                <button class="btn btn-sm text-white btn-post btn-pill">POST (Eksekusi Stok)</button>
-                            </form>
-                        @endif
-
-                        @if ($canVoid)
-                            <form action="{{ $isOverproduction ? route('production.cutting_overproduction.void', $adjustment) : route('inventory.adjustments.void', $adjustment) }}" method="POST"
-                                onsubmit="return confirm('Batalkan dokumen ini?');">
-                                @csrf
-                                <button class="btn btn-sm btn-outline-danger btn-pill">Batalkan</button>
-                            </form>
-                        @endif
-
-                        @if ($canApprove)
-                            <form action="{{ route('inventory.adjustments.approve', $adjustment) }}" method="POST"
-                                onsubmit="return confirm('Approve adjustment ini? Stok akan dikoreksi sesuai baris di bawah.');">
-                                @csrf
-                                <button class="btn btn-sm btn-success btn-pill">Approve & Eksekusi Stok</button>
-                            </form>
-                        @endif
-                    </div>
-
-                    @if ($isOverproductionproduction ?? false)
-                    @endif
-                    @if ($isOverproduction && $adjustment->status === InventoryAdjustment::STATUS_DRAFT)
-                        <div class="text-muted" style="font-size:.82rem; max-width: 420px;">
-                            Status <b>Draft</b>. Overproduction belum mempengaruhi stok sampai kamu klik <b>POST</b>.
+                            @if ($isOverproduction)
+                                <span class="ref-chip" title="Dokumen koreksi stok untuk overproduction cutting">
+                                    ⚙️ <b>Cutting Overproduction</b>
+                                </span>
+                            @endif
                         </div>
-                    @endif
+
+                        <div class="hero-title">Inventory Adjustment • {{ $adjustment->code }}</div>
+                        <div class="hero-sub">
+                            {{ $isOverproduction ? 'Dokumen koreksi stok untuk hasil cutting lebih (overproduction).' : 'Dokumen penyesuaian stok gudang.' }}
+                            @if ($adjustment->status === InventoryAdjustment::STATUS_DRAFT)
+                                Draft ini belum mempengaruhi stok sampai di-post.
+                            @endif
+                        </div>
+
+                        <div class="hero-meta">
+                            <span class="hero-meta-pill">Gudang: <b>{{ $adjustment->warehouse?->code ?? '-' }}</b></span>
+                            <span class="hero-meta-pill">Tanggal: <b>{{ $adjustment->date?->format('d M Y') ?? '-' }}</b></span>
+                            <span class="hero-meta-pill">Dibuat: <b>{{ $adjustment->creator?->name ?? '-' }}</b></span>
+                            @if ($sourceLabel)
+                                <span class="hero-meta-pill">Sumber: <b>{{ \Illuminate\Support\Str::limit($sourceLabel, 32) }}</b></span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="hero-action">
+                        <div class="pill-label">Aksi</div>
+                        <div class="action-bar" style="justify-content:flex-start; margin-top:.45rem;">
+                            @if ($canPostDraft)
+                                <form action="{{ route('inventory.adjustments.post', $adjustment) }}" method="POST"
+                                    onsubmit="return confirm('POST draft ini? Stok akan dikoreksi sesuai baris yang tersimpan.');">
+                                    @csrf
+                                    <button class="btn btn-sm text-white btn-post btn-pill">POST & Eksekusi Stok</button>
+                                </form>
+                            @endif
+
+                            @if ($canApprove)
+                                <form action="{{ route('inventory.adjustments.approve', $adjustment) }}" method="POST"
+                                    onsubmit="return confirm('Approve adjustment ini? Stok akan dikoreksi sesuai baris di bawah.');">
+                                    @csrf
+                                    <button class="btn btn-sm btn-success btn-pill">Approve</button>
+                                </form>
+                            @endif
+
+                            @if ($canVoid)
+                                <form action="{{ route('inventory.adjustments.void', $adjustment) }}" method="POST"
+                                    onsubmit="return confirm('Batalkan draft/pending ini?');">
+                                    @csrf
+                                    <button class="btn btn-sm btn-outline-danger btn-pill">Batalkan</button>
+                                </form>
+                            @endif
+                        </div>
+
+                        <div class="hero-action-note">
+                            @if ($adjustment->status === InventoryAdjustment::STATUS_DRAFT)
+                                Simpan dulu sebagai draft, lalu post dari halaman detail saat sudah siap.
+                            @elseif ($adjustment->status === InventoryAdjustment::STATUS_PENDING)
+                                Menunggu approval Owner atau Admin.
+                            @elseif ($adjustment->status === InventoryAdjustment::STATUS_APPROVED)
+                                Sudah diposting dan tercatat di kartu stok.
+                            @else
+                                Dokumen sudah dibatalkan.
+                            @endif
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         {{-- ALERT STATUS --}}
-        @if ($adjustment->status === InventoryAdjustment::STATUS_DRAFT && $isOverproduction)
+        @if ($adjustment->status === InventoryAdjustment::STATUS_DRAFT)
             <div class="alert alert-info py-2 px-3 mb-3" style="font-size:.82rem;">
-                <strong>Draft (Overproduction).</strong> Dokumen ini masih draft. Klik <b>POST</b> untuk mengeksekusi stok
-                masuk.
+                <strong>Draft tersimpan.</strong>
+                Dokumen belum mempengaruhi stok sampai kamu klik <b>POST</b> di kanan atas.
             </div>
         @elseif ($adjustment->status === InventoryAdjustment::STATUS_PENDING)
             <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.82rem;">
@@ -542,17 +636,22 @@
                 </div>
 
                 {{-- REASON / NOTES --}}
-                @if ($adjustment->reason || $adjustment->notes)
+                @if ($showReasonBlock || $adjustment->notes)
                     <hr>
                     <div class="row g-3 mb-2">
-                        <div class="col-md-6">
-                            <div class="pill-label">Alasan</div>
-                            <div>{{ $adjustment->reason }}</div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="pill-label">Catatan</div>
-                            <div>{!! nl2br(e($adjustment->notes)) !!}</div>
-                        </div>
+                        @if ($showReasonBlock)
+                            <div class="{{ $adjustment->notes ? 'col-md-6' : 'col-12' }}">
+                                <div class="pill-label">Ringkasan</div>
+                                <div>{{ $adjustment->reason }}</div>
+                            </div>
+                        @endif
+
+                        @if ($adjustment->notes)
+                            <div class="{{ $showReasonBlock ? 'col-md-6' : 'col-12' }}">
+                                <div class="pill-label">Catatan</div>
+                                <div>{!! nl2br(e($adjustment->notes)) !!}</div>
+                            </div>
+                        @endif
                     </div>
                 @endif
 
@@ -626,6 +725,11 @@
                 <div class="d-flex align-items-end justify-content-between gap-2 mb-2">
                     <div>
                         <h2 class="h6 mb-1">Detail Baris Adjustment</h2>
+                        @if ($adjustment->status === InventoryAdjustment::STATUS_DRAFT)
+                            <div class="text-muted" style="font-size:.82rem;">
+                                Alasan wajib diisi per baris sebelum dokumen di-post.
+                            </div>
+                        @endif
                         @if ($isOverproduction)
                             <div class="text-muted" style="font-size:.82rem;">
                                 Overproduction biasanya <b>hanya baris MASUK (IN)</b>. Setelah klik <b>POST</b>, stok akan
@@ -657,7 +761,7 @@
                                 @if ($hasAnyBundleRef)
                                     <th class="text-center" style="width:90px;">Bundle</th>
                                 @endif
-                                <th>Catatan</th>
+                                <th>Alasan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -721,7 +825,7 @@
                                         </td>
                                     @endif
 
-                                    <td data-label="Catatan" style="font-size:.82rem;">
+                                    <td data-label="Alasan" style="font-size:.82rem;">
                                         {{ $line->notes }}
                                     </td>
                                 </tr>

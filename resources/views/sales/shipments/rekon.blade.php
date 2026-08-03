@@ -678,6 +678,67 @@ body[data-theme="dark"] .rk-sisa-name { color: #9ca3af; }
 body[data-theme="dark"] .rk-empty-title { color: #94a3b8; }
 .rk-empty-sub { font-size: .8rem; margin-top: .3rem; }
 
+/* ══════════════════════════════════════════════════
+   SEARCH BAR
+══════════════════════════════════════════════════ */
+.rk-searchbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    align-items: center;
+    margin-bottom: .7rem;
+}
+.rk-searchbox {
+    flex: 1 1 360px;
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .42rem .55rem;
+    border: 1px solid rgba(148,163,184,.24);
+    border-radius: 10px;
+    background: var(--card,#fff);
+    box-shadow: 0 1px 6px rgba(15,23,42,.03);
+}
+body[data-theme="dark"] .rk-searchbox {
+    background: rgba(15,23,42,.92);
+    border-color: rgba(30,64,175,.3);
+}
+.rk-search-icon {
+    flex-shrink: 0;
+    color: #94a3b8;
+    font-size: .92rem;
+}
+.rk-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: .9rem;
+    color: #0f172a;
+}
+body[data-theme="dark"] .rk-search-input { color: #e2e8f0; }
+.rk-search-input::placeholder { color: #94a3b8; }
+.rk-search-clear {
+    flex-shrink: 0;
+    border: none;
+    background: rgba(148,163,184,.1);
+    color: #64748b;
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: .88rem;
+    cursor: pointer;
+}
+.rk-search-clear:hover { background: rgba(148,163,184,.2); }
+.rk-search-clear[hidden] { display: none; }
+.rk-search-meta {
+    font-size: .76rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+body[data-theme="dark"] .rk-search-meta { color: #94a3b8; }
+
 /* Compact neutral override, aligned with shipment edit */
 :root,
 .page-theme-shopee,
@@ -1059,6 +1120,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
     <span class="shp-topbar-spacer"></span>
+    <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
     <span class="shp-pill">Batch <b>{{ $totalLines }}</b> SKU</span>
     <span class="shp-pill shp-pill-accent">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     <span class="shp-pill" id="topPillOrders" style="display:none">Pesanan <b id="topOrderCount">0</b></span>
@@ -1089,6 +1151,17 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
                    style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
                    autocomplete="off" spellcheck="false" autofocus>
 
+        </div>
+
+        <div class="rk-searchbar">
+            <div class="rk-searchbox">
+                <span class="rk-search-icon" aria-hidden="true">⌕</span>
+                <input type="search" id="orderSearchInput" class="rk-search-input"
+                       placeholder="Cari no resi, no pesanan, kode atau nama item"
+                       autocomplete="off" spellcheck="false">
+                <button type="button" id="orderSearchClear" class="rk-search-clear" aria-label="Hapus pencarian" hidden>x</button>
+            </div>
+            <div class="rk-search-meta" id="orderSearchMeta">Menampilkan semua pesanan</div>
         </div>
 
         {{-- ORDER LIST --}}
@@ -1256,6 +1329,8 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 (function () {
 'use strict';
 
+window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
+
 /* ── URLs ── */
 const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const MATCH_URL  = @json(parse_url(route('sales.shipments.rekon_match', $shipment), PHP_URL_PATH));
@@ -1280,10 +1355,83 @@ let drawerCtx        = null;
 let drawerPool       = [];
 let drawerPendingSub = null;   // item yang di-tap di list, belum dikonfirmasi
 let drawerPendingQty = 1;      // qty yang akan di-sub
+let orderSearchQuery = '';
 
 /* ── Persistence ── */
 function normalizeOrderNo(no) {
     return String(no || '').trim().toUpperCase();
+}
+
+function normalizeSearchText(value) {
+    return String(value ?? '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getOrderSearchBlob(o) {
+    const parts = [
+        o?.no,
+        o?.order?.order_no,
+        o?.order?.invoice_code,
+        o?.order?.shipping_awb_no,
+        o?.order?.store_name,
+        o?.order?.store_code,
+        o?.order?.status,
+        o?.scanned_at,
+    ];
+
+    (o?.order?.lines || []).forEach(line => {
+        parts.push(line?.item_code, line?.item_name, line?.sub_code, line?.sub_name);
+    });
+
+    return normalizeSearchText(parts.filter(Boolean).join(' '));
+}
+
+function orderMatchesSearch(o, q) {
+    const query = normalizeSearchText(q);
+    if (!query) return true;
+
+    const blob = getOrderSearchBlob(o);
+    return query
+        .split(' ')
+        .filter(Boolean)
+        .every(part => blob.includes(part));
+}
+
+function getVisibleOrders() {
+    if (!orderSearchQuery.trim()) {
+        return orders.map((o, idx) => ({ order: o, idx, displayNo: idx + 1 }));
+    }
+
+    return orders
+        .map((o, idx) => ({ order: o, idx }))
+        .filter(row => orderMatchesSearch(row.order, orderSearchQuery))
+        .map((row, visibleIdx) => ({ ...row, displayNo: visibleIdx + 1 }));
+}
+
+function updateSearchUi(visibleCount) {
+    if (orderSearchInput && orderSearchClear) {
+        orderSearchClear.hidden = !orderSearchQuery.trim();
+    }
+
+    if (!orderSearchMeta) return;
+
+    if (!orders.length) {
+        orderSearchMeta.textContent = 'Belum ada pesanan tersimpan';
+        return;
+    }
+
+    if (orderSearchQuery.trim()) {
+        orderSearchMeta.textContent = `Menampilkan ${visibleCount} dari ${orders.length} pesanan`;
+    } else {
+        orderSearchMeta.textContent = `Menampilkan semua ${orders.length} pesanan`;
+    }
+}
+
+function setOrderSearchQuery(value) {
+    orderSearchQuery = String(value || '');
+    renderAll();
 }
 function rebuildPoolUsed() {
     poolUsed = {};
@@ -1462,6 +1610,9 @@ function clearState() {
 
 /* ── DOM ── */
 const orderInput    = document.getElementById('orderInput');
+const orderSearchInput = document.getElementById('orderSearchInput');
+const orderSearchClear = document.getElementById('orderSearchClear');
+const orderSearchMeta = document.getElementById('orderSearchMeta');
 const orderList     = document.getElementById('orderList');
 const emptyState    = document.getElementById('emptyState');
 const scanCounter   = document.getElementById('scanCounter');
@@ -1505,6 +1656,7 @@ function unlockAudio() {
 }
 
 function tone(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
+    if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
     try {
         const ctx = getAudioContext();
         if (!ctx) return;
@@ -1533,18 +1685,24 @@ function tone(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
 }
 
 /* ── Named sounds ── */
+function playConfiguredSound(eventKey, fallback) {
+    if (window.GFID && typeof window.GFID.playScanSound === 'function') {
+        return window.GFID.playScanSound(eventKey, fallback);
+    }
+    fallback();
+}
 /* order ditemukan, semua stok cukup — 3-nada arpeggio naik, nyaring */
-function sndOrderReady()   { tone(880, 0.13, 0.80, 0, 'square'); tone(1100, 0.13, 0.78, 0.14, 'square'); tone(1320, 0.16, 0.75, 0.28, 'square'); }
+function sndOrderReady()   { playConfiguredSound('order_ready', () => { tone(880, 0.13, 0.80, 0, 'square'); tone(1100, 0.13, 0.78, 0.14, 'square'); tone(1320, 0.16, 0.75, 0.28, 'square'); }); }
 /* order ditemukan, stok kurang — ok lalu turun (waspada) */
-function sndOrderPartial() { tone(880, 0.13, 0.78, 0, 'square'); tone(660,  0.16, 0.75, 0.14, 'triangle'); }
+function sndOrderPartial() { playConfiguredSound('order_partial', () => { tone(880, 0.13, 0.78, 0, 'square'); tone(660,  0.16, 0.75, 0.14, 'triangle'); }); }
 /* order tidak ditemukan di batch — 2-nada rendah agak nyaring */
-function sndOrderNoMatch() { tone(660, 0.18, 0.72, 0, 'triangle'); tone(500, 0.18, 0.70, 0.19, 'triangle'); }
+function sndOrderNoMatch() { playConfiguredSound('order_no_match', () => { tone(660, 0.18, 0.72, 0, 'triangle'); tone(500, 0.18, 0.70, 0.19, 'triangle'); }); }
 /* duplikat / blocked — buzz pendek double */
-function sndGuard()        { tone(450, 0.09, 0.72, 0, 'square'); tone(380,  0.11, 0.70, 0.10, 'square'); }
+function sndGuard()        { playConfiguredSound('item_duplicate', () => { tone(450, 0.09, 0.72, 0, 'square'); tone(380,  0.11, 0.70, 0.10, 'square'); }); }
 /* server / network error — 3-nada turun sawtooth */
-function sndErr()          { tone(240, 0.16, 0.72, 0, 'sawtooth'); tone(150, 0.20, 0.72, 0.16, 'sawtooth'); tone(110, 0.24, 0.70, 0.36, 'sawtooth'); }
+function sndErr()          { playConfiguredSound('error_network', () => { tone(240, 0.16, 0.72, 0, 'sawtooth'); tone(150, 0.20, 0.72, 0.16, 'sawtooth'); tone(110, 0.24, 0.70, 0.36, 'sawtooth'); }); }
 /* pindah mode (NEXT) — 3-nada sweep naik halus */
-function sndNav()          { tone(700, 0.06, 0.38, 0, 'sine'); tone(1100, 0.06, 0.38, 0.07, 'sine'); tone(1700, 0.10, 0.38, 0.14, 'sine'); }
+function sndNav()          { playConfiguredSound('navigation', () => { tone(700, 0.06, 0.38, 0, 'sine'); tone(1100, 0.06, 0.38, 0.07, 'sine'); tone(1700, 0.10, 0.38, 0.14, 'sine'); }); }
 /* compat shim */
 function beep(ok) { ok ? sndOrderReady() : sndErr(); }
 
@@ -1594,6 +1752,24 @@ document.addEventListener('keydown', e => {
 
 /* ── Input: uppercase ── */
 orderInput?.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
+orderSearchInput?.addEventListener('input', function () {
+    setOrderSearchQuery(this.value);
+});
+orderSearchInput?.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        this.value = '';
+        setOrderSearchQuery('');
+        orderSearchInput?.blur();
+        refocusScan();
+    }
+});
+orderSearchClear?.addEventListener('click', function () {
+    if (!orderSearchInput) return;
+    orderSearchInput.value = '';
+    setOrderSearchQuery('');
+    orderSearchInput.focus();
+});
 
 /* ── Enter → process ── */
 orderInput?.addEventListener('keydown', e => {
@@ -1655,7 +1831,14 @@ async function processOrder(no) {
             if (s === 'ready')        sndOrderReady();
             else if (s === 'partial') sndOrderPartial();
             else                      sndOrderNoMatch();
-            toast(s === 'ready' ? 'ok' : 'warn', no + (data.order?.source === 'manual_scan' ? ' dicatat' : (s === 'ready' ? ' - semua item tersedia' : s === 'partial' ? ' - stok kurang' : ' - item tidak ada di batch')));
+            const scanMessage = data.order?.source === 'manual_scan'
+                ? `${no} dicatat`
+                : s === 'ready'
+                    ? `${no} tercatat`
+                    : s === 'partial'
+                        ? `${no} tercatat, cek rincian item`
+                        : `${no} tercatat tanpa item yang cocok`;
+            toast(s === 'partial' || s === 'ready' ? 'ok' : 'warn', scanMessage);
         } else {
             saveState();
             if (SHIPMENT_TYPE === 'manual') {
@@ -1682,18 +1865,32 @@ async function processOrder(no) {
 function renderAll() {
     var _rkc = document.getElementById('rkOrderCount');
     if (_rkc) _rkc.textContent = orders.length;
+    const visibleOrders = getVisibleOrders();
+    const hasSearch = orderSearchQuery.trim().length > 0;
+
     if (!orders.length) {
         emptyState.style.display = '';
+        emptyState.querySelector('.rk-empty-title').textContent = 'Scan nomor pesanan';
+        emptyState.querySelector('.rk-empty-sub').textContent = 'Bisa dari barcode scanner atau ketik manual lalu tekan Enter';
         orderList.innerHTML = '';
         topPillOrders.style.display = 'none';
         scanCounter.textContent = '0 pesanan';
+        updateSearchUi(0);
         renderSisa();
         updateConfirmBtn();
         return;
     }
-    emptyState.style.display = 'none';
+    if (!visibleOrders.length && hasSearch) {
+        emptyState.style.display = '';
+        emptyState.querySelector('.rk-empty-title').textContent = 'Tidak ada hasil pencarian';
+        emptyState.querySelector('.rk-empty-sub').textContent = 'Coba kata kunci lain: no resi, no pesanan, kode item, atau nama item';
+    } else {
+        emptyState.style.display = 'none';
+        emptyState.querySelector('.rk-empty-title').textContent = 'Scan nomor pesanan';
+        emptyState.querySelector('.rk-empty-sub').textContent = 'Bisa dari barcode scanner atau ketik manual lalu tekan Enter';
+    }
 
-    orderList.innerHTML = orders.map((o, i) => renderCard(o, i)).join('');
+    orderList.innerHTML = visibleOrders.map((row) => renderCard(row.order, row.idx, row.displayNo)).join('');
 
     orderList.querySelectorAll('.rk-act-btn[data-idx]').forEach(btn => {
         btn.addEventListener('click', function () { setDecision(+this.dataset.idx, this.dataset.action); });
@@ -1703,26 +1900,29 @@ function renderAll() {
     });
 
     topPillOrders.style.display = '';
-    topOrderCount.textContent   = orders.length;
-    scanCounter.textContent     = orders.length + ' pesanan';
+    topOrderCount.textContent   = hasSearch ? `${visibleOrders.length}/${orders.length}` : String(orders.length);
+    scanCounter.textContent     = hasSearch
+        ? `${visibleOrders.length} dari ${orders.length} pesanan`
+        : `${orders.length} pesanan`;
 
+    updateSearchUi(visibleOrders.length);
     renderSisa();
     updateConfirmBtn();
 }
 
-function renderCard(o, idx) {
+function renderCard(o, idx, displayNo) {
     const { no, found, order, decision } = o;
     const dupeBadge = o.dupe ? '<span class="rk-dupe-badge">⚠ Duplikat</span>' : '';
     const cls = 'rk-order-card' + (decision ? ' decided-' + decision : '') + (o.dupe ? ' rk-dupe' : '');
 
-    const isLast = idx === orders.length - 1;
+    const rowNo = displayNo || (idx + 1);
 
     if (!found) {
         if (SHIPMENT_TYPE === 'manual') {
             const decBadge = decision ? statusBadge(decision) : statusBadge('ready');
             return `<div class="${cls}" id="ocard-${idx}">
               <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-                <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
+                <span class="rk-order-num">${rowNo}.</span><span class="rk-order-no">${no}</span>
                 <span class="rk-order-store">Pesanan Manual</span>
                 ${o.scanned_at ? `<span style="font-size:0.7rem; color:#94a3b8; margin-left:0.3rem">${o.scanned_at}</span>` : ''}
                 ${decBadge}${dupeBadge}
@@ -1751,7 +1951,7 @@ function renderCard(o, idx) {
 
         return `<div class="${cls}" id="ocard-${idx}">
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-            <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
+            <span class="rk-order-num">${rowNo}.</span><span class="rk-order-no">${no}</span>
             ${statusBadge('not_found')}${dupeBadge}
             <span class="rk-order-chev" id="chev-${idx}">▼</span>
           </div>
@@ -1776,7 +1976,7 @@ function renderCard(o, idx) {
         const decBadge = decision ? statusBadge(decision) : statusBadge('pending');
         return `<div class="${cls}" id="ocard-${idx}">
           <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-            <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
+            <span class="rk-order-num">${rowNo}.</span><span class="rk-order-no">${no}</span>
             <span class="rk-order-store">Belum tertaut</span>
             ${o.scanned_at ? `<span style="font-size:0.7rem; color:#94a3b8; margin-left:0.3rem">${o.scanned_at}</span>` : ''}
             ${decBadge}${dupeBadge}
@@ -1903,7 +2103,7 @@ function renderCard(o, idx) {
 
     return `<div class="${cls}" id="ocard-${idx}">
       <div class="rk-order-hdr" onclick="toggleCard(${idx})">
-        <span class="rk-order-num">${idx + 1}.</span><span class="rk-order-no">${no}</span>
+        <span class="rk-order-num">${rowNo}.</span><span class="rk-order-no">${no}</span>
         ${order.store_name ? `<span class="rk-order-store">${order.store_name}</span>` : ''}
         ${mpBadge}
         ${order.date ? `<span style="font-size:.73rem;color:#94a3b8">${fmtDate(order.date)}</span>` : ''}
@@ -2268,6 +2468,8 @@ window.resetRekon = function () {
 
 topConfirmBtn.addEventListener('click', function () {
     if (this.disabled) return;
+    unlockAudio();
+    sndNav();
     saveState();
     window.location.href = CONFIRM_URL;
 });

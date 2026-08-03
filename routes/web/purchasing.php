@@ -49,7 +49,7 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             ->except(['destroy']);
 
         // PR-C + PR-D: Approve / Reject / Convert — hanya owner + admin
-        Route::middleware('role:owner,admin')->group(function () {
+        Route::middleware('role:owner,admin,nta')->group(function () {
             Route::post('purchase-requests/{purchase_request}/approve', [PurchaseRequestController::class, 'approve'])
                 ->name('purchase_requests.approve');
             Route::post('purchase-requests/{purchase_request}/reject', [PurchaseRequestController::class, 'reject'])

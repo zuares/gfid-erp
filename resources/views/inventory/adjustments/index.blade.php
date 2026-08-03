@@ -299,7 +299,7 @@
                                     <td>
                                         <div class="adj-row-main">
                                             <div>
-                                                <a class="code-link" href="{{ route('inventory.adjustments.show', $adj) }}">{{ $adj->code }}</a>
+                                                <a class="code-link" href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adj->getKey()]) }}">{{ $adj->code }}</a>
                                                 <div class="muted mt-1">{{ $adj->reason ?: '—' }}</div>
                                             </div>
                                             <span class="badge-status {{ $statusClass }} d-md-none">{{ ucfirst($adj->status) }}</span>
@@ -324,7 +324,7 @@
                                         <span class="badge-status {{ $statusClass }}">{{ ucfirst($adj->status) }}</span>
                                     </td>
                                     <td class="text-end">
-                                        <a href="{{ route('inventory.adjustments.show', $adj) }}" class="btn btn-sm btn-adj-outline btn-pill">Detail</a>
+                                        <a href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adj->getKey()]) }}" class="btn btn-sm btn-adj-outline btn-pill">Detail</a>
                                     </td>
                                 </tr>
                             @empty

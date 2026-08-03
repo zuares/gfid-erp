@@ -98,6 +98,35 @@ class ShopeeChannelMetaTest extends TestCase
         $this->assertSame(500, $result['_meta']['http_status']);
     }
 
+    public function test_gms_campaign_performance_uses_valid_payload()
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/ads/get_gms_campaign_performance*' => Http::response([
+                'response' => ['report' => []],
+            ], 200),
+        ]);
+
+        app(ShopeeChannel::class)->getGmsCampaignPerformance(
+            $store,
+            null,
+            '30-07-2026',
+            '30-07-2026'
+        );
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/ads/get_gms_campaign_performance')
+                && ($body['start_date'] ?? null) === '30-07-2026'
+                && ($body['end_date'] ?? null) === '30-07-2026'
+                && ! array_key_exists('campaign_id_list', $body)
+                && ! array_key_exists('campaign_id', $body);
+        });
+    }
+
     public function test_meta_tetap_ada_untuk_body_non_json()
     {
         $store = $this->createStore();

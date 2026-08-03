@@ -93,7 +93,19 @@ class TikTokShopChannel implements MarketplaceChannel
 
         $query['sign'] = $this->sign($store, $path, $query, $timestamp);
 
-        $response = Http::timeout(30)
+        $response = Http::connectTimeout(10)
+            ->timeout(30)
+            ->retry(2, function (int $attempt, \Throwable $exception) {
+                // Hanya retry pada error transien (5xx, connection timeout)
+                if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
+                    return $attempt * 1000;
+                }
+                if ($exception instanceof \Illuminate\Http\Client\RequestException
+                    && $exception->response->status() >= 500) {
+                    return $attempt * 1000;
+                }
+                return false; // Jangan retry 4xx (client error)
+            }, throw: false)
             ->withHeaders([
                 'x-tts-access-token' => $this->accessToken($store),
                 'content-type'       => 'application/json',
@@ -147,11 +159,13 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['error' => 'not_implemented', 'message' => 'Fitur Cetak Resi untuk TikTok Shop belum tersedia.'];
     }
 
-    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = ''): array
+    public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array
     {
+        // TikTok Shop: pakai create_time_* saat backfill histori, selain itu update_time_*.
+        $prefix = $timeRangeField === 'create_time' ? 'create_time' : 'update_time';
         $params = [
-            'update_time_ge' => $timeFrom,
-            'update_time_lt' => $timeTo,
+            $prefix . '_ge' => $timeFrom,
+            $prefix . '_lt' => $timeTo,
             'page_size'      => $pageSize,
         ];
         if ($cursor) {
@@ -195,9 +209,80 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['code' => -1, 'message' => 'Not supported for TikTok Shop'];
     }
 
+    public function getDiscountList(
+        Store $store,
+        string $status = 'ongoing',
+        int $pageNo = 1,
+        int $pageSize = 100,
+        ?int $updateTimeFrom = null,
+        ?int $updateTimeTo = null
+    ): array {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function addDiscount(Store $store, string $discountName, int $startTime, int $endTime): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function addDiscountItem(Store $store, int $discountId, array $itemList): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function updateDiscountItem(Store $store, int $discountId, array $itemList): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function endDiscount(Store $store, int $discountId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function getDiscount(Store $store, int $discountId, int $pageNo = 1, int $pageSize = 50): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function updateDiscount(
+        Store $store,
+        int $discountId,
+        ?string $discountName = null,
+        ?int $startTime = null,
+        ?int $endTime = null
+    ): array {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteDiscount(Store $store, int $discountId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteDiscountItem(Store $store, int $discountId, int $itemId, int $modelId = 0): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur diskon belum tersedia untuk TikTok Shop'];
+    }
+
+    public function getSipDiscounts(Store $store, ?string $region = null): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
+    }
+
+    public function setSipDiscount(Store $store, string $region, int $sipDiscountRate): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteSipDiscount(Store $store, string $region): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
+    }
+
     // ─── Refresh token ────────────────────────────────────────────────────────
 
-    public function refreshToken(Store $store): array
+    public function refreshToken(Store $store, bool $force = false): array
     {
         if (! $store->is_active) {
             // Toko nonaktif: jangan hubungi API auth TikTok sama sekali.
@@ -213,7 +298,9 @@ class TikTokShopChannel implements MarketplaceChannel
         $appKey    = $this->appKey($store);
         $appSecret = $this->appSecret($store);
 
-        $response = Http::timeout(30)->post($authUrl . '/api/v2/token/refresh', [
+        $response = Http::connectTimeout(10)->timeout(30)
+            ->retry(2, 1000, throw: false)
+            ->post($authUrl . '/api/v2/token/refresh', [
             'app_key'       => $appKey,
             'app_secret'    => $appSecret,
             'refresh_token' => $store->credential('refresh_token'),

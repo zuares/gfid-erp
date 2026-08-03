@@ -61,7 +61,8 @@
 
         $initTotalQty = (float) (($hppSummary['total_qty'] ?? null) ?? $rowsNow->sum(fn($r) => (float) ($r->total_qty ?? 0)));
         $initTotalVal = (float) (($hppSummary['total_value'] ?? null) ?? $rowsNow->sum(fn($r) => (float) ($r->stock_value ?? 0)));
-        $initAvgHpp = $initTotalQty > 0 ? $initTotalVal / $initTotalQty : 0;
+        $initValueQty = (float) (($hppSummary['value_qty'] ?? null) ?? $rowsNow->sum(fn($r) => (float) ($r->value_qty ?? 0)));
+        $initAvgHpp = $initValueQty > 0 ? $initTotalVal / $initValueQty : 0;
         $initAvgAds = (float) (($hppSummary['avg_ads'] ?? null) ?? ($rowsNow->count() ? (float) $rowsNow->avg(fn($r) => (float) ($r->ads ?? 0)) : 0));
 
         $initByCat = $hppByCategory ?? $rowsNow
@@ -69,11 +70,13 @@
             ->map(function ($grp, $catName) {
                 $qty = (float) $grp->sum('total_qty');
                 $val = (float) $grp->sum('stock_value');
+                $valueQty = (float) $grp->sum(fn($r) => (float) ($r->value_qty ?? 0));
                 return [
                     'category' => (string) $catName,
                     'total_qty' => $qty,
                     'total_value' => $val,
-                    'avg_hpp_weighted' => $qty > 0 ? $val / $qty : 0.0,
+                    'value_qty' => $valueQty,
+                    'avg_hpp_weighted' => $valueQty > 0 ? $val / $valueQty : 0.0,
                 ];
             })
             ->values()
@@ -228,7 +231,7 @@
                                 </div>
                             </div>
 
-                            <div class="small text-muted mt-2">* Weighted Avg HPP = total_value / total_qty</div>
+                            <div class="small text-muted mt-2">* Weighted Avg HPP = total_value / qty valuated (exclude RM)</div>
                         </div>
                     </div>
                 </div>
@@ -270,7 +273,7 @@
                             </div>
                         @endif
 
-                        <div>
+                        <div class="stock-control-desktop-only">
                             <div class="meta mb-1">Urutkan</div>
                             <select name="sort" id="sortSelect" class="form-select form-select-sm">
                                 <option value="code" @selected($sortVal === 'code')>Alfabet (Kode)</option>
@@ -287,7 +290,7 @@
                             </select>
                         </div>
 
-                        <div>
+                        <div class="stock-control-desktop-only">
                             <div class="meta mb-1">Arah</div>
                             <select name="dir" id="dirSelect" class="form-select form-select-sm">
                                 <option value="desc" @selected($dirVal === 'desc')>Menurun (Desc)</option>

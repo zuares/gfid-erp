@@ -57,17 +57,32 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         // ── Shopee Ads: sinkronisasi otomatis ───────────────────────────
-        // Setiap 4 jam: sync data harian (Balance + Campaigns + CPC + GMS) 3 hari terakhir
-        $schedule->command('marketplace:sync-ads')
-            ->everyFourHours()
-            ->withoutOverlapping(30)
-            ->name('sync-ads-main');
+        
+        // 1. Sinkronisasi data terbaru setiap jam (hari ini & kemarin)
+        $schedule->call(function () {
+            \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
+                '--from' => now()->subDay()->toDateString(),
+                '--to'   => now()->toDateString(),
+            ]);
+        })
+        ->hourly()
+        ->name('sync-ads-hourly-latest')
+        ->withoutOverlapping(30);
 
-        // Setiap jam: sync data per jam (untuk heatmap)
-        $schedule->command('marketplace:sync-ads', ['--hourly'])
-            ->hourly()
-            ->withoutOverlapping(30)
-            ->name('sync-ads-hourly');
+        // 2. Verifikasi backfill harian (mundur 14 hari untuk update data telat dari Shopee)
+        $schedule->command('marketplace:sync-ads')
+            ->dailyAt('00:00')
+            ->name('sync-ads-midnight-verify')
+            ->withoutOverlapping(60)
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/sync-ads.log'));
+
+        // Backfill chat audit lama: isi raw_payload/raw_context dan kaitkan webhook_log_id
+        // untuk message yang sempat terlewat dari jalur webhook lama.
+        $schedule->command('marketplace:repair-chat-raw-payloads', ['--limit' => 1000])
+            ->dailyAt('02:20')
+            ->name('repair-chat-raw-payloads')
+            ->withoutOverlapping();
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {

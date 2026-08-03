@@ -156,6 +156,14 @@
 
     .sr-status-submitted::before { background: #3b82f6; }
 
+    .sr-status-cancelled {
+        color: #991b1b;
+        background: rgba(239, 68, 68, .10);
+        border-color: rgba(239, 68, 68, .28);
+    }
+
+    .sr-status-cancelled::before { background: #ef4444; }
+
     .sr-status-posted {
         color: #166534;
         background: rgba(34, 197, 94, .10);
@@ -180,6 +188,85 @@
     .sr-orders {
         display: grid;
         gap: .5rem;
+    }
+
+    .sr-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .35rem;
+        padding: .25rem;
+        border: 1px solid rgba(148, 163, 184, .22);
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .sr-tab {
+        min-height: 40px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #64748b;
+        font-size: .78rem;
+        font-weight: 900;
+        cursor: pointer;
+    }
+
+    .sr-tab.active {
+        background: #111827;
+        color: #fff;
+    }
+
+    .sr-tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 22px;
+        margin-left: .25rem;
+        padding: .1rem .3rem;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, .18);
+        font-size: .66rem;
+    }
+
+    .sr-tab.active .sr-tab-count {
+        background: rgba(255, 255, 255, .2);
+    }
+
+    .sr-tab-panel[hidden] {
+        display: none;
+    }
+
+    .sr-search-wrap {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin-bottom: .55rem;
+    }
+
+    .sr-search {
+        width: 100%;
+        min-height: 40px;
+        border: 1px solid rgba(148, 163, 184, .35) !important;
+        border-radius: 8px !important;
+        padding: .45rem .7rem;
+        color: #111827;
+        font-size: .8rem;
+        font-weight: 650;
+        box-shadow: none !important;
+    }
+
+    .sr-search-count {
+        flex-shrink: 0;
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 750;
+        white-space: nowrap;
+    }
+
+    .sr-scan-time {
+        color: #94a3b8;
+        font-size: .68rem;
+        font-weight: 650;
     }
 
     .sr-order {
@@ -334,6 +421,11 @@
             padding: .55rem .6rem;
         }
 
+        .sr-search-wrap {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
         .sr-actions {
             position: fixed;
             left: 0;
@@ -365,21 +457,29 @@
 @php
     $status = $shipmentReturn->status ?? 'draft';
     $statusClass = match ($status) {
-        'submitted' => 'sr-status-submitted',
+        'cancelled' => 'sr-status-cancelled',
         'posted' => 'sr-status-posted',
         default => '',
+    };
+    $statusLabel = match ($status) {
+        'submitted', 'draft' => 'Draft',
+        'posted' => 'Diterima WH-RTS',
+        'cancelled' => 'Dibatalkan',
+        default => ucfirst($status),
     };
 
     $lines = $shipmentReturn->lines ?? collect();
     $totalQty = (int) $lines->sum('qty');
-    $groupedOrders = $shipmentReturn->orderScans->isNotEmpty()
+    $orderRecords = $shipmentReturn->orderScans->isNotEmpty()
         ? $shipmentReturn->orderScans->map(fn ($scan) => [
-            'code' => ($scan->order_number ?: $scan->order_no) ?: 'MANUAL',
-            'qty' => (int) $scan->items->sum(fn ($scanItem) => (int) ($scanItem->qty_scanned ?: $scanItem->qty)),
+            'code' => $scan->order_number ?: 'MANUAL',
+            'label' => $scan->order_number ? 'Pencatatan order' : 'Tanpa order',
+            'scanned_at' => $scan->scanned_at,
+            'qty' => (int) $scan->items->sum(fn ($scanItem) => (int) $scanItem->qty_scanned),
             'items' => $scan->items->map(fn ($scanItem) => [
                 'code' => $scanItem->item->code ?? '-',
                 'name' => $scanItem->item->name ?? '',
-                'qty' => (int) ($scanItem->qty_scanned ?: $scanItem->qty),
+                'qty' => (int) $scanItem->qty_scanned,
             ])->values(),
         ])->values()
         : $lines
@@ -387,6 +487,8 @@
             ->map(function ($group, $orderCode) {
                 return [
                     'code' => $orderCode,
+                    'label' => $orderCode === 'MANUAL' ? 'Tanpa order' : 'Retur pesanan',
+                    'scanned_at' => $group->max('scanned_at'),
                     'qty' => (int) $group->sum('qty'),
                     'items' => $group->map(fn ($line) => [
                         'code' => $line->item->code ?? '-',
@@ -396,6 +498,7 @@
                 ];
             })
             ->values();
+    $groupedOrders = $orderRecords;
 @endphp
 
 <div class="sr-show-page">
@@ -433,12 +536,12 @@
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Status</div>
                         <div class="sr-meta-value">
-                            <span class="sr-status {{ $statusClass }}">{{ ucfirst($status) }}</span>
+                            <span class="sr-status {{ $statusClass }}">{{ $statusLabel }}</span>
                         </div>
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Marketplace</div>
-                        <div class="sr-meta-value">{{ $shipmentReturn->store->code ?? '-' }} - {{ $shipmentReturn->store->name ?? '-' }}</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->store ? (($shipmentReturn->store->code ?? '-') . ' - ' . ($shipmentReturn->store->name ?? '-')) : 'Belum dihubungkan' }}</div>
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Tanggal</div>
@@ -446,7 +549,7 @@
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Shipment Asal</div>
-                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Manual' }}</div>
+                        <div class="sr-meta-value">{{ $shipmentReturn->shipment->code ?? 'Belum dihubungkan' }}</div>
                     </div>
                 </div>
             </div>
@@ -467,7 +570,7 @@
             </div>
         </div>
 
-        @if ($shipmentReturn->reason || $shipmentReturn->notes || $shipmentReturn->submitted_at || $shipmentReturn->posted_at)
+        @if ($shipmentReturn->reason || $shipmentReturn->notes || $shipmentReturn->submitted_at || $shipmentReturn->posted_at || $shipmentReturn->cancelled_at)
             <div class="sr-panel">
                 <div class="sr-panel-body">
                     <div class="sr-meta">
@@ -499,6 +602,17 @@
                                 </div>
                             </div>
                         @endif
+                        @if ($shipmentReturn->cancelled_at)
+                            <div class="sr-meta-item">
+                                <div class="sr-meta-label">Dibatalkan</div>
+                                <div class="sr-meta-value">
+                                    {{ optional($shipmentReturn->cancelled_at)->format('d M Y H:i') }}
+                                    @if ($shipmentReturn->cancelledBy)
+                                        <div class="sr-order-info">{{ $shipmentReturn->cancelledBy->name }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                         @if ($shipmentReturn->notes)
                             <div class="sr-meta-item" style="grid-column:1 / -1;">
                                 <div class="sr-meta-label">Catatan</div>
@@ -510,21 +624,35 @@
             </div>
         @endif
 
-        <div class="sr-panel">
+        <div class="sr-tabs" role="tablist" aria-label="Data retur">
+            <button type="button" class="sr-tab active" data-sr-tab="orders" role="tab" aria-selected="true">
+                Order <span class="sr-tab-count">{{ number_format($orderRecords->count(), 0, ',', '.') }}</span>
+            </button>
+            <button type="button" class="sr-tab" data-sr-tab="items" role="tab" aria-selected="false">
+                Item <span class="sr-tab-count">{{ number_format($lines->count(), 0, ',', '.') }}</span>
+            </button>
+        </div>
+
+        <div class="sr-panel sr-tab-panel" data-sr-panel="orders" role="tabpanel">
             <div class="sr-panel-body">
-                <div class="sr-orders">
-                    @forelse ($groupedOrders as $order)
-                        <div class="sr-order">
+                <div class="sr-search-wrap">
+                    <input type="search" class="form-control sr-search" id="srOrderSearch" placeholder="Cari nomor order / resi..." autocomplete="off">
+                    <span class="sr-search-count" id="srOrderSearchCount"></span>
+                </div>
+                <div class="sr-orders" id="srOrderList">
+                    @forelse ($orderRecords as $order)
+                        <div class="sr-order" data-sr-search-row data-search="{{ strtolower($order['code'] . ' ' . ($order['label'] ?? '')) }}">
                             <div class="sr-order-head">
                                 <div>
                                     <div class="sr-order-no">No Order</div>
                                     <div class="sr-order-code">{{ $order['code'] }}</div>
-                                    <div class="sr-order-info">{{ $order['code'] === 'MANUAL' ? 'Tanpa order' : 'Retur pesanan' }}</div>
+                                    <div class="sr-order-info">{{ $order['label'] ?? 'Pencatatan order' }}</div>
+                                    <div class="sr-scan-time">Scan: {{ optional($order['scanned_at'] ?? null)->format('d M Y H:i:s') ?: '-' }}</div>
                                 </div>
                                 <div class="sr-order-qty">{{ number_format($order['qty'], 0, ',', '.') }}</div>
                             </div>
                             <div class="sr-item-list">
-                                @foreach ($order['items'] as $line)
+                                @forelse ($order['items'] as $line)
                                     <div class="sr-item-row">
                                         <div class="sr-item-num">{{ $loop->iteration }}.</div>
                                         <div>
@@ -533,13 +661,41 @@
                                         </div>
                                         <div class="sr-item-qty">{{ number_format((int) ($line['qty'] ?? 0), 0, ',', '.') }}</div>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <div class="sr-empty">Order dicatat tanpa item terhubung.</div>
+                                @endforelse
                             </div>
+                        </div>
+                    @empty
+                        <div class="sr-empty">Belum ada order retur.</div>
+                    @endforelse
+                </div>
+                <div class="sr-empty" id="srOrderSearchEmpty" hidden>Order tidak ditemukan.</div>
+            </div>
+        </div>
+
+        <div class="sr-panel sr-tab-panel" data-sr-panel="items" role="tabpanel" hidden>
+            <div class="sr-panel-body">
+                <div class="sr-search-wrap">
+                    <input type="search" class="form-control sr-search" id="srItemSearch" placeholder="Cari kode atau nama item..." autocomplete="off">
+                    <span class="sr-search-count" id="srItemSearchCount"></span>
+                </div>
+                <div class="sr-item-list" id="srItemList">
+                    @forelse ($lines as $line)
+                        <div class="sr-item-row" data-sr-search-row data-search="{{ strtolower(($line->item->code ?? '') . ' ' . ($line->item->name ?? '') . ' ' . ($line->remarks ?? '')) }}">
+                            <div class="sr-item-num">{{ $loop->iteration }}.</div>
+                            <div>
+                                <div class="sr-item-code">{{ $line->item->code ?? '-' }}</div>
+                                <div class="sr-item-name">{{ $line->item->name ?? '' }}</div>
+                                <div class="sr-scan-time">Scan: {{ optional($line->scanned_at)->format('d M Y H:i:s') ?: '-' }}</div>
+                            </div>
+                            <div class="sr-item-qty">{{ number_format((int) $line->qty, 0, ',', '.') }}</div>
                         </div>
                     @empty
                         <div class="sr-empty">Belum ada item retur.</div>
                     @endforelse
                 </div>
+                <div class="sr-empty" id="srItemSearchEmpty" hidden>Item tidak ditemukan.</div>
             </div>
         </div>
 
@@ -552,16 +708,17 @@
             </div>
 
             <div class="sr-actions-group">
-                @if ($status === 'draft')
-                    <a href="{{ route('sales.shipment_returns.edit', $shipmentReturn) }}" class="sr-btn">Scan Retur</a>
-                    <form action="{{ route('sales.shipment_returns.submit', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Submit retur ini?');">
+                @if (in_array($status, ['draft', 'submitted'], true))
+                    @if ($status === 'draft')
+                        <a href="{{ route('sales.shipment_returns.edit', $shipmentReturn) }}" class="sr-btn">Scan Retur</a>
+                    @endif
+                    <form action="{{ route('sales.shipment_returns.receive', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Terima retur ini ke WH-RTS dan tambah stok?');">
                         @csrf
-                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Submit</button>
+                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Terima ke WH-RTS</button>
                     </form>
-                @elseif ($status === 'submitted')
-                    <form action="{{ route('sales.shipment_returns.post', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Posting retur ini dan tambah stok ke WH-RTS?');">
+                    <form action="{{ route('sales.shipment_returns.cancel', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Batalkan retur ini? Data tetap disimpan sebagai histori.');">
                         @csrf
-                        <button type="submit" class="sr-btn sr-btn-primary" @disabled($lines->count() === 0)>Posting WH-RTS</button>
+                        <button type="submit" class="sr-btn sr-btn-danger">Batalkan Retur</button>
                     </form>
                 @else
                     <a href="{{ route('sales.shipment_returns.index') }}" class="sr-btn sr-btn-primary">Selesai</a>
@@ -571,3 +728,62 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const tabStorageKey = @json('shipment_return_show_tab_' . $shipmentReturn->id);
+    const tabs = document.querySelectorAll('[data-sr-tab]');
+    const panels = document.querySelectorAll('[data-sr-panel]');
+
+    function setActiveTab(name, persist = true) {
+        tabs.forEach(tab => {
+            const active = tab.dataset.srTab === name;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        panels.forEach(panel => {
+            panel.hidden = panel.dataset.srPanel !== name;
+        });
+        if (persist) {
+            try { localStorage.setItem(tabStorageKey, name); } catch (error) {}
+        }
+    }
+
+    function bindSearch(inputId, listId, countId, emptyId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        const count = document.getElementById(countId);
+        const empty = document.getElementById(emptyId);
+        if (!input || !list) return;
+
+        const rows = Array.from(list.querySelectorAll('[data-sr-search-row]'));
+        const update = () => {
+            const query = input.value.trim().toLowerCase();
+            let visible = 0;
+            rows.forEach(row => {
+                const matches = !query || (row.dataset.search || '').toLowerCase().includes(query);
+                row.hidden = !matches;
+                if (matches) visible += 1;
+            });
+            if (count) count.textContent = rows.length ? `${visible}/${rows.length}` : '0';
+            if (empty) empty.hidden = rows.length === 0 || visible > 0;
+        };
+
+        input.addEventListener('input', update);
+        update();
+    }
+
+    tabs.forEach(tab => tab.addEventListener('click', () => setActiveTab(tab.dataset.srTab)));
+    bindSearch('srOrderSearch', 'srOrderList', 'srOrderSearchCount', 'srOrderSearchEmpty');
+    bindSearch('srItemSearch', 'srItemList', 'srItemSearchCount', 'srItemSearchEmpty');
+
+    let initialTab = 'orders';
+    try {
+        const savedTab = localStorage.getItem(tabStorageKey);
+        if (savedTab === 'items' || savedTab === 'orders') initialTab = savedTab;
+    } catch (error) {}
+    setActiveTab(initialTab, false);
+})();
+</script>
+@endpush

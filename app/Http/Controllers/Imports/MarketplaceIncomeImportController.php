@@ -80,6 +80,10 @@ class MarketplaceIncomeImportController extends Controller
                     ->on('sx.channel', '=', 'mp_incomes.channel')
                     ->on('sx.platform_order_id', '=', 'mp_incomes.platform_order_id');
             })
+            // Read the fields from the primary shipment selected by the aggregate
+            // instead of aggregating shipment values (important when an order has
+            // more than one shipment row).
+            ->leftJoin('mp_shipments as sp', 'sp.id', '=', 'sx.mp_shipment_id')
             ->leftJoinSub($itemsAgg, 'sia', function ($j) {
                 $j->on('sia.mp_shipment_id', '=', 'sx.mp_shipment_id');
             });
@@ -109,6 +113,14 @@ class MarketplaceIncomeImportController extends Controller
                 DB::raw('CASE WHEN sx.mp_shipment_id IS NULL THEN 0 ELSE 1 END as is_matched'),
                 DB::raw('COALESCE(sia.items_qty_sum, 0) as ship_items_qty_sum'),
                 DB::raw('COALESCE(sia.items_rows_count, 0) as ship_items_rows_count'),
+                DB::raw('sp.tracking_no as shipment_tracking_no'),
+                DB::raw('sp.marketplace_status as shipment_marketplace_status'),
+                DB::raw('sp.status_norm as shipment_status_norm'),
+                DB::raw('sp.total_qty as shipment_total_qty'),
+                DB::raw('sp.order_subtotal as shipment_order_subtotal'),
+                DB::raw('sp.discount_total as shipment_discount_total'),
+                DB::raw('sp.shipping_fee as shipment_shipping_fee'),
+                DB::raw('sp.grand_total as shipment_grand_total'),
             ])
             ->orderByDesc('mp_incomes.released_at')
             ->orderByDesc('mp_incomes.id')
@@ -152,6 +164,33 @@ class MarketplaceIncomeImportController extends Controller
     /* ============================================================
      * PREVIEW
      * ============================================================ */
+    public function previewPage(Request $request): RedirectResponse
+    {
+        $draftId = trim((string) $request->query('draft_id', ''));
+
+        if ($draftId === '') {
+            $latest = null;
+            foreach ($request->session()->all() as $key => $value) {
+                if (!str_starts_with((string) $key, 'mp_income_preview:') || !is_array($value)) {
+                    continue;
+                }
+                if (($value['mode'] ?? '') !== 'income') {
+                    continue;
+                }
+
+                if ($latest === null || (string) ($value['created_at'] ?? '') > (string) ($latest['created_at'] ?? '')) {
+                    $latest = $value;
+                    $draftId = substr((string) $key, strlen('mp_income_preview:'));
+                }
+            }
+        }
+
+        return redirect()->route(
+            'imports.marketplace_income.draft',
+            $draftId !== '' ? ['draft_id' => $draftId] : []
+        );
+    }
+
     public function preview(Request $request, MpIncomeImportService $svc): View | RedirectResponse
     {
         $data = $request->validate([
