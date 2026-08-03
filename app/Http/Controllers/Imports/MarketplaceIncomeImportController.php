@@ -153,12 +153,15 @@ class MarketplaceIncomeImportController extends Controller
      * ============================================================ */
     public function create(Request $request): View
     {
-        $stores = $this->storesList();
+        $stores = $this->storesList()
+            ->filter(fn (Store $store) => $store->is_active && $this->incomeChannelKey($store->channel) !== null)
+            ->values();
+        $selectedStoreId = (int) old('store_id', $request->integer('store_id', 0));
 
         $draftId = (string) $request->get('draft_id', '');
         $draft = $draftId !== '' ? session($this->draftKey($draftId)) : null;
 
-        return view('imports.marketplace_income.create', compact('stores', 'draft', 'draftId'));
+        return view('imports.marketplace_income.create', compact('stores', 'draft', 'draftId', 'selectedStoreId'));
     }
 
     /* ============================================================
@@ -194,10 +197,29 @@ class MarketplaceIncomeImportController extends Controller
     public function preview(Request $request, MpIncomeImportService $svc): View | RedirectResponse
     {
         $data = $request->validate([
-            'channel' => ['required', 'in:shopee,tiktok'],
+            'channel' => ['nullable', 'in:shopee,tiktok'],
             'store_id' => ['required', 'integer', 'min:1', 'exists:stores,id'],
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
         ]);
+
+        $store = Store::query()
+            ->with('channel:id,code,name')
+            ->where('is_active', true)
+            ->find((int) $data['store_id']);
+
+        if (!$store) {
+            return back()->withInput()->with('error', 'Toko tidak aktif atau tidak ditemukan. Pilih toko yang tersedia.');
+        }
+
+        $channel = $this->incomeChannelKey($store->channel);
+        if ($channel === null) {
+            return back()->withInput()->with('error', 'Channel toko belum didukung untuk import income. Gunakan toko Shopee atau TikTok Shop.');
+        }
+
+        $submittedChannel = strtolower(trim((string) ($data['channel'] ?? '')));
+        if ($submittedChannel !== '' && $submittedChannel !== $channel) {
+            return back()->withInput()->with('error', 'Channel tidak sesuai dengan toko yang dipilih. Channel sudah ditentukan otomatis dari toko.');
+        }
 
         // cleanup old draft (if re-upload)
         $oldDraftId = (string) $request->get('draft_id', '');
@@ -209,7 +231,6 @@ class MarketplaceIncomeImportController extends Controller
             session()->forget($this->draftKey($oldDraftId));
         }
 
-        $channel = strtolower(trim($data['channel']));
         $storeId = (int) $data['store_id'];
 
         $file = $request->file('file');
@@ -600,7 +621,30 @@ class MarketplaceIncomeImportController extends Controller
 
     private function storesList()
     {
-        return Store::query()->select('id', 'name')->orderBy('name')->get();
+        return Store::query()
+            ->with('channel:id,code,name')
+            ->select('id', 'name', 'channel_id', 'is_active')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function incomeChannelKey(?object $channel): ?string
+    {
+        if (!$channel) {
+            return null;
+        }
+
+        $value = strtoupper(trim((string) ($channel->code ?? '') . ' ' . (string) ($channel->name ?? '')));
+
+        if (str_contains($value, 'TIKTOK') || in_array(strtok($value, ' '), ['TTK', 'TKT'], true)) {
+            return 'tiktok';
+        }
+
+        if (str_contains($value, 'SHOPEE') || str_contains($value, ' SHP') || str_starts_with($value, 'SHP')) {
+            return 'shopee';
+        }
+
+        return null;
     }
 
     private function baseIncomeQuery(): Builder

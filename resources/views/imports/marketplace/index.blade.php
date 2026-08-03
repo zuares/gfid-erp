@@ -572,7 +572,10 @@
         <i class="bi bi-check2-square"></i> Reconcile
       </a>
       <a class="btn btn-primary btn-sm px-3" href="{{ route('imports.marketplace.create') }}">
-        <i class="bi bi-upload"></i> Import Shipment
+        <i class="bi bi-box-seam"></i> Import Order
+      </a>
+      <a class="btn btn-outline-primary btn-sm px-3" href="{{ route('imports.marketplace_income.create') }}">
+        <i class="bi bi-wallet2"></i> Import Income
       </a>
     </div>
   </section>

@@ -82,7 +82,9 @@
 
   .shipment-tabs-wrap{ display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem; padding:.28rem; border:1px solid var(--line); border-radius:999px; background:var(--card,#fff); box-shadow:var(--shadow); }
   .import-tabs{ display:flex; gap:.2rem; }
-  .import-tab{ display:inline-flex; align-items:center; gap:.35rem; padding:.52rem .82rem; border-radius:999px; background:#0f172a; color:#fff; font-size:.76rem; font-weight:850; }
+  .import-tab{ display:inline-flex; align-items:center; gap:.35rem; padding:.52rem .82rem; border-radius:999px; color:var(--ink); background:transparent; font-size:.76rem; font-weight:850; text-decoration:none; }
+  .import-tab:hover{ color:var(--ink); background:var(--soft); }
+  .import-tab.is-active{ background:#0f172a; color:#fff; }
   .shipment-tab-meta{ padding:0 .8rem; color:var(--muted); font-size:.72rem; font-weight:700; }
 
   .shipment-card{ border:1px solid var(--line); border-radius:18px; background:var(--card,#fff); box-shadow:var(--shadow); }
@@ -147,10 +149,11 @@
   </section>
 
   <div class="shipment-tabs-wrap">
-    <div class="import-tabs" role="tablist" aria-label="Navigasi import marketplace shipments">
-      <div class="import-tab" role="tab" aria-selected="true"><i class="bi bi-upload"></i> Upload Data</div>
+    <div class="import-tabs" role="tablist" aria-label="Navigasi import marketplace">
+      <a class="import-tab is-active" role="tab" aria-selected="true" href="{{ route('imports.marketplace.create') }}"><i class="bi bi-box-seam"></i> Import Order</a>
+      <a class="import-tab" role="tab" aria-selected="false" href="{{ route('imports.marketplace_income.create') }}"><i class="bi bi-wallet2"></i> Import Income</a>
     </div>
-    <div class="shipment-tab-meta">Pilih channel dan store • upload file • lanjut ke preview</div>
+    <div class="shipment-tab-meta">Order / shipment marketplace</div>
   </div>
 
   @if(session('error'))

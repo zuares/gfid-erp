@@ -414,6 +414,23 @@
     body[data-theme="dark"] .summary-label { color: #cbd5e1; }
     .summary-stats { display: flex; gap: 1.5rem; }
     .summary-stat-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; }
+    .import-modal-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .6rem;
+        padding: .8rem;
+        border: 1px solid var(--shp-border);
+        border-radius: 10px;
+        background: rgba(148,163,184,.06);
+    }
+    .import-modal-summary-label { display:block; color:#94a3b8; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .import-modal-summary-value { display:block; margin-top:.15rem; color:#0f172a; font-size:.82rem; font-weight:800; }
+    body[data-theme="dark"] .import-modal-summary-value { color:#f1f5f9; }
+    .import-mode-tabs { display:flex; gap:.35rem; padding:.25rem; border-radius:9px; background:rgba(148,163,184,.10); }
+    .import-mode-tab { flex:1; border:0; border-radius:7px; padding:.5rem .65rem; background:transparent; color:#64748b; font-size:.78rem; font-weight:800; }
+    .import-mode-tab:disabled { opacity:.45; cursor:not-allowed; }
+    .import-mode-tab.is-active { background:var(--shp-accent); color:#fff; box-shadow:0 2px 6px rgba(15,23,42,.12); }
+    .import-file-note { display:flex; align-items:flex-start; gap:.45rem; margin-top:.5rem; color:#64748b; font-size:.73rem; line-height:1.45; }
 
     @media (max-width: 575.98px) {
         .page-wrap { padding-inline: .55rem; }
@@ -458,7 +475,7 @@
             </button>
             @if($canImport)
                 <a href="{{ $importCreateUrl }}" class="btn btn-sm btn-ship-primary btn-pill">
-                    <i class="bi bi-upload"></i> Import Shipment
+                    <i class="bi bi-upload"></i> Import Order
                 </a>
             @endif
             <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="openWebhookLogs()" style="border-color:#e2e8f0;">
@@ -495,6 +512,52 @@
 </div>
 
 {{-- Modal & Skrip pendukung lainnya disembunyikan untuk kerapihan, tapi tetap berjalan --}}
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" id="importModalForm" method="POST" action="{{ route('imports.marketplace.preview') }}" enctype="multipart/form-data">
+            @csrf
+            <input type="hidden" name="channel_id" id="importModalChannelId">
+            <input type="hidden" name="channel" id="importModalChannelKey">
+            <input type="hidden" name="store_id" id="importModalStoreId">
+
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="modal-title fw-bold">Import File</h5>
+                    <div class="text-muted small" id="importModalSubtitle">Pilih jenis data yang akan diimport.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="import-mode-tabs mb-3" role="tablist" aria-label="Jenis import">
+                    <button type="button" class="import-mode-tab is-active" id="importModeOrder" onclick="setImportMode('order')"><i class="bi bi-box-seam me-1"></i> Import Order</button>
+                    <button type="button" class="import-mode-tab" id="importModeIncome" onclick="setImportMode('income')"><i class="bi bi-wallet2 me-1"></i> Import Income</button>
+                </div>
+
+                <div class="import-modal-summary mb-3">
+                    <div>
+                        <span class="import-modal-summary-label">Toko</span>
+                        <span class="import-modal-summary-value" id="importModalStoreName">—</span>
+                    </div>
+                    <div>
+                        <span class="import-modal-summary-label">Channel</span>
+                        <span class="import-modal-summary-value" id="importModalChannelName">—</span>
+                    </div>
+                </div>
+
+                <label for="importModalFile" class="form-label small fw-semibold">File Import</label>
+                <input type="file" class="form-control" id="importModalFile" name="file" accept=".xlsx,.xls,.csv" required>
+                <div class="import-file-note" id="importModalFileNote"><i class="bi bi-info-circle"></i><span>Pilih file order marketplace (.xlsx, .xls, atau .csv).</span></div>
+            </div>
+
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-ship-outline btn-pill btn-sm" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-ship-primary btn-pill btn-sm" id="importModalSubmit" disabled><i class="bi bi-search me-1"></i>Preview Order</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="modal fade" id="storeFormModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form class="modal-content" onsubmit="submitStoreForm(event)">
@@ -679,7 +742,8 @@
     let activePlatformTab = 'shopee';
     let syncStoreId = null, syncStoreName = '';
     const canImport = @json($canImport);
-    const importCreateUrl = @json($importCreateUrl);
+    const importOrderPreviewUrl = @json(route('imports.marketplace.preview'));
+    const importIncomePreviewUrl = @json(route('imports.marketplace_income.preview'));
     const $ = id => document.getElementById(id);
 
     // ── Icons for Platform ────────────────────────────────────────────────
@@ -837,10 +901,8 @@
             const connectUrl = isTiktok
                 ? `/marketplace/tiktok/connect?store_id=${s.id}`
                 : (isShopee ? `/marketplace/shopee/connect?store_id=${s.id}` : '');
-            const importUrl = canImport
-                ? `${importCreateUrl}?store_id=${encodeURIComponent(s.id)}&channel_id=${encodeURIComponent(s.channel_id || s.channel?.id || '')}`
-                : '';
             const isConn = s.connection_status === 'CONNECTED';
+            const canStoreImport = canImport && !isConn;
 
             return `
             <div class="store-card ${inactive ? 'is-inactive' : ''}">
@@ -871,7 +933,7 @@
                             <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/orders?store_id=${s.id}"><i class="bi bi-card-list me-2"></i>Semua Pesanan</a></li>
                             <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/fulfillment"><i class="bi bi-box-seam me-2"></i>Menu Packing</a></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="editStore(${s.id})"><i class="bi bi-pencil-square me-2"></i>Edit Toko</button></li>
-                            ${canImport ? `<li><a class="dropdown-item py-2 fw-semibold text-success" href="${importUrl}"><i class="bi bi-upload me-2"></i>Import File Shipment</a></li>` : ''}
+                            ${canStoreImport ? `<li><button type="button" class="dropdown-item py-2 fw-semibold text-success" onclick="openImportModal(${s.id})"><i class="bi bi-upload me-2"></i>Import File</button></li>` : ''}
                             <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="checkStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-info-square me-2"></i>Shop Info API</button></li>
                             ${isShopee ? `
@@ -931,9 +993,9 @@
                         }
                         <a href="/marketplace/orders?store_id=${s.id}" class="btn-action-secondary"><i class="bi bi-receipt"></i> Kelola</a>
                     </div>
-                    ${canImport ? `
+                    ${canStoreImport ? `
                     <div class="action-row">
-                        <a href="${importUrl}" class="btn-action-secondary"><i class="bi bi-upload"></i> Import File</a>
+                        <button type="button" class="btn-action-secondary" onclick="openImportModal(${s.id})"><i class="bi bi-upload"></i> Import File</button>
                     </div>
                     ` : ''}
                 </div>
@@ -959,6 +1021,59 @@
         `;
         summary.style.display = 'flex';
     }
+
+    let importModalStore = null;
+    let importModalMode = 'order';
+
+    window.setImportMode = function (mode) {
+        if (!importModalStore) return;
+
+        const incomeSupported = ['SHP', 'SHOPEE', 'TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP']
+            .includes(String(importModalStore.channel?.code || '').toUpperCase());
+        importModalMode = mode === 'income' && incomeSupported ? 'income' : 'order';
+
+        $('importModeOrder').classList.toggle('is-active', importModalMode === 'order');
+        $('importModeIncome').classList.toggle('is-active', importModalMode === 'income');
+        $('importModeIncome').disabled = !incomeSupported;
+        $('importModalForm').action = importModalMode === 'income' ? importIncomePreviewUrl : importOrderPreviewUrl;
+        $('importModalSubmit').innerHTML = importModalMode === 'income'
+            ? '<i class="bi bi-search me-1"></i>Preview Income'
+            : '<i class="bi bi-search me-1"></i>Preview Order';
+        $('importModalSubtitle').textContent = importModalMode === 'income'
+            ? 'Upload report payout untuk toko ini.'
+            : 'Upload file order/shipment untuk toko ini.';
+        $('importModalFileNote').innerHTML = importModalMode === 'income'
+            ? '<i class="bi bi-info-circle"></i><span>Gunakan report Income Shopee atau payout per order TikTok Shop.</span>'
+            : '<i class="bi bi-info-circle"></i><span>Pilih file order marketplace (.xlsx, .xls, atau .csv).</span>';
+    };
+
+    window.openImportModal = function (storeId) {
+        const store = stores.find(item => String(item.id) === String(storeId));
+        if (!store) return;
+
+        importModalStore = store;
+        $('importModalForm').reset();
+        $('importModalStoreId').value = store.id;
+        $('importModalChannelId').value = store.channel_id || store.channel?.id || '';
+        $('importModalChannelKey').value = storePlatformKey(store) === 'tiktok' ? 'tiktok' : 'shopee';
+        $('importModalStoreName').textContent = store.name || 'Toko Tanpa Nama';
+        $('importModalChannelName').textContent = store.channel?.name || store.channel?.code || 'Marketplace';
+        $('importModalSubmit').disabled = true;
+        setImportMode('order');
+
+        bootstrap.Modal.getOrCreateInstance($('importModal')).show();
+    };
+
+    $('importModalFile')?.addEventListener('change', function () {
+        const file = this.files?.[0];
+        const valid = file && /\.(xlsx|xls|csv)$/i.test(file.name);
+        $('importModalSubmit').disabled = !valid;
+        if (file && !valid) {
+            $('importModalFileNote').innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i><span>Format file harus .xlsx, .xls, atau .csv.</span>';
+        } else if (file) {
+            $('importModalFileNote').innerHTML = `<i class="bi bi-check-circle text-success"></i><span>${esc(file.name)} siap dipreview.</span>`;
+        }
+    });
 
     window.openSync = function (id, name) {
         syncStoreId = id;

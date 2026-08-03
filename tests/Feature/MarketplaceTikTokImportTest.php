@@ -89,7 +89,7 @@ class MarketplaceTikTokImportTest extends TestCase
         $this->actingAs($admin)
             ->get(route('marketplace.toko'))
             ->assertOk()
-            ->assertSee('Import Shipment');
+            ->assertSee('Import Order');
 
         $this->actingAs($admin)
             ->get(route('imports.marketplace.create', ['store_id' => $store->id]))
@@ -344,5 +344,52 @@ class MarketplaceTikTokImportTest extends TestCase
             'error_count' => 1,
         ]);
         $this->assertDatabaseCount('mp_shipments', 0);
+    }
+
+    public function test_income_import_uses_store_channel_and_rejects_mismatch(): void
+    {
+        $shopee = Channel::updateOrCreate(
+            ['code' => 'SHP'],
+            ['name' => 'Shopee', 'status' => 'active', 'is_active' => true]
+        );
+        $tiktok = Channel::updateOrCreate(
+            ['code' => 'TTK'],
+            ['name' => 'Tiktok', 'status' => 'active', 'is_active' => true]
+        );
+
+        $store = Store::create([
+            'code' => 'SHP-INCOME-TEST',
+            'name' => 'Shopee Income Test',
+            'channel_id' => $shopee->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'INCOME-TEST-' . uniqid(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('imports.marketplace_income.create'))
+            ->assertOk()
+            ->assertSee('Import Order')
+            ->assertSee('Import Income')
+            ->assertSee('data-income-channel="shopee"', false)
+            ->assertSee('Channel income mengikuti channel toko secara otomatis.');
+
+        // Toko Shopee tidak boleh diproses sebagai TikTok meski payload diubah manual.
+        $this->actingAs($user)
+            ->from(route('imports.marketplace_income.create'))
+            ->post(route('imports.marketplace_income.preview'), [
+                'channel' => 'tiktok',
+                'store_id' => $store->id,
+                'file' => UploadedFile::fake()->createWithContent('income.csv', "Order ID,Amount\nINCOME-001,1000\n"),
+            ])
+            ->assertRedirect(route('imports.marketplace_income.create'))
+            ->assertSessionHas('error', 'Channel tidak sesuai dengan toko yang dipilih. Channel sudah ditentukan otomatis dari toko.');
+
+        $this->assertDatabaseMissing('mp_incomes', ['store_id' => $store->id]);
+        $this->assertDatabaseHas('channels', ['id' => $tiktok->id, 'code' => 'TTK']);
     }
 }

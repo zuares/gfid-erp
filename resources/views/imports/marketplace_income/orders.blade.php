@@ -485,6 +485,9 @@
       <a class="btn btn-sm btn-primary px-3" href="{{ route('imports.marketplace_income.create') }}">
         <i class="bi bi-upload"></i> Import Income
       </a>
+      <a class="btn btn-sm btn-outline-primary px-3" href="{{ route('imports.marketplace.create') }}">
+        <i class="bi bi-box-seam"></i> Import Order
+      </a>
     </div>
   </section>
 
