@@ -1223,6 +1223,19 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     const getTo     = () => $('mpDateTo').value;
     const getSearch = () => ($('filterSearch').value || '').toLowerCase().trim();
 
+    // Semua reload order wajib memakai scope yang sama. Sebelumnya silent
+    // refresh memanggil endpoint polos sehingga setelah beberapa detik data
+    // seluruh database menimpa hasil halaman yang sudah difilter.
+    function localOrdersUrl() {
+        const lp = new URLSearchParams();
+        if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
+        if (getFrom()) lp.set('date_from', getFrom());
+        if (getTo())   lp.set('date_to', getTo());
+        lp.set('live_status', '1');
+        lp.set('live_status_scope', 'matched');
+        return '/api/marketplace/local-orders' + (lp.toString() ? ('?' + lp.toString()) : '');
+    }
+
     // Status order yang dianggap "aktif" (perlu proses / sedang packing)
     const ACTIVE_ORDER_STATUSES = ['READY_TO_SHIP', 'MATCHED', 'PROCESSED'];
 
@@ -2014,17 +2027,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         $('ordersBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         // Kirim rentang tanggal aktif ke backend supaya order lama hasil backfill
         // ikut terambil (backend tidak lagi terpaku 200 order terbaru saja).
-        const lp = new URLSearchParams();
-        if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
-        if (getFrom()) lp.set('date_from', getFrom());
-        if (getTo())   lp.set('date_to', getTo());
-        // Status tab Perlu Dikirim/Sedang Dikemas harus mengikuti status live
-        // marketplace; backend tetap menyediakan fallback database bila API gagal.
-        lp.set('live_status', '1');
-        // Sementara fokus verifikasi hanya order MATCHED agar halaman tetap cepat.
-        lp.set('live_status_scope', 'matched');
-        const url = '/api/marketplace/local-orders' + (lp.toString() ? ('?' + lp.toString()) : '');
-        orders = await api(url).catch(() => []);
+        orders = await api(localOrdersUrl()).catch(() => []);
 
         if (activeStore && !isNaN(activeStore)) {
             const storeIdNum = parseInt(activeStore, 10);
@@ -4332,7 +4335,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (el) el.remove();
             
             try {
-                const newOrders = await api('/api/marketplace/local-orders');
+                const newOrders = await api(localOrdersUrl());
                 orders = newOrders;
                 fulfillmentStatusMap.clear();
                 orders.forEach(o => {
@@ -4517,8 +4520,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             
             setTimeout(async () => {
                 try {
-                    const url = (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) ? '/api/marketplace/local-orders?dummy=1' : '/api/marketplace/local-orders';
-                    const newOrders = await api(url);
+                    const newOrders = await api(localOrdersUrl());
                     orders = newOrders;
                     fulfillmentStatusMap.clear();
                     orders.forEach(o => {
@@ -4745,7 +4747,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (silentRefreshBusy) return;
         silentRefreshBusy = true;
         try {
-            const newOrders = await api('/api/marketplace/local-orders');
+            const newOrders = await api(localOrdersUrl());
             orders = newOrders;
             fulfillmentStatusMap.clear();
             orders.forEach(o => {
