@@ -67,6 +67,15 @@ class MarketplaceOrderItem extends Model
     }
 
     /**
+     * Legacy order relation for rows created before marketplace_order_id was
+     * introduced. Both schemas point to marketplace_orders.
+     */
+    public function legacyOrder(): BelongsTo
+    {
+        return $this->belongsTo(MarketplaceOrder::class, 'order_id');
+    }
+
+    /**
      * Item internal yang sudah di-resolve dari SKU Mapping.
      */
     public function internalItem(): BelongsTo

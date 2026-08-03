@@ -30,9 +30,28 @@
     {{-- Existing Mappings --}}
     <x-gf.panel title="Mapping Terdaftar" subtitle="Seluruh mapping SKU marketplace → item internal.">
         <x-slot:actions>
-            <input type="text" id="mappingSearch" placeholder="Cari SKU atau item…"
-                style="border-radius:999px;font-size:.75rem;padding:.3rem .85rem;border:1px solid rgba(15,23,42,.1);background:#fff;min-width:200px"
-                oninput="filterMappings(this.value)">
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <input type="text" id="mappingSearch" placeholder="Cari SKU atau item…"
+                    style="border-radius:999px;font-size:.75rem;padding:.3rem .85rem;border:1px solid rgba(15,23,42,.1);background:#fff;min-width:200px"
+                    oninput="filterMappings(this.value)">
+                <select id="mappingChannelFilter" class="form-select form-select-sm"
+                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:130px"
+                    onchange="applyMappingFilters()">
+                    <option value="">Semua Channel</option>
+                    <option value="global">Global</option>
+                    <option value="shopee">Shopee</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="tokopedia">Tokopedia</option>
+                    <option value="lazada">Lazada</option>
+                </select>
+                <select id="mappingStockFilter" class="form-select form-select-sm"
+                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:125px"
+                    onchange="applyMappingFilters()">
+                    <option value="">Semua Stok</option>
+                    <option value="available">Ada Stok</option>
+                    <option value="empty">Stok Habis</option>
+                </select>
+            </div>
         </x-slot:actions>
         <div id="mappingsBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
     </x-gf.panel>
@@ -50,6 +69,9 @@
     let mappingsPaginator = null;
     let currentPage = 1;
     let currentSearch = '';
+    let currentChannel = '';
+    let currentStockStatus = '';
+    let visibleMappings = [];
 
     const $ = id => document.getElementById(id);
 
@@ -57,8 +79,7 @@
         $('unmappedBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
 
-        const params = new URLSearchParams({ page: currentPage, per_page: 50 });
-        if (currentSearch) params.append('search', currentSearch);
+        const params = mappingParams();
 
         const [um, mp] = await Promise.allSettled([
             api('/api/sku-mappings/unmapped-skus'),
@@ -87,8 +108,7 @@
     async function reloadMappingsOnly() {
         $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         
-        const params = new URLSearchParams({ page: currentPage, per_page: 50 });
-        if (currentSearch) params.append('search', currentSearch);
+        const params = mappingParams();
         
         try {
             mappingsPaginator = await api('/api/sku-mappings?' + params.toString());
@@ -98,6 +118,14 @@
             console.error(e);
             $('mappingsBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat daftar mapping.</div>';
         }
+    }
+
+    function mappingParams() {
+        const params = new URLSearchParams({ page: currentPage, per_page: 50 });
+        if (currentSearch) params.append('search', currentSearch);
+        if (currentChannel) params.append('channel_code', currentChannel);
+        if (currentStockStatus) params.append('stock_status', currentStockStatus);
+        return params;
     }
 
     function renderKpi() {
@@ -145,10 +173,11 @@
     function renderMappings() {
         const body = $('mappingsBody');
         const rows = mappingsPaginator && mappingsPaginator.data ? mappingsPaginator.data : [];
+        visibleMappings = rows;
 
         if (!rows.length) {
-            body.innerHTML = currentSearch
-                ? '<div class="oc-empty">Tidak ada mapping yang cocok.</div>'
+            body.innerHTML = currentSearch || currentChannel || currentStockStatus
+                ? '<div class="oc-empty">Tidak ada mapping yang cocok dengan filter.</div>'
                 : '<div class="oc-empty">Belum ada mapping terdaftar.</div>';
             return;
         }
@@ -179,6 +208,8 @@
                 </td>
                 <td style="font-size:.78rem;color:#64748b">${esc(m.notes || '—')}</td>
                 <td class="text-end">
+                    <button class="btn btn-light border btn-sm me-1" style="border-radius:999px;font-size:.72rem;color:#1d4ed8"
+                        onclick="editMapping(${m.id})">Edit</button>
                     <button class="btn btn-light border btn-sm" style="border-radius:999px;font-size:.72rem;color:#b91c1c"
                         onclick="deleteMapping(${m.id})">Hapus</button>
                 </td>
@@ -230,6 +261,11 @@
         reloadMappingsOnly();
     };
 
+    window.editMapping = function (id) {
+        const mapping = visibleMappings.find(row => Number(row.id) === Number(id));
+        if (mapping) mpMapping.open(mapping.marketplace_sku, window.loadData, mapping);
+    };
+
     window.deleteMapping = async function (id) {
         if (!confirm('Hapus mapping ini?')) return;
         try {
@@ -246,6 +282,13 @@
         searchTimeout = setTimeout(() => {
             reloadMappingsOnly();
         }, 400);
+    };
+
+    window.applyMappingFilters = function () {
+        currentChannel = $('mappingChannelFilter').value;
+        currentStockStatus = $('mappingStockFilter').value;
+        currentPage = 1;
+        reloadMappingsOnly();
     };
     
     // Setup initial window globals

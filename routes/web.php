@@ -388,6 +388,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/sku-mappings')->g
     Route::get('/',                  [SkuMappingController::class, 'index']);
     Route::post('/',                 [SkuMappingController::class, 'store'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::put('/{skuMapping}',      [SkuMappingController::class, 'update'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::patch('/{skuMapping}',    [SkuMappingController::class, 'update'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::delete('/{skuMapping}',   [SkuMappingController::class, 'destroy'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/search-items',      [SkuMappingController::class, 'searchItems']);

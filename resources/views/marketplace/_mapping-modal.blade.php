@@ -3,7 +3,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:20px">
             <div class="modal-header border-0">
-                <h5 class="modal-title fw-black">Tambah SKU Mapping</h5>
+                <h5 class="modal-title fw-black" id="mappingModalTitle">Tambah SKU Mapping</h5>
                 <button class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -65,7 +65,7 @@
                 <div id="mapSaveAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
                 <div class="d-flex justify-content-end gap-2">
                     <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
-                    <button class="btn btn-dark" style="border-radius:999px;font-weight:700" onclick="mpMapping.save()">Simpan</button>
+                    <button class="btn btn-dark" id="mapSaveButton" style="border-radius:999px;font-weight:700" onclick="mpMapping.save()">Simpan</button>
                 </div>
             </div>
         </div>
@@ -78,22 +78,37 @@ window.mpMapping = (function () {
     const { api, esc } = window.mpHelpers;
     let _onSaved = null; // callback after save
 
-    function open(prefillSku = '', onSaved = null) {
+    function open(prefillSku = '', onSaved = null, mapping = null) {
         _onSaved = onSaved;
-        document.getElementById('mapSku').value = prefillSku;
-        document.getElementById('mapChannel').value = '';
-        document.getElementById('mapItemId').value = '';
-        document.getElementById('mapItemSearch').value = '';
-        document.getElementById('mapItemSelected').textContent = '';
-        document.getElementById('mapNotes').value = '';
+        const modal = document.getElementById('mappingModal');
+        const isEdit = Boolean(mapping?.id);
+        document.getElementById('mapSku').value = mapping?.marketplace_sku || prefillSku;
+        const channelSelect = document.getElementById('mapChannel');
+        channelSelect.value = mapping?.channel_code || '';
+        if (mapping?.channel_code && channelSelect.value !== mapping.channel_code) {
+            const option = new Option(mapping.channel_code, mapping.channel_code);
+            channelSelect.add(option);
+            channelSelect.value = mapping.channel_code;
+        }
+        document.getElementById('mapItemId').value = mapping?.item_id || '';
+        document.getElementById('mapItemSearch').value = mapping?.item?.code || '';
+        document.getElementById('mapItemSelected').textContent = mapping?.item
+            ? `✓ ${mapping.item.code} — ${mapping.item.name}`
+            : '';
+        document.getElementById('mapNotes').value = mapping?.notes || '';
+        document.getElementById('mappingModalTitle').textContent = isEdit ? 'Edit SKU Mapping' : 'Tambah SKU Mapping';
+        document.getElementById('mapSaveButton').textContent = isEdit ? 'Update' : 'Simpan';
         document.getElementById('mapRecommendations').style.display = 'none';
         document.getElementById('mapRecoList').innerHTML = '';
         document.getElementById('mapNewItemForm').style.display = 'none';
         document.getElementById('mapNewItemAlert').className = 'alert d-none';
         document.getElementById('mapSaveAlert').className = 'alert d-none';
-        delete document.getElementById('mappingModal').dataset.editLineId;
-        new bootstrap.Modal(document.getElementById('mappingModal')).show();
-        if (prefillSku) setTimeout(() => fetchReco(prefillSku), 200);
+        delete modal.dataset.editMappingId;
+        delete modal.dataset.editLineId;
+        delete modal.dataset.editFulfillId;
+        if (isEdit) modal.dataset.editMappingId = mapping.id;
+        new bootstrap.Modal(modal).show();
+        if (!isEdit && prefillSku) setTimeout(() => fetchReco(prefillSku), 200);
     }
 
     function openForLine(lineId, fulfillId, sku) {
@@ -164,8 +179,10 @@ window.mpMapping = (function () {
         if (!sku || !itemId) { alertEl.className = 'alert alert-warning'; alertEl.textContent = 'Isi SKU dan pilih item.'; return; }
         alertEl.className = 'alert d-none';
         try {
-            await api('/api/sku-mappings', {
-                method: 'POST',
+            const modal = document.getElementById('mappingModal');
+            const mappingId = modal.dataset.editMappingId;
+            await api(mappingId ? '/api/sku-mappings/' + mappingId : '/api/sku-mappings', {
+                method: mappingId ? 'PUT' : 'POST',
                 body: JSON.stringify({
                     marketplace_sku: sku,
                     channel_code: document.getElementById('mapChannel').value || null,
@@ -175,7 +192,6 @@ window.mpMapping = (function () {
             });
 
             // Jika dibuka dari edit line fulfillment → update line sekalian
-            const modal = document.getElementById('mappingModal');
             if (modal.dataset.editLineId && modal.dataset.editFulfillId) {
                 await api(`/api/fulfillments/${modal.dataset.editFulfillId}/lines/${modal.dataset.editLineId}`, {
                     method: 'PATCH', body: JSON.stringify({ item_id: parseInt(itemId) }),

@@ -7,8 +7,8 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
-use App\Models\MarketplaceOrderItem;
 use App\Models\SkuMapping;
+use App\Services\SkuMappingPropagationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -18,6 +18,10 @@ use Illuminate\Validation\Rule;
 
 class SkuMappingController extends Controller
 {
+    public function __construct(
+        private readonly SkuMappingPropagationService $mappingPropagation,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $query = SkuMapping::with('item:id,code,name');
@@ -33,11 +37,31 @@ class SkuMappingController extends Controller
             });
         }
 
+        $channelCode = strtolower(trim((string) $request->input('channel_code')));
+        if ($channelCode === 'global') {
+            $query->whereNull('channel_code');
+        } elseif ($channelCode !== '') {
+            $query->whereRaw('LOWER(channel_code) = ?', [$channelCode]);
+        }
+
+        $stockStatus = strtolower(trim((string) $request->input('stock_status')));
+        if (in_array($stockStatus, ['available', 'empty'], true)) {
+            $stockAvailable = '(SELECT COALESCE(SUM(stock.qty), 0) - COALESCE(SUM(stock.allocated_qty), 0)
+                FROM inventory_stocks AS stock
+                WHERE stock.item_id = items.id)';
+
+            $query->whereHas('item', function ($itemQuery) use ($stockAvailable, $stockStatus) {
+                $operator = $stockStatus === 'available' ? '>' : '<=';
+                $itemQuery->whereRaw("{$stockAvailable} {$operator} 0");
+            });
+        }
+
+        $perPage = min(max($request->integer('per_page', 50), 1), 100);
         $mappings = $query->orderBy('marketplace_sku')
-            ->paginate($request->input('per_page', 50));
+            ->paginate($perPage);
 
         $itemIds = collect($mappings->items())->pluck('item_id')->filter()->unique();
-        
+
         $stocks = DB::table('inventory_stocks')
             ->whereIn('item_id', $itemIds)
             ->selectRaw('item_id, SUM(qty) as total_qty, SUM(allocated_qty) as allocated_qty')
@@ -66,6 +90,11 @@ class SkuMappingController extends Controller
             'notes'           => ['nullable', 'string', 'max:255'],
         ]);
 
+        $data['marketplace_sku'] = trim($data['marketplace_sku']);
+        $data['channel_code'] = filled($data['channel_code'] ?? null)
+            ? strtolower(trim($data['channel_code']))
+            : null;
+
         $mapping = SkuMapping::updateOrCreate(
             [
                 'marketplace_sku' => $data['marketplace_sku'],
@@ -77,41 +106,71 @@ class SkuMappingController extends Controller
             ]
         );
 
-        // Terapkan mapping LANGSUNG ke item order yang sudah tersinkron.
-        // Tanpa ini, item lama tetap berstatus "Belum Mapping" di UI (Orders,
-        // Kilat, Issues) sampai order-nya kebetulan ter-sync ulang dari Shopee.
-        try {
-            $issueService = app(\App\Services\MarketplaceIssueService::class);
-            \App\Models\MarketplaceOrderItem::query()
-                ->where(function ($q) use ($data) {
-                    $q->where('model_sku', $data['marketplace_sku'])
-                      ->orWhere(function ($qq) use ($data) {
-                          $qq->whereNull('model_sku')->where('item_sku', $data['marketplace_sku']);
-                      });
-                })
-                ->chunkById(300, function ($items) use ($issueService, $data) {
-                    foreach ($items as $it) {
-                        $attrs = $issueService->buildMappingAttributes(
-                            modelSku:    $it->model_sku,
-                            itemSku:     $it->item_sku,
-                            externalSku: null,
-                            channelCode: $data['channel_code'] ?? null,
-                            itemName:    $it->item_name,
-                            variantName: $it->variant_name,
-                        );
-                        $it->update($attrs);
-                    }
-                });
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Backfill mapping ke order items gagal: ' . $e->getMessage());
-        }
+        $this->mappingPropagation->propagate([[
+            'marketplace_sku' => $data['marketplace_sku'],
+            'channel_code' => $data['channel_code'],
+        ]]);
 
         return response()->json($mapping->load('item:id,code,name'), 201);
     }
 
+    public function update(Request $request, SkuMapping $skuMapping): JsonResponse
+    {
+        $data = $request->validate([
+            'marketplace_sku' => ['required', 'string', 'max:100'],
+            'channel_code' => ['nullable', 'string', 'max:30'],
+            'item_id' => ['required', 'integer', 'exists:items,id'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $data['marketplace_sku'] = trim($data['marketplace_sku']);
+        $data['channel_code'] = filled($data['channel_code'] ?? null)
+            ? strtolower(trim($data['channel_code']))
+            : null;
+
+        $duplicate = SkuMapping::query()
+            ->where('marketplace_sku', $data['marketplace_sku'])
+            ->where(function ($query) use ($data) {
+                $data['channel_code'] === null
+                    ? $query->whereNull('channel_code')
+                    : $query->whereRaw('LOWER(channel_code) = ?', [$data['channel_code']]);
+            })
+            ->where('id', '!=', $skuMapping->id)
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json([
+                'message' => 'SKU dan channel tersebut sudah memiliki mapping lain.',
+            ], 422);
+        }
+
+        $oldSku = $skuMapping->marketplace_sku;
+        $oldChannel = $skuMapping->channel_code;
+
+        $skuMapping->update([
+            'marketplace_sku' => $data['marketplace_sku'],
+            'channel_code' => $data['channel_code'],
+            'item_id' => $data['item_id'],
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        $this->mappingPropagation->propagate([
+            ['marketplace_sku' => $oldSku, 'channel_code' => $oldChannel],
+            ['marketplace_sku' => $data['marketplace_sku'], 'channel_code' => $data['channel_code']],
+        ]);
+
+        return response()->json($skuMapping->fresh()->load('item:id,code,name'));
+    }
+
     public function destroy(SkuMapping $skuMapping): JsonResponse
     {
+        $oldKey = [
+            'marketplace_sku' => $skuMapping->marketplace_sku,
+            'channel_code' => $skuMapping->channel_code,
+        ];
         $skuMapping->delete();
+        $this->mappingPropagation->propagate([$oldKey]);
+
         return response()->json(['message' => 'Mapping dihapus.']);
     }
 
