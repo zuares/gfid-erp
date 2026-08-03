@@ -319,6 +319,10 @@
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
+    $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
+    $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
+    $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
+    $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
     $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
     $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
 
@@ -512,6 +516,7 @@
         request()->routeIs('marketplace.settlement') ||
         request()->routeIs('marketplace.income-detail') ||
         request()->routeIs('marketplace.profit') ||
+        request()->routeIs('marketplace.reports.*') ||
         request()->routeIs('marketplace.ads') ||
         request()->routeIs('marketplace.analytics') ||
         request()->routeIs('marketplace.issues');
@@ -1460,7 +1465,7 @@
                     {{-- SALES & MARKETPLACE --}}
                     <div class="mobile-sidebar-section-label">Penjualan & Toko Online</div>
 
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues)
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
                                 type="button"
@@ -1570,6 +1575,34 @@
                                 <a href="{{ route('marketplace.profit') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.profit') ? 'active' : '' }}">
                                     <span class="icon">📈</span><span>Laba Order</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceProfitReport)
+                                <a href="{{ route('marketplace.reports.profit') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.profit*') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Laporan Keuntungan · Owner</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinancialStatement)
+                                <a href="{{ route('marketplace.reports.financial-statement') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-statement*') ? 'active' : '' }}">
+                                    <span class="icon">🧾</span><span>Laporan Keuangan · Owner</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinancialClosing)
+                                <a href="{{ route('marketplace.reports.financial-closing') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-closing*') ? 'active' : '' }}">
+                                    <span class="icon">🔒</span><span>Closing & Audit · Owner</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinancialQuality)
+                                <a href="{{ route('marketplace.reports.financial-quality') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-quality*') ? 'active' : '' }}">
+                                    <span class="icon">✅</span><span>Audit Keuangan · Owner</span>
                                 </a>
                             @endif
 

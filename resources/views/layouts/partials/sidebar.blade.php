@@ -119,6 +119,10 @@
     // Toko Online Laporan
     $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
     $hasMarketplaceSalesExport = $router->has('marketplace.reports.sales.export');
+    $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
+    $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
+    $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
+    $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
 
     // Toko Online Reconcile
     $hasMarketplaceReconcileQueue = !$isAdmin && $router->has('marketplace.reconcile.queue');
@@ -972,6 +976,13 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasMarketplaceFinancialQuality)
+                        <x-sidebar.simple-link href="{{ route('marketplace.reports.financial-quality') }}" icon="bi bi-clipboard2-data"
+                            :active="request()->routeIs('marketplace.reports.financial-quality*')">
+                            Audit Keuangan (Owner)
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasMarketplaceReconcileQueue)
                         <x-sidebar.simple-link href="{{ route('marketplace.reconcile.queue') }}" icon="bi bi-puzzle"
                             :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
@@ -1369,7 +1380,12 @@
                 $hasMarketplaceSkuMapping,
                 $hasMarketplaceSync,
                 $hasMarketplacePencairanDana,
+                $hasMarketplaceIncomeDetail,
                 $hasMarketplaceProfit,
+                $hasMarketplaceSalesReport,
+                $hasMarketplaceProfitReport,
+                $hasMarketplaceFinancialStatement,
+                $hasMarketplaceFinancialQuality,
                 $hasMarketplaceAds,
                 $hasMarketplaceAnalytics,
                 $hasMarketplaceIssues
@@ -1493,6 +1509,39 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.profit') }}" icon="bi bi-graph-up"
                                 :active="request()->routeIs('marketplace.profit')">
                                 Laba Pesanan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceProfitReport)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.profit') }}" icon="bi bi-graph-up-arrow"
+                                :active="request()->routeIs('marketplace.reports.profit*')">
+                                Laporan Keuntungan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFinancialStatement)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.financial-statement') }}" icon="bi bi-file-earmark-spreadsheet"
+                                :active="request()->routeIs('marketplace.reports.financial-statement*')">
+                                Laporan Keuangan
+                                <span class="badge rounded-pill text-bg-info ms-1">Owner</span>
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFinancialClosing)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.financial-closing') }}" icon="bi bi-lock-fill"
+                                :active="request()->routeIs('marketplace.reports.financial-closing*')">
+                                Closing & Audit
+                                <span class="badge rounded-pill text-bg-warning ms-1">Owner</span>
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceSalesReport)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-bar-chart-line"
+                                :active="request()->routeIs('marketplace.reports.sales')">
+                                Laporan Penjualan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceFinancialQuality)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.financial-quality') }}" icon="bi bi-clipboard2-data"
+                                :active="request()->routeIs('marketplace.reports.financial-quality*')">
+                                Audit Keuangan
+                                <span class="badge rounded-pill text-bg-warning ms-1">Owner</span>
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceAds)

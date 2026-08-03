@@ -1,0 +1,171 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Channel;
+use App\Models\MarketplaceOrder;
+use App\Models\Store;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class MarketplaceFinancialQualityUiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_owner_can_open_financial_quality_ui(): void
+    {
+        $owner = $this->owner();
+
+        $response = $this->actingAs($owner)
+            ->get(route('marketplace.reports.financial-quality'));
+
+        $response->assertOk()
+            ->assertSee('Audit Kualitas Data Keuangan')
+            ->assertSee('Audit dry-run')
+            ->assertSee('Audit & simpan status', false)
+            ->assertSee(route('marketplace.reports.financial-quality'), false);
+    }
+
+    public function test_non_owner_cannot_open_financial_quality_ui(): void
+    {
+        $admin = \App\Models\User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ADMIN-FIN-QUALITY',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('marketplace.reports.financial-quality'))
+            ->assertForbidden();
+    }
+
+    public function test_owner_ui_lists_orders_by_quality_status_and_store(): void
+    {
+        $store = $this->store();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-LIST-001',
+            'channel_order_id' => 'UI-LIST-001',
+            'order_date' => now(),
+            'order_status' => 'COMPLETED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'settlement_missing',
+            'financial_checked_at' => now(),
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality', [
+                'store_id' => $store->id,
+                'status' => 'incomplete',
+            ]))
+            ->assertOk()
+            ->assertSee('UI-LIST-001')
+            ->assertSee('settlement missing');
+    }
+
+    public function test_operational_filters_search_status_settlement_and_date(): void
+    {
+        $store = $this->store();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'FILTER-OPS-001',
+            'channel_order_id' => 'FILTER-OPS-001',
+            'order_date' => '2026-08-04 10:00:00',
+            'ordered_at' => '2026-08-04 10:00:00',
+            'order_status' => 'COMPLETED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'settlement_missing',
+        ]);
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'FILTER-OPS-002',
+            'channel_order_id' => 'FILTER-OPS-002',
+            'order_date' => '2026-07-01 10:00:00',
+            'ordered_at' => '2026-07-01 10:00:00',
+            'order_status' => 'SHIPPED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'settlement_missing',
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality', [
+                'store_id' => $store->id,
+                'status' => 'incomplete',
+                'q' => 'FILTER-OPS-001',
+                'order_status' => 'COMPLETED',
+                'settlement_status' => 'missing',
+                'date_from' => '2026-08-01',
+                'date_to' => '2026-08-31',
+            ]))
+            ->assertOk()
+            ->assertSee('FILTER-OPS-001')
+            ->assertDontSee('FILTER-OPS-002');
+    }
+
+    public function test_owner_can_run_dry_run_from_ui_without_writing_status(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-DRY-RUN-001',
+            'channel_order_id' => 'UI-DRY-RUN-001',
+            'order_date' => now(),
+            'order_status' => 'COMPLETED',
+        ]);
+
+        $this->actingAs($this->owner())
+            ->post(route('marketplace.reports.financial-quality.refresh'), [
+                'store_id' => (string) $store->id,
+                'dry_run' => '1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('quality_result');
+
+        $this->assertSame('unknown', $order->fresh()->financial_data_status);
+    }
+
+    public function test_owner_can_save_quality_status_from_ui(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-SAVE-001',
+            'channel_order_id' => 'UI-SAVE-001',
+            'order_date' => now(),
+            'order_status' => 'COMPLETED',
+        ]);
+
+        $this->actingAs($this->owner())
+            ->post(route('marketplace.reports.financial-quality.refresh'), [
+                'store_id' => (string) $store->id,
+                'dry_run' => '0',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('incomplete', $order->fresh()->financial_data_status);
+        $this->assertSame('settlement_missing', $order->fresh()->financial_issue_reason);
+    }
+
+    private function owner()
+    {
+        return \App\Models\User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-FIN-QUALITY-' . uniqid(),
+        ]);
+    }
+
+    private function store(): Store
+    {
+        $channel = Channel::create([
+            'code' => 'shopee',
+            'name' => 'Shopee',
+        ]);
+
+        return Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'FIN-Q-' . uniqid(),
+            'name' => 'Store Financial Quality',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+    }
+}
