@@ -885,7 +885,11 @@ body[data-theme="dark"] .dpanel-table thead th { color: #9ca3af; }
     font-size: .78rem;
     height: 32px;
     line-height: 32px;
-    max-width: 34px;
+    /* Flatpickr harus selalu 7 kolom. max-width 34px membuatnya
+       memadat menjadi 9 kolom pada kalender desktop/mobile tertentu. */
+    width: 14.2857143%;
+    max-width: 14.2857143%;
+    flex-basis: 14.2857143%;
 }
 .ads-fp .flatpickr-day.selected,
 .ads-fp .flatpickr-day.startRange,
