@@ -1373,6 +1373,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 
+    // Jangan gunakan new Date('YYYY-MM-DD'): format ISO date-only diparse
+    // sebagai UTC oleh browser dan dapat bergeser satu hari di Asia/Jakarta.
+    function parseLocalDate(value) {
+        if (value instanceof Date) {
+            return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+        }
+        const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (match) {
+            return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        }
+        return value ? new Date(value) : null;
+    }
+
     function canonicalQuery(params) {
         return [...params.entries()]
             .filter(([, value]) => value !== null && value !== undefined && String(value).length > 0)
@@ -1409,11 +1422,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if(typeof flatpickr !== 'undefined' && rangePicker) {
         flatpickr(rangePicker, {
             mode: 'range',
-            locale: 'id',
+            locale: Object.assign({}, (flatpickr.l10ns && flatpickr.l10ns.id) || {}, {
+                firstDayOfWeek: 1
+            }),
             showMonths: 1, // kompak — rentang panjang lebih cepat lewat preset di bawah kalender
             dateFormat: 'd M Y',
             altInput: false,
-            defaultDate: [new Date(fromEl.value), new Date(toEl.value)],
+            defaultDate: [parseLocalDate(fromEl.value), parseLocalDate(toEl.value)],
             onChange: function(selectedDates, dateStr, instance) {
                 if(selectedDates.length === 2) {
                     applyRange(selectedDates[0], selectedDates[1]);
@@ -2781,13 +2796,13 @@ document.addEventListener("DOMContentLoaded", function() {
     if (fromEl && toEl && fromEl.value && toEl.value) {
         // use ymd function defined earlier or create inline logic
         function ymdLocal(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
-        const dStart = new Date(fromEl.value);
-        const dEnd = new Date(toEl.value);
+        const dStart = parseLocalDate(fromEl.value);
+        const dEnd = parseLocalDate(toEl.value);
         for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
             let ds = ymdLocal(d);
             let found = rawDaily.find(item => {
                 if(!item.date) return false;
-                let itemDate = new Date(item.date);
+                let itemDate = parseLocalDate(item.date);
                 return ymdLocal(itemDate) === ds;
             });
             dailyData.push(found ? found : { date: ds, spend: 0, gmv: 0, roas: 0, impressions: 0, clicks: 0, ctr: 0 });
@@ -2984,7 +2999,7 @@ document.addEventListener("DOMContentLoaded", function() {
             data: {
                 labels: dailyData.map(d => {
                     // ubah format "2026-07-22" jadi "22 Jul"
-                    const date = new Date(d.date);
+                    const date = parseLocalDate(d.date);
                     return date.getDate() + ' ' + date.toLocaleString('id-ID', { month: 'short' });
                 }),
                 datasets: [
@@ -3254,7 +3269,7 @@ document.addEventListener("DOMContentLoaded", function() {
             type: 'line',
             data: {
                 labels: dailyData.map(d => {
-                    const date = new Date(d.date);
+                    const date = parseLocalDate(d.date);
                     return date.getDate() + ' ' + date.toLocaleString('id-ID', { month: 'short' });
                 }),
                 datasets: [
@@ -3653,8 +3668,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 let maxDays = 0;
                 const fromElHist = document.getElementById('fromHidden');
                 const toElHist = document.getElementById('toHidden');
-                const dStartHist = fromElHist && fromElHist.value ? new Date(fromElHist.value) : new Date();
-                const dEndHist = toElHist && toElHist.value ? new Date(toElHist.value) : new Date();
+                const dStartHist = fromElHist && fromElHist.value ? parseLocalDate(fromElHist.value) : new Date();
+                const dEndHist = toElHist && toElHist.value ? parseLocalDate(toElHist.value) : new Date();
                 if (dStartHist && dEndHist) {
                     maxDays = Math.round((dEndHist - dStartHist) / (1000 * 60 * 60 * 24)) + 1;
                 }
@@ -3712,10 +3727,10 @@ document.addEventListener("DOMContentLoaded", function() {
                         
                         // Align data to specific day offset
                         if (period.start) {
-                            const pStart = new Date(period.start);
+                            const pStart = parseLocalDate(period.start);
                             period.data.forEach(d => {
                                 if (d.date) {
-                                    const pDate = new Date(d.date);
+                                    const pDate = parseLocalDate(d.date);
                                     const dayOffset = Math.round((pDate - pStart) / (1000 * 60 * 60 * 24));
                                     if (dayOffset >= 0 && dayOffset < maxDays) {
                                         dataPoints[dayOffset] = getMetricValue(d, metric);
