@@ -2845,8 +2845,9 @@ class MarketplaceController extends Controller
         // memakai data lokal agar tidak menambah traffic API secara tidak perlu.
         // Letakkan setelah order kilat tambahan digabung agar order lama juga ikut
         // diverifikasi bila masih berada di salah satu tab aktif.
+        $liveStatusScope = strtolower((string) request()->query('live_status_scope', 'active'));
         $liveOrderStatuses = request()->boolean('live_status')
-            ? $this->fetchLiveOrderStatuses($orders, $kilatMap)
+            ? $this->fetchLiveOrderStatuses($orders, $kilatMap, $liveStatusScope)
             : [];
 
         $mapped = $orders->map(function ($o) use ($hasScanLog, $kilatMap, $liveOrderStatuses) {
@@ -3045,7 +3046,7 @@ class MarketplaceController extends Controller
                 ->unique('marketplace_sku')
                 ->keyBy('marketplace_sku');
 
-            $liveBookingStatuses = request()->boolean('live_status')
+            $liveBookingStatuses = request()->boolean('live_status') && $liveStatusScope !== 'matched'
                 ? $this->fetchLiveBookingStatuses($pureBookings)
                 : [];
 
@@ -3131,9 +3132,9 @@ class MarketplaceController extends Controller
      * Ambil status terbaru untuk order yang sedang berada di tab aktif.
      * Kegagalan API sengaja tidak menghilangkan order; UI akan memakai status DB.
      */
-    private function fetchLiveOrderStatuses($orders, array $kilatMap = []): array
+    private function fetchLiveOrderStatuses($orders, array $kilatMap = [], string $scope = 'active'): array
     {
-        $candidateStatuses = [
+        $candidateStatuses = $scope === 'matched' ? ['MATCHED'] : [
             'UNPAID',
             'READY_TO_SHIP',
             'MATCHED',
