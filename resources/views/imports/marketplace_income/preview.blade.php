@@ -55,13 +55,10 @@
     overflow:hidden;
     margin-bottom:.9rem;
     padding:1.15rem 1.2rem;
-    border:1px solid rgba(148,163,184,.14);
-    border-radius:22px;
-    background:
-      radial-gradient(circle at top right, rgba(96,165,250,.28), transparent 30%),
-      radial-gradient(circle at bottom left, rgba(16,185,129,.16), transparent 28%),
-      linear-gradient(135deg,#0f172a 0%,#111827 48%,#1d4ed8 135%);
-    box-shadow:0 18px 50px rgba(15,23,42,.16);
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    background:#fff;
+    box-shadow:0 14px 34px rgba(15,23,42,.06);
   }
 
   .preview-hero > * { position:relative; z-index:1; }
@@ -71,7 +68,7 @@
     align-items:center;
     gap:.35rem;
     margin-bottom:.35rem;
-    color:#93c5fd;
+    color:#475569;
     font-size:.65rem;
     font-weight:900;
     letter-spacing:.1em;
@@ -80,7 +77,7 @@
 
   .preview-title {
     margin:0;
-    color:#fff;
+    color:#1f2937;
     font-size:1.35rem;
     font-weight:900;
     letter-spacing:-.04em;
@@ -89,7 +86,7 @@
   .preview-sub {
     max-width:52rem;
     margin-top:.3rem;
-    color:rgba(226,232,240,.78);
+    color:#64748b;
     font-size:.8rem;
   }
 
@@ -108,10 +105,10 @@
     align-items:center;
     gap:.35rem;
     padding:.33rem .62rem;
-    border:1px solid rgba(255,255,255,.14);
+    border:1px solid #e2e8f0;
     border-radius:999px;
-    background:rgba(255,255,255,.08);
-    color:rgba(255,255,255,.9);
+    background:#f8fafc;
+    color:#475569;
     font-size:.69rem;
     font-weight:800;
     white-space:nowrap;
@@ -119,8 +116,9 @@
 
   .preview-hero .btn { border-radius:999px; font-weight:800; }
   .preview-hero .btn-outline-light {
-    background:rgba(255,255,255,.06);
-    border-color:rgba(255,255,255,.2);
+    background:#fff;
+    border-color:#cbd5e1;
+    color:#334155;
   }
 
   .preview-card {
