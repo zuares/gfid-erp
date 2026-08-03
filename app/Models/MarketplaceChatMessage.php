@@ -10,18 +10,25 @@ class MarketplaceChatMessage extends Model
     protected $fillable = [
         'marketplace_conversation_id',
         'store_id',
+        'source',
+        'external_conversation_id',
         'external_message_id',
         'from_role',
         'from_id',
         'message_type',
         'text',
         'content',
+        'raw_payload',
+        'raw_context',
+        'webhook_log_id',
         'sent_at',
         'is_read',
     ];
 
     protected $casts = [
         'content' => 'array',
+        'raw_payload' => 'array',
+        'raw_context' => 'array',
         'sent_at' => 'datetime',
         'is_read' => 'boolean',
     ];
@@ -34,5 +41,10 @@ class MarketplaceChatMessage extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class);
+    }
+
+    public function webhookLog(): BelongsTo
+    {
+        return $this->belongsTo(WebhookLog::class);
     }
 }

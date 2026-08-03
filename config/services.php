@@ -42,4 +42,58 @@ return [
         ],
     ],
 
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-5.6-terra'),
+    ],
+
+    'ffmpeg' => [
+        'binary' => env('FFMPEG_BINARY'),
+        'ffprobe_binary' => env('FFPROBE_BINARY'),
+    ],
+
+    'oauth' => [
+        'default_role' => env('OAUTH_DEFAULT_ROLE', env('GOOGLE_OAUTH_DEFAULT_ROLE', 'operating')),
+        'providers' => [
+            'google' => [
+                'client_id' => env('GOOGLE_OAUTH_CLIENT_ID'),
+                'client_secret' => env('GOOGLE_OAUTH_CLIENT_SECRET'),
+                'redirect' => env('GOOGLE_OAUTH_REDIRECT_URI'),
+                'scopes' => env('GOOGLE_OAUTH_SCOPES', 'openid email profile'),
+                'auth_url' => 'https://accounts.google.com/o/oauth2/v2/auth',
+                'token_url' => 'https://oauth2.googleapis.com/token',
+                'userinfo_url' => 'https://openidconnect.googleapis.com/v1/userinfo',
+                'profile_id_key' => 'sub',
+                'email_key' => 'email',
+                'name_key' => 'name',
+                'avatar_key' => 'picture',
+                'prompt' => 'select_account',
+                'access_type' => 'online',
+            ],
+            'github' => [
+                'client_id' => env('GITHUB_OAUTH_CLIENT_ID'),
+                'client_secret' => env('GITHUB_OAUTH_CLIENT_SECRET'),
+                'redirect' => env('GITHUB_OAUTH_REDIRECT_URI'),
+                'scopes' => env('GITHUB_OAUTH_SCOPES', 'read:user user:email'),
+                'auth_url' => 'https://github.com/login/oauth/authorize',
+                'token_url' => 'https://github.com/login/oauth/access_token',
+                'userinfo_url' => 'https://api.github.com/user',
+                'email_url' => 'https://api.github.com/user/emails',
+                'profile_id_key' => 'id',
+                'email_key' => 'email',
+                'name_key' => 'name',
+                'avatar_key' => 'avatar_url',
+                'primary_email' => true,
+            ],
+        ],
+    ],
+
+    'google_oauth' => [
+        'client_id' => env('GOOGLE_OAUTH_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_OAUTH_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_OAUTH_REDIRECT_URI'),
+        'scopes' => env('GOOGLE_OAUTH_SCOPES', 'openid email profile'),
+        'default_role' => env('GOOGLE_OAUTH_DEFAULT_ROLE', 'operating'),
+    ],
+
 ];

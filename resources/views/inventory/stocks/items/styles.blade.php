@@ -200,6 +200,12 @@
         }
     }
 
+    @media (max-width: 767.98px) {
+        .stock-control-desktop-only {
+            display: none !important;
+        }
+    }
+
     .search {
         position: relative;
     }

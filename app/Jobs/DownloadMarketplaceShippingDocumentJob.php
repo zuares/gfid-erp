@@ -7,6 +7,7 @@ use App\Models\MarketplaceOrder;
 use App\Services\Channels\ChannelManager;
 use App\Services\ShippingLabelOverlayService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
+class DownloadMarketplaceShippingDocumentJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -26,12 +27,30 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue
     public $backoff = [60, 180, 300]; // Wait 1min, then 3mins, then 5mins on failures
 
     /**
+     * UNIK per (store, order_sn): selama job untuk order yang sama masih antre /
+     * berjalan, dispatch baru DIABAIKAN. Tanpa ini, cron sync 5-menit men-dispatch
+     * ulang job untuk semua order READY_TO_SHIP/PROCESSED di jendelanya setiap kali
+     * jalan — antrean pernah tersumbat ~979 job duplikat.
+     */
+    public int $uniqueFor = 3600;
+
+    public function uniqueId(): string
+    {
+        return $this->storeId . ':' . $this->orderSn;
+    }
+
+    /**
      * Create a new job instance.
      */
     public function __construct($storeId, $orderSn)
     {
         $this->storeId = $storeId;
         $this->orderSn = $orderSn;
+
+        // Queue 'labels' terpisah: worker default memprosesnya SETELAH queue default
+        // kosong (--queue=default,labels), jadi webhook/real-time tak pernah tertahan
+        // di belakang unduhan resi massal.
+        $this->onQueue('labels');
     }
 
     /**

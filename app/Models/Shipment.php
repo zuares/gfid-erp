@@ -16,6 +16,7 @@ class Shipment extends Model
     protected $fillable = [
         'code',
         'shipment_type',
+        'scan_mode',
         'store_id',
         'warehouse_id',
         'sales_invoice_id',

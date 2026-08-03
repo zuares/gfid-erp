@@ -62,6 +62,11 @@
                 'name' => $it->name,
                 'item_category_id' => $it->item_category_id,
                 'item_category_name' => optional($it->category)->name,
+                'item_category_kind' => optional($it->category)->kind,
+                'product_category_id' => $it->product_category_id,
+                'product_category_name' => optional($it->productCategory)->name,
+                'product_category_kind' => optional($it->productCategory)->kind,
+                'last_purchase_price' => (float) ($it->last_purchase_price ?? 0),
             ],
         )
         ->values();

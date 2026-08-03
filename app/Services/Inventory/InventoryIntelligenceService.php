@@ -290,18 +290,24 @@ class InventoryIntelligenceService
     /** KPI ringkas untuk tab Executive Summary (dihitung dari rows()). */
     public function summary(Collection $rows): array
     {
+        $covered = $rows->whereNotNull('cover_days');
+
         return [
             'sku_total' => $rows->count(),
             'sku_demand' => $rows->where('status', '!=', 'no_demand')->count(),
+            'sku_no_demand' => $rows->where('status', 'no_demand')->count(),
             'stockout' => $rows->where('status', 'stockout')->count(),
             'kritis' => $rows->where('status', 'kritis')->count(),
             'menipis' => $rows->where('status', 'menipis')->count(),
             'sehat' => $rows->where('status', 'sehat')->count(),
             'below_target' => $rows->whereIn('status', ['stockout', 'kritis', 'menipis'])->count(),
+            'total_rts' => (float) $rows->sum('ready'),
+            'total_wh_prd' => (float) $rows->sum('wh_prd'),
             'total_ready' => (float) $rows->sum('ready_total'),
             'total_wip' => (float) $rows->sum('wip'),
             'total_suggested' => (float) $rows->sum('suggested_qty'),
             'tightest_cover' => $rows->whereNotNull('cover_days')->min('cover_days'),
+            'avg_cover' => $covered->isNotEmpty() ? round((float) $covered->avg('cover_days'), 1) : null,
         ];
     }
 }

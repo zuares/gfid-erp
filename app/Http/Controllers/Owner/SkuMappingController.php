@@ -77,6 +77,35 @@ class SkuMappingController extends Controller
             ]
         );
 
+        // Terapkan mapping LANGSUNG ke item order yang sudah tersinkron.
+        // Tanpa ini, item lama tetap berstatus "Belum Mapping" di UI (Orders,
+        // Kilat, Issues) sampai order-nya kebetulan ter-sync ulang dari Shopee.
+        try {
+            $issueService = app(\App\Services\MarketplaceIssueService::class);
+            \App\Models\MarketplaceOrderItem::query()
+                ->where(function ($q) use ($data) {
+                    $q->where('model_sku', $data['marketplace_sku'])
+                      ->orWhere(function ($qq) use ($data) {
+                          $qq->whereNull('model_sku')->where('item_sku', $data['marketplace_sku']);
+                      });
+                })
+                ->chunkById(300, function ($items) use ($issueService, $data) {
+                    foreach ($items as $it) {
+                        $attrs = $issueService->buildMappingAttributes(
+                            modelSku:    $it->model_sku,
+                            itemSku:     $it->item_sku,
+                            externalSku: null,
+                            channelCode: $data['channel_code'] ?? null,
+                            itemName:    $it->item_name,
+                            variantName: $it->variant_name,
+                        );
+                        $it->update($attrs);
+                    }
+                });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Backfill mapping ke order items gagal: ' . $e->getMessage());
+        }
+
         return response()->json($mapping->load('item:id,code,name'), 201);
     }
 

@@ -21,11 +21,19 @@ class MarketplaceOrder extends Model
         'total_amount',
         'currency',
         'ordered_at',
+        'paid_at',
+        'shipped_at',
+        'delivered_at',
         'synced_at',
+        'processed_api_checked_at',
         'shipping_arranged_at',
         'raw_json',
         'settlement_sync_error_code',
         'settlement_sync_failed_at',
+        'settlement_sync_last_attempt_at',
+        'financial_data_status',
+        'financial_issue_reason',
+        'financial_checked_at',
 
         // Legacy — digunakan modul marketplace lama
         'external_order_id',
@@ -55,19 +63,27 @@ class MarketplaceOrder extends Model
         'customer_id',
         'remarks',
         'raw_payload_json',
+        'meta',
     ];
 
     protected $casts = [
         'total_amount'  => 'decimal:2',
         'ordered_at'    => 'datetime',
+        'paid_at'       => 'datetime',
+        'shipped_at'    => 'datetime',
+        'delivered_at'  => 'datetime',
         'synced_at'     => 'datetime',
+        'processed_api_checked_at' => 'datetime',
         'shipping_arranged_at' => 'datetime',
         'settlement_sync_failed_at' => 'datetime',
+        'settlement_sync_last_attempt_at' => 'datetime',
         'raw_json'      => 'array',
+        'meta'          => 'array',
         'payment_date'  => 'datetime',
         'completed_at'  => 'datetime',
         'cancelled_at'  => 'datetime',
         'order_date'    => 'datetime',
+        'financial_checked_at' => 'datetime',
     ];
 
     public function store(): BelongsTo
@@ -88,6 +104,11 @@ class MarketplaceOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(MarketplaceOrderItem::class);
+    }
+
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(MpShipment::class, 'marketplace_order_id');
     }
 
     public function getNeedsShippingArrangementAttribute(): bool

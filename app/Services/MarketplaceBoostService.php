@@ -7,6 +7,7 @@ use App\Models\MarketplaceBoostPool;
 use App\Models\MarketplaceBoostSchedule;
 use App\Models\MarketplaceProduct;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -29,7 +30,7 @@ class MarketplaceBoostService
     public const MAX_SLOTS      = 5;
     public const COOLDOWN_HOURS = 4;
 
-    public function __construct(protected ChannelManager $manager) {}
+    public function __construct(protected MarketplaceApiGateway $gateway) {}
 
     // ─── Manual ───────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ class MarketplaceBoostService
             return ['success' => false, 'boosted' => 0, 'message' => 'Tidak ada produk valid untuk di-boost.'];
         }
 
-        $driver  = $this->manager->driver($store);
+        $driver  = $this->gateway;
         $itemIds = $products->pluck('item_id')->all();
 
         try {
@@ -77,7 +78,7 @@ class MarketplaceBoostService
      */
     public function currentlyBoosted(Store $store): array
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
 
         try {
             $res = $driver->getBoostedList($store);
@@ -141,10 +142,21 @@ class MarketplaceBoostService
     public function run(): array
     {
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->where('status', 'active')->get()
+            ->where('status', 'active')
+            ->where('is_active', true) // toko nonaktif dilewati
+            ->get()
             // Lewati toko yang belum terhubung (tanpa access_token) — kalau tidak,
             // tiap run akan gagal "invalid token" dan mengotori log.
-            ->filter(fn ($s) => filled($s->credential('access_token')));
+            // Kredensial yang tidak bisa didekripsi (mis. APP_KEY berubah)
+            // juga dilewati, bukan melempar "The MAC is invalid" tiap 5 menit.
+            ->filter(function ($s) {
+                try {
+                    return filled($s->credential('access_token'));
+                } catch (\Throwable) {
+                    \Illuminate\Support\Facades\Log::warning("[Boost] Kredensial toko {$s->name} tidak bisa dibaca — dilewati.");
+                    return false;
+                }
+            });
 
         $summary = [];
         foreach ($stores as $store) {
@@ -189,7 +201,7 @@ class MarketplaceBoostService
         }
 
         // 3. Cek slot terpakai di Shopee.
-        $driver    = $this->manager->driver($store);
+        $driver    = $this->gateway;
         $boostedIds = [];
         try {
             $boostedIds = $this->extractBoostedIds($driver->getBoostedList($store));

@@ -25,6 +25,7 @@ class MarketplaceConversation extends Model
     protected $casts = [
         'meta'            => 'array',
         'last_message_at' => 'datetime',
+        'is_answered'     => 'boolean',
     ];
 
     public function store(): BelongsTo

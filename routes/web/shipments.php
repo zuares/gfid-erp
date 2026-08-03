@@ -33,11 +33,14 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
                 Route::get('{shipment}', 'show')->name('show');
                 Route::get('{shipment}/scan-order', 'editOrderFirst')->name('scan_order');
+                Route::get('{shipment}/cancel', 'cancelForm')->name('cancel_form');
                 Route::get('{shipment}/edit', 'edit')->name('edit');
                 Route::delete('{shipment}', 'destroy')->name('destroy');
 
                 Route::post('{shipment}/clear-lines', 'clearLines')->name('clear_lines');
                 Route::get('{shipment}/scan-lookup', 'scanLookup')->name('scan_lookup');
+                Route::post('{shipment}/scan-order', 'scanOrder')->name('scan_order_store');
+                Route::post('{shipment}/order-scans/delete', 'deleteOrderScan')->name('delete_order_scan');
                 Route::post('{shipment}/scan-item', 'scanItem')->name('scan_item');
 
                 Route::post('{shipment}/submit', 'submit')->name('submit');
@@ -86,7 +89,9 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('create', 'create')->name('create');
                 Route::post('/', 'store')->name('store');
 
+                Route::post('{shipmentReturn}/scan-order', 'scanOrder')->name('scan_order');
                 Route::get('{shipmentReturn}/scan-lookup', 'scanLookup')->name('scan_lookup');
+                Route::get('{shipmentReturn}/scan-items', 'editItemFirst')->name('scan_items');
                 Route::get('{shipmentReturn}/edit', 'edit')->name('edit');
 
                 // ✅ Cetak barcode (qty label default = qty retur, bisa disesuaikan)
@@ -100,6 +105,8 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::post('{shipmentReturn}/orders/clear', 'clearOrders')->name('clear_orders');
                 Route::post('{shipmentReturn}/scan-item', 'scanItem')->name('scan_item');
                 Route::post('{shipmentReturn}/submit', 'submit')->name('submit');
+                Route::post('{shipmentReturn}/receive', 'receive')->name('receive');
+                Route::post('{shipmentReturn}/cancel', 'cancel')->name('cancel');
                 Route::post('{shipmentReturn}/post', 'post')->name('post');
                 Route::post('{shipmentReturn}/sync-scans', 'syncScans')->name('sync_scans');
             });

@@ -48,6 +48,52 @@
     /* cegah auto-zoom iOS saat focus input */
     input,select,textarea{ font-size:16px; }
 
+    /* Error modal yang ringkas dan konsisten di tengah layar. */
+    .swal2-popup.gf-minimal-error-alert{
+      border-radius:12px !important;
+      box-shadow:0 18px 48px rgba(15,23,42,.18) !important;
+    }
+    .swal2-popup.gf-minimal-error-alert .swal2-title{
+      margin:.25rem 0 .35rem !important;
+      color:#111827 !important;
+      font-size:1rem !important;
+      font-weight:800 !important;
+    }
+    .swal2-popup.gf-minimal-error-alert .swal2-html-container{
+      margin:.35rem 0 .8rem !important;
+      color:#64748b !important;
+      font-size:.84rem !important;
+      line-height:1.45 !important;
+    }
+    .swal2-popup.gf-minimal-error-alert .gf-minimal-error-alert-button{
+      min-width:72px;
+      border-radius:7px !important;
+      padding:.45rem 1rem !important;
+      font-size:.8rem !important;
+      font-weight:750 !important;
+    }
+    .swal2-popup .gf-confirm-summary{
+      width:100%;
+      margin:.25rem 0 .65rem;
+      border-collapse:collapse;
+      border:1px solid rgba(148,163,184,.22);
+      border-radius:8px;
+      overflow:hidden;
+      font-size:.8rem;
+    }
+    .swal2-popup .gf-confirm-summary th,
+    .swal2-popup .gf-confirm-summary td{
+      padding:.45rem .6rem;
+      border-bottom:1px solid rgba(148,163,184,.16);
+    }
+    .swal2-popup .gf-confirm-summary tr:last-child th,
+    .swal2-popup .gf-confirm-summary tr:last-child td{ border-bottom:0; }
+    .swal2-popup .gf-confirm-summary th{ text-align:left; color:#64748b; font-weight:700; }
+    .swal2-popup .gf-confirm-summary td{ text-align:right; color:#111827; font-weight:900; }
+    .swal2-popup .gf-confirm-summary-note{ color:#64748b; font-size:.72rem; }
+    .gf-scan-sound-toggle{ display:inline-flex; align-items:center; justify-content:center; gap:.3rem; min-height:32px; border:1px solid rgba(148,163,184,.3); border-radius:7px; padding:.28rem .55rem; background:transparent; color:#475569; font-size:.7rem; font-weight:750; cursor:pointer; }
+    .gf-scan-sound-toggle.is-off{ color:#94a3b8; border-color:rgba(148,163,184,.22); }
+
     /**
      * ✅ ANDROID FIX:
      * Jangan pakai 100vh/min-vh-100 langsung (sering berubah saat keyboard).
@@ -329,14 +375,15 @@
         <div class="page-wrap">
 
           @php
-            $hasValidationErrors = $errors instanceof \Illuminate\Support\ViewErrorBag ? $errors->any() : false;
+            $errorBag = $errors ?? null;
+            $hasValidationErrors = $errorBag instanceof \Illuminate\Support\ViewErrorBag ? $errorBag->any() : false;
           @endphp
 
           @if ($hasValidationErrors)
             <div class="alert alert-danger mb-3">
               <strong>Terjadi error:</strong>
               <ul class="mb-0">
-                @foreach ($errors->all() as $error)
+                @foreach ($errorBag->all() as $error)
                   <li>{{ $error }}</li>
                 @endforeach
               </ul>
@@ -470,7 +517,7 @@
     })();
   </script>
 
-  @if (session('success') || session('error'))
+  @if (session('success'))
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         if (!window.Swal) return;
@@ -478,11 +525,55 @@
         window.Swal.fire({
           toast: true,
           position: 'top-end',
-          icon: @json(session('success') ? 'success' : 'error'),
-          title: @json(session('success') ?: session('error')),
+          icon: 'success',
+          title: @json(session('success')),
           showConfirmButton: false,
           timer: 2600,
           timerProgressBar: true
+        });
+      });
+    </script>
+  @endif
+
+  @if (session('error'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (!window.Swal) return;
+
+        window.Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: @json(session('error')),
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#334155',
+          width: 'min(92vw, 360px)',
+          padding: '1rem',
+          customClass: {
+            popup: 'gf-minimal-error-alert',
+            confirmButton: 'gf-minimal-error-alert-button'
+          }
+        });
+      });
+    </script>
+  @endif
+
+  @if (request()->routeIs('sales.shipments.*') && session('status') === 'error' && session('message') && !session('stock_insufficient'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (!window.Swal) return;
+
+        window.Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: @json(session('message')),
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#334155',
+          width: 'min(92vw, 360px)',
+          padding: '1rem',
+          customClass: {
+            popup: 'gf-minimal-error-alert',
+            confirmButton: 'gf-minimal-error-alert-button'
+          }
         });
       });
     </script>
@@ -513,6 +604,26 @@
     - window.GFID.initDateRange(selector, options)
     - window.GFID.initGreatfitUi(root)
   ========================= --}}
+  @php
+    $gfidScanSoundMap = json_decode((string) \App\Models\SystemSetting::get(\App\Models\SystemSetting::KEY_SHIPMENT_SCAN_SOUND_MAP, '{}'), true);
+    $gfidScanSoundMap = is_array($gfidScanSoundMap) ? $gfidScanSoundMap : [];
+    $gfidScanSoundRingtoneUrls = [];
+    $gfidRingtoneIds = collect($gfidScanSoundMap)
+      ->filter(fn ($value) => is_string($value) && str_starts_with($value, 'ringtone:'))
+      ->map(fn ($value) => (int) substr($value, 9))
+      ->filter()
+      ->unique()
+      ->values();
+    if ($gfidRingtoneIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('shipment_scan_ringtones')) {
+      $gfidScanSoundRingtoneUrls = \App\Models\ShipmentScanRingtone::query()
+        ->whereIn('id', $gfidRingtoneIds)
+        ->get(['id', 'path'])
+        ->mapWithKeys(fn ($ringtone) => [
+          'ringtone:' . $ringtone->id => \Illuminate\Support\Facades\Storage::disk('public')->url($ringtone->path),
+        ])
+        ->all();
+    }
+  @endphp
   <script>
     (function(){
       window.GFID = window.GFID || {};
@@ -572,6 +683,126 @@
         }, options));
       };
 
+      window.GFID.errorAlert = function(message, options = {}){
+        if (!window.Swal) return null;
+        return Swal.fire(Object.assign({
+          icon: 'error',
+          title: 'Gagal',
+          text: message || 'Terjadi kesalahan.',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#334155',
+          width: 'min(92vw, 360px)',
+          padding: '1rem',
+          customClass: {
+            popup: 'gf-minimal-error-alert',
+            confirmButton: 'gf-minimal-error-alert-button'
+          }
+        }, options));
+      };
+
+      window.GFID.scanSoundDefault = @json(
+        (string) \App\Models\SystemSetting::get(\App\Models\SystemSetting::KEY_SHIPMENT_SCAN_SOUND, '1') !== '0'
+      );
+      window.GFID.scanSoundEnabled = window.GFID.scanSoundDefault;
+      window.GFID.scanSoundMap = @json($gfidScanSoundMap);
+      window.GFID.scanSoundRingtoneUrls = @json($gfidScanSoundRingtoneUrls);
+      window.GFID.scanSoundPresets = {
+        ok: [{freq:880,duration:.055,gap:0,type:'sine',volume:.25},{freq:1175,duration:.065,gap:.045,type:'sine',volume:.25}],
+        item: [{freq:932,duration:.045,gap:0,type:'sine',volume:.25},{freq:1244,duration:.05,gap:.035,type:'sine',volume:.25}],
+        order: [{freq:587,duration:.07,gap:0,type:'sine',volume:.25},{freq:784,duration:.08,gap:.045,type:'sine',volume:.25}],
+        orderRepeat: [{freq:659,duration:.055,gap:0,type:'sine',volume:.25},{freq:659,duration:.055,gap:.04,type:'sine',volume:.25}],
+        next: [{freq:523,duration:.06,gap:0,type:'sine',volume:.22},{freq:698,duration:.06,gap:.035,type:'sine',volume:.22},{freq:880,duration:.075,gap:.035,type:'sine',volume:.22}],
+        undo: [{freq:784,duration:.055,gap:0,type:'sine',volume:.25},{freq:523,duration:.075,gap:.04,type:'sine',volume:.25}],
+        reset: [{freq:440,duration:.07,gap:0,type:'sine',volume:.25},{freq:330,duration:.07,gap:.05,type:'sine',volume:.25},{freq:220,duration:.09,gap:.05,type:'sine',volume:.25}],
+        errorGuard: [{freq:196,duration:.09,gap:0,type:'square',volume:.22},{freq:196,duration:.09,gap:.055,type:'square',volume:.22}],
+        errorNoOrder: [{freq:220,duration:.08,gap:0,type:'triangle',volume:.24},{freq:165,duration:.105,gap:.055,type:'triangle',volume:.24}],
+        errorNetwork: [{freq:155,duration:.08,gap:0,type:'sawtooth',volume:.22},{freq:120,duration:.08,gap:.05,type:'sawtooth',volume:.22},{freq:100,duration:.11,gap:.05,type:'sawtooth',volume:.22}],
+        error: [{freq:180,duration:.09,gap:0,type:'sawtooth',volume:.22},{freq:140,duration:.12,gap:.055,type:'sawtooth',volume:.22}],
+        orderReady: [{freq:880,duration:.13,gap:0,type:'square',volume:.28},{freq:1100,duration:.13,gap:.14,type:'square',volume:.28},{freq:1320,duration:.16,gap:.28,type:'square',volume:.28}],
+        orderPartial: [{freq:880,duration:.13,gap:0,type:'square',volume:.28},{freq:660,duration:.16,gap:.14,type:'triangle',volume:.28}],
+        orderNoMatch: [{freq:660,duration:.18,gap:0,type:'triangle',volume:.25},{freq:500,duration:.18,gap:.19,type:'triangle',volume:.25}],
+      };
+      window.GFID.isScanSoundEnabled = function(){
+        return window.GFID.scanSoundEnabled !== false;
+      };
+      window.GFID.setScanSoundEnabled = function(enabled){
+        window.GFID.scanSoundEnabled = Boolean(enabled);
+      };
+      window.GFID.playScanSoundPreset = function(presetKey){
+        const notes = window.GFID.scanSoundPresets[presetKey];
+        if (!Array.isArray(notes)) return false;
+
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return false;
+          const ctx = window.GFID.scanAudioContext || (window.GFID.scanAudioContext = new Ctx());
+          const play = () => {
+            let cursor = ctx.currentTime;
+            notes.forEach(note => {
+              cursor += Number(note.gap || 0);
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = note.type || 'sine';
+              osc.frequency.setValueAtTime(Number(note.freq), cursor);
+              gain.gain.setValueAtTime(0.0001, cursor);
+              gain.gain.exponentialRampToValueAtTime(Number(note.volume || .22), cursor + .01);
+              gain.gain.exponentialRampToValueAtTime(.001, cursor + Number(note.duration || .1));
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start(cursor);
+              osc.stop(cursor + Number(note.duration || .1) + .02);
+            });
+          };
+          if (ctx.state === 'suspended') {
+            ctx.resume().then(play).catch(() => {});
+          } else {
+            play();
+          }
+          return true;
+        } catch (e) {
+          return false;
+        }
+      };
+      window.GFID.playScanSound = function(eventKey, fallback){
+        if (!window.GFID.isScanSoundEnabled()) return;
+
+        const selected = window.GFID.scanSoundMap[eventKey];
+        if (typeof selected === 'string' && selected.startsWith('ringtone:')) {
+          const url = window.GFID.scanSoundRingtoneUrls[selected];
+          if (url && window.Audio) {
+            const audio = new Audio(url);
+            audio.preload = 'auto';
+            audio.volume = .85;
+            const result = audio.play();
+            if (result && typeof result.catch === 'function') {
+              result.catch(() => typeof fallback === 'function' && fallback());
+            }
+            return;
+          }
+        }
+        if (typeof selected === 'string' && selected.startsWith('builtin:')) {
+          if (window.GFID.playScanSoundPreset(selected.slice(8))) return;
+        }
+        if (typeof fallback === 'function') fallback();
+      };
+      window.GFID.bindScanSoundToggle = function(button){
+        if (!button) return;
+
+        function render(){
+          const enabled = window.GFID.isScanSoundEnabled();
+          button.classList.toggle('is-off', !enabled);
+          button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+          button.textContent = enabled ? '🔊 Suara ON' : '🔇 Suara OFF';
+          button.title = enabled ? 'Matikan suara scan' : 'Nyalakan suara scan';
+        }
+
+        render();
+        button.addEventListener('click', function(){
+          window.GFID.setScanSoundEnabled(!window.GFID.isScanSoundEnabled());
+          render();
+        });
+      };
+
       function isDateLikeInput(el){
         if (!el || el.tagName !== 'INPUT') return false;
         if (el.dataset.gfDate === 'off') return false;
@@ -603,6 +834,34 @@
       function initConfirmables(root){
         const scope = root || document;
 
+        function confirmBody(el, fallbackText){
+          const rawSummary = el.dataset.gfConfirmSummary;
+          if (!rawSummary) return { text: fallbackText };
+
+          try {
+            const summary = JSON.parse(rawSummary);
+            const escapeHtml = (value) => String(value ?? '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+            const rows = [
+              ['Order discan', summary.orders ?? 0],
+              ['Item / SKU', summary.items ?? 0],
+              ['Total qty', summary.qty ?? 0],
+            ];
+
+            return {
+              html: `<table class="gf-confirm-summary"><tbody>${rows.map(([label, value]) => `
+                <tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>
+              `).join('')}</tbody></table><div class="gf-confirm-summary-note">Periksa kembali sebelum proses dilanjutkan.</div>`
+            };
+          } catch (error) {
+            return { text: fallbackText };
+          }
+        }
+
         scope.querySelectorAll('form[data-gf-confirm], form[data-confirm]').forEach((form) => {
           if (form.dataset.gfConfirmBound === '1') return;
           form.dataset.gfConfirmBound = '1';
@@ -613,7 +872,7 @@
 
             Swal.fire({
               title: form.dataset.gfConfirmTitle || form.dataset.confirmTitle || 'Lanjutkan?',
-              text: form.dataset.gfConfirmText || form.dataset.confirmText || 'Pastikan data sudah benar sebelum diproses.',
+              ...confirmBody(form, form.dataset.gfConfirmText || form.dataset.confirmText || 'Pastikan data sudah benar sebelum diproses.'),
               icon: form.dataset.gfConfirmIcon || form.dataset.confirmIcon || 'question',
               showCancelButton: true,
               confirmButtonText: form.dataset.gfConfirmOk || form.dataset.confirmOk || 'Ya, lanjutkan',
@@ -636,7 +895,7 @@
 
             Swal.fire({
               title: el.dataset.gfConfirmTitle || 'Lanjutkan?',
-              text: el.dataset.gfConfirmText || 'Aksi ini akan diproses.',
+              ...confirmBody(el, el.dataset.gfConfirmText || 'Aksi ini akan diproses.'),
               icon: el.dataset.gfConfirmIcon || 'question',
               showCancelButton: true,
               confirmButtonText: el.dataset.gfConfirmOk || 'Ya, lanjutkan',
@@ -788,7 +1047,13 @@
                 'ops' => 'OPS',
                 default => 'DB?',
             };
+            $gfShowDevPet = $gfOwnerUser->isDeveloper() || $gfDbMode === 'ops';
         @endphp
+
+        @if ($gfShowDevPet)
+            @include('layouts.partials.dev-ai-pet')
+        @endif
+
         <div class="gf-owner-floating-tools">
             <div class="dropup gf-owner-mode-wrap">
                 <button type="button"

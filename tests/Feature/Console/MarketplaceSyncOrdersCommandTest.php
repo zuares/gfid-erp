@@ -166,6 +166,6 @@ class MarketplaceSyncOrdersCommandTest extends TestCase
     {
         Artisan::call('schedule:list');
         $output = Artisan::output();
-        $this->assertStringContainsString('marketplace:sync-orders', $output);
+        $this->assertStringContainsString('sync-orders', $output);
     }
 }

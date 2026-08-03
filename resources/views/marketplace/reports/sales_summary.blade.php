@@ -40,7 +40,7 @@
 
     <div class="col-auto">
       <select name="date_field" class="form-select">
-        @foreach(['shipped_at','paid_at','order_created_at','delivered_at','completed_at'] as $f)
+        @foreach(['ordered_at','paid_at','shipped_at','delivered_at','completed_at','settlement_time'] as $f)
           <option value="{{ $f }}" @selected($dateField===$f)>{{ $f }}</option>
         @endforeach
       </select>

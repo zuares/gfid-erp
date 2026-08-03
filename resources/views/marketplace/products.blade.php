@@ -108,6 +108,26 @@
     .prd-caret{ cursor:pointer; user-select:none; color:#64748b; font-size:.8rem; }
     .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
 
+    /* Autosuggest item untuk SKU varian di tab Bermasalah */
+    .variant-sku-suggest{ position:relative; width:180px; }
+    .variant-sku-suggest .input-group{ width:100%; }
+    .variant-sku-results{
+        display:none; position:absolute; left:0; right:0; top:calc(100% + 3px); z-index:10050;
+        max-height:210px; overflow-y:auto; background:var(--card,#fff);
+        border:1px solid rgba(148,163,184,.35); border-radius:7px;
+        box-shadow:0 8px 18px rgba(15,23,42,.16);
+    }
+    body[data-theme="dark"] .variant-sku-results{ background:#1e293b; border-color:rgba(51,65,85,.9); }
+    .variant-sku-option{
+        display:block; width:100%; padding:.42rem .55rem; border:0; border-bottom:1px solid rgba(148,163,184,.14);
+        background:transparent; color:inherit; text-align:left; cursor:pointer; font-size:.7rem;
+    }
+    .variant-sku-option:last-child{ border-bottom:0; }
+    .variant-sku-option:hover{ background:rgba(59,130,246,.12); }
+    .variant-sku-option-code{ display:block; font-weight:750; }
+    .variant-sku-option-name{ display:block; color:#64748b; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body[data-theme="dark"] .variant-sku-option-name{ color:#cbd5e1; }
+
     /* ── Tabs (Produk / Boost) ── */
     .store-tab { 
         background: transparent; border: none; padding: .4rem .8rem; font-size: .8rem; font-weight: 600; 
@@ -416,7 +436,9 @@
     }
     function productMapState(p) {
         const models = p.models || [];
-        if (!models.length) return 'nosku';
+        if (!models.length) {
+            return p.item_sku ? (p.mapping ? 'mapped' : 'unmapped') : 'nosku';
+        }
         const states = models.map(modelMapState);
         if (states.every(s => s === 'nosku')) return 'nosku';
         return states.some(s => s === 'unmapped') ? 'unmapped' : 'mapped';
@@ -519,13 +541,15 @@
         return `<b>${n}</b>`;
     }
 
-    function mappingBadge(m) {
-        if (!m.model_sku) return '<span class="badge-status st-map-warn">SKU kosong</span>';
-        if (m.mapping) {
-            return `<span class="badge-status st-map-ok" title="${esc(m.mapping.item_name || '')}">${esc(m.mapping.item_code || m.mapping.item_id)}</span>
-                <button class="btn btn-prd-outline btn-mini" onclick="openMapModal('${esc(m.model_sku)}')" title="Ganti mapping">✎</button>`;
+    function mappingBadge(m, skuOverride = null, mappingOverride = undefined) {
+        const sku = skuOverride ?? m.model_sku ?? '';
+        const mapping = mappingOverride === undefined ? m.mapping : mappingOverride;
+        if (!sku) return '<span class="badge-status st-map-warn">SKU kosong</span>';
+        if (mapping) {
+            return `<span class="badge-status st-map-ok" title="${esc(mapping.item_name || '')}">${esc(mapping.item_code || mapping.item_id)}</span>
+                <button class="btn btn-prd-outline btn-mini" onclick="openMapModal('${esc(sku)}')" title="Ganti mapping">✎</button>`;
         }
-        return `<button class="btn btn-outline-danger btn-mini" onclick="openMapModal('${esc(m.model_sku)}')">❌ Map</button>`;
+        return `<button class="btn btn-outline-danger btn-mini" onclick="openMapModal('${esc(sku)}')">❌ Map</button>`;
     }
 
     function mappingSummary(models) {
@@ -647,19 +671,22 @@
                 <td>${stockCell(p.stock_total)}</td>
                 <td class="muted">${p.sales ?? '—'}</td>
                 <td>${stats}</td>
-                <td>${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : '—')}</td>
+                <td data-product-mapping="${p.id}">${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : mappingBadge(p, p.item_sku, p.mapping))}</td>
                 <td>
                     ${aksiContent}
                 </td>
             </tr>`;
 
             const modelRows = multiModel ? models.map(m => `
-                <tr class="model-row mr-${p.id}" style="${isModelOpened ? '' : 'display:none'}">
+                <tr class="model-row mr-${p.id}" data-model-id="${esc(m.model_id)}" style="${isModelOpened ? '' : 'display:none'}">
                     <td></td><td></td>
                     <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} 
-                        <div class="input-group input-group-sm mt-1" style="max-width:180px;">
-                            <input type="text" class="form-control px-2" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" placeholder="Kode Variasi">
-                            <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveSkuInline(${p.id}, '${m.model_id}')" style="padding:1px 8px;" title="Simpan SKU">💾</button>
+                        <div class="variant-sku-suggest mt-1">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control px-2 js-variant-sku-input" style="font-size:.72rem" value="${esc(m.model_sku || '')}" id="vsku-${p.id}-${m.model_id}" data-product-id="${p.id}" data-model-id="${esc(m.model_id)}" placeholder="Kode Variasi" autocomplete="off">
+                                <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveSkuInline(${p.id}, '${m.model_id}')" style="padding:1px 8px;" title="Simpan SKU">💾</button>
+                            </div>
+                            <div class="variant-sku-results" role="listbox"></div>
                         </div>
                     </td>
                     <td></td>
@@ -667,7 +694,7 @@
                     <td>${stockCell(m.stock)}</td>
                     <td></td>
                     <td></td>
-                    <td>${mappingBadge(m)}</td>
+                    <td class="variant-mapping-cell">${mappingBadge(m)}</td>
                     <td><div class="d-flex align-items-center gap-1">${inlineEditors(p.id, m)}<button class="btn btn-outline-secondary btn-mini" onclick="showHistory(${p.id})" style="padding:1px 5px" title="Riwayat">📈</button></div></td>
                 </tr>`).join('') : '';
 
@@ -684,6 +711,118 @@
         if (show) openedModels.add(pid);
         else openedModels.delete(pid);
     };
+
+    // ── Autosuggest item untuk input SKU varian ─────────────────────────────
+    // Input dirender ulang setiap kali tabel di-render, jadi gunakan event delegation.
+    function closeVariantSuggestions(except = null) {
+        document.querySelectorAll('.variant-sku-results').forEach(box => {
+            if (!except || box !== except) box.style.display = 'none';
+        });
+    }
+
+    function renderVariantSuggestions(input, items) {
+        const box = input.closest('.variant-sku-suggest')?.querySelector('.variant-sku-results');
+        if (!box) return;
+
+        box.innerHTML = '';
+        if (!items.length) {
+            box.innerHTML = '<div class="p-2 text-muted" style="font-size:.7rem">Item tidak ditemukan</div>';
+            box.style.display = 'block';
+            return;
+        }
+
+        items.slice(0, 8).forEach(item => {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'variant-sku-option';
+            option.dataset.code = item.code || '';
+            option.dataset.itemId = item.id || '';
+            option.dataset.itemName = item.name || '';
+            option.innerHTML = `<span class="variant-sku-option-code"></span><span class="variant-sku-option-name"></span>`;
+            option.querySelector('.variant-sku-option-code').textContent = (item.code || '').toUpperCase();
+            option.querySelector('.variant-sku-option-name').textContent = item.name || '';
+            box.appendChild(option);
+        });
+
+        closeVariantSuggestions(box);
+        box.style.display = 'block';
+    }
+
+    async function loadVariantSuggestions(input) {
+        const box = input.closest('.variant-sku-suggest')?.querySelector('.variant-sku-results');
+        if (!box) return;
+
+        const q = input.value.trim();
+        if (q.length < 2) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const requestId = String(Number(input.dataset.suggestRequest || 0) + 1);
+        input.dataset.suggestRequest = requestId;
+        box.innerHTML = '<div class="p-2 text-muted" style="font-size:.7rem">Mencari item…</div>';
+        closeVariantSuggestions(box);
+        box.style.display = 'block';
+
+        try {
+            const result = await api('/api/v1/items/suggest?q=' + encodeURIComponent(q) + '&limit=8');
+            if (input.dataset.suggestRequest !== requestId) return;
+            renderVariantSuggestions(input, Array.isArray(result?.data) ? result.data : []);
+        } catch (e) {
+            if (input.dataset.suggestRequest !== requestId) return;
+            box.innerHTML = '<div class="p-2 text-danger" style="font-size:.7rem">Autosuggest gagal dimuat</div>';
+            box.style.display = 'block';
+        }
+    }
+
+    let variantSuggestTimer = null;
+    document.addEventListener('focusin', e => {
+        const input = e.target.closest('.js-variant-sku-input');
+        if (!input) return;
+
+        // Memudahkan mengganti SKU varian yang sudah ada.
+        input.select();
+        clearTimeout(variantSuggestTimer);
+        variantSuggestTimer = setTimeout(() => loadVariantSuggestions(input), 80);
+    });
+
+    document.addEventListener('input', e => {
+        const input = e.target.closest('.js-variant-sku-input');
+        if (!input) return;
+
+        clearTimeout(variantSuggestTimer);
+        variantSuggestTimer = setTimeout(() => loadVariantSuggestions(input), 220);
+    });
+
+    document.addEventListener('mousedown', e => {
+        const option = e.target.closest('.variant-sku-option');
+        if (option) {
+            e.preventDefault();
+            const input = option.closest('.variant-sku-suggest')?.querySelector('.js-variant-sku-input');
+            if (!input) return;
+            clearTimeout(variantSuggestTimer);
+            input.value = option.dataset.code || '';
+            input.focus();
+            input.select();
+            clearTimeout(variantSuggestTimer);
+            closeVariantSuggestions();
+            if (option.dataset.itemId) {
+                autoMapVariantSelection(input, {
+                    id: Number(option.dataset.itemId),
+                    code: option.dataset.code || '',
+                    name: option.dataset.itemName || '',
+                });
+            }
+            return;
+        }
+
+        if (!e.target.closest('.variant-sku-suggest')) closeVariantSuggestions();
+    });
+
+    document.addEventListener('keydown', e => {
+        const input = e.target.closest('.js-variant-sku-input');
+        if (input && e.key === 'Escape') closeVariantSuggestions();
+    });
 
     // ── Aksi stok / harga / unlist ──────────────────────────────────────────
     window.saveStock = async function (pid, modelId) {
@@ -804,6 +943,94 @@
         }
     };
 
+    function updateVariantMappingUi(pid, modelId, model) {
+        const row = [...document.querySelectorAll(`tr.mr-${pid}`)]
+            .find(el => String(el.dataset.modelId) === String(modelId));
+        const mappingCell = row?.querySelector('.variant-mapping-cell');
+        if (mappingCell) mappingCell.innerHTML = mappingBadge(model);
+
+        const product = products.find(p => String(p.id) === String(pid));
+        const productCell = document.querySelector(`tr[data-pid="${pid}"] [data-product-mapping="${pid}"]`);
+        if (product && productCell) {
+            productCell.innerHTML = product.has_model
+                ? mappingSummary(product.models || [])
+                : (product.models?.length ? mappingBadge(product.models[0]) : '—');
+        }
+    }
+
+    async function autoMapVariantSelection(input, item) {
+        const pid = input.dataset.productId;
+        const modelId = input.dataset.modelId;
+        const product = products.find(p => String(p.id) === String(pid));
+        const model = product?.models?.find(m => String(m.model_id) === String(modelId));
+        const sku = (item.code || '').trim();
+        const saveButton = input.closest('.variant-sku-suggest')?.querySelector('button[title="Simpan SKU"]');
+
+        if (!product || !model || !sku || !item.id) return;
+
+        const previousSku = model.model_sku || '';
+        const previousMapping = model.mapping || null;
+        const originalButtonText = saveButton?.innerHTML || '💾';
+        let skuSaved = false;
+
+        input.disabled = true;
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.innerHTML = '⏳';
+        }
+
+        try {
+            // Pilihan autosuggest juga langsung menyimpan SKU varian ke marketplace.
+            if (previousSku !== sku) {
+                const skuResponse = await fetch(`/api/marketplace/products/${pid}/model-sku`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ model_id: modelId, new_sku: sku })
+                });
+                const skuData = await skuResponse.json().catch(() => ({}));
+                if (!skuResponse.ok) throw new Error(skuData.message || 'Gagal update SKU');
+
+                model.model_sku = sku;
+                model.mapping = null;
+                skuSaved = true;
+            }
+
+            // Buat/update mapping tanpa memuat ulang seluruh tabel.
+            const mapping = await api('/api/sku-mappings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    marketplace_sku: sku,
+                    channel_code: null,
+                    item_id: Number(item.id),
+                    notes: 'auto-map dari autosuggest SKU varian'
+                })
+            });
+
+            model.mapping = {
+                id: mapping.id,
+                item_id: mapping.item_id ?? mapping.item?.id ?? Number(item.id),
+                item_code: mapping.item?.code ?? item.code,
+                item_name: mapping.item?.name ?? item.name,
+            };
+            updateVariantMappingUi(pid, modelId, model);
+            input.value = sku;
+            toast(`Varian ${sku} tersimpan & auto-map ✔`);
+        } catch (e) {
+            if (!skuSaved) {
+                input.value = previousSku;
+                model.mapping = previousMapping;
+            }
+            updateVariantMappingUi(pid, modelId, model);
+            toast(skuSaved ? `SKU tersimpan, mapping gagal: ${e.message}` : `Gagal auto-map: ${e.message}`, 'error');
+        } finally {
+            input.disabled = false;
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalButtonText;
+            }
+        }
+    }
+
     window.saveIndukSkuInline = async function (pid) {
         const inp = document.getElementById(`isku-${pid}`);
         const newSku = inp.value;
@@ -821,6 +1048,7 @@
             if (!res.ok) throw new Error(dat.message || 'Gagal update SKU');
             
             prod.item_sku = newSku;
+            prod.mapping = null;
             toast('Induk SKU berhasil disimpan ✔');
             
             if (!prod.has_model) {
@@ -893,6 +1121,9 @@
             products.forEach(p => (p.models || []).forEach(m => {
                 if (m.model_sku === sku) m.mapping = map;
             }));
+            products.forEach(p => {
+                if (p.item_sku === sku) p.mapping = map;
+            });
 
             toast(`SKU ${sku} berhasil di-mapping ✔`);
             render();

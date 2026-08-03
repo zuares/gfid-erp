@@ -199,27 +199,42 @@ class ShippingLabelOverlayService
                 // Cap footer height at 20% of document height (approx 30mm for thermal)
                 $maxFooterHeight = $height * 0.20;
                 $reservedBottom = 0;
-                
+
+                $footerTopPadding = 0.75;
+                $footerBottomPadding = 0.75;
+                $dividerHeight = $showDivider ? 1.0 : 0.0;
                 $footerImgWidth = 0;
                 $footerImgHeight = 0;
-                
+                $socialRowHeight = !empty($socialAccountsFormatted) ? 4.0 : 0.0;
+
                 if ($footerImgSize) {
                     $scaledWidth = $width; // Full width, no side margins
                     $scaledHeight = ($footerImgSize[1] / $footerImgSize[0]) * $scaledWidth;
-                    
+
                     if ($scaledHeight > $maxFooterHeight) {
                         $scaledHeight = $maxFooterHeight;
                         $scaledWidth = ($footerImgSize[0] / $footerImgSize[1]) * $scaledHeight;
                     }
-                    
+
                     $footerImgWidth = $scaledWidth;
                     $footerImgHeight = $scaledHeight;
-                    // Reserve space for image + social media row below it
-                    $socialRowHeight = !empty($socialAccountsFormatted) ? 2.5 : 0;
-                    $reservedBottom = $footerImgHeight + $socialRowHeight + 0.5;
+                    // Reserve exact footer stack height so the content ends
+                    // right before the footer band starts.
+                    $reservedBottom = $footerTopPadding + $dividerHeight + $footerImgHeight + $socialRowHeight + $footerBottomPadding;
                 } else {
+                    $textFooterHeight = 0.0;
                     if ($senderName || $senderPhone) {
-                        $reservedBottom = 12; // Moderate space for text footer
+                        $textFooterHeight += 4.0;
+                    }
+                    if ($greetingStr) {
+                        $textFooterHeight += 3.5;
+                    }
+                    if ($socialRowHeight > 0) {
+                        $textFooterHeight += $socialRowHeight;
+                    }
+
+                    if ($textFooterHeight > 0) {
+                        $reservedBottom = $footerTopPadding + $dividerHeight + $textFooterHeight + $footerBottomPadding;
                     }
                 }
                 
@@ -233,28 +248,26 @@ class ShippingLabelOverlayService
                 $pdf->Rect(0, $height - $reservedBottom, $width, $reservedBottom, 'F');
                 
                 // Draw Footer
-                $pdf->SetY($height - $reservedBottom + 1);
-                
-                if ($showDivider) {
+                $footerTopY = $height - $reservedBottom;
+                $currentY = $reservedBottom > 0 ? $footerTopY + $footerTopPadding : $footerTopY;
+
+                $pdf->SetY($currentY);
+
+                if ($reservedBottom > 0 && $showDivider) {
                     $pdf->SetDrawColor(200, 200, 200);
                     // Draw a simple dashed line manually by short segments
-                    $yLine = $height - $reservedBottom + 1;
+                    $yLine = $currentY;
                     for ($xLine = 0; $xLine < $width; $xLine += 4) {
                         $pdf->Line($xLine, $yLine, $xLine + 2, $yLine);
                     }
-                    $pdf->SetY($height - $reservedBottom + 2);
+                    $currentY += 1.0;
+                    $pdf->SetY($currentY);
                 }
                 
-                if ($footerImgSize && $footerImgHeight > 0) {
-                    // Full width, flush to edges
-                    $xPos = ($width - $footerImgWidth) / 2;
-                    
-                    // Keep social media fixed at a safe distance from the bottom
-                    $socialMediaY = $height - 3.5; 
-                    
-                    // Push footer image down so it sits closer to social media
-                    // We allow it to overlap the social media's top margin slightly since the image has white space
-                    $imgY = $socialMediaY - $footerImgHeight + 2.5; // +2.5mm pushes the image DOWN
+                if ($reservedBottom > 0 && $footerImgSize && $footerImgHeight > 0) {
+                    // Keep the footer block attached directly under the label body.
+                    $xPos = max(0, ($width - $footerImgWidth) / 2);
+                    $imgY = $currentY;
                     
                     try {
                         if ($isFooterPdf && $footerPdfTpl) {
@@ -265,10 +278,10 @@ class ShippingLabelOverlayService
                     } catch (\Exception $e) {
                         \Illuminate\Support\Facades\Log::error("Failed to render footer image/template: " . $e->getMessage());
                     }
-                    
-                    // Set Y for social media at its fixed position
-                    $pdf->SetY($socialMediaY);
-                } else {
+
+                    $currentY += $footerImgHeight;
+                    $pdf->SetY($currentY);
+                } elseif ($reservedBottom > 0) {
                     if ($senderName || $senderPhone) {
                         $pdf->SetFont('Arial', 'B', 10);
                         $pdf->SetTextColor(0, 0, 0);
@@ -279,6 +292,7 @@ class ShippingLabelOverlayService
                         
                         $senderText = iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $senderText);
                         $pdf->Cell(0, 4, $senderText, 0, 1, $alignStr);
+                        $currentY = $pdf->GetY();
                     }
                     
                     if ($greetingStr) {
@@ -286,12 +300,12 @@ class ShippingLabelOverlayService
                         $pdf->SetTextColor(0, 0, 0);
                         $greeting = iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $greetingStr);
                         $pdf->Cell(0, 3, $greeting, 0, 1, $alignStr);
+                        $currentY = $pdf->GetY();
                     }
                 }
                 
-                $socialMediaY = null;
                 // Always render social media accounts below footer (image or text)
-                if (!empty($socialAccountsFormatted)) {
+                if ($reservedBottom > 0 && !empty($socialAccountsFormatted)) {
                     $pdf->SetFont('Arial', 'B', 7); // Make font slightly bolder for clarity
                     $pdf->SetTextColor(40, 40, 40); // Darker grey for better contrast
                     
@@ -309,11 +323,8 @@ class ShippingLabelOverlayService
                     
                     $startX = $alignStr === 'C' ? ($width - $totalWidth) / 2 : 3;
                     $currentX = max(2, $startX);
-                    
-                    $currentY = $pdf->GetY();
-                    // Track it for the border to know where social media starts
-                    $socialMediaY = $currentY;
-                    
+                    $currentY = max($currentY, $pdf->GetY());
+
                     foreach ($socialAccountsFormatted as $acc) {
                         if ($acc['icon'] && file_exists($acc['icon'])) {
                             // Perfect vertical alignment for 2.8mm icon and 7pt font
@@ -328,17 +339,18 @@ class ShippingLabelOverlayService
                         $currentX += $pdf->GetStringWidth($acc['text']) + $itemSpacing;
                     }
                     $pdf->Ln(4);
+                    $currentY = $pdf->GetY();
                 }
                 
-                if ($this->getSetting('marketplace_footer_border', '0', $config) == '1') {
+                if ($reservedBottom > 0 && $this->getSetting('marketplace_footer_border', '0', $config) == '1') {
                     $pdf->SetDrawColor(0, 0, 0);
                     $pdf->SetLineWidth(0.5);
                     
                     $borderHeight = $height - 4;
-                    if ($socialMediaY !== null) {
+                    if ($currentY > $footerTopY) {
                         // End the border just slightly above the social media row,
                         // but ensure it completely covers the footer image.
-                        $borderBottomY = $socialMediaY - 0.2; // 0.2mm above social text
+                        $borderBottomY = $currentY - 0.2; // 0.2mm above footer text
                         $borderHeight = $borderBottomY - 2;
                     }
                     

@@ -497,6 +497,89 @@ body[data-theme="dark"] .shp-table-head { border-bottom-color: rgba(51,65,85,.8)
 }
 body[data-theme="dark"] .shp-table-actions { border-bottom-color: rgba(51,65,85,.45); }
 
+.shp-item-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem;
+}
+
+.shp-item-searchbox {
+    flex: 1 1 280px;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+    padding: .4rem .55rem;
+    border: 1px solid rgba(148,163,184,.22);
+    border-radius: 10px;
+    background: var(--card, #fff);
+}
+
+body[data-theme="dark"] .shp-item-searchbox {
+    background: rgba(15,23,42,.92);
+    border-color: rgba(30,64,175,.28);
+}
+
+.shp-item-search-icon {
+    flex-shrink: 0;
+    color: #94a3b8;
+    font-size: .92rem;
+}
+
+.shp-item-search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #0f172a;
+    font-size: .9rem;
+}
+
+body[data-theme="dark"] .shp-item-search-input { color: #e2e8f0; }
+.shp-item-search-input::placeholder { color: #94a3b8; }
+
+.shp-item-search-clear {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(148,163,184,.1);
+    color: #64748b;
+    font-size: .86rem;
+    cursor: pointer;
+}
+
+.shp-item-search-clear:hover { background: rgba(148,163,184,.2); }
+.shp-item-search-clear[hidden] { display: none; }
+
+.shp-item-filter-meta {
+    font-size: .74rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+body[data-theme="dark"] .shp-item-filter-meta { color: #94a3b8; }
+
+.shp-filter-empty {
+    display: none;
+    margin: .45rem .75rem 0;
+    padding: .6rem .75rem;
+    border-radius: 8px;
+    border: 1px dashed rgba(148,163,184,.28);
+    background: rgba(248,250,252,.85);
+    color: #64748b;
+    font-size: .84rem;
+}
+
+body[data-theme="dark"] .shp-filter-empty {
+    background: rgba(15,23,42,.9);
+    border-color: rgba(30,64,175,.28);
+    color: #94a3b8;
+}
+
 /* scrollable area */
 .lines-wrapper {
     max-height: 400px;
@@ -1079,13 +1162,14 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     .shp-table-title {
         display: none;
     }
-    .shp-table-head .input-group {
-        width: 100% !important;
-    }
-    .shp-table-head .input-group-text,
-    .shp-table-head .form-control {
+    .shp-item-filterbar { width: 100%; }
+    .shp-item-searchbox {
+        width: 100%;
+        flex-basis: 100%;
         min-height: 40px;
-        font-size: .9rem;
+    }
+    .shp-item-filter-meta {
+        width: 100%;
     }
     .lines-wrapper {
         max-height: 52vh;
@@ -1269,11 +1353,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 <div class="shp-wrap page-theme-{{ $scanTheme }}">
 
     {{-- ═════════════════ FLASH ═════════════════ --}}
-    @if (session('status') === 'error')
-        <div class="shp-flash alert alert-danger js-auto-hide-alert" role="alert">
-            {{ session('message') }}
-        </div>
-    @elseif (session('status') === 'success')
+    @if (session('status') === 'success')
         <div class="shp-flash alert alert-success js-auto-hide-alert" role="alert">
             {{ session('message') }}
         </div>
@@ -1363,10 +1443,16 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         <div class="shp-table-head">
             <span class="shp-table-title">Daftar Barang Keluar</span>
             <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
-                <div class="input-group input-group-sm" style="width:210px">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" id="itemFilterInput" class="form-control"
-                           placeholder="Filter kode / nama">
+                <div class="shp-item-filterbar">
+                    <div class="shp-item-searchbox">
+                        <span class="shp-item-search-icon" aria-hidden="true">⌕</span>
+                        <input type="search" id="itemFilterInput" class="shp-item-search-input"
+                               placeholder="Filter kode / nama item"
+                               autocomplete="off" spellcheck="false">
+                        <button type="button" id="itemFilterClear" class="shp-item-search-clear"
+                                aria-label="Hapus filter" hidden>x</button>
+                    </div>
+                    <div class="shp-item-filter-meta" id="itemFilterMeta">Menampilkan semua item</div>
                 </div>
                 @if ($lastScannedLineId)
                     <button type="button" class="btn btn-sm btn-shp-outline" id="btnJumpLast">
@@ -1374,6 +1460,10 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     </button>
                 @endif
             </div>
+        </div>
+
+        <div class="shp-filter-empty" id="itemFilterEmpty">
+            Tidak ada item yang cocok dengan pencarian ini.
         </div>
 
         {{-- action strip --}}
@@ -1607,9 +1697,13 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     /* ── DOM refs ── */
     const scanInput         = document.getElementById('scanInput');
     const scanForm          = document.getElementById('scanForm');
+    const scanLookupUrl     = @json(route('sales.shipments.scan_lookup', $shipment));
     const linesWrapper      = document.getElementById('linesWrapper');
     const linesTbody        = document.getElementById('linesTbody');
     const itemFilterInput   = document.getElementById('itemFilterInput');
+    const itemFilterClear   = document.getElementById('itemFilterClear');
+    const itemFilterMeta    = document.getElementById('itemFilterMeta');
+    const itemFilterEmpty   = document.getElementById('itemFilterEmpty');
     const btnJumpLast       = document.getElementById('btnJumpLast');
     const rekonBtn          = document.getElementById('rekonBtn');
     const toastEl           = document.getElementById('scanToast');
@@ -1630,9 +1724,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 
     let lastScannedLineId = @json($lastScannedLineId);
     let sessionScanCount  = 0;
+    let itemFilterQuery   = '';
     const pickingLines = new Map(@json($pickingLinesPayload));
 
     const FMT = new Intl.NumberFormat('id-ID');
+
+    function normalizeSearchText(value) {
+        return String(value ?? '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
 
     function syncPickingLine(line) {
         if (!line?.id) return;
@@ -1663,6 +1765,49 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 qty: Number(qtyText.replace(/\./g, '').replace(/,/g, '').trim() || 0),
             };
         }).filter(line => Number(line.qty || 0) > 0);
+    }
+
+    function getItemFilterBlob(row) {
+        const code = row.querySelector('.item-code')?.textContent || '';
+        const name = row.querySelector('.item-name')?.textContent || '';
+        const remarks = row.querySelector('.remarks-wrap')?.textContent || '';
+        return normalizeSearchText([code, name, remarks].join(' '));
+    }
+
+    function applyItemFilter() {
+        if (!linesTbody) return;
+
+        const query = normalizeSearchText(itemFilterQuery);
+        const rows = Array.from(linesTbody.querySelectorAll('tr[data-line-id]'));
+        const hasRows = rows.length > 0;
+        let visible = 0;
+
+        rows.forEach(row => {
+            const match = !query || getItemFilterBlob(row).includes(query);
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+
+        if (itemFilterClear) {
+            itemFilterClear.hidden = !query;
+        }
+
+        if (itemFilterMeta) {
+            if (!hasRows) {
+                itemFilterMeta.textContent = 'Belum ada item shipment';
+            } else if (query) {
+                itemFilterMeta.textContent = `Menampilkan ${visible} dari ${rows.length} item`;
+            } else {
+                itemFilterMeta.textContent = `Menampilkan semua ${rows.length} item`;
+            }
+        }
+
+        if (itemFilterEmpty) {
+            itemFilterEmpty.style.display = hasRows && query && visible === 0 ? 'block' : 'none';
+            itemFilterEmpty.textContent = query
+                ? `Tidak ada item yang cocok dengan "${itemFilterQuery.trim()}".`
+                : 'Tidak ada item yang cocok dengan pencarian ini.';
+        }
     }
 
     /* ── delete url template ── */
@@ -1708,6 +1853,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     }
 
     function beep(freq, dur = 0.14, vol = 0.2, delay = 0, type = 'sine') {
+        if (window.GFID && typeof window.GFID.isScanSoundEnabled === 'function' && !window.GFID.isScanSoundEnabled()) return;
         try {
             const ctx = getAudioContext();
             if (!ctx) return;
@@ -1726,22 +1872,28 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         } catch (e) {}
     }
     /* scan item OK — 2-nada pendek naik */
-    const beepOk  = () => {
+    const playConfiguredSound = (eventKey, fallback) => {
+        if (window.GFID && typeof window.GFID.playScanSound === 'function') {
+            return window.GFID.playScanSound(eventKey, fallback);
+        }
+        fallback();
+    };
+    const beepOk  = () => playConfiguredSound('item_success', () => {
         beep(1900, 0.07, 0.55, 0,    'square');
         beep(2600, 0.07, 0.50, 0.08, 'square');
-    };
+    });
     /* scan item GAGAL — 3-nada turun sawtooth */
-    const beepErr = () => {
+    const beepErr = () => playConfiguredSound('error_general', () => {
         beep(240,  0.16, 0.72, 0,    'sawtooth');
         beep(150,  0.20, 0.72, 0.16, 'sawtooth');
         beep(110,  0.24, 0.70, 0.36, 'sawtooth');
-    };
+    });
     /* pindah mode (NEXT) — 3-nada sweep naik halus */
-    const beepNav = () => {
+    const beepNav = () => playConfiguredSound('navigation', () => {
         beep(700,  0.06, 0.38, 0,    'sine');
         beep(1100, 0.06, 0.38, 0.07, 'sine');
         beep(1700, 0.10, 0.38, 0.14, 'sine');
-    };
+    });
 
     ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
         document.addEventListener(eventName, unlockAudio, { once: true, passive: true });
@@ -1784,6 +1936,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         scanErrorMsg.textContent = msg;
         scanErrorBox.style.display = 'flex';
         setTimeout(() => { scanErrorBox.style.display = 'none'; }, 3500);
+    }
+
+    function lookupScanCode(code) {
+        if (!scanLookupUrl || !code) return Promise.resolve(null);
+
+        return fetch(`${scanLookupUrl}?code=${encodeURIComponent(code)}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        }).then(res => res.ok ? res.json() : null).catch(() => null);
     }
 
     /* ── session counter ── */
@@ -1911,6 +2071,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         }
     }
 
+    rekonBtn?.addEventListener('click', function (event) {
+        if (this.classList.contains('is-disabled') || this.getAttribute('aria-disabled') === 'true') {
+            event.preventDefault();
+            beepErr();
+            return;
+        }
+
+        unlockAudio();
+        beepNav();
+    });
+
     /* ── scroll + highlight row ── */
     function scrollToRow(lineId, flash = true) {
         if (!linesWrapper) return;
@@ -1981,6 +2152,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     }
                     form.classList.add('d-none'); qtyEl.classList.remove('d-none');
                 }
+                applyItemFilter();
                 updateTotals(data.totals);
                 maybeRenderStockPanel(data);
                 showToast('ok', data.message || 'Qty diperbarui.');
@@ -2017,6 +2189,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 removePickingLine(lineId);
                 if (row) row.remove();
                 renumberRows();
+                applyItemFilter();
                 updateTotals(data.totals);
                 maybeRenderStockPanel(data);
                 showToast('ok', data.message || 'Baris dihapus.');
@@ -2214,26 +2387,35 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         linesTbody.querySelectorAll('tr[data-line-id]').forEach(r => bindQtyClick(r));
         linesTbody.querySelectorAll('.js-delete-line-form').forEach(f => bindDelete(f));
     }
+    applyItemFilter();
 
     /* ── filter ── */
     if (itemFilterInput && linesWrapper) {
         itemFilterInput.addEventListener('input', function () {
-            const term = this.value.toLowerCase().trim();
-            linesWrapper.querySelectorAll('tbody tr[data-line-id]').forEach(row => {
-                const code = (row.querySelector('.item-code')?.textContent || '').toLowerCase();
-                const name = (row.querySelector('.item-name')?.textContent || '').toLowerCase();
-                row.style.display = (!term || code.includes(term) || name.includes(term)) ? '' : 'none';
-            });
+            itemFilterQuery = this.value;
+            applyItemFilter();
         });
         itemFilterInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === 'Escape') {
                 e.preventDefault();
+                if (e.key === 'Escape') {
+                    this.value = '';
+                    itemFilterQuery = '';
+                    applyItemFilter();
+                }
                 this.blur();
                 scheduleFocusScan({ force: true });
             }
         });
         itemFilterInput.addEventListener('blur', () => scheduleFocusScan({ force: true }));
     }
+    itemFilterClear?.addEventListener('click', function () {
+        if (!itemFilterInput) return;
+        itemFilterInput.value = '';
+        itemFilterQuery = '';
+        applyItemFilter();
+        itemFilterInput.focus();
+    });
 
     /* ── jump to last ── */
     if (btnJumpLast && linesWrapper) {
@@ -2245,7 +2427,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 
     /* ── scan AJAX ── */
     if (scanForm && scanInput && linesTbody) {
-        scanForm.addEventListener('submit', function (e) {
+        scanForm.addEventListener('submit', async function (e) {
             e.preventDefault();
             unlockAudio();
             const code = scanInput.value.trim();
@@ -2260,6 +2442,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                         window.location.href = rekonBtn.dataset.rekonUrl;
                     }
                 }
+                return;
+            }
+
+            const lookup = await lookupScanCode(code);
+            if (lookup && lookup.type === 'order') {
+                scanInput.value = '';
+                beepErr();
+                const msg = 'Yang discan adalah nomor pesanan/resi, bukan item. Gunakan Scan Pesanan.';
+                showScanError(msg);
+                showToast('err', msg);
+                focusScan();
                 return;
             }
 
@@ -2344,6 +2537,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                     bindDelete(row.querySelector('.js-delete-line-form'));
 
                     renumberRows();
+                    applyItemFilter();
                     updateTotals(totals);
 
                     lastScannedLineId = line.id;
@@ -2523,45 +2717,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (!window.Swal) return;
     const items = @json(session('stock_insufficient'));
-    const rows = items.map(r => `
-        <tr>
-            <td style="padding:6px 8px;font-weight:700;font-family:monospace;font-size:.8rem;white-space:nowrap">${r.code}</td>
-            <td style="padding:6px 8px;font-size:.8rem;text-align:left">${r.name}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;color:#dc2626">${r.stock.toLocaleString('id')}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem">${r.needed.toLocaleString('id')}</td>
-            <td style="padding:6px 8px;text-align:right;font-size:.8rem;font-weight:700;color:#dc2626">-${r.short.toLocaleString('id')}</td>
-        </tr>`).join('');
-    Swal.fire({
-        icon: 'error',
-        title: 'Barang Belum Siap Dikirim',
-        html: `
-            <p style="margin-bottom:8px;font-size:.85rem;font-weight:700">Shipment ditolak — stok WH-RTS tidak mencukupi.</p>
-            <ul style="text-align:left;font-size:.8rem;color:#475569;margin:0 0 12px;padding-left:18px;line-height:1.9">
-                <li>Ada <strong>return barang</strong> yang belum masuk WH-RTS</li>
-                <li>Barang masih proses <strong>produksi</strong></li>
-                <li><strong>PO pembelian</strong> belum dibuat / belum di-approve</li>
-                <li>GRN belum diposting</li>
-            </ul>
-            <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse">
-                <thead>
-                    <tr style="background:#fef2f2;border-bottom:2px solid #fecaca">
-                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase">Kode</th>
-                        <th style="padding:6px 8px;text-align:left;font-size:.72rem;color:#64748b;text-transform:uppercase">Item</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Stok</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#64748b;text-transform:uppercase">Perlu</th>
-                        <th style="padding:6px 8px;text-align:right;font-size:.72rem;color:#dc2626;text-transform:uppercase">Kurang</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-            </div>`,
-        confirmButtonText: 'Mengerti',
-        confirmButtonColor: '#dc2626',
-        width: 600,
-    });
+    if (!window.GFID || typeof window.GFID.errorAlert !== 'function') return;
+    const codes = items.map(item => item.code).filter(Boolean).join(', ');
+    window.GFID.errorAlert(
+        codes
+            ? `Stok WH-RTS belum cukup untuk: ${codes}.`
+            : 'Stok WH-RTS belum cukup untuk shipment ini.'
+    );
 });
 </script>
 @endpush

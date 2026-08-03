@@ -21,6 +21,10 @@ class TikTokShopAuthController extends Controller
             return response('TIKTOK_SHOP_APP_KEY belum diisi di .env', 422);
         }
 
+        if (request()->has('store_id')) {
+            session(['tiktok_connect_store_id' => (int) request('store_id')]);
+        }
+
         $callbackUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/')
             . '/marketplace/tiktok/callback';
 
@@ -96,6 +100,9 @@ class TikTokShopAuthController extends Controller
             ['name' => 'TikTok Shop', 'status' => 'active']
         );
 
+        $targetStoreId = session()->pull('tiktok_connect_store_id');
+        $targetStore = $targetStoreId ? Store::find((int) $targetStoreId) : null;
+
         // ─── Simpan satu Store per shop ───────────────────────────────────────
         foreach ($shops as $shop) {
             $shopId     = (string) ($shop['shop_id']     ?? '');
@@ -118,26 +125,36 @@ class TikTokShopAuthController extends Controller
                 'refresh_token_expire_in'  => $data['refresh_token_expire_in'] ?? null,
             ];
 
-            $storeModel = Store::updateOrCreate(
-                ['code' => 'tiktok_' . $shopCipher],
-                [
-                    'name'             => $shopName,
-                    'channel_id'       => $channel->id,
-                    'external_shop_id' => $shopId,
-                    'region'           => $region,
-                    'status'           => 'active',
-                    'is_active'        => true,
-                    'credentials'      => $credentials,
-                    'token_expires_at' => isset($data['access_token_expire_in'])
-                        ? now()->addSeconds((int) $data['access_token_expire_in'])
-                        : null,
-                    'meta' => [
-                        'auth_source'        => 'tiktok_oauth',
-                        'shop_cipher'        => $shopCipher,
-                        'raw_token_response' => $tokenData,
-                    ],
-                ]
-            );
+            $storePayload = [
+                'name'             => $shopName,
+                'channel_id'       => $channel->id,
+                'external_shop_id' => $shopId,
+                'region'           => $region,
+                'status'           => 'active',
+                'is_active'        => true,
+                'credentials'      => $credentials,
+                'token_expires_at' => isset($data['access_token_expire_in'])
+                    ? now()->addSeconds((int) $data['access_token_expire_in'])
+                    : null,
+                'meta' => [
+                    'auth_source'        => 'tiktok_oauth',
+                    'shop_cipher'        => $shopCipher,
+                    'raw_token_response' => $tokenData,
+                ],
+            ];
+
+            if ($targetStore) {
+                $targetStore->update($storePayload);
+                $storeModel = $targetStore;
+                // Bila satu authorization mengembalikan beberapa shop, hanya
+                // shop pertama yang ditautkan ke toko yang dipilih user.
+                $targetStore = null;
+            } else {
+                $storeModel = Store::updateOrCreate(
+                    ['code' => 'tiktok_' . $shopCipher],
+                    $storePayload
+                );
+            }
 
             // Jalankan sinkronisasi awal secara otomatis di background
             if (isset($storeModel) && $storeModel) {

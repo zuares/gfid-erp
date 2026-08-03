@@ -170,10 +170,167 @@
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
         .btn-submit:hover { opacity: .82; }
-        .btn-submit:active { opacity: .7; }
+	        .btn-submit:active { opacity: .7; }
 
-        .back-link {
-            display: block; text-align: center;
+        .oauth-card {
+	            margin-bottom: 18px;
+	            padding: 16px;
+	            border-radius: 16px;
+	            border: 1px solid rgba(148,163,184,.18);
+	            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+	            box-shadow: 0 14px 32px rgba(15,23,42,.06);
+	        }
+
+        .oauth-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .oauth-eyebrow {
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .oauth-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .34rem .7rem;
+            border-radius: 999px;
+            background: #ecfeff;
+            color: #155e75;
+            border: 1px solid #cffafe;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .oauth-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .oauth-provider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 15px;
+            border-radius: 14px;
+            border: 1px solid #dbe4ee;
+            background: #fff;
+            text-decoration: none;
+            color: #0f172a;
+            transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+        }
+
+        .oauth-provider:hover {
+            color: #0f172a;
+            border-color: #cbd5e1;
+            box-shadow: 0 12px 26px rgba(15,23,42,.08);
+            transform: translateY(-1px);
+        }
+
+        .oauth-provider-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            flex: 0 0 auto;
+        }
+
+        .oauth-provider-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .oauth-provider-title {
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        .oauth-provider-desc {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.45;
+        }
+
+	        .oauth-btn {
+	            width: 100%;
+	            min-height: 50px;
+	            padding: 0 16px;
+	            border-radius: 12px;
+	            border: 1px solid #dbe4ee;
+	            background: #fff;
+	            color: #0f172a;
+	            display: flex;
+	            align-items: center;
+	            justify-content: center;
+	            gap: 10px;
+	            font-family: 'Plus Jakarta Sans', sans-serif;
+	            font-size: 14px;
+	            font-weight: 800;
+	            text-decoration: none;
+	            transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+	        }
+
+	        .oauth-btn:hover {
+	            color: #0f172a;
+	            border-color: #cbd5e1;
+	            box-shadow: 0 12px 24px rgba(15,23,42,.08);
+	            transform: translateY(-1px);
+	        }
+
+	        .oauth-btn-google {
+	            background: #fff;
+	        }
+
+	        .oauth-divider {
+	            display: flex;
+	            align-items: center;
+	            gap: 12px;
+	            margin: 18px 0;
+	            color: var(--muted);
+	            font-size: 12px;
+	            font-weight: 700;
+	            letter-spacing: .08em;
+	            text-transform: uppercase;
+	        }
+
+	        .oauth-divider::before,
+	        .oauth-divider::after {
+	            content: '';
+	            flex: 1;
+	            height: 1px;
+	            background: var(--line);
+	        }
+
+	        .login-note {
+	            margin-top: 14px;
+	            padding: 14px 16px;
+	            border-radius: 14px;
+	            background: linear-gradient(180deg, #f8fafc 0%, #eef6ff 100%);
+	            border: 1px solid #dbeafe;
+	            color: #334155;
+	            font-size: 13px;
+	            line-height: 1.55;
+	        }
+
+	        .back-link {
+	            display: block; text-align: center;
             margin-top: 20px;
             font-size: 13px; font-weight: 600; color: var(--muted);
             text-decoration: none;
@@ -236,23 +393,33 @@
     </div>
 </div>
 
-{{-- RIGHT: Form Panel --}}
-<div class="panel-form">
-    <div class="form-wrap">
+	{{-- RIGHT: Form Panel --}}
+	<div class="panel-form">
+	    <div class="form-wrap">
         <div class="form-heading">
             <span class="form-label-top">Admin Panel</span>
             <div class="form-title">Masuk ke<br>Akun Kamu</div>
         </div>
 
-        @if ($errors->any() && !$errors->has('employee_code') && !$errors->has('password'))
-            <div class="error-global">{{ $errors->first() }}</div>
-        @endif
+	        @if (session('error'))
+	            <div class="error-global">{{ session('error') }}</div>
+	        @endif
 
-        <form method="POST" action="{{ route('login.post', [], false) }}">
-            @csrf
+	        @if ($errors->any() && !$errors->has('employee_code') && !$errors->has('password'))
+	            <div class="error-global">{{ $errors->first() }}</div>
+	        @endif
 
-            <div class="field">
-                <label for="employee_code">Employee Code</label>
+	        <div class="admin-info" style="margin-top:18px;">
+	            <p style="margin:0;">
+	                Login admin hanya memakai email dan password internal. Jika ingin masuk ke toko website, gunakan halaman storefront.
+	            </p>
+	        </div>
+
+	        <form method="POST" action="{{ route('login.post', [], false) }}">
+	            @csrf
+
+	            <div class="field">
+	                <label for="employee_code">Employee Code</label>
                 <input type="text" id="employee_code" name="employee_code"
                     value="{{ old('employee_code') }}"
                     class="{{ $errors->has('employee_code') ? 'is-invalid' : '' }}"
@@ -279,13 +446,13 @@
                 </label>
             </div>
 
-            <button type="submit" class="btn-submit">
-                Masuk
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </button>
-        </form>
+	            <button type="submit" class="btn-submit">
+	                Masuk
+	                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+	            </button>
+	        </form>
 
-        <a href="{{ route('storefront.home') }}" class="back-link">← Kembali ke Beranda</a>
+	        <a href="{{ route('storefront.home') }}" class="back-link">← Kembali ke Beranda</a>
     </div>
 </div>
 

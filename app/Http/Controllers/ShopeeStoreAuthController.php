@@ -89,14 +89,14 @@ class ShopeeStoreAuthController extends Controller
         ];
 
         $storeId = session()->pull('shopee_connect_store_id');
-        $store = null;
+        $storeModel = null;
         if ($storeId) {
-            $store = Store::find($storeId);
+            $storeModel = Store::find($storeId);
         }
 
         try {
-            if ($store) {
-                $store->update([
+            if ($storeModel) {
+                $storeModel->update([
                     'channel_id' => $channel->id,
                     'external_shop_id' => (string) $shopId,
                     'credentials' => $credentials,
@@ -105,7 +105,7 @@ class ShopeeStoreAuthController extends Controller
                     'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
                 ]);
             } else {
-                $store = Store::updateOrCreate(
+                $storeModel = Store::updateOrCreate(
                     ['code' => 'shopee_' . $shopId],
                     [
                         'name' => 'Shopee ' . $shopId,
@@ -131,10 +131,13 @@ class ShopeeStoreAuthController extends Controller
                 'updated_at' => now(),
             ];
 
-            if ($store) {
-                \Illuminate\Support\Facades\DB::table('stores')->where('id', $store->id)->update($updateData);
+            if ($storeModel) {
+                \Illuminate\Support\Facades\DB::table('stores')->where('id', $storeModel->id)->update($updateData);
+                $storeModel->refresh();
             } else {
                 \Illuminate\Support\Facades\DB::table('stores')->where('code', 'shopee_' . $shopId)->update($updateData);
+                $storeModel = Store::where('external_shop_id', (string) $shopId)->first()
+                    ?? Store::where('code', 'shopee_' . $shopId)->first();
             }
         } catch (\Throwable $e) {
             return redirect('/marketplace/toko')->with('error', 'Terjadi kesalahan sistem saat menyimpan otentikasi toko: ' . $e->getMessage());
@@ -142,7 +145,6 @@ class ShopeeStoreAuthController extends Controller
 
         // Try to fetch real shop name from Shopee API
         try {
-            $storeModel = Store::where('code', 'shopee_' . $shopId)->first();
             if ($storeModel) {
                 /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
                 $shopee   = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
@@ -163,8 +165,23 @@ class ShopeeStoreAuthController extends Controller
             \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $storeModel->id]);
             \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', ['--store' => $storeModel->id]);
             \App\Jobs\SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
+
+            // Ads: backfill awal 90 hari lewat chain queue (chunk 30 hari,
+            // dedupe + progress bar ditangani command). Tanpa ini toko baru
+            // tampil kosong di dashboard ads.
+            try {
+                \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
+                    '--store'    => $storeModel->id,
+                    '--backfill' => true,
+                    '--from'     => now()->subDays(90)->toDateString(),
+                    '--to'       => now()->toDateString(),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[ShopeeAuth] Gagal antre backfill ads awal: ' . $e->getMessage());
+            }
         }
 
-        return redirect('/marketplace/toko?connected=1');
+        return redirect('/marketplace/toko?connected=1')
+            ->with('success', 'Shopee berhasil terhubung.');
     }
 }

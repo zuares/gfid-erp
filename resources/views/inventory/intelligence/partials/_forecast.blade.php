@@ -29,10 +29,10 @@
         </select>
 
         <select class="form-select form-select-sm" data-ii-sort aria-label="Urutkan" style="max-width:200px;">
+            <option value="ads-desc" selected>Jual/hari tertinggi</option>
             <option value="suggested-desc">Saran produksi terbanyak</option>
             <option value="score-desc">Skor evaluasi tertinggi</option>
             <option value="wads-desc">wADS tertinggi</option>
-            <option value="ads-desc">Jual/hari tertinggi</option>
             <option value="cover-asc">Cover tertipis</option>
             <option value="sku-asc">SKU A–Z</option>
         </select>
@@ -49,17 +49,15 @@
     @if ($rows->isEmpty())
         <div class="ii-empty">Tidak ada data untuk filter ini.</div>
     @else
-        <div class="table-responsive" style="max-height: 70vh;">
-            <table class="table table-hover align-middle table-list" data-ii-table id="table-forecast">
-                <thead style="background: rgba(241, 245, 249, 0.5); position: sticky; top: 0; z-index: 10;">
+        <div class="table-responsive ii-table-scroll" style="max-height: 70vh;">
+            <table class="table table-hover align-middle table-list" data-ii-table id="table-forecast" data-ii-default-sort="ads" data-ii-default-dir="desc">
+                <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
-                        <th style="padding-left: 1.25rem;">SKU & Produk</th>
-                        <th class="text-end">Jual / Hari</th>
-                        <th class="text-end gf-hide-mobile" title="Skor evaluasi prioritas">Skor</th>
-                        <th class="text-end gf-hide-mobile">Total Ready</th>
-                        <th class="text-end" title="Ketahanan stok tersedia (hari)">Cover (hr)</th>
-                        <th class="text-end" title="Prediksi penjualan 30 hari ke depan">Forecast 30hr</th>
-                        <th class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Produksi</th>
+                        <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
+                        <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Saat Ini</th>
+                        <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
+                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 30 hari ke depan">Forecast 30hr</th>
+                        <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Produksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,9 +66,11 @@
                             data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                             data-status="{{ $r->status }}"
                             data-sku="{{ $r->sku }}"
+                            data-stock="{{ $r->ready_total }}"
                             data-cover="{{ $r->cover_days ?? 99999 }}"
                             data-ads="{{ $r->ads }}"
                             data-wads="{{ $r->wads }}"
+                            data-forecast="{{ $r->forecast_30 }}"
                             data-score="{{ $r->eval_score }}"
                             data-suggested="{{ $r->suggested_qty }}">
                             
@@ -82,19 +82,14 @@
                                     <span class="text-muted-ii" style="font-size: .65rem;">{{ $r->category }}</span>
                                 </div>
                             </td>
-                            
-                            <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                            <td class="text-end gf-hide-mobile">
-                                @php $sc = $r->eval_score; $scb = $sc >= 70 ? 'ii-score-high' : ($sc >= 40 ? 'ii-score-mid' : 'ii-score-low'); @endphp
-                                <span class="ii-score {{ $scb }}">{{ $sc }}</span>
-                            </td>
-                            <td class="text-end gf-hide-mobile">
+
+                            <td class="text-end">
                                 <div class="fw-semibold">{{ $fmt($r->ready_total) }}</div>
                                 <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
                                     RTS: {{ $fmt($r->ready) }} | PRD: {{ $fmt($r->wh_prd) }}
                                 </div>
                             </td>
-                            <td class="text-end fw-semibold">{{ $r->cover_days === null ? '–' : $fmt($r->cover_days, 1) }}</td>
+                            <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
                             <td class="text-end text-muted">{{ $fmt($r->forecast_30) }}</td>
                             <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #2563eb;">{{ $fmt($r->suggested_qty) }}</td>
                         </tr>
@@ -102,8 +97,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="fw-semibold">
-                        <td colspan="5" class="text-end gf-hide-mobile">Total saran produksi</td>
-                        <td colspan="1" class="text-end d-md-none">Total saran</td>
+                        <td colspan="4" class="text-end">Total saran produksi</td>
                         <td class="text-end" style="padding-right: 1.25rem; color: #2563eb;"><b>{{ $fmt($totalSuggested) }}</b></td>
                     </tr>
                 </tfoot>

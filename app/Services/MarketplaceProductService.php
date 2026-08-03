@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceProductModel;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
 
 class MarketplaceProductService
 {
-    public function __construct(protected ChannelManager $manager) {}
+    public function __construct(
+        protected MarketplaceApiGateway $gateway,
+        protected ?ChannelManager $manager = null,
+    ) {}
 
     /**
      * Sync semua produk sebuah toko (status NORMAL + UNLIST).
@@ -18,7 +22,7 @@ class MarketplaceProductService
      */
     public function syncProducts(Store $store, array $statuses = ['NORMAL', 'UNLIST']): array
     {
-        $driver  = $this->manager->driver($store);
+        $driver  = $this->gateway;
         $itemIds = [];
         $errors  = [];
 
@@ -229,7 +233,7 @@ class MarketplaceProductService
      */
     public function syncSingleItem(Store $store, $itemId): ?MarketplaceProduct
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $res = $driver->getItemBaseInfo($store, [(string) $itemId]);
 
         if (! empty($res['error'])) {
@@ -249,7 +253,7 @@ class MarketplaceProductService
      */
     public function updateStock(MarketplaceProduct $product, array $stockList): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
         $res = $driver->updateProductStock($product->store, $product->item_id, $stockList);
 
         if (! empty($res['error'])) {
@@ -275,12 +279,12 @@ class MarketplaceProductService
      */
     public function updatePrice(MarketplaceProduct $product, array $priceList): array
     {
-        $driver = $this->manager->driver($product->store);
-        
-        $originalPriceList = array_map(function($p) {
+        $driver = $this->channelDriver($product->store);
+
+        $originalPriceList = array_map(function ($p) {
             return [
                 'model_id' => $p['model_id'],
-                'original_price' => $p['original_price']
+                'original_price' => $p['original_price'],
             ];
         }, $priceList);
 
@@ -300,34 +304,11 @@ class MarketplaceProductService
         }
 
         if ($hasDiscount) {
-            // Find or create an ongoing discount campaign
-            $discounts = $driver->getDiscountList($product->store, 'ongoing');
-            $discountId = null;
-            if (empty($discounts['error'])) {
-                foreach (data_get($discounts, 'response.discount_list', []) as $d) {
-                    if (str_contains($d['discount_name'], 'GFID-Harga-Jual')) {
-                        $discountId = $d['discount_id'];
-                        break;
-                    }
-                }
-            }
+            $discountId = $this->findDiscountCampaignId($product->store, 'GFID-Harga-Jual');
 
-            // Jika tidak ada promo GFID-Harga-Jual yang ongoing, cari yang upcoming
-            if (!$discountId) {
-                $upcoming = $driver->getDiscountList($product->store, 'upcoming');
-                if (empty($upcoming['error'])) {
-                    foreach (data_get($upcoming, 'response.discount_list', []) as $d) {
-                        if (str_contains($d['discount_name'], 'GFID-Harga-Jual')) {
-                            $discountId = $d['discount_id'];
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!$discountId) {
+            if (! $discountId) {
                 $newD = $driver->addDiscount($product->store, 'GFID-Harga-Jual-' . date('Ym'), time(), time() + (86400 * 180));
-                if (!empty($newD['error'])) {
+                if (! empty($newD['error'])) {
                     Log::error("Failed to create discount: " . ($newD['message'] ?? $newD['error']));
                 } else {
                     $discountId = data_get($newD, 'response.discount_id');
@@ -335,23 +316,13 @@ class MarketplaceProductService
             }
 
             if ($discountId) {
-                $itemList = [
-                    [
-                        'item_id' => (int)$product->item_id,
-                        'model_list' => array_map(function($p) {
-                            return [
-                                'model_id' => (int)$p['model_id'],
-                                'model_promotion_price' => (float)$p['discount_price']
-                            ];
-                        }, $priceList)
-                    ]
-                ];
-                
+                $itemList = $this->buildDiscountItemList($product, $priceList);
+
                 $addRes = $driver->addDiscountItem($product->store, $discountId, $itemList);
-                
+
                 // Jika gagal karena item sudah ada di dalam diskon ini, maka update item tersebut
-                if (!empty($addRes['error']) && str_contains(strtolower($addRes['message'] ?? ''), 'exists')) {
-                     $driver->updateDiscountItem($product->store, $discountId, $itemList);
+                if (! empty($addRes['error']) && str_contains(strtolower($addRes['message'] ?? ''), 'exists')) {
+                    $driver->updateDiscountItem($product->store, $discountId, $itemList);
                 }
             }
         }
@@ -391,7 +362,7 @@ class MarketplaceProductService
      */
     public function setUnlist(MarketplaceProduct $product, bool $unlist): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
         $res = $driver->unlistItems($product->store, [
             ['item_id' => $product->item_id, 'unlist' => $unlist],
         ]);
@@ -479,7 +450,7 @@ class MarketplaceProductService
 
     private function syncModels(Store $store, MarketplaceProduct $product): void
     {
-        $driver = $this->manager->driver($store);
+        $driver = $this->gateway;
         $res = $driver->getProductModelList($store, $product->item_id);
 
         if (! empty($res['error'])) {
@@ -532,7 +503,7 @@ class MarketplaceProductService
 
     public function updateSku(MarketplaceProduct $product, string $newSku): array
     {
-        $driver = $this->manager->driver($product->store);
+        $driver = $this->channelDriver($product->store);
         $res = $driver->updateItemBaseInfo($product->store, (int)$product->item_id, ['item_sku' => $newSku]);
 
         if (!empty($res['error'])) {
@@ -546,8 +517,8 @@ class MarketplaceProductService
     public function updateModelSku(MarketplaceProductModel $model, string $newSku): array
     {
         $product = $model->product;
-        $driver = $this->manager->driver($product->store);
-        
+        $driver = $this->channelDriver($product->store);
+
         $modelsParam = [
             [
                 'model_id' => (int)$model->model_id,
@@ -563,5 +534,75 @@ class MarketplaceProductService
 
         $model->update(['model_sku' => $newSku]);
         return $res;
+    }
+
+    /** Resolve channel driver for product mutations.
+     *
+     * The nullable fallback keeps direct/unit construction with only the
+     * gateway working while the application container injects ChannelManager.
+     */
+    private function channelDriver(Store $store)
+    {
+        return ($this->manager ??= app(ChannelManager::class))->driver($store);
+    }
+
+    /**
+     * Update metadata promo diskon Shoppe yang sudah ada.
+     */
+    public function updateDiscount(
+        Store $store,
+        int $discountId,
+        ?string $discountName = null,
+        ?int $startTime = null,
+        ?int $endTime = null
+    ): array {
+        $driver = $this->gateway;
+
+        return $driver->updateDiscount($store, $discountId, $discountName, $startTime, $endTime);
+    }
+
+    /**
+     * Hapus satu item/model dari promo diskon Shoppe.
+     */
+    public function deleteDiscountItem(Store $store, int $discountId, int $itemId, int $modelId = 0): array
+    {
+        $driver = $this->gateway;
+
+        return $driver->deleteDiscountItem($store, $discountId, $itemId, $modelId);
+    }
+
+    private function findDiscountCampaignId(Store $store, string $namePrefix): ?int
+    {
+        $driver = $this->gateway;
+
+        foreach (['ongoing', 'upcoming'] as $status) {
+            $discounts = $driver->getDiscountList($store, $status);
+            if (! empty($discounts['error'])) {
+                continue;
+            }
+
+            foreach (data_get($discounts, 'response.discount_list', []) as $discount) {
+                if (str_contains((string) ($discount['discount_name'] ?? ''), $namePrefix)) {
+                    return (int) ($discount['discount_id'] ?? 0) ?: null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function buildDiscountItemList(MarketplaceProduct $product, array $priceList): array
+    {
+        return [
+            [
+                'item_id' => (int) $product->item_id,
+                'model_list' => array_map(function ($p) {
+                    return [
+                        'model_id' => (int) ($p['model_id'] ?? 0),
+                        'model_promotion_price' => (float) ($p['discount_price'] ?? 0),
+                    ];
+                }, $priceList),
+            ],
+        ];
     }
 }

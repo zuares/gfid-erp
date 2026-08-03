@@ -619,7 +619,7 @@
                                 Adjustment <strong>{{ $adj->code }}</strong> sudah disetujui — stok masuk dan kelengkapan tercatat.
                             </div>
                         </div>
-                        <a href="{{ route('inventory.adjustments.show', $adj) }}"
+                        <a href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adj->getKey()]) }}"
                            class="btn btn-sm btn-success" style="white-space:nowrap;">
                             Lihat Adjustment →
                         </a>
@@ -710,7 +710,7 @@
                                     </div>
                                 @endif
                             </div>
-                            <a href="{{ route('inventory.adjustments.show', $adj) }}"
+                            <a href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adj->getKey()]) }}"
                                class="btn btn-sm {{ $adjConfig['btnClass'] }}" style="white-space:nowrap;">
                                 Lihat Adjustment →
                             </a>

@@ -75,6 +75,92 @@ class AdsModuleTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_dashboard_auto_sync_uses_selected_recent_range()
+    {
+        $store = $this->createStore('AUTODATE');
+        $store->update(['token_expires_at' => now()->addHour()]);
+
+        $pending = \Mockery::mock();
+        $pending->shouldReceive('onQueue')->once()->with('ads');
+
+        \Illuminate\Support\Facades\Artisan::shouldReceive('queue')
+            ->once()
+            ->with('marketplace:sync-ads', \Mockery::on(function (array $params) use ($store) {
+                return ($params['--from'] ?? null) === '2026-07-30'
+                    && ($params['--to'] ?? null) === '2026-07-30'
+                    && ($params['--store'] ?? null) == $store->id;
+            }))
+            ->andReturn($pending);
+
+        $dashboardService = \Mockery::mock(\App\Services\Marketplace\Ads\AdsDashboardService::class);
+        $dashboardService->shouldReceive('buildDashboardData')->once()->andReturn([
+            'dateFrom' => '2026-07-30',
+            'dateTo' => '2026-07-30',
+            'compareMode' => 'prev_period',
+        ]);
+
+        $renderedView = \Mockery::mock(\Illuminate\Contracts\View\View::class);
+        $view = \Mockery::mock(\Illuminate\Contracts\View\Factory::class);
+        $view->shouldReceive('make')->once()->andReturn($renderedView);
+        $this->app->instance(\Illuminate\Contracts\View\Factory::class, $view);
+
+        $request = \Illuminate\Http\Request::create('/marketplace/ads-dashboard', 'GET', [
+            'store_id' => $store->id,
+            'date_from' => '2026-07-30',
+            'date_to' => '2026-07-30',
+        ]);
+
+        $result = app(\App\Http\Controllers\Marketplace\AdsDashboardController::class)
+            ->index($request, app(\App\Services\Marketplace\Ads\AdsAnalyticsService::class), $dashboardService);
+
+        $this->assertSame($renderedView, $result);
+    }
+
+    public function test_ads_throttle_uses_database_rate_limiter_without_redis()
+    {
+        config(['cache.limiter' => 'database']);
+
+        \Illuminate\Support\Facades\Redis::shouldReceive('throttle')->never();
+
+        $store = $this->createStore('DBLIMITER');
+        $gateway = \Mockery::mock(\App\Services\Marketplace\MarketplaceApiGateway::class);
+        $gateway->shouldReceive('getAdsTotalBalance')
+            ->once()
+            ->with($store)
+            ->andReturn(['response' => ['total_balance' => 0]]);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsApiService($gateway);
+
+        $this->assertSame(
+            ['response' => ['total_balance' => 0]],
+            $service->getAdsTotalBalance($store)
+        );
+    }
+
+    public function test_marketplace_gateway_throttle_uses_database_rate_limiter_without_redis()
+    {
+        config(['cache.limiter' => 'database']);
+
+        \Illuminate\Support\Facades\Redis::shouldReceive('throttle')->never();
+
+        $store = $this->createStore('GWDBLIMITER');
+        $driver = \Mockery::mock(\App\Services\Channels\Contracts\MarketplaceChannel::class);
+        $driver->shouldReceive('getAdsTotalBalance')
+            ->once()
+            ->with($store)
+            ->andReturn(['response' => ['total_balance' => 0]]);
+
+        $manager = \Mockery::mock(\App\Services\Channels\ChannelManager::class);
+        $manager->shouldReceive('driver')->once()->with($store)->andReturn($driver);
+
+        $gateway = new \App\Services\Marketplace\MarketplaceApiGateway($manager);
+
+        $this->assertSame(
+            ['response' => ['total_balance' => 0]],
+            $gateway->getAdsTotalBalance($store)
+        );
+    }
+
     // 4. User non-owner/non-admin tidak dapat melakukan backfill
     // 5. Owner/admin dapat melakukan backfill
     public function test_backfill_authorization()
@@ -217,6 +303,94 @@ class AdsModuleTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_gms_api_uses_shopee_date_format()
+    {
+        $store = $this->createStore('GMSDATE');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+            'campaign_status' => 'ongoing',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getGmsCampaignPerformance')
+            ->once()
+            ->with($store, null, '30-07-2026', '30-07-2026')
+            ->andReturn(['response' => []]);
+        $api->shouldReceive('getGmsItemPerformance')
+            ->once()
+            ->with($store, null, '30-07-2026', '30-07-2026')
+            ->andReturn(['response' => []]);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertTrue($service->syncGmsDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+    }
+
+    public function test_cpc_api_error_is_reported_to_caller()
+    {
+        $store = $this->createStore('CPCFAIL');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getCampaignDailyPerformance')
+            ->once()
+            ->andReturn(['error' => 'API_ERROR', 'message' => 'CPC unavailable']);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertFalse($service->syncCampaignDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+    }
+
+    public function test_gms_api_error_is_reported_to_caller()
+    {
+        $store = $this->createStore('GMSFAIL');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+            'campaign_status' => 'ongoing',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getGmsCampaignPerformance')
+            ->once()
+            ->andReturn(['error' => 'API_ERROR', 'message' => 'GMS campaign unavailable']);
+        $api->shouldReceive('getGmsItemPerformance')
+            ->once()
+            ->andReturn(['error' => 'API_ERROR', 'message' => 'GMS item unavailable']);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertFalse($service->syncGmsDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+    }
+
+    public function test_cpc_failure_marks_job_partial_success()
+    {
+        $store = $this->createStore('PARTIAL');
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:' . $store->id);
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:all');
+
+        $service = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
+        $service->shouldReceive('syncBalance')->once();
+        $service->shouldReceive('syncCampaignsAndSettings')->once();
+        $service->shouldReceive('syncShopDailyPerformance')->once();
+        $service->shouldReceive('syncCampaignDailyPerformance')->once()->andReturn(false);
+        $service->shouldReceive('syncGmsDailyPerformance')->once()->andReturn(true);
+
+        $job = new ShopeeAdsSyncJob($store, Carbon::parse('2026-07-30'), Carbon::parse('2026-07-30'));
+        $job->handle($service);
+
+        $run = MarketplaceAdsSyncRun::latest()->first();
+        $this->assertEquals('partial_success', $run->status);
+        $this->assertStringContainsString('CPC', $run->error_message);
+    }
+
     // 13. API error membuat sync run failed
     public function test_job_status_on_error()
     {
@@ -307,6 +481,732 @@ class AdsModuleTest extends TestCase
         $this->assertTrue(true); // Tested intrinsically
     }
 
+    public function test_dashboard_kpi_aggregates_campaign_daily_facts()
+    {
+        $store = $this->createStore('KPIFACTS');
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-KPI',
+            'date' => '2026-07-30',
+            'impressions' => 1000,
+            'clicks' => 50,
+            'expense' => 12500,
+            'broad_order' => 4,
+            'broad_gmv' => 200000,
+            'direct_order' => 2,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $summary = app(AdsAnalyticsService::class)->getKpiSummary($store->id, '2026-07-30', '2026-07-30');
+
+        $this->assertSame(12500.0, (float) $summary['current']->spend);
+        $this->assertSame(200000.0, (float) $summary['current']->gmv);
+        $this->assertSame(4, (int) $summary['current']->orders);
+    }
+
+    public function test_profit_is_calculated_even_when_campaign_is_already_below_break_even()
+    {
+        $store = $this->createStore('PROFITLOSS');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-PROFITLOSS',
+            'name' => 'Item Profit Loss',
+            'type' => 'finished',
+            'hpp' => 90000,
+            'active' => true,
+        ]);
+
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654321',
+            'item_name' => 'Product Profit Loss',
+            'price_min' => 100000,
+            'price_max' => 100000,
+        ]);
+        \App\Models\MarketplaceProductModel::create([
+            'marketplace_product_id' => $product->id,
+            'model_id' => '1',
+            'model_sku' => 'SKU-PROFITLOSS',
+            'price' => 100000,
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'SKU-PROFITLOSS',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITLOSS',
+            'channel_item_id' => 987654321,
+            'campaign_name' => 'Campaign Profit Loss',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITLOSS',
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-PROFITLOSS');
+
+        // Net revenue 78.1k - HPP 90k - iklan 11.1k = -23k.
+        $this->assertNotNull($campaign->profit_after_ads);
+        $this->assertSame(-23000.0, (float) $campaign->profit_after_ads);
+        $this->assertSame(-23000.0, (float) $data['kpi']['current']->net_profit);
+    }
+
+    public function test_single_day_profit_falls_back_to_orders_when_pcs_is_missing()
+    {
+        $store = $this->createStore('PROFITPCS');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-PROFITPCS',
+            'name' => 'Item Profit Pcs Fallback',
+            'type' => 'finished',
+            'hpp' => 90000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654322',
+            'item_name' => 'Product Profit Pcs Fallback',
+            'price_min' => 100000,
+            'price_max' => 100000,
+        ]);
+        \App\Models\MarketplaceProductModel::create([
+            'marketplace_product_id' => $product->id,
+            'model_id' => '1',
+            'model_sku' => 'SKU-PROFITPCS',
+            'price' => 100000,
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'SKU-PROFITPCS',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITPCS',
+            'channel_item_id' => 987654322,
+            'campaign_name' => 'Campaign Profit Pcs Fallback',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-PROFITPCS',
+            'date' => '2026-07-01',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 0,
+            'broad_gmv' => 50000,
+            'direct_order' => 1,
+            'direct_order_amount' => 0,
+            'direct_gmv' => 50000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-01', '2026-07-01', 'prev_period', app(AdsAnalyticsService::class));
+
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-PROFITPCS');
+
+        // HPP memakai 1 order sebagai estimasi pcs, bukan rasio GMV/harga.
+        // 39.050 - 90.000 - 11.100 = -62.050.
+        $this->assertSame('order_fallback', $campaign->items_sold_source);
+        $this->assertSame(-62050.0, (float) $campaign->profit_after_ads);
+    }
+
+    public function test_unmapped_ads_campaign_can_be_mapped_from_dashboard()
+    {
+        $store = $this->createStore('MAPFROMADS');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPFROMADS',
+            'channel_item_id' => 123456789,
+            'campaign_name' => 'Campaign Map From Ads',
+            'campaign_status' => 'ongoing',
+        ]);
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-MAPFROMADS',
+            'name' => 'Item Map From Ads',
+            'type' => 'finished',
+            'hpp' => 25000,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/api/marketplace/ad-campaigns/' . $campaign->id . '/map-item', [
+                'internal_item_id' => $item->id,
+            ]);
+
+        $response->assertOk()->assertJsonPath('internal_item_id', $item->id);
+        $this->assertDatabaseHas('marketplace_ad_campaigns', [
+            'id' => $campaign->id,
+            'internal_item_id' => $item->id,
+            'mapping_status' => 'manual',
+        ]);
+    }
+
+    public function test_gmv_max_campaign_without_item_id_can_be_mapped()
+    {
+        $store = $this->createStore('GMSMAP');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => null,
+            'campaign_name' => 'GMV Max (Semua Produk)',
+            'campaign_status' => 'ongoing',
+        ]);
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMSMAP',
+            'name' => 'Item GMV Max Acuan',
+            'type' => 'finished',
+            'hpp' => 30000,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/api/marketplace/ad-campaigns/' . $campaign->id . '/map-item', [
+                'internal_item_id' => $item->id,
+            ]);
+
+        $response->assertOk()->assertJsonPath('internal_item_id', $item->id);
+        $this->assertDatabaseHas('marketplace_ad_item_maps', [
+            'store_id' => $store->id,
+            'channel_code' => 'shopee',
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'internal_item_id' => $item->id,
+        ]);
+    }
+
+    public function test_gmv_max_items_endpoint_returns_products_and_hpp_status()
+    {
+        $store = $this->createStore('GMSITEMS');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMSITEMS',
+            'name' => 'Item GMV Max Detail',
+            'type' => 'finished',
+            'hpp' => 3000,
+            'active' => true,
+        ]);
+        \App\Models\MarketplaceAdItemMap::create([
+            'store_id' => $store->id,
+            'channel_code' => 'shopee',
+            'channel_item_id' => 7654321,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'internal_item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => 7654321,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 1000,
+            'broad_order' => 2,
+            'broad_gmv' => 10000,
+            'direct_order' => 2,
+            'direct_gmv' => 10000,
+            'raw_json' => ['broad_order_amount' => 2],
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '?date_from=2026-07-30&date_to=2026-07-30');
+
+        $response->assertOk()
+            ->assertJsonPath('total_items', 1)
+            ->assertJsonPath('mapped_items', 1)
+            ->assertJsonPath('data.0.channel_item_id', '7654321')
+            ->assertJsonPath('data.0.pcs', 2)
+            ->assertJsonPath('data.0.unit_cogs', 3000);
+    }
+
+    public function test_gmv_max_product_can_be_mapped_from_product_detail()
+    {
+        $store = $this->createStore('GMSMAPITEM');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMSMAPITEM',
+            'name' => 'Item Mapping GMV Max',
+            'type' => 'finished',
+            'hpp' => 4500,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '/7654321/map', [
+                'internal_item_id' => $item->id,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('mapping.internal_item_id', $item->id);
+        $this->assertDatabaseHas('marketplace_ad_item_maps', [
+            'store_id' => $store->id,
+            'channel_code' => 'shopee',
+            'channel_item_id' => 7654321,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'internal_item_id' => $item->id,
+        ]);
+    }
+
+    public function test_ads_mapping_search_returns_product_and_average_variant_hpp()
+    {
+        $parent = \App\Models\Item::create([
+            'code' => 'ITEM-PRODUCT-PARENT',
+            'name' => 'Parent Produk Ads',
+            'type' => 'finished',
+            'hpp' => 0,
+            'active' => true,
+        ]);
+        $variantOne = \App\Models\Item::create([
+            'code' => 'ITEM-PRODUCT-V1',
+            'name' => 'Variant Produk Ads Merah',
+            'type' => 'finished',
+            'hpp' => 10000,
+            'active' => true,
+        ]);
+        $variantTwo = \App\Models\Item::create([
+            'code' => 'ITEM-PRODUCT-V2',
+            'name' => 'Variant Produk Ads Biru',
+            'type' => 'finished',
+            'hpp' => 30000,
+            'active' => true,
+        ]);
+        $product = \App\Models\StorefrontProduct::create([
+            'slug' => 'parent-produk-ads',
+            'name' => 'Parent Produk Ads',
+            'base_price' => 100000,
+            'item_id' => $parent->id,
+        ]);
+        $size = \App\Models\StorefrontProductSize::create([
+            'product_id' => $product->id,
+            'size_label' => 'M',
+        ]);
+        $colorRed = \App\Models\StorefrontProductVariant::create([
+            'product_id' => $product->id,
+            'color_name' => 'Merah',
+        ]);
+        $colorBlue = \App\Models\StorefrontProductVariant::create([
+            'product_id' => $product->id,
+            'color_name' => 'Biru',
+        ]);
+        \App\Models\StorefrontVariantItemMapping::create([
+            'product_id' => $product->id,
+            'variant_id' => $colorRed->id,
+            'size_id' => $size->id,
+            'item_id' => $variantOne->id,
+        ]);
+        \App\Models\StorefrontVariantItemMapping::create([
+            'product_id' => $product->id,
+            'variant_id' => $colorBlue->id,
+            'size_id' => $size->id,
+            'item_id' => $variantTwo->id,
+        ]);
+
+        $this->assertSame(
+            20000.0,
+            app(\App\Services\Marketplace\Ads\ItemHppResolver::class)->resolve($parent)
+        );
+
+        $store = $this->createStore('AUTOSUGGEST');
+        $marketplaceProduct = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654398',
+            'item_name' => 'Parent Produk Ads',
+            'price_min' => 100000,
+            'price_max' => 100000,
+        ]);
+        \App\Models\MarketplaceProductModel::create([
+            'marketplace_product_id' => $marketplaceProduct->id,
+            'model_id' => 'MODEL-AUTOSUGGEST',
+            'model_sku' => 'SKU-AUTOSUGGEST',
+            'price' => 100000,
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'SKU-AUTOSUGGEST',
+            'channel_code' => 'shopee',
+            'item_id' => $variantOne->id,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/api/marketplace/items/search?q=&group_products=1&store_id=' . $store->id . '&channel_item_id=987654398');
+
+        $response->assertOk()
+            ->assertJsonPath('0.id', $parent->id)
+            ->assertJsonPath('0.name', 'Parent Produk Ads')
+            ->assertJsonPath('0.hpp', 20000)
+            ->assertJsonPath('0.hpp_source', 'variant_average')
+            ->assertJsonPath('0.variant_count', 2)
+            ->assertJsonPath('0.suggestion_source', 'SKU marketplace');
+    }
+
+    public function test_campaign_profit_uses_average_hpp_after_product_mapping()
+    {
+        $store = $this->createStore('MAPAVGPROFIT');
+        $parent = \App\Models\Item::create([
+            'code' => 'ITEM-AVG-PARENT',
+            'name' => 'Parent Average Ads',
+            'type' => 'finished',
+            'hpp' => 0,
+            'active' => true,
+        ]);
+        $variantOne = \App\Models\Item::create([
+            'code' => 'ITEM-AVG-V1',
+            'name' => 'Variant Average Ads 1',
+            'type' => 'finished',
+            'hpp' => 10000,
+            'active' => true,
+        ]);
+        $variantTwo = \App\Models\Item::create([
+            'code' => 'ITEM-AVG-V2',
+            'name' => 'Variant Average Ads 2',
+            'type' => 'finished',
+            'hpp' => 30000,
+            'active' => true,
+        ]);
+        $product = \App\Models\StorefrontProduct::create([
+            'slug' => 'parent-average-ads',
+            'name' => 'Parent Average Ads',
+            'base_price' => 100000,
+            'item_id' => $parent->id,
+        ]);
+        $size = \App\Models\StorefrontProductSize::create([
+            'product_id' => $product->id,
+            'size_label' => 'M',
+        ]);
+        foreach ([['Merah', $variantOne], ['Biru', $variantTwo]] as [$color, $variantItem]) {
+            $variant = \App\Models\StorefrontProductVariant::create([
+                'product_id' => $product->id,
+                'color_name' => $color,
+            ]);
+            \App\Models\StorefrontVariantItemMapping::create([
+                'product_id' => $product->id,
+                'variant_id' => $variant->id,
+                'size_id' => $size->id,
+                'item_id' => $variantItem->id,
+            ]);
+        }
+
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPAVGPROFIT',
+            'channel_item_id' => 987654399,
+            'campaign_name' => 'Campaign Average HPP',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPAVGPROFIT',
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->patchJson('/api/marketplace/ad-campaigns/' . $campaign->id . '/map-item', [
+                'internal_item_id' => $parent->id,
+            ]);
+        $response->assertOk();
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $mappedCampaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-MAPAVGPROFIT');
+
+        $this->assertSame(20000.0, (float) $mappedCampaign->unit_cogs);
+        $this->assertSame(20000.0, (float) $mappedCampaign->total_cogs);
+    }
+
+    public function test_campaign_profit_uses_parent_marketplace_sku_mapping_when_no_variant_exists()
+    {
+        $store = $this->createStore('MAPPARENTSKU');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-PARENT-SKU',
+            'name' => 'Item Parent SKU Ads',
+            'type' => 'finished',
+            'hpp' => 15000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654400',
+            'item_name' => 'Produk Tanpa Variant',
+            'item_sku' => 'PARENT-SKU-ADS',
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'PARENT-SKU-ADS',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPPARENTSKU',
+            'channel_item_id' => $product->item_id,
+            'campaign_name' => 'Campaign Parent SKU',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'C-MAPPARENTSKU',
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'C-MAPPARENTSKU');
+
+        $this->assertSame(15000.0, (float) $campaign->unit_cogs);
+        $this->assertSame(15000.0, (float) $campaign->total_cogs);
+    }
+
+    public function test_gmv_max_items_use_parent_marketplace_sku_mapping_when_no_variant_exists()
+    {
+        $store = $this->createStore('GMSPARENTSKU');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMS-PARENT-SKU',
+            'name' => 'Item GMV Max Parent SKU',
+            'type' => 'finished',
+            'hpp' => 15000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654401',
+            'item_name' => 'Produk GMV Max Tanpa Variant',
+            'item_sku' => 'GMS-PARENT-SKU',
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'GMS-PARENT-SKU',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => $product->item_id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 1000,
+            'broad_order' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_gmv' => 100000,
+            'raw_json' => ['broad_order_amount' => 1],
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '?date_from=2026-07-30&date_to=2026-07-30');
+
+        $response->assertOk()
+            ->assertJsonPath('mapped_items', 1)
+            ->assertJsonPath('data.0.unit_cogs', 15000);
+    }
+
+    public function test_gmv_max_product_mapping_updates_parent_campaign_profit_kpi()
+    {
+        $store = $this->createStore('GMSKPIPROFIT');
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-GMS-KPI',
+            'name' => 'Item GMV Max KPI',
+            'type' => 'finished',
+            'hpp' => 15000,
+            'active' => true,
+        ]);
+        $product = \App\Models\MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => '987654402',
+            'item_name' => 'Produk GMV Max KPI',
+            'item_sku' => 'GMS-KPI-SKU',
+        ]);
+        \App\Models\SkuMapping::create([
+            'marketplace_sku' => 'GMS-KPI-SKU',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => null,
+            'campaign_name' => 'GMV Max Semua Produk',
+            'campaign_status' => 'ongoing',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_order_amount' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_order_amount' => 1,
+            'direct_gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => $product->item_id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_gmv' => 100000,
+            'direct_order' => 1,
+            'direct_gmv' => 100000,
+            'raw_json' => ['broad_order_amount' => 1],
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $campaign = $data['campaigns']->firstWhere('channel_campaign_id', 'GMS-' . $store->id);
+
+        $this->assertNotNull($campaign->profit_after_ads);
+        $this->assertSame(0, (int) $data['kpi']['current']->profit_unknown_campaign_count);
+        $this->assertSame(15000.0, (float) $campaign->unit_cogs);
+    }
+
+    public function test_historical_comparison_uses_selected_compare_mode()
+    {
+        $store = $this->createStore('HISTMODE');
+        $rows = [
+            ['date' => '2026-07-30', 'expense' => 10000, 'broad_gmv' => 100000],
+            ['date' => '2026-06-30', 'expense' => 20000, 'broad_gmv' => 180000],
+        ];
+
+        foreach ($rows as $row) {
+            \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert(array_merge($row, [
+                'store_id' => $store->id,
+                'channel_campaign_id' => 'C-HIST',
+                'impressions' => 100,
+                'clicks' => 10,
+                'broad_order' => 1,
+                'direct_order' => 1,
+                'direct_gmv' => 50000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+        }
+
+        $history = app(AdsAnalyticsService::class)
+            ->getHistoricalComparison($store->id, '2026-07-30', '2026-07-30', 2, 'prev_month');
+
+        $this->assertSame('2026-07-30', $history[0]['start']);
+        $this->assertSame('2026-06-30', $history[1]['start']);
+        $this->assertSame(20000.0, (float) $history[1]['data']->first()['spend']);
+    }
+
+    public function test_summary_prefers_shop_total_and_adds_gms_once()
+    {
+        $store = $this->createStore('SUMMARYSOURCE');
+        $now = now();
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 1000,
+            'clicks' => 50,
+            'spend' => 10000,
+            'orders' => 3,
+            'gmv' => 100000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        foreach ([
+            ['channel_campaign_id' => '123', 'expense' => 10000, 'broad_gmv' => 100000],
+            ['channel_campaign_id' => 'GMS-' . $store->id, 'expense' => 5000, 'broad_gmv' => 50000],
+        ] as $fact) {
+            \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert(array_merge($fact, [
+                'store_id' => $store->id,
+                'date' => '2026-07-30',
+                'impressions' => 100,
+                'clicks' => 10,
+                'broad_order' => 1,
+                'direct_order' => 1,
+                'direct_gmv' => 50000,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]));
+        }
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        $this->assertSame(15000.0, (float) $data['kpi']['current']->spend);
+        $this->assertSame(150000.0, (float) $data['kpi']['current']->gmv);
+    }
+
+    public function test_summary_roas_change_is_not_always_zero()
+    {
+        $store = $this->createStore('ROASCHANGE');
+        $now = now();
+
+        foreach ([
+            ['date' => '2026-07-30', 'spend' => 10000, 'gmv' => 100000],
+            ['date' => '2026-07-29', 'spend' => 20000, 'gmv' => 100000],
+        ] as $row) {
+            \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+                'store_id' => $store->id,
+                'date' => $row['date'],
+                'spend' => $row['spend'],
+                'gmv' => $row['gmv'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        // ROAS saat ini 10x, sebelumnya 5x, jadi naik 100%.
+        $this->assertSame(100.0, (float) $data['kpi']['changes']['roas']);
+    }
+
     // 19. Sync overlap dicegah
     public function test_job_has_without_overlapping_middleware()
     {
@@ -380,7 +1280,7 @@ class AdsModuleTest extends TestCase
 
     public function test_sync_ads_command_uses_queue()
     {
-        Queue::fake();
+        Bus::fake();
 
         $store = $this->createStore('CMD1');
 
@@ -390,11 +1290,10 @@ class AdsModuleTest extends TestCase
             '--to' => '2026-07-24',
         ])->assertSuccessful();
 
-        Queue::assertPushed(ShopeeAdsSyncJob::class, function ($job) use ($store) {
+        Bus::assertDispatched(ShopeeAdsSyncJob::class, function ($job) use ($store) {
             $jobStore = (new \ReflectionProperty($job, 'store'))->getValue($job);
             return $jobStore->id === $store->id &&
-                   $job->connection === 'database' &&
-                   $job->queue === 'shopee-ads';
+                   $job->queue === 'ads';
         });
     }
 

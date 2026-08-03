@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace\Income;
 
 use App\Models\MpIncome;
+use App\Models\MpShipment;
 use App\Services\Marketplace\Income\Adapters\MpIncomeAdapterInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ class MpIncomeImportService
 
         // 1) Parse
         $rows = $adapter->parse($path, $sourceFile);
+        $adapterStats = method_exists($adapter, 'lastStats') ? $adapter->lastStats() : [];
 
         // 2) Dedupe by platform_order_id (last wins)
         [$uniqueOrderIds, $rowByOrder, $skippedNoOrderId, $skippedDedupe] = $this->dedupeRowsByOrderId($rows);
@@ -75,6 +77,10 @@ class MpIncomeImportService
 
             'rows_skipped_no_order_id' => $skippedNoOrderId,
             'rows_skipped_dedupe' => $skippedDedupe,
+            'rows_skipped_unlinked_adjustment' => (int) ($adapterStats['rows_skipped_unlinked_adjustment'] ?? 0),
+            'rows_skipped' => (int) ($adapterStats['rows_skipped'] ?? $skippedNoOrderId),
+            'sheet_name' => (string) ($adapterStats['sheet_name'] ?? ''),
+            'header_row' => (int) ($adapterStats['header_row'] ?? 0),
 
             'dry_run' => $dryRun,
         ];
@@ -84,6 +90,22 @@ class MpIncomeImportService
         }
 
         if ($dryRun) {
+            $matchedOrderIds = MpShipment::query()
+                ->where('store_id', $storeId)
+                ->where('channel', $channel)
+                ->whereIn('platform_order_id', $uniqueOrderIds)
+                ->distinct()
+                ->pluck('platform_order_id')
+                ->map(fn ($id): string => (string) $id)
+                ->all();
+
+            $stats['orders_matched_shipments'] = count($matchedOrderIds);
+            $stats['orders_unmatched_shipments'] = max(
+                0,
+                $stats['orders_parsed'] - $stats['orders_matched_shipments']
+            );
+            $stats['shipments_updated'] = $stats['orders_matched_shipments'];
+
             $sample = [];
             foreach (array_slice($uniqueOrderIds, 0, 5) as $oid) {
                 $sample[] = $rowByOrder[$oid] ?? [];

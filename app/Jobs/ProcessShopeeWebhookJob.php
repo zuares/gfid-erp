@@ -338,6 +338,14 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             } catch (\Throwable $e) {}
         }
 
+        // Booking berstatus lanjut tapi belum punya order_sn → promosi via job idempotent
+        // (get_booking_detail → order_sn → tarik order → tautkan). Satu implementasi
+        // dengan tombol Atur Pengiriman; polling mundur menangani matching asinkron Shopee.
+        if (blank($bModel->order_sn)
+            && in_array(strtoupper((string) $bookingStatus), ['MATCHED', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED'])) {
+            \App\Jobs\PromoteBookingToOrderJob::dispatch($store->id, $bookingSn);
+        }
+
         // Cari order berdasarkan channel_order_id ATAU booking_sn
         $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
                 $q->where('channel_order_id', $bookingSn)
@@ -633,6 +641,28 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             \Illuminate\Support\Facades\Log::info("Order {$orderSn} not found locally during return_updates_push. Syncing via API.");
             try {
                 app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $orderSn);
+                
+                // Setelah order berhasil di-sync (yang biasanya masih berstatus SHIPPED karena API telat),
+                // kita harus langsung menimpanya jadi TO_RETURN karena kita tahu dari webhook ini ada retur.
+                $newLocalOrder = MarketplaceOrder::where('channel_order_id', $orderSn)
+                    ->where('store_id', $store->id)
+                    ->first();
+                    
+                if ($newLocalOrder) {
+                    $meta = $newLocalOrder->meta ?? [];
+                    if ($returnSn) {
+                        $meta['return_sn'] = $returnSn;
+                    }
+                    $meta['return_updates'] = array_merge($meta['return_updates'] ?? [], $updatedValues);
+                    
+                    if ($newLocalOrder->order_status !== 'TO_RETURN' && $newLocalOrder->order_status !== 'CANCELLED') {
+                         $newLocalOrder->update(['order_status' => 'TO_RETURN', 'meta' => $meta]);
+                         \Illuminate\Support\Facades\Log::info("Updated newly synced local order {$orderSn} status to TO_RETURN due to return_updates_push.");
+                    } else {
+                         $newLocalOrder->update(['meta' => $meta]);
+                    }
+                    event(new \App\Events\OrderUpdated($store->id, $orderSn, $newLocalOrder->order_status));
+                }
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("Failed to sync missing order {$orderSn}: " . $e->getMessage());
             }

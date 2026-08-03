@@ -18,7 +18,9 @@ class SnapshotProductsCommand extends Command
         // 1. Optional: refresh data dari Shopee dulu
         if ($this->option('sync')) {
             $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-                ->where('status', 'active')->get();
+                ->where('status', 'active')
+                ->where('is_active', true) // toko nonaktif dilewati
+                ->get();
             foreach ($stores as $store) {
                 $res = $service->syncProducts($store);
                 $this->info("[{$store->name}] sync {$res['synced']} produk" . ($res['errors'] ? ' (ada error, cek log)' : ''));

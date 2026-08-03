@@ -21,7 +21,9 @@ class SyncAdsDailyCommand extends Command
         $dateTo   = now()->format('d-m-Y');
 
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
-            ->where('status', 'active')->get();
+            ->where('status', 'active')
+            ->where('is_active', true) // toko nonaktif dilewati
+            ->get();
 
         $saved = 0;
         foreach ($stores as $store) {

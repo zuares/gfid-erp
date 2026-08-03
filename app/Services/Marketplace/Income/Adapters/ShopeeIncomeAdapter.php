@@ -158,7 +158,13 @@ class ShopeeIncomeAdapter implements MpIncomeAdapterInterface
             // Kolom biaya di file kamu banyak yang berawalan "Biaya ..."
             // mis: Biaya Administrasi, Biaya Layanan, Biaya Proses Pesanan, dll.
             $hn = strtolower($h);
-            if (str_starts_with($hn, 'biaya')) {
+            if (
+                str_starts_with($hn, 'biaya')
+                || str_contains($hn, 'premi')
+                || str_contains($hn, 'asuransi')
+                || str_contains($hn, 'affiliate')
+                || str_contains($hn, 'afiliasi')
+            ) {
                 $cols[] = $col;
             }
         }

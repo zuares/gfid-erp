@@ -448,7 +448,6 @@ class InventoryAdjustmentController extends Controller
         $rules = [
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'date' => ['required', 'date'],
-            'reason' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'exists:items,id'],
@@ -457,34 +456,33 @@ class InventoryAdjustmentController extends Controller
             'lines.*.notes' => ['nullable', 'string'],
         ];
 
-        $user = $request->user();
-        $isOwner = $user && (($user->role ?? null) === 'owner');
-
-        if (!$isOwner) {
-            // Non-owner WAJIB isi alasan
-            $rules['reason'] = ['required', 'string', 'max:255'];
-        }
-
         $validated = $request->validate($rules);
 
-        $user = $request->user();
-        $userId = $user?->id;
-        $isOwner = $user && (($user->role ?? null) === 'owner');
+        foreach ($validated['lines'] as $index => $lineData) {
+            $signedChange = (float) ($lineData['qty_change'] ?? 0);
+            if (abs($signedChange) < 0.000001) {
+                continue;
+            }
 
-        $adjustment = DB::transaction(function () use ($validated, $userId, $inventory, $isOwner) {
+            if (trim((string) ($lineData['notes'] ?? '')) === '') {
+                return back()
+                    ->withErrors([
+                        "lines.$index.notes" => 'Alasan baris wajib diisi untuk item yang diubah.',
+                    ])
+                    ->withInput();
+            }
+        }
+
+        $userId = $request->user()?->id;
+        $adjustment = DB::transaction(function () use ($validated, $userId) {
             $adjustment = new InventoryAdjustment();
             $adjustment->code = $this->generateCodeForDate($validated['date']);
             $adjustment->warehouse_id = (int) $validated['warehouse_id'];
             $adjustment->date = $validated['date'];
-            $adjustment->reason = $validated['reason'] ?? 'Adjustment Manual';
+            $adjustment->reason = 'Adjustment Manual Draft';
             $adjustment->notes = $validated['notes'] ?? null;
-            $adjustment->status = $isOwner ? InventoryAdjustment::STATUS_APPROVED : InventoryAdjustment::STATUS_PENDING;
+            $adjustment->status = InventoryAdjustment::STATUS_DRAFT;
             $adjustment->created_by = $userId;
-
-            if ($isOwner) {
-                $adjustment->approved_by = $userId;
-                $adjustment->approved_at = now();
-            }
 
             $adjustment->save();
 
@@ -498,68 +496,11 @@ class InventoryAdjustmentController extends Controller
                 }
 
                 $direction = $signedChange >= 0 ? 'in' : 'out';
-                $qtyBefore = null;
-                $qtyAfter = null;
-
-                if ($isOwner) {
-                    if ($lotId) {
-                        $qtyBefore = $inventory->getLotBalance(
-                            warehouseId: $adjustment->warehouse_id,
-                            itemId: $itemId,
-                            lotId: $lotId
-                        );
-                    } else {
-                        $qtyBefore = $inventory->getOnHandQty(
-                            warehouseId: $adjustment->warehouse_id,
-                            itemId: $itemId
-                        );
-                    }
-
-                    // ✅ resolve cost saat eksekusi langsung (owner)
-                    $item = Item::find($itemId);
-                    $unitCostOverride = $this->resolveUnitCostForAdjustmentApprove(
-                        itemId: $itemId,
-                        warehouseId: (int) $adjustment->warehouse_id,
-                        item: $item,
-                        inventory: $inventory
-                    );
-
-                    $mutation = $inventory->adjustByDifference(
-                        warehouseId: (int) $adjustment->warehouse_id,
-                        itemId: $itemId,
-                        qtyChange: $signedChange,
-                        date: $adjustment->date,
-                        sourceType: InventoryAdjustment::class,
-                        sourceId: $adjustment->id,
-                        notes: $lineData['notes'] ?? $adjustment->reason,
-                        lotId: $lotId,
-                        allowNegative: false,
-                        unitCostOverride: $unitCostOverride,
-                        affectLotCost: false,
-                    );
-
-                    if (!$mutation) {
-                        continue;
-                    }
-
-                    if ($lotId) {
-                        $qtyAfter = $inventory->getLotBalance(
-                            warehouseId: (int) $adjustment->warehouse_id,
-                            itemId: $itemId,
-                            lotId: $lotId
-                        );
-                    } else {
-                        $qtyAfter = $inventory->getOnHandQty(
-                            warehouseId: (int) $adjustment->warehouse_id,
-                            itemId: $itemId
-                        );
-                    }
-                }
 
                 $adjustment->lines()->create([
                     'item_id' => $itemId,
-                    'qty_before' => $qtyBefore,
-                    'qty_after' => $qtyAfter,
+                    'qty_before' => null,
+                    'qty_after' => null,
                     'qty_change' => $signedChange,
                     'direction' => $direction,
                     'notes' => $lineData['notes'] ?? null,
@@ -567,29 +508,13 @@ class InventoryAdjustmentController extends Controller
                 ]);
             }
 
-            if ($isOwner) {
-                $this->journal->postInventoryAdjustment($adjustment);
-            }
-
             return $adjustment;
         });
 
-        // Post jurnal jika langsung approved (owner path)
-        if ($adjustment->status === InventoryAdjustment::STATUS_APPROVED) {
-            try {
-                $this->journal->postInventoryAdjustment($adjustment);
-            } catch (\Throwable $e) {
-                Log::warning('[InventoryAdjustment] Gagal post jurnal setelah store (owner).', [
-                    'adjustment_id' => $adjustment->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
         return redirect()
-            ->route('inventory.adjustments.show', $adjustment)
+            ->route('inventory.adjustments.show', ['inventoryAdjustment' => $adjustment->getKey()])
             ->with('status', 'success')
-            ->with('message', 'Adjustment Manual berhasil dibuat.');
+            ->with('message', 'Draft adjustment berhasil disimpan.');
     }
 
     /**
@@ -621,7 +546,7 @@ class InventoryAdjustmentController extends Controller
 
         if (!$inventoryAdjustment->canApprove()) {
             return redirect()
-                ->route('inventory.adjustments.show', $inventoryAdjustment)
+                ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
                 ->with('status', 'error')
                 ->with('message', 'Hanya dokumen dengan status pending yang bisa di-approve.');
         }
@@ -660,7 +585,7 @@ class InventoryAdjustmentController extends Controller
         }
 
         return redirect()
-            ->route('inventory.adjustments.show', $inventoryAdjustment)
+            ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
             ->with('status', 'success')
             ->with('message', 'Adjustment berhasil di-approve dan stok sudah dikoreksi.');
     }
@@ -682,7 +607,7 @@ class InventoryAdjustmentController extends Controller
 
         if (!$inventoryAdjustment->isPending() && !$inventoryAdjustment->isDraft()) {
             return redirect()
-                ->route('inventory.adjustments.show', $inventoryAdjustment)
+                ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
                 ->with('status', 'error')
                 ->with('message', 'Hanya adjustment berstatus pending atau draft yang bisa dibatalkan.');
         }
@@ -691,7 +616,7 @@ class InventoryAdjustmentController extends Controller
         $inventoryAdjustment->save();
 
         return redirect()
-            ->route('inventory.adjustments.show', $inventoryAdjustment)
+            ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
             ->with('status', 'success')
             ->with('message', 'Adjustment berhasil dibatalkan (VOID).');
     }
@@ -1193,93 +1118,130 @@ class InventoryAdjustmentController extends Controller
         return "ADJ-{$ymd}-{$seq}";
     }
 
-    public function post(InventoryAdjustment $adjustment)
+    public function post(InventoryAdjustment $inventoryAdjustment): RedirectResponse
     {
-        abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
-        abort_unless($adjustment->status === 'draft', 422);
+        $user = auth()->user();
+        abort_unless($user && in_array($user->role ?? null, ['owner', 'admin'], true), 403);
 
-        $adjustment->loadMissing(['lines']);
+        $adjustmentId = (int) $inventoryAdjustment->getKey();
+        if ($adjustmentId <= 0) {
+            return redirect()
+                ->route('inventory.adjustments.index')
+                ->with('status', 'error')
+                ->with('message', 'Adjustment tidak valid.');
+        }
 
-        DB::transaction(function () use ($adjustment) {
+        if (!$inventoryAdjustment->isDraft()) {
+            return redirect("/inventory/adjustments/{$adjustmentId}")
+                ->with('status', 'warning')
+                ->with('message', 'Hanya draft yang bisa dipost. Dokumen ini sudah berstatus ' . ($inventoryAdjustment->status ?? '-'));
+        }
 
-            // lock header biar gak double post
-            $adjustment = InventoryAdjustment::whereKey($adjustment->id)->lockForUpdate()->first();
+        $inventoryAdjustment->loadMissing(['lines.item', 'source']);
 
-            if ($adjustment->status !== 'draft') {
-                abort(422, 'Adjustment sudah diposting.');
+        $posted = false;
+
+        DB::transaction(function () use ($inventoryAdjustment, $user, &$posted) {
+            $adjustment = InventoryAdjustment::query()
+                ->with(['lines.item', 'source'])
+                ->whereKey($inventoryAdjustment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (!$adjustment->isDraft()) {
+                return;
             }
 
             $warehouseId = (int) $adjustment->warehouse_id;
+            $date = $adjustment->date?->toDateString() ?? now()->toDateString();
 
             foreach ($adjustment->lines as $line) {
-                $itemId = (int) $line->item_id;
-                $qty = (float) $line->qty_change;
-
-                // ambil stok saat ini (qty_before)
-                $qtyBefore = (float) DB::table('inventory_mutations')
-                    ->where('warehouse_id', $warehouseId)
-                    ->where('item_id', $itemId)
-                    ->sum('qty_change');
-
-                $qtyAfter = $qtyBefore;
-
-                if ($line->direction === 'in') {
-                    $qtyAfter = $qtyBefore + $qty;
-                    // stockIn
-                    $this->inventory->stockIn(
-                        warehouseId: $warehouseId,
-                        itemId: $itemId,
-                        qty: $qty,
-                        date: $adjustment->date ?? now()->toDateString(),
-                        sourceType: InventoryAdjustment::class,
-                        sourceId: $adjustment->id,
-                        notes: $line->notes ?? "Inventory Adjustment IN #{$adjustment->id}",
-                        lotId: $line->lot_id,
-                        unitCost: null,
-                        affectLotCost: false,
-                    );
-                } else {
-                    $qtyAfter = $qtyBefore - $qty;
-                    // stockOut
-                    $this->inventory->stockOut(
-                        warehouseId: $warehouseId,
-                        itemId: $itemId,
-                        qty: $qty,
-                        date: $adjustment->date ?? now()->toDateString(),
-                        sourceType: InventoryAdjustment::class,
-                        sourceId: $adjustment->id,
-                        notes: $line->notes ?? "Inventory Adjustment OUT #{$adjustment->id}",
-                        allowNegative: false,
-                        lotId: $line->lot_id,
-                        unitCostOverride: null,
-                        affectLotCost: false,
-                    );
+                $signed = (float) $line->qty_change;
+                if (abs($signed) < 0.000001) {
+                    continue;
                 }
+
+                $qtyBefore = $line->lot_id
+                    ? $this->inventory->getLotBalance(
+                        warehouseId: $warehouseId,
+                        itemId: (int) $line->item_id,
+                        lotId: (int) $line->lot_id
+                    )
+                    : $this->inventory->getOnHandQty(
+                        warehouseId: $warehouseId,
+                        itemId: (int) $line->item_id
+                    );
+
+                $unitCostOverride = $this->resolveUnitCostForAdjustmentApprove(
+                    itemId: (int) $line->item_id,
+                    warehouseId: $warehouseId,
+                    item: $line->item,
+                    inventory: $this->inventory
+                );
+
+                $mutation = $this->inventory->adjustByDifference(
+                    warehouseId: $warehouseId,
+                    itemId: (int) $line->item_id,
+                    qtyChange: $signed,
+                    date: $date,
+                    sourceType: InventoryAdjustment::class,
+                    sourceId: $adjustment->id,
+                    notes: $line->notes ?? $adjustment->reason,
+                    lotId: $line->lot_id ?? null,
+                    allowNegative: false,
+                    unitCostOverride: $unitCostOverride,
+                    affectLotCost: false,
+                );
+
+                if (!$mutation) {
+                    continue;
+                }
+
+                $qtyAfter = $line->lot_id
+                    ? $this->inventory->getLotBalance(
+                        warehouseId: $warehouseId,
+                        itemId: (int) $line->item_id,
+                        lotId: (int) $line->lot_id
+                    )
+                    : $this->inventory->getOnHandQty(
+                        warehouseId: $warehouseId,
+                        itemId: (int) $line->item_id
+                    );
 
                 $line->update([
                     'qty_before' => $qtyBefore,
                     'qty_after' => $qtyAfter,
+                    'direction' => $signed >= 0 ? 'in' : 'out',
                 ]);
             }
 
             $adjustment->update([
-                'status' => \App\Models\InventoryAdjustment::STATUS_APPROVED,
-                'approved_by' => auth()->id(),
+                'status' => InventoryAdjustment::STATUS_APPROVED,
+                'approved_by' => $user->id,
                 'approved_at' => now(),
             ]);
+
+            $posted = true;
         });
 
-        // Post jurnal SETELAH transaksi inventory committed (idempotent, try/catch agar tidak crash flow)
+        if (!$posted) {
+            return redirect("/inventory/adjustments/{$adjustmentId}")
+                ->with('status', 'warning')
+                ->with('message', 'Adjustment sudah berubah status sebelum dipost. Tidak ada perubahan stok yang dilakukan.');
+        }
+
         try {
-            $this->journal->postInventoryAdjustment($adjustment->fresh());
+            $this->journal->postInventoryAdjustment($inventoryAdjustment->fresh());
         } catch (\Throwable $e) {
             Log::warning('[InventoryAdjustment] Gagal post jurnal setelah post().', [
-                'adjustment_id' => $adjustment->id,
+                'adjustment_id' => $inventoryAdjustment->id,
                 'error' => $e->getMessage(),
             ]);
         }
 
-        return back()->with('success', 'Adjustment berhasil diposting (audit trail tercatat).');
+        return redirect("/inventory/adjustments/{$adjustmentId}")
+            ->with('status', 'success')
+            ->with('message', 'Draft adjustment berhasil diposting dan stok sudah dikoreksi.');
     }
     public function cuttingOverproductionCreate(Request $request): View
     {
@@ -1394,7 +1356,7 @@ class InventoryAdjustmentController extends Controller
         });
 
         return redirect()
-            ->route('inventory.adjustments.show', $adjustment)
+            ->route('inventory.adjustments.show', ['inventoryAdjustment' => $adjustment->getKey()])
             ->with('status', 'success')
             ->with('message', 'Overproduction Adjustment berhasil dibuat (draft). Silakan POST untuk eksekusi.');
     }

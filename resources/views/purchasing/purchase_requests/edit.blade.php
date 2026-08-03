@@ -42,9 +42,12 @@
                 'linesData'   => $linesData,
             ])
 
-            <div class="d-flex gap-2 justify-content-end mt-2">
+            <div class="d-flex gap-2 justify-content-end mt-2 flex-wrap">
                 <a href="{{ route('purchasing.purchase_requests.show', $purchase_request->id) }}"
                     class="btn btn-outline-secondary">Batal</a>
+                <button type="submit" name="after_save_allocate" value="1" class="btn btn-outline-primary">
+                    Simpan &amp; lanjut ke draft PO
+                </button>
                 <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
             </div>
         </form>

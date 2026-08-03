@@ -140,6 +140,7 @@
     <div class="d-flex align-items-center gap-2" style="font-size:.7rem;color:#64748b">
         <span class="rt-dot rt-off" id="rtDot"></span><span id="rtLabel">menghubungkan…</span>
         <button class="btn btn-sm btn-outline-secondary" style="font-size:.7rem" onclick="loadConversations(true);loadStoreStatus()">⟳ Sync</button>
+        <a class="btn btn-sm btn-outline-dark" style="font-size:.7rem" href="{{ route('marketplace.chat.audit') }}">Audit raw</a>
     </div>
 </div>
 

@@ -47,14 +47,7 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->mirrorLegacyMarketplaceStore($this->store);
     }
 
-    /**
-     * marketplace_orders.store_id masih FK ke tabel legacy `marketplace_stores`
-     * (bukan `stores`) — split-brain skema yang sudah didokumentasikan di
-     * AUDIT_LANJUTAN_SYNC_SETTLEMENT.md dan sengaja TIDAK diperbaiki di Fase 1
-     * (di luar scope, keputusan user: "defer FK fix"). Baris ini murni supaya
-     * insert MarketplaceOrder di test lolos FK constraint yang SUDAH ADA di
-     * skema saat ini — tidak mengubah aplikasi/skema sama sekali.
-     */
+    /** Mirror legacy rows while the test exercises the canonical Store model. */
     private function mirrorLegacyMarketplaceStore(Store $store): void
     {
         $channelId = DB::table('marketplace_channels')->where('code', $this->shopee->code)->value('id');
@@ -89,6 +82,23 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
             'order_status'      => 'COMPLETED',
             'ordered_at'        => now()->subDays(2),
         ], $overrides));
+    }
+
+    private function createAdditionalStore(string $name = 'Toko Uji 2'): Store
+    {
+        $store = Store::create([
+            'channel_id'  => $this->shopee->id,
+            'code'        => 'S' . rand(1000, 9999),
+            'name'        => $name,
+            'status'      => 'active',
+            'is_active'   => true,
+            'credentials' => ['access_token' => 'dummy'],
+            'token_expires_at' => now()->addDay(),
+        ]);
+
+        $this->mirrorLegacyMarketplaceStore($store);
+
+        return $store;
     }
 
     private function mockDriver(\Closure $expectations): void
@@ -463,6 +473,25 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(1, $result['skipped']);
         $this->assertSame(0, $result['errors']);
         $this->assertDatabaseMissing('marketplace_order_settlements', ['channel_order_id' => $order->channel_order_id]);
+        $this->assertNotNull($order->fresh()->settlement_sync_last_attempt_at);
+    }
+
+    public function test_response_kosong_menghormati_cooldown_tanpa_membuat_row_dummy()
+    {
+        $order = $this->createOrder();
+
+        $this->mockDriver(function (MockInterface $mock) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn(['response' => ['order_income' => []], '_meta' => ['http_status' => 200, 'retry_after' => null]]);
+        });
+
+        $service = app(MarketplaceSyncService::class);
+        $service->syncSettlements($this->store);
+        $second = $service->syncSettlements($this->store);
+
+        $this->assertSame(0, $second['found']);
+        $this->assertDatabaseMissing('marketplace_order_settlements', ['channel_order_id' => $order->channel_order_id]);
     }
 
     // ── 20-22. Normalisasi nominal (null / string numerik / string nonnumerik) ─
@@ -617,6 +646,61 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
 
         $settlement = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->first();
         $this->assertNull($settlement->settlement_time);
+    }
+
+    public function test_update_time_order_tidak_dianggap_sebagai_waktu_pencairan()
+    {
+        $order = $this->createOrder([
+            'raw_json' => ['update_time' => now()->subDay()->timestamp],
+        ]);
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse([
+                    'escrow_amount' => 1000,
+                    'order_sn' => $order->channel_order_id,
+                ]));
+        });
+
+        app(MarketplaceSyncService::class)->syncSettlements($this->store);
+
+        $this->assertNull(MarketplaceOrderSettlement::where('store_id', $this->store->id)
+            ->where('channel_order_id', $order->channel_order_id)
+            ->value('settlement_time'));
+    }
+
+    public function test_settlement_same_order_number_di_dua_toko_tidak_saling_menimpa()
+    {
+        $storeB = $this->createAdditionalStore();
+        $orderA = $this->createOrder(['channel_order_id' => 'DUPLICATE-SN']);
+        $orderB = $this->createOrder(['store_id' => $storeB->id, 'channel_order_id' => 'DUPLICATE-SN']);
+
+        $this->mockDriver(function (MockInterface $mock) use ($orderA, $orderB) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->withArgs(fn ($store, $sn) => $sn === 'DUPLICATE-SN')
+                ->twice()
+                ->andReturn(
+                    $this->escrowResponse(['escrow_amount' => 1000, 'order_sn' => $orderA->channel_order_id]),
+                    $this->escrowResponse(['escrow_amount' => 2000, 'order_sn' => $orderB->channel_order_id]),
+                );
+        });
+
+        $service = app(MarketplaceSyncService::class);
+        $service->syncSettlements($this->store);
+        $service->syncSettlements($storeB);
+
+        $this->assertSame(2, MarketplaceOrderSettlement::where('channel_order_id', 'DUPLICATE-SN')->count());
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'store_id' => $this->store->id,
+            'channel_order_id' => 'DUPLICATE-SN',
+            'final_income' => '1000.00',
+        ]);
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'store_id' => $storeB->id,
+            'channel_order_id' => 'DUPLICATE-SN',
+            'final_income' => '2000.00',
+        ]);
     }
 
     // ── 29. Transaction hanya per order, bukan seluruh batch ────────────────────
@@ -889,6 +973,30 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         // sepenuhnya) — hanya tidak dipakai sebagai sumber activity_fee.
         $settlement = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->first();
         $this->assertSame(999999, (int) $settlement->raw_json['campaign_fee']);
+    }
+
+    // ── 9. affiliate_fee dan shipping_insurance_fee ikut dipetakan ─────────────
+    public function test_affiliate_fee_dan_shipping_insurance_fee_dipetakan()
+    {
+        $order = $this->createOrder();
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse($this->realisticIncomeFields([
+                    'affiliate_commission_fee' => 425,
+                    'shipping_insurance' => 1200,
+                    'order_sn' => $order->channel_order_id,
+                ])));
+        });
+
+        app(MarketplaceSyncService::class)->syncSettlements($this->store);
+
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'channel_order_id' => $order->channel_order_id,
+            'affiliate_fee' => '425.00',
+            'shipping_insurance_fee' => '1200.00',
+        ]);
     }
 
     // ── 9. escrow_amount tetap dipetakan ke final_income (regresi, fixture baru) ──
@@ -1239,5 +1347,72 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
             'action' => 'sync_settlements',
             'status' => 'failed',
         ]);
+    }
+
+    public function test_sync_order_tidak_membuat_duplikat_untuk_settlement_final()
+    {
+        $orderSn = '260726PFTRAJ2Q';
+        $finalTime = now()->subHour();
+
+        $existingOrder = $this->createOrder([
+            'channel_order_id' => $orderSn,
+            'order_status' => 'COMPLETED',
+        ]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $this->store->id,
+            'order_id' => $existingOrder->id,
+            'channel_order_id' => $orderSn,
+            'buyer_payment_amount' => 86417,
+            'final_income' => 80000,
+            'settlement_time' => $finalTime,
+            'raw_json' => ['escrow_amount' => 80000],
+        ]);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $orderSn,
+            'order_status' => 'COMPLETED',
+            'total_amount' => 86417,
+            'item_list' => [[
+                'model_original_price' => 100000,
+                'model_discounted_price' => 58000,
+                'model_quantity_purchased' => 1,
+            ]],
+        ]]);
+
+        $settlement = MarketplaceOrderSettlement::where('store_id', $this->store->id)
+            ->where('channel_order_id', $orderSn)
+            ->firstOrFail();
+
+        $this->assertSame(1, MarketplaceOrderSettlement::where('store_id', $this->store->id)
+            ->where('channel_order_id', $orderSn)
+            ->count());
+        $this->assertEquals($finalTime->timestamp, $settlement->settlement_time->timestamp);
+        $this->assertSame(['escrow_amount' => 80000], $settlement->raw_json);
+    }
+
+    public function test_sync_order_tidak_mendowngrade_status_ready_to_handover()
+    {
+        $orderSn = 'ORDER-READY-HANDOVER';
+        $order = $this->createOrder([
+            'channel_order_id' => $orderSn,
+            'order_status' => 'READY_TO_HANDOVER',
+        ]);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $orderSn,
+            'order_status' => 'PROCESSED',
+            'total_amount' => 100000,
+            'item_list' => [],
+        ]]);
+
+        $order->refresh();
+
+        $this->assertSame('READY_TO_HANDOVER', $order->order_status);
+        $this->assertSame('packed', $order->status);
     }
 }

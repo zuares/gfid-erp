@@ -27,9 +27,8 @@
     }
 
     .ship-topbar{
-        position:sticky;
-        top:0;
-        z-index:300;
+        position:relative;
+        z-index:1;
         display:flex;
         justify-content:space-between;
         align-items:center;
@@ -62,7 +61,14 @@
     body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
     .kpi .val{ font-weight:650; color:var(--shp-accent); }
 
-    .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .header-actions{ display:flex; gap:.45rem; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .filter-bar{ display:flex; align-items:center; gap:.75rem; margin:0 0 .65rem; padding:.6rem .7rem; border:1px solid var(--shp-border); border-radius:8px; background:var(--card,#fff); }
+    .filter-heading{ min-width:105px; color:#334155; font-size:.76rem; font-weight:800; }
+    .filter-heading small{ display:block; margin-top:.08rem; color:#94a3b8; font-size:.66rem; font-weight:600; }
+    .shipment-filter-form{ display:grid; grid-template-columns:minmax(220px,1.5fr) repeat(2,minmax(115px, .8fr)) repeat(2,minmax(115px,.8fr)) auto auto; gap:.4rem; align-items:center; flex:1; }
+    .shipment-filter-form .filter-input{ min-width:0; border-radius:7px; font-size:.78rem; }
+    .shipment-filter-form .filter-date{ width:125px; border-radius:7px; font-size:.78rem; }
+    .shipment-filter-form .btn{ min-height:32px; }
     .filter-label{ font-size:.8rem; color:#6b7280; }
     body[data-theme="dark"] .filter-label{ color:#9ca3af; }
     .filter-select{ border-radius:7px; padding-left:.75rem; padding-right:2rem; font-size:.82rem; }
@@ -75,7 +81,11 @@
     .btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
 
     .table-list{ margin-bottom:0; }
+    .table-responsive{ max-height:min(64vh, 640px); overflow:auto; }
     .table-list thead th{
+        position:sticky;
+        top:0;
+        z-index:20;
         border-bottom-width:1px;
         font-size:.68rem;
         text-transform:none;
@@ -85,6 +95,12 @@
         padding:.52rem .62rem;
         white-space:nowrap;
     }
+    .table-list thead tr{ position:sticky; top:0; z-index:20; }
+    .table-sort{ display:inline-flex; align-items:center; gap:.25rem; color:#64748b; text-decoration:none; }
+    .table-sort:hover{ color:#111827; text-decoration:none; }
+    .table-sort.active{ color:#334155; }
+    .table-sort-icon{ font-size:.62rem; color:#94a3b8; }
+    .table-sort.active .table-sort-icon{ color:#334155; }
     body[data-theme="dark"] .table-list thead th{
         background: rgba(15, 23, 42, 0.98);
         color:#9ca3af;
@@ -97,7 +113,7 @@
     }
     body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
-    .code-link{ font-weight:700; text-decoration:none; color:inherit; }
+    .code-link{ font-size:.68rem; font-weight:650; text-decoration:none; color:#94a3b8!important; letter-spacing:.01em; }
     .code-link:hover{ text-decoration:underline; }
     .muted{ font-size:.82rem; color:#6b7280; }
     body[data-theme="dark"] .muted{ color:#9ca3af; }
@@ -136,13 +152,19 @@
         .ship-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
         .title{ font-size:1.05rem; }
         .sub{ display:none; }
-        .controls{ width:100%; align-items:stretch; }
-        .controls form{ flex:1 1 100%; }
+        .header-actions{ width:100%; justify-content:flex-start; }
+        .header-actions .btn{ flex:1; }
+        .filter-bar{ display:block; padding:.65rem; }
+        .filter-heading{ margin-bottom:.5rem; }
+        .shipment-filter-form{ display:grid; grid-template-columns:1fr 1fr; width:100%; }
+        .shipment-filter-form .filter-input{ grid-column:1 / -1; width:100%; }
+        .shipment-filter-form .filter-date{ width:100%; }
+        .shipment-filter-form .filter-label{ display:none; }
+        .shipment-filter-form .btn{ width:100%; }
         .filter-select{ width:100%; min-height:40px; }
-        .controls .btn,
-        .controls form button{ min-height:40px; }
+        .shipment-filter-form .btn{ min-height:40px; }
         .kpis{ display:none; }
-        .table-responsive{ overflow:visible; }
+        .table-responsive{ max-height:62vh; overflow:auto; }
         .table-list thead{ display:none; }
         .table-list,
         .table-list tbody,
@@ -344,8 +366,18 @@
         $canSeeNominal = $canSeeNominal ?? ((auth()->user()->role ?? null) !== 'admin');
         $canFreshShipments = $canFreshShipments ?? false;
 
-        $pageTotalQty = (int) $shipments->getCollection()->sum('total_qty_calc');
-        $pageTotalRp  = $canSeeNominal ? (float) $shipments->getCollection()->sum('total_rp_calc') : 0;
+        $sortUrl = function (string $column) use ($sort, $direction) {
+            $nextDirection = $sort === $column && $direction === 'asc' ? 'desc' : 'asc';
+            return request()->fullUrlWithQuery([
+                'sort' => $column,
+                'direction' => $nextDirection,
+                'page' => 1,
+            ]);
+        };
+        $sortIcon = function (string $column) use ($sort, $direction) {
+            if ($sort !== $column) return '↕';
+            return $direction === 'asc' ? '↑' : '↓';
+        };
     @endphp
 
     @if(session('message'))
@@ -374,28 +406,14 @@
             <div class="sub">Dokumen barang keluar WH-RTS.</div>
 
             <div class="kpis">
-                <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($shipments->total(), 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Halaman</span><span class="val">{{ number_format($shipments->count(), 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Qty</span><span class="val">{{ number_format($pageTotalQty, 0, ',', '.') }}</span></span>
-
-                @if($canSeeNominal)
-                    <span class="kpi"><span class="lbl">Rp</span><span class="val">Rp {{ number_format($pageTotalRp, 0, ',', '.') }}</span></span>
-                @endif
+                <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($kpi['total'], 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Draft</span><span class="val">{{ number_format($kpi['draft'], 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Submitted</span><span class="val">{{ number_format($kpi['submitted'], 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Posted</span><span class="val">{{ number_format($kpi['posted'], 0, ',', '.') }}</span></span>
             </div>
         </div>
 
-        <div class="controls">
-            <form method="GET" class="d-flex gap-2 align-items-center">
-                <span class="filter-label">Status</span>
-                <select name="status" class="form-select form-select-sm filter-select" onchange="this.form.submit()">
-                    <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All</option>
-                    <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Draft</option>
-                    <option value="submitted" {{ $statusFilter === 'submitted' ? 'selected' : '' }}>Submitted</option>
-                    <option value="posted" {{ $statusFilter === 'posted' ? 'selected' : '' }}>Posted</option>
-                    <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                </select>
-            </form>
-
+        <div class="header-actions">
             @if($canFreshShipments)
                 <form method="POST" action="{{ route('sales.shipments.dev_fresh') }}"
                       onsubmit="return confirm('Fresh semua data shipment? Aksi ini hanya untuk database dev.');">
@@ -412,6 +430,33 @@
         </div>
     </div>
 
+    <div class="filter-bar">
+        <div class="filter-heading">Filter daftar<small>Cari dan saring shipment</small></div>
+        <form method="GET" class="shipment-filter-form">
+            <input type="hidden" name="sort" value="{{ $sort }}">
+            <input type="hidden" name="direction" value="{{ $direction }}">
+            <input type="search" name="q" value="{{ $search }}" class="form-control form-control-sm filter-input" placeholder="Cari kode shipment / order / resi..." autocomplete="off">
+            <select name="status" class="form-select form-select-sm filter-select" aria-label="Filter status">
+                <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Semua status</option>
+                <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Draft</option>
+                <option value="submitted" {{ $statusFilter === 'submitted' ? 'selected' : '' }}>Submitted</option>
+                <option value="posted" {{ $statusFilter === 'posted' ? 'selected' : '' }}>Posted</option>
+                <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+            </select>
+            <select name="scan_mode" class="form-select form-select-sm filter-select" aria-label="Filter mode scan">
+                <option value="all" {{ $scanMode === 'all' ? 'selected' : '' }}>Semua mode</option>
+                <option value="order_first" {{ $scanMode === 'order_first' ? 'selected' : '' }}>Scan Order</option>
+                <option value="item_first" {{ $scanMode === 'item_first' ? 'selected' : '' }}>Scan Item</option>
+            </select>
+            <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm filter-date" aria-label="Dari tanggal" title="Dari tanggal">
+            <input type="date" name="date_to" value="{{ $dateTo }}" class="form-control form-control-sm filter-date" aria-label="Sampai tanggal" title="Sampai tanggal">
+            <button type="submit" class="btn btn-sm btn-ship-outline btn-pill">Filter</button>
+            @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo)
+                <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill">Reset</a>
+            @endif
+        </form>
+    </div>
+
     <div class="card card-main">
         <div class="card-body p-0">
             @if ($shipments->count() === 0)
@@ -425,30 +470,20 @@
                         <thead>
                             <tr>
                                 <th style="width: 46px;">#</th>
-                                <th style="width: 120px;">Tanggal</th>
-                                <th style="width: 210px;">Shipment</th>
-                                <th>Store / Channel</th>
-                                <th class="text-end" style="width: 110px;">Qty</th>
-
-                                @if($canSeeNominal)
-                                    <th class="text-end" style="width: 170px;">Total Rp</th>
-                                @endif
-
-                                <th class="text-end" style="width: 110px;">Kategori</th>
-                                <th style="width: 130px;">Status</th>
+                                <th style="width: 135px;"><a class="table-sort {{ $sort === 'date' ? 'active' : '' }}" href="{{ $sortUrl('date') }}">Tanggal &amp; Jam <span class="table-sort-icon">{{ $sortIcon('date') }}</span></a></th>
+                                <th style="width: 210px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Shipment <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
+                                <th class="text-end" style="width: 100px;"><a class="table-sort {{ $sort === 'order_scans_count' ? 'active' : '' }}" href="{{ $sortUrl('order_scans_count') }}">Pesanan <span class="table-sort-icon">{{ $sortIcon('order_scans_count') }}</span></a></th>
+                                <th class="text-end" style="width: 90px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Item/SKU <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
+                                <th style="width: 130px;"><a class="table-sort {{ $sort === 'status' ? 'active' : '' }}" href="{{ $sortUrl('status') }}">Status <span class="table-sort-icon">{{ $sortIcon('status') }}</span></a></th>
                                 <th style="width: 90px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($shipments as $shipment)
                                 @php
-                                    $storeName = $shipment->store->name ?? '-';
-                                    $storeCode = $shipment->store->code ?? '';
-                                    $channelLabel = $storeCode ? strtoupper($storeCode) : null;
-
                                     $qty = (int) ($shipment->total_qty_calc ?? 0);
-                                    $totalRp = (float) ($shipment->total_rp_calc ?? 0);
-                                    $catCount = (int) ($shipment->category_count_calc ?? 0);
+                                    $orderCount = (int) ($shipment->order_scans_count ?? 0);
+                                    $itemCount = (int) ($shipment->lines_count ?? $shipment->lines->count());
 
                                     $isCancelled = !empty($shipment->cancelled_at);
                                     $uiStatus = $isCancelled ? 'cancelled' : ($shipment->status ?? 'submitted');
@@ -462,8 +497,12 @@
                                     };
 
                                     $statusLabel = ucfirst($uiStatus);
+                                    // Fallback untuk shipment lama yang dibuat sebelum scan_mode disimpan.
+                                    $isOrderFirst = ($shipment->scan_mode ?? 'item_first') === 'order_first'
+                                        || (($shipment->scan_mode ?? null) === 'item_first' && (int) ($shipment->order_scans_count ?? 0) > 0);
+                                    $stockBlocked = !empty($shipment->stock_insufficient_calc);
                                     $actionRoute = $uiStatus === 'draft'
-                                        ? route('sales.shipments.edit', $shipment)
+                                        ? route($isOrderFirst ? 'sales.shipments.confirm_orders' : 'sales.shipments.edit', $shipment)
                                         : route('sales.shipments.show', $shipment);
                                     $actionLabel = $uiStatus === 'draft' ? 'Lanjutkan' : 'Detail';
                                 @endphp
@@ -473,7 +512,10 @@
                                         {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
                                     </td>
 
-                                    <td class="small mobile-hide">{{ $fmtDate($shipment->date, 'd M Y') }}</td>
+                                    <td class="small mobile-hide">
+                                        <div>{{ $fmtDate($shipment->date, 'd M Y') }}</div>
+                                        <div class="muted" style="font-size:.64rem;">{{ $fmtDate($shipment->created_at, 'H:i') }} WIB</div>
+                                    </td>
 
                                     <td>
                                         <div class="ship-row-main">
@@ -482,46 +524,22 @@
                                                     {{ $shipment->code }}
                                                 </a>
 
-                                                <div class="muted mt-1">
-                                                    @if ($isCancelled)
-                                                        Cancelled {{ $fmtDate($shipment->cancelled_at, 'd M Y H:i') }}
-                                                    @elseif (!empty($shipment->posted_at))
-                                                        Posted {{ $fmtDate($shipment->posted_at, 'd M Y H:i') }}
-                                                    @elseif (!empty($shipment->submitted_at))
-                                                        Submitted {{ $fmtDate($shipment->submitted_at, 'd M Y H:i') }}
-                                                    @else
-                                                        Draft
-                                                    @endif
+                                                <div class="ship-row-meta d-md-none">
+                                                    <span>{{ $fmtDate($shipment->date, 'd M Y') }}</span>
+                                                    <span>{{ $fmtDate($shipment->created_at, 'H:i') }}</span>
+                                                    <span>Order {{ number_format($orderCount, 0, ',', '.') }}</span>
+                                                    <span>Item {{ number_format($itemCount, 0, ',', '.') }}</span>
                                                 </div>
                                             </div>
-                                            <span class="badge-status {{ $statusClass }} d-md-none">{{ $statusLabel }}</span>
-                                        </div>
-                                    </td>
-
-                                    <td>
-                                        <div class="store-name">{{ $storeName }}</div>
-                                        @if ($channelLabel)
-                                            <div class="muted">{{ $channelLabel }}</div>
-                                        @endif
-                                        <div class="ship-row-meta d-md-none">
-                                            <span>{{ $fmtDate($shipment->date, 'd M Y') }}</span>
-                                            <span>Qty {{ number_format($qty, 0, ',', '.') }}</span>
-                                            <span>{{ number_format($catCount, 0, ',', '.') }} kategori</span>
                                         </div>
                                     </td>
 
                                     <td class="text-end mobile-hide">
-                                        <span class="fw-semibold">{{ number_format($qty, 0, ',', '.') }}</span>
+                                        <span class="fw-semibold">{{ number_format($orderCount, 0, ',', '.') }}</span>
                                     </td>
 
-                                    @if($canSeeNominal)
-                                        <td class="text-end mobile-hide">
-                                            <span class="fw-semibold">Rp {{ number_format($totalRp, 0, ',', '.') }}</span>
-                                        </td>
-                                    @endif
-
                                     <td class="text-end mobile-hide">
-                                        <span class="fw-semibold">{{ number_format($catCount, 0, ',', '.') }}</span>
+                                        <span class="fw-semibold">{{ number_format($itemCount, 0, ',', '.') }}</span>
                                     </td>
 
                                     <td class="mobile-hide">
@@ -557,9 +575,15 @@
                                                 </button>
                                                 
                                                 @if($uiStatus === 'draft')
-                                                    <form action="{{ route('sales.shipments.manual.post', $shipment) }}" method="POST" class="d-inline" onsubmit="return confirm('Kirim paket manual ini? Stok WH-RTS akan dipotong.');">
+                                                    <form action="{{ route('sales.shipments.manual.post', $shipment) }}" method="POST" class="d-inline"
+                                                          data-gf-confirm
+                                                          data-gf-confirm-title="Kirim paket manual?"
+                                                          data-gf-confirm-summary='@json(["orders" => (int) ($shipment->order_scans_count ?? 0), "items" => $shipment->lines->count(), "qty" => $qty])'
+                                                          data-gf-confirm-text="Order discan: {{ (int) ($shipment->order_scans_count ?? 0) }} · Item/SKU: {{ $shipment->lines->count() }} · Total qty: {{ $qty }}. Stok WH-RTS akan dipotong."
+                                                          data-gf-confirm-ok="Kirim"
+                                                          data-gf-confirm-cancel="Batal">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill" title="Kirim/Post">
+                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill" title="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim/Post' }}" @disabled($stockBlocked)>
                                                             <i class="bi bi-send"></i>
                                                         </button>
                                                     </form>

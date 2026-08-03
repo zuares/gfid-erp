@@ -2,6 +2,7 @@
 
 namespace App\Services\Marketplace\Import\Adapters;
 
+use Carbon\Carbon;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class TiktokImportAdapter implements MpImportAdapterInterface
@@ -74,6 +75,7 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $status = $this->v($r, $map, ['order status', 'status']);
             $substatus = $this->v($r, $map, ['order substatus', 'substatus']);
             $tracking = $this->v($r, $map, ['tracking id', 'tracking no', 'tracking number', 'awb', 'resi']);
+            $packageId = $this->v($r, $map, ['package id', 'shipment id', 'platform shipment id']);
 
             $created = $this->dt($this->v($r, $map, ['created time', 'order created time']));
             $paidAt = $this->dt($this->v($r, $map, ['paid time', 'payment time']));
@@ -87,19 +89,26 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $qty = (int) $this->num($this->v($r, $map, ['quantity', 'qty']));
             $unitPrice = (float) $this->num($this->v($r, $map, ['sku unit original price', 'unit price']));
             $subtotal = (float) $this->num($this->v($r, $map, ['sku subtotal after discount', 'subtotal']));
+            $lineBeforeDiscount = (float) $this->num($this->v($r, $map, ['sku subtotal before discount']));
+            $linePlatformDiscount = (float) $this->num($this->v($r, $map, ['sku platform discount']));
+            $lineSellerDiscount = (float) $this->num($this->v($r, $map, ['sku seller discount']));
+            $orderAmount = (float) $this->num($this->v($r, $map, ['order amount', 'grand total', 'total amount']));
+            $shippingFee = (float) $this->num($this->v($r, $map, ['shipping fee after discount', 'shipping fee']));
+            $refundAmount = (float) $this->num($this->v($r, $map, ['order refund amount', 'refund amount']));
 
             if ($subtotal <= 0 && $qty > 0) {
                 $subtotal = $qty * $unitPrice;
             }
 
-            $key = $orderId . '|' . ($tracking ? trim((string) $tracking) : '');
+            $shipmentKey = $packageId ?: $tracking;
+            $key = $orderId . '|' . ($shipmentKey ? trim((string) $shipmentKey) : '');
 
             if (!isset($shipments[$key])) {
                 $shipments[$key] = [
                     'store_id' => $storeId,
                     'channel' => 'tiktok',
                     'platform_order_id' => $orderId,
-                    'platform_shipment_id' => null,
+                    'platform_shipment_id' => $packageId ? trim((string) $packageId) : null,
                     'tracking_no' => $tracking ? trim((string) $tracking) : null,
 
                     'marketplace_status' => $status ? (string) $status : null,
@@ -114,8 +123,8 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                     'currency' => (string) ($this->v($r, $map, ['currency']) ?: 'IDR'),
                     'order_subtotal' => 0,
                     'discount_total' => 0,
-                    'shipping_fee' => 0,
-                    'grand_total' => 0,
+                    'shipping_fee' => $shippingFee,
+                    'grand_total' => $orderAmount,
 
                     'platform_fee_total' => 0,
                     'refund_total' => 0,
@@ -123,14 +132,47 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                     'released_at' => null,
 
                     'source_file' => $sourceFile,
+                    'source_updated_at' => $this->dt(
+                        $this->v($r, $map, ['delivered time', 'shipped time', 'paid time', 'created time'])
+                    ),
                     'raw_payload' => [
                         'order_substatus' => $substatus,
+                        'package_id' => $packageId,
                         'shipping_provider_name' => $this->v($r, $map, ['shipping provider name']),
                         'delivery_option' => $this->v($r, $map, ['delivery option']),
+                        'fulfillment_type' => $this->v($r, $map, ['fulfillment type']),
+                        'warehouse_name' => $this->v($r, $map, ['warehouse name']),
+                        'payment_method' => $this->v($r, $map, ['payment method']),
+                        'buyer_username' => $this->v($r, $map, ['buyer username']),
+                        'recipient' => $this->v($r, $map, ['recipient']),
+                        'phone' => $this->v($r, $map, ['phone #', 'phone']),
+                        'zipcode' => $this->v($r, $map, ['zipcode']),
+                        'country' => $this->v($r, $map, ['country']),
+                        'province' => $this->v($r, $map, ['province']),
+                        'city' => $this->v($r, $map, ['regency and city', 'city']),
+                        'district' => $this->v($r, $map, ['districts', 'district']),
+                        'village' => $this->v($r, $map, ['villages', 'village']),
+                        'address' => $this->v($r, $map, ['detail address', 'address']),
+                        'additional_address' => $this->v($r, $map, ['additional address information']),
+                        'weight_kg' => $this->num($this->v($r, $map, ['weight kg', 'weight'])),
+                        'order_amount' => $orderAmount,
+                        'shipping_fee_after_discount' => $shippingFee,
+                        'refund_amount' => $refundAmount,
                         'source' => 'full',
                     ],
                     'items' => [],
                 ];
+
+                $shipments[$key]['order_subtotal'] = $lineBeforeDiscount > 0 ? $lineBeforeDiscount : ($qty * $unitPrice);
+                $shipments[$key]['discount_total'] = $linePlatformDiscount + $lineSellerDiscount;
+                $shipments[$key]['refund_total'] = $refundAmount;
+            }
+
+            // Nilai order-level hanya boleh dihitung sekali, walaupun export
+            // mengulanginya pada setiap baris item.
+            if (count($shipments[$key]['items']) > 0) {
+                $shipments[$key]['order_subtotal'] += $lineBeforeDiscount;
+                $shipments[$key]['discount_total'] += $linePlatformDiscount + $lineSellerDiscount;
             }
 
             // Only append item when it looks like a real line
@@ -150,7 +192,9 @@ class TiktokImportAdapter implements MpImportAdapterInterface
 
         foreach ($shipments as &$s) {
             $s['total_qty'] = array_sum(array_map(fn($i) => (int) ($i['qty'] ?? 0), $s['items']));
-            $s['grand_total'] = array_sum(array_map(fn($i) => (float) ($i['subtotal'] ?? 0), $s['items']));
+            if ((float) ($s['grand_total'] ?? 0) <= 0) {
+                $s['grand_total'] = array_sum(array_map(fn($i) => (float) ($i['subtotal'] ?? 0), $s['items']));
+            }
         }
 
         return array_values($shipments);
@@ -301,8 +345,11 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $k = $this->norm($c);
             if (isset($map[$k])) {
                 $val = $row[$map[$k]] ?? null;
-                if ($val !== null && $val !== '') {
-                    return $val;
+                if ($val !== null) {
+                    $cleaned = $this->clean($val);
+                    if ($cleaned !== '') {
+                        return $cleaned;
+                    }
                 }
 
             }
@@ -340,13 +387,14 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             return (float) $v;
         }
 
-        $t = trim((string) $v);
+        $t = $this->clean($v);
         if ($t === '') {
             return 0;
         }
 
         $t = preg_replace('/[^0-9\.\,\-]/', '', $t);
-        // convert comma decimals to dot if needed
+        // TikTok CSV menggunakan angka rupiah tanpa separator ribuan.
+        // Jika ada koma desimal, ubah ke titik; titik tetap dipertahankan.
         $t = str_replace(',', '.', $t);
 
         return is_numeric($t) ? (float) $t : 0;
@@ -362,18 +410,20 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             return $v->format('Y-m-d H:i:s');
         }
 
-        $s = trim((string) $v);
+        $s = $this->clean($v);
         if ($s === '') {
             return null;
         }
 
-        $s = str_replace('/', '-', $s);
-        $ts = strtotime($s);
-        if (!$ts) {
-            return null;
+        foreach (['d/m/Y H:i:s', 'd-m-Y H:i:s', 'Y-m-d H:i:s', 'Y-m-d H:i'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, $s, 'Asia/Jakarta')->format('Y-m-d H:i:s');
+            } catch (\Throwable) {
+                // coba format berikutnya
+            }
         }
 
-        return date('Y-m-d H:i:s', $ts);
+        return null;
     }
 
     private function normStatus(?string $status, ?string $sub): string
@@ -417,5 +467,10 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $out[$h] = $row[$col] ?? null;
         }
         return $out;
+    }
+
+    private function clean(mixed $value): string
+    {
+        return trim(str_replace(["\xEF\xBB\xBF", "\t", '"'], '', (string) ($value ?? '')));
     }
 }

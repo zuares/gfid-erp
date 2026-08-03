@@ -18,6 +18,7 @@ class SyncOrdersRequest extends FormRequest
             'time_to'   => ['required', 'integer'],
             'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
             'dry_run'   => ['nullable', 'boolean'],
+            'sync_bookings' => ['nullable', 'boolean'],
         ];
     }
 }

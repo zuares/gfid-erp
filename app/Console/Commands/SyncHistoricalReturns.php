@@ -34,7 +34,7 @@ class SyncHistoricalReturns extends Command
 
         $query = Store::whereHas('channel', function($q) {
             $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']);
-        });
+        })->where('is_active', true); // toko nonaktif dilewati
 
         if ($storeId !== 'all') {
             $query->where('id', $storeId);

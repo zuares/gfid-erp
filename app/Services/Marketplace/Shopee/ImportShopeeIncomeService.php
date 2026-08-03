@@ -30,9 +30,12 @@ class ImportShopeeIncomeService
             'Biaya Layanan',
             'Biaya Proses Pesanan',
             'Premi',
+            'Biaya Asuransi Pengiriman',
             'Biaya Program Hemat Biaya Kirim',
             'Biaya Transaksi',
             'Biaya Kampanye',
+            'Biaya Affiliate',
+            'Affiliate',
             'Bea Masuk, PPN & PPh',
         ];
 
@@ -167,9 +170,12 @@ class ImportShopeeIncomeService
             'Biaya Layanan',
             'Biaya Proses Pesanan',
             'Premi',
+            'Biaya Asuransi Pengiriman',
             'Biaya Program Hemat Biaya Kirim',
             'Biaya Transaksi',
             'Biaya Kampanye',
+            'Biaya Affiliate',
+            'Affiliate',
             'Bea Masuk, PPN & PPh',
         ];
 
@@ -261,8 +267,12 @@ class ImportShopeeIncomeService
     private function sumFees(array $r, array $feeCols): float
     {
         $sum = 0.0;
+        $normalized = [];
+        foreach ($r as $key => $value) {
+            $normalized[$this->normHeader((string) $key)] = $value;
+        }
         foreach ($feeCols as $c) {
-            $v = $r[$c] ?? 0;
+            $v = $normalized[$this->normHeader((string) $c)] ?? ($r[$c] ?? 0);
             $n = is_numeric($v) ? (float) $v : (float) $this->toNumber($v);
             $sum += $n < 0 ? abs($n) : $n;
         }

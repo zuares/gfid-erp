@@ -2,225 +2,548 @@
 @extends('layouts.app')
 @section('title','Preview • Marketplace Income')
 
-@push('head')
-<style>
-  .page{ max-width:1220px; margin:0 auto; padding: 1rem .9rem 4.8rem; }
-  .page > .d-flex{ position:relative; z-index:20; }
-  @media(min-width:768px){ .page{ padding: 1.1rem 1rem 4.8rem; } }
-
-  :root{
-    --line: rgba(148,163,184,.18);
-    --line2: rgba(148,163,184,.22);
-    --ink: rgba(15,23,42,.92);
-    --muted: rgba(100,116,139,1);
-    --soft: rgba(148,163,184,.06);
-    --soft2: rgba(148,163,184,.10);
-    --shadow: 0 10px 24px rgba(15,23,42,.05);
-  }
-  body[data-theme="dark"]{
-    --ink: rgba(226,232,240,.92);
-    --muted: rgba(148,163,184,.85);
-    --line: rgba(148,163,184,.14);
-    --line2: rgba(148,163,184,.18);
-    --soft: rgba(148,163,184,.08);
-    --soft2: rgba(148,163,184,.12);
-    --shadow: 0 12px 28px rgba(0,0,0,.35);
-  }
-
-  .cardx{ border:1px solid var(--line); border-radius:14px; background:var(--card,#fff); box-shadow:var(--shadow); }
-  .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.18rem .55rem; border-radius:999px; font-size:.78rem; border:1px solid var(--line2); background:var(--soft); white-space:nowrap; }
-  .mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
-  .muted{ color: var(--muted); }
-
-  .tbl{ width:100%; border-collapse:separate; border-spacing:0; }
-  .tbl th,.tbl td{ padding:.6rem .65rem; border-bottom:1px solid var(--line); vertical-align:top; }
-  .tbl th{ font-size:.82rem; color: var(--muted); font-weight:800; }
-
-  .show-sm{ display:none; }
-  .hide-sm{ display:table-cell; }
-  @media(max-width:820px){
-    thead{ display:none; }
-    .hide-sm{ display:none; }
-    .show-sm{ display:block; }
-    tbody td{ display:block; border-bottom:none; padding:.75rem .85rem; }
-    tbody tr{ display:block; border-bottom:1px solid rgba(148,163,184,.14); }
-    body[data-theme="dark"] tbody tr{ border-bottom:1px solid rgba(148,163,184,.10); }
-    .mrow{ display:flex; justify-content:space-between; gap:.75rem; }
-    .mright{ text-align:right; white-space:nowrap; }
-  }
-
-  .kpi{ font-weight:900; letter-spacing:.01em; color: var(--ink); font-size:1.05rem; }
-  .sep{ height:1px; background: var(--line); margin:.75rem 0; }
-  .head-actions .btn{ white-space:nowrap; border-radius:12px; }
-</style>
-@endpush
-
-@section('content')
 @php
   $stats = $stats ?? [];
   $sample = $sample ?? [];
   $draftId = (string)($draft_id ?? '');
+  $channelValue = (string)($channel ?? '');
+  $storeValue = (int)($store_id ?? 0);
+  $sourceFile = (string)($source_file ?? '-');
+  $pageError = $error ?? session('error');
+  $ordersParsed = (int)($stats['orders_parsed'] ?? 0);
+  $matched = (int)($stats['orders_matched_shipments'] ?? 0);
+  $unmatched = (int)($stats['orders_unmatched_shipments'] ?? max(0, $ordersParsed - $matched));
+  $matchRate = $ordersParsed > 0 ? round(($matched / $ordersParsed) * 100, 1) : 0;
+  $canCommit = $ordersParsed > 0 && empty($draft_file_missing);
 
   $money = function ($n) {
-    $v = (int) round((float)($n ?? 0));
-    return 'Rp ' . number_format($v, 0, ',', '.');
+      return 'Rp ' . number_format((int) round((float)($n ?? 0)), 0, ',', '.');
   };
 @endphp
 
-<div class="page">
+@push('head')
+<style>
+  .preview-page {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 1rem .9rem 5rem;
+    color: var(--preview-ink);
+  }
 
-  @if(session('error')) <div class="alert alert-danger mb-3">{{ session('error') }}</div> @endif
-  @if(session('success')) <div class="alert alert-success mb-3">{{ session('success') }}</div> @endif
+  :root {
+    --preview-ink: #0f172a;
+    --preview-muted: #64748b;
+    --preview-line: rgba(148,163,184,.18);
+    --preview-card: #fff;
+    --preview-shadow: 0 14px 34px rgba(15,23,42,.06);
+  }
 
-  {{-- HEADER --}}
-  <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+  body[data-theme="dark"] {
+    --preview-ink: #e2e8f0;
+    --preview-muted: #94a3b8;
+    --preview-line: rgba(148,163,184,.16);
+    --preview-card: rgba(15,23,42,.92);
+    --preview-shadow: 0 14px 34px rgba(0,0,0,.24);
+  }
+
+  .preview-hero {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:1rem;
+    flex-wrap:wrap;
+    overflow:hidden;
+    margin-bottom:.9rem;
+    padding:1.15rem 1.2rem;
+    border:1px solid rgba(148,163,184,.14);
+    border-radius:22px;
+    background:
+      radial-gradient(circle at top right, rgba(96,165,250,.28), transparent 30%),
+      radial-gradient(circle at bottom left, rgba(16,185,129,.16), transparent 28%),
+      linear-gradient(135deg,#0f172a 0%,#111827 48%,#1d4ed8 135%);
+    box-shadow:0 18px 50px rgba(15,23,42,.16);
+  }
+
+  .preview-hero > * { position:relative; z-index:1; }
+
+  .preview-eyebrow {
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    margin-bottom:.35rem;
+    color:#93c5fd;
+    font-size:.65rem;
+    font-weight:900;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+
+  .preview-title {
+    margin:0;
+    color:#fff;
+    font-size:1.35rem;
+    font-weight:900;
+    letter-spacing:-.04em;
+  }
+
+  .preview-sub {
+    max-width:52rem;
+    margin-top:.3rem;
+    color:rgba(226,232,240,.78);
+    font-size:.8rem;
+  }
+
+  .preview-badges,
+  .preview-actions {
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:.45rem;
+  }
+
+  .preview-badges { margin-top:.8rem; }
+
+  .preview-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    padding:.33rem .62rem;
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:999px;
+    background:rgba(255,255,255,.08);
+    color:rgba(255,255,255,.9);
+    font-size:.69rem;
+    font-weight:800;
+    white-space:nowrap;
+  }
+
+  .preview-hero .btn { border-radius:999px; font-weight:800; }
+  .preview-hero .btn-outline-light {
+    background:rgba(255,255,255,.06);
+    border-color:rgba(255,255,255,.2);
+  }
+
+  .preview-card {
+    margin-bottom:.9rem;
+    border:1px solid var(--preview-line);
+    border-radius:18px;
+    background:var(--preview-card);
+    box-shadow:var(--preview-shadow);
+  }
+
+  .preview-card-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:.75rem;
+    flex-wrap:wrap;
+    padding:1rem 1rem .75rem;
+  }
+
+  .preview-card-title {
+    margin:0;
+    color:var(--preview-ink);
+    font-size:.9rem;
+    font-weight:900;
+  }
+
+  .preview-note {
+    color:var(--preview-muted);
+    font-size:.72rem;
+  }
+
+  .preview-kpi-grid {
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:.7rem;
+    margin-bottom:.9rem;
+  }
+
+  .preview-kpi {
+    position:relative;
+    min-height:128px;
+    overflow:hidden;
+    padding:.95rem 1rem;
+    border:1px solid var(--preview-line);
+    border-radius:16px;
+    background:var(--preview-card);
+    box-shadow:var(--preview-shadow);
+  }
+
+  .preview-kpi::before {
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height:3px;
+    content:'';
+    background:var(--preview-kpi-color,#2563eb);
+  }
+
+  .preview-kpi-label {
+    color:var(--preview-muted);
+    font-size:.65rem;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .preview-kpi-value {
+    margin-top:.45rem;
+    color:var(--preview-ink);
+    font-size:1.25rem;
+    font-weight:950;
+    letter-spacing:-.04em;
+  }
+
+  .preview-kpi-sub {
+    margin-top:.35rem;
+    color:var(--preview-muted);
+    font-size:.7rem;
+    font-weight:750;
+  }
+
+  .preview-kpi.rows { --preview-kpi-color:#334155; }
+  .preview-kpi.orders { --preview-kpi-color:#2563eb; }
+  .preview-kpi.matched { --preview-kpi-color:#16a34a; }
+  .preview-kpi.unmatched { --preview-kpi-color:#f59e0b; }
+  .preview-kpi.updated { --preview-kpi-color:#8b5cf6; }
+
+  .preview-meta-grid {
+    display:grid;
+    grid-template-columns:1.3fr 1fr 1fr 1fr;
+    gap:.8rem;
+    padding:0 1rem 1rem;
+  }
+
+  .preview-meta-item {
+    min-width:0;
+    padding:.72rem .78rem;
+    border:1px solid var(--preview-line);
+    border-radius:12px;
+    background:rgba(148,163,184,.05);
+  }
+
+  .preview-meta-label {
+    color:var(--preview-muted);
+    font-size:.64rem;
+    font-weight:900;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+  }
+
+  .preview-meta-value {
+    margin-top:.28rem;
+    overflow:hidden;
+    color:var(--preview-ink);
+    font-size:.75rem;
+    font-weight:800;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .preview-table-wrap {
+    overflow-x:auto;
+    border-top:1px solid var(--preview-line);
+  }
+
+  .preview-table {
+    width:100%;
+    min-width:820px;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+
+  .preview-table th,
+  .preview-table td {
+    padding:.78rem .85rem;
+    border-bottom:1px solid var(--preview-line);
+    vertical-align:top;
+  }
+
+  .preview-table th {
+    color:var(--preview-muted);
+    font-size:.65rem;
+    font-weight:900;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+
+  .preview-table td {
+    color:var(--preview-ink);
+    font-size:.77rem;
+  }
+
+  .preview-table tbody tr:hover td { background:rgba(148,163,184,.06); }
+
+  .preview-order {
+    color:var(--preview-ink);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+    font-weight:900;
+  }
+
+  .preview-muted { color:var(--preview-muted); }
+  .preview-number {
+    text-align:right;
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+  }
+  .preview-net { color:#16a34a; font-weight:950; }
+  .preview-net.negative { color:#dc2626; }
+
+  .preview-mobile-list { display:none; }
+
+  .preview-empty {
+    padding:2.5rem 1rem;
+    color:var(--preview-muted);
+    text-align:center;
+  }
+
+  .preview-warning {
+    margin:0 1rem 1rem;
+    padding:.75rem .85rem;
+    border:1px solid rgba(245,158,11,.22);
+    border-radius:12px;
+    background:rgba(245,158,11,.08);
+    color:#b45309;
+    font-size:.75rem;
+  }
+
+  @media(max-width:1180px) {
+    .preview-kpi-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .preview-meta-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+
+  @media(max-width:820px) {
+    .preview-page { padding-inline:.65rem; }
+    .preview-hero { padding:1rem; }
+    .preview-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .preview-table-wrap { display:none; }
+    .preview-mobile-list { display:block; }
+  }
+
+  @media(max-width:520px) {
+    .preview-kpi-grid,
+    .preview-meta-grid { grid-template-columns:1fr; }
+    .preview-actions { width:100%; }
+    .preview-actions .btn { flex:1 1 auto; }
+  }
+</style>
+@endpush
+
+@section('content')
+<div class="preview-page">
+  @if($pageError)
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      {{ $pageError }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  @endif
+
+  @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      {{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  @endif
+
+  <section class="preview-hero">
     <div>
-      <h1 class="h4 mb-1 fw-bold">Preview Import • Income</h1>
-      <div class="text-muted small d-flex flex-wrap gap-1 align-items-center">
-        <span class="chip">draft <span class="mono">{{ $draftId }}</span></span>
-        <span class="chip">channel <span class="mono">{{ $channel }}</span></span>
-        <span class="chip">store_id <span class="mono">{{ $store_id }}</span></span>
-        <span class="chip">file <span class="mono">{{ $source_file }}</span></span>
+      <div class="preview-eyebrow"><i class="bi bi-eye"></i> Import preview</div>
+      <h1 class="preview-title">Review Income sebelum Commit</h1>
+      <div class="preview-sub">
+        Pastikan parser membaca order, nilai payout, dan konteks file sebelum data ditulis ke mp_incomes.
+      </div>
+      <div class="preview-badges">
+        <span class="preview-chip"><i class="bi bi-file-earmark-spreadsheet"></i> {{ $sourceFile }}</span>
+        <span class="preview-chip">{{ strtoupper($channelValue ?: '-') }}</span>
+        <span class="preview-chip"><i class="bi bi-shop"></i> Store #{{ $storeValue ?: '-' }}</span>
+        <span class="preview-chip"><i class="bi bi-shield-check"></i> Dry run</span>
       </div>
     </div>
 
-    <div class="d-flex gap-2 align-items-center head-actions">
-      <a class="btn btn-outline-secondary btn-sm px-3"
-         href="{{ route('imports.marketplace_income.create', ['draft_id' => $draftId]) }}">
-        ← Kembali
+    <div class="preview-actions">
+      <a class="btn btn-sm btn-outline-light px-3"
+         href="{{ route('imports.marketplace_income.create', $draftId !== '' ? ['draft_id' => $draftId] : []) }}">
+        <i class="bi bi-arrow-left"></i> Kembali
       </a>
 
       <form method="POST" action="{{ route('imports.marketplace_income.cancel') }}"
             onsubmit="return confirm('Batalkan draft dan hapus file upload?')">
         @csrf
         <input type="hidden" name="draft_id" value="{{ $draftId }}">
-        <button class="btn btn-outline-danger btn-sm px-3" type="submit">Batal</button>
+        <button class="btn btn-sm btn-outline-danger px-3" type="submit">
+          <i class="bi bi-trash3"></i> Batal
+        </button>
       </form>
 
       <form method="POST" action="{{ route('imports.marketplace_income.commit') }}"
-            onsubmit="return confirm('Commit import income? Ini akan menulis ke database.')">
+            onsubmit="return confirm('Commit import income? Data akan ditulis ke database.')">
         @csrf
         <input type="hidden" name="draft_id" value="{{ $draftId }}">
-        <button class="btn btn-primary btn-sm px-3" type="submit">Commit</button>
+        <button class="btn btn-sm btn-primary px-3" type="submit" @disabled(!$canCommit)>
+          <i class="bi bi-check2-circle"></i> Commit
+        </button>
       </form>
     </div>
-  </div>
+  </section>
 
-  {{-- SUMMARY --}}
-  <div class="cardx p-3 mb-3">
-    <div class="fw-bold mb-2">Ringkasan</div>
+  <section class="preview-kpi-grid">
+    <div class="preview-kpi rows">
+      <div class="preview-kpi-label">Rows parsed</div>
+      <div class="preview-kpi-value">{{ number_format((int)($stats['rows_parsed'] ?? 0)) }}</div>
+      <div class="preview-kpi-sub">Baris income yang dinormalisasi</div>
+    </div>
+    <div class="preview-kpi orders">
+      <div class="preview-kpi-label">Orders parsed</div>
+      <div class="preview-kpi-value">{{ number_format($ordersParsed) }}</div>
+      <div class="preview-kpi-sub">Order unik berdasarkan platform ID</div>
+    </div>
+    <div class="preview-kpi matched">
+      <div class="preview-kpi-label">Matched shipments</div>
+      <div class="preview-kpi-value">{{ number_format($matched) }}</div>
+      <div class="preview-kpi-sub">{{ $matchRate }}% dapat langsung di-apply</div>
+    </div>
+    <div class="preview-kpi unmatched">
+      <div class="preview-kpi-label">Unmatched</div>
+      <div class="preview-kpi-value">{{ number_format($unmatched) }}</div>
+      <div class="preview-kpi-sub">Akan dicocokkan saat shipment tersedia</div>
+    </div>
+    <div class="preview-kpi updated">
+      <div class="preview-kpi-label">Shipments updated</div>
+      <div class="preview-kpi-value">{{ number_format((int)($stats['shipments_updated'] ?? 0)) }}</div>
+      <div class="preview-kpi-sub">Perkiraan update pada commit</div>
+    </div>
+  </section>
 
-    <div class="row g-2">
-      <div class="col-6 col-md-3">
-        <div class="muted small">Rows parsed</div>
-        <div class="kpi">{{ (int)($stats['rows_parsed'] ?? 0) }}</div>
+  <section class="preview-card">
+    <div class="preview-card-head">
+      <div>
+        <h2 class="preview-card-title"><i class="bi bi-clipboard-data"></i> Metadata import</h2>
+        <div class="preview-note">Audit sumber dan hasil parser sebelum commit.</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="muted small">Orders parsed</div>
-        <div class="kpi">{{ (int)($stats['orders_parsed'] ?? 0) }}</div>
+      <span class="badge rounded-pill text-bg-success">DRY RUN</span>
+    </div>
+
+    <div class="preview-meta-grid">
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Draft</div>
+        <div class="preview-meta-value font-monospace" title="{{ $draftId }}">{{ $draftId ?: '-' }}</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="muted small">Matched shipments</div>
-        <div class="kpi">{{ (int)($stats['orders_matched_shipments'] ?? 0) }}</div>
-        <div class="muted small">
-          Unmatched {{ (int)($stats['orders_unmatched_shipments'] ?? 0) }}
-          @if(!empty($stats['orders_with_multi_shipments']))
-            • Multi-ship {{ (int)$stats['orders_with_multi_shipments'] }}
-          @endif
-        </div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Batch</div>
+        <div class="preview-meta-value font-monospace" title="{{ $stats['batch'] ?? '-' }}">{{ $stats['batch'] ?? '-' }}</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="muted small">Shipments updated</div>
-        <div class="kpi">{{ (int)($stats['shipments_updated'] ?? 0) }}</div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Sheet</div>
+        <div class="preview-meta-value">{{ $stats['sheet_name'] ?? '—' }} · header {{ $stats['header_row'] ?? '—' }}</div>
+      </div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Rows skipped</div>
+        <div class="preview-meta-value">{{ number_format((int)($stats['rows_skipped'] ?? 0)) }}</div>
+      </div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Stored path</div>
+        <div class="preview-meta-value font-monospace" title="{{ $stored_path ?? '-' }}">{{ $stored_path ?? '-' }}</div>
+      </div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">File</div>
+        <div class="preview-meta-value" title="{{ $sourceFile }}">{{ $sourceFile }}</div>
+      </div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Channel / Store</div>
+        <div class="preview-meta-value">{{ strtoupper($channelValue ?: '-') }} · #{{ $storeValue ?: '-' }}</div>
+      </div>
+      <div class="preview-meta-item">
+        <div class="preview-meta-label">Parser status</div>
+        <div class="preview-meta-value">{{ !empty($stats['error']) ? 'Perlu upload ulang' : ($ordersParsed > 0 ? 'Siap direview' : 'Tidak ada order valid') }}</div>
       </div>
     </div>
 
-    <div class="sep"></div>
+    @if(!empty($stats['warnings']) || !empty($stats['error']))
+      <div class="preview-warning">
+        <strong><i class="bi bi-exclamation-triangle"></i> Perhatian:</strong>
+        @if(!empty($stats['error'])) {{ $stats['error'] }} @endif
+        @if(!empty($stats['warnings'])) {{ implode(' ', array_map('strval', (array)$stats['warnings'])) }} @endif
+      </div>
+    @elseif($unmatched > 0)
+      <div class="preview-warning">
+        <strong><i class="bi bi-info-circle"></i> Shipment belum match:</strong>
+        {{ number_format($unmatched) }} income tetap bisa di-commit. Nilai akan otomatis diterapkan ketika shipment dengan order ID yang sama tersedia.
+      </div>
+    @endif
+  </section>
 
-    <div class="row g-2">
-      <div class="col-md-6">
-        <div class="muted small">Batch</div>
-        <div class="mono small">{{ $stats['batch'] ?? '-' }}</div>
-        <div class="muted small mt-1">Stored path</div>
-        <div class="mono small">{{ $stored_path ?? '-' }}</div>
+  <section class="preview-card">
+    <div class="preview-card-head">
+      <div>
+        <h2 class="preview-card-title"><i class="bi bi-list-columns-reverse"></i> Sample income per order</h2>
+        <div class="preview-note">Menampilkan maksimal 5 order pertama dari hasil parser.</div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="muted small">Rows skipped</div>
-        <div class="kpi" style="font-size:1rem;">{{ (int)($stats['rows_skipped'] ?? 0) }}</div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="muted small">Dry run</div>
-        <div class="kpi" style="font-size:1rem;">{{ !empty($stats['dry_run']) ? 'YES' : 'NO' }}</div>
-      </div>
+      <span class="preview-note">{{ count($sample) }} / 5 order</span>
     </div>
 
-    <div class="muted small mt-2">
-      Sample maksimal 5 order. Commit akan upsert ke <span class="mono">mp_incomes</span>
-      dan apply snapshot ke <span class="mono">mp_shipments</span> yang match.
-    </div>
-  </div>
-
-  {{-- SAMPLE --}}
-  <div class="cardx">
-    <div class="p-3 d-flex justify-content-between align-items-center">
-      <div class="fw-bold">Sample Income (per Order)</div>
-      <div class="text-muted small">max 5</div>
-    </div>
-
-    <div class="table-responsive">
-      <table class="tbl">
+    <div class="preview-table-wrap">
+      <table class="preview-table">
         <thead>
           <tr>
             <th>Order</th>
-            <th class="hide-sm">Released</th>
-            <th class="hide-sm text-end">Fee</th>
-            <th class="hide-sm text-end">Refund</th>
-            <th class="hide-sm text-end">Net</th>
+            <th>Released</th>
+            <th class="text-end">Fee</th>
+            <th class="text-end">Refund</th>
+            <th class="text-end">Net payout</th>
           </tr>
         </thead>
         <tbody>
-          @forelse($sample as $r)
-            @php
-              $oid = $r['platform_order_id'] ?? '-';
-              $releasedAt = $r['released_at'] ?? null;
-              $fee = (int)($r['platform_fee_total'] ?? 0);
-              $refund = (int)($r['refund_total'] ?? 0);
-              $net = (int)($r['net_payout_actual'] ?? 0);
-            @endphp
-
-            <tr>
-              {{-- mobile --}}
-              <td class="show-sm">
-                <div class="mrow">
-                  <div>
-                    <div class="fw-bold mono">{{ $oid }}</div>
-                    <div class="text-muted small mt-1">{{ $releasedAt ?: '-' }}</div>
-                    <div class="mt-1 d-flex flex-wrap gap-1">
-                      <span class="chip">fee {{ $money($fee) }}</span>
-                      <span class="chip">refund {{ $money($refund) }}</span>
-                    </div>
-                  </div>
-                  <div class="mright">
-                    <div class="fw-bold">{{ $money($net) }}</div>
-                  </div>
-                </div>
-              </td>
-
-              {{-- desktop --}}
-              <td class="hide-sm mono">{{ $oid }}</td>
-              <td class="hide-sm">{{ $releasedAt ?: '-' }}</td>
-              <td class="hide-sm text-end">{{ $money($fee) }}</td>
-              <td class="hide-sm text-end">{{ $money($refund) }}</td>
-              <td class="hide-sm text-end fw-bold">{{ $money($net) }}</td>
-            </tr>
-          @empty
-            <tr><td colspan="5" class="text-muted p-3">Tidak ada sample.</td></tr>
-          @endforelse
+        @forelse($sample as $row)
+          @php
+            $rowNet = (float)($row['net_payout_actual'] ?? 0);
+            $rowFee = (float)($row['platform_fee_total'] ?? 0);
+            $rowRefund = (float)($row['refund_total'] ?? 0);
+          @endphp
+          <tr>
+            <td>
+              <div class="preview-order">{{ $row['platform_order_id'] ?? '-' }}</div>
+              <div class="preview-muted small">{{ data_get($row, 'hint.transaction_types.0', 'Income') }}</div>
+            </td>
+            <td>{{ $row['released_at'] ?? '-' }}</td>
+            <td class="preview-number">{{ $money($rowFee) }}</td>
+            <td class="preview-number {{ $rowRefund != 0 ? 'text-warning fw-bold' : 'preview-muted' }}">{{ $money($rowRefund) }}</td>
+            <td class="preview-number {{ $rowNet < 0 ? 'preview-net negative' : 'preview-net' }}">{{ $money($rowNet) }}</td>
+          </tr>
+        @empty
+          <tr><td colspan="5" class="preview-empty">Tidak ada sample income yang valid.</td></tr>
+        @endforelse
         </tbody>
       </table>
     </div>
 
-  </div>
-
+    <div class="preview-mobile-list">
+      @forelse($sample as $row)
+        @php
+          $rowNet = (float)($row['net_payout_actual'] ?? 0);
+          $rowFee = (float)($row['platform_fee_total'] ?? 0);
+          $rowRefund = (float)($row['refund_total'] ?? 0);
+        @endphp
+        <div style="padding:1rem;border-bottom:1px solid var(--preview-line);">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div class="min-w-0">
+              <div class="preview-order">{{ $row['platform_order_id'] ?? '-' }}</div>
+              <div class="preview-muted small mt-1">{{ $row['released_at'] ?? '-' }}</div>
+              <div class="preview-muted small mt-1">{{ data_get($row, 'hint.transaction_types.0', 'Income') }}</div>
+            </div>
+            <div class="text-end">
+              <div class="preview-net {{ $rowNet < 0 ? 'negative' : '' }}">{{ $money($rowNet) }}</div>
+              <div class="preview-muted small">Fee {{ $money($rowFee) }}</div>
+              <div class="preview-muted small">Refund {{ $money($rowRefund) }}</div>
+            </div>
+          </div>
+        </div>
+      @empty
+        <div class="preview-empty">Tidak ada sample income yang valid.</div>
+      @endforelse
+    </div>
+  </section>
 </div>
 @endsection

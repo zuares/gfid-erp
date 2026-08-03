@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceLogisticsService;
+
 use Illuminate\Http\Request;
 use App\Models\Store;
 use App\Models\MarketplaceBooking;
 use App\Services\Channels\ChannelManager;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Modul "Pesanan Kilat" (booking / fulfillment gudang Shopee).
@@ -121,7 +125,7 @@ class MarketplaceBookingController extends Controller
     public function detail(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->manager->driver($store);
+            $driver  = $this->gateway;
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
@@ -181,7 +185,7 @@ class MarketplaceBookingController extends Controller
     public function tracking(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->manager->driver($store);
+            $driver  = $this->gateway;
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
             $orderSn = ($booking && $booking->order_sn) ? $booking->order_sn : null;
@@ -249,8 +253,11 @@ class MarketplaceBookingController extends Controller
     public function shippingParameter(Store $store, string $bookingSn)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (! method_exists($driver, 'getBookingShippingParameter')) {
+            // Toko nonaktif / kredensial korup: jawab jelas tanpa membanjiri log.
+            if (! $store->is_active) {
+                return response()->json(['error' => true, 'message' => 'Toko nonaktif — hubungkan ulang untuk memakai fitur ini.'], 422);
+            }
+                        if (! method_exists($driver, 'getBookingShippingParameter')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
             $res = $driver->getBookingShippingParameter($store, $bookingSn);
@@ -258,6 +265,10 @@ class MarketplaceBookingController extends Controller
                 return response()->json(['error' => $res['message'] ?? $res['error']], 400);
             }
             return response()->json($res['response'] ?? $res);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            // Kredensial tak terbaca (APP_KEY berubah) — satu warning singkat, tanpa trace.
+            \Illuminate\Support\Facades\Log::warning("[Booking] Kredensial toko {$store->name} tidak bisa dibaca — shippingParameter dilewati.");
+            return response()->json(['error' => true, 'message' => 'Kredensial toko tidak valid — hubungkan ulang toko.'], 422);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Marketplace Booking Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
@@ -271,8 +282,29 @@ class MarketplaceBookingController extends Controller
     public function ship(Store $store, string $bookingSn, Request $request)
     {
         try {
-            $driver = $this->manager->driver($store);
-            if (! method_exists($driver, 'shipBooking')) {
+            // Concurrency guard: cegah double-click / rapid retry memicu API ganda
+            $lockKey = "shipBooking:{$store->id}:{$bookingSn}";
+            $lock = Cache::lock($lockKey, 30);
+            if (! $lock->get()) {
+                return response()->json(['error' => 'Proses pengiriman sedang berjalan, tunggu sebentar.'], 429);
+            }
+
+            try {
+                // Early return jika booking sudah PROCESSED
+                $existingBooking = MarketplaceBooking::where('store_id', $store->id)
+                    ->where('booking_sn', $bookingSn)
+                    ->first();
+                if ($existingBooking && $existingBooking->booking_status === 'PROCESSED') {
+                    $lock->release();
+                    return response()->json([
+                        'success'         => true,
+                        'message'         => 'Pengiriman kilat sudah diatur sebelumnya.',
+                        'tracking_number' => $existingBooking->tracking_number,
+                        'order_sn'        => $existingBooking->order_sn,
+                    ]);
+                }
+
+                        if (! method_exists($driver, 'shipBooking')) {
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 
@@ -324,14 +356,31 @@ class MarketplaceBookingController extends Controller
 
             // Setelah diatur: lengkapi order_sn (booking → MATCHED) dan tarik order-nya
             // ke marketplace_orders, supaya halaman Orders menampilkan NOMOR PESANAN
-            // (bukan nomor booking) di tab Sedang Dikemas dan seterusnya.
-            $this->promoteBookingToOrder($store, $bookingSn);
+            // (bukan nomor booking) — sama seperti perilaku platform Shopee.
+            $orderSn = $this->promoteBookingToOrder($store, $bookingSn);
+
+            if (! $orderSn) {
+                // Matching Shopee asinkron — cek sekali langsung hampir selalu terlalu
+                // cepat. Job ini polling get_booking_detail dengan jeda mundur
+                // (15 dtk → 5 mnt, ±15 menit) sampai order_sn muncul, lalu menarik
+                // order & menautkannya. Sebelumnya nomor pesanan baru muncul 1 jam
+                // kemudian lewat sync terjadwal.
+                \App\Jobs\PromoteBookingToOrderJob::dispatch($store->id, $bookingSn)
+                    ->delay(now()->addSeconds(15));
+            }
 
             return response()->json([
                 'success'         => true,
-                'message'         => 'Pengiriman kilat berhasil diatur.',
+                'message'         => $orderSn
+                    ? "Pengiriman kilat berhasil diatur. Nomor pesanan: {$orderSn}."
+                    : 'Pengiriman kilat berhasil diatur. Nomor pesanan menyusul otomatis begitu Shopee selesai mencocokkan (±beberapa menit).',
                 'tracking_number' => $tracking,
+                'order_sn'        => $orderSn,
             ]);
+
+            } finally {
+                $lock->release();
+            }
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -343,49 +392,54 @@ class MarketplaceBookingController extends Controller
      * begitu baris pseudo-booking di halaman Orders otomatis digantikan baris order
      * asli bernomor pesanan. Kegagalan di sini tidak menggagalkan proses arrange.
      */
-    protected function promoteBookingToOrder(Store $store, string $bookingSn): void
+    /**
+     * Tandai booking sudah dicetak (hitungan + waktu cetak pertama, juga pada
+     * order tertautnya). SATU implementasi untuk 4 titik cetak yang sebelumnya
+     * menduplikasi blok yang sama — dan TAHAN BANTING: statistik cetak tidak
+     * boleh menggagalkan proses cetak resi (mis. kolom print_count belum
+     * termigrasi → dulu error "no such column: print_count").
+     */
+    protected function markBookingPrinted(?MarketplaceBooking $booking): void
     {
+        if (! $booking) {
+            return;
+        }
+
         try {
-            $booking = MarketplaceBooking::where('store_id', $store->id)
-                ->where('booking_sn', $bookingSn)->first();
-            if (! $booking) {
-                return;
+            $booking->increment('print_count');
+            if (! $booking->printed_at) {
+                $booking->update(['printed_at' => now()]);
             }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                "markBookingPrinted booking {$booking->booking_sn}: " . $e->getMessage()
+                . ' (jalankan php artisan migrate bila kolom print_count/printed_at belum ada)'
+            );
+        }
 
-            $driver = $this->manager->driver($store);
-
-            // order_sn belum tercatat → ambil dari get_booking_detail (muncul saat MATCHED).
-            if (blank($booking->order_sn) && method_exists($driver, 'getBookingDetail')) {
-                $det  = $driver->getBookingDetail($store, $bookingSn);
-                $list = $det['response']['booking_list'] ?? $det['response']['order_list'] ?? [];
-                $d    = collect($list)->firstWhere('booking_sn', $bookingSn) ?? ($list[0] ?? null);
-                if (! empty($d['order_sn'])) {
-                    $booking->order_sn = $d['order_sn'];
-                    $booking->save();
-                }
+        try {
+            if ($booking->order_sn) {
+                \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count');
             }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                "markBookingPrinted order {$booking->order_sn}: " . $e->getMessage()
+            );
+        }
+    }
 
-            if (blank($booking->order_sn)) {
-                return; // belum MATCHED — nanti dilengkapi webhook/sync per jam.
-            }
-
-            // Order lokal belum ada → backfill via detail order.
-            $exists = \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)
-                ->orWhere('external_order_id', $booking->order_sn)
-                ->exists();
-            if (! $exists) {
-                app(\App\Services\MarketplaceSyncService::class)->syncOrdersBySn($store, [$booking->order_sn]);
-            }
-
-            // Tautkan booking_sn ke order lokal.
-            \App\Models\MarketplaceOrder::where('store_id', $store->id)
-                ->where('channel_order_id', $booking->order_sn)
-                ->whereNull('booking_sn')
-                ->update(['booking_sn' => $bookingSn]);
+    protected function promoteBookingToOrder(Store $store, string $bookingSn): ?string
+    {
+        // Logika promosi dipindah ke MarketplaceSyncService::promoteBookingToOrder()
+        // (satu implementasi — juga dipakai PromoteBookingToOrderJob).
+        try {
+            return app(\App\Services\MarketplaceSyncService::class)
+                ->promoteBookingToOrder($store, $bookingSn);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning(
                 "promoteBookingToOrder [{$store->id}] {$bookingSn}: " . $e->getMessage()
             );
+            return null;
         }
     }
 
@@ -399,7 +453,7 @@ class MarketplaceBookingController extends Controller
     public function printDocument(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->manager->driver($store);
+            $driver  = $this->gateway;
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
@@ -425,9 +479,7 @@ class MarketplaceBookingController extends Controller
 
             if ($disk->exists($cachePath)) {
                 if ($booking) {
-                    $booking->increment('print_count');
-                    if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
-                    if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
+                    $this->markBookingPrinted($booking);
                 }
                 $content = gzdecode($disk->get($cachePath));
                 return response($content, 200, [
@@ -510,9 +562,7 @@ class MarketplaceBookingController extends Controller
             $disk->put($cachePath, gzencode($pdfContent, 9));
 
             if ($booking) {
-                $booking->increment('print_count');
-                if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
-                if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
+                $this->markBookingPrinted($booking);
             }
 
             return response($pdfContent, 200, [
@@ -585,8 +635,7 @@ class MarketplaceBookingController extends Controller
                 $store = Store::find($storeId);
                 if (!$store) continue;
 
-                $driver = $this->manager->driver($store);
-                if (!method_exists($driver, 'createBookingShippingDocument')) continue;
+                                if (!method_exists($driver, 'createBookingShippingDocument')) continue;
 
                 foreach ($storeBookings as $item) {
                     $bookingSn = $item['booking_sn'];
@@ -613,9 +662,7 @@ class MarketplaceBookingController extends Controller
                                     if (isset($dlRes['error']) && $dlRes['error'] === 'invalid_response' && str_starts_with($dlRes['message'] ?? '', '%PDF')) {
                                         $pdfPages[] = $dlRes['message'];
                                         if ($booking) {
-                                            $booking->increment('print_count');
-                                            if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
-                                            if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
+                                            $this->markBookingPrinted($booking);
                                         }
                                         continue;
                                     }
@@ -644,9 +691,7 @@ class MarketplaceBookingController extends Controller
                         if (str_starts_with($pdfContent, '%PDF')) {
                             $pdfPages[] = $pdfContent;
                             if ($booking) {
-                                $booking->increment('print_count');
-                                if (!$booking->printed_at) $booking->update(['printed_at' => now()]);
-                                if ($booking->order_sn) { \App\Models\MarketplaceOrder::where('channel_order_id', $booking->order_sn)->increment('print_count'); }
+                                $this->markBookingPrinted($booking);
                             }
                         } else {
                             $errors[] = "Booking {$bookingSn}: Format dokumen tidak valid";

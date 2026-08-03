@@ -46,6 +46,106 @@
     .btn-submit { width: 100%; padding: 14px; background: var(--black); color: var(--white); font-family: var(--font); font-size: 15px; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; transition: background .15s; margin-top: 4px; }
     .btn-submit:hover { background: #333; }
 
+    .oauth-card {
+        margin-top: 18px;
+        padding: 16px;
+        border-radius: 14px;
+        border: 1px solid var(--gray-200);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .oauth-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .oauth-title {
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: var(--gray-500);
+    }
+
+    .oauth-sub {
+        font-size: 13px;
+        color: var(--gray-700);
+        line-height: 1.5;
+        margin-top: 4px;
+    }
+
+    .oauth-grid {
+        display: grid;
+        gap: 10px;
+    }
+
+    .oauth-provider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--gray-200);
+        background: var(--white);
+        text-decoration: none;
+        color: var(--ink);
+        transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+
+    .oauth-provider:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(15,23,42,.08);
+        border-color: #cbd5e1;
+    }
+
+    .oauth-provider-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        border: 1px solid var(--gray-200);
+        flex-shrink: 0;
+    }
+
+    .oauth-provider-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .oauth-provider-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--black);
+    }
+
+    .oauth-provider-desc {
+        font-size: 12px;
+        color: var(--gray-500);
+    }
+
+    .oauth-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .34rem .7rem;
+        border-radius: 999px;
+        background: #ecfeff;
+        color: #155e75;
+        border: 1px solid #cffafe;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
     .divider { text-align: center; margin: 18px 0; position: relative; color: var(--gray-500); font-size: 13px; }
     .divider::before, .divider::after { content: ''; position: absolute; top: 50%; width: 42%; height: 1px; background: var(--gray-200); }
     .divider::before { left: 0; }
@@ -79,6 +179,35 @@
     </div>
 
     <div id="pane-customer" class="tab-pane {{ $tab !== 'admin' ? 'active' : '' }}">
+        @php
+            $oauthProviders = collect(config('services.oauth.providers', []))
+                ->mapWithKeys(function (array $provider, string $key) {
+                    $enabled = filled($provider['client_id'] ?? null) && filled($provider['client_secret'] ?? null);
+
+                    return [
+                        $key => [
+                            'enabled' => $enabled,
+                            'label' => match ($key) {
+                                'google' => 'Google',
+                                'github' => 'GitHub',
+                                default => ucfirst($key),
+                            },
+                            'description' => match ($key) {
+                                'google' => 'Masuk dengan Google untuk belanja di toko Greatfit.',
+                                'github' => 'Masuk dengan GitHub untuk akses pelanggan yang sudah diundang.',
+                                default => 'Masuk dengan provider OAuth ini.',
+                            },
+                            'icon' => match ($key) {
+                                'google' => 'google',
+                                'github' => 'github',
+                                default => 'oauth',
+                            },
+                        ],
+                    ];
+                })
+                ->filter(fn ($provider) => $provider['enabled'] ?? false);
+        @endphp
+
         <div class="pane-title">Masuk ke akun kamu</div>
         <div class="pane-sub">Masukkan nomor WhatsApp yang terdaftar.</div>
 
@@ -97,6 +226,47 @@
             </div>
             <button type="submit" class="btn-submit">Kirim Kode OTP</button>
         </form>
+
+        <div class="oauth-card">
+            <div class="oauth-head">
+                <div>
+                    <div class="oauth-title">Login cepat</div>
+                    <div class="oauth-sub">Kalau kamu punya akun Google atau GitHub, kamu bisa masuk tanpa OTP.</div>
+                </div>
+                <span class="oauth-badge"><i class="bi bi-shield-check"></i> Storefront only</span>
+            </div>
+
+            @if ($oauthProviders->isNotEmpty())
+                <div class="oauth-grid">
+                    @foreach ($oauthProviders as $providerKey => $provider)
+                        <a href="{{ route('auth.oauth.redirect', ['provider' => $providerKey]) }}" class="oauth-provider">
+                            <span class="oauth-provider-icon">
+                                @if ($providerKey === 'google')
+                                    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fill="#EA4335" d="M12 10.2v3.95h5.62c-.25 1.34-1.47 3.94-5.62 3.94-3.39 0-6.15-2.81-6.15-6.27S8.61 5.55 12 5.55c1.93 0 3.22.82 3.96 1.53l2.69-2.59C16.93 2.92 14.71 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10c5.76 0 9.58-4.05 9.58-9.75 0-.66-.07-1.16-.15-1.67H12z"/>
+                                        <path fill="#4285F4" d="M3.45 7.38l3.15 2.31C7.46 7.37 9.5 5.55 12 5.55c1.93 0 3.22.82 3.96 1.53l2.69-2.59C16.93 2.92 14.71 2 12 2 8.1 2 4.73 4.19 3.45 7.38z"/>
+                                        <path fill="#FBBC05" d="M12 22c2.66 0 4.88-.87 6.5-2.37l-3-2.47c-.84.57-1.98.97-3.5.97-4.11 0-6.32-2.57-6.98-3.92l-3.08 2.36C3.19 19.83 7.17 22 12 22z"/>
+                                        <path fill="#34A853" d="M21.58 12.25c0-.67-.07-1.17-.15-1.68H12v3.95h5.62c-.27 1.42-1.53 3.33-3.5 4.64l3 2.47C18.87 19.13 21.58 16.32 21.58 12.25z"/>
+                                    </svg>
+                                @elseif ($providerKey === 'github')
+                                    <i class="bi bi-github" style="font-size: 1.1rem;"></i>
+                                @else
+                                    <i class="bi bi-shield-lock"></i>
+                                @endif
+                            </span>
+                            <span class="oauth-provider-copy">
+                                <span class="oauth-provider-title">Lanjut dengan {{ $provider['label'] }}</span>
+                                <span class="oauth-provider-desc">{{ $provider['description'] }}</span>
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
+            @else
+                <div style="font-size:14px;color:#475569;line-height:1.55;">
+                    OAuth belum aktif. Isi env Google atau GitHub supaya tombol login cepat muncul di sini.
+                </div>
+            @endif
+        </div>
 
         <div class="divider">atau</div>
         <p class="link-register">Belum punya akun? <a href="{{ route('storefront.register') }}">Daftar sekarang</a></p>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MarketplaceChatMessage;
 use App\Models\MarketplaceConversation;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
@@ -18,6 +19,51 @@ class MarketplaceChatController extends Controller
     public function page(Request $request)
     {
         return view('marketplace.chat');
+    }
+
+    /**
+     * Audit raw payload setiap pesan chat.
+     */
+    public function audit(Request $request)
+    {
+        $storeId = $request->filled('store_id') ? (int) $request->input('store_id') : null;
+        $conversationId = trim((string) $request->query('conversation_id', ''));
+        $q = trim((string) $request->query('q', ''));
+        $direction = trim((string) $request->query('direction', ''));
+        $source = trim((string) $request->query('source', ''));
+        $webhookLogId = $request->filled('webhook_log_id') ? (int) $request->input('webhook_log_id') : null;
+        $focusMessageId = $request->filled('message_id') ? (int) $request->input('message_id') : null;
+
+        $stores = Store::whereHas('channel', fn ($query) => $query->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $messages = MarketplaceChatMessage::query()
+            ->with([
+                'store:id,name,external_shop_id',
+                'conversation:id,store_id,conversation_id,buyer_user_id,buyer_username,last_message_at',
+                'webhookLog:id,provider,event_type,signature_verified,payload,created_at',
+            ])
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->when($conversationId !== '', fn ($query) => $query->where('external_conversation_id', $conversationId))
+            ->when($direction !== '', fn ($query) => $query->where('from_role', $direction))
+            ->when($source !== '', fn ($query) => $query->where('source', $source))
+            ->when($webhookLogId, fn ($query) => $query->where('webhook_log_id', $webhookLogId))
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('external_message_id', 'like', "%{$q}%")
+                        ->orWhere('external_conversation_id', 'like', "%{$q}%")
+                        ->orWhere('text', 'like', "%{$q}%")
+                        ->orWhere('source', 'like', "%{$q}%")
+                        ->orWhere('from_id', 'like', "%{$q}%");
+                });
+            })
+            ->orderByDesc('sent_at')
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('marketplace.chat-audit', compact('messages', 'stores', 'storeId', 'conversationId', 'q', 'direction', 'source', 'webhookLogId', 'focusMessageId'));
     }
 
     /**
@@ -75,6 +121,112 @@ class MarketplaceChatController extends Controller
             'can_reply'    => $reply['can_reply'],
             'reply_reason' => $reply['reason'],
         ]);
+    }
+
+    /**
+     * Detail raw payload untuk satu message.
+     */
+    public function messageRaw(MarketplaceChatMessage $message)
+    {
+        $message->load([
+            'store:id,name,external_shop_id',
+            'conversation:id,store_id,conversation_id,buyer_user_id,buyer_username,last_message_at',
+            'webhookLog:id,provider,event_type,signature_verified,payload,ip_address,created_at',
+        ]);
+
+        [$rawPayload, $rawContext, $auditState] = $this->resolveAuditPayloads($message);
+
+        return response()->json([
+            'message' => [
+                'id' => $message->id,
+                'store_id' => $message->store_id,
+                'marketplace_conversation_id' => $message->marketplace_conversation_id,
+                'external_conversation_id' => $message->external_conversation_id,
+                'external_message_id' => $message->external_message_id,
+                'source' => $message->source,
+                'from_role' => $message->from_role,
+                'from_id' => $message->from_id,
+                'message_type' => $message->message_type,
+                'text' => $message->text,
+                'content' => $message->content,
+                'raw_payload' => $rawPayload,
+                'raw_context' => $rawContext,
+                'webhook_log_id' => $message->webhook_log_id,
+                'sent_at' => optional($message->sent_at)?->toIso8601String(),
+                'is_read' => $message->is_read,
+                'audit_state' => $auditState,
+            ],
+            'store' => $message->store,
+            'conversation' => $message->conversation,
+            'webhook_log' => $message->webhookLog,
+        ]);
+    }
+
+    /**
+     * Fallback audit payload untuk message legacy yang belum punya raw data lengkap.
+     *
+     * @return array{0:array,1:array,2:string}
+     */
+    protected function resolveAuditPayloads(MarketplaceChatMessage $message): array
+    {
+        $rawPayload = $message->raw_payload;
+        $rawContext = $message->raw_context;
+        $auditState = 'stored';
+
+        if (is_string($rawPayload)) {
+            $decoded = json_decode($rawPayload, true);
+            $rawPayload = is_array($decoded) ? $decoded : [];
+        }
+        $rawPayload = is_array($rawPayload) ? $rawPayload : [];
+
+        if (is_string($rawContext)) {
+            $decoded = json_decode($rawContext, true);
+            $rawContext = is_array($decoded) ? $decoded : [];
+        }
+        $rawContext = is_array($rawContext) ? $rawContext : [];
+
+        if (empty($rawPayload) && $message->webhookLog?->payload) {
+            $rawPayload = $message->webhookLog->payload;
+            $rawContext['audit'] = array_merge($rawContext['audit'] ?? [], [
+                'mode' => 'webhook_log_payload',
+                'webhook_log_id' => $message->webhook_log_id,
+            ]);
+            $auditState = 'synthesized_from_webhook_log';
+        }
+
+        if (empty($rawPayload)) {
+            $rawPayload = array_filter([
+                'message_id' => $message->external_message_id,
+                'conversation_id' => $message->external_conversation_id,
+                'message_type' => $message->message_type,
+                'source' => $message->source,
+                'from_role' => $message->from_role,
+                'from_id' => $message->from_id,
+                'text' => $message->text,
+                'content' => $message->content ?: (filled($message->text) ? ['text' => $message->text] : null),
+                'created_timestamp' => optional($message->sent_at)?->timestamp,
+            ], static fn ($value) => $value !== null && $value !== '');
+
+            $rawContext['audit'] = array_merge($rawContext['audit'] ?? [], [
+                'mode' => 'synthesized_from_row',
+                'message_id' => $message->external_message_id,
+                'conversation_id' => $message->external_conversation_id,
+                'message_type' => $message->message_type,
+            ]);
+
+            $auditState = 'synthesized';
+        }
+
+        if (empty($rawContext)) {
+            $rawContext = [
+                'audit' => [
+                    'mode' => 'empty_fallback',
+                    'message_id' => $message->external_message_id,
+                ],
+            ];
+        }
+
+        return [$rawPayload, $rawContext, $auditState];
     }
 
     /**
@@ -208,7 +360,7 @@ class MarketplaceChatController extends Controller
         }
 
         /** @var \App\Services\Channels\Shopee\ShopeeChannel $shopee */
-        $shopee = app(\App\Services\Channels\Shopee\ShopeeChannel::class);
+        $shopee = app(\App\Services\Marketplace\MarketplaceApiGateway::class);
 
         return response()->json([
             'store_id' => $store->id,

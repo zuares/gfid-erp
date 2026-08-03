@@ -36,20 +36,31 @@ class MarketplaceProductController extends Controller
         $products = $q->limit(500)->get();
 
         // ── Status mapping per model (dipakai juga oleh sync order) ─────────
-        $skus = $products->flatMap(fn ($p) => $p->models->pluck('model_sku'))
-            ->filter()->unique()->values();
+        $skus = $products->flatMap(fn ($p) => $p->models->pluck('model_sku')->push($p->item_sku))
+            ->filter()->map(fn ($sku) => trim((string) $sku))->unique()->values();
 
         $mappings = \App\Models\SkuMapping::whereIn('marketplace_sku', $skus)
-            ->where(fn ($w) => $w->whereNull('channel_code')->orWhere('channel_code', 'shopee'))
+            ->where(fn ($w) => $w->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) = ?', ['shopee']))
             ->with('item:id,code,name')
             ->get()
             // channel-spesifik menang atas global
             ->sortBy(fn ($m) => $m->channel_code === null ? 1 : 0)
-            ->keyBy('marketplace_sku');
+            ->keyBy(fn ($mapping) => mb_strtolower(trim((string) $mapping->marketplace_sku)));
 
         foreach ($products as $p) {
+            $parentMapping = $p->item_sku
+                ? ($mappings[mb_strtolower(trim((string) $p->item_sku))] ?? null)
+                : null;
+            $p->setAttribute('mapping', $parentMapping ? [
+                'id'        => $parentMapping->id,
+                'item_id'   => $parentMapping->item_id,
+                'item_code' => $parentMapping->item?->code,
+                'item_name' => $parentMapping->item?->name,
+            ] : null);
             foreach ($p->models as $m) {
-                $map = $m->model_sku ? ($mappings[$m->model_sku] ?? null) : null;
+                $map = $m->model_sku
+                    ? ($mappings[mb_strtolower(trim((string) $m->model_sku))] ?? null)
+                    : null;
                 $m->setAttribute('mapping', $map ? [
                     'id'        => $map->id,
                     'item_id'   => $map->item_id,
@@ -70,7 +81,11 @@ class MarketplaceProductController extends Controller
     {
         $unmappedSkus = \App\Models\MarketplaceProductModel::whereNotNull('model_sku')
             ->where('model_sku', '!=', '')
-            ->pluck('model_sku')->unique()
+            ->pluck('model_sku')
+            ->merge(\App\Models\MarketplaceProduct::whereNotNull('item_sku')->pluck('item_sku'))
+            ->filter()
+            ->map(fn ($sku) => trim((string) $sku))
+            ->unique()
             ->reject(fn ($sku) => \App\Models\SkuMapping::where('marketplace_sku', $sku)->exists())
             ->values();
 

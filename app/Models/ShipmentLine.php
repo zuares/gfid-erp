@@ -11,6 +11,7 @@ class ShipmentLine extends Model
 
     protected $fillable = [
         'shipment_id',
+        'shipment_order_scan_id',
         'item_id',
         'qty_scanned',
         'allocated_qty',
@@ -25,5 +26,10 @@ class ShipmentLine extends Model
     public function item()
     {
         return $this->belongsTo(Item::class);
+    }
+
+    public function orderScan()
+    {
+        return $this->belongsTo(ShipmentOrderScan::class, 'shipment_order_scan_id');
     }
 }

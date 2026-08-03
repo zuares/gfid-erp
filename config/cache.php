@@ -17,6 +17,10 @@ return [
 
     'default' => env('CACHE_STORE', 'database'),
 
+    // RateLimiter harus memakai database agar tetap berjalan di Web Hosting
+    // yang tidak menyediakan Redis lokal.
+    'limiter' => env('CACHE_LIMITER', 'database'),
+
     /*
     |--------------------------------------------------------------------------
     | Cache Stores

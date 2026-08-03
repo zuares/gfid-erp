@@ -130,11 +130,11 @@ if ($navShowBell) {
         height: 56px;
         z-index: 1050;
 
-        background: color-mix(in srgb, var(--card) 82%, var(--bg) 18%);
+        background: var(--card);
         border-bottom: 1px solid var(--line);
 
-        backdrop-filter: blur(14px) saturate(160%);
-        -webkit-backdrop-filter: blur(14px) saturate(160%);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
 
         display: flex;
         align-items: center;
