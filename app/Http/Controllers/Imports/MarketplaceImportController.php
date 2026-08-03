@@ -109,6 +109,17 @@ class MarketplaceImportController extends Controller
     /* ============================================================
      * PREVIEW
      * ============================================================ */
+    public function previewPage(): RedirectResponse
+    {
+        if (session('mp_import_preview')) {
+            return redirect()->route('imports.marketplace.draft');
+        }
+
+        return redirect()
+            ->route('imports.marketplace.create')
+            ->with('error', 'Tidak ada draft preview yang bisa dibuka. Silakan upload file terlebih dahulu.');
+    }
+
     public function preview(Request $request, MpImportService $svc): View | RedirectResponse
     {
         $data = $request->validate([

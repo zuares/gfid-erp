@@ -23,7 +23,7 @@
 
 @push('head')
 <style>
-  .page{ max-width:1220px; margin:0 auto; padding: 1rem .9rem 4.8rem; }
+  .page{ max-width:1440px; margin:0 auto; padding: 1rem .9rem 4.8rem; }
   @media(min-width:768px){ .page{ padding: 1.1rem 1rem 4.8rem; } }
 
   :root{
@@ -57,6 +57,48 @@
   .row-title{ font-weight:800; letter-spacing:.01em; color: var(--ink); }
 
   .muted{ color: var(--muted); }
+
+  .shipment-hero{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:1rem;
+    flex-wrap:wrap;
+    margin-bottom:.9rem;
+    padding:1.15rem 1.2rem;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--card,#fff);
+    box-shadow:var(--shadow);
+  }
+  .shipment-hero-title{ margin:0; color:var(--ink); font-size:1.35rem; font-weight:900; letter-spacing:-.04em; }
+  .shipment-hero-sub{ max-width:48rem; margin-top:.25rem; color:var(--muted); font-size:.82rem; }
+  .shipment-eyebrow{ display:inline-flex; align-items:center; gap:.35rem; margin-bottom:.35rem; color:var(--muted); font-size:.65rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+  .shipment-badges,.shipment-actions,.shipment-tabs{ display:flex; align-items:center; flex-wrap:wrap; gap:.45rem; }
+  .shipment-badges{ margin-top:.8rem; }
+  .shipment-chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.33rem .62rem; border:1px solid var(--line2); border-radius:999px; background:var(--soft); color:var(--muted); font-size:.7rem; font-weight:800; white-space:nowrap; }
+  .shipment-hero .btn{ border-radius:999px; font-weight:800; }
+  .shipment-hero .btn-outline-secondary,.shipment-hero .btn-outline-warning{ background:var(--card,#fff); }
+
+  .shipment-tabs-wrap{ display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem; padding:.28rem; border:1px solid var(--line); border-radius:999px; background:var(--card,#fff); box-shadow:var(--shadow); }
+  .import-tabs{ display:flex; gap:.2rem; }
+  .import-tab{ display:inline-flex; align-items:center; gap:.35rem; padding:.52rem .82rem; border-radius:999px; background:#0f172a; color:#fff; font-size:.76rem; font-weight:850; }
+  .shipment-tab-meta{ padding:0 .8rem; color:var(--muted); font-size:.72rem; font-weight:700; }
+
+  .shipment-card{ border:1px solid var(--line); border-radius:18px; background:var(--card,#fff); box-shadow:var(--shadow); }
+  .shipment-card-head{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; padding:1rem 1rem .75rem; }
+  .shipment-card-title{ margin:0; color:var(--ink); font-size:.9rem; font-weight:900; }
+  .shipment-card-note{ margin-top:.2rem; color:var(--muted); font-size:.72rem; }
+  .shipment-form-grid{ display:grid; grid-template-columns:1fr 1.25fr 1.55fr; gap:.75rem; padding:0 1rem 1rem; }
+  .shipment-field label{ display:block; margin-bottom:.3rem; color:var(--muted); font-size:.68rem; font-weight:850; }
+  .shipment-field .form-control,.shipment-field .form-select{ min-height:40px; }
+  .shipment-field .form-help{ margin-top:.35rem; font-size:.72rem; }
+  .shipment-upload-note{ display:flex; align-items:center; gap:.45rem; padding:.7rem .8rem; border:1px dashed var(--line2); border-radius:12px; background:var(--soft); color:var(--muted); font-size:.75rem; }
+  .shipment-form-actions{ display:flex; justify-content:flex-end; gap:.5rem; padding:0 1rem 1rem; }
+  .shipment-draft-card{ margin-bottom:.9rem; }
+  @media(max-width:1100px){ .shipment-form-grid{ grid-template-columns:1fr 1fr; } }
+  @media(max-width:820px){ .shipment-tabs-wrap{ border-radius:18px; } .shipment-tabs{ flex:1 1 100%; } .import-tab{ flex:1 1 auto; justify-content:center; } .shipment-tab-meta{ width:100%; padding:.3rem .55rem .5rem; } }
+  @media(max-width:620px){ .shipment-form-grid{ grid-template-columns:1fr; } .shipment-actions{ width:100%; } .shipment-actions .btn{ flex:1 1 auto; } .shipment-form-actions{ padding-inline:1rem; } .shipment-form-actions .btn{ width:100%; } }
 </style>
 @endpush
 
@@ -64,18 +106,24 @@
 <div class="page">
 
   {{-- HEADER --}}
-  <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+  <section class="shipment-hero">
     <div>
-      <h1 class="h4 mb-1 fw-bold">Import Marketplace Shipments</h1>
-      <div class="text-muted small d-flex flex-wrap gap-1 align-items-center">
-        <span class="chip">Upload file → Preview → Commit</span>
+      <div class="shipment-eyebrow"><i class="bi bi-truck"></i> Marketplace shipments • Import</div>
+      <h1 class="shipment-hero-title">Import Marketplace Shipments</h1>
+      <div class="shipment-hero-sub">
+        Upload data pengiriman dari marketplace, periksa hasil normalisasi, lalu commit ke <span class="mono">mp_shipments</span>.
+      </div>
+      <div class="shipment-badges">
+        <span class="shipment-chip"><i class="bi bi-upload"></i> Upload</span>
+        <span class="shipment-chip"><i class="bi bi-search"></i> Preview</span>
+        <span class="shipment-chip"><i class="bi bi-check2-circle"></i> Commit</span>
 
         @if(!empty($draft))
-          <span class="chip" style="border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.10);">
+          <span class="shipment-chip" style="border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.10); color:#a16207;">
             Draft import tersedia
           </span>
           @if(!$canResume)
-            <span class="chip" style="border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10);">
+            <span class="shipment-chip" style="border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10); color:#b91c1c;">
               File draft tidak ditemukan (upload ulang)
             </span>
           @endif
@@ -83,19 +131,26 @@
       </div>
     </div>
 
-    <div class="d-flex gap-2 align-items-center head-actions">
-      <a class="btn btn-outline-secondary btn-sm px-3" href="{{ route('imports.marketplace.index') }}">← Kembali</a>
+    <div class="shipment-actions head-actions">
+      <a class="btn btn-outline-secondary btn-sm px-3" href="{{ route('imports.marketplace.index') }}"><i class="bi bi-arrow-left"></i> Kembali</a>
 
       @if(!empty($draft) && $canResume)
         <a class="btn btn-outline-warning btn-sm px-3" href="{{ route('imports.marketplace.draft') }}">
-          Lanjutkan Draft
+          <i class="bi bi-file-earmark-arrow-up"></i> Lanjutkan Draft
         </a>
       @elseif(!empty($draft))
         <a class="btn btn-outline-warning btn-sm px-3" href="{{ route('imports.marketplace.create') }}">
-          Draft ada (upload ulang)
+          <i class="bi bi-arrow-repeat"></i> Upload Ulang Draft
         </a>
       @endif
     </div>
+  </section>
+
+  <div class="shipment-tabs-wrap">
+    <div class="import-tabs" role="tablist" aria-label="Navigasi import marketplace shipments">
+      <div class="import-tab" role="tab" aria-selected="true"><i class="bi bi-upload"></i> Upload Data</div>
+    </div>
+    <div class="shipment-tab-meta">Pilih channel dan store • upload file • lanjut ke preview</div>
   </div>
 
   @if(session('error'))
@@ -107,20 +162,20 @@
 
   {{-- DRAFT CARD --}}
   @if(!empty($draft))
-    <div class="cardx p-3 mb-3">
+    <section class="shipment-card shipment-draft-card p-3">
       <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
         <div class="flex-grow-1">
           <div class="d-flex align-items-center gap-2 mb-1">
             <div class="fw-bold">Draft preview masih ada</div>
-            <span class="chip" style="border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.10);">
+            <span class="shipment-chip" style="border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.10); color:#a16207;">
               Draft
             </span>
           </div>
 
           <div class="text-muted small d-flex flex-wrap gap-2">
-            <span class="chip">Channel: <span class="mono">{{ $draft['channel_key'] ?? ($draft['channel_name'] ?? '-') }}</span></span>
-            <span class="chip">Store: <span class="mono">{{ $draft['store_name'] ?? ($draft['store_id'] ?? '-') }}</span></span>
-            <span class="chip">File: <span class="mono">{{ $draft['source_file'] ?? '-' }}</span></span>
+            <span class="shipment-chip">Channel: <span class="mono">{{ $draft['channel_key'] ?? ($draft['channel_name'] ?? '-') }}</span></span>
+            <span class="shipment-chip">Store: <span class="mono">{{ $draft['store_name'] ?? ($draft['store_id'] ?? '-') }}</span></span>
+            <span class="shipment-chip">File: <span class="mono">{{ $draft['source_file'] ?? '-' }}</span></span>
           </div>
 
           @if(!$canResume)
@@ -143,21 +198,24 @@
           </form>
         </div>
       </div>
-    </div>
+    </section>
   @endif
 
   {{-- UPLOAD FORM --}}
-  <form method="POST" action="{{ route('imports.marketplace.preview') }}" enctype="multipart/form-data" class="cardx p-3">
+  <form method="POST" action="{{ route('imports.marketplace.preview') }}" enctype="multipart/form-data" class="shipment-card">
     @csrf
 
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <div class="row-title">Upload File</div>
-      <div class="text-muted small">Format: xlsx / xls / csv</div>
+    <div class="shipment-card-head">
+      <div>
+        <h2 class="shipment-card-title"><i class="bi bi-cloud-arrow-up"></i> Upload File</h2>
+        <div class="shipment-card-note">Pilih sumber data dan file yang ingin diproses ke preview.</div>
+      </div>
+      <span class="shipment-chip mono">.xlsx • .xls • .csv</span>
     </div>
 
-    <div class="row g-3">
+    <div class="shipment-form-grid">
       {{-- Channel --}}
-      <div class="col-md-3">
+      <div class="shipment-field">
         <label class="form-label small" style="color:var(--muted)">Channel</label>
         <select name="channel_id" id="channelSelect" class="form-select" required>
           <option value="">— pilih channel —</option>
@@ -169,7 +227,7 @@
       </div>
 
       {{-- Store (filtered by channel_id) --}}
-      <div class="col-md-4">
+      <div class="shipment-field">
         <label class="form-label small" style="color:var(--muted)">Store</label>
         <select name="store_id" id="storeSelect" class="form-select" required disabled data-selected-store-id="{{ $selectedStoreId ?? '' }}">
           <option value="">— pilih store —</option>
@@ -183,15 +241,15 @@
       </div>
 
       {{-- File --}}
-      <div class="col-md-5">
+      <div class="shipment-field">
         <label class="form-label small" style="color:var(--muted)">File</label>
         <input type="file" name="file" class="form-control" required accept=".xlsx,.xls,.csv">
-        <div class="form-help mt-1">Pastikan header kolom sesuai template marketplace.</div>
+        <div class="shipment-upload-note mt-2"><i class="bi bi-info-circle"></i> Pastikan header kolom sesuai template marketplace.</div>
       </div>
+    </div>
 
-      <div class="col-12 d-flex justify-content-end">
-        <button class="btn btn-success px-3">Preview Import →</button>
-      </div>
+    <div class="shipment-form-actions">
+      <button class="btn btn-primary px-3"><i class="bi bi-search"></i> Preview Import</button>
     </div>
   </form>
 

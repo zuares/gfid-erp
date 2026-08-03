@@ -3,6 +3,8 @@
 @section('title','Imports • Preview Marketplace Import')
 
 @php
+  use Illuminate\Support\Str;
+
   /* =========================================================
     META (NO legacy vars)
   ========================================================= */
@@ -150,7 +152,7 @@
     Layout (match index)
   ========================= */
   .page{
-    max-width:1220px;
+    max-width:1440px;
     margin:0 auto;
     padding: 1rem .9rem 4.8rem;
   }
@@ -259,6 +261,133 @@
     border-bottom:1px dashed rgba(148,163,184,.25);
   }
   .err-row:last-child{ border-bottom:none; }
+
+  /* =========================
+    Shared marketplace index language
+  ========================= */
+  .shipment-hero{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:1rem;
+    flex-wrap:wrap;
+    margin-bottom:.9rem;
+    padding:1.15rem 1.2rem;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--card,#fff);
+    box-shadow:var(--shadow);
+  }
+  .shipment-hero-title{
+    margin:0;
+    color:var(--ink);
+    font-size:1.35rem;
+    font-weight:900;
+    letter-spacing:-.04em;
+  }
+  .shipment-hero-sub{ max-width:48rem; margin-top:.25rem; color:var(--muted); font-size:.82rem; }
+  .shipment-eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    margin-bottom:.35rem;
+    color:var(--muted);
+    font-size:.65rem;
+    font-weight:900;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .shipment-badges,.shipment-actions,.shipment-tabs{ display:flex; align-items:center; flex-wrap:wrap; gap:.45rem; }
+  .shipment-badges{ margin-top:.8rem; }
+  .shipment-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    padding:.33rem .62rem;
+    border:1px solid var(--line2);
+    border-radius:999px;
+    background:var(--soft);
+    color:var(--muted);
+    font-size:.7rem;
+    font-weight:800;
+    white-space:nowrap;
+  }
+  .shipment-hero .btn{ border-radius:999px; font-weight:800; }
+  .shipment-hero .btn-outline-secondary,.shipment-hero .btn-outline-danger{ background:var(--card,#fff); }
+
+  .shipment-tabs-wrap{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+    margin-bottom:.9rem;
+    padding:.28rem;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:var(--card,#fff);
+    box-shadow:var(--shadow);
+  }
+  .import-tabs{ display:flex; gap:.2rem; }
+  .import-tab{
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    padding:.52rem .82rem;
+    border:0;
+    border-radius:999px;
+    background:transparent;
+    color:var(--muted);
+    font-size:.76rem;
+    font-weight:850;
+  }
+  .import-tab.active{ color:#fff; background:#0f172a; }
+  .shipment-tab-meta{ padding:0 .8rem; color:var(--muted); font-size:.72rem; font-weight:700; }
+
+  .shipment-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:.7rem;
+    margin-bottom:.9rem;
+  }
+  .shipment-kpi{
+    min-height:112px;
+    padding:1rem;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--card,#fff);
+    box-shadow:var(--shadow);
+  }
+  .shipment-kpi.order{ border-top:3px solid #2563eb; }
+  .shipment-kpi.ship{ border-top:3px solid #14b8a6; }
+  .shipment-kpi.warn{ border-top:3px solid #f59e0b; }
+  .shipment-kpi.muted{ border-top:3px solid #94a3b8; }
+  .shipment-kpi-label{ color:var(--muted); font-size:.7rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+  .shipment-kpi-value{ margin-top:.25rem; color:var(--ink); font-size:1.25rem; font-weight:900; letter-spacing:-.03em; }
+  .shipment-kpi-sub{ margin-top:.2rem; color:var(--muted); font-size:.72rem; }
+
+  .shipment-card{ border:1px solid var(--line); border-radius:18px; background:var(--card,#fff); box-shadow:var(--shadow); }
+  .shipment-card-head{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; padding:1rem 1rem .75rem; }
+  .shipment-card-title{ margin:0; color:var(--ink); font-size:.9rem; font-weight:900; }
+  .shipment-card-note{ margin-top:.2rem; color:var(--muted); font-size:.72rem; }
+  .shipment-meta-grid{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.65rem; padding:0 1rem 1rem; }
+  .shipment-meta-item{ min-width:0; padding:.75rem; border:1px solid var(--line); border-radius:14px; background:var(--soft); }
+  .shipment-meta-label{ color:var(--muted); font-size:.65rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+  .shipment-meta-value{ margin-top:.25rem; color:var(--ink); font-size:.95rem; font-weight:900; }
+
+  .preview-list{ display:flex; flex-direction:column; gap:.65rem; padding:0 1rem 1rem; }
+  .preview-items-scroll{ overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable both-edges; }
+
+  @media(max-width:1100px){ .shipment-kpi-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } .shipment-meta-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media(max-width:820px){
+    .shipment-kpi-grid{ grid-template-columns:1fr; }
+    .shipment-meta-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .shipment-tabs-wrap{ border-radius:18px; }
+    .shipment-tabs{ flex:1 1 100%; }
+    .import-tab{ flex:1 1 auto; justify-content:center; }
+    .shipment-tab-meta{ width:100%; padding:.3rem .55rem .5rem; }
+  }
+  @media(max-width:520px){ .shipment-meta-grid{ grid-template-columns:1fr; } .shipment-actions{ width:100%; } .shipment-actions .btn{ flex:1 1 auto; } }
 </style>
 @endpush
 
@@ -268,42 +397,53 @@
   {{-- =========================
     HEADER
   ========================= --}}
-  <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+  <section class="shipment-hero">
     <div>
-      <h1 class="h4 mb-1 fw-bold">Preview Import</h1>
-      <div class="text-muted small d-flex flex-wrap gap-1 align-items-center">
-        <span class="chip">Channel: <b class="mono">{{ $channelName ?? $channelKey ?? '-' }}</b></span>
-        <span class="chip">Store: <b class="mono">{{ $storeName ?? ($storeId ? ('#'.$storeId) : '-') }}</b></span>
-        <span class="chip">File: <b class="mono">{{ $sourceFile ?? '-' }}</b></span>
+      <div class="shipment-eyebrow"><i class="bi bi-truck"></i> Marketplace shipments • Preview</div>
+      <h1 class="shipment-hero-title">Preview Import Shipment</h1>
+      <div class="shipment-hero-sub">
+        Validasi data pengiriman sebelum disimpan ke <span class="mono">mp_shipments</span>. Preview ini masih dry-run dan belum mengubah data utama.
+      </div>
+      <div class="shipment-badges">
+        <span class="shipment-chip"><i class="bi bi-diagram-3"></i> {{ $channelName ?? $channelKey ?? '-' }}</span>
+        <span class="shipment-chip"><i class="bi bi-shop"></i> {{ $storeName ?? ($storeId ? ('#'.$storeId) : '-') }}</span>
+        <span class="shipment-chip mono"><i class="bi bi-file-earmark-text"></i> {{ Str::limit((string)($sourceFile ?? '-'), 44) }}</span>
 
         @if($hasErrors)
-          <span class="chip" style="border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10);">
+          <span class="shipment-chip" style="border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10); color:#b91c1c;">
             Ada error validasi
           </span>
         @else
-          <span class="chip" style="border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.10);">
+          <span class="shipment-chip" style="border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.10); color:#15803d;">
             Siap di-commit
           </span>
         @endif
       </div>
     </div>
 
-    <div class="d-flex gap-2 align-items-center head-actions">
-      <a class="btn btn-outline-secondary btn-sm px-3" href="{{ route('imports.marketplace.create') }}">← Ubah File</a>
+    <div class="shipment-actions head-actions">
+      <a class="btn btn-outline-secondary btn-sm px-3" href="{{ route('imports.marketplace.create') }}"><i class="bi bi-arrow-left"></i> Ubah File</a>
 
       <form method="POST" action="{{ route('imports.marketplace.cancel') }}"
             onsubmit="return confirm('Batalkan preview?')" class="d-inline">
         @csrf
-        <button class="btn btn-outline-danger btn-sm px-3">Cancel</button>
+        <button class="btn btn-outline-danger btn-sm px-3"><i class="bi bi-x-circle"></i> Batalkan</button>
       </form>
 
       <form method="POST" action="{{ route('imports.marketplace.commit') }}" class="d-inline">
         @csrf
-        <button class="btn btn-success btn-sm px-3" {{ $hasErrors ? 'disabled' : '' }}>
-          Commit
+        <button class="btn btn-primary btn-sm px-3" {{ $hasErrors ? 'disabled' : '' }}>
+          <i class="bi bi-check2-circle"></i> Commit Import
         </button>
       </form>
     </div>
+  </section>
+
+  <div class="shipment-tabs-wrap">
+    <div class="import-tabs" role="tablist" aria-label="Navigasi preview marketplace shipments">
+      <div class="import-tab active" role="tab" aria-selected="true"><i class="bi bi-table"></i> Preview Data</div>
+    </div>
+    <div class="shipment-tab-meta">Dry-run • cek rows, KPI, error, dan detail item sebelum commit</div>
   </div>
 
   @if(session('error'))
@@ -316,68 +456,45 @@
   {{-- =========================
     SUMMARY
   ========================= --}}
-  <div class="cardx p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <div class="fw-bold">Ringkasan</div>
-      <div class="text-muted small">{{ $actionHint }}</div>
+  <div class="shipment-kpi-grid">
+    <div class="shipment-kpi order">
+      <div class="shipment-kpi-label">Rows</div>
+      <div class="shipment-kpi-value">{{ $num($rowsTotal) }}</div>
+      <div class="shipment-kpi-sub">Baris terbaca dari file</div>
     </div>
-
-    <div class="sum-grid">
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Rows</div>
-        <div class="sum-val">{{ $num($rowsTotal) }}</div>
-        <div class="sum-sub">Baris terbaca</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Orders</div>
-        <div class="sum-val">{{ $num($ordersTotal) }}</div>
-        <div class="sum-sub">Total shipment/order</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Items</div>
-        <div class="sum-val">{{ $num($itemsTotal) }}</div>
-        <div class="sum-sub">Item lines</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Qty</div>
-        <div class="sum-val">{{ $num($qtyTotal) }}</div>
-        <div class="sum-sub">Total qty</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 6;">
-        <div class="sum-title">Grand Total</div>
-        <div class="sum-val">{{ $money($grandTotal) }}</div>
-        <div class="sum-sub">Total nilai transaksi</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Duplikat Tracking</div>
-        <div class="sum-val">{{ $num($dupTracking) }}</div>
-        <div class="sum-sub">Duplikat di file</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Duplikat Order</div>
-        <div class="sum-val">{{ $num($dupOrder) }}</div>
-        <div class="sum-sub">Duplikat di file</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Data Baru</div>
-        <div class="sum-val">{{ $num($newTotal) }}</div>
-        <div class="sum-sub">Shipment baru</div>
-      </div>
-
-      <div class="cardx sum-card" style="grid-column: span 3;">
-        <div class="sum-title">Akan Di-update</div>
-        <div class="sum-val">{{ $num($existingTotal) }}</div>
-        <div class="sum-sub">Idempotent import</div>
-      </div>
+    <div class="shipment-kpi ship">
+      <div class="shipment-kpi-label">Orders</div>
+      <div class="shipment-kpi-value">{{ $num($ordersTotal) }}</div>
+      <div class="shipment-kpi-sub">Shipment/order terdeteksi</div>
+    </div>
+    <div class="shipment-kpi warn">
+      <div class="shipment-kpi-label">Items</div>
+      <div class="shipment-kpi-value">{{ $num($itemsTotal) }}</div>
+      <div class="shipment-kpi-sub">Item lines • Qty {{ $num($qtyTotal) }}</div>
+    </div>
+    <div class="shipment-kpi muted">
+      <div class="shipment-kpi-label">Grand Total</div>
+      <div class="shipment-kpi-value">{{ $money($grandTotal) }}</div>
+      <div class="shipment-kpi-sub">Total nilai transaksi</div>
     </div>
   </div>
+
+  <section class="shipment-card mb-3">
+    <div class="shipment-card-head">
+      <div>
+        <h2 class="shipment-card-title"><i class="bi bi-clipboard-data"></i> Audit import</h2>
+        <div class="shipment-card-note">{{ $actionHint }} Data baru dan update dipisahkan untuk menjaga import tetap idempotent.</div>
+      </div>
+      <span class="shipment-chip"><i class="bi bi-shield-check"></i> Dry-run</span>
+    </div>
+    <div class="shipment-meta-grid">
+      <div class="shipment-meta-item"><div class="shipment-meta-label">Data Baru</div><div class="shipment-meta-value">{{ $num($newTotal) }}</div></div>
+      <div class="shipment-meta-item"><div class="shipment-meta-label">Akan Di-update</div><div class="shipment-meta-value">{{ $num($existingTotal) }}</div></div>
+      <div class="shipment-meta-item"><div class="shipment-meta-label">Duplikat Tracking</div><div class="shipment-meta-value">{{ $num($dupTracking) }}</div></div>
+      <div class="shipment-meta-item"><div class="shipment-meta-label">Duplikat Order</div><div class="shipment-meta-value">{{ $num($dupOrder) }}</div></div>
+      <div class="shipment-meta-item"><div class="shipment-meta-label">Sample</div><div class="shipment-meta-value">{{ $num(count($rows)) }} rows</div></div>
+    </div>
+  </section>
 
   @if(!empty($warnings))
     <div class="alert alert-warning py-2 mb-3">
@@ -394,10 +511,10 @@
     ERROR LIST
   ========================= --}}
   @if($hasErrors)
-    <div class="cardx p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="fw-bold">Daftar Error ({{ count($importErrors) }})</div>
-        <span class="chip" style="border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10);">
+    <section class="shipment-card p-3 mb-3">
+      <div class="shipment-card-head px-0 pt-0">
+        <div class="shipment-card-title">Daftar Error ({{ count($importErrors) }})</div>
+        <span class="shipment-chip" style="border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10); color:#b91c1c;">
           Commit dinonaktifkan
         </span>
       </div>
@@ -416,24 +533,25 @@
           </div>
         @endforeach
       </div>
-    </div>
+    </section>
   @endif
 
   {{-- =========================
     PREVIEW DATA
   ========================= --}}
-  <div class="cardx p-3">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <div class="fw-bold">Preview Data</div>
-      <div class="text-muted small">
-        {{ count($rows) }} shipment/order ditampilkan
+  <section class="shipment-card">
+    <div class="shipment-card-head">
+      <div>
+        <h2 class="shipment-card-title"><i class="bi bi-table"></i> Preview Data</h2>
+        <div class="shipment-card-note">Buka setiap order untuk memeriksa tracking, status, nilai, dan item sebelum commit.</div>
       </div>
+      <span class="shipment-card-note">{{ count($rows) }} shipment/order ditampilkan</span>
     </div>
 
     @if(empty($rows))
       <div class="text-muted">Tidak ada data untuk ditampilkan.</div>
     @else
-      <div class="d-flex flex-column gap-2">
+      <div class="preview-list">
         @foreach($rows as $i => $r)
           @php
             if (!is_array($r)) $r = [];
@@ -539,7 +657,7 @@
         @endforeach
       </div>
     @endif
-  </div>
+  </section>
 
 </div>
 @endsection

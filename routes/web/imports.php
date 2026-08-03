@@ -31,6 +31,7 @@ Route::middleware(['web', 'auth', 'access:imports'])
             Route::get('draft', [MarketplaceImportController::class, 'draft'])->name('draft');
 
             // actions
+            Route::get('preview', [MarketplaceImportController::class, 'previewPage'])->name('preview_page');
             Route::post('preview', [MarketplaceImportController::class, 'preview'])->name('preview');
             Route::post('commit', [MarketplaceImportController::class, 'commit'])->name('commit');
             Route::post('cancel', [MarketplaceImportController::class, 'cancel'])->name('cancel');
