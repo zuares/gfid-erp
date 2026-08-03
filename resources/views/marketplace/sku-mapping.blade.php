@@ -45,6 +45,7 @@
 <script>
 (function () {
     const { api, esc, channelPill } = window.mpHelpers;
+    const FMT = new Intl.NumberFormat('id-ID');
     let unmappedList = [];
     let mappingsPaginator = null;
     let currentPage = 1;
