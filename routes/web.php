@@ -312,6 +312,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     Route::get('/warehouses',                  [MarketplaceController::class, 'warehouses']);
+    Route::post('/stores',                     [MarketplaceController::class, 'storeStore'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::patch('/stores/{store}',            [MarketplaceController::class, 'updateStore'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::delete('/stores/{store}',           [MarketplaceController::class, 'deleteStore'])

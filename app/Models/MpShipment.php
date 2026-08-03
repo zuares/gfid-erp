@@ -13,6 +13,7 @@ class MpShipment extends Model
 
     protected $fillable = [
         'store_id',
+        'marketplace_order_id',
         'channel',
         'platform_order_id',
         'platform_shipment_id',
@@ -37,11 +38,14 @@ class MpShipment extends Model
         'import_batch_id',
         'source_file',
         'imported_at',
+        'source_type',
+        'source_updated_at',
         'raw_payload',
     ];
 
     protected $casts = [
         'store_id' => 'integer',
+        'marketplace_order_id' => 'integer',
         'total_qty' => 'integer',
 
         'order_subtotal' => 'decimal:2',
@@ -59,6 +63,7 @@ class MpShipment extends Model
         'completed_at' => 'datetime',
         'released_at' => 'datetime',
         'imported_at' => 'datetime',
+        'source_updated_at' => 'datetime',
 
         'raw_payload' => 'array',
     ];
@@ -71,6 +76,11 @@ class MpShipment extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class, 'store_id');
+    }
+
+    public function marketplaceOrder(): BelongsTo
+    {
+        return $this->belongsTo(MarketplaceOrder::class, 'marketplace_order_id');
     }
 
     /** Marketplace items */

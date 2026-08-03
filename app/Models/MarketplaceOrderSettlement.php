@@ -46,6 +46,9 @@ class MarketplaceOrderSettlement extends Model
         // Meta
         'synced_at',
         'raw_json',
+        'data_status',
+        'data_quality_flags',
+        'data_checked_at',
     ];
 
     protected $casts = [
@@ -68,6 +71,8 @@ class MarketplaceOrderSettlement extends Model
         'settlement_time'        => 'datetime',
         'synced_at'              => 'datetime',
         'raw_json'               => 'array',
+        'data_quality_flags'     => 'array',
+        'data_checked_at'        => 'datetime',
     ];
 
     public function store(): BelongsTo

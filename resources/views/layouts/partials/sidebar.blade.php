@@ -1564,6 +1564,47 @@
                 </li>
             @endif
 
+            {{-- IMPOR --}}
+            @if ($canShow(
+                $hasImportMarketplaceIndex,
+                $hasImportMarketplaceDraft,
+                $hasImportMarketplaceCreate,
+                $hasImportMarketplaceExport,
+                $hasImportMarketplaceIncomeCreate,
+                $hasImportMarketplaceIncomeIndex
+            ))
+                <x-sidebar.label text="Impor" />
+                <li class="simple-group">
+                    @if ($hasImportMarketplaceIndex)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace.index') }}" icon="bi bi-upload"
+                            :active="request()->routeIs('imports.marketplace.*')">
+                            Impor Pengiriman
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportMarketplaceDraft)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace.draft') }}" icon="bi bi-clock-history"
+                            :active="request()->routeIs('imports.marketplace.draft')">
+                            Draft Pengiriman
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportMarketplaceIncomeIndex)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.index') }}" icon="bi bi-cash-stack"
+                            :active="request()->routeIs('imports.marketplace_income.*')">
+                            Import Toko Online Income
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasImportMarketplaceIncomeDraft)
+                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.draft') }}" icon="bi bi-clock-history"
+                            :active="request()->routeIs('imports.marketplace_income.draft')">
+                            Draft Income
+                        </x-sidebar.simple-link>
+                    @endif
+                </li>
+            @endif
+
             {{-- SALES --}}
             @if ($canShow(
                 $hasSalesInvoicesIndex,

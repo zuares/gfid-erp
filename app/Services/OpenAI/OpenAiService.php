@@ -107,14 +107,26 @@ TXT;
         if (! $response->successful()) {
             $error = $response->json('error');
             $errorMessage = data_get($error, 'message') ?: trim((string) $response->body());
+            $errorCode = data_get($error, 'code');
+            $status = $response->status();
+
+            if ($status === 429 || $errorCode === 'insufficient_quota') {
+                return [
+                    'ok' => false,
+                    'message' => 'Layanan AI belum dapat digunakan karena kredit OpenAI habis atau billing belum aktif. Tambahkan kredit atau gunakan API key lain di Pengaturan OpenAI.',
+                    'status' => 429,
+                    'error_type' => data_get($error, 'type'),
+                    'error_code' => $errorCode ?: 'insufficient_quota',
+                ];
+            }
 
             return [
                 'ok' => false,
                 'message' => 'OpenAI API gagal dipanggil: ' . ($errorMessage !== '' ? $errorMessage : 'unknown error'),
-                'status' => $response->status(),
+                'status' => $status,
                 'error' => $error ?: $response->body(),
                 'error_type' => data_get($error, 'type'),
-                'error_code' => data_get($error, 'code'),
+                'error_code' => $errorCode,
             ];
         }
 

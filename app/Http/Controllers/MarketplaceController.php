@@ -31,6 +31,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
@@ -813,6 +814,7 @@ class MarketplaceController extends Controller
         $stores = Store::with(['channel', 'defaultWarehouse'])->latest()->get()->map(fn (Store $store) => [
             'id'                   => $store->id,
             'channel_id'           => $store->channel_id,
+            'code'                 => $store->code,
             'name'                 => $store->name,
             'external_shop_id'     => $store->external_shop_id,
             'region'               => $store->region,
@@ -837,6 +839,44 @@ class MarketplaceController extends Controller
         ]);
 
         return response()->json($stores);
+    }
+
+    public function storeStore(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'channel_id'           => ['required', 'integer', 'exists:channels,id'],
+            'name'                 => ['required', 'string', 'min:1', 'max:120'],
+            'code'                 => ['nullable', 'string', 'max:80'],
+            'region'               => ['nullable', 'string', 'max:32'],
+            'default_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+        ]);
+
+        $channel = Channel::findOrFail((int) $data['channel_id']);
+        $requestedCode = trim((string) ($data['code'] ?? ''));
+        $baseCode = Str::upper(Str::slug($requestedCode !== '' ? $requestedCode : $data['name'], '-'));
+        $baseCode = Str::limit($baseCode !== '' ? $baseCode : 'STORE', 68, '');
+
+        $code = $baseCode;
+        $suffix = 2;
+        while (Store::where('code', $code)->exists()) {
+            $suffixText = '-' . $suffix++;
+            $code = Str::limit($baseCode, 80 - strlen($suffixText), '') . $suffixText;
+        }
+
+        $store = Store::create([
+            'code'                 => $code,
+            'name'                 => trim($data['name']),
+            'channel_id'           => $channel->id,
+            'region'               => $data['region'] ?? null,
+            'default_warehouse_id' => $data['default_warehouse_id'] ?? null,
+            'status'               => 'active',
+            'is_active'            => true,
+        ]);
+
+        return response()->json([
+            'message' => 'Toko berhasil ditambahkan. Hubungkan akun marketplace dari menu toko untuk mulai sinkronisasi.',
+            'store' => $store->load('channel'),
+        ], 201);
     }
 
     public function shopInfo(Store $store): JsonResponse
@@ -6018,6 +6058,7 @@ class MarketplaceController extends Controller
     {
         $data = $request->validate([
             'name'                        => ['sometimes', 'string', 'max:120'],
+            'region'                      => ['sometimes', 'nullable', 'string', 'max:32'],
             'default_warehouse_id'        => ['nullable', 'integer', 'exists:warehouses,id'],
             'meta_shipping_document_type' => ['sometimes', 'string', 'in:THERMAL_AIR_WAYBILL,NORMAL_AIR_WAYBILL'],
         ]);
@@ -6025,6 +6066,9 @@ class MarketplaceController extends Controller
         $updateData = [];
         if (array_key_exists('name', $data)) {
             $updateData['name'] = $data['name'];
+        }
+        if (array_key_exists('region', $data)) {
+            $updateData['region'] = $data['region'];
         }
         if (array_key_exists('default_warehouse_id', $data)) {
             $updateData['default_warehouse_id'] = $data['default_warehouse_id'];
@@ -6096,20 +6140,42 @@ class MarketplaceController extends Controller
 
     public function deleteStore(Store $store): JsonResponse
     {
-        // Cek apakah ada data krusial yang sudah masuk
-        $hasOrders = \Illuminate\Support\Facades\DB::table('marketplace_orders')->where('store_id', $store->id)->exists();
-        $hasShipments = \Illuminate\Support\Facades\DB::table('shipments')->where('store_id', $store->id)->exists();
+        // Jangan menghapus toko yang sudah memiliki data historis. Gunakan
+        // nonaktifkan toko bila hanya ingin menghentikan pemakaiannya.
+        $protectedTables = [
+            'marketplace_orders' => 'pesanan marketplace',
+            'shipments' => 'shipment operasional',
+            'mp_shipments' => 'shipment import/API',
+            'mp_incomes' => 'data income',
+            'marketplace_order_settlements' => 'settlement',
+            'marketplace_import_batches' => 'riwayat import',
+            'marketplace_ad_campaigns' => 'campaign iklan',
+            'marketplace_products' => 'produk marketplace',
+            'marketplace_promotions' => 'promosi',
+            'marketplace_returns' => 'retur marketplace',
+            'marketplace_bookings' => 'booking marketplace',
+        ];
 
-        if ($hasOrders || $hasShipments) {
+        $historyLabel = null;
+        foreach ($protectedTables as $table => $label) {
+            if (Schema::hasTable($table)
+                && Schema::hasColumn($table, 'store_id')
+                && DB::table($table)->where('store_id', $store->id)->exists()) {
+                $historyLabel = $label;
+                break;
+            }
+        }
+
+        if ($historyLabel) {
             return response()->json([
-                'message' => 'Toko ini tidak dapat dihapus karena sudah memiliki riwayat pesanan (orders) atau pengiriman (shipments). Untuk menjaga integritas data akuntansi dan riwayat, sistem menolak penghapusan ini.'
+                'message' => "Toko ini tidak dapat dihapus karena sudah memiliki {$historyLabel}. Nonaktifkan toko jika tidak ingin dipakai lagi."
             ], 422);
         }
 
         try {
             \Illuminate\Support\Facades\DB::transaction(function () use ($store) {
                 // Hanya membersihkan data log yang tidak berdampak pada transaksi utama
-                \Illuminate\Support\Facades\DB::table('marketplace_sync_logs')->where('store_id', $store->id)->delete();
+                DB::table('marketplace_sync_logs')->where('store_id', $store->id)->delete();
                 $store->delete();
             });
 

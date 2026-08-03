@@ -84,6 +84,65 @@
         grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
         gap: 1.25rem;
     }
+    .platform-tabs {
+        display: flex;
+        gap: .5rem;
+        overflow-x: auto;
+        padding: .25rem .1rem .65rem;
+        margin-bottom: .9rem;
+        scrollbar-width: thin;
+    }
+    .platform-tabs:empty { display: none; }
+    .store-tab {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        min-height: 38px;
+        max-width: 230px;
+        padding: .45rem .75rem;
+        border: 1px solid var(--shp-border-strong);
+        border-radius: 9px;
+        background: var(--card, #fff);
+        color: #64748b;
+        font-size: .78rem;
+        font-weight: 700;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all .18s ease;
+    }
+    .store-tab:hover { color: var(--shp-accent); border-color: rgba(51,65,85,.55); }
+    .store-tab.is-active {
+        background: var(--shp-accent);
+        border-color: var(--shp-accent);
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(51,65,85,.14);
+    }
+    .store-tab-label { overflow: hidden; text-overflow: ellipsis; }
+    .store-tab-count {
+        min-width: 20px;
+        padding: .1rem .35rem;
+        border-radius: 999px;
+        background: rgba(148,163,184,.14);
+        font-size: .65rem;
+        text-align: center;
+    }
+    .store-tab.is-active .store-tab-count { background: rgba(255,255,255,.18); }
+    .store-tab-icon {
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 6px;
+        background: rgba(148,163,184,.12);
+    }
+    .store-tab-icon .platform-icon { width: 100%; height: 100%; object-fit: contain; }
+    .store-tab-icon .platform-logo-fallback { width: 18px; height: 18px; border-radius: 5px; font-size: .65rem; }
+    body[data-theme="dark"] .store-tab { background: var(--card, #0f172a); color: #94a3b8; }
+    body[data-theme="dark"] .store-tab:hover { color: #f8fafc; }
+    body[data-theme="dark"] .store-tab.is-active { background: #334155; border-color: #475569; color: #fff; }
     .store-card {
         background: var(--card, #ffffff);
         border: 1px solid var(--shp-border);
@@ -122,15 +181,37 @@
         gap: 0.75rem;
     }
     .store-brand-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
-        object-fit: contain;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 10px;
         background: #f8fafc;
-        padding: 4px;
+        padding: 6px;
         border: 1px solid rgba(148,163,184,.15);
     }
     body[data-theme="dark"] .store-brand-icon { background: rgba(255,255,255,0.05); }
+    .store-brand-icon .platform-icon {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center;
+    }
+    .platform-logo-fallback {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: #fff;
+        font-size: .95rem;
+    }
+    .platform-logo-shopee { background: #ee4d2d; }
+    .platform-logo-tiktok { background: #111827; }
+    .platform-logo-generic { background: #64748b; }
     .store-title-wrap {
         display: flex;
         flex-direction: column;
@@ -333,11 +414,32 @@
     body[data-theme="dark"] .summary-label { color: #cbd5e1; }
     .summary-stats { display: flex; gap: 1.5rem; }
     .summary-stat-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; }
+
+    @media (max-width: 575.98px) {
+        .page-wrap { padding-inline: .55rem; }
+        .ship-topbar { align-items: flex-start; padding-inline: .55rem; margin-inline: -.55rem; }
+        .ship-topbar > div:first-child { width: 100%; }
+        .controls { width: 100%; gap: .35rem; }
+        .controls > .btn,
+        .controls > a { flex: 1 1 calc(50% - .35rem); min-width: 0; text-align: center; }
+        .grid-stores { grid-template-columns: minmax(0, 1fr); gap: .8rem; }
+        .store-card { padding: .9rem; }
+        .store-actions .action-row { flex-wrap: wrap; }
+        .store-actions .btn-action-primary,
+        .store-actions .btn-action-secondary,
+        .store-actions a { min-width: 0; }
+        .summary-bar { align-items: flex-start; padding: .85rem; }
+        .summary-stats { flex-wrap: wrap; gap: .65rem .9rem; }
+    }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 @endpush
 
 @section('content')
+@php
+    $canImport = auth()->check() && auth()->user()->canAccessModule('imports');
+    $importCreateUrl = route('imports.marketplace.create');
+@endphp
 <div class="page-wrap">
 
     <div class="ship-topbar">
@@ -351,6 +453,14 @@
         </div>
 
         <div class="controls">
+            <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="openStoreForm()">
+                <i class="bi bi-plus-circle"></i> Tambah Toko
+            </button>
+            @if($canImport)
+                <a href="{{ $importCreateUrl }}" class="btn btn-sm btn-ship-primary btn-pill">
+                    <i class="bi bi-upload"></i> Import Shipment
+                </a>
+            @endif
             <button type="button" class="btn btn-sm btn-ship-outline btn-pill" onclick="openWebhookLogs()" style="border-color:#e2e8f0;">
                 <i class="bi bi-file-earmark-code"></i> Log Webhook
             </button>
@@ -371,6 +481,8 @@
         </div>
     </div>
 
+    <div id="platformTabs" class="platform-tabs" role="tablist" aria-label="Pilih platform marketplace"></div>
+
     <div id="storeBody" class="grid-stores">
         <div class="empty-state"><div class="spinner-border text-primary"></div><div class="mt-3">Memuat data toko...</div></div>
     </div>
@@ -383,6 +495,52 @@
 </div>
 
 {{-- Modal & Skrip pendukung lainnya disembunyikan untuk kerapihan, tapi tetap berjalan --}}
+<div class="modal fade" id="storeFormModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" onsubmit="submitStoreForm(event)">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="modal-title fw-bold" id="storeFormTitle">Tambah Toko</h5>
+                    <div class="text-muted small" id="storeFormSubtitle">Daftarkan toko marketplace sebelum menghubungkan akun API.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <div id="storeFormAlert" class="alert d-none py-2 small"></div>
+                <input type="hidden" id="storeFormId">
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Channel</label>
+                    <select class="form-select" id="storeFormChannel" required></select>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label small fw-semibold">Nama Toko</label>
+                        <input class="form-control" id="storeFormName" maxlength="120" required placeholder="Contoh: Shopee GFID">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold">Kode Toko <span class="text-muted fw-normal">(opsional)</span></label>
+                        <input class="form-control" id="storeFormCode" maxlength="80" placeholder="Otomatis jika kosong">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Region <span class="text-muted fw-normal">(opsional)</span></label>
+                        <input class="form-control" id="storeFormRegion" maxlength="32" placeholder="Contoh: ID">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Gudang Default <span class="text-muted fw-normal">(opsional)</span></label>
+                        <select class="form-select" id="storeFormWarehouse"></select>
+                    </div>
+                </div>
+                <div class="form-text mt-3">Toko baru dibuat dalam status belum terhubung. Gunakan menu <strong>Otorisasi Ulang</strong> untuk menghubungkan Shopee/TikTok.</div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-ship-outline btn-pill btn-sm" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-ship-primary btn-pill btn-sm" id="storeFormSubmit">Simpan Toko</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="modal fade" id="syncModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width:350px">
         <div class="modal-content" style="border-radius:12px">
@@ -518,16 +676,19 @@
 (function () {
     const { api, fmt, fmtDate, esc, channelPill, statusBadge } = window.mpHelpers;
     let channels = [], stores = [], warehouses = [], storeStats = {};
+    let activePlatformTab = 'shopee';
     let syncStoreId = null, syncStoreName = '';
+    const canImport = @json($canImport);
+    const importCreateUrl = @json($importCreateUrl);
     const $ = id => document.getElementById(id);
 
     // ── Icons for Platform ────────────────────────────────────────────────
     const platformIcon = (channelCode) => {
-        if (!channelCode) return '';
+        if (!channelCode) return '<span class="platform-logo-fallback platform-logo-generic" title="Marketplace"><i class="bi bi-shop"></i></span>';
         const c = channelCode.toUpperCase();
-        if (c === 'SHP' || c === 'SHOPEE') return `<img src="https://logodownload.org/wp-content/uploads/2021/03/shopee-logo-0.png" class="platform-icon" title="Shopee">`;
-        if (c === 'TKT' || c === 'TIKTOK') return `<img src="https://cdn4.iconfinder.com/data/icons/social-media-flat-7/64/Social-media_Tiktok-512.png" class="platform-icon" title="TikTok Shop">`;
-        return `<span class="badge bg-secondary" style="font-size:.65rem">${esc(c)}</span>`;
+        if (c === 'SHP' || c === 'SHOPEE') return `<img src="https://logodownload.org/wp-content/uploads/2021/03/shopee-logo-0.png" class="platform-icon" title="Shopee" alt="Shopee" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.classList.remove('d-none')"><span class="platform-logo-fallback platform-logo-shopee d-none" title="Shopee"><i class="bi bi-bag-fill"></i></span>`;
+        if (c === 'TTK' || c === 'TKT' || c === 'TIKTOK' || c === 'TIKTOK SHOP') return `<img src="https://cdn4.iconfinder.com/data/icons/social-media-flat-7/64/Social-media_Tiktok-512.png" class="platform-icon" title="TikTok Shop" alt="TikTok Shop" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.classList.remove('d-none')"><span class="platform-logo-fallback platform-logo-tiktok d-none" title="TikTok Shop"><i class="bi bi-music-note-beamed"></i></span>`;
+        return `<span class="platform-logo-fallback platform-logo-generic" title="${esc(c)}"><i class="bi bi-shop"></i></span>`;
     };
 
     const fmtShortDate = dStr => {
@@ -539,19 +700,85 @@
     };
 
     async function loadAll() {
-        $('storeBody').innerHTML = `<tr><td colspan="8" class="empty"><div class="spinner-border spinner-border-sm text-secondary me-2"></div> Memuat toko...</td></tr>`;
+        $('storeBody').innerHTML = `<div class="empty-state"><div class="spinner-border spinner-border-sm text-secondary"></div><div class="mt-3">Memuat toko...</div></div>`;
         const [cRes, sRes, wRes, statRes] = await Promise.allSettled([
             api('/api/marketplace/channels'),
             api('/api/marketplace/stores'),
             api('/api/marketplace/warehouses'),
             api('/api/marketplace/stores-summary'),
         ]);
-        channels   = cRes.value   || [];
-        stores     = sRes.value   || [];
-        warehouses = wRes.value   || [];
-        storeStats = statRes.value || {};
+        if (sRes.status !== 'fulfilled') {
+            $('storeBody').innerHTML = `<div class="empty-state"><i class="bi bi-cloud-slash"></i><div>Data toko gagal dimuat.</div><button type="button" class="btn btn-ship-primary btn-pill btn-sm mt-3" onclick="loadAll()"><i class="bi bi-arrow-clockwise me-1"></i>Coba Lagi</button></div>`;
+            $('platformTabs').innerHTML = '';
+            $('storeSummary').style.display = 'none';
+            return;
+        }
+        channels   = cRes.status === 'fulfilled' ? (cRes.value || []) : [];
+        stores     = sRes.value || [];
+        warehouses = wRes.status === 'fulfilled' ? (wRes.value || []) : [];
+        storeStats = statRes.status === 'fulfilled' ? (statRes.value || {}) : {};
+        populateStoreFormOptions();
         renderKpi();
         renderStoreCards();
+    }
+
+    function storePlatformKey(store) {
+        const code = String(store?.channel?.code || '').toUpperCase();
+        if (['SHP', 'SHOPEE'].includes(code)) return 'shopee';
+        if (['TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP'].includes(code)) return 'tiktok';
+        return 'other';
+    }
+
+    function renderPlatformTabs() {
+        const tabs = $('platformTabs');
+        if (!stores.length) {
+            tabs.innerHTML = '';
+            return;
+        }
+
+        const counts = stores.reduce((result, store) => {
+            const key = storePlatformKey(store);
+            result[key] = (result[key] || 0) + 1;
+            return result;
+        }, { shopee: 0, tiktok: 0, other: 0 });
+        const platformTabs = [
+            { key: 'shopee', label: 'Shopee', icon: platformIcon('SHP') },
+            { key: 'tiktok', label: 'TikTok Shop', icon: platformIcon('TTK') },
+        ].filter(tab => counts[tab.key] > 0);
+        if (counts.other > 0) {
+            platformTabs.push({ key: 'other', label: 'Lainnya', icon: '<i class="bi bi-shop"></i>' });
+        }
+
+        if (!platformTabs.some(tab => tab.key === activePlatformTab)) {
+            activePlatformTab = platformTabs[0]?.key || 'shopee';
+        }
+
+        tabs.innerHTML = platformTabs.map(tab => `<button type="button" class="store-tab ${activePlatformTab === tab.key ? 'is-active' : ''}" role="tab" aria-selected="${activePlatformTab === tab.key}" onclick="selectPlatformTab('${tab.key}')">
+            <span class="store-tab-icon">${tab.icon}</span>
+            <span class="store-tab-label">${tab.label}</span>
+            <span class="store-tab-count">${counts[tab.key] || 0}</span>
+        </button>`).join('');
+    }
+
+    window.selectPlatformTab = function (platform) {
+        activePlatformTab = String(platform || 'shopee');
+        renderStoreCards();
+    };
+
+    function populateStoreFormOptions() {
+        const channelSelect = $('storeFormChannel');
+        const warehouseSelect = $('storeFormWarehouse');
+        if (channelSelect) {
+            channelSelect.innerHTML = '<option value="">— pilih channel —</option>' + channels
+                .filter(ch => String(ch.status || 'active').toLowerCase() !== 'inactive')
+                .map(ch => `<option value="${ch.id}">${esc(ch.name || ch.code || 'Channel')}</option>`)
+                .join('');
+        }
+        if (warehouseSelect) {
+            warehouseSelect.innerHTML = '<option value="">— tanpa gudang default —</option>' + warehouses
+                .map(wh => `<option value="${wh.id}">${esc(wh.code ? `${wh.code} — ${wh.name}` : wh.name)}</option>`)
+                .join('');
+        }
     }
 
     function renderKpi() {
@@ -564,8 +791,18 @@
     function renderStoreCards() {
         const body = $('storeBody');
         const summary = $('storeSummary');
+        renderPlatformTabs();
         if (!stores.length) {
-            body.innerHTML = `<div class="empty-state"><i class="bi bi-inboxes"></i><div>Belum ada toko yang terhubung.</div></div>`;
+            body.innerHTML = `<div class="empty-state"><i class="bi bi-inboxes"></i><div>Belum ada toko terdaftar.</div><div class="small mt-2">Tambahkan toko baru atau hubungkan toko marketplace dari tombol di atas.</div></div>`;
+            summary.style.display = 'none';
+            return;
+        }
+
+        const visibleStores = stores.filter(store => storePlatformKey(store) === activePlatformTab);
+
+        if (!visibleStores.length) {
+            const platformName = activePlatformTab === 'shopee' ? 'Shopee' : 'TikTok Shop';
+            body.innerHTML = `<div class="empty-state"><i class="bi bi-shop"></i><div>Belum ada toko ${platformName}.</div><div class="small mt-2">Tambahkan atau hubungkan toko ${platformName} dari tombol di atas.</div></div>`;
             summary.style.display = 'none';
             return;
         }
@@ -574,7 +811,7 @@
         let totalUnfulfil = 0;
         let totalIssues = 0;
 
-        body.innerHTML = stores.map((s, idx) => {
+        body.innerHTML = visibleStores.map((s, idx) => {
             const stats = storeStats[String(s.id)] || {};
             const issues    = stats.issues    || 0;
             const orders    = stats.orders_today || 0;
@@ -595,7 +832,14 @@
             if (inactive) { statusClass = 'st-inactive'; statusLabel = 'Nonaktif'; }
 
             const channelCode = s.channel ? (s.channel.code || '').toUpperCase() : '';
-            const connectUrl = `/marketplace/${channelCode === 'TKT' || channelCode === 'TIKTOK' ? 'tiktok' : 'shopee'}/connect?store_id=${s.id}`;
+            const isShopee = ['SHP', 'SHOPEE'].includes(channelCode);
+            const isTiktok = ['TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP'].includes(channelCode);
+            const connectUrl = isTiktok
+                ? `/marketplace/tiktok/connect?store_id=${s.id}`
+                : (isShopee ? `/marketplace/shopee/connect?store_id=${s.id}` : '');
+            const importUrl = canImport
+                ? `${importCreateUrl}?store_id=${encodeURIComponent(s.id)}&channel_id=${encodeURIComponent(s.channel_id || s.channel?.id || '')}`
+                : '';
             const isConn = s.connection_status === 'CONNECTED';
 
             return `
@@ -626,9 +870,11 @@
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/orders?store_id=${s.id}"><i class="bi bi-card-list me-2"></i>Semua Pesanan</a></li>
                             <li><a class="dropdown-item py-2 fw-semibold" href="/marketplace/fulfillment"><i class="bi bi-box-seam me-2"></i>Menu Packing</a></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="editStore(${s.id})"><i class="bi bi-pencil-square me-2"></i>Edit Toko</button></li>
+                            ${canImport ? `<li><a class="dropdown-item py-2 fw-semibold text-success" href="${importUrl}"><i class="bi bi-upload me-2"></i>Import File Shipment</a></li>` : ''}
                             <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="checkStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-info-square me-2"></i>Shop Info API</button></li>
-                            ${(channelCode === 'SHP' || channelCode === 'SHOPEE') ? `
+                            ${isShopee ? `
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'order_status_update')"><i class="bi bi-broadcast text-primary me-2"></i>Simulasi: Tes Order Baru</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'auth_expiry_push')"><i class="bi bi-broadcast text-warning me-2"></i>Simulasi: Token Expired (Push 12)</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
@@ -638,7 +884,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="checkBookingList(${s.id}, '${esc(s.name)}')"><i class="bi bi-list-check text-primary me-2"></i>Tes API: get_booking_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
-                            <li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>
+                            ${connectUrl ? `<li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>` : ''}
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-secondary me-2"></i>Putuskan Koneksi</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="toggleActive(${s.id})"><i class="bi bi-power ${inactive ? 'text-success' : 'text-secondary'} me-2"></i>${inactive ? 'Aktifkan Toko' : 'Nonaktifkan Toko (sembunyikan peringatan)'}</button></li>
                             <li><hr class="dropdown-divider"></li>
@@ -652,7 +898,7 @@
                     ${inactive
                         ? `<button class="btn btn-sm btn-outline-success" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan Toko</button>`
                         : `<span style="display:flex; gap:.35rem; align-items:center;">
-                             <a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>
+                             ${connectUrl ? `<a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>` : ''}
                              <button class="btn btn-sm btn-outline-secondary" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})" title="Sembunyikan dari peringatan koneksi"><i class="bi bi-power"></i> Nonaktifkan</button>
                            </span>`}
                 </div>
@@ -685,6 +931,11 @@
                         }
                         <a href="/marketplace/orders?store_id=${s.id}" class="btn-action-secondary"><i class="bi bi-receipt"></i> Kelola</a>
                     </div>
+                    ${canImport ? `
+                    <div class="action-row">
+                        <a href="${importUrl}" class="btn-action-secondary"><i class="bi bi-upload"></i> Import File</a>
+                    </div>
+                    ` : ''}
                 </div>
 
                 <div class="store-footer">
@@ -1050,6 +1301,87 @@
         }
     };
 
+    window.openStoreForm = function (storeId = null) {
+        populateStoreFormOptions();
+
+        const store = storeId ? stores.find(item => Number(item.id) === Number(storeId)) : null;
+        const isEdit = Boolean(store);
+        $('storeFormId').value = store?.id || '';
+        $('storeFormTitle').textContent = isEdit ? 'Edit Toko' : 'Tambah Toko';
+        $('storeFormSubtitle').textContent = isEdit
+            ? 'Perbarui informasi operasional toko. Channel dan kode tidak diubah agar relasi data tetap aman.'
+            : 'Daftarkan toko marketplace sebelum menghubungkan akun API.';
+        $('storeFormChannel').value = store?.channel_id || store?.channel?.id || '';
+        $('storeFormChannel').disabled = isEdit;
+        $('storeFormName').value = store?.name || '';
+        $('storeFormCode').value = store?.code || '';
+        $('storeFormCode').disabled = isEdit;
+        $('storeFormRegion').value = store?.region || '';
+        $('storeFormWarehouse').value = store?.default_warehouse_id || '';
+        $('storeFormAlert').className = 'alert d-none py-2 small';
+        $('storeFormAlert').textContent = '';
+        $('storeFormSubmit').textContent = isEdit ? 'Simpan Perubahan' : 'Simpan Toko';
+        $('storeFormModal').dataset.mode = isEdit ? 'edit' : 'create';
+
+        new bootstrap.Modal($('storeFormModal')).show();
+    };
+
+    window.editStore = function (storeId) {
+        window.openStoreForm(storeId);
+    };
+
+    window.submitStoreForm = async function (event) {
+        event.preventDefault();
+
+        const modal = $('storeFormModal');
+        const id = $('storeFormId').value;
+        const isEdit = modal.dataset.mode === 'edit';
+        const name = $('storeFormName').value.trim();
+        const alertEl = $('storeFormAlert');
+        const submitBtn = $('storeFormSubmit');
+
+        if (!name) {
+            alertEl.className = 'alert alert-danger py-2 small';
+            alertEl.textContent = 'Nama toko wajib diisi.';
+            return;
+        }
+
+        const payload = {
+            name,
+            region: $('storeFormRegion').value.trim() || null,
+            default_warehouse_id: $('storeFormWarehouse').value || null,
+        };
+
+        if (!isEdit) {
+            payload.channel_id = $('storeFormChannel').value;
+            payload.code = $('storeFormCode').value.trim() || null;
+            if (!payload.channel_id) {
+                alertEl.className = 'alert alert-danger py-2 small';
+                alertEl.textContent = 'Channel wajib dipilih.';
+                return;
+            }
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Menyimpan...';
+        alertEl.className = 'alert d-none py-2 small';
+
+        try {
+            await api(isEdit ? `/api/marketplace/stores/${id}` : '/api/marketplace/stores', {
+                method: isEdit ? 'PATCH' : 'POST',
+                body: JSON.stringify(payload),
+            });
+            bootstrap.Modal.getInstance(modal)?.hide();
+            await loadAll();
+        } catch (e) {
+            alertEl.className = 'alert alert-danger py-2 small';
+            alertEl.textContent = e.message || 'Gagal menyimpan toko.';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = isEdit ? 'Simpan Perubahan' : 'Simpan Toko';
+        }
+    };
+
     window.startRename = function (storeId) {
         document.getElementById('store-name-' + storeId).style.display = 'none';
         const row = document.getElementById('rename-inline-' + storeId);
@@ -1071,8 +1403,7 @@
                 method: 'PATCH',
                 body: JSON.stringify({ name }),
             });
-            document.getElementById('store-name-' + storeId).textContent = name;
-            cancelRename(storeId);
+            await loadAll();
         } catch (e) {
             alert('Gagal menyimpan nama: ' + e.message);
         }

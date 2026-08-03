@@ -8,7 +8,7 @@ use App\Models\Item;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
-use App\Models\MarketplaceStore;
+use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +19,8 @@ class MarketplaceOrderController extends Controller
 {
     public function index(Request $request)
     {
-        $stores = MarketplaceStore::with('channel')
+        $stores = Store::with('channel')
+            ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
@@ -324,7 +325,7 @@ class MarketplaceOrderController extends Controller
 
     public function create()
     {
-        $stores = MarketplaceStore::with('channel')
+        $stores = Store::with('channel')
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
@@ -340,7 +341,7 @@ class MarketplaceOrderController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'store_id' => ['required', 'exists:marketplace_stores,id'],
+            'store_id' => ['required', 'exists:stores,id'],
             'external_order_id' => ['required', 'string', 'max:100'],
             'external_invoice_no' => ['nullable', 'string', 'max:100'],
             'order_date' => ['required', 'date'],
@@ -587,162 +588,110 @@ class MarketplaceOrderController extends Controller
     {
         $month = (string) $request->get('month', now()->format('Y-m'));
         $channel = (string) $request->get('channel', 'shopee');
-        $dateField = (string) $request->get('date_field', 'shipped_at');
+        $dateField = (string) $request->get('date_field', 'ordered_at');
         $storeId = (int) $request->get('store_id', 0);
         $qItem = trim((string) $request->get('q_item', ''));
 
         $start = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth()->startOfDay();
         $end = (clone $start)->addMonth(); // [start, end)
 
-        $allowed = ['shipped_at', 'paid_at', 'order_created_at', 'completed_at', 'delivered_at'];
+        $allowed = ['ordered_at', 'paid_at', 'shipped_at', 'delivered_at', 'completed_at', 'settlement_time'];
         if (!in_array($dateField, $allowed, true)) {
-            $dateField = 'shipped_at';
+            $dateField = 'ordered_at';
         }
 
-        // =========================
-        // A) SUMMARY HEADER: mp_shipments
-        // =========================
-        $shipQ = DB::table('mp_shipments')
-            ->where('channel', $channel)
-            ->whereNotNull($dateField)
-            ->where($dateField, '>=', $start->toDateTimeString())
-            ->where($dateField, '<', $end->toDateTimeString());
+        $dateExpression = $dateField === 'settlement_time'
+            ? 's.settlement_time'
+            : 'o.' . $dateField;
 
-        if ($storeId > 0) {
-            $shipQ->where('store_id', $storeId);
-        }
+        $channelId = DB::table('channels')->where('code', $channel)->value('id');
 
-        $summary = $shipQ->selectRaw("
-        COUNT(*) as total_orders,
-        COALESCE(SUM(total_qty),0) as total_qty,
-        COALESCE(SUM(order_subtotal),0) as subtotal,
-        COALESCE(SUM(grand_total),0) as gross_sales,
-        COALESCE(SUM(discount_total),0) as discount_total,
-        COALESCE(SUM(shipping_fee),0) as shipping_fee,
-        COALESCE(SUM(platform_fee_total),0) as platform_fee,
-        COALESCE(SUM(refund_total),0) as refund_total,
-        COALESCE(SUM(net_payout_actual),0) as net_payout
-    ")->first();
+        $itemTotals = DB::table('marketplace_order_items as oi')
+            ->selectRaw('oi.marketplace_order_id as order_id, COALESCE(SUM(oi.qty), 0) as total_qty')
+            ->groupBy('oi.marketplace_order_id');
+
+        $base = DB::table('marketplace_orders as o')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoinSub($itemTotals, 'itot', 'itot.order_id', '=', 'o.id')
+            ->whereNotNull($dateExpression)
+            ->where($dateExpression, '>=', $start->toDateTimeString())
+            ->where($dateExpression, '<', $end->toDateTimeString())
+            ->when($channelId, fn ($q) => $q->where('st.channel_id', $channelId))
+            ->when($storeId > 0, fn ($q) => $q->where('o.store_id', $storeId));
+
+        $productSalesExpr = 'CASE WHEN COALESCE(o.subtotal_items, 0) > 0 THEN o.subtotal_items ELSE COALESCE(o.total_amount, 0) END';
+        $shippingExpr = 'COALESCE(o.shipping_fee_customer, 0)';
+        $platformFeeExpr = 'COALESCE(s.commission_fee, 0) + COALESCE(s.service_fee, 0) + COALESCE(s.transaction_fee, 0) + COALESCE(s.affiliate_fee, 0) + COALESCE(s.activity_fee, 0) + COALESCE(s.shipping_insurance_fee, 0) + COALESCE(s.escrow_tax, 0)';
+        $refundExpr = 'COALESCE(s.drc_adjustable_refund, 0)';
+
+        $summary = (clone $base)
+            ->selectRaw('COUNT(DISTINCT o.id) as total_orders')
+            ->selectRaw('COALESCE(SUM(COALESCE(itot.total_qty, 0)), 0) as total_qty')
+            ->selectRaw("COALESCE(SUM({$productSalesExpr}), 0) as subtotal")
+            ->selectRaw("COALESCE(SUM({$productSalesExpr} + {$shippingExpr}), 0) as gross_sales")
+            ->selectRaw('COALESCE(SUM(COALESCE(o.voucher_discount, 0) + COALESCE(o.other_discount, 0)), 0) as discount_total')
+            ->selectRaw("COALESCE(SUM({$shippingExpr}), 0) as shipping_fee")
+            ->selectRaw("COALESCE(SUM({$platformFeeExpr}), 0) as platform_fee")
+            ->selectRaw("COALESCE(SUM({$refundExpr}), 0) as refund_total")
+            ->selectRaw('COALESCE(SUM(COALESCE(s.final_income, 0)), 0) as net_payout')
+            ->first();
 
         $summary->aov = ((int) $summary->total_orders) > 0
         ? ((float) $summary->gross_sales / (int) $summary->total_orders)
         : 0;
 
-        // =========================
-        // B) SUBQUERY QTY: mp_packet_items -> JOIN items + categories
-        //    qty REAL (SKU parent)
-        // =========================
-        $qtySub = DB::table('mp_packet_items as p')
-            ->join('mp_shipments as s', function ($join) {
-                $join->on('s.id', '=', DB::raw('CAST(p.mp_shipment_id AS INTEGER)'));
-            })
-            ->leftJoin('items as it', 'it.code', '=', 'p.sku')
+        $itemDateExpression = $dateField === 'settlement_time' ? 's.settlement_time' : 'o.' . $dateField;
+        $skuExpression = "COALESCE(NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.item_sku, ''), NULLIF(oi.external_sku, ''))";
+        $lineSalesExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) ELSE 0 END';
+
+        $itemBase = DB::table('marketplace_order_items as oi')
+            ->join('marketplace_orders as o', 'o.id', '=', 'oi.marketplace_order_id')
+            ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('items as it', 'it.id', '=', 'oi.internal_item_id')
             ->leftJoin('item_categories as ic', 'ic.id', '=', 'it.item_category_id')
-            ->where('p.channel', $channel)
-            ->where('s.channel', $channel)
-            ->whereNotNull("s.$dateField")
-            ->where("s.$dateField", '>=', $start->toDateTimeString())
-            ->where("s.$dateField", '<', $end->toDateTimeString());
-
-        if ($storeId > 0) {
-            $qtySub->where('s.store_id', $storeId);
-        }
-
-        if ($qItem !== '') {
-            $qtySub->where(function ($w) use ($qItem) {
-                $w->where('p.sku', 'like', "%{$qItem}%")
-                    ->orWhere('p.name', 'like', "%{$qItem}%")
-                    ->orWhere('it.name', 'like', "%{$qItem}%")
-                    ->orWhere('ic.name', 'like', "%{$qItem}%");
+            ->whereNotNull($itemDateExpression)
+            ->where($itemDateExpression, '>=', $start->toDateTimeString())
+            ->where($itemDateExpression, '<', $end->toDateTimeString())
+            ->when($channelId, fn ($q) => $q->where('st.channel_id', $channelId))
+            ->when($storeId > 0, fn ($q) => $q->where('o.store_id', $storeId))
+            ->when($qItem !== '', function ($q) use ($qItem, $skuExpression) {
+                $q->where(function ($w) use ($qItem, $skuExpression) {
+                    $w->whereRaw("{$skuExpression} LIKE ?", ["%{$qItem}%"])
+                        ->orWhere('oi.item_name', 'like', "%{$qItem}%")
+                        ->orWhere('oi.variant_name', 'like', "%{$qItem}%")
+                        ->orWhere('it.name', 'like', "%{$qItem}%")
+                        ->orWhere('ic.name', 'like', "%{$qItem}%");
+                });
             });
-        }
 
-        $qtySub->groupBy('p.sku')->selectRaw("
-        p.sku as sku,
-        COALESCE(MAX(p.name),'') as mp_name,
+        $itemRows = (clone $itemBase)
+            ->groupBy(DB::raw($skuExpression), 'it.id', 'it.code', 'it.name', 'ic.code', 'ic.name')
+            ->selectRaw("{$skuExpression} as sku")
+            ->selectRaw("COALESCE(MAX(oi.item_name), {$skuExpression}) as name")
+            ->selectRaw('MAX(it.id) as item_id, MAX(it.code) as item_code, MAX(it.name) as item_name')
+            ->selectRaw("MAX(ic.code) as category_code, MAX(ic.name) as category_name")
+            ->selectRaw('COALESCE(SUM(oi.qty), 0) as qty')
+            ->selectRaw("COALESCE(SUM({$lineSalesExpression}), 0) as sales")
+            ->selectRaw("ROUND(1.0 * COALESCE(SUM({$lineSalesExpression}), 0) / NULLIF(SUM(oi.qty), 0), 2) as avg_price");
 
-        MAX(it.id) as item_id,
-        MAX(it.code) as item_code,
-        MAX(it.name) as item_name,
-
-        MAX(ic.code) as category_code,
-        MAX(ic.name) as category_name,
-
-        COALESCE(SUM(p.qty),0) as qty
-    ");
-
-        // =========================
-        // C) SUBQUERY SALES: mp_shipment_items (subtotal) -> normalize sku_code
-        // =========================
-        $skuNormExpr = "CASE
-        WHEN instr(si.sku_code,'-') > 0 THEN substr(si.sku_code, 1, instr(si.sku_code,'-')-1)
-        ELSE si.sku_code
-    END";
-
-        $salesSub = DB::table('mp_shipment_items as si')
-            ->join('mp_shipments as s', 's.id', '=', 'si.mp_shipment_id')
-            ->where('s.channel', $channel)
-            ->whereNotNull("s.$dateField")
-            ->where("s.$dateField", '>=', $start->toDateTimeString())
-            ->where("s.$dateField", '<', $end->toDateTimeString());
-
-        if ($storeId > 0) {
-            $salesSub->where('s.store_id', $storeId);
-        }
-
-        if ($qItem !== '') {
-            $salesSub->where(function ($w) use ($qItem) {
-                $w->where('si.sku_code', 'like', "%{$qItem}%")
-                    ->orWhere('si.product_name', 'like', "%{$qItem}%")
-                    ->orWhere('si.variant_name', 'like', "%{$qItem}%");
-            });
-        }
-
-        $salesSub->groupBy(DB::raw("($skuNormExpr)"))
-            ->selectRaw("
-            ($skuNormExpr) as sku,
-            COALESCE(SUM(si.subtotal),0) as sales
-        ");
-
-        // =========================
-        // D) ITEMS LIST: join qtySub + salesSub
-        // =========================
-        $items = DB::query()
-            ->fromSub($qtySub, 'q')
-            ->leftJoinSub($salesSub, 'x', 'x.sku', '=', 'q.sku')
-            ->selectRaw("
-            q.sku,
-            COALESCE(q.item_name, q.mp_name, q.sku) as name,
-            q.item_id,
-            q.item_code,
-            q.category_code,
-            q.category_name,
-            q.qty,
-            COALESCE(x.sales,0) as sales,
-            ROUND(1.0 * COALESCE(x.sales,0) / NULLIF(q.qty,0), 2) as avg_price
-        ")
+        $items = (clone $itemRows)
             ->orderByDesc('sales')
             ->paginate(50)
             ->withQueryString();
 
-        // =========================
-        // E) CATEGORY SUMMARY: group by category
-        // =========================
         $categories = DB::query()
-            ->fromSub($qtySub, 'q')
-            ->leftJoinSub($salesSub, 'x', 'x.sku', '=', 'q.sku')
-            ->selectRaw("
-            COALESCE(q.category_code, 'UNMAPPED') as category_code,
-            COALESCE(q.category_name, 'Unmapped') as category_name,
-            SUM(q.qty) as total_qty,
-            COALESCE(SUM(x.sales),0) as total_sales,
-            ROUND(1.0 * COALESCE(SUM(x.sales),0) / NULLIF(SUM(q.qty),0), 2) as avg_unit_price
-        ")
+            ->fromSub($itemRows, 'q')
+            ->selectRaw("COALESCE(q.category_code, 'UNMAPPED') as category_code")
+            ->selectRaw("COALESCE(q.category_name, 'Unmapped') as category_name")
+            ->selectRaw('SUM(q.qty) as total_qty, COALESCE(SUM(q.sales), 0) as total_sales')
+            ->selectRaw('ROUND(1.0 * COALESCE(SUM(q.sales), 0) / NULLIF(SUM(q.qty), 0), 2) as avg_unit_price')
             ->groupBy('category_code', 'category_name')
             ->orderByDesc('total_sales')
             ->get();
 
-        $stores = MarketplaceStore::with('channel')->orderBy('name')->get();
+        $stores = Store::with('channel')->where('is_active', true)->orderBy('name')->get();
 
         return view('marketplace.reports.sales_summary', compact(
             'month', 'channel', 'dateField', 'storeId',
@@ -756,38 +705,45 @@ class MarketplaceOrderController extends Controller
     {
         $month = (string) $request->get('month', now()->format('Y-m'));
         $channel = (string) $request->get('channel', 'shopee');
-        $dateField = (string) $request->get('date_field', 'shipped_at');
+        $dateField = (string) $request->get('date_field', 'ordered_at');
         $storeId = (int) $request->get('store_id', 0);
 
         $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->startOfDay();
         $end = (clone $start)->addMonth();
 
-        $allowed = ['shipped_at', 'paid_at', 'order_created_at', 'completed_at', 'delivered_at'];
+        $allowed = ['ordered_at', 'paid_at', 'shipped_at', 'delivered_at', 'completed_at', 'settlement_time'];
         if (!in_array($dateField, $allowed, true)) {
-            $dateField = 'shipped_at';
+            $dateField = 'ordered_at';
         }
 
-        $q = DB::table('mp_shipments')
-            ->where('channel', $channel)
-            ->whereNotNull($dateField)
-            ->where($dateField, '>=', $start->toDateTimeString())
-            ->where($dateField, '<', $end->toDateTimeString());
+        $dateExpression = $dateField === 'settlement_time' ? 's.settlement_time' : 'o.' . $dateField;
+        $channelId = DB::table('channels')->where('code', $channel)->value('id');
+        $itemTotals = DB::table('marketplace_order_items as oi')
+            ->selectRaw('oi.marketplace_order_id as order_id, COALESCE(SUM(oi.qty), 0) as total_qty')
+            ->groupBy('oi.marketplace_order_id');
 
-        if ($storeId > 0) {
-            $q->where('store_id', $storeId);
-        }
+        $productSalesExpr = 'CASE WHEN COALESCE(o.subtotal_items, 0) > 0 THEN o.subtotal_items ELSE COALESCE(o.total_amount, 0) END';
+        $platformFeeExpr = 'COALESCE(s.commission_fee, 0) + COALESCE(s.service_fee, 0) + COALESCE(s.transaction_fee, 0) + COALESCE(s.affiliate_fee, 0) + COALESCE(s.activity_fee, 0) + COALESCE(s.shipping_insurance_fee, 0) + COALESCE(s.escrow_tax, 0)';
+
+        $q = DB::table('marketplace_orders as o')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoinSub($itemTotals, 'itot', 'itot.order_id', '=', 'o.id')
+            ->whereNotNull($dateExpression)
+            ->where($dateExpression, '>=', $start->toDateTimeString())
+            ->where($dateExpression, '<', $end->toDateTimeString())
+            ->when($channelId, fn ($query) => $query->where('st.channel_id', $channelId))
+            ->when($storeId > 0, fn ($query) => $query->where('o.store_id', $storeId));
 
         // export harian (biar CSV berguna)
-        $rows = $q->selectRaw("
-        DATE($dateField) as day,
-        COUNT(*) as orders,
-        COALESCE(SUM(total_qty),0) as qty,
-        COALESCE(SUM(grand_total),0) as gross_sales,
-        COALESCE(SUM(platform_fee_total),0) as platform_fee,
-        COALESCE(SUM(refund_total),0) as refund_total,
-        COALESCE(SUM(net_payout_actual),0) as net_payout
-    ")
-            ->groupBy(DB::raw("DATE($dateField)"))
+        $rows = $q->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw('COUNT(DISTINCT o.id) as orders')
+            ->selectRaw('COALESCE(SUM(COALESCE(itot.total_qty, 0)), 0) as qty')
+            ->selectRaw("COALESCE(SUM({$productSalesExpr} + COALESCE(o.shipping_fee_customer, 0)), 0) as gross_sales")
+            ->selectRaw("COALESCE(SUM({$platformFeeExpr}), 0) as platform_fee")
+            ->selectRaw('COALESCE(SUM(COALESCE(s.drc_adjustable_refund, 0)), 0) as refund_total')
+            ->selectRaw('COALESCE(SUM(COALESCE(s.final_income, 0)), 0) as net_payout')
+            ->groupBy(DB::raw("DATE({$dateExpression})"))
             ->orderBy('day')
             ->cursor();
 

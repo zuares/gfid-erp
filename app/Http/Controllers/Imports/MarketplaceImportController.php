@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Imports;
 
 use App\Http\Controllers\Controller;
 use App\Models\Channel;
+use App\Models\MarketplaceImportBatch;
 use App\Models\MpShipment;
 use App\Models\Store;
 use App\Services\Marketplace\Export\MarketplaceExportService;
@@ -12,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -56,6 +58,10 @@ class MarketplaceImportController extends Controller
             'stores' => Store::select('id', 'name')->orderBy('name')->get(),
             'draft' => session('mp_import_preview'),
             'filters' => $filters,
+            'recentBatches' => MarketplaceImportBatch::with('store:id,name')
+                ->latest()
+                ->limit(8)
+                ->get(),
         ]);
     }
 
@@ -70,8 +76,21 @@ class MarketplaceImportController extends Controller
     /* ============================================================
      * CREATE
      * ============================================================ */
-    public function create(): View
+    public function create(Request $request): View
     {
+        $selectedStore = null;
+
+        if ($request->filled('store_id')) {
+            $selectedStore = Store::query()
+                ->select('id', 'name', 'channel_id')
+                ->where('is_active', 1)
+                ->find((int) $request->input('store_id'));
+        }
+
+        $selectedStoreId = $selectedStore?->id;
+        $selectedChannelId = $selectedStore?->channel_id
+            ?: ($request->filled('channel_id') ? (int) $request->input('channel_id') : null);
+
         return view('imports.marketplace.create', [
             'channels' => Channel::select('id', 'code', 'name')
                 ->where('is_active', 1)
@@ -82,6 +101,8 @@ class MarketplaceImportController extends Controller
                 ->orderBy('name')
                 ->get(),
             'draft' => session('mp_import_preview'),
+            'selectedChannelId' => $selectedChannelId,
+            'selectedStoreId' => $selectedStoreId,
         ]);
     }
 
@@ -126,6 +147,49 @@ class MarketplaceImportController extends Controller
 
         $res = $svc->import($channelKey, $abs, $storeId, $sourceFile, true);
 
+        $stats = is_array($res['stats'] ?? null) ? $res['stats'] : [];
+        $importErrors = is_array($res['import_errors'] ?? null) ? $res['import_errors'] : [];
+
+        // File yang lolos ekstensi tetapi tidak menghasilkan shipment tidak boleh
+        // diteruskan ke commit. Parser tetap mengembalikan preview agar user bisa
+        // melihat konteksnya, tetapi tombol commit harus dinonaktifkan.
+        if ((int) ($stats['shipments_parsed'] ?? 0) === 0) {
+            $importErrors[] = [
+                'key' => 'file',
+                'message' => 'Tidak ada shipment yang berhasil dibaca. Pastikan template dan header file sesuai channel yang dipilih.',
+            ];
+        }
+
+        $importErrors = array_values($importErrors);
+        $stats['warnings'] = array_values(array_unique(array_merge(
+            is_array($stats['warnings'] ?? null) ? $stats['warnings'] : [],
+            $importErrors ? ['File belum bisa di-commit sebelum error diperbaiki.'] : []
+        )));
+        $res['stats'] = $stats;
+        $res['import_errors'] = $importErrors;
+
+        $batchId = (string) data_get($res, 'stats.import_batch_id');
+        $fileHash = hash_file('sha256', $abs) ?: null;
+
+        MarketplaceImportBatch::updateOrCreate(
+            ['id' => $batchId],
+            [
+                'channel' => $channelKey,
+                'store_id' => $storeId,
+                'source_type' => 'import',
+                'source_file' => $sourceFile,
+                'file_hash' => $fileHash,
+                'status' => 'preview',
+                'total_rows' => (int) ($res['stats']['rows'] ?? $res['stats']['shipments_parsed'] ?? 0),
+                'shipments_parsed' => (int) ($res['stats']['shipments_parsed'] ?? 0),
+                'items_parsed' => (int) ($res['stats']['items_parsed'] ?? 0),
+                'warnings' => $res['stats']['warnings'] ?? [],
+                'errors' => $importErrors,
+                'error_count' => count($importErrors),
+                'created_by' => $request->user()?->id,
+            ]
+        );
+
         // ===== persist draft =====
         session([
             'mp_import_preview' => [
@@ -141,9 +205,11 @@ class MarketplaceImportController extends Controller
                 'store_name' => (string) $store->name,
 
                 'source_file' => $sourceFile,
+                'import_batch_id' => $batchId,
+                'file_hash' => $fileHash,
                 'preview' => array_slice($res['normalized'] ?? [], 0, 50),
                 'stats' => $res['stats'] ?? [],
-                'import_errors' => $res['import_errors'] ?? [],
+                'import_errors' => $importErrors,
             ],
         ]);
 
@@ -177,20 +243,92 @@ class MarketplaceImportController extends Controller
 
         $abs = Storage::disk($disk)->path($storedPath);
 
-        $res = $svc->import(
-            $channelKey,
-            $abs,
-            (int) ($draft['store_id'] ?? 0),
-            (string) ($draft['source_file'] ?? 'draft.xlsx'),
-            false
-        );
+        $batchId = (string) ($draft['import_batch_id'] ?? '');
+        $batch = $batchId !== '' ? MarketplaceImportBatch::find($batchId) : null;
+
+        if (!empty($draft['import_errors']) || (int) data_get($draft, 'stats.shipments_parsed', 0) === 0) {
+            $commitErrors = !empty($draft['import_errors'])
+                ? $draft['import_errors']
+                : [[
+                    'key' => 'file',
+                    'message' => 'Tidak ada shipment yang bisa di-commit.',
+                ]];
+
+            $batch?->update([
+                'status' => 'failed',
+                'errors' => $commitErrors,
+                'error_count' => count($commitErrors),
+                'completed_at' => now(),
+            ]);
+
+            return redirect()
+                ->route('imports.marketplace.create')
+                ->with('error', 'Import belum bisa di-commit. Perbaiki error pada preview atau upload file yang benar.');
+        }
+
+        if ($batch && in_array($batch->status, ['processing', 'completed'], true)) {
+            return redirect()
+                ->route('imports.marketplace.index')
+                ->with('error', 'Batch import ini sudah sedang atau pernah diproses.');
+        }
+
+        $commitLock = $batchId !== ''
+            ? Cache::lock('mp_import_commit:' . $batchId, 600)
+            : null;
+
+        if ($commitLock && !$commitLock->get()) {
+            return redirect()
+                ->route('imports.marketplace.index')
+                ->with('error', 'Import ini sedang diproses. Tunggu sampai selesai sebelum mencoba lagi.');
+        }
+
+        $batch?->update([
+            'status' => 'processing',
+            'started_at' => now(),
+        ]);
+
+        try {
+            $res = $svc->import(
+                $channelKey,
+                $abs,
+                (int) ($draft['store_id'] ?? 0),
+                (string) ($draft['source_file'] ?? 'draft.xlsx'),
+                false,
+                $batchId !== '' ? $batchId : null
+            );
+
+            $stats = $res['stats'] ?? [];
+            $batch?->update([
+                'status' => 'completed',
+                'shipments_parsed' => (int) ($stats['shipments_parsed'] ?? 0),
+                'items_parsed' => (int) ($stats['items_parsed'] ?? 0),
+                'inserted_shipments' => (int) ($stats['inserted_shipments'] ?? 0),
+                'updated_shipments' => (int) ($stats['updated_shipments'] ?? 0),
+                'inserted_items' => (int) ($stats['inserted_items'] ?? 0),
+                'warnings' => $stats['warnings'] ?? [],
+                'completed_at' => now(),
+            ]);
+
+            Storage::disk($disk)->delete($storedPath);
+        } catch (\Throwable $e) {
+            $batch?->update([
+                'status' => 'failed',
+                'errors' => [$e->getMessage()],
+                'error_count' => 1,
+                'completed_at' => now(),
+            ]);
+
+            throw $e;
+        } finally {
+            $commitLock?->release();
+        }
 
         // ✅ bust KPI cache so index updates immediately
         Cache::increment('mp_shipments:kpi:ver');
 
         session()->forget('mp_import_preview');
 
-        $rows = (int) ($res['stats']['rows'] ?? $draft['stats']['rows'] ?? 0);
+        $rows = (int) ($res['stats']['shipments_parsed'] ?? $draft['stats']['rows'] ?? 0);
 
         return redirect()
             ->route('imports.marketplace.index')
@@ -248,7 +386,8 @@ class MarketplaceImportController extends Controller
                 $abs,
                 (int) ($draft['store_id'] ?? 0),
                 (string) ($draft['source_file'] ?? 'draft.xlsx'),
-                true
+                true,
+                ! empty($draft['import_batch_id']) ? (string) $draft['import_batch_id'] : null
             );
 
             // normalize key untuk blade preview
@@ -281,6 +420,13 @@ class MarketplaceImportController extends Controller
     public function cancel(): RedirectResponse
     {
         if ($draft = session('mp_import_preview')) {
+            if (! empty($draft['import_batch_id'])) {
+                MarketplaceImportBatch::whereKey($draft['import_batch_id'])->update([
+                    'status' => 'cancelled',
+                    'completed_at' => now(),
+                ]);
+            }
+
             if (!empty($draft['disk']) && !empty($draft['stored_path'])) {
                 Storage::disk($draft['disk'])->delete($draft['stored_path']);
             }
@@ -291,6 +437,64 @@ class MarketplaceImportController extends Controller
         return redirect()
             ->route('imports.marketplace.create')
             ->with('success', 'Draft dibatalkan');
+    }
+
+    /* ============================================================
+     * DELETE IMPORT BATCH
+     * ============================================================ */
+    public function destroyBatch(MarketplaceImportBatch $batch): RedirectResponse
+    {
+        if (! in_array($batch->status, ['completed', 'failed'], true)) {
+            return redirect()
+                ->route('imports.marketplace.index')
+                ->with('error', 'Hanya import yang sudah selesai atau gagal yang bisa dihapus.');
+        }
+
+        // Batch dengan update tidak aman dihapus karena belum ada snapshot
+        // nilai sebelum import untuk melakukan rollback secara akurat.
+        if ((int) $batch->updated_shipments > 0) {
+            return redirect()
+                ->route('imports.marketplace.index')
+                ->with('error', 'Batch ini memperbarui shipment lama sehingga tidak bisa dihapus otomatis.');
+        }
+
+        $deleted = DB::transaction(function () use ($batch): array {
+            $shipmentIds = MpShipment::query()
+                ->where('import_batch_id', $batch->id)
+                ->pluck('id');
+
+            $packetShipmentIds = $shipmentIds
+                ->map(static fn ($id): string => (string) $id)
+                ->all();
+
+            $shipmentItems = DB::table('mp_shipment_items')
+                ->whereIn('mp_shipment_id', $shipmentIds)
+                ->delete();
+
+            $packetItems = DB::table('mp_packet_items')
+                ->whereIn('mp_shipment_id', $packetShipmentIds)
+                ->delete();
+
+            $reconciliations = DB::table('mp_reconciliations')
+                ->whereIn('mp_shipment_id', $shipmentIds)
+                ->delete();
+
+            $shipments = MpShipment::query()
+                ->whereIn('id', $shipmentIds)
+                ->delete();
+
+            $batches = MarketplaceImportBatch::query()
+                ->whereKey($batch->id)
+                ->delete();
+
+            return compact('shipments', 'shipmentItems', 'packetItems', 'reconciliations', 'batches');
+        });
+
+        Cache::increment('mp_shipments:kpi:ver');
+
+        return redirect()
+            ->route('imports.marketplace.index')
+            ->with('success', 'Import dihapus: ' . (int) $deleted['shipments'] . ' shipment.');
     }
 
     /* ============================================================

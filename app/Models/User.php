@@ -155,7 +155,7 @@ class User extends Authenticatable
                 'purchasing'  => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
                 'marketplace' => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
                 'accounting'  => ['on' => false, 'reason' => 'Admin tidak diizinkan mengakses modul ini.'],
-                'imports'     => ['on' => false, 'reason' => 'Admin tidak diizinkan mengakses modul ini.'],
+                'imports'     => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
             ],
             'nta' => [
                 'purchasing' => ['on' => true, 'reason' => 'NTA diberi akses ke modul pembelian.'],

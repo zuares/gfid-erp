@@ -34,6 +34,8 @@ Route::middleware(['web', 'auth', 'access:imports'])
             Route::post('preview', [MarketplaceImportController::class, 'preview'])->name('preview');
             Route::post('commit', [MarketplaceImportController::class, 'commit'])->name('commit');
             Route::post('cancel', [MarketplaceImportController::class, 'cancel'])->name('cancel');
+            Route::delete('batches/{batch}', [MarketplaceImportController::class, 'destroyBatch'])
+                ->name('batches.destroy');
 
             // detail import/draft (opsional)
             Route::get('{import}', [MarketplaceImportController::class, 'show'])
@@ -56,6 +58,7 @@ Route::middleware(['web', 'auth', 'access:imports'])
 
             // draft/session helpers
             Route::get('draft', [MarketplaceIncomeImportController::class, 'draft'])->name('draft');
+            Route::get('preview', [MarketplaceIncomeImportController::class, 'previewPage'])->name('preview_page');
 
             // actions
             Route::post('preview', [MarketplaceIncomeImportController::class, 'preview'])->name('preview');

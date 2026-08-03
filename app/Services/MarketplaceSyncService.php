@@ -14,6 +14,7 @@ use App\Models\MarketplaceSyncLog;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
@@ -39,6 +40,7 @@ class MarketplaceSyncService
         protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
         protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
+        protected MarketplaceFinancialDataQualityService $financialQuality = new MarketplaceFinancialDataQualityService(),
     ) {}
 
     /**
@@ -758,6 +760,10 @@ class MarketplaceSyncService
                     $order->update(['settlement_sync_last_attempt_at' => null]);
                 });
 
+                // Simpan status kesiapan finansial order secara eksplisit. Ini hanya
+                // penanda kualitas data; belum membuat jurnal accounting.
+                $this->financialQuality->refreshOrder($order->fresh());
+
                 $synced++;
                 if ($wasNew) {
                     $new++;
@@ -1239,13 +1245,15 @@ class MarketplaceSyncService
             return $this->nn($decimal);
         };
 
+        $quality = $this->financialQuality->assessSettlement($income);
+
         $values = [
             'store_id'   => $store->id,
             'order_id'   => $order->id,
 
             // Pembayaran customer (Subtotal Pesanan / Harga Produk yg diakui seller sbg gross)
             'buyer_payment_amount'  => $val('buyer_payment_amount', $this->decimalValue(
-                $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? $income['buyer_payment_amount'] ?? $income['order_selling_price'] ?? $income['cost_of_goods_sold'] ?? null
+                $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? $income['buyer_payment_amount'] ?? $income['order_selling_price'] ?? null
             )),
 
             // Fee marketplace
@@ -1287,6 +1295,11 @@ class MarketplaceSyncService
 
             'synced_at' => now(),
             'raw_json'  => $income, // murni payload Shopee, TANPA _meta
+            'data_status' => $quality['status'],
+            'data_quality_flags' => array_merge($quality['flags'], [
+                'source' => 'escrow_detail',
+            ]),
+            'data_checked_at' => now(),
         ];
 
         return [
@@ -2009,6 +2022,23 @@ class MarketplaceSyncService
                     ?? $detail['shipping_carrier']
                     ?? $detail['checkout_shipping_carrier']
                     ?? null;
+
+                // Canonical timeline. Tidak mengarang tanggal dari status; hanya
+                // menyimpan timestamp yang benar-benar dikirim API.
+                $eventDates = array_filter([
+                    'paid_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['pay_time'] ?? $detail['payment_time'] ?? $detail['paid_time'] ?? null
+                    ),
+                    'shipped_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['ship_time'] ?? $firstPkg['ship_time'] ?? $firstPkg['shipping_time'] ?? null
+                    ),
+                    'delivered_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['delivered_time'] ?? $firstPkg['delivered_time'] ?? null
+                    ),
+                    'completed_at' => $this->normalizeOrderEventTimestamp(
+                        $detail['completed_time'] ?? null
+                    ),
+                ], static fn ($value) => $value !== null);
                 
                 $logisticsStatus = $firstPkg['logistics_status'] ?? '';
                 
@@ -2115,6 +2145,7 @@ class MarketplaceSyncService
                         'booking_sn'        => $detail['booking_sn'] ?? null,
                         'order_date'        => $orderDate,
                         'ordered_at'        => $orderedAt,
+                        ...$eventDates,
 
                         // Status
                         'order_status'  => $orderStatus,
@@ -2191,11 +2222,28 @@ class MarketplaceSyncService
                             'order_id'             => $order->id,
                             'buyer_payment_amount' => $totalAmount,
                             'raw_json'             => ['seller_discount' => $calcSellerDiscount],
+                            'data_status'          => MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+                            'data_quality_flags'   => [
+                                'source' => 'order_detail_placeholder',
+                                'reason' => 'settlement_not_final',
+                            ],
+                            'data_checked_at'      => now(),
                         ]);
-                    } elseif ($settlement->settlement_time === null) {
+                    } elseif (
+                        $settlement->settlement_time === null
+                        && $settlement->data_status !== MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
+                        && ! array_key_exists('final_income', (array) $settlement->raw_json)
+                        && ! array_key_exists('escrow_amount', (array) $settlement->raw_json)
+                    ) {
                         $settlement->update([
                             'order_id'             => $order->id,
                             'buyer_payment_amount' => $totalAmount,
+                            'data_status'          => MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+                            'data_quality_flags'   => [
+                                'source' => 'order_detail_placeholder',
+                                'reason' => 'settlement_not_final',
+                            ],
+                            'data_checked_at'      => now(),
                             'raw_json'             => ['seller_discount' => $calcSellerDiscount],
                         ]);
                     }
@@ -2317,6 +2365,32 @@ class MarketplaceSyncService
         }
 
         return $outerStats;
+    }
+
+    private function normalizeOrderEventTimestamp(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value);
+        }
+
+        if (is_numeric($value)) {
+            $timestamp = (int) $value;
+            if ($timestamp <= 0) {
+                return null;
+            }
+
+            return Carbon::createFromTimestamp($timestamp, config('app.timezone'));
+        }
+
+        try {
+            return Carbon::parse((string) $value, config('app.timezone'));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function autoCreateFulfillments(Store $store): void

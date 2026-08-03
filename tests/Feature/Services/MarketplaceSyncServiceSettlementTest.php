@@ -47,14 +47,7 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->mirrorLegacyMarketplaceStore($this->store);
     }
 
-    /**
-     * marketplace_orders.store_id masih FK ke tabel legacy `marketplace_stores`
-     * (bukan `stores`) — split-brain skema yang sudah didokumentasikan di
-     * AUDIT_LANJUTAN_SYNC_SETTLEMENT.md dan sengaja TIDAK diperbaiki di Fase 1
-     * (di luar scope, keputusan user: "defer FK fix"). Baris ini murni supaya
-     * insert MarketplaceOrder di test lolos FK constraint yang SUDAH ADA di
-     * skema saat ini — tidak mengubah aplikasi/skema sama sekali.
-     */
+    /** Mirror legacy rows while the test exercises the canonical Store model. */
     private function mirrorLegacyMarketplaceStore(Store $store): void
     {
         $channelId = DB::table('marketplace_channels')->where('code', $this->shopee->code)->value('id');

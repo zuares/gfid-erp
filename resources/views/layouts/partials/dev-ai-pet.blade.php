@@ -732,7 +732,10 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.ok) {
                 const error = new Error(data.message || 'Gagal memproses permintaan.');
-                error.status = res.status || data.status || 0;
+                // Prefer status dari payload karena proxy/server bisa mengubah
+                // HTTP 429 provider menjadi 500 di sisi luar aplikasi.
+                error.status = Number(data.status) || res.status || 0;
+                error.code = data.error_code || '';
                 throw error;
             }
 
@@ -749,11 +752,22 @@
                 setOpen(true);
             }
         } catch (error) {
+            const quotaError = error.status === 429
+                || error.code === 'insufficient_quota'
+                || /kredit|credits|insufficient_quota|billing/i.test(error.message || '');
+            const friendlyMessage = quotaError
+                ? (markAuto
+                    ? 'Auto insight dinonaktifkan sementara karena kredit OpenAI habis atau billing belum aktif. Tambahkan kredit/API key di Pengaturan OpenAI untuk mengaktifkannya kembali.'
+                    : 'Layanan AI belum tersedia karena kredit OpenAI habis atau billing belum aktif. Tambahkan kredit/API key di Pengaturan OpenAI lalu coba lagi.')
+                : (error.message || 'Terjadi error saat memanggil AI.');
+
             if (!markAuto) {
-                pushMessage('ai', error.message || 'Terjadi error saat memanggil AI.');
+                pushMessage('ai', friendlyMessage);
             }
-            statusEl.textContent = error.message || 'Terjadi error.';
-            if (markAuto && error.status !== 429) {
+            statusEl.textContent = friendlyMessage;
+            if (markAuto && quotaError) {
+                saveSessionFlag(storageAutoInsightKey, 'unavailable');
+            } else if (markAuto) {
                 console.warn('Auto insight gagal:', error);
             }
         } finally {

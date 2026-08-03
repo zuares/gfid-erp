@@ -9,7 +9,6 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
-use App\Models\MarketplaceStore;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\Channels\Shopee\ShopeeChannel;
@@ -155,15 +154,6 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
     {
         $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWN']);
         $store = $this->createStore();
-        $marketplaceChannelId = DB::table('marketplace_channels')->where('code', $this->shopee->code)->value('id');
-        $marketplaceStore = MarketplaceStore::create([
-            'channel_id' => $marketplaceChannelId,
-            'external_store_id' => 'EXT-001',
-            'name' => 'Marketplace Test Store',
-            'short_code' => 'MKT-TEST',
-            'is_active' => true,
-        ]);
-
         MarketplaceOrderSettlement::create(['channel_order_id' => 'SN-001']);
         MarketplaceOrderSettlement::create(['channel_order_id' => 'SN-002']);
         MarketplaceSyncLog::create([
@@ -181,7 +171,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'payload' => ['found' => 2],
         ]);
         MarketplaceOrder::create([
-            'store_id' => $marketplaceStore->id,
+            'store_id' => $store->id,
             'channel_order_id' => 'ORD-001',
             'external_order_id' => 'ORD-001',
             'order_date' => now(),
