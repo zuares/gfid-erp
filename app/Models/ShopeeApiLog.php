@@ -8,6 +8,11 @@ class ShopeeApiLog extends Model
 {
     protected $table = 'shopee_api_logs';
 
+    public function getConnectionName()
+    {
+        return config('database.shopee_api_log_connection', 'sqlite');
+    }
+
     protected $fillable = [
         'method',
         'endpoint',

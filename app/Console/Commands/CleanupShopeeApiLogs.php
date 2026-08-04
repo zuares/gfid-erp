@@ -21,6 +21,8 @@ class CleanupShopeeApiLogs extends Command
     {
         $days = max(1, (int) $this->option('days'));
         $redactDays = max(0, (int) $this->option('redact-days'));
+        $connection = DB::connection(config('database.shopee_api_log_connection', 'sqlite'));
+        $schema = Schema::connection($connection->getName());
 
         if ($redactDays >= $days) {
             $this->error('--redact-days harus lebih kecil dari --days.');
@@ -28,7 +30,7 @@ class CleanupShopeeApiLogs extends Command
             return self::FAILURE;
         }
 
-        if (! Schema::hasTable('shopee_api_logs')) {
+        if (! $schema->hasTable('shopee_api_logs')) {
             $this->warn('Tabel shopee_api_logs belum tersedia; tidak ada yang diproses.');
 
             return self::SUCCESS;
@@ -41,8 +43,8 @@ class CleanupShopeeApiLogs extends Command
             return self::FAILURE;
         }
 
-        $driver = DB::connection()->getDriverName();
-        if ($driver === 'sqlite' && ! $this->sqliteIsHealthy()) {
+        $driver = $connection->getDriverName();
+        if ($driver === 'sqlite' && ! $this->sqliteIsHealthy($connection)) {
             $this->error('Database SQLite tidak sehat; cleanup dibatalkan. Backup/repair database terlebih dahulu.');
 
             return self::FAILURE;
@@ -50,14 +52,14 @@ class CleanupShopeeApiLogs extends Command
 
         $redactCutoff = now()->subDays($redactDays);
         $deleteCutoff = now()->subDays($days);
-        $payloadQuery = DB::table('shopee_api_logs')
+        $payloadQuery = $connection->table('shopee_api_logs')
             ->whereNotNull('created_at')
             ->where('created_at', '<', $redactCutoff)
             ->where(function ($query) {
                 $query->whereNotNull('request_payload')
                     ->orWhereNotNull('response_payload');
             });
-        $deleteQuery = DB::table('shopee_api_logs')
+        $deleteQuery = $connection->table('shopee_api_logs')
             ->whereNotNull('created_at')
             ->where('created_at', '<', $deleteCutoff);
 
@@ -84,11 +86,11 @@ class CleanupShopeeApiLogs extends Command
                 $this->warn('--vacuum hanya didukung untuk SQLite; dilewati.');
             } else {
                 $this->warn('Menjalankan VACUUM; database dapat terkunci sementara.');
-                DB::statement('VACUUM');
+                $connection->statement('VACUUM');
             }
         }
 
-        if ($driver === 'sqlite' && ! $this->sqliteIsHealthy()) {
+        if ($driver === 'sqlite' && ! $this->sqliteIsHealthy($connection)) {
             $this->error('Cleanup selesai tetapi pemeriksaan integritas akhir gagal. Hentikan worker dan pulihkan backup.');
 
             return self::FAILURE;
@@ -105,10 +107,10 @@ class CleanupShopeeApiLogs extends Command
         return self::SUCCESS;
     }
 
-    private function sqliteIsHealthy(): bool
+    private function sqliteIsHealthy($connection): bool
     {
         try {
-            return (DB::selectOne('PRAGMA quick_check')->quick_check ?? null) === 'ok';
+            return ($connection->selectOne('PRAGMA quick_check')->quick_check ?? null) === 'ok';
         } catch (\Throwable) {
             return false;
         }

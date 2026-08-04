@@ -18,6 +18,10 @@ return [
 
     'default' => env('DB_CONNECTION', 'sqlite'),
 
+    // Dipakai oleh ShopeeApiLog setelah proses pemisahan log diaktifkan.
+    // Default tetap sqlite agar deployment pertama tidak mengubah perilaku aplikasi.
+    'shopee_api_log_connection' => env('SHOPEE_API_LOG_CONNECTION', 'sqlite'),
+
     /*
     |--------------------------------------------------------------------------
     | Database Connections
@@ -46,6 +50,18 @@ return [
             // IMMEDIATE mengambil write lock sejak awal transaksi sehingga
             // read-then-write tidak gagal saat upgrade lock di SQLite.
             'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
+        ],
+
+        'logs' => [
+            'driver' => 'sqlite',
+            'url' => env('DB_LOGS_URL'),
+            'database' => env('DB_LOGS_DATABASE', database_path('logs.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+            'busy_timeout' => env('DB_LOGS_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_LOGS_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_LOGS_SYNCHRONOUS', 'NORMAL'),
+            'transaction_mode' => env('DB_LOGS_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

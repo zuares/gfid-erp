@@ -12,12 +12,23 @@ class BackupDatabase extends Command
 
     public function handle(): int
     {
-        $dbPath = config('database.connections.sqlite.database') ?? database_path('database.sqlite');
+        $databasePaths = [
+            'database' => config('database.connections.sqlite.database') ?? database_path('database.sqlite'),
+        ];
+        $logsPath = config('database.connections.logs.database');
+
+        if ($logsPath && File::exists($logsPath)) {
+            $databasePaths['logs'] = $logsPath;
+        }
+
         $backupDir = storage_path('backups');
 
-        if (!File::exists($dbPath)) {
-            $this->error("Database SQLite tidak ditemukan: $dbPath");
-            return self::FAILURE;
+        foreach ($databasePaths as $label => $dbPath) {
+            if (! File::exists($dbPath)) {
+                $this->error("Database {$label} tidak ditemukan: {$dbPath}");
+
+                return self::FAILURE;
+            }
         }
 
         // Pastikan folder backup ada
@@ -25,14 +36,19 @@ class BackupDatabase extends Command
             File::makeDirectory($backupDir, 0755, true);
         }
 
-        // 1️⃣ Buat backup baru
-        $filename = 'backup_' . now()->format('Ymd_His_u') . '.sqlite';
-        $target = $backupDir . '/' . $filename;
+        // 1️⃣ Buat backup baru untuk database utama dan database log (jika ada)
+        $timestamp = now()->format('Ymd_His_u');
+        $this->info('🎉 Backup berhasil disimpan:');
 
-        File::copy($dbPath, $target);
+        foreach ($databasePaths as $label => $dbPath) {
+            $filename = $label === 'database'
+                ? "backup_{$timestamp}.sqlite"
+                : "{$label}_backup_{$timestamp}.sqlite";
+            $target = $backupDir . '/' . $filename;
 
-        $this->info("🎉 Backup berhasil disimpan:");
-        $this->info("→ storage/backups/{$filename}");
+            File::copy($dbPath, $target);
+            $this->info("→ storage/backups/{$filename}");
+        }
 
         // 2️⃣ Batasi jumlah backup maks 20 file (hapus yang paling lama)
         $this->cleanupOldBackups($backupDir);
