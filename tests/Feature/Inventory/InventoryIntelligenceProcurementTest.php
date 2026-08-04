@@ -17,6 +17,7 @@ it('uses a 60-day FOB forecast and counts process WIP once', function () {
         'unit' => 'pcs',
         'type' => 'finished_good',
         'production_source' => Item::PRODUCTION_BUY,
+        'last_purchase_price' => 100000,
         'active' => true,
     ]);
 
@@ -60,9 +61,12 @@ it('uses a 60-day FOB forecast and counts process WIP once', function () {
         ->and($row->ready_total)->toBe(15.0)
         ->and($row->wip_process)->toBe(15.0)
         ->and($row->available_stock)->toBe(30.0)
+        ->and($row->unit_cost)->toBe(100000.0)
+        ->and($row->available_value)->toBe(3000000.0)
         ->and($row->production_forecast)->toBe(60.0)
         ->and($row->procurement_forecast)->toBe(120.0)
         ->and($row->procurement_suggested_qty)->toBe(90.0)
+        ->and($row->suggested_value)->toBe(9000000.0)
         ->and($row->suggested_qty)->toBe(90.0);
 
     $row30 = app(InventoryIntelligenceService::class)

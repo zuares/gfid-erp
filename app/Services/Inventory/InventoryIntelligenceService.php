@@ -47,7 +47,7 @@ class InventoryIntelligenceService
             return collect();
         }
 
-        $items = Item::with('category')
+        $items = Item::with(['category', 'activeCostSnapshot'])
             ->whereIn('id', $snapshot->keys())
             ->where('type', 'finished_good')
             ->get()
@@ -86,6 +86,9 @@ class InventoryIntelligenceService
                 ? max(0.0, round($procurementForecast - $availableStock, 0))
                 : 0.0;
             $suggested = $item->is_made_in_house ? $productionSuggested : $procurementSuggested;
+            $unitCost = $this->unitCost($item);
+            $suggestedValue = round($suggested * $unitCost, 0);
+            $availableValue = round($availableStock * $unitCost, 0);
 
             $vals = $series->get($item->id, array_fill(0, self::FORECAST_HORIZON, 0.0));
             $wads = $this->weightedAds($vals);
@@ -127,6 +130,9 @@ class InventoryIntelligenceService
                 'production_suggested_qty' => $productionSuggested,
                 'procurement_suggested_qty' => $procurementSuggested,
                 'suggested_qty' => $suggested,
+                'unit_cost' => $unitCost,
+                'suggested_value' => $suggestedValue,
+                'available_value' => $availableValue,
                 'eval_score' => $this->evalScore($ads, $cover, $wads, $status),
                 'status' => $status,
             ];
@@ -180,6 +186,35 @@ class InventoryIntelligenceService
         return in_array($requested, self::PRODUCTION_HORIZONS, true)
             ? $requested
             : self::FORECAST_HORIZON;
+    }
+
+    private function unitCost(Item $item): float
+    {
+        $activeSnapshot = $item->relationLoaded('activeCostSnapshot')
+            ? $item->getRelation('activeCostSnapshot')
+            : null;
+
+        $candidates = $item->is_made_in_house
+            ? [
+                $activeSnapshot?->unit_cost,
+                $item->base_unit_cost,
+                $item->hpp,
+                $item->last_purchase_price,
+            ]
+            : [
+                $item->last_purchase_price,
+                $activeSnapshot?->unit_cost,
+                $item->base_unit_cost,
+                $item->hpp,
+            ];
+
+        foreach ($candidates as $candidate) {
+            if ((float) $candidate > 0) {
+                return (float) $candidate;
+            }
+        }
+
+        return 0.0;
     }
 
     /**
@@ -367,6 +402,8 @@ class InventoryIntelligenceService
             'total_ready' => (float) $rows->sum('ready_total'),
             'total_wip' => (float) $rows->sum('wip'),
             'total_suggested' => (float) $rows->sum('suggested_qty'),
+            'total_suggested_value' => (float) $rows->sum('suggested_value'),
+            'total_available_value' => (float) $rows->sum('available_value'),
             'tightest_cover' => $rows->whereNotNull('cover_days')->min('cover_days'),
             'avg_cover' => $covered->isNotEmpty() ? round((float) $covered->avg('cover_days'), 1) : null,
         ];

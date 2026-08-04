@@ -1,5 +1,6 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
+    $fmtRp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
     $productionDays = (int) ($filters['production_days'] ?? 30);
     $procurementDays = (int) ($filters['procurement_days'] ?? 60);
 
@@ -136,6 +137,10 @@
             <div class="kpi-sub-item">
                 <span class="kpi-sub-label"><i class="bi bi-truck"></i><span>FOB</span></span>
                 <span class="kpi-sub-val">{{ $fmt($extSuggested) }}</span>
+            </div>
+            <div class="kpi-sub-item">
+                <span class="kpi-sub-label"><i class="bi bi-cash-stack"></i><span>Nilai saran</span></span>
+                <span class="kpi-sub-val">{{ $fmtRp($summary['total_suggested_value'] ?? 0) }}</span>
             </div>
         </div>
     </div>

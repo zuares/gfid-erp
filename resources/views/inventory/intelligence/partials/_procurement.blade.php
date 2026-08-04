@@ -2,8 +2,12 @@
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
     $rows = $rows->where('production_source_key', 'external')->values();
     $procurementDays = (int) ($filters['procurement_days'] ?? 60);
+    $fmtRp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
     $skuCount = $rows->count();
     $totalSuggested = (float) $rows->sum('suggested_qty');
+    $totalForecast = (float) $rows->sum('procurement_forecast');
+    $totalAvailable = (float) $rows->sum('available_stock');
+    $totalSuggestedValue = (float) $rows->sum('suggested_value');
     $statusLabel = [
         'stockout' => 'Stockout',
         'kritis' => 'Kritis',
@@ -12,6 +16,39 @@
         'no_demand' => 'Tanpa demand',
     ];
 @endphp
+
+<div class="row g-2 mb-3">
+    <div class="col-6 col-xl">
+        <div class="card-main h-100 p-3">
+            <div class="text-muted-ii small">SKU FOB</div>
+            <div class="fw-bold fs-5">{{ $fmt($skuCount) }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl">
+        <div class="card-main h-100 p-3">
+            <div class="text-muted-ii small">Forecast {{ $procurementDays }} hari</div>
+            <div class="fw-bold fs-5">{{ $fmt($totalForecast) }} pcs</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl">
+        <div class="card-main h-100 p-3">
+            <div class="text-muted-ii small">Stok tersedia</div>
+            <div class="fw-bold fs-5">{{ $fmt($totalAvailable) }} pcs</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl">
+        <div class="card-main h-100 p-3">
+            <div class="text-muted-ii small">Saran pengadaan</div>
+            <div class="fw-bold fs-5 text-success">{{ $fmt($totalSuggested) }} pcs</div>
+        </div>
+    </div>
+    <div class="col-12 col-xl">
+        <div class="card-main h-100 p-3">
+            <div class="text-muted-ii small">Estimasi nilai pengadaan</div>
+            <div class="fw-bold fs-5 text-success">{{ $fmtRp($totalSuggestedValue) }}</div>
+        </div>
+    </div>
+</div>
 
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -103,7 +140,10 @@
                             </td>
                             <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
                             <td class="text-end text-muted">{{ $fmt($r->procurement_forecast) }}</td>
-                            <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #059669;">{{ $fmt($r->suggested_qty) }}</td>
+                            <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #059669;">
+                                <div>{{ $fmt($r->suggested_qty) }} pcs</div>
+                                <div class="text-muted-ii" style="font-size:.65rem;">{{ $fmtRp($r->suggested_value) }}</div>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

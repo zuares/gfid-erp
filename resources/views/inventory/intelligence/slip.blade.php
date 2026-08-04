@@ -1,5 +1,6 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
+    $fmtRp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
     $groups = $rows->groupBy('category')
         ->map(fn($g, $cat) => (object) [
             'category' => $cat ?: '-',
@@ -19,6 +20,7 @@
     $forecastDays = $forecastDays ?? ($isProcurement ? 60 : 30);
     $forecastField = $forecastField ?? ($isProcurement ? 'forecast_60' : 'forecast_30');
     $suggestionLabel = $suggestionLabel ?? ($isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi');
+    $totalSuggestedValue = (float) ($totalSuggestedValue ?? $rows->sum('suggested_value'));
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -178,6 +180,7 @@
                     <div class="hero-label">Total {{ $suggestionLabel }}</div>
                     <div class="hero-amount">{{ $fmt($totalSuggested) }} pcs</div>
                     <div class="hero-sub">{{ $fmt($skuCount) }} SKU perlu ditindaklanjuti</div>
+                    <div class="hero-sub">Estimasi nilai: {{ $fmtRp($totalSuggestedValue) }}</div>
                 </div>
             </div>
 
@@ -189,7 +192,8 @@
                         <th class="num">WIP proses</th>
                         <th class="num">Cover</th>
                         <th class="num">F{{ $forecastDays }}</th>
-                        <th class="num">Saran</th>
+                        <th class="num">Saran (pcs)</th>
+                        <th class="num">Nilai</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -198,6 +202,7 @@
                             <td>{{ $g->category }}</td>
                             <td class="num" colspan="4"></td>
                             <td class="num">{{ $fmt($g->qty) }}</td>
+                            <td class="num">{{ $fmtRp($g->lines->sum('suggested_value')) }}</td>
                         </tr>
                         @foreach ($g->lines as $l)
                             <tr class="line-row">
@@ -214,6 +219,7 @@
                                 <td class="num">{{ $l->cover_days === null ? '–' : $fmt($l->cover_days, 1) }}</td>
                                 <td class="num">{{ $fmt($l->{$forecastField}) }}</td>
                                 <td class="num saran">{{ $fmt($l->suggested_qty) }}</td>
+                                <td class="num saran">{{ $fmtRp($l->suggested_value) }}</td>
                             </tr>
                         @endforeach
                     @endforeach
@@ -223,6 +229,7 @@
             <div class="grand">
                 <div class="grand-box">
                     <div class="total"><span>Total Saran</span><span>{{ $fmt($totalSuggested) }} pcs</span></div>
+                    <div class="total"><span>Estimasi Nilai</span><span>{{ $fmtRp($totalSuggestedValue) }}</span></div>
                 </div>
             </div>
 

@@ -442,10 +442,6 @@
                 const fd = new FormData(form);
                 const obj = {};
                 for (const [k, v] of fd.entries()) if (v !== '' && v != null) obj[k] = v;
-                const productionHorizon = paneByName('forecast')?.querySelector('[data-ii-production-days]')?.value;
-                if (productionHorizon) selectedProductionDays = Number(productionHorizon) || selectedProductionDays;
-                const procurementHorizon = paneByName('procurement')?.querySelector('[data-ii-procurement-days]')?.value;
-                if (procurementHorizon) selectedProcurementDays = Number(procurementHorizon) || selectedProcurementDays;
                 // Horizon adalah state bersama agar Ringkasan, Kesehatan, dan tab aksi
                 // selalu membaca parameter forecast yang sama.
                 obj.production_days = String(selectedProductionDays);
@@ -703,7 +699,13 @@
                 applyTableFilter(e.target.closest('[data-tab-panel]'));
             });
             document.addEventListener('change', (e) => {
-                if (e.target.matches('[data-ii-production-days],[data-ii-procurement-days]')) {
+                if (e.target.matches('[data-ii-production-days]')) {
+                    selectedProductionDays = Number(e.target.value) === 60 ? 60 : 30;
+                    applyFilters();
+                    return;
+                }
+                if (e.target.matches('[data-ii-procurement-days]')) {
+                    selectedProcurementDays = Number(e.target.value) === 30 ? 30 : 60;
                     applyFilters();
                     return;
                 }

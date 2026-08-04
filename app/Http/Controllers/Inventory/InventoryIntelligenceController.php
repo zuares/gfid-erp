@@ -116,6 +116,7 @@ class InventoryIntelligenceController extends Controller
             'itemLabel' => $item ? $item->code . ' — ' . $item->name : null,
             'skuCount' => $rows->count(),
             'totalSuggested' => (float) $rows->sum('suggested_qty'),
+            'totalSuggestedValue' => (float) $rows->sum('suggested_value'),
             'draftType' => $isProcurement ? 'procurement' : 'production',
             'forecastDays' => $isProcurement ? $filters['procurement_days'] : $filters['production_days'],
             'forecastField' => $isProcurement ? 'procurement_forecast' : 'production_forecast',
@@ -141,7 +142,8 @@ class InventoryIntelligenceController extends Controller
             fwrite($out, "\xEF\xBB\xBF"); // BOM
             fputcsv($out, [
                 'SKU', 'Produk', 'Kategori', 'Jual/hari', 'Ready', 'WIP proses', 'Stok tersedia',
-                'Cover (hari)', $isProcurement
+                'Cover (hari)', 'Harga/unit', 'Nilai Saran',
+                $isProcurement
                     ? 'Forecast ' . $filters['procurement_days'] . 'hr'
                     : 'Forecast ' . $filters['production_days'] . 'hr',
                 $isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi', 'Status',
@@ -156,6 +158,8 @@ class InventoryIntelligenceController extends Controller
                     $r->wip_process,
                     $r->available_stock,
                     $r->cover_days,
+                    $r->unit_cost,
+                    $r->suggested_value,
                     $isProcurement ? $r->procurement_forecast : $r->production_forecast,
                     $r->suggested_qty,
                     $r->status,
