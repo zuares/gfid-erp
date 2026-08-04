@@ -20,6 +20,8 @@
 .po-info:hover{background:#0284c7!important}
 .po-wa{background:#25d366!important;border-color:#25d366!important;color:#fff!important}
 .po-wa:hover{background:#16a34a!important;border-color:#16a34a!important;color:#fff!important}
+.po-wa-sent{background:#ecfdf5!important;border-color:#86efac!important;color:#15803d!important}
+.po-wa-sent:hover{background:#dcfce7!important;border-color:#4ade80!important;color:#166534!important}
 .po-status{font-weight:850;color:#334155;background:rgba(148,163,184,.08)}
 .po-status.approved{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.2)}
 .po-status.closed{color:#0f172a;background:rgba(15,23,42,.08);border-color:rgba(15,23,42,.2)}
@@ -217,9 +219,11 @@
     @endif
 
     @if ($canSendWhatsapp && $supplierPhone !== '')
-        <a href="{{ route('whatsapp.messages.compose.purchase_order', $order->id) }}" class="po-btn po-wa" title="Review dan kirim ke supplier via WhatsApp">
-            <i class="bi bi-whatsapp"></i>
-            <span class="d-none d-md-inline">WA Supplier</span>
+        <a href="{{ route('whatsapp.messages.compose.purchase_order', $order->id) }}"
+           class="po-btn {{ $lastWhatsappMessage ? 'po-wa-sent' : 'po-wa' }}"
+           title="{{ $lastWhatsappMessage ? 'Sudah dikirim pada ' . optional($lastWhatsappMessage->sent_at)->format('d/m/Y H:i') . '. Klik untuk kirim ulang.' : 'Review dan kirim ke supplier via WhatsApp' }}">
+            <i class="bi {{ $lastWhatsappMessage ? 'bi-check-circle-fill' : 'bi-whatsapp' }}"></i>
+            <span class="d-none d-md-inline">{{ $lastWhatsappMessage ? 'Sudah dikirim' : 'WA Supplier' }}</span>
         </a>
     @elseif ($canSendWhatsapp)
         <button type="button" class="po-btn" disabled title="Nomor WhatsApp supplier belum diisi">

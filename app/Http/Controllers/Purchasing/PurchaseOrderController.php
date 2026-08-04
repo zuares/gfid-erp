@@ -11,6 +11,7 @@ use App\Models\PurchasePayment;
 use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
+use App\Models\WhatsAppMessage;
 use App\Services\Purchasing\PurchaseOrderService;
 use App\Services\WhatsApp\WhatsAppMessageService;
 use App\Services\WhatsApp\PurchaseOrderWhatsAppMessageBuilder;
@@ -473,6 +474,15 @@ class PurchaseOrderController extends Controller
         $closeBlockers = $this->calcCloseBlockers($purchase_order, $poInvoices);
         $canClose = empty($closeBlockers) && !$purchase_order->isClosed();
 
+        $lastWhatsappMessage = WhatsAppMessage::query()
+            ->where('module', 'purchasing')
+            ->where('reference_type', PurchaseOrder::class)
+            ->where('reference_id', $purchase_order->id)
+            ->where('status', 'sent')
+            ->latest('sent_at')
+            ->latest('id')
+            ->first();
+
         return view('purchasing.purchase_orders.show', [
             'order' => $purchase_order,
             'paymentMethods' => $paymentMethods,
@@ -496,6 +506,7 @@ class PurchaseOrderController extends Controller
             'invoiceOutstanding' => $invoiceOutstanding,
             'closeBlockers' => $closeBlockers,
             'canClose' => $canClose,
+            'lastWhatsappMessage' => $lastWhatsappMessage,
         ]);
     }
 

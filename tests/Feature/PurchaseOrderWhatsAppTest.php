@@ -135,4 +135,45 @@ class PurchaseOrderWhatsAppTest extends TestCase
             ->post(route('purchasing.purchase_orders.whatsapp', $order))
             ->assertForbidden();
     }
+
+    public function test_purchase_order_button_shows_sent_state_after_successful_whatsapp(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-PO-WA-SENT-' . uniqid(),
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-PO-WA-SENT-' . uniqid(),
+            'name' => 'Supplier Sent',
+            'phone' => '08123456789',
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-WA-SENT-' . uniqid(),
+            'date' => '2026-08-04',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 125000,
+            'status' => 'draft',
+        ]);
+
+        WhatsAppMessage::create([
+            'direction' => 'outbound',
+            'provider' => 'fonnte',
+            'recipient_phone' => '628123456789',
+            'recipient_name' => $supplier->name,
+            'message' => 'PO terkirim',
+            'module' => 'purchasing',
+            'reference_type' => PurchaseOrder::class,
+            'reference_id' => $order->id,
+            'reference_label' => $order->code,
+            'status' => 'sent',
+            'sent_by' => $owner->id,
+            'sent_at' => now(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.show', $order))
+            ->assertOk()
+            ->assertSee('Sudah dikirim')
+            ->assertSee('bi-check-circle-fill');
+    }
 }
