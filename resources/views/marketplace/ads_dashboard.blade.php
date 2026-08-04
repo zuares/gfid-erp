@@ -1644,7 +1644,7 @@ function sortTrafficTable(col) {
             <div class="sub" style="font-size: .8rem; margin: 0;">Pantau efisiensi, biaya, dan margin profit kampanye.</div>
             <div id="globalSyncStatus" data-last-sync="{{ $lastSyncTime ?? '' }}" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.35rem;font-size:.68rem;color:var(--dsh-muted);">
                 <span class="global-sync-dot" style="width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block;"></span>
-                <span class="global-sync-label">Sync terakhir: {{ $lastSyncTime ?: 'Belum pernah' }}</span>
+                <span class="global-sync-label">Sync terakhir: {{ ($lastSyncTime ?? '') ?: 'Belum pernah' }}</span>
                 <span style="opacity:.65;">· otomatis tiap jam</span>
             </div>
         </div>
@@ -4439,7 +4439,7 @@ function pollSyncProgress(storeId) {
 
     const labelEl = statusEl.querySelector('.global-sync-label');
     const dotEl = statusEl.querySelector('.global-sync-dot');
-    const lastSync = statusEl.dataset.lastSync || 'Belum pernah';
+    let lastSync = statusEl.dataset.lastSync || 'Belum pernah';
     const endpoint = `{{ route('marketplace.ads.syncProgress') }}?store_id=all`;
 
     function setStatus(color, icon, text) {
@@ -4454,6 +4454,10 @@ function pollSyncProgress(storeId) {
         fetch(endpoint, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
             .then(response => response.json())
             .then(data => {
+                if (data.last_sync_time) {
+                    lastSync = data.last_sync_time;
+                    statusEl.dataset.lastSync = lastSync;
+                }
                 if (data.status === 'queued' || data.status === 'processing') {
                     const percent = Number(data.percent || 0);
                     setStatus('#2563eb', 'bi-arrow-repeat spin-icon', `Sync berjalan ${percent}%`);

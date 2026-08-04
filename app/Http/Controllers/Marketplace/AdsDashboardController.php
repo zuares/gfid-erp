@@ -36,6 +36,7 @@ class AdsDashboardController extends Controller
                 : 'prev_period';
 
             return view('marketplace.ads_dashboard', compact('stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode'))
+                ->with('lastSyncTime', '')
                 ->with('error', 'Tidak ada toko Shopee aktif dengan token valid.');
         }
 
@@ -110,12 +111,15 @@ class AdsDashboardController extends Controller
         );
         
         $lastSync = \App\Models\MarketplaceAdsSyncRun::where('status', 'success')
+            ->whereNotNull('finished_at')
             ->when($storeId !== 'all', fn($q) => $q->where('store_id', $storeId))
-            ->latest('finished_at')
+            ->orderByDesc('finished_at')
+            ->orderByDesc('id')
             ->first();
-            
-        $dashboard['lastSyncAt'] = $lastSync && $lastSync->finished_at ? $lastSync->finished_at->diffForHumans() : 'Belum pernah';
-        $dashboard['lastSyncTime'] = $lastSync && $lastSync->finished_at ? $lastSync->finished_at->format('d M Y H:i') : '';
+
+        $finishedAt = $lastSync?->finished_at;
+        $dashboard['lastSyncAt'] = $finishedAt ? $finishedAt->copy()->timezone(config('app.timezone'))->diffForHumans() : 'Belum pernah';
+        $dashboard['lastSyncTime'] = $finishedAt ? $finishedAt->copy()->timezone(config('app.timezone'))->format('d M Y H:i') : '';
 
         return view('marketplace.ads_dashboard', $dashboard);
     }
@@ -220,6 +224,18 @@ class AdsDashboardController extends Controller
     {
         $storeId = $request->input('store_id', 'all');
         $progressKey = 'marketplace:ads_sync_progress:' . $storeId;
+
+        $lastSync = \App\Models\MarketplaceAdsSyncRun::query()
+            ->where('status', 'success')
+            ->whereNotNull('finished_at')
+            ->when($storeId !== 'all', fn ($q) => $q->where('store_id', $storeId))
+            ->orderByDesc('finished_at')
+            ->orderByDesc('id')
+            ->first();
+        $finishedAt = $lastSync?->finished_at;
+        $lastSyncTime = $finishedAt
+            ? $finishedAt->copy()->timezone(config('app.timezone'))->format('d M Y H:i')
+            : '';
         
         $data = \Illuminate\Support\Facades\Cache::get($progressKey);
         
@@ -229,10 +245,13 @@ class AdsDashboardController extends Controller
                 'phase' => 'idle',
                 'percent' => 0,
                 'label' => 'Tidak ada proses berjalan',
+                'last_sync_time' => $lastSyncTime,
             ]);
         }
-        
-        return response()->json($data);
+
+        return response()->json(array_merge($data, [
+            'last_sync_time' => $lastSyncTime,
+        ]));
     }
 
     public function clear(Request $request)
