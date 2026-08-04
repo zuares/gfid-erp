@@ -446,26 +446,33 @@ class PurchaseRequestController extends Controller
                 ->with('error', 'PR ini belum siap diproses atau sudah pernah dibuatkan PO.');
         }
 
-        $lineIds = $purchase_request->lines()->pluck('id')->all();
+        $lineIds = $purchase_request->lines()->pluck('id')->map(fn ($id) => (int) $id)->all();
         $data = $request->validate([
-            'suppliers' => ['required', 'array', 'size:' . count($lineIds)],
+            'suppliers' => ['required', 'array', 'min:1'],
             'suppliers.*' => ['required', 'integer', Rule::exists('suppliers', 'id')->where('active', true)],
         ]);
 
         $submittedIds = array_map('intval', array_keys($data['suppliers']));
-        sort($submittedIds);
-        $expectedIds = array_map('intval', $lineIds);
-        sort($expectedIds);
+        $unknownIds = array_diff($submittedIds, $lineIds);
 
-        if ($submittedIds !== $expectedIds) {
+        if ($unknownIds) {
             return back()->withInput()->withErrors([
-                'suppliers' => 'Semua item PR harus memiliki supplier sebelum PO dibuat.',
+                'suppliers' => 'Ada baris PR yang tidak valid. Silakan muat ulang halaman.',
             ]);
         }
 
+        sort($submittedIds);
+
         $previewLines = $purchase_request->lines()
+            ->whereIn('id', $submittedIds)
             ->with('item:id,type')
             ->get();
+
+        if ($previewLines->isEmpty()) {
+            return back()->withInput()->withErrors([
+                'suppliers' => 'Minimal satu baris harus dipertahankan untuk membuat PO draft.',
+            ]);
+        }
 
         $previewGroups = $previewLines->groupBy(function ($line) use ($data) {
             $supplierId = (int) ($data['suppliers'][$line->id] ?? 0);
@@ -501,17 +508,27 @@ class PurchaseRequestController extends Controller
             $purchase_request,
             $purchaseOrderService,
             $request,
-            $generatedOrderCodes
+            $generatedOrderCodes,
+            $submittedIds
         ) {
             $lockedRequest = PurchaseRequest::query()
                 ->whereKey($purchase_request->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $lines = $purchase_request->lines()->with('item')->lockForUpdate()->get();
+            $allLines = $purchase_request->lines()->with('item')->lockForUpdate()->get();
 
-            if (!in_array($lockedRequest->status, ['draft', 'approved'], true) || $lines->contains(fn ($line) => $line->purchase_order_id !== null)) {
+            if (!in_array($lockedRequest->status, ['draft', 'approved'], true) || $allLines->contains(fn ($line) => $line->purchase_order_id !== null)) {
                 abort(409, 'PR sudah diproses oleh pengguna lain. Muat ulang halaman.');
             }
+
+            $lines = $allLines->whereIn('id', $submittedIds)->values();
+            if ($lines->isEmpty()) {
+                abort(409, 'Minimal satu baris harus dipertahankan untuk membuat PO draft.');
+            }
+
+            // Baris yang dihapus di halaman alokasi tidak boleh tertinggal di PR
+            // tanpa PO setelah proses konversi selesai.
+            $allLines->whereNotIn('id', $submittedIds)->each->delete();
 
             $orders = collect();
             

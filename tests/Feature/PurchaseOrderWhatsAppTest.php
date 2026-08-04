@@ -79,7 +79,7 @@ class PurchaseOrderWhatsAppTest extends TestCase
         $this->actingAs($owner)
             ->get(route('whatsapp.messages.compose.purchase_order', $order))
             ->assertOk()
-            ->assertSee('Kirim WhatsApp Supplier')
+            ->assertSee('Review Pesan WhatsApp')
             ->assertSee($order->code)
             ->assertSee('Supplier Review');
     }
