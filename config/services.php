@@ -29,6 +29,11 @@ return [
         'ads_scheduler_enabled' => env('SHOPEE_ADS_SCHEDULER_ENABLED', false),
     ],
 
+    'fonnte' => [
+        'token' => env('FONNTE_TOKEN'),
+        'api_url' => env('FONNTE_API_URL', 'https://api.fonnte.com/send'),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

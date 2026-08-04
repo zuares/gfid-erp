@@ -12,6 +12,8 @@ use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderService;
+use App\Services\WhatsApp\WhatsAppMessageService;
+use App\Services\WhatsApp\PurchaseOrderWhatsAppMessageBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -695,6 +697,53 @@ class PurchaseOrderController extends Controller
         return redirect()
             ->route('purchasing.purchase_orders.show', $purchase_order->id)
             ->with('success', 'PO berhasil dikembalikan ke status Draft.');
+    }
+
+    /**
+     * Kirim ringkasan PO ke supplier melalui WhatsApp.
+     */
+    public function sendWhatsapp(
+        PurchaseOrder $purchase_order,
+        WhatsAppMessageService $whatsapp,
+        PurchaseOrderWhatsAppMessageBuilder $builder,
+    )
+    {
+        abort_unless(
+            in_array(auth()->user()?->role, ['owner', 'admin'], true) || auth()->user()?->isDeveloper(),
+            403,
+            'Hanya owner atau admin yang bisa mengirim PO melalui WhatsApp.'
+        );
+
+        $draft = $builder->build($purchase_order);
+        $phone = $draft['phone'];
+
+        if ($phone === '') {
+            return back()->with('error', 'Nomor WhatsApp supplier belum diisi.');
+        }
+
+        if (! filled(config('services.fonnte.token'))) {
+            return back()->with('error', 'FONNTE_TOKEN belum dikonfigurasi.');
+        }
+
+        $messageLog = $whatsapp->sendText(
+            $phone,
+            $draft['message'],
+            [
+                'module' => $draft['module'],
+                'reference_type' => $draft['reference_type'],
+                'reference_id' => $draft['reference_id'],
+                'reference_label' => $draft['reference_label'],
+            ],
+            $draft['recipient_name'],
+            $draft['template_key'],
+        );
+
+        return back()->with(
+            $messageLog->isSent() ? 'success' : 'error',
+            $messageLog->isSent()
+                ? "Ringkasan PO {$purchase_order->code} berhasil dikirim ke supplier via WhatsApp."
+                : 'Pesan WhatsApp gagal dikirim. Periksa koneksi device Fonnte dan log aplikasi.'
+        );
     }
 
     public function cancel(PurchaseOrder $purchase_order)

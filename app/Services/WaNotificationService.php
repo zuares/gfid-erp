@@ -18,7 +18,7 @@ class WaNotificationService
     public function sendOrderNotification(StorefrontOrder $order): void
     {
         $adminPhone = env('ADMIN_WA_NUMBER');
-        $token      = env('FONNTE_TOKEN');
+        $token      = $this->token();
 
         if (! $adminPhone || ! $token) {
             return; // Notif tidak dikonfigurasi — skip
@@ -53,10 +53,32 @@ class WaNotificationService
     public function sendToAdmin(string $message): void
     {
         $adminPhone = env('ADMIN_WA_NUMBER');
-        $token      = env('FONNTE_TOKEN');
+        $token      = $this->token();
         if (! $adminPhone || ! $token) return;
 
         $this->sendFonnte($token, $adminPhone, $message);
+    }
+
+    /**
+     * Kirim pesan test dari halaman pengaturan WhatsApp.
+     */
+    public function sendTestMessage(string $phone, string $message): bool
+    {
+        return $this->sendMessage($phone, $message);
+    }
+
+    /**
+     * Kirim pesan WhatsApp teks ke nomor tujuan melalui Fonnte.
+     */
+    public function sendMessage(string $phone, string $message): bool
+    {
+        $token = $this->token();
+
+        if (! $token) {
+            return false;
+        }
+
+        return $this->sendFonnte($token, $phone, $message);
     }
 
     /**
@@ -64,7 +86,7 @@ class WaNotificationService
      */
     public function sendToOperatingRole(string $message): void
     {
-        $token = env('FONNTE_TOKEN');
+        $token = $this->token();
         if (! $token) return;
 
         $operatings = \App\Models\User::where('role', 'operating')
@@ -92,7 +114,7 @@ class WaNotificationService
             . "🔐 *{$otp}*\n\n"
             . "Kode berlaku 10 menit. Jangan bagikan ke siapapun.";
 
-        $token = env('FONNTE_TOKEN');
+        $token = $this->token();
         if ($token) {
             $sent = $this->sendFonnte($token, $phone, $message);
             if (! $sent) {
@@ -113,10 +135,10 @@ class WaNotificationService
 
     private function sendFonnte(string $token, string $target, string $message): bool
     {
-        $target = preg_replace('/\D/', '', $target);
+        $target = $this->normalizePhone($target);
 
         try {
-            $ch = curl_init('https://api.fonnte.com/send');
+            $ch = curl_init((string) config('services.fonnte.api_url', 'https://api.fonnte.com/send'));
             if (! $ch) {
                 Log::warning('Fonnte curl_init gagal');
                 return false;
@@ -177,11 +199,29 @@ class WaNotificationService
 
     private function maskPhone(string $phone): string
     {
-        $phone = preg_replace('/\D/', '', $phone);
+        $phone = $this->normalizePhone($phone);
         if (strlen($phone) <= 6) {
             return $phone;
         }
 
         return substr($phone, 0, 4) . str_repeat('*', max(0, strlen($phone) - 7)) . substr($phone, -3);
+    }
+
+    private function token(): ?string
+    {
+        $token = trim((string) config('services.fonnte.token'));
+
+        return $token !== '' ? $token : null;
+    }
+
+    private function normalizePhone(string $phone): string
+    {
+        $phone = preg_replace('/\D/', '', $phone) ?? '';
+
+        if (str_starts_with($phone, '0')) {
+            return '62' . substr($phone, 1);
+        }
+
+        return $phone;
     }
 }

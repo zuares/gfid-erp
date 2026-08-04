@@ -26,6 +26,7 @@ require __DIR__ . '/web/accounting.php';
 require __DIR__ . '/web/shipments.php';
 require __DIR__ . '/web/imports.php';
 require __DIR__ . '/web/settings.php';
+require __DIR__ . '/web/whatsapp.php';
 
 // NOTE: Route produksi-lama (orders/issues/receipts/activities) dipindah ke
 // routes/web/production-legacy.php agar konsisten dengan pola routing per-domain.

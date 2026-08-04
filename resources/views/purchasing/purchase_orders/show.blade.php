@@ -18,6 +18,8 @@
 .po-success:hover{background:#166534!important;border-color:#166534!important}
 .po-info{background:#0ea5e9!important;border-color:#0ea5e9!important;color:#fff!important}
 .po-info:hover{background:#0284c7!important}
+.po-wa{background:#25d366!important;border-color:#25d366!important;color:#fff!important}
+.po-wa:hover{background:#16a34a!important;border-color:#16a34a!important;color:#fff!important}
 .po-status{font-weight:850;color:#334155;background:rgba(148,163,184,.08)}
 .po-status.approved{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.2)}
 .po-status.closed{color:#0f172a;background:rgba(15,23,42,.08);border-color:rgba(15,23,42,.2)}
@@ -85,6 +87,8 @@
     @php
         $user = auth()->user();
         $isAdmin = strtolower((string)($user->role ?? '')) === 'admin';
+        $canSendWhatsapp = $user && ($user->isOwner() || $isAdmin || $user->isDeveloper());
+        $supplierPhone = trim((string) ($order->supplier?->phone ?? ''));
         $canSeeMoney = $user?->canSeePurchasePrices() ?? false;
         $poHasPrice  = (float) ($order->grand_total ?? 0) > 0;
 
@@ -210,6 +214,18 @@
     {{-- Terima (buat GRN) --}}
     @if ($user && ($user->isOwner() || $isAdmin) && $order->isReceivableForGrn() && $status !== 'cancelled' && ($canCreateGrn ?? true))
          <a href="{{ route('purchasing.purchase_receipts.create_from_order', $order->id) }}" class="po-btn po-info" title="Terima Barang"><i class="bi bi-box-seam d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Terima</span></a>
+    @endif
+
+    @if ($canSendWhatsapp && $supplierPhone !== '')
+        <a href="{{ route('whatsapp.messages.compose.purchase_order', $order->id) }}" class="po-btn po-wa" title="Review dan kirim ke supplier via WhatsApp">
+            <i class="bi bi-whatsapp"></i>
+            <span class="d-none d-md-inline">WA Supplier</span>
+        </a>
+    @elseif ($canSendWhatsapp)
+        <button type="button" class="po-btn" disabled title="Nomor WhatsApp supplier belum diisi">
+            <i class="bi bi-whatsapp"></i>
+            <span class="d-none d-md-inline">WA Supplier</span>
+        </button>
     @endif
 
     {{-- Opsi Lainnya --}}

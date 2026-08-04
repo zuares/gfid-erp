@@ -47,6 +47,8 @@ class SystemSetting extends Model
     public const KEY_SALES_ALLOW_MIXED_LINKAGE = 'sales_allow_mixed_linkage';
     public const KEY_SALES_STATUS_TIMING = 'sales_marketplace_status_timing';
     public const KEY_SALES_RECORD_ONLY_DAILY_SALES = 'sales_record_only_daily_sales';
+    public const KEY_WHATSAPP_TEST_NUMBER = 'whatsapp_test_number';
+    public const KEY_WHATSAPP_TEST_MESSAGE = 'whatsapp_test_message';
 
     // ──────────────────────────────────────────────────────
     // RELATIONS

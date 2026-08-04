@@ -392,6 +392,7 @@
 
     $openCrm = $open('admin.crm.*');
     $openAi = $open('ai.*');
+    $openCommunication = $open('whatsapp.*') || $open('settings.whatsapp.*');
 
     // =========================================================
     // BADGE COUNTERS (dot-only, cached)
@@ -740,6 +741,32 @@
                     <x-sidebar.simple-link href="{{ route('owner.activity-logs.index') }}" icon="bi bi-activity" :active="request()->routeIs('owner.activity-logs.*')">
                         Log Aktivitas
                     </x-sidebar.simple-link>
+                </li>
+            @endif
+            @if (($isOwner || $isAdmin) && ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index')))
+                <x-sidebar.label text="Komunikasi" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openCommunication ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navCommunication"
+                        aria-expanded="{{ $openCommunication ? 'true' : 'false' }}" aria-controls="navCommunication">
+                        <span class="icon"><i class="bi bi-whatsapp"></i></span>
+                        <span>WhatsApp</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openCommunication ? 'show' : '' }}" id="navCommunication">
+                        @if ($router->has('whatsapp.index'))
+                            <x-sidebar.sub-link href="{{ route('whatsapp.index') }}" icon="bi bi-chat-left-text"
+                                :active="request()->routeIs('whatsapp.*')">
+                                WhatsApp Center
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($isOwner && $router->has('settings.whatsapp.index'))
+                            <x-sidebar.sub-link href="{{ route('settings.whatsapp.index') }}" icon="bi bi-gear"
+                                :active="request()->routeIs('settings.whatsapp.*')">
+                                Pengaturan WhatsApp
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
                 </li>
             @endif
             @if ($isOwner && $router->has('settings.system.index'))

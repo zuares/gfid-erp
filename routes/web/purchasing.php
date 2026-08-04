@@ -138,6 +138,11 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->name('purchase_orders.unapprove');
         });
 
+        Route::middleware('role:owner,admin')->group(function () {
+            Route::post('purchase-orders/{purchase_order}/whatsapp', [PurchaseOrderController::class, 'sendWhatsapp'])
+                ->name('purchase_orders.whatsapp');
+        });
+
         // SUPPLIER INVOICE — owner + accounting (akses dikontrol di controller)
         Route::get('supplier-invoices', [SupplierInvoiceController::class, 'index'])
             ->name('supplier_invoices.index');
