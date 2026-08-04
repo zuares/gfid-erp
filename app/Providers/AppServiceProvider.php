@@ -18,13 +18,30 @@ class AppServiceProvider extends ServiceProvider
             $url = $event->request->url();
             if (str_contains($url, 'shopee')) {
                 try {
+                    $endpoint = parse_url($url, PHP_URL_PATH);
+                    $endpoint = is_string($endpoint) && $endpoint !== ''
+                        ? $endpoint
+                        : preg_replace('/\?.*$/', '', $url);
+
+                    // Simpan metadata/error ringkas saja. Payload penuh dan query
+                    // string berisi token Shopee sehingga tidak boleh masuk DB.
+                    $responsePayload = [
+                        'error' => $event->response->json('error'),
+                        'message' => $event->response->json('message'),
+                        'request_id' => $event->response->json('request_id'),
+                    ];
+                    $responsePayload = array_filter(
+                        $responsePayload,
+                        static fn ($value) => $value !== null && $value !== ''
+                    );
+
                     $log = \App\Models\ShopeeApiLog::create([
                         'method' => $event->request->method(),
-                        'endpoint' => $url,
-                        'request_payload' => $event->request->data(),
-                        'response_payload' => $event->response->json() ?? ['raw' => $event->response->body()],
+                        'endpoint' => $endpoint,
+                        'request_payload' => null,
+                        'response_payload' => $responsePayload ?: null,
                         'status_code' => $event->response->status(),
-                        'duration' => $event->response->handlerStats()['total_time'] * 1000 ?? 0,
+                        'duration' => ((float) ($event->response->handlerStats()['total_time'] ?? 0)) * 1000,
                     ]);
                     event(new \App\Events\ShopeeApiLogged($log));
                 } catch (\Exception $e) {
@@ -37,10 +54,15 @@ class AppServiceProvider extends ServiceProvider
             $url = $event->request->url();
             if (str_contains($url, 'shopee')) {
                 try {
+                    $endpoint = parse_url($url, PHP_URL_PATH);
+                    $endpoint = is_string($endpoint) && $endpoint !== ''
+                        ? $endpoint
+                        : preg_replace('/\?.*$/', '', $url);
+
                     $log = \App\Models\ShopeeApiLog::create([
                         'method' => $event->request->method(),
-                        'endpoint' => $url,
-                        'request_payload' => $event->request->data(),
+                        'endpoint' => $endpoint,
+                        'request_payload' => null,
                         'response_payload' => null,
                         'status_code' => 500, // or 0
                         'duration' => 0,

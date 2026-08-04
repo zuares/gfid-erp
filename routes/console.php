@@ -186,3 +186,14 @@ Schedule::call(fn () => Artisan::call('marketplace:cleanup-labels'))
     ->dailyAt('01:00')
     ->name('cleanup-labels')
     ->withoutOverlapping();
+
+// Pertahankan log API Shopee hanya 14 hari agar payload metadata tidak
+// tumbuh tanpa batas. Command akan membatalkan cleanup jika SQLite korup.
+Schedule::command('shopee:cleanup-api-logs', [
+        '--days' => 14,
+        '--redact-days' => 1,
+        '--force' => true,
+    ])
+    ->dailyAt('01:20')
+    ->name('cleanup-shopee-api-logs')
+    ->withoutOverlapping();
