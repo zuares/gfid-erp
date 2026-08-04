@@ -44,8 +44,8 @@
                 <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
                         <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
-                        <th data-ii-sort-key="ready_total" data-ii-sort-type="number" class="text-end">Total Ready</th>
-                        <th data-ii-sort-key="wip" data-ii-sort-type="number" class="text-end gf-hide-mobile">WIP (Sedang Jahit)</th>
+                        <th data-ii-sort-key="ready_total" data-ii-sort-type="number" class="text-end">Stok Siap</th>
+                        <th data-ii-sort-key="wip" data-ii-sort-type="number" class="text-end gf-hide-mobile">WIP Proses</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end gf-hide-mobile">Jual/hari</th>
                         <th data-ii-sort-key="cover" data-ii-sort-type="number" class="text-end" title="Cover = ready ÷ laju jual">Cover (hr)</th>
                         <th data-ii-sort-key="pipe" data-ii-sort-type="number" class="text-end gf-hide-mobile" title="Pipe = (ready + WIP) ÷ laju jual">Pipeline (hr)</th>
@@ -61,7 +61,7 @@
                             data-ads="{{ $r->ads }}"
                             data-sku="{{ $r->sku }}"
                             data-ready_total="{{ $r->ready_total }}"
-                            data-wip="{{ $r->wip }}"
+                            data-wip="{{ $r->wip_process }}"
                             data-pipe="{{ $r->pipe_cover_days ?? 99999 }}">
                             
                             <td style="padding-left: 1.25rem;">
@@ -76,7 +76,7 @@
                                     RTS: {{ $fmt($r->ready) }} | PRD: {{ $fmt($r->wh_prd) }}
                                 </div>
                             </td>
-                            <td class="text-end gf-hide-mobile text-muted">{{ $fmt($r->wip) }}</td>
+                            <td class="text-end gf-hide-mobile text-muted">{{ $fmt($r->wip_process) }}</td>
                             <td class="text-end gf-hide-mobile text-muted">{{ $fmt($r->ads, 1) }}</td>
                             <td class="text-end fw-semibold">{{ $r->cover_days === null ? '–' : $fmt($r->cover_days, 1) }}</td>
                             <td class="text-end gf-hide-mobile text-muted">{{ $r->pipe_cover_days === null ? '–' : $fmt($r->pipe_cover_days, 1) }}</td>

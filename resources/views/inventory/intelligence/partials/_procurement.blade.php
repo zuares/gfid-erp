@@ -1,6 +1,7 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
     $rows = $rows->where('production_source_key', 'external')->values();
+    $procurementDays = (int) ($filters['procurement_days'] ?? 60);
     $skuCount = $rows->count();
     $totalSuggested = (float) $rows->sum('suggested_qty');
     $statusLabel = [
@@ -15,10 +16,21 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
-        <span class="text-muted-ii" style="font-size:.72rem;">Forecast 60 hari · stok ready + WIP proses</span>
+        <span class="text-muted-ii" style="font-size:.72rem;">Forecast {{ $procurementDays }} hari · stok ready + WIP proses</span>
         <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
             placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
+
+        <select class="form-select form-select-sm" data-ii-procurement-days aria-label="Periode forecast pengadaan" style="max-width:150px;">
+            <option value="30" @selected($procurementDays === 30)>Forecast 30 hari</option>
+            <option value="60" @selected($procurementDays === 60)>Forecast 60 hari</option>
+        </select>
+
+        <select class="form-select form-select-sm" data-ii-action-filter aria-label="Filter pengadaan" style="max-width:190px;">
+            <option value="">Semua item FOB</option>
+            <option value="need">Perlu pengadaan (saran &gt; 0)</option>
+            <option value="none">Belum perlu pengadaan</option>
+        </select>
 
         <select class="form-select form-select-sm" data-ii-status aria-label="Status" style="max-width:140px;">
             <option value="">Semua Status</option>
@@ -56,7 +68,7 @@
                         <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
                         <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
-                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 60 hari ke depan">Forecast 60hr</th>
+                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan {{ $procurementDays }} hari ke depan">Forecast {{ $procurementDays }}hr</th>
                         <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Pengadaan</th>
                     </tr>
                 </thead>
@@ -70,7 +82,7 @@
                             data-cover="{{ $r->cover_days ?? 99999 }}"
                             data-ads="{{ $r->ads }}"
                             data-wads="{{ $r->wads }}"
-                            data-forecast="{{ $r->forecast_60 }}"
+                            data-forecast="{{ $r->procurement_forecast }}"
                             data-score="{{ $r->eval_score }}"
                             data-suggested="{{ $r->suggested_qty }}">
                             
@@ -90,7 +102,7 @@
                                 </div>
                             </td>
                             <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                            <td class="text-end text-muted">{{ $fmt($r->forecast_60) }}</td>
+                            <td class="text-end text-muted">{{ $fmt($r->procurement_forecast) }}</td>
                             <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #059669;">{{ $fmt($r->suggested_qty) }}</td>
                         </tr>
                     @endforeach
@@ -98,7 +110,9 @@
                 <tfoot>
                     <tr class="fw-semibold">
                         <td colspan="4" class="text-end">Total saran pengadaan</td>
-                        <td class="text-end" style="padding-right: 1.25rem; color: #059669;"><b>{{ $fmt($totalSuggested) }}</b></td>
+                        <td class="text-end" style="padding-right: 1.25rem; color: #059669;">
+                            <b data-ii-filtered-total>{{ $fmt($totalSuggested) }}</b>
+                        </td>
                     </tr>
                 </tfoot>
             </table>

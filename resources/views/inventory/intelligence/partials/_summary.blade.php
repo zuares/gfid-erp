@@ -1,5 +1,7 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
+    $productionDays = (int) ($filters['production_days'] ?? 30);
+    $procurementDays = (int) ($filters['procurement_days'] ?? 60);
 
     // SKU paling berisiko
     $critical = $rows
@@ -125,7 +127,7 @@
             <div class="kpi-inline-pct">{{ $summary['total_suggested'] > 0 ? 'need' : 'ok' }}</div>
         </div>
         <div class="kpi-val text-primary">{{ $fmt($summary['total_suggested']) }}</div>
-        <div class="kpi-note">pcs (target cover 21 hr)</div>
+        <div class="kpi-note">pcs (produksi {{ $productionDays }} hr · FOB {{ $procurementDays }} hr)</div>
         <div class="kpi-sub-list">
             <div class="kpi-sub-item">
                 <span class="kpi-sub-label"><i class="bi bi-hammer"></i><span>In-house</span></span>
@@ -262,9 +264,9 @@
                         <thead style="background: rgba(37, 99, 235, 0.05);">
                             <tr>
                                 <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
-                                <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Saat Ini</th>
+                                <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                                 <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
-                                <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 30 hari ke depan">Forecast 30hr</th>
+                                <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan {{ $productionDays }} hari ke depan">Forecast {{ $productionDays }}hr</th>
                                 <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem;">Saran Produksi</th>
                             </tr>
                         </thead>
@@ -274,9 +276,9 @@
                                     data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                                     data-status="{{ $r->status }}"
                                     data-sku="{{ $r->sku }}"
-                                    data-stock="{{ $r->ready_total }}"
+                                    data-stock="{{ $r->available_stock }}"
                                     data-ads="{{ $r->ads }}"
-                                    data-forecast="{{ $r->forecast_30 }}"
+                                    data-forecast="{{ $r->production_forecast }}"
                                     data-score="{{ $r->eval_score }}"
                                     data-suggested="{{ $r->suggested_qty }}">
                                     <td style="padding-left: 1.25rem;">
@@ -288,13 +290,13 @@
                                         </div>
                                     </td>
                                     <td class="text-end">
-                                        <div class="fw-semibold">{{ $fmt($r->ready_total) }}</div>
+                                        <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                         <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
-                                            RTS: {{ $fmt($r->ready) }} | PRD: {{ $fmt($r->wh_prd) }}
+                                            Ready+PRD: {{ $fmt($r->ready_total) }} | WIP: {{ $fmt($r->wip_process) }}
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                                    <td class="text-end text-muted">{{ $fmt($r->forecast_60) }}</td>
+                                    <td class="text-end text-muted">{{ $fmt($r->production_forecast) }}</td>
                                     <td class="text-end fw-bold" style="padding-right: 1.25rem;">
                                         <span style="background: #eff6ff; color: #2563eb; padding: 3px 8px; border-radius: 4px;">{{ $fmt($r->suggested_qty) }}</span>
                                     </td>
@@ -315,9 +317,10 @@
                         <thead style="background: rgba(16, 185, 129, 0.05);">
                             <tr>
                                 <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
+                                <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                                 <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
                                 <th data-ii-sort-key="score" data-ii-sort-type="number" class="text-end gf-hide-mobile">Skor</th>
-                                <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 60 hari ke depan">Forecast 60hr</th>
+                                <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan {{ $procurementDays }} hari ke depan">Forecast {{ $procurementDays }}hr</th>
                                 <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem;">Saran Pengadaan</th>
                             </tr>
                         </thead>
@@ -329,7 +332,7 @@
                                     data-sku="{{ $r->sku }}"
                                     data-stock="{{ $r->available_stock }}"
                                     data-ads="{{ $r->ads }}"
-                                    data-forecast="{{ $r->forecast_60 }}"
+                                    data-forecast="{{ $r->procurement_forecast }}"
                                     data-score="{{ $r->eval_score }}"
                                     data-suggested="{{ $r->suggested_qty }}">
                                     <td style="padding-left: 1.25rem;">
@@ -347,7 +350,8 @@
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                                    <td class="text-end text-muted">{{ $fmt($r->forecast_60) }}</td>
+                                    <td class="text-end fw-semibold gf-hide-mobile">{{ $fmt($r->eval_score) }}</td>
+                                    <td class="text-end text-muted">{{ $fmt($r->procurement_forecast) }}</td>
                                     <td class="text-end fw-bold" style="padding-right: 1.25rem;">
                                         <span style="background: #ecfdf5; color: #059669; padding: 3px 8px; border-radius: 4px;">{{ $fmt($r->suggested_qty) }}</span>
                                     </td>

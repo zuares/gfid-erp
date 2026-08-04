@@ -13,7 +13,7 @@
     $tabDesc = [
         'summary' => 'Ringkasan kesehatan stok seluruh SKU barang jadi.',
         'health' => 'Cover stok per SKU — mana yang menipis / kritis / stockout.',
-        'forecast' => 'Laju jual, perkiraan 30 hari, dan saran jumlah produksi.',
+        'forecast' => 'Forecast 30/60 hari, stok ready + WIP proses, dan saran produksi in-house.',
         'procurement' => 'Forecast 60 hari, stok ready + WIP proses, dan saran pengadaan eksternal (FOB).',
         'trend' => 'Pergerakan penjualan harian per SKU dan arah naik/turun.',
     ];
@@ -419,6 +419,8 @@
             const EXPORT_URL = @json(route('inventory.intelligence.export'));
             const SERVER_INITIAL = @json($initialTab);
             const TAB_DESC = @json($tabDesc);
+            let selectedProductionDays = Number(@json($filters['production_days'] ?? 30)) || 30;
+            let selectedProcurementDays = Number(@json($filters['procurement_days'] ?? 60)) || 60;
             const descEl = document.querySelector('.gf-master-desc');
             const setDesc = (name) => { if (descEl && TAB_DESC[name]) descEl.textContent = TAB_DESC[name]; };
 
@@ -440,6 +442,14 @@
                 const fd = new FormData(form);
                 const obj = {};
                 for (const [k, v] of fd.entries()) if (v !== '' && v != null) obj[k] = v;
+                const productionHorizon = paneByName('forecast')?.querySelector('[data-ii-production-days]')?.value;
+                if (productionHorizon) selectedProductionDays = Number(productionHorizon) || selectedProductionDays;
+                const procurementHorizon = paneByName('procurement')?.querySelector('[data-ii-procurement-days]')?.value;
+                if (procurementHorizon) selectedProcurementDays = Number(procurementHorizon) || selectedProcurementDays;
+                // Horizon adalah state bersama agar Ringkasan, Kesehatan, dan tab aksi
+                // selalu membaca parameter forecast yang sama.
+                obj.production_days = String(selectedProductionDays);
+                obj.procurement_days = String(selectedProcurementDays);
                 return obj;
             }
             function buildUrl(tab) {
@@ -645,16 +655,24 @@
                 const tbody = table.querySelector('tbody');
                 const q = (root.querySelector('[data-ii-search]')?.value || '').trim().toLowerCase();
                 const status = root.querySelector('[data-ii-status]')?.value || '';
+                const actionFilter = root.querySelector('[data-ii-action-filter],[data-ii-procurement-filter]')?.value || '';
                 const sort = root.querySelector('[data-ii-sort]')?.value || '';
 
                 const rows = Array.from(tbody.querySelectorAll('[data-ii-row]'));
                 let shown = 0;
+                let visibleSuggested = 0;
                 rows.forEach(r => {
                     let ok = true;
                     if (q && !(r.dataset.search || '').includes(q)) ok = false;
                     if (status && r.dataset.status !== status) ok = false;
+                    const suggested = parseFloat(r.dataset.suggested || '0') || 0;
+                    if (actionFilter === 'need' && suggested <= 0) ok = false;
+                    if (actionFilter === 'none' && suggested > 0) ok = false;
                     r.hidden = !ok;
-                    if (ok) shown++;
+                    if (ok) {
+                        shown++;
+                        visibleSuggested += suggested;
+                    }
                 });
 
                 const cmp = {
@@ -673,16 +691,22 @@
 
                 const cnt = root.querySelector('[data-ii-count]');
                 if (cnt) cnt.textContent = idFmt(shown) + ' SKU';
+                const total = root.querySelector('[data-ii-filtered-total]');
+                if (total) total.textContent = idFmt(visibleSuggested);
                 const empty = root.querySelector('[data-ii-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
             }
 
-            const II_SEL = '[data-ii-search],[data-ii-status],[data-ii-sort]';
+            const II_SEL = '[data-ii-search],[data-ii-status],[data-ii-sort],[data-ii-action-filter],[data-ii-procurement-filter]';
             document.addEventListener('input', (e) => {
                 if (!e.target.matches('[data-ii-search]')) return;
                 applyTableFilter(e.target.closest('[data-tab-panel]'));
             });
             document.addEventListener('change', (e) => {
+                if (e.target.matches('[data-ii-production-days],[data-ii-procurement-days]')) {
+                    applyFilters();
+                    return;
+                }
                 if (!e.target.matches(II_SEL)) return;
                 applyTableFilter(e.target.closest('[data-tab-panel]'));
             });

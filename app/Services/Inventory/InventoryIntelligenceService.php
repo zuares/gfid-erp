@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  * lalu menurunkan metrik forecast realtime:
  *   - forecast_30   = ADS × 30
  *   - forecast_60   = ADS × 60 (khusus saran pengadaan FOB)
- *   - suggested_qty = saran produksi 21 hari untuk in-house, atau
+ *   - suggested_qty = saran produksi sesuai horizon untuk in-house, atau
  *                     saran pengadaan 60 hari untuk FOB
  *   - status        = sehat / menipis / kritis / stockout / no_demand
  *
@@ -26,7 +26,9 @@ class InventoryIntelligenceService
 {
     private const COVER_TARGET = 21;      // hari cover dianggap "aman" (selaras ProductionPriorityService)
     private const FORECAST_HORIZON = 30;  // horizon forecast (hari)
+    private const PRODUCTION_HORIZONS = [30, 60];
     private const PROCUREMENT_HORIZON = 60; // horizon forecast pengadaan FOB (hari)
+    private const PROCUREMENT_HORIZONS = [30, 60];
     private const COVER_CRITICAL = 7;     // di bawah ini = kritis
     private const WEIGHT_LAMBDA = 0.92;   // peluruhan harian wADS (half-life ~8-9 hari)
 
@@ -52,8 +54,10 @@ class InventoryIntelligenceService
             ->keyBy('id');
 
         $series = $this->demandSeries($filters, self::FORECAST_HORIZON);
+        $productionHorizon = $this->productionHorizon($filters);
+        $procurementHorizon = $this->procurementHorizon($filters);
 
-        return $items->map(function ($item) use ($snapshot, $series) {
+        return $items->map(function ($item) use ($snapshot, $series, $productionHorizon, $procurementHorizon) {
             $s = $snapshot->get($item->id);
 
             $readyRts = (float) ($s->ready_stock ?? 0);
@@ -73,11 +77,13 @@ class InventoryIntelligenceService
 
             $forecast30 = round($ads * self::FORECAST_HORIZON, 1);
             $forecast60 = round($ads * self::PROCUREMENT_HORIZON, 1);
+            $productionForecast = round($ads * $productionHorizon, 1);
+            $procurementForecast = round($ads * $procurementHorizon, 1);
             $productionSuggested = $ads > 0
-                ? max(0.0, round(self::COVER_TARGET * $ads - $availableStock, 0))
+                ? max(0.0, round($productionForecast - $availableStock, 0))
                 : 0.0;
             $procurementSuggested = $ads > 0
-                ? max(0.0, round($forecast60 - $availableStock, 0))
+                ? max(0.0, round($procurementForecast - $availableStock, 0))
                 : 0.0;
             $suggested = $item->is_made_in_house ? $productionSuggested : $procurementSuggested;
 
@@ -114,6 +120,10 @@ class InventoryIntelligenceService
                 'pipe_cover_days' => $pipeCover,
                 'forecast_30' => $forecast30,
                 'forecast_60' => $forecast60,
+                'production_days' => $productionHorizon,
+                'production_forecast' => $productionForecast,
+                'procurement_days' => $procurementHorizon,
+                'procurement_forecast' => $procurementForecast,
                 'production_suggested_qty' => $productionSuggested,
                 'procurement_suggested_qty' => $procurementSuggested,
                 'suggested_qty' => $suggested,
@@ -152,6 +162,24 @@ class InventoryIntelligenceService
             ->filter(fn ($r) => $r->suggested_qty > 0)
             ->sortByDesc('suggested_qty')
             ->values();
+    }
+
+    private function procurementHorizon(array $filters): int
+    {
+        $requested = (int) ($filters['procurement_days'] ?? self::PROCUREMENT_HORIZON);
+
+        return in_array($requested, self::PROCUREMENT_HORIZONS, true)
+            ? $requested
+            : self::PROCUREMENT_HORIZON;
+    }
+
+    private function productionHorizon(array $filters): int
+    {
+        $requested = (int) ($filters['production_days'] ?? self::FORECAST_HORIZON);
+
+        return in_array($requested, self::PRODUCTION_HORIZONS, true)
+            ? $requested
+            : self::FORECAST_HORIZON;
     }
 
     /**

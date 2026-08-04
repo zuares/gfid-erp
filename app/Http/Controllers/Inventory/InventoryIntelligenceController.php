@@ -117,8 +117,8 @@ class InventoryIntelligenceController extends Controller
             'skuCount' => $rows->count(),
             'totalSuggested' => (float) $rows->sum('suggested_qty'),
             'draftType' => $isProcurement ? 'procurement' : 'production',
-            'forecastDays' => $isProcurement ? 60 : 30,
-            'forecastField' => $isProcurement ? 'forecast_60' : 'forecast_30',
+            'forecastDays' => $isProcurement ? $filters['procurement_days'] : $filters['production_days'],
+            'forecastField' => $isProcurement ? 'procurement_forecast' : 'production_forecast',
             'suggestionLabel' => $isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi',
         ]);
     }
@@ -141,7 +141,9 @@ class InventoryIntelligenceController extends Controller
             fwrite($out, "\xEF\xBB\xBF"); // BOM
             fputcsv($out, [
                 'SKU', 'Produk', 'Kategori', 'Jual/hari', 'Ready', 'WIP proses', 'Stok tersedia',
-                'Cover (hari)', $isProcurement ? 'Forecast 60hr' : 'Forecast 30hr',
+                'Cover (hari)', $isProcurement
+                    ? 'Forecast ' . $filters['procurement_days'] . 'hr'
+                    : 'Forecast ' . $filters['production_days'] . 'hr',
                 $isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi', 'Status',
             ]);
             foreach ($rows as $r) {
@@ -154,7 +156,7 @@ class InventoryIntelligenceController extends Controller
                     $r->wip_process,
                     $r->available_stock,
                     $r->cover_days,
-                    $isProcurement ? $r->forecast_60 : $r->forecast_30,
+                    $isProcurement ? $r->procurement_forecast : $r->production_forecast,
                     $r->suggested_qty,
                     $r->status,
                 ]);
@@ -168,9 +170,20 @@ class InventoryIntelligenceController extends Controller
     /** Parse filter (item_id, category_id). Tidak ada rentang tanggal (window snapshot tetap). */
     private function resolveFilters(Request $request): array
     {
+        $procurementDays = (int) $request->input('procurement_days', 60);
+        if (!in_array($procurementDays, [30, 60], true)) {
+            $procurementDays = 60;
+        }
+        $productionDays = (int) $request->input('production_days', 30);
+        if (!in_array($productionDays, [30, 60], true)) {
+            $productionDays = 30;
+        }
+
         return [
             'item_id' => $request->input('item_id') ?: null,
             'category_id' => $request->input('category_id') ?: null,
+            'production_days' => $productionDays,
+            'procurement_days' => $procurementDays,
         ];
     }
 

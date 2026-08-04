@@ -1,6 +1,7 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
     $rows = $rows->where('production_source_key', 'own')->values();
+    $productionDays = (int) ($filters['production_days'] ?? 30);
     $skuCount = $rows->count();
     $totalSuggested = (float) $rows->sum('suggested_qty');
     $statusLabel = [
@@ -15,9 +16,21 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
+        <span class="text-muted-ii" style="font-size:.72rem;">Forecast {{ $productionDays }} hari · stok ready + WIP proses</span>
         <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
             placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
+
+        <select class="form-select form-select-sm" data-ii-production-days aria-label="Periode forecast produksi" style="max-width:150px;">
+            <option value="30" @selected($productionDays === 30)>Forecast 30 hari</option>
+            <option value="60" @selected($productionDays === 60)>Forecast 60 hari</option>
+        </select>
+
+        <select class="form-select form-select-sm" data-ii-action-filter aria-label="Filter produksi" style="max-width:190px;">
+            <option value="">Semua item In-House</option>
+            <option value="need">Perlu produksi (saran &gt; 0)</option>
+            <option value="none">Belum perlu produksi</option>
+        </select>
 
         <select class="form-select form-select-sm" data-ii-status aria-label="Status" style="max-width:140px;">
             <option value="">Semua Status</option>
@@ -54,9 +67,9 @@
                 <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
                         <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
-                        <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Saat Ini</th>
+                        <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
-                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 30 hari ke depan">Forecast 30hr</th>
+                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan {{ $productionDays }} hari ke depan">Forecast {{ $productionDays }}hr</th>
                         <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Produksi</th>
                     </tr>
                 </thead>
@@ -66,11 +79,11 @@
                             data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                             data-status="{{ $r->status }}"
                             data-sku="{{ $r->sku }}"
-                            data-stock="{{ $r->ready_total }}"
+                            data-stock="{{ $r->available_stock }}"
                             data-cover="{{ $r->cover_days ?? 99999 }}"
                             data-ads="{{ $r->ads }}"
                             data-wads="{{ $r->wads }}"
-                            data-forecast="{{ $r->forecast_30 }}"
+                            data-forecast="{{ $r->production_forecast }}"
                             data-score="{{ $r->eval_score }}"
                             data-suggested="{{ $r->suggested_qty }}">
                             
@@ -84,13 +97,13 @@
                             </td>
 
                             <td class="text-end">
-                                <div class="fw-semibold">{{ $fmt($r->ready_total) }}</div>
+                                <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                 <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
-                                    RTS: {{ $fmt($r->ready) }} | PRD: {{ $fmt($r->wh_prd) }}
+                                    Ready+PRD: {{ $fmt($r->ready_total) }} | WIP: {{ $fmt($r->wip_process) }}
                                 </div>
                             </td>
                             <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                            <td class="text-end text-muted">{{ $fmt($r->forecast_30) }}</td>
+                            <td class="text-end text-muted">{{ $fmt($r->production_forecast) }}</td>
                             <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #2563eb;">{{ $fmt($r->suggested_qty) }}</td>
                         </tr>
                     @endforeach
@@ -98,7 +111,9 @@
                 <tfoot>
                     <tr class="fw-semibold">
                         <td colspan="4" class="text-end">Total saran produksi</td>
-                        <td class="text-end" style="padding-right: 1.25rem; color: #2563eb;"><b>{{ $fmt($totalSuggested) }}</b></td>
+                        <td class="text-end" style="padding-right: 1.25rem; color: #2563eb;">
+                            <b data-ii-filtered-total>{{ $fmt($totalSuggested) }}</b>
+                        </td>
                     </tr>
                 </tfoot>
             </table>
