@@ -22,6 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *  - summary  : KPI kesehatan stok (Executive Summary).
  *  - health   : tabel kesehatan stok per SKU (ready/wip/ads/cover/status).
  *  - forecast : ADS, forecast 30 hari, saran produksi per SKU.
+ *  - procurement: ADS, forecast 60 hari, saran pengadaan FOB per SKU.
  */
 class InventoryIntelligenceController extends Controller
 {
@@ -98,7 +99,11 @@ class InventoryIntelligenceController extends Controller
     {
         $filters = $this->resolveFilters($request);
         $itemIds = $this->resolveItemIds($request);
-        $rows = $this->service->productionDraft($filters, $itemIds);
+        $source = $this->resolveDraftSource($request);
+        $isProcurement = $source === 'external';
+        $rows = $isProcurement
+            ? $this->service->procurementDraft($filters, $itemIds)
+            : $this->service->productionDraft($filters, $itemIds);
 
         $category = $filters['category_id'] ? ItemCategory::find($filters['category_id']) : null;
         $item = $filters['item_id'] ? Item::find($filters['item_id']) : null;
@@ -106,11 +111,15 @@ class InventoryIntelligenceController extends Controller
         return view('inventory.intelligence.slip', [
             'rows' => $rows,
             'printedAt' => now(),
-            'fileName' => 'saran-produksi-' . now()->format('Ymd-Hi'),
+            'fileName' => ($isProcurement ? 'saran-pengadaan-fob-' : 'saran-produksi-') . now()->format('Ymd-Hi'),
             'categoryLabel' => $category?->name,
             'itemLabel' => $item ? $item->code . ' — ' . $item->name : null,
             'skuCount' => $rows->count(),
             'totalSuggested' => (float) $rows->sum('suggested_qty'),
+            'draftType' => $isProcurement ? 'procurement' : 'production',
+            'forecastDays' => $isProcurement ? 60 : 30,
+            'forecastField' => $isProcurement ? 'forecast_60' : 'forecast_30',
+            'suggestionLabel' => $isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi',
         ]);
     }
 
@@ -119,24 +128,33 @@ class InventoryIntelligenceController extends Controller
     {
         $filters = $this->resolveFilters($request);
         $itemIds = $this->resolveItemIds($request);
-        $rows = $this->service->productionDraft($filters, $itemIds);
+        $source = $this->resolveDraftSource($request);
+        $isProcurement = $source === 'external';
+        $rows = $isProcurement
+            ? $this->service->procurementDraft($filters, $itemIds)
+            : $this->service->productionDraft($filters, $itemIds);
 
-        $fileName = 'saran-produksi-' . now()->format('Ymd-His') . '.csv';
+        $fileName = ($isProcurement ? 'saran-pengadaan-fob-' : 'saran-produksi-') . now()->format('Ymd-His') . '.csv';
 
-        return response()->streamDownload(function () use ($rows) {
+        return response()->streamDownload(function () use ($rows, $isProcurement) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM
-            fputcsv($out, ['SKU', 'Produk', 'Kategori', 'Jual/hari', 'Ready', 'WIP', 'Cover (hari)', 'Forecast 30hr', 'Saran Produksi', 'Status']);
+            fputcsv($out, [
+                'SKU', 'Produk', 'Kategori', 'Jual/hari', 'Ready', 'WIP proses', 'Stok tersedia',
+                'Cover (hari)', $isProcurement ? 'Forecast 60hr' : 'Forecast 30hr',
+                $isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi', 'Status',
+            ]);
             foreach ($rows as $r) {
                 fputcsv($out, [
                     $r->sku,
                     $r->product,
                     $r->category,
                     $r->ads,
-                    $r->ready,
-                    $r->wip,
+                    $r->ready_total,
+                    $r->wip_process,
+                    $r->available_stock,
                     $r->cover_days,
-                    $r->forecast_30,
+                    $isProcurement ? $r->forecast_60 : $r->forecast_30,
                     $r->suggested_qty,
                     $r->status,
                 ]);
@@ -170,6 +188,12 @@ class InventoryIntelligenceController extends Controller
             ->unique()
             ->values()
             ->all();
+    }
+
+    /** Mode draft untuk tombol slip/export: default tetap saran produksi. */
+    private function resolveDraftSource(Request $request): string
+    {
+        return $request->input('source') === 'external' ? 'external' : 'own';
     }
 
     /** Nama blade partial untuk sebuah tab. */

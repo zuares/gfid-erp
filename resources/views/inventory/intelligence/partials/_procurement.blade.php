@@ -15,6 +15,7 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
+        <span class="text-muted-ii" style="font-size:.72rem;">Forecast 60 hari · stok ready + WIP proses</span>
         <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
             placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
@@ -53,9 +54,9 @@
                 <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
                         <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
-                        <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Saat Ini</th>
+                        <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
-                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 30 hari ke depan">Forecast 30hr</th>
+                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 60 hari ke depan">Forecast 60hr</th>
                         <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Pengadaan</th>
                     </tr>
                 </thead>
@@ -65,11 +66,11 @@
                             data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                             data-status="{{ $r->status }}"
                             data-sku="{{ $r->sku }}"
-                            data-stock="{{ $r->ready_total }}"
+                            data-stock="{{ $r->available_stock }}"
                             data-cover="{{ $r->cover_days ?? 99999 }}"
                             data-ads="{{ $r->ads }}"
                             data-wads="{{ $r->wads }}"
-                            data-forecast="{{ $r->forecast_30 }}"
+                            data-forecast="{{ $r->forecast_60 }}"
                             data-score="{{ $r->eval_score }}"
                             data-suggested="{{ $r->suggested_qty }}">
                             
@@ -83,13 +84,13 @@
                             </td>
 
                             <td class="text-end">
-                                <div class="fw-semibold">{{ $fmt($r->ready_total) }}</div>
+                                <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                 <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
-                                    RTS: {{ $fmt($r->ready) }} | PRD: {{ $fmt($r->wh_prd) }}
+                                    Ready+PRD: {{ $fmt($r->ready_total) }} | WIP: {{ $fmt($r->wip_process) }}
                                 </div>
                             </td>
                             <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                            <td class="text-end text-muted">{{ $fmt($r->forecast_30) }}</td>
+                            <td class="text-end text-muted">{{ $fmt($r->forecast_60) }}</td>
                             <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #059669;">{{ $fmt($r->suggested_qty) }}</td>
                         </tr>
                     @endforeach

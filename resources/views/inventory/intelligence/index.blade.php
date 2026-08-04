@@ -14,7 +14,7 @@
         'summary' => 'Ringkasan kesehatan stok seluruh SKU barang jadi.',
         'health' => 'Cover stok per SKU — mana yang menipis / kritis / stockout.',
         'forecast' => 'Laju jual, perkiraan 30 hari, dan saran jumlah produksi.',
-        'procurement' => 'Laju jual, perkiraan 30 hari, dan saran pengadaan eksternal.',
+        'procurement' => 'Forecast 60 hari, stok ready + WIP proses, dan saran pengadaan eksternal (FOB).',
         'trend' => 'Pergerakan penjualan harian per SKU dan arah naik/turun.',
     ];
 @endphp
@@ -762,6 +762,8 @@
             // ---- Production Action: slip cetak + export CSV (ikut filter aktif) ----
             function actionUrl(base) {
                 const params = new URLSearchParams(currentFilters());
+                if (activeName() === 'procurement') params.set('source', 'external');
+                if (activeName() === 'forecast') params.set('source', 'own');
                 return base + (params.toString() ? '?' + params.toString() : '');
             }
             document.addEventListener('click', (e) => {

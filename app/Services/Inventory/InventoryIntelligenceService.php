@@ -15,7 +15,9 @@ use Illuminate\Support\Facades\DB;
  * Menggabungkan snapshot stok + laju jual dengan metadata item (finished_good)
  * lalu menurunkan metrik forecast realtime:
  *   - forecast_30   = ADS × 30
- *   - suggested_qty = max(0, (COVER_TARGET × ADS) − ready − wip)
+ *   - forecast_60   = ADS × 60 (khusus saran pengadaan FOB)
+ *   - suggested_qty = saran produksi 21 hari untuk in-house, atau
+ *                     saran pengadaan 60 hari untuk FOB
  *   - status        = sehat / menipis / kritis / stockout / no_demand
  *
  * Read-only. Tidak membuat tabel/kolom. Sumber kebenaran sama dgn modul Produksi.
@@ -24,6 +26,7 @@ class InventoryIntelligenceService
 {
     private const COVER_TARGET = 21;      // hari cover dianggap "aman" (selaras ProductionPriorityService)
     private const FORECAST_HORIZON = 30;  // horizon forecast (hari)
+    private const PROCUREMENT_HORIZON = 60; // horizon forecast pengadaan FOB (hari)
     private const COVER_CRITICAL = 7;     // di bawah ini = kritis
     private const WEIGHT_LAMBDA = 0.92;   // peluruhan harian wADS (half-life ~8-9 hari)
 
@@ -55,17 +58,28 @@ class InventoryIntelligenceService
 
             $readyRts = (float) ($s->ready_stock ?? 0);
             $readyAllocated = (float) ($s->ready_allocated ?? 0);
+            $siapJahit = (float) ($s->siap_jahit ?? 0);
+            $sedangJahit = (float) ($s->sedang_jahit ?? 0);
             $whPrd = (float) ($s->wh_prd ?? 0);
             $readyTotal = $readyRts + $whPrd;
             $wip = (float) ($s->wip_stock ?? 0);
+            // wip_stock juga membawa WH-PRD. Gunakan hanya WIP proses di sini
+            // agar readyTotal + WIP tidak menghitung WH-PRD dua kali.
+            $wipProcess = max(0.0, $siapJahit + $sedangJahit);
+            $availableStock = $readyTotal + $wipProcess;
             $ads = (float) ($s->ads ?? 0);
             $cover = $s->cover_days ?? null;
             $pipeCover = $s->pipe_cover_days ?? null;
 
-            $forecast = round($ads * self::FORECAST_HORIZON, 1);
-            $suggested = $ads > 0
-                ? max(0.0, round(self::COVER_TARGET * $ads - $readyTotal - $wip, 0))
+            $forecast30 = round($ads * self::FORECAST_HORIZON, 1);
+            $forecast60 = round($ads * self::PROCUREMENT_HORIZON, 1);
+            $productionSuggested = $ads > 0
+                ? max(0.0, round(self::COVER_TARGET * $ads - $availableStock, 0))
                 : 0.0;
+            $procurementSuggested = $ads > 0
+                ? max(0.0, round($forecast60 - $availableStock, 0))
+                : 0.0;
+            $suggested = $item->is_made_in_house ? $productionSuggested : $procurementSuggested;
 
             $vals = $series->get($item->id, array_fill(0, self::FORECAST_HORIZON, 0.0));
             $wads = $this->weightedAds($vals);
@@ -86,6 +100,10 @@ class InventoryIntelligenceService
                 'wh_prd' => $whPrd,
                 'ready_total' => $readyTotal,
                 'wip' => $wip,
+                'siap_jahit' => $siapJahit,
+                'sedang_jahit' => $sedangJahit,
+                'wip_process' => $wipProcess,
+                'available_stock' => $availableStock,
                 's7' => (float) ($s->s7 ?? 0),
                 's14' => (float) ($s->s14 ?? 0),
                 's30' => (float) ($s->s30 ?? 0),
@@ -94,7 +112,10 @@ class InventoryIntelligenceService
                 'ads_lift' => round($wads - $ads, 2),
                 'cover_days' => $cover,
                 'pipe_cover_days' => $pipeCover,
-                'forecast_30' => $forecast,
+                'forecast_30' => $forecast30,
+                'forecast_60' => $forecast60,
+                'production_suggested_qty' => $productionSuggested,
+                'procurement_suggested_qty' => $procurementSuggested,
                 'suggested_qty' => $suggested,
                 'eval_score' => $this->evalScore($ads, $cover, $wads, $status),
                 'status' => $status,
@@ -115,6 +136,18 @@ class InventoryIntelligenceService
     public function productionDraft(array $filters, array $itemIds = []): Collection
     {
         return $this->rows($filters)
+            ->where('production_source_key', 'own')
+            ->when(!empty($itemIds), fn ($rows) => $rows->whereIn('item_id', $itemIds))
+            ->filter(fn ($r) => $r->suggested_qty > 0)
+            ->sortByDesc('suggested_qty')
+            ->values();
+    }
+
+    /** Draft saran pengadaan FOB berbasis forecast 60 hari dan stok ready + WIP proses. */
+    public function procurementDraft(array $filters, array $itemIds = []): Collection
+    {
+        return $this->rows($filters)
+            ->where('production_source_key', 'external')
             ->when(!empty($itemIds), fn ($rows) => $rows->whereIn('item_id', $itemIds))
             ->filter(fn ($r) => $r->suggested_qty > 0)
             ->sortByDesc('suggested_qty')

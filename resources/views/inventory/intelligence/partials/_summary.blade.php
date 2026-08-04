@@ -294,7 +294,7 @@
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                                    <td class="text-end text-muted">{{ $fmt($r->forecast_30) }}</td>
+                                    <td class="text-end text-muted">{{ $fmt($r->forecast_60) }}</td>
                                     <td class="text-end fw-bold" style="padding-right: 1.25rem;">
                                         <span style="background: #eff6ff; color: #2563eb; padding: 3px 8px; border-radius: 4px;">{{ $fmt($r->suggested_qty) }}</span>
                                     </td>
@@ -317,7 +317,7 @@
                                 <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
                                 <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
                                 <th data-ii-sort-key="score" data-ii-sort-type="number" class="text-end gf-hide-mobile">Skor</th>
-                                <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 30 hari ke depan">Forecast 30hr</th>
+                                <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan 60 hari ke depan">Forecast 60hr</th>
                                 <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem;">Saran Pengadaan</th>
                             </tr>
                         </thead>
@@ -327,9 +327,9 @@
                                     data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                                     data-status="{{ $r->status }}"
                                     data-sku="{{ $r->sku }}"
-                                    data-stock="{{ $r->ready_total }}"
+                                    data-stock="{{ $r->available_stock }}"
                                     data-ads="{{ $r->ads }}"
-                                    data-forecast="{{ $r->forecast_30 }}"
+                                    data-forecast="{{ $r->forecast_60 }}"
                                     data-score="{{ $r->eval_score }}"
                                     data-suggested="{{ $r->suggested_qty }}">
                                     <td style="padding-left: 1.25rem;">
@@ -341,13 +341,13 @@
                                         </div>
                                     </td>
                                     <td class="text-end">
-                                        <div class="fw-semibold">{{ $fmt($r->ready_total) }}</div>
+                                        <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                         <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
-                                            RTS: {{ $fmt($r->ready) }} | PRD: {{ $fmt($r->wh_prd) }}
+                                            Ready+PRD: {{ $fmt($r->ready_total) }} | WIP: {{ $fmt($r->wip_process) }}
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                                    <td class="text-end text-muted">{{ $fmt($r->forecast_30) }}</td>
+                                    <td class="text-end text-muted">{{ $fmt($r->forecast_60) }}</td>
                                     <td class="text-end fw-bold" style="padding-right: 1.25rem;">
                                         <span style="background: #ecfdf5; color: #059669; padding: 3px 8px; border-radius: 4px;">{{ $fmt($r->suggested_qty) }}</span>
                                     </td>

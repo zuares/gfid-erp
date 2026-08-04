@@ -15,6 +15,10 @@
         'sehat' => 'Sehat',
         'no_demand' => 'Tanpa demand',
     ];
+    $isProcurement = ($draftType ?? 'production') === 'procurement';
+    $forecastDays = $forecastDays ?? ($isProcurement ? 60 : 30);
+    $forecastField = $forecastField ?? ($isProcurement ? 'forecast_60' : 'forecast_30');
+    $suggestionLabel = $suggestionLabel ?? ($isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi');
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -138,11 +142,11 @@
         <div class="slip-head">
             <div class="slip-brand">
                 {{ config('app.name', 'Inventory') }}
-                <small>Saran Produksi</small>
+                <small>{{ $suggestionLabel }}</small>
             </div>
             <div class="slip-title">
-                <b>Draft Saran Produksi</b>
-                <span>Target cover {{ 21 }} hari</span>
+                <b>Draft {{ $suggestionLabel }}</b>
+                <span>Forecast {{ $forecastDays }} hari, termasuk stok WIP proses</span>
             </div>
         </div>
 
@@ -154,7 +158,7 @@
         </dl>
 
         @if ($rows->isEmpty())
-            <div class="empty">Tidak ada saran produksi untuk filter ini.<br>Semua SKU tercukupi (saran 0).</div>
+            <div class="empty">Tidak ada {{ strtolower($suggestionLabel) }} untuk filter ini.<br>Semua SKU tercukupi (saran 0).</div>
         @else
             <div class="hero">
                 @if ($groups->count() > 1)
@@ -171,9 +175,9 @@
                     </div>
                 @endif
                 <div class="hero-total">
-                    <div class="hero-label">Total Saran Produksi</div>
+                    <div class="hero-label">Total {{ $suggestionLabel }}</div>
                     <div class="hero-amount">{{ $fmt($totalSuggested) }} pcs</div>
-                    <div class="hero-sub">{{ $fmt($skuCount) }} SKU perlu diproduksi</div>
+                    <div class="hero-sub">{{ $fmt($skuCount) }} SKU perlu ditindaklanjuti</div>
                 </div>
             </div>
 
@@ -181,10 +185,10 @@
                 <thead>
                     <tr>
                         <th>Produk</th>
-                        <th class="num">Ready</th>
-                        <th class="num">WIP</th>
+                        <th class="num">Ready + PRD</th>
+                        <th class="num">WIP proses</th>
                         <th class="num">Cover</th>
-                        <th class="num">F30</th>
+                        <th class="num">F{{ $forecastDays }}</th>
                         <th class="num">Saran</th>
                     </tr>
                 </thead>
@@ -205,10 +209,10 @@
                                         @endif
                                     </span>
                                 </td>
-                                <td class="num">{{ $fmt($l->ready) }}</td>
-                                <td class="num">{{ $fmt($l->wip) }}</td>
+                                <td class="num">{{ $fmt($l->ready_total) }}</td>
+                                <td class="num">{{ $fmt($l->wip_process) }}</td>
                                 <td class="num">{{ $l->cover_days === null ? '–' : $fmt($l->cover_days, 1) }}</td>
-                                <td class="num">{{ $fmt($l->forecast_30) }}</td>
+                                <td class="num">{{ $fmt($l->{$forecastField}) }}</td>
                                 <td class="num saran">{{ $fmt($l->suggested_qty) }}</td>
                             </tr>
                         @endforeach
@@ -228,7 +232,8 @@
             </div>
 
             <div class="foot-note">
-                Saran = maks(0, 21 × laju jual − ready − WIP). F30 = laju jual × 30. Angka mengikuti data realtime saat dicetak.
+                Saran = maks(0, forecast {{ $forecastDays }} hari − (ready + PRD + WIP proses)).
+                Forecast {{ $forecastDays }} = laju jual × {{ $forecastDays }}. Angka mengikuti data realtime saat dicetak.
             </div>
         @endif
     </div>
