@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceLogisticsService;
 
 use Illuminate\Http\Request;
@@ -125,7 +124,7 @@ class MarketplaceBookingController extends Controller
     public function detail(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->gateway;
+            $driver  = $this->manager->driver($store);
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
@@ -185,7 +184,7 @@ class MarketplaceBookingController extends Controller
     public function tracking(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->gateway;
+            $driver  = $this->manager->driver($store);
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
             $orderSn = ($booking && $booking->order_sn) ? $booking->order_sn : null;
@@ -253,6 +252,7 @@ class MarketplaceBookingController extends Controller
     public function shippingParameter(Store $store, string $bookingSn)
     {
         try {
+            $driver = $this->manager->driver($store);
             // Toko nonaktif / kredensial korup: jawab jelas tanpa membanjiri log.
             if (! $store->is_active) {
                 return response()->json(['error' => true, 'message' => 'Toko nonaktif — hubungkan ulang untuk memakai fitur ini.'], 422);
@@ -282,6 +282,7 @@ class MarketplaceBookingController extends Controller
     public function ship(Store $store, string $bookingSn, Request $request)
     {
         try {
+            $driver = $this->manager->driver($store);
             // Concurrency guard: cegah double-click / rapid retry memicu API ganda
             $lockKey = "shipBooking:{$store->id}:{$bookingSn}";
             $lock = Cache::lock($lockKey, 30);
@@ -453,7 +454,7 @@ class MarketplaceBookingController extends Controller
     public function printDocument(Store $store, string $bookingSn)
     {
         try {
-            $driver  = $this->gateway;
+            $driver  = $this->manager->driver($store);
             $booking = MarketplaceBooking::where('store_id', $store->id)
                 ->where('booking_sn', $bookingSn)->first();
 
@@ -634,6 +635,8 @@ class MarketplaceBookingController extends Controller
             foreach ($grouped as $storeId => $storeBookings) {
                 $store = Store::find($storeId);
                 if (!$store) continue;
+
+                $driver = $this->manager->driver($store);
 
                                 if (!method_exists($driver, 'createBookingShippingDocument')) continue;
 

@@ -17,12 +17,14 @@ class MarketplaceLogisticsController extends Controller
 {
     public function __construct(
         protected MarketplaceApiGateway $gateway,
-        protected MarketplaceLogisticsService $logistics
+        protected MarketplaceLogisticsService $logistics,
+        protected ChannelManager $manager
     ) {}
 
     public function syncAwb(Store $store, string $orderSn): JsonResponse
     {
         try {
+            $driver = $this->manager->driver($store);
                         $order = MarketplaceOrder::where('store_id', $store->id)
                 ->where(function ($q) use ($orderSn) {
                     $q->where('channel_order_id', $orderSn)
@@ -103,7 +105,8 @@ class MarketplaceLogisticsController extends Controller
     public function getShippingParameter(Store $store, string $orderSn): JsonResponse
     {
         try {
-                        $raw = $driver->getShippingParameter($store, $orderSn);
+            $driver = $this->manager->driver($store);
+            $raw = $driver->getShippingParameter($store, $orderSn);
 
             // Jaring pengaman Pesanan Kilat: bila $orderSn ternyata booking_sn
             // (baris kilat belum MATCHED), Shopee menjawab "order_sn ... not exist".
@@ -147,7 +150,8 @@ class MarketplaceLogisticsController extends Controller
     public function getBookingDetail(Store $store, string $orderSn): JsonResponse
     {
         try {
-                        if (method_exists($driver, 'getBookingDetail')) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getBookingDetail')) {
                 $result = $this->ensureSuccess($driver->getBookingDetail($store, $orderSn));
                 return response()->json($result);
             }
@@ -163,7 +167,8 @@ class MarketplaceLogisticsController extends Controller
     public function getOrderDetailRaw(Store $store, string $orderSn): JsonResponse
     {
         try {
-                        if (method_exists($driver, 'getOrderDetail')) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getOrderDetail')) {
                 $result = $this->ensureSuccess($driver->getOrderDetail($store, [$orderSn]));
                 return response()->json($result);
             }
@@ -179,7 +184,8 @@ class MarketplaceLogisticsController extends Controller
     public function getPackageDetailRaw(Store $store, string $packageNumber): JsonResponse
     {
         try {
-                        if (method_exists($driver, 'getPackageDetail')) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getPackageDetail')) {
                 $result = $this->ensureSuccess($driver->getPackageDetail($store, $packageNumber));
                 return response()->json($result);
             }
@@ -195,7 +201,8 @@ class MarketplaceLogisticsController extends Controller
     public function getReturnListRaw(Store $store, Request $request): JsonResponse
     {
         try {
-                        if (method_exists($driver, 'getReturnList')) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getReturnList')) {
                 $pageNo = (int) $request->input('page_no', 0);
                 $pageSize = (int) $request->input('page_size', 20);
                 $result = $this->ensureSuccess($driver->getReturnList($store, $pageNo, $pageSize));
@@ -213,7 +220,8 @@ class MarketplaceLogisticsController extends Controller
     public function getBookingList(Store $store, Request $request): JsonResponse
     {
         try {
-                        if (method_exists($driver, 'getBookingList')) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getBookingList')) {
                 $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
                 $timeTo = $request->input('time_to', time());
                 $status = $request->input('booking_status', '');
@@ -233,7 +241,8 @@ class MarketplaceLogisticsController extends Controller
     public function getOrderList(Store $store, Request $request): JsonResponse
     {
         try {
-                        if (method_exists($driver, 'getOrders')) {
+            $driver = $this->manager->driver($store);
+            if (method_exists($driver, 'getOrders')) {
                 $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
                 $timeTo = $request->input('time_to', time());
                 $status = $request->input('order_status', '');
@@ -290,7 +299,7 @@ class MarketplaceLogisticsController extends Controller
     public function printDocument(Store $store, string $orderSn)
     {
         try {
-                        
+            $driver = $this->manager->driver($store);
             $order = MarketplaceOrder::where('store_id', $store->id)
                 ->where('channel_order_id', $orderSn)
                 ->first();
@@ -976,7 +985,8 @@ class MarketplaceLogisticsController extends Controller
     public function getTrackingInfo(Store $store, $orderSn, Request $request)
     {
         try {
-                        if (!method_exists($driver, 'getTrackingInfo')) {
+            $driver = $this->manager->driver($store);
+            if (!method_exists($driver, 'getTrackingInfo')) {
                 return response()->json(['error' => true, 'message' => 'Driver tidak mendukung pelacakan'], 400);
             }
 
