@@ -3307,7 +3307,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             rows = rows.filter(o => {
                 // Order kilat dipisahkan ke sub-tab "Pengiriman Kilat" (keluar dari yang lain).
                 if (subTabReady === 'kilat') {
-                    return o.is_kilat && ['MATCHED', 'READY_TO_SHIP'].includes(o.order_status);
+                    return o.is_kilat && o.order_status === 'READY_TO_SHIP';
                 }
                 if (subTabReady === 'unpaid')  return o.order_status === 'UNPAID' && !o.is_kilat;
                 if (subTabReady === 'process') return o.order_status !== 'UNPAID' && !o.is_kilat;
