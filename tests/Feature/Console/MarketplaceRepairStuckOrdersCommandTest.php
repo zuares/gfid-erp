@@ -183,6 +183,39 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         });
     }
 
+    public function test_sync_manual_melewati_toko_nonaktif(): void
+    {
+        $this->store->update(['is_active' => false]);
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('syncOrders');
+        });
+
+        $request = SyncOrdersRequest::create('/api/marketplace/stores/1/sync-orders', 'POST', [
+            'time_from' => now()->subDay()->timestamp,
+            'time_to' => now()->timestamp,
+            'page_size' => 50,
+            'sync_bookings' => 1,
+        ]);
+
+        $response = app(MarketplaceController::class)->syncOrders($request, $this->store);
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($payload['skipped']);
+        $this->assertSame('skipped', $payload['status']);
+    }
+
+    public function test_sync_booking_job_melewati_toko_nonaktif(): void
+    {
+        $this->store->update(['is_active' => false]);
+
+        $manager = $this->mock(ChannelManager::class);
+        $manager->shouldNotReceive('driver');
+
+        (new SyncMarketplaceBookings($this->store))->handle($manager);
+    }
+
     public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
     {
         $order = $this->createOrder('REPAIR-MOVE-READY', 'PROCESSED');

@@ -18,6 +18,7 @@ class SyncMarketplaceBookingsCommand extends Command
 
         $stores = Store::with('channel')
             ->where('is_active', true)
+            ->where('status', 'active')
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->get()
             ->filter(fn ($s) => ! blank($s->credential('access_token')));

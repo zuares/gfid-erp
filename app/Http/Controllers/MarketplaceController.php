@@ -2486,6 +2486,16 @@ class MarketplaceController extends Controller
     private function ensureStoreReadyForBackgroundSync(Store $store, bool $refreshExpiredToken = true): ?JsonResponse
     {
         $store->loadMissing('channel');
+
+        if (! $store->is_active || $store->status !== 'active') {
+            return response()->json([
+                'success' => true,
+                'status'  => 'skipped',
+                'skipped' => true,
+                'message' => "Sync dilewati: toko {$store->name} sedang nonaktif.",
+            ]);
+        }
+
         $status = $store->connection_status;
 
         if ($status === 'TOKEN_EXPIRED' && $refreshExpiredToken) {

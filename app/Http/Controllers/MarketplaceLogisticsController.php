@@ -261,6 +261,15 @@ class MarketplaceLogisticsController extends Controller
      */
     public function syncBookings(Store $store, Request $request): JsonResponse
     {
+        if (! $store->is_active || $store->status !== 'active') {
+            return response()->json([
+                'success' => true,
+                'status'  => 'skipped',
+                'skipped' => true,
+                'message' => "Sync dilewati: toko {$store->name} sedang nonaktif.",
+            ]);
+        }
+
         try {
             $timeFrom = $request->input('time_from') ? (int) $request->input('time_from') : (time() - 86400 * 14);
             $timeTo   = $request->input('time_to')   ? (int) $request->input('time_to')   : time();

@@ -40,6 +40,11 @@ class SyncMarketplaceBookings implements ShouldQueue
 
     public function handle(ChannelManager $manager): void
     {
+        if (! $this->store->is_active || $this->store->status !== 'active') {
+            Log::info("SyncMarketplaceBookings skipped inactive store [{$this->store->id}].");
+            return;
+        }
+
         try {
             $driver = $manager->driver($this->store);
             if (! method_exists($driver, 'getBookingList')) {

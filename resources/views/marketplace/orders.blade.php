@@ -1430,7 +1430,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             if (!bgSyncStoresCache) {
                 bgSyncStoresCache = await api('/api/marketplace/stores');
             }
-            const activeStores = bgSyncStoresCache.filter(s => s.is_active);
+            const activeStores = bgSyncStoresCache.filter(s => s.is_active && s.status === 'active');
             if (!activeStores.length) {
                 el.innerHTML = '<div style="padding:.4rem;font-size:.72rem;color:#94a3b8">Tidak ada toko aktif.</div>';
                 return;
@@ -3753,7 +3753,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
         try {
             const stores = await api('/api/marketplace/stores');
-            const active = stores.filter(s => s.connection_status === 'CONNECTED');
+            const active = stores.filter(s => s.is_active && s.status === 'active' && s.connection_status === 'CONNECTED');
 
             if (!active.length) {
                 document.getElementById('qsAlert').className = 'alert alert-warning';
@@ -3907,7 +3907,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         try {
             qsSetProgress(5, 'Mengambil daftar toko…');
             const stores = await api('/api/marketplace/stores');
-            const active = stores.filter(s => s.connection_status === 'CONNECTED');
+            const active = stores.filter(s => s.is_active && s.status === 'active' && s.connection_status === 'CONNECTED');
 
             if (!active.length) {
                 document.getElementById('qsResultIcon').textContent = '⚠️';
@@ -4058,7 +4058,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
         try {
             const stores = await api('/api/marketplace/stores');
-            let storesToSync = stores.filter(s => s.connection_status === 'CONNECTED');
+            let storesToSync = stores.filter(s => s.is_active && s.status === 'active' && s.connection_status === 'CONNECTED');
             
             if (activeStore) {
                 storesToSync = storesToSync.filter(s => s.id == activeStore);
