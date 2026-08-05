@@ -110,7 +110,9 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->name('sync-returns')
     ->withoutOverlapping();
 
-Schedule::call(fn () => Artisan::call('marketplace:sync-settlements'))
+Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
+        '--all' => true,
+    ]))
     ->cron('7 */4 * * *') // tiap 4 jam di menit :07 (sebelumnya :00, tabrakan dengan sync-finance)
     ->name('sync-settlements')
     ->withoutOverlapping();

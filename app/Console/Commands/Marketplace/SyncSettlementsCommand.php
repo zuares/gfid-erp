@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Command ini tetap bisa dijalankan manual kapan saja untuk backfill/`--resync`/
  * `--order` spesifik/`--all` (loop banyak batch) — lock per toko (lihat
- * LOCK_TTL_SECONDS) memastikan eksekusi manual dan scheduler untuk toko yang sama
+ * config marketplace.settlement_lock_ttl memastikan eksekusi manual dan scheduler untuk toko yang sama
  * tidak tumpang tindih. Kunci ini SAMA dengan yang dipakai
  * `MarketplaceController::syncSettlements()` (tombol "Tarik Settlement Baru" di
  * /marketplace/settlement) — ketiga jalur (scheduler, CLI manual, tombol UI)
@@ -47,8 +47,6 @@ class SyncSettlementsCommand extends Command
      * batch), supaya proses lain (mis. --resync manual untuk toko sama) tidak bisa
      * menyelinap di antara dua batch yang sedang berjalan.
      */
-    private const LOCK_TTL_SECONDS = 900; // 15 menit — lihat audit pola lock TTL command lain
-
     /**
      * Pengaman mode --all: jangan biarkan berjalan tanpa batas.
      */
@@ -164,8 +162,10 @@ class SyncSettlementsCommand extends Command
             return self::SUCCESS;
         }
 
+        $lockTtlSeconds = (int) config('marketplace.settlement_lock_ttl', 3600);
+
         if ($all) {
-            $this->warn('Mode --all aktif. Lock TTL per toko: ' . self::LOCK_TTL_SECONDS . ' detik (15 menit). ' .
+            $this->warn('Mode --all aktif. Lock TTL per toko: ' . $lockTtlSeconds . ' detik. ' .
                 'Batas pengaman: maksimal ' . self::ALL_MAX_BATCHES . ' batch atau ' . (self::ALL_MAX_RUNTIME_SECONDS / 60) . ' menit runtime, mana yang tercapai lebih dulu.');
         }
 
@@ -180,7 +180,7 @@ class SyncSettlementsCommand extends Command
             $this->info(sprintf('[%d/%d] %s', $index + 1, $stores->count(), $store->name));
 
             $lockKey = "sync_settlements_store_{$store->id}";
-            $lock = Cache::lock($lockKey, self::LOCK_TTL_SECONDS);
+            $lock = Cache::lock($lockKey, $lockTtlSeconds);
 
             if (! $lock->get()) {
                 $this->warn('Hasil: Dilewati (toko sedang disinkronkan proses lain)');

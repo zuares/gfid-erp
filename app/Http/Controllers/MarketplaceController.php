@@ -3423,9 +3423,12 @@ class MarketplaceController extends Controller
             : url('/marketplace/settings');
 
         // Kunci yang SAMA dengan yang dipakai `marketplace:sync-settlements` (lihat
-        // SyncSettlementsCommand::LOCK_TTL_SECONDS) supaya sync manual dari tombol UI dan
+        // config marketplace.settlement_lock_ttl) supaya sync manual dari tombol UI dan
         // sync dari scheduler/CLI untuk toko yang sama tidak bisa tumpang tindih.
-        $lock = \Illuminate\Support\Facades\Cache::lock("sync_settlements_store_{$store->id}", 900);
+        $lock = \Illuminate\Support\Facades\Cache::lock(
+            "sync_settlements_store_{$store->id}",
+            (int) config('marketplace.settlement_lock_ttl', 3600)
+        );
 
         if (! $lock->get()) {
             return response()->json([

@@ -728,23 +728,24 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertDatabaseMissing('marketplace_order_settlements', ['channel_order_id' => $orderBad->channel_order_id]);
     }
 
-    // ── Retry: transient (429/5xx) di-retry, 4xx lain tidak ─────────────────────
-    public function test_retry_untuk_429_lalu_sukses()
+    // ── Retry transient ditangani channel; service tidak retry ganda ────────────
+    public function test_rate_limit_dicatat_tanpa_retry_ganda_di_service()
     {
         $order = $this->createOrder();
 
         $this->mockDriver(function (MockInterface $mock) use ($order) {
             $mock->shouldReceive('getEscrowDetail')
-                ->times(2) // percobaan 1: 429, percobaan 2: sukses
-                ->andReturn(
-                    ['error' => 'rate_limited', 'message' => 'Too many requests', '_meta' => ['http_status' => 429, 'retry_after' => 0]],
-                    $this->escrowResponse(['final_income' => 1000, 'order_sn' => $order->channel_order_id]),
-                );
+                ->once()
+                ->andReturn(['error' => 'rate_limited', 'message' => 'Too many requests', '_meta' => ['http_status' => 429, 'retry_after' => 0]]);
         });
 
         $result = app(MarketplaceSyncService::class)->syncSettlements($this->store);
 
-        $this->assertSame(1, $result['synced']);
+        $this->assertSame(1, $result['errors']);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'settlement_sync_error_code' => 'rate_limit',
+        ]);
     }
 
     public function test_tidak_retry_untuk_4xx_selain_429()
@@ -762,26 +763,53 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(1, $result['errors']);
     }
 
-    public function test_retry_untuk_connection_exception()
+    public function test_connection_exception_dicatat_tanpa_retry_ganda_di_service()
     {
         $order = $this->createOrder();
 
         $this->mockDriver(function (MockInterface $mock) use ($order) {
             $mock->shouldReceive('getEscrowDetail')
-                ->times(2)
-                ->andReturnUsing(function () use ($order) {
-                    static $calls = 0;
-                    $calls++;
-                    if ($calls === 1) {
-                        throw new ConnectionException('Connection timed out');
-                    }
-                    return $this->escrowResponse(['final_income' => 1000, 'order_sn' => $order->channel_order_id]);
-                });
+                ->once()
+                ->andThrow(new ConnectionException('Connection timed out'));
         });
 
         $result = app(MarketplaceSyncService::class)->syncSettlements($this->store);
 
-        $this->assertSame(1, $result['synced']);
+        $this->assertSame(1, $result['errors']);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'settlement_sync_error_code' => 'connection_exception',
+        ]);
+    }
+
+    public function test_error_transient_dicoba_lagi_setelah_cooldown()
+    {
+        $order = $this->createOrder([
+            'settlement_sync_error_code' => 'server_error',
+            'settlement_sync_failed_at' => now(),
+            'settlement_sync_last_attempt_at' => now(),
+        ]);
+
+        $service = app(MarketplaceSyncService::class);
+        $first = $service->syncSettlements($this->store);
+        $this->assertSame(0, $first['found']);
+
+        $order->update(['settlement_sync_last_attempt_at' => now()->subHours(2)]);
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse(['final_income' => 1000, 'order_sn' => $order->channel_order_id]));
+        });
+
+        $second = $service->syncSettlements($this->store);
+
+        $this->assertSame(1, $second['found']);
+        $this->assertSame(1, $second['synced']);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'settlement_sync_error_code' => null,
+        ]);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1054,18 +1082,15 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
 
         $this->mockDriver(function (MockInterface $mock) use ($order) {
             $mock->shouldReceive('getEscrowDetail')
-                ->times(2) // percobaan 1: 429, percobaan 2: sukses
-                ->andReturn(
-                    ['error' => 'rate_limited', 'message' => 'Too many requests', '_meta' => ['http_status' => 429, 'retry_after' => 0]],
-                    $this->escrowResponse($this->realisticIncomeFields(['order_sn' => $order->channel_order_id])),
-                );
+                ->once()
+                ->andReturn(['error' => 'rate_limited', 'message' => 'Too many requests', '_meta' => ['http_status' => 429, 'retry_after' => 0]]);
         });
 
         $result = app(MarketplaceSyncService::class)->syncSettlements($this->store);
 
-        $this->assertSame(1, $result['synced']);
+        $this->assertSame(1, $result['errors']);
         $this->assertNotNull($result['last_call_meta']);
-        $this->assertSame(2, $result['last_call_meta']['attempts']);
+        $this->assertSame(1, $result['last_call_meta']['attempts']);
     }
 
     // ── 12. Duration tersedia pada result ───────────────────────────────────────

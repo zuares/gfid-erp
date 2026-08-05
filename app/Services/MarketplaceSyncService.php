@@ -271,6 +271,28 @@ class MarketplaceSyncService
         ];
     }
 
+    private function retryableSettlementErrorCode(array $response, string $errorCode): ?string
+    {
+        $status = data_get($response, '_meta.http_status');
+        $normalized = strtolower($errorCode);
+
+        if ($status === 429 || str_contains($normalized, 'rate_limit')) {
+            return 'rate_limit';
+        }
+
+        if (is_numeric($status) && (int) $status >= 500) {
+            return 'server_error';
+        }
+
+        if ($normalized === 'connection_exception') {
+            return 'connection_exception';
+        }
+
+        return in_array($normalized, self::RETRYABLE_SETTLEMENT_ERROR_CODES, true)
+            ? $normalized
+            : null;
+    }
+
     /**
      * Sync order berdasarkan daftar order_sn spesifik (tanpa get_order_list).
      * Dipakai backfill Pesanan Kilat: booking yang sudah MATCHED punya order_sn,
@@ -490,6 +512,17 @@ class MarketplaceSyncService
     /** Status order yang memang sudah boleh ditarik detail settlement-nya. */
     public const SETTLEMENT_ELIGIBLE_ORDER_STATUSES = ['COMPLETED'];
 
+    /** Error sementara tetap boleh dicoba lagi setelah cooldown. */
+    private const RETRYABLE_SETTLEMENT_ERROR_CODES = [
+        'connection_exception',
+        'rate_limit',
+        'rate_limited',
+        'rate_limit_cooldown',
+        'server_error',
+        'service_unavailable',
+        'timeout',
+    ];
+
     /**
      * Field settlement yang dianggap "material" untuk keperluan logging perubahan
      * saat --resync (BUKAN untuk tabel histori — histori sengaja belum dibuat di Fase 1,
@@ -577,6 +610,12 @@ class MarketplaceSyncService
                       ->where(function ($synced) use ($cooldownAt) {
                           $synced->whereNull('marketplace_order_settlements.synced_at')
                               ->orWhere('marketplace_order_settlements.synced_at', '<=', $cooldownAt);
+                      })
+                      ->where(function ($attempt) use ($cooldownAt) {
+                          // Error transient pada settlement pending juga harus
+                          // menunggu cooldown sebelum dipilih lagi dalam --all.
+                          $attempt->whereNull('marketplace_orders.settlement_sync_last_attempt_at')
+                              ->orWhere('marketplace_orders.settlement_sync_last_attempt_at', '<=', $cooldownAt);
                       });
                 });
             });
@@ -584,8 +623,12 @@ class MarketplaceSyncService
         if ($orderSn) {
             $query->where('channel_order_id', $orderSn);
         } else {
-            // Abaikan order dengan permanent failure saat memproses batch
-            $query->whereNull('settlement_sync_error_code');
+            // Abaikan error permanen, tetapi jangan mengunci order selamanya
+            // hanya karena API sedang rate-limit, 5xx, atau koneksi putus.
+            $query->where(function ($errors) {
+                $errors->whereNull('settlement_sync_error_code')
+                    ->orWhereIn('settlement_sync_error_code', self::RETRYABLE_SETTLEMENT_ERROR_CODES);
+            });
         }
         if ($timeFrom) {
             $query->where('ordered_at', '>=', now()->setTimestamp($timeFrom));
@@ -696,13 +739,20 @@ class MarketplaceSyncService
                 if ($validation['status'] === 'error') {
                     $errors++;
                     $failedOrderIds[] = $order->channel_order_id;
-                    Log::warning("[sync-settlements] Order {$order->channel_order_id} gagal validasi ({$validation['reason']}): {$validation['message']}");
-                    
-                    // Tandai error code untuk semua error yang lolos retry agar order
-                    // bermasalah tidak terus-menerus memblokir limit batch.
+                    $errorCode = (string) ($validation['reason'] ?? 'api_error');
+                    $retryableCode = $this->retryableSettlementErrorCode($response, $errorCode);
+                    Log::warning("[sync-settlements] Order {$order->channel_order_id} gagal validasi ({$errorCode}): {$validation['message']}", [
+                        'retryable' => $retryableCode !== null,
+                        'http_status' => data_get($response, '_meta.http_status'),
+                    ]);
+
+                    // Error transient dicatat untuk observabilitas, tetapi tetap
+                    // boleh dipilih lagi setelah cooldown. Error permanen tetap
+                    // dikeluarkan dari batch reguler sampai sync eksplisit.
                     $order->update([
-                        'settlement_sync_error_code' => $validation['reason'] ?? 'api_error',
+                        'settlement_sync_error_code' => $retryableCode ?? $errorCode,
                         'settlement_sync_failed_at' => now(),
+                        'settlement_sync_last_attempt_at' => now(),
                     ]);
                     
                     continue;
@@ -1015,15 +1065,8 @@ class MarketplaceSyncService
     }
 
     /**
-     * Panggil getEscrowDetail() dengan retry terbatas — HANYA untuk kegagalan
-     * transient (ConnectionException, HTTP 429, HTTP 5xx). Tidak retry untuk error
-     * 4xx lain (dianggap permanen: validasi/permission/order tidak valid).
-     *
-     * Membaca status HTTP dari `_meta.http_status` (lihat ShopeeChannel::withHttpMeta()),
-     * BUKAN dari pencocokan string bebas terhadap field 'message'/'error' Shopee.
-     *
-     * Tidak pernah mencetak/mencatat token atau credential — hanya menerima $orderSn
-     * (string) dan mengembalikan response API apa adanya (ditambah _meta).
+     * Panggil getEscrowDetail() sekali setelah channel menyelesaikan retry internal.
+     * Status HTTP tetap dibawa untuk klasifikasi error dan observabilitas.
      */
     /**
      * @return array{payload:array, meta:array{attempts:int, http_status:mixed, retry_after:mixed, token_refreshed:null, duration_ms:float}}
@@ -1036,71 +1079,22 @@ class MarketplaceSyncService
         ?callable $progress = null,
     ): array
     {
-        // CATATAN KONSOLIDASI: loop retry transien (429/5xx/koneksi putus) yang dulu
-        // ada di sini DIHAPUS — sekarang ditangani SATU kali di lapisan channel
-        // (ShopeeChannel::resilientRequest: backoff + cooldown 429 global per toko).
-        // Dobel retry di dua lapis = hingga 9 panggilan API untuk satu order gagal.
-        // Wrapper ini dipertahankan hanya untuk instrumentasi (durasi, http_status)
-        // dengan BENTUK RETURN yang sama persis (payload + meta) supaya
-        // validateEscrowIncome()/mapEscrowSettlement()/laporan --inspect tidak berubah.
+        // Retry transient dilakukan satu kali di lapisan channel
+        // (ShopeeChannel::resilientRequest). Wrapper ini hanya untuk instrumentasi;
+        // retry kedua di sini sebelumnya dapat memicu sampai enam panggilan API
+        // untuk satu order yang sama.
         $startedAt = hrtime(true);
-        $attempts = 0;
-        $maxAttempts = $waitForRateLimit ? 13 : 2;
-        $maxCooldownWaits = $waitForRateLimit ? 12 : 0;
-        $cooldownWaits = 0;
-        $response = [];
+        $attempts = 1;
 
-        do {
-            $attempts++;
-
-            try {
-                $response = $driver->getEscrowDetail($store, $orderSn);
-            } catch (\Illuminate\Http\Client\ConnectionException $e) {
-                $response = [
-                    'error'   => 'connection_exception',
-                    'message' => $e->getMessage(),
-                    '_meta'   => ['http_status' => null, 'retry_after' => null],
-                ];
-            }
-
-            $status = $response['_meta']['http_status'] ?? null;
-            $error  = (string) ($response['error'] ?? '');
-            $msg    = strtolower((string) ($response['message'] ?? ''));
-            $isRateLimited = $status === 429
-                || str_contains(strtolower($error), 'rate_limit')
-                || str_contains($msg, 'rate limit');
-            $isConnectionException = $error === 'connection_exception';
-            $isServerError = is_int($status) && $status >= 500;
-            $shouldRetry = ($isRateLimited || $isConnectionException || $isServerError) && $attempts < $maxAttempts;
-
-            if (! $shouldRetry) {
-                break;
-            }
-
-            if ($isRateLimited && $waitForRateLimit && $cooldownWaits < $maxCooldownWaits) {
-                $retryAfter = (int) ($response['_meta']['retry_after'] ?? 0);
-                if ($retryAfter <= 0) {
-                    $retryAfter = (int) config('shopee.rate_limit_cooldown', 30);
-                }
-
-                $sleepSeconds = max(1, $retryAfter + random_int(1, 3));
-                $cooldownWaits++;
-                Log::warning("[sync-settlements] Rate limit cooldown untuk order {$orderSn} di toko {$store->id}; menunggu {$sleepSeconds}s lalu retry (attempt {$attempts}).");
-                $this->reportProgress($progress, [
-                    'status'        => 'running',
-                    'phase'         => 'retry_wait',
-                    'percent'       => null,
-                    'label'         => "Rate limit, menunggu {$sleepSeconds}s untuk order {$orderSn}…",
-                    'store_id'      => $store->id,
-                    'store_name'    => $store->name,
-                    'current_order' => $orderSn,
-                    'retry_after'   => $sleepSeconds,
-                    'attempts'      => $attempts,
-                ]);
-                set_time_limit(max(180, $sleepSeconds + 60));
-                sleep($sleepSeconds);
-            }
-        } while (true);
+        try {
+            $response = $driver->getEscrowDetail($store, $orderSn);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $response = [
+                'error'   => 'connection_exception',
+                'message' => $e->getMessage(),
+                '_meta'   => ['http_status' => null, 'retry_after' => null],
+            ];
+        }
 
         $durationMs = (hrtime(true) - $startedAt) / 1_000_000;
 
