@@ -2861,7 +2861,11 @@ class MarketplaceController extends Controller
             $arr['booking_sn']             = $bookingSn ?: null;
             $liveStatus = $liveOrderStatuses[$o->id]['status'] ?? null;
             $liveNeedsShipping = $liveOrderStatuses[$o->id]['needs_shipping'] ?? null;
+            $liveLogisticsStatus = $liveOrderStatuses[$o->id]['logistics_status'] ?? null;
+            $livePlatformPending = $liveOrderStatuses[$o->id]['platform_pending'] ?? null;
             $arr['api_order_status']       = $liveStatus;
+            $arr['api_logistics_status']   = $liveLogisticsStatus;
+            $arr['api_platform_pending']   = $livePlatformPending;
             $arr['status_source']          = $liveStatus ? 'api' : 'database';
             if ($liveStatus) {
                 $arr['order_status'] = ($liveNeedsShipping === true)
@@ -3098,6 +3102,8 @@ class MarketplaceController extends Controller
                     // termasuk PROCESSED yang belum punya resi/package/document.
                     'order_status'                => $needsShipping ? 'READY_TO_SHIP' : $bookingStatus,
                     'api_order_status'            => $liveStatus,
+                    'api_logistics_status'        => $liveBookingStatuses[$b->id]['logistics_status'] ?? null,
+                    'api_platform_pending'        => $liveBookingStatuses[$b->id]['platform_pending'] ?? null,
                     // Simpan status booking lokal juga agar UI tetap bisa
                     // membedakan PENDING/PROCESSED saat live API dibatasi
                     // dengan scope matched demi menjaga kecepatan halaman.
@@ -3205,6 +3211,12 @@ class MarketplaceController extends Controller
 
                         $keys = array_filter([$detail['booking_sn'] ?? null, $detail['order_sn'] ?? null]);
                         $package = data_get($detail, 'package_list.0', []);
+                        $logisticsStatus = strtoupper((string) (
+                            data_get($package, 'logistics_status')
+                            ?? data_get($detail, 'logistics_status')
+                            ?? ''
+                        ));
+                        $platformPending = $logisticsStatus === 'LOGISTICS_NOT_START';
                         $hasShippingArtifact = filled($detail['tracking_number'] ?? null)
                             || filled($detail['package_number'] ?? null)
                             || filled($detail['shipping_document_status'] ?? null)
@@ -3218,6 +3230,8 @@ class MarketplaceController extends Controller
                                 $result[$orderId] = [
                                     'status' => $status,
                                     'needs_shipping' => $needsShipping,
+                                    'logistics_status' => $logisticsStatus ?: null,
+                                    'platform_pending' => $platformPending,
                                 ];
                             }
                         }
@@ -3244,8 +3258,20 @@ class MarketplaceController extends Controller
                             continue;
                         }
 
+                        $package = data_get($detail, 'package_list.0', []);
+                        $logisticsStatus = strtoupper((string) (
+                            data_get($package, 'logistics_status')
+                            ?? data_get($detail, 'logistics_status')
+                            ?? ''
+                        ));
+                        $platformPending = $logisticsStatus === 'LOGISTICS_NOT_START';
+
                         foreach ($keyToOrderIds[(string) $id] ?? [] as $orderId) {
-                            $result[$orderId] = ['status' => $status];
+                            $result[$orderId] = [
+                                'status' => $status,
+                                'logistics_status' => $logisticsStatus ?: null,
+                                'platform_pending' => $platformPending,
+                            ];
                         }
                     }
                 } catch (\Throwable $e) {
@@ -3294,6 +3320,11 @@ class MarketplaceController extends Controller
                         }
 
                         $package = data_get($detail, 'package_list.0', []);
+                        $logisticsStatus = strtoupper((string) (
+                            data_get($package, 'logistics_status')
+                            ?? data_get($detail, 'logistics_status')
+                            ?? ''
+                        ));
                         $hasShippingArtifact = filled($detail['tracking_number'] ?? null)
                             || filled($detail['package_number'] ?? null)
                             || filled($detail['shipping_document_status'] ?? null)
@@ -3303,6 +3334,8 @@ class MarketplaceController extends Controller
 
                         $result[$booking->id] = [
                             'status' => $status,
+                            'logistics_status' => $logisticsStatus ?: null,
+                            'platform_pending' => $logisticsStatus === 'LOGISTICS_NOT_START',
                             // Booking PROCESSED tanpa bukti pengaturan kirim tetap
                             // diperlakukan sebagai READY_TO_SHIP di UI.
                             'needs_shipping' => ! $hasShippingArtifact

@@ -520,6 +520,38 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('database', $row['status_source']);
     }
 
+    public function test_local_orders_memindahkan_logistics_not_start_ke_subtab_tertunda(): void
+    {
+        $order = $this->createOrder('LIVE-LOGISTICS-PENDING', 'READY_TO_SHIP');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getOrderDetail')->once()->andReturn([
+                'response' => [
+                    'order_list' => [[
+                        'order_sn' => 'LIVE-LOGISTICS-PENDING',
+                        'order_status' => 'READY_TO_SHIP',
+                        'package_list' => [[
+                            'logistics_status' => 'LOGISTICS_NOT_START',
+                        ]],
+                    ]],
+                ],
+            ]);
+        });
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=active',
+            'GET',
+            ['live_status' => '1', 'live_status_scope' => 'active'],
+        ));
+
+        $row = collect(app(MarketplaceController::class)->localOrders()->getData(true))
+            ->firstWhere('id', $order->id);
+
+        $this->assertSame('READY_TO_SHIP', $row['api_order_status']);
+        $this->assertSame('LOGISTICS_NOT_START', $row['api_logistics_status']);
+        $this->assertTrue($row['api_platform_pending']);
+    }
+
     public function test_live_status_scope_matched_tidak_memanggil_api_untuk_processed(): void
     {
         $order = $this->createOrder('LIVE-SCOPE-PROCESSED', 'PROCESSED');

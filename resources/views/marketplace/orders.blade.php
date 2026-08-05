@@ -2698,11 +2698,15 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     function isPendingOrder(o) {
-        return platformOrderStatus(o) === 'PENDING';
+        return platformOrderStatus(o) === 'PENDING'
+            || o.api_platform_pending === true
+            || String(o.api_logistics_status || '').toUpperCase() === 'LOGISTICS_NOT_START';
     }
 
     function isKilatReadyToShip(o) {
-        return !!o.is_kilat && platformOrderStatus(o) === 'READY_TO_SHIP';
+        return !!o.is_kilat
+            && platformOrderStatus(o) === 'READY_TO_SHIP'
+            && !isPendingOrder(o);
     }
 
     // MATCHED/PROCESSED tanpa bukti pengiriman belum dapat diatur dari
