@@ -3098,6 +3098,10 @@ class MarketplaceController extends Controller
                     // termasuk PROCESSED yang belum punya resi/package/document.
                     'order_status'                => $needsShipping ? 'READY_TO_SHIP' : $bookingStatus,
                     'api_order_status'            => $liveStatus,
+                    // Simpan status booking lokal juga agar UI tetap bisa
+                    // membedakan PENDING/PROCESSED saat live API dibatasi
+                    // dengan scope matched demi menjaga kecepatan halaman.
+                    'platform_status'             => $bookingStatus,
                     'status_source'               => $liveStatus ? 'api' : 'database',
                     'ordered_at'                  => $b->create_time
                         ? \Carbon\Carbon::createFromTimestamp($b->create_time)->toIso8601String()

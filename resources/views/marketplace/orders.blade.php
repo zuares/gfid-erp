@@ -835,6 +835,8 @@ body[data-theme="dark"] .ord-table tbody tr td {
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
                 <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Proses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
                 <button class="ord-subtab" data-sub="kilat" onclick="switchSubTabReady('kilat', this)">⚡ Kilat <span class="ord-badge bg-secondary" id="badge-sub-ready-kilat">—</span></button>
+                <button class="ord-subtab" data-sub="pending" onclick="switchSubTabReady('pending', this)" title="Status platform masih tertunda">⏳ Tertunda <span class="ord-badge bg-secondary" id="badge-sub-ready-pending">—</span></button>
+                <button class="ord-subtab" data-sub="blocked" onclick="switchSubTabReady('blocked', this)" title="Platform belum mengizinkan pengaturan pengiriman">🚫 Belum Bisa Atur <span class="ord-badge bg-secondary" id="badge-sub-ready-blocked">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
             </div>
             <div id="subTabShippedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
@@ -2543,8 +2545,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         let unpaidCount = 0;
         let processCount = 0;
         let kilatCount = 0;
+        let pendingCount = 0;
+        let blockedCount = 0;
         readyRows.forEach(o => {
-            if (o.is_kilat) kilatCount++;
+            if (isPendingOrder(o)) pendingCount++;
+            else if (isKilatPlatformBlocked(o)) blockedCount++;
+            else if (isKilatReadyToShip(o)) kilatCount++;
             else if (o.order_status === 'UNPAID') unpaidCount++;
             else processCount++;
         });
@@ -2556,6 +2562,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (badgeSubReadyProcess) badgeSubReadyProcess.textContent = processCount;
         const badgeSubReadyKilat = $('badge-sub-ready-kilat');
         if (badgeSubReadyKilat) badgeSubReadyKilat.textContent = kilatCount;
+        const badgeSubReadyPending = $('badge-sub-ready-pending');
+        if (badgeSubReadyPending) badgeSubReadyPending.textContent = pendingCount;
+        const badgeSubReadyBlocked = $('badge-sub-ready-blocked');
+        if (badgeSubReadyBlocked) badgeSubReadyBlocked.textContent = blockedCount;
         
         const shippedRows = filterByTab(rows, 'shipped');
         let shippedOnlyCount = 0;
@@ -2676,6 +2686,30 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         return o.is_kilat && (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no));
     }
 
+    // Status platform menjadi acuan untuk memisahkan sub-tab. Saat API live
+    // tersedia, api_order_status tetap menyimpan status asli meskipun
+    // order_status dinormalisasi menjadi READY_TO_SHIP karena belum ada bukti
+    // pengaturan pengiriman.
+    function platformOrderStatus(o) {
+        return String(o.api_order_status || o.platform_status || o.order_status || '').toUpperCase();
+    }
+
+    function isPendingOrder(o) {
+        return platformOrderStatus(o) === 'PENDING';
+    }
+
+    function isKilatReadyToShip(o) {
+        return !!o.is_kilat && platformOrderStatus(o) === 'READY_TO_SHIP';
+    }
+
+    // MATCHED/PROCESSED tanpa bukti pengiriman belum dapat diatur dari
+    // platform. Pisahkan dari Kilat supaya tidak terlihat siap diproses.
+    function isKilatPlatformBlocked(o) {
+        return !!o.is_kilat
+            && kilatNeedsArrange(o)
+            && ['MATCHED', 'PROCESSED'].includes(platformOrderStatus(o));
+    }
+
     // ── Table ─────────────────────────────────────────────────────────────
     function filterByTab(rows, tab) {
         if (tab === 'issues') return rows.filter(TAB_FILTERS.issues);
@@ -2699,8 +2733,12 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             return rows.filter(o => {
                 if (hasLiveStatus(o)) {
                     if (tab === 'ready') {
-                        if (o.is_kilat) return ['READY_TO_SHIP', 'MATCHED'].includes(o.order_status);
-                        return ['UNPAID', 'READY_TO_SHIP', 'MATCHED'].includes(o.order_status) && !isInstant(o);
+                        if (o.is_kilat) {
+                            return isKilatReadyToShip(o)
+                                || isPendingOrder(o)
+                                || isKilatPlatformBlocked(o);
+                        }
+                        return ['UNPAID', 'PENDING', 'READY_TO_SHIP', 'MATCHED'].includes(o.order_status) && !isInstant(o);
                     }
 
                     if (tab === 'processed') {
@@ -2714,6 +2752,8 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 if (tab === 'ready') {
                     if (isPacked(o)) return false;
                     const isUnpaid = o.order_status === 'UNPAID';
+
+                    if (isPendingOrder(o)) return true;
                     
                     if (o.is_kilat) return kilatNeedsArrange(o);
                     
@@ -3307,10 +3347,16 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
             rows = rows.filter(o => {
                 // Order kilat dipisahkan ke sub-tab "Pengiriman Kilat" (keluar dari yang lain).
                 if (subTabReady === 'kilat') {
-                    return o.is_kilat && o.order_status === 'READY_TO_SHIP';
+                    return isKilatReadyToShip(o);
                 }
+                if (subTabReady === 'pending') return isPendingOrder(o);
+                if (subTabReady === 'blocked') return isKilatPlatformBlocked(o);
                 if (subTabReady === 'unpaid')  return o.order_status === 'UNPAID' && !o.is_kilat;
-                if (subTabReady === 'process') return o.order_status !== 'UNPAID' && !o.is_kilat;
+                if (subTabReady === 'process') {
+                    return o.order_status !== 'UNPAID'
+                        && !isPendingOrder(o)
+                        && !o.is_kilat;
+                }
                 return true;
             });
         }

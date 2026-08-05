@@ -2519,7 +2519,9 @@ class MarketplaceSyncService
                             'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
                             'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
                             'image_url'            => data_get($item, 'image_info.image_url'),
-                            'raw_json'             => $item,
+                            // Detail item sudah dinormalisasi ke kolom item.
+                            // Jangan menyimpan salinan payload yang sama di setiap baris.
+                            'raw_json'             => null,
                         ], $mappingAttrs)
                     );
 

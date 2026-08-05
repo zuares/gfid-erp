@@ -145,7 +145,7 @@ class OmnichannelSyncService
                         'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
                         'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
                         'image_url'            => data_get($item, 'image_info.image_url'),
-                        'raw_json'             => $item,
+                            'raw_json'             => null,
                     ]);
                 }
 

@@ -42,6 +42,29 @@ class MarketplaceSyncLog extends Model
      */
     public static function compactPayload(array $payload, int $sampleSize = self::DEFAULT_ORDER_SN_SAMPLE_SIZE): array
     {
+        // sync_specific_order sebelumnya menyimpan seluruh detail order/API
+        // response ke log. Itu hanya dibutuhkan untuk diagnosis dan menduplikasi
+        // data yang sudah tersimpan di marketplace_orders/order_items.
+        if (self::looksLikeOrderList($payload)) {
+            return self::summarizeOrderList($payload, $sampleSize);
+        }
+
+        // Pertahankan error/code/_meta di level atas, tetapi ringkas daftar
+        // order/booking besar di dalam response API.
+        foreach ([
+            ['response', 'order_list'],
+            ['response', 'booking_list'],
+            ['data', 'orders'],
+            ['data', 'order_list'],
+        ] as [$root, $key]) {
+            $list = $payload[$root][$key] ?? null;
+            if (! is_array($list) || ! self::looksLikeOrderList($list)) {
+                continue;
+            }
+
+            $payload[$root][$key] = self::summarizeOrderList($list, $sampleSize);
+        }
+
         $orderSnList = $payload['order_sn_list'] ?? null;
         if (! is_array($orderSnList) || count($orderSnList) <= $sampleSize) {
             return $payload;
@@ -52,6 +75,52 @@ class MarketplaceSyncLog extends Model
         $payload['order_sn_list_truncated'] = true;
 
         return $payload;
+    }
+
+    /** @param array<int,mixed> $value */
+    private static function looksLikeOrderList(array $value): bool
+    {
+        if (! array_is_list($value) || $value === []) {
+            return false;
+        }
+
+        $sample = array_slice($value, 0, 3);
+
+        return collect($sample)->contains(function ($row): bool {
+            return is_array($row)
+                && (array_key_exists('order_sn', $row)
+                    || array_key_exists('booking_sn', $row)
+                    || array_key_exists('order_id', $row));
+        });
+    }
+
+    /** @param array<int,array<string,mixed>> $rows */
+    private static function summarizeOrderList(array $rows, int $sampleSize): array
+    {
+        $ids = [];
+        $statuses = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $id = $row['order_sn'] ?? $row['booking_sn'] ?? $row['order_id'] ?? null;
+            if ($id !== null && $id !== '') {
+                $ids[] = (string) $id;
+            }
+
+            $status = strtoupper((string) ($row['order_status'] ?? $row['booking_status'] ?? $row['status'] ?? 'UNKNOWN'));
+            $statuses[$status] = ($statuses[$status] ?? 0) + 1;
+        }
+
+        return [
+            '_compacted'          => true,
+            'count'               => count($rows),
+            'order_sn_list'       => array_slice(array_values(array_unique($ids)), 0, max(1, $sampleSize)),
+            'order_sn_list_total' => count(array_unique($ids)),
+            'status_counts'       => $statuses,
+        ];
     }
 
     public function store(): BelongsTo

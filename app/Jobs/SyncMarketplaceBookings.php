@@ -128,7 +128,13 @@ class SyncMarketplaceBookings implements ShouldQueue
             'booking_status' => $b['booking_status'] ?? null,
             'create_time'    => $b['create_time'] ?? null,
             'update_time'    => $b['update_time'] ?? null,
-            'raw_json'       => $b,
+            // Field operasional disimpan di kolom tersendiri; hindari
+            // menduplikasi seluruh payload booking dan daftar item di JSON.
+            'raw_json'       => array_intersect_key($b, array_flip([
+                'booking_sn', 'order_sn', 'booking_status', 'shipping_carrier',
+                'tracking_number', 'package_number', 'shipping_document_status',
+                'create_time', 'update_time',
+            ])),
         ];
         // Jangan menimpa nilai yang sudah terisi dengan null — order_sn/kurir bisa berasal
         // dari get_booking_detail dan tidak selalu ada di get_booking_list.
@@ -354,7 +360,7 @@ class SyncMarketplaceBookings implements ShouldQueue
                                     'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
                                     'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
                                     'image_url'            => data_get($item, 'image_info.image_url'),
-                                    'raw_json'             => $item,
+                                    'raw_json'             => null,
                                 ]);
                             }
                         }
