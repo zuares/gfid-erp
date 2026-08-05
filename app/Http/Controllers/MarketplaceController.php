@@ -3147,6 +3147,9 @@ class MarketplaceController extends Controller
             'SHIPPED',
             'TO_CONFIRM_RECEIVE',
             'COMPLETED',
+            'IN_CANCEL',
+            'CANCELLED',
+            'INVOICE_PENDING',
         ];
         $candidates = $orders->filter(fn ($order) =>
             in_array(strtoupper((string) $order->order_status), $candidateStatuses, true)
@@ -3395,6 +3398,7 @@ class MarketplaceController extends Controller
             'CANCELLED',
             'CANCELLED_BEFORE_SHIPPING',
             'IN_CANCEL',
+            'INVOICE_PENDING',
             'TO_RETURN',
             'RETURNING',
             'RETURNED',

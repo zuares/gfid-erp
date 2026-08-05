@@ -437,6 +437,60 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('api', $row['status_source']);
     }
 
+    public function test_local_orders_memverifikasi_status_cancel_invoice_dan_status_aktif_ke_api(): void
+    {
+        $statuses = [
+            'UNPAID',
+            'READY_TO_SHIP',
+            'PROCESSED',
+            'SHIPPED',
+            'COMPLETED',
+            'IN_CANCEL',
+            'CANCELLED',
+            'INVOICE_PENDING',
+        ];
+        $orders = collect($statuses)->mapWithKeys(function (string $status): array {
+            $id = 'LIVE-' . $status;
+
+            return [$id => $this->createOrder($id, $status)];
+        });
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($orders, $statuses): void {
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->withArgs(function (Store $store, array $orderSns) use ($orders): bool {
+                    return $store->id === $this->store->id
+                        && empty(array_diff($orders->keys()->all(), $orderSns))
+                        && empty(array_diff($orderSns, $orders->keys()->all()));
+                })
+                ->andReturn([
+                    'response' => [
+                        'order_list' => collect($statuses)->map(fn (string $status): array => [
+                            'order_sn' => 'LIVE-' . $status,
+                            'order_status' => $status,
+                        ])->all(),
+                    ],
+                ]);
+        });
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=active',
+            'GET',
+            ['live_status' => '1', 'live_status_scope' => 'active'],
+        ));
+
+        $rows = collect(app(MarketplaceController::class)->localOrders()->getData(true))
+            ->whereIn('id', $orders->pluck('id')->all())
+            ->keyBy('channel_order_id');
+
+        foreach ($statuses as $status) {
+            $row = $rows->get('LIVE-' . $status);
+
+            $this->assertSame($status, $row['api_order_status']);
+            $this->assertSame('api', $row['status_source']);
+        }
+    }
+
     public function test_local_orders_mengabaikan_status_api_yang_tidak_dikenal(): void
     {
         $order = $this->createOrder('LIVE-UNKNOWN-STATUS', 'MATCHED');
