@@ -2721,7 +2721,15 @@ class MarketplaceController extends Controller
             if (! $request->boolean('dry_run')
                 && $request->boolean('sync_bookings', true)
                 && class_exists(\App\Jobs\SyncMarketplaceBookings::class)) {
-                dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, null, null, false));
+                // Booking harus memakai rentang yang sama dengan order reguler.
+                // Sebelumnya selalu memakai default 14 hari, sehingga sync 30/60
+                // hari tidak pernah menyelaraskan seluruh data Pesanan Kilat.
+                dispatch_sync(new \App\Jobs\SyncMarketplaceBookings(
+                    $store,
+                    (int) $request->time_from,
+                    (int) $request->time_to,
+                    false,
+                ));
             }
 
         } catch (\RuntimeException $e) {

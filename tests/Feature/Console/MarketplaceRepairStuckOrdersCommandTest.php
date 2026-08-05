@@ -13,6 +13,7 @@ use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceSyncService;
 use App\Services\Channels\ChannelManager;
 use App\Http\Controllers\MarketplaceController;
+use App\Http\Requests\SyncOrdersRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -147,6 +148,41 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         });
     }
 
+    public function test_sync_manual_memakai_rentang_yang_sama_untuk_booking(): void
+    {
+        $this->store->update(['connection_status' => 'CONNECTED']);
+        Bus::fake();
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('syncOrders')->once()->andReturn([
+                'new' => 0,
+                'updated' => 0,
+                'sku_empty' => 0,
+                'mapping_not_found' => 0,
+                'missing_hpp' => 0,
+            ]);
+        });
+
+        $from = now()->subDays(30)->timestamp;
+        $to = now()->timestamp;
+        $request = SyncOrdersRequest::create('/api/marketplace/stores/1/sync-orders', 'POST', [
+            'time_from' => $from,
+            'time_to' => $to,
+            'page_size' => 50,
+            'sync_bookings' => 1,
+        ]);
+
+        $response = app(MarketplaceController::class)->syncOrders($request, $this->store);
+
+        $this->assertSame(200, $response->getStatusCode());
+        Bus::assertDispatched(SyncMarketplaceBookings::class, function (SyncMarketplaceBookings $job) use ($from, $to): bool {
+            return $job->store->id === $this->store->id
+                && $job->timeFrom === $from
+                && $job->timeTo === $to
+                && $job->fullSync === false;
+        });
+    }
+
     public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
     {
         $order = $this->createOrder('REPAIR-MOVE-READY', 'PROCESSED');
@@ -245,7 +281,7 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
 
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order) {
             $mock->shouldReceive('getOrders')
-                ->times(7)
+                ->times(8)
                 ->andReturn(['response' => ['order_list' => []]]);
             $mock->shouldReceive('getOrderDetail')
                 ->once()
