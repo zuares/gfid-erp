@@ -917,7 +917,7 @@ class MarketplaceSyncService
     }
 
     /**
-     * Isi waktu pencairan dari endpoint Shopee GetEscrowReleasedOrders.
+     * Isi waktu pencairan dari endpoint Shopee GetEscrowList.
      *
      * Endpoint ini sengaja dipisahkan dari syncSettlements(): get_escrow_detail
      * dapat mengembalikan nominal lengkap tanpa escrow_release_time. Enrichment
@@ -953,96 +953,113 @@ class MarketplaceSyncService
         }
 
         $pageSize = min(100, max(1, $pageSize));
-        $offset = 0;
         $pages = 0;
         $found = 0;
         $updated = 0;
         $matched = 0;
         $unmatched = 0;
         $maxPages = 100;
+        $maxWindowSeconds = (15 * 86400) - 1;
+        $releaseByOrder = [];
 
         try {
-            do {
-                $pages++;
-                $response = $this->gateway->getEscrowReleasedOrders(
-                    $store,
-                    $from,
-                    $to,
-                    $offset,
-                    $pageSize,
-                );
+            for ($windowFrom = $from; $windowFrom <= $to; $windowFrom = $windowTo + 1) {
+                $windowTo = min($to, $windowFrom + $maxWindowSeconds);
+                $pageNo = 1;
 
-                $responseCode = $response['code'] ?? null;
-                if (! empty($response['error'])
-                    || ($responseCode !== null && (string) $responseCode !== '0')) {
-                    $error = (string) ($response['error'] ?? $responseCode ?? 'unknown');
-                    $message = (string) ($response['message'] ?? $error);
-                    $unsupported = $error === 'error_not_found';
-                    Log::warning('[sync-released-settlements] Endpoint release gagal', [
-                        'store_id' => $store->id,
-                        'error' => $error,
-                        'message' => $message,
-                    ]);
-
-                    return [
-                        'found' => $found, 'updated' => $updated, 'matched' => $matched,
-                        'unmatched' => $unmatched, 'pages' => $pages,
-                        'unsupported' => $unsupported ? 1 : 0,
-                        'errors' => $unsupported ? 0 : 1,
-                        'message' => $unsupported
-                            ? 'Endpoint release tidak tersedia untuk aplikasi Shopee ini; settlement nominal tetap aman.'
-                            : "Endpoint release gagal: {$message}",
-                    ];
-                }
-
-                $rows = data_get($response, 'response.orders');
-                if (! is_array($rows)) {
-                    $rows = data_get($response, 'orders');
-                }
-                if (! is_array($rows)) {
-                    $rows = data_get($response, 'response.order_list', []);
-                }
-
-                $rows = array_values(array_filter($rows, 'is_array'));
-                $found += count($rows);
-
-                foreach ($rows as $row) {
-                    $orderSn = (string) ($row['order_sn'] ?? $row['ordersn'] ?? '');
-                    $releaseTime = $this->normalizeShopeeTimestamp(
-                        $row['escrow_release_time'] ?? $row['release_time'] ?? null
+                do {
+                    $pages++;
+                    $response = $this->gateway->getEscrowList(
+                        $store,
+                        $windowFrom,
+                        $windowTo,
+                        $pageNo,
+                        $pageSize,
                     );
 
-                    if ($orderSn === '' || ! $releaseTime) {
-                        continue;
+                    $responseCode = $response['code'] ?? null;
+                    if (! empty($response['error'])
+                        || ($responseCode !== null && (string) $responseCode !== '0')) {
+                        $error = (string) ($response['error'] ?? $responseCode ?? 'unknown');
+                        $message = (string) ($response['message'] ?? $error);
+                        $unsupported = $error === 'error_not_found';
+                        Log::warning('[sync-released-settlements] Endpoint escrow list gagal', [
+                            'store_id' => $store->id,
+                            'error' => $error,
+                            'message' => $message,
+                            'window_from' => $windowFrom,
+                            'window_to' => $windowTo,
+                            'page_no' => $pageNo,
+                        ]);
+
+                        return [
+                            'found' => $found, 'updated' => $updated, 'matched' => $matched,
+                            'unmatched' => $unmatched, 'pages' => $pages,
+                            'unsupported' => $unsupported ? 1 : 0,
+                            'errors' => $unsupported ? 0 : 1,
+                            'message' => $unsupported
+                                ? 'Endpoint escrow list tidak tersedia untuk aplikasi Shopee ini; settlement nominal tetap aman.'
+                                : "Endpoint escrow list gagal: {$message}",
+                        ];
                     }
 
-                    $settlement = MarketplaceOrderSettlement::where('store_id', $store->id)
-                        ->where('channel_order_id', $orderSn)
-                        ->first();
-
-                    if (! $settlement) {
-                        $unmatched++;
-                        continue;
+                    $rows = data_get($response, 'response.escrow_list');
+                    if (! is_array($rows)) {
+                        $rows = data_get($response, 'escrow_list', []);
                     }
 
-                    $matched++;
-                    if (! $settlement->settlement_time
-                        || ! $settlement->settlement_time->equalTo($releaseTime)) {
-                        $settlement->update(['settlement_time' => $releaseTime]);
-                        $updated++;
+                    $rows = array_values(array_filter($rows, 'is_array'));
+                    $found += count($rows);
+
+                    foreach ($rows as $row) {
+                        $orderSn = (string) ($row['order_sn'] ?? $row['ordersn'] ?? '');
+                        $releaseTime = $this->normalizeShopeeTimestamp(
+                            $row['escrow_release_time'] ?? $row['release_time'] ?? null
+                        );
+
+                        if ($orderSn === '' || ! $releaseTime) {
+                            continue;
+                        }
+
+                        if (! isset($releaseByOrder[$orderSn])
+                            || $releaseTime->greaterThan($releaseByOrder[$orderSn])) {
+                            $releaseByOrder[$orderSn] = $releaseTime;
+                        }
                     }
+
+                    $hasMore = (bool) (
+                        data_get($response, 'response.more')
+                        ?? data_get($response, 'response.has_more')
+                        ?? data_get($response, 'more')
+                        ?? data_get($response, 'has_more')
+                        ?? (count($rows) >= $pageSize)
+                    );
+
+                    $pageNo++;
+                } while ($hasMore && count($rows) > 0 && $pages < $maxPages);
+
+                if ($pages >= $maxPages) {
+                    break;
+                }
+            }
+
+            foreach ($releaseByOrder as $orderSn => $releaseTime) {
+                $settlement = MarketplaceOrderSettlement::where('store_id', $store->id)
+                    ->where('channel_order_id', $orderSn)
+                    ->first();
+
+                if (! $settlement) {
+                    $unmatched++;
+                    continue;
                 }
 
-                $hasMore = (bool) (
-                    data_get($response, 'response.more')
-                    ?? data_get($response, 'response.has_more')
-                    ?? data_get($response, 'more')
-                    ?? data_get($response, 'has_more')
-                    ?? (count($rows) >= $pageSize)
-                );
-
-                $offset += count($rows);
-            } while ($hasMore && count($rows) > 0 && $pages < $maxPages);
+                $matched++;
+                if (! $settlement->settlement_time
+                    || ! $settlement->settlement_time->equalTo($releaseTime)) {
+                    $settlement->update(['settlement_time' => $releaseTime]);
+                    $updated++;
+                }
+            }
         } catch (\Throwable $e) {
             // Release-time enrichment bersifat tambahan: jangan mengubah status
             // sync nominal menjadi gagal total ketika API release sedang down.
@@ -1065,7 +1082,8 @@ class MarketplaceSyncService
             'unmatched' => $unmatched,
             'pages' => $pages,
             'errors' => 0,
-            'message' => "{$updated} settlement ditandai cair dari {$found} record release.",
+            'unsupported' => 0,
+            'message' => "{$updated} settlement ditandai cair dari {$found} record escrow list.",
         ];
     }
 

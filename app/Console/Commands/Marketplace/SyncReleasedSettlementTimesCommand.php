@@ -18,7 +18,7 @@ class SyncReleasedSettlementTimesCommand extends Command
         {--to= : Akhir rentang release time (Y-m-d)}
         {--limit=100 : Jumlah record per halaman (1-100)}';
 
-    protected $description = 'Mengisi tanggal dana cair dari endpoint Shopee GetEscrowReleasedOrders.';
+    protected $description = 'Mengisi tanggal dana cair dari endpoint Shopee GetEscrowList.';
 
     public function handle(MarketplaceSyncService $syncService): int
     {

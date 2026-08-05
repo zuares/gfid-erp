@@ -1503,11 +1503,11 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         ]);
 
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('getEscrowReleasedOrders')
+            $mock->shouldReceive('getEscrowList')
                 ->once()
                 ->andReturn([
                     'response' => [
-                        'orders' => [
+                        'escrow_list' => [
                             [
                                 'order_sn' => 'ORDER-RELEASED',
                                 'escrow_release_time' => now()->subHour()->timestamp,
@@ -1536,10 +1536,39 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertNotNull($releasedOrder->fresh()->settlement->settlement_time);
     }
 
+    public function test_release_time_membagi_rentang_lebih_dari_15_hari(): void
+    {
+        $from = \Carbon\Carbon::create(2026, 8, 1, 0, 0, 0, config('app.timezone'));
+        $to = $from->copy()->addDays(16)->endOfDay();
+        $calls = [];
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use (&$calls): void {
+            $mock->shouldReceive('getEscrowList')
+                ->twice()
+                ->andReturnUsing(function (Store $store, int $windowFrom, int $windowTo, int $pageNo, int $pageSize) use (&$calls): array {
+                    $calls[] = compact('windowFrom', 'windowTo', 'pageNo', 'pageSize');
+
+                    return ['response' => ['escrow_list' => [], 'more' => false]];
+                });
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncReleasedSettlementTimes(
+            $this->store,
+            $from->timestamp,
+            $to->timestamp,
+        );
+
+        $this->assertSame(0, $result['errors']);
+        $this->assertCount(2, $calls);
+        $this->assertSame($calls[0]['windowTo'] + 1, $calls[1]['windowFrom']);
+        $this->assertSame(1, $calls[0]['pageNo']);
+        $this->assertSame(100, $calls[0]['pageSize']);
+    }
+
     public function test_release_time_error_tidak_menggagalkan_sync_nominal()
     {
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('getEscrowReleasedOrders')
+            $mock->shouldReceive('getEscrowList')
                 ->once()
                 ->andReturn([
                     'error' => 'error_param',
@@ -1554,13 +1583,13 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         );
 
         $this->assertSame(1, $result['errors']);
-        $this->assertStringContainsString('Endpoint release gagal', $result['message']);
+        $this->assertStringContainsString('Endpoint escrow list gagal', $result['message']);
     }
 
     public function test_endpoint_release_tidak_ditemukan_ditandai_unsupported_bukan_error(): void
     {
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('getEscrowReleasedOrders')
+            $mock->shouldReceive('getEscrowList')
                 ->once()
                 ->andReturn(['error' => 'error_not_found', 'message' => 'error_not_found']);
         });

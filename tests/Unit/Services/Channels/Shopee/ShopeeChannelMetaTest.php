@@ -168,14 +168,14 @@ class ShopeeChannelMetaTest extends TestCase
         });
     }
 
-    public function test_getEscrowReleasedOrders_mengirim_filter_rentang_dan_pagination()
+    public function test_getEscrowList_mengirim_filter_rentang_dan_pagination()
     {
         $store = $this->createStore();
 
         Http::fake([
-            '*/api/v2/payment/get_escrow_released_orders*' => Http::response([
+            '*/api/v2/payment/get_escrow_list*' => Http::response([
                 'response' => [
-                    'orders' => [[
+                    'escrow_list' => [[
                         'order_sn' => 'ORDER-RELEASED',
                         'escrow_release_time' => 1754395200,
                     ]],
@@ -184,23 +184,23 @@ class ShopeeChannelMetaTest extends TestCase
             ], 200),
         ]);
 
-        $result = app(ShopeeChannel::class)->getEscrowReleasedOrders(
+        $result = app(ShopeeChannel::class)->getEscrowList(
             $store,
             1754006400,
             1754438400,
-            100,
+            2,
             250,
         );
 
-        $this->assertSame('ORDER-RELEASED', $result['response']['orders'][0]['order_sn']);
+        $this->assertSame('ORDER-RELEASED', $result['response']['escrow_list'][0]['order_sn']);
         Http::assertSent(function ($request) {
             $url = $request->url();
 
-            return str_contains($url, '/api/v2/payment/get_escrow_released_orders')
+            return str_contains($url, '/api/v2/payment/get_escrow_list')
                 && str_contains($url, 'release_time_from=1754006400')
                 && str_contains($url, 'release_time_to=1754438400')
-                && str_contains($url, 'pagination_offset=100')
-                && str_contains($url, 'pagination_entries_per_page=100');
+                && str_contains($url, 'page_no=2')
+                && str_contains($url, 'page_size=100');
         });
     }
 }
