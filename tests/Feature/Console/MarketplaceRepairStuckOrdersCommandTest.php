@@ -402,6 +402,41 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('api', $row['status_source']);
     }
 
+    public function test_local_orders_memakai_status_live_api_untuk_ready_to_ship(): void
+    {
+        $order = $this->createOrder('LIVE-READY-TO-SHIP-ORDER', 'READY_TO_SHIP');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->withArgs(function (Store $store, array $orderSns) use ($order): bool {
+                    return $store->id === $order->store_id
+                        && $orderSns === [$order->channel_order_id];
+                })
+                ->andReturn([
+                    'response' => [
+                        'order_list' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'order_status' => 'SHIPPED',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=active',
+            'GET',
+            ['live_status' => '1', 'live_status_scope' => 'active'],
+        ));
+
+        $row = collect(app(MarketplaceController::class)->localOrders()->getData(true))
+            ->firstWhere('id', $order->id);
+
+        $this->assertSame('SHIPPED', $row['order_status']);
+        $this->assertSame('SHIPPED', $row['api_order_status']);
+        $this->assertSame('api', $row['status_source']);
+    }
+
     public function test_local_orders_mengabaikan_status_api_yang_tidak_dikenal(): void
     {
         $order = $this->createOrder('LIVE-UNKNOWN-STATUS', 'MATCHED');

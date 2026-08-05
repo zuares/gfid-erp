@@ -1234,7 +1234,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         if (getFrom()) lp.set('date_from', getFrom());
         if (getTo())   lp.set('date_to', getTo());
         lp.set('live_status', '1');
-        lp.set('live_status_scope', 'matched');
+        // Verifikasi semua status aktif agar READY_TO_SHIP di "Bisa Proses"
+        // tidak hanya mengandalkan status database yang bisa sudah tertinggal
+        // dari status terbaru di Shopee.
+        lp.set('live_status_scope', 'active');
         return '/api/marketplace/local-orders' + (lp.toString() ? ('?' + lp.toString()) : '');
     }
 
