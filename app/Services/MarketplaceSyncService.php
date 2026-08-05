@@ -509,8 +509,23 @@ class MarketplaceSyncService
      */
     private const PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES = 60;
 
-    /** Status order yang memang sudah boleh ditarik detail settlement-nya. */
-    public const SETTLEMENT_ELIGIBLE_ORDER_STATUSES = ['COMPLETED'];
+    /**
+     * Status order yang boleh dicek ke escrow.
+     *
+     * Shopee dapat melepas dana ketika status order lokal belum sempat berubah
+     * menjadi COMPLETED. Karena itu status shipped/pending ikut dicek; bila
+     * API belum menyediakan income, validator akan melewati response tanpa
+     * membuat settlement dummy.
+     */
+    public const SETTLEMENT_ELIGIBLE_ORDER_STATUSES = [
+        'READY_TO_SHIP',
+        'PROCESSED',
+        'SHIPPED',
+        'TO_CONFIRM_RECEIVE',
+        'TO_RETURN',
+        'RETURNING',
+        'COMPLETED',
+    ];
 
     /** Error sementara tetap boleh dicoba lagi setelah cooldown. */
     private const RETRYABLE_SETTLEMENT_ERROR_CODES = [
@@ -703,7 +718,7 @@ class MarketplaceSyncService
                 $order->refresh();
                 if (! in_array($order->order_status, self::SETTLEMENT_ELIGIBLE_ORDER_STATUSES, true)) {
                     $skipped++;
-                    Log::info("[sync-settlements] Order {$order->channel_order_id} berubah status menjadi {$order->order_status} (bukan COMPLETED), API batal dipanggil.");
+                    Log::info("[sync-settlements] Order {$order->channel_order_id} berubah status menjadi {$order->order_status} (tidak eligible untuk escrow), API batal dipanggil.");
                     continue;
                 }
 

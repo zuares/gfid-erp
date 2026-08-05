@@ -1208,20 +1208,27 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
     // Permanent Failure & Revalidation (Tugas 3, Tugas 4, Tugas 5, Tugas 6)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public function test_query_kandidat_hanya_mengambil_order_completed_dan_shipped_tidak_dipanggil()
+    public function test_query_kandidat_mencakup_order_pending_dan_tidak_membuat_row_dummy_jika_api_kosong()
     {
         $this->createOrder(['order_status' => 'SHIPPED', 'channel_order_id' => 'ORD-SHIPPED']);
         $this->createOrder(['order_status' => 'TO_CONFIRM_RECEIVE', 'channel_order_id' => 'ORD-TCR']);
 
         $this->mockDriver(function (MockInterface $mock) {
-            $mock->shouldNotReceive('getEscrowDetail');
+            $mock->shouldReceive('getEscrowDetail')
+                ->twice()
+                ->andReturn(
+                    ['response' => ['order_income' => []], '_meta' => ['http_status' => 200]],
+                    ['response' => ['order_income' => []], '_meta' => ['http_status' => 200]],
+                );
         });
 
         $service = app(MarketplaceSyncService::class);
         $result = $service->syncSettlements($this->store);
 
-        $this->assertEquals(0, $result['found']);
-        $this->assertEquals(0, $result['processed']);
+        $this->assertEquals(2, $result['found']);
+        $this->assertEquals(2, $result['processed']);
+        $this->assertEquals(2, $result['skipped']);
+        $this->assertDatabaseCount('marketplace_order_settlements', 0);
     }
 
     public function test_order_berubah_status_sebelum_api_menjadi_skipped()
@@ -1232,10 +1239,11 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
             $mock->shouldNotReceive('getEscrowDetail');
         });
 
-        // Paksa agar kandidat bisa diambil tapi berubah status sebelum API dipanggil
+        // Paksa agar kandidat berubah menjadi status yang memang tidak eligible
+        // sebelum API dipanggil.
         MarketplaceOrder::retrieved(function ($model) {
             if ($model->channel_order_id === 'ORD-STALE') {
-                DB::table('marketplace_orders')->where('id', $model->id)->update(['order_status' => 'SHIPPED']);
+                DB::table('marketplace_orders')->where('id', $model->id)->update(['order_status' => 'CANCELLED']);
             }
         });
 
