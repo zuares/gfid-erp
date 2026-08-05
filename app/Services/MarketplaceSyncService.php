@@ -518,8 +518,6 @@ class MarketplaceSyncService
      * membuat settlement dummy.
      */
     public const SETTLEMENT_ELIGIBLE_ORDER_STATUSES = [
-        'READY_TO_SHIP',
-        'PROCESSED',
         'SHIPPED',
         'TO_CONFIRM_RECEIVE',
         'TO_RETURN',
@@ -2188,6 +2186,18 @@ class MarketplaceSyncService
                         'raw_json'  => $detail,
                     ]
                 );
+
+                // Error order_not_found yang tercatat saat order masih terlalu
+                // dini (READY_TO_SHIP/PROCESSED) tidak boleh mengunci settlement
+                // selamanya. Begitu sync order melihat status yang sudah eligible,
+                // beri kesempatan escrow dicoba ulang.
+                if (in_array($orderStatus, self::SETTLEMENT_ELIGIBLE_ORDER_STATUSES, true)
+                    && $order->settlement_sync_error_code !== null) {
+                    $order->update([
+                        'settlement_sync_error_code' => null,
+                        'settlement_sync_failed_at' => null,
+                    ]);
+                }
 
                 if ($order->wasRecentlyCreated) {
                     $outerStats['new']++;

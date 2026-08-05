@@ -1231,6 +1231,21 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertDatabaseCount('marketplace_order_settlements', 0);
     }
 
+    public function test_order_belum_dikirim_tidak_dipanggil_ke_escrow()
+    {
+        $this->createOrder(['order_status' => 'READY_TO_SHIP', 'channel_order_id' => 'ORD-READY']);
+        $this->createOrder(['order_status' => 'PROCESSED', 'channel_order_id' => 'ORD-PROCESSED']);
+
+        $this->mockDriver(function (MockInterface $mock) {
+            $mock->shouldNotReceive('getEscrowDetail');
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncSettlements($this->store);
+
+        $this->assertSame(0, $result['found']);
+        $this->assertSame(0, $result['processed']);
+    }
+
     public function test_order_berubah_status_sebelum_api_menjadi_skipped()
     {
         $order = $this->createOrder(['order_status' => 'COMPLETED', 'channel_order_id' => 'ORD-STALE']);
@@ -1447,5 +1462,30 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
 
         $this->assertSame('READY_TO_HANDOVER', $order->order_status);
         $this->assertSame('packed', $order->status);
+    }
+
+    public function test_sync_order_membuka_kembali_error_settlement_saat_status_sudah_eligible()
+    {
+        $orderSn = 'ORDER-READY-TO-SHIPPED';
+        $order = $this->createOrder([
+            'channel_order_id' => $orderSn,
+            'order_status' => 'READY_TO_SHIP',
+            'settlement_sync_error_code' => 'order_not_found',
+            'settlement_sync_failed_at' => now(),
+        ]);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $orderSn,
+            'order_status' => 'SHIPPED',
+            'total_amount' => 100000,
+            'item_list' => [],
+        ]]);
+
+        $order->refresh();
+
+        $this->assertNull($order->settlement_sync_error_code);
+        $this->assertNull($order->settlement_sync_failed_at);
     }
 }
