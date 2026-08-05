@@ -8,6 +8,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use App\Services\Channels\Shopee\ShopeeChannel;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -1487,5 +1488,72 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
 
         $this->assertNull($order->settlement_sync_error_code);
         $this->assertNull($order->settlement_sync_failed_at);
+    }
+
+    public function test_release_time_dari_endpoint_released_orders_mengubah_status_cair()
+    {
+        $releasedOrder = $this->createOrder(['channel_order_id' => 'ORDER-RELEASED']);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $this->store->id,
+            'order_id' => $releasedOrder->id,
+            'channel_order_id' => $releasedOrder->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 90000,
+            'raw_json' => ['escrow_amount' => 90000],
+        ]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getEscrowReleasedOrders')
+                ->once()
+                ->andReturn([
+                    'response' => [
+                        'orders' => [
+                            [
+                                'order_sn' => 'ORDER-RELEASED',
+                                'escrow_release_time' => now()->subHour()->timestamp,
+                            ],
+                            [
+                                'order_sn' => 'ORDER-NOT-IN-DB',
+                                'escrow_release_time' => now()->subHour()->timestamp,
+                            ],
+                        ],
+                        'more' => false,
+                    ],
+                ]);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncReleasedSettlementTimes(
+            $this->store,
+            now()->subDay()->timestamp,
+            now()->timestamp,
+        );
+
+        $this->assertSame(2, $result['found']);
+        $this->assertSame(1, $result['updated']);
+        $this->assertSame(1, $result['matched']);
+        $this->assertSame(1, $result['unmatched']);
+        $this->assertSame(0, $result['errors']);
+        $this->assertNotNull($releasedOrder->fresh()->settlement->settlement_time);
+    }
+
+    public function test_release_time_error_tidak_menggagalkan_sync_nominal()
+    {
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getEscrowReleasedOrders')
+                ->once()
+                ->andReturn([
+                    'error' => 'error_param',
+                    'message' => 'Endpoint release unavailable',
+                ]);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncReleasedSettlementTimes(
+            $this->store,
+            now()->subDay()->timestamp,
+            now()->timestamp,
+        );
+
+        $this->assertSame(1, $result['errors']);
+        $this->assertStringContainsString('Endpoint release gagal', $result['message']);
     }
 }

@@ -26,4 +26,8 @@ return [
     'retry_max_attempts'  => env('SHOPEE_RETRY_MAX_ATTEMPTS'),
     'retry_max_sleep'     => (int) env('SHOPEE_RETRY_MAX_SLEEP', 15),
     'rate_limit_cooldown' => (int) env('SHOPEE_RATE_LIMIT_COOLDOWN', 30),
+
+    // Rentang default enrichment escrow_release_time. Dibuat terbatas agar
+    // scheduler tidak mengulang seluruh histori pada setiap siklus.
+    'release_time_lookback_days' => (int) env('SHOPEE_RELEASE_TIME_LOOKBACK_DAYS', 45),
 ];

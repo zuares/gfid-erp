@@ -385,6 +385,26 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
+    /**
+     * GetEscrowReleasedOrders mengembalikan order yang sudah cair, termasuk
+     * escrow_release_time. Endpoint ini dipisahkan dari get_escrow_detail karena
+     * detail escrow tidak selalu mengirim timestamp pencairan.
+     */
+    public function getEscrowReleasedOrders(
+        Store $store,
+        int $releaseTimeFrom,
+        int $releaseTimeTo,
+        int $paginationOffset = 0,
+        int $paginationEntriesPerPage = 100
+    ): array {
+        return $this->get($store, '/api/v2/payment/get_escrow_released_orders', [
+            'release_time_from'             => $releaseTimeFrom,
+            'release_time_to'               => $releaseTimeTo,
+            'pagination_offset'             => max(0, $paginationOffset),
+            'pagination_entries_per_page'   => min(100, max(1, $paginationEntriesPerPage)),
+        ]);
+    }
+
     // ─── Ads API ──────────────────────────────────────────────────────────────
 
     /**

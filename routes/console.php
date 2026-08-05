@@ -117,6 +117,14 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
     ->name('sync-settlements')
     ->withoutOverlapping();
 
+// Isi tanggal dana cair lewat GetEscrowReleasedOrders setelah settlement nominal
+// selesai. Jalur terpisah supaya endpoint release yang bermasalah tidak menggagalkan
+// sync settlement utama; lock per toko tetap sama agar tidak overlap.
+Schedule::call(fn () => Artisan::call('marketplace:sync-released-settlements'))
+    ->cron('22 */4 * * *')
+    ->name('sync-released-settlements')
+    ->withoutOverlapping();
+
 // Finance: sync order → settlement → COGS setiap 4 jam (profit per order)
 Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
         '--months' => 1,

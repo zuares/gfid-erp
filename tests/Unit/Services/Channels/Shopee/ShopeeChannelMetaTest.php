@@ -167,4 +167,40 @@ class ShopeeChannelMetaTest extends TestCase
             return str_contains($request->url(), '/api/v2/payment/get_escrow_detail');
         });
     }
+
+    public function test_getEscrowReleasedOrders_mengirim_filter_rentang_dan_pagination()
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_escrow_released_orders*' => Http::response([
+                'response' => [
+                    'orders' => [[
+                        'order_sn' => 'ORDER-RELEASED',
+                        'escrow_release_time' => 1754395200,
+                    ]],
+                    'more' => false,
+                ],
+            ], 200),
+        ]);
+
+        $result = app(ShopeeChannel::class)->getEscrowReleasedOrders(
+            $store,
+            1754006400,
+            1754438400,
+            100,
+            250,
+        );
+
+        $this->assertSame('ORDER-RELEASED', $result['response']['orders'][0]['order_sn']);
+        Http::assertSent(function ($request) {
+            $url = $request->url();
+
+            return str_contains($url, '/api/v2/payment/get_escrow_released_orders')
+                && str_contains($url, 'release_time_from=1754006400')
+                && str_contains($url, 'release_time_to=1754438400')
+                && str_contains($url, 'pagination_offset=100')
+                && str_contains($url, 'pagination_entries_per_page=100');
+        });
+    }
 }

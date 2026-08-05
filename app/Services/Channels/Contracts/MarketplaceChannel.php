@@ -21,6 +21,18 @@ interface MarketplaceChannel
     public function getEscrowDetail(Store $store, string $orderSn): array;
 
     /**
+     * Ambil order yang sudah menerima pencairan escrow beserta waktunya.
+     * Shopee-only; channel lain boleh mengembalikan not_supported.
+     */
+    public function getEscrowReleasedOrders(
+        Store $store,
+        int $releaseTimeFrom,
+        int $releaseTimeTo,
+        int $paginationOffset = 0,
+        int $paginationEntriesPerPage = 100
+    ): array;
+
+    /**
      * Cek apakah iklan aktif di toko ini.
      * Endpoint: GET /api/v2/ads/get_shop_toggle_info
      */

@@ -917,6 +917,154 @@ class MarketplaceSyncService
     }
 
     /**
+     * Isi waktu pencairan dari endpoint Shopee GetEscrowReleasedOrders.
+     *
+     * Endpoint ini sengaja dipisahkan dari syncSettlements(): get_escrow_detail
+     * dapat mengembalikan nominal lengkap tanpa escrow_release_time. Enrichment
+     * ini bersifat idempotent dan non-blocking terhadap sync nominal; kegagalan
+     * endpoint release tidak boleh menghapus atau membatalkan settlement yang
+     * sudah berhasil disimpan.
+     *
+     * @return array{found:int, updated:int, matched:int, unmatched:int, pages:int, errors:int, message:string}
+     */
+    public function syncReleasedSettlementTimes(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        int $pageSize = 100,
+    ): array {
+        $channelCode = strtolower((string) ($store->channel?->code ?? ''));
+        if (! in_array($channelCode, ['shopee', 'shp'], true)) {
+            return [
+                'found' => 0, 'updated' => 0, 'matched' => 0, 'unmatched' => 0,
+                'pages' => 0, 'errors' => 0,
+                'message' => "Channel {$channelCode} belum mendukung endpoint release time.",
+            ];
+        }
+
+        $to = $timeTo ?? now()->timestamp;
+        $from = $timeFrom ?? now()->subDays((int) config('shopee.release_time_lookback_days', 45))->startOfDay()->timestamp;
+        if ($from >= $to) {
+            return [
+                'found' => 0, 'updated' => 0, 'matched' => 0, 'unmatched' => 0,
+                'pages' => 0, 'errors' => 0,
+                'message' => 'Rentang release time tidak valid.',
+            ];
+        }
+
+        $pageSize = min(100, max(1, $pageSize));
+        $offset = 0;
+        $pages = 0;
+        $found = 0;
+        $updated = 0;
+        $matched = 0;
+        $unmatched = 0;
+        $maxPages = 100;
+
+        try {
+            do {
+                $pages++;
+                $response = $this->gateway->getEscrowReleasedOrders(
+                    $store,
+                    $from,
+                    $to,
+                    $offset,
+                    $pageSize,
+                );
+
+                $responseCode = $response['code'] ?? null;
+                if (! empty($response['error'])
+                    || ($responseCode !== null && (string) $responseCode !== '0')) {
+                    $error = (string) ($response['error'] ?? $responseCode ?? 'unknown');
+                    $message = (string) ($response['message'] ?? $error);
+                    Log::warning('[sync-released-settlements] Endpoint release gagal', [
+                        'store_id' => $store->id,
+                        'error' => $error,
+                        'message' => $message,
+                    ]);
+
+                    return [
+                        'found' => $found, 'updated' => $updated, 'matched' => $matched,
+                        'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
+                        'message' => "Endpoint release gagal: {$message}",
+                    ];
+                }
+
+                $rows = data_get($response, 'response.orders');
+                if (! is_array($rows)) {
+                    $rows = data_get($response, 'orders');
+                }
+                if (! is_array($rows)) {
+                    $rows = data_get($response, 'response.order_list', []);
+                }
+
+                $rows = array_values(array_filter($rows, 'is_array'));
+                $found += count($rows);
+
+                foreach ($rows as $row) {
+                    $orderSn = (string) ($row['order_sn'] ?? $row['ordersn'] ?? '');
+                    $releaseTime = $this->normalizeShopeeTimestamp(
+                        $row['escrow_release_time'] ?? $row['release_time'] ?? null
+                    );
+
+                    if ($orderSn === '' || ! $releaseTime) {
+                        continue;
+                    }
+
+                    $settlement = MarketplaceOrderSettlement::where('store_id', $store->id)
+                        ->where('channel_order_id', $orderSn)
+                        ->first();
+
+                    if (! $settlement) {
+                        $unmatched++;
+                        continue;
+                    }
+
+                    $matched++;
+                    if (! $settlement->settlement_time
+                        || ! $settlement->settlement_time->equalTo($releaseTime)) {
+                        $settlement->update(['settlement_time' => $releaseTime]);
+                        $updated++;
+                    }
+                }
+
+                $hasMore = (bool) (
+                    data_get($response, 'response.more')
+                    ?? data_get($response, 'response.has_more')
+                    ?? data_get($response, 'more')
+                    ?? data_get($response, 'has_more')
+                    ?? (count($rows) >= $pageSize)
+                );
+
+                $offset += count($rows);
+            } while ($hasMore && count($rows) > 0 && $pages < $maxPages);
+        } catch (\Throwable $e) {
+            // Release-time enrichment bersifat tambahan: jangan mengubah status
+            // sync nominal menjadi gagal total ketika API release sedang down.
+            Log::warning('[sync-released-settlements] Exception non-blocking', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'found' => $found, 'updated' => $updated, 'matched' => $matched,
+                'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
+                'message' => 'Enrichment release gagal sementara: ' . $e->getMessage(),
+            ];
+        }
+
+        return [
+            'found' => $found,
+            'updated' => $updated,
+            'matched' => $matched,
+            'unmatched' => $unmatched,
+            'pages' => $pages,
+            'errors' => 0,
+            'message' => "{$updated} settlement ditandai cair dari {$found} record release.",
+        ];
+    }
+
+    /**
      * Backfill settlement secara synchronous untuk rentang panjang.
      *
      * Dipakai controller UI agar 1-3 bulan ke belakang bisa dijalankan langsung
