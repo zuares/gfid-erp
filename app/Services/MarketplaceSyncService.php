@@ -925,7 +925,7 @@ class MarketplaceSyncService
      * endpoint release tidak boleh menghapus atau membatalkan settlement yang
      * sudah berhasil disimpan.
      *
-     * @return array{found:int, updated:int, matched:int, unmatched:int, pages:int, errors:int, message:string}
+     * @return array{found:int, updated:int, matched:int, unmatched:int, pages:int, unsupported:int, errors:int, message:string}
      */
     public function syncReleasedSettlementTimes(
         Store $store,
@@ -937,7 +937,7 @@ class MarketplaceSyncService
         if (! in_array($channelCode, ['shopee', 'shp'], true)) {
             return [
                 'found' => 0, 'updated' => 0, 'matched' => 0, 'unmatched' => 0,
-                'pages' => 0, 'errors' => 0,
+                'pages' => 0, 'unsupported' => 1, 'errors' => 0,
                 'message' => "Channel {$channelCode} belum mendukung endpoint release time.",
             ];
         }
@@ -977,6 +977,7 @@ class MarketplaceSyncService
                     || ($responseCode !== null && (string) $responseCode !== '0')) {
                     $error = (string) ($response['error'] ?? $responseCode ?? 'unknown');
                     $message = (string) ($response['message'] ?? $error);
+                    $unsupported = $error === 'error_not_found';
                     Log::warning('[sync-released-settlements] Endpoint release gagal', [
                         'store_id' => $store->id,
                         'error' => $error,
@@ -985,8 +986,12 @@ class MarketplaceSyncService
 
                     return [
                         'found' => $found, 'updated' => $updated, 'matched' => $matched,
-                        'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
-                        'message' => "Endpoint release gagal: {$message}",
+                        'unmatched' => $unmatched, 'pages' => $pages,
+                        'unsupported' => $unsupported ? 1 : 0,
+                        'errors' => $unsupported ? 0 : 1,
+                        'message' => $unsupported
+                            ? 'Endpoint release tidak tersedia untuk aplikasi Shopee ini; settlement nominal tetap aman.'
+                            : "Endpoint release gagal: {$message}",
                     ];
                 }
 

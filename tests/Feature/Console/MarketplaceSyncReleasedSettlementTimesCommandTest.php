@@ -44,7 +44,7 @@ class MarketplaceSyncReleasedSettlementTimesCommandTest extends TestCase
                 ->twice()
                 ->andReturnUsing(function (Store $store) use ($first, $second): array {
                     if ($store->id === $first->id) {
-                        return ['found' => 2, 'updated' => 2, 'unmatched' => 0, 'errors' => 0];
+                        return ['found' => 2, 'updated' => 2, 'unmatched' => 0, 'unsupported' => 0, 'errors' => 0, 'message' => ''];
                     }
 
                     if ($store->id === $second->id) {
@@ -56,9 +56,10 @@ class MarketplaceSyncReleasedSettlementTimesCommandTest extends TestCase
         });
 
         $this->artisan('marketplace:sync-released-settlements', [
-            '--from' => '2026-08-01',
+            '--from' => '2026-08-02',
             '--to' => '2026-08-05',
         ])
+            ->expectsOutputToContain('Sync release time 2026-08-02 sampai 2026-08-05')
             ->expectsOutputToContain('Toko Release 1: ditemukan=2 updated=2')
             ->expectsOutputToContain('Toko Release 2: enrichment gagal sementara')
             ->expectsOutputToContain('Updated   : 2')

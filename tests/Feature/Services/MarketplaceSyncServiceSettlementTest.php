@@ -1556,4 +1556,23 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(1, $result['errors']);
         $this->assertStringContainsString('Endpoint release gagal', $result['message']);
     }
+
+    public function test_endpoint_release_tidak_ditemukan_ditandai_unsupported_bukan_error(): void
+    {
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getEscrowReleasedOrders')
+                ->once()
+                ->andReturn(['error' => 'error_not_found', 'message' => 'error_not_found']);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncReleasedSettlementTimes(
+            $this->store,
+            now()->subDay()->timestamp,
+            now()->timestamp,
+        );
+
+        $this->assertSame(1, $result['unsupported']);
+        $this->assertSame(0, $result['errors']);
+        $this->assertStringContainsString('tidak tersedia', $result['message']);
+    }
 }
