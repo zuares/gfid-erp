@@ -2551,10 +2551,10 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
         let pendingCount = 0;
         let blockedCount = 0;
         readyRows.forEach(o => {
-            if (isPendingOrder(o)) pendingCount++;
+            if (isUnpaidOrder(o)) unpaidCount++;
+            else if (isPendingOrder(o)) pendingCount++;
             else if (isKilatPlatformBlocked(o)) blockedCount++;
             else if (isKilatReadyToShip(o)) kilatCount++;
-            else if (o.order_status === 'UNPAID') unpaidCount++;
             else processCount++;
         });
         const badgeSubReadyAll = $('badge-sub-ready-all');
@@ -2698,9 +2698,20 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     }
 
     function isPendingOrder(o) {
+        const logisticsStatus = String(o.api_logistics_status || '').toUpperCase();
+
+        // LOGISTICS_READY berarti platform sudah mengizinkan proses pengiriman.
+        // Prioritaskan status terbaru ini bila flag pending dari payload lama
+        // masih terbawa.
+        if (logisticsStatus === 'LOGISTICS_READY') return false;
+
         return platformOrderStatus(o) === 'PENDING'
             || o.api_platform_pending === true
-            || String(o.api_logistics_status || '').toUpperCase() === 'LOGISTICS_NOT_START';
+            || logisticsStatus === 'LOGISTICS_NOT_START';
+    }
+
+    function isUnpaidOrder(o) {
+        return platformOrderStatus(o) === 'UNPAID';
     }
 
     function isKilatReadyToShip(o) {
@@ -2742,10 +2753,13 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                     if (tab === 'ready') {
                         if (o.is_kilat) {
                             return isKilatReadyToShip(o)
+                                || isUnpaidOrder(o)
                                 || isPendingOrder(o)
                                 || isKilatPlatformBlocked(o);
                         }
-                        return ['UNPAID', 'PENDING', 'READY_TO_SHIP', 'MATCHED'].includes(o.order_status) && !isInstant(o);
+                        return (isUnpaidOrder(o)
+                            || ['PENDING', 'READY_TO_SHIP', 'MATCHED'].includes(o.order_status))
+                            && !isInstant(o);
                     }
 
                     if (tab === 'processed') {
@@ -2758,7 +2772,7 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
 
                 if (tab === 'ready') {
                     if (isPacked(o)) return false;
-                    const isUnpaid = o.order_status === 'UNPAID';
+                    const isUnpaid = isUnpaidOrder(o);
 
                     if (isPendingOrder(o)) return true;
                     
@@ -3358,9 +3372,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
                 }
                 if (subTabReady === 'pending') return isPendingOrder(o);
                 if (subTabReady === 'blocked') return isKilatPlatformBlocked(o);
-                if (subTabReady === 'unpaid')  return o.order_status === 'UNPAID' && !o.is_kilat;
+                if (subTabReady === 'unpaid')  return isUnpaidOrder(o);
                 if (subTabReady === 'process') {
-                    return o.order_status !== 'UNPAID'
+                    return !isUnpaidOrder(o)
                         && !isPendingOrder(o)
                         && !o.is_kilat;
                 }
