@@ -2759,6 +2759,14 @@ class MarketplaceController extends Controller
                 ], 401);
             }
 
+            if (str_contains(strtolower($msg), 'rate limit') || str_contains(strtolower($msg), 'membatasi permintaan')) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'SHOPEE_RATE_LIMITED',
+                    'message' => $msg,
+                ], 429);
+            }
+
             return response()->json([
                 'success' => false,
                 'code'    => 'VALIDATION_ERROR',

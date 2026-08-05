@@ -146,9 +146,18 @@ class SyncMarketplaceBookings implements ShouldQueue
         if (! empty($b['order_sn']))         $attrs['order_sn'] = $b['order_sn'];
         if (! empty($b['shipping_carrier'])) $attrs['shipping_carrier'] = $b['shipping_carrier'];
 
-        MarketplaceBooking::updateOrCreate(
-            ['store_id' => $this->store->id, 'booking_sn' => $bookingSn],
-            $attrs
+        // Upsert atomik mencegah race condition ketika scheduler dan sync manual
+        // menerima booking yang sama pada waktu berdekatan.
+        MarketplaceBooking::upsert(
+            [[
+                'store_id'   => $this->store->id,
+                'booking_sn' => $bookingSn,
+                ...$attrs,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]],
+            ['store_id', 'booking_sn'],
+            array_values(array_unique(array_merge(array_keys($attrs), ['updated_at'])))
         );
 
         if (! empty($b['order_sn'])) {

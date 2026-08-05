@@ -4105,27 +4105,9 @@ const IS_DUMMY_MODE = @json($isDummy ?? false);
     window.loadOrders = loadOrders;
     const shippingParamCache = new Map();
     
-    // Background prefetch function to silently cache shipping parameters for all pending ship orders
-    async function prefetchShippingParams() {
-        const readyOrders = orders.filter(o => ['READY_TO_SHIP', 'RETRY_SHIP'].includes(o.order_status) && !o.shipping_awb_no);
-        for (const o of readyOrders) {
-            if (!shippingParamCache.has(o.channel_order_id)) {
-                try {
-                    const endpoint = o.is_kilat
-                        ? `/api/marketplace/stores/${o.store_id}/bookings/${o.booking_sn || o.channel_order_id}/shipping-parameter`
-                        : `/api/marketplace/stores/${o.store_id}/orders/${o.channel_order_id}/shipping-parameter`;
-                    
-                    const res = await api(endpoint);
-                    if (res && !res.error) shippingParamCache.set(o.channel_order_id, res);
-                } catch(e) {}
-                // Jeda 500ms agar tidak spam API server/Shopee
-                await new Promise(r => setTimeout(r, 500));
-            }
-        }
-    }
-    
-    // Trigger prefetch periodically
-    setInterval(prefetchShippingParams, 15000);
+    // Jangan prefetch shipping parameter untuk semua order secara otomatis.
+    // Endpoint ini memanggil API Shopee per order dan mudah memicu rate limit;
+    // parameter diambil saat operator membuka dialog Atur Pengiriman saja.
 
     // ── Order Details ────────────────────────────────────────────────────
     window.showOrderDetail = function(orderId) {
