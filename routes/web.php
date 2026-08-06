@@ -64,6 +64,10 @@ Route::middleware(['auth'])
     });
 
 use App\Http\Controllers\MarketplaceController;
+use App\Http\Controllers\MarketplaceFinanceController;
+use App\Http\Controllers\MarketplacePromotionsController;
+use App\Http\Controllers\MarketplaceSettingsController;
+use App\Http\Controllers\MarketplaceSystemController;
 use App\Http\Controllers\Owner\FulfillmentController;
 use App\Http\Controllers\Owner\SkuMappingController;
 use App\Http\Controllers\ShopeeStoreAuthController;
@@ -78,34 +82,34 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/chat/audit',  [\App\Http\Controllers\MarketplaceChatController::class, 'audit'])->name('marketplace.chat.audit');
     Route::get('/marketplace/products',    [\App\Http\Controllers\MarketplaceProductController::class, 'page'])->name('marketplace.products');
     Route::get('/marketplace/boost',       [\App\Http\Controllers\MarketplaceBoostController::class, 'page'])->name('marketplace.boost');
-    Route::get('/marketplace/promotions',  [MarketplaceController::class, 'promotions'])->name('marketplace.promotions');
-    Route::get('/marketplace/promotions/create', [MarketplaceController::class, 'promotionCreatePage'])->name('marketplace.promotions.create');
-    Route::get('/marketplace/promotions/{store}/{discountId}/edit', [MarketplaceController::class, 'promotionEdit'])->name('marketplace.promotions.edit');
-    Route::get('/marketplace/promotions/summary',  [MarketplaceController::class, 'promotionsSummary'])->name('marketplace.promotions.summary');
+    Route::get('/marketplace/promotions',  [MarketplacePromotionsController::class, 'promotions'])->name('marketplace.promotions');
+    Route::get('/marketplace/promotions/create', [MarketplacePromotionsController::class, 'promotionCreatePage'])->name('marketplace.promotions.create');
+    Route::get('/marketplace/promotions/{store}/{discountId}/edit', [MarketplacePromotionsController::class, 'promotionEdit'])->name('marketplace.promotions.edit');
+    Route::get('/marketplace/promotions/summary',  [MarketplacePromotionsController::class, 'promotionsSummary'])->name('marketplace.promotions.summary');
     Route::get('/marketplace/fulfillment',                          [MarketplaceController::class, 'fulfillment'])->name('marketplace.fulfillment');
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
     Route::get('/marketplace/picking',     [MarketplaceController::class, 'picking'])->name('marketplace.picking');
     Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
     Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
-    Route::get('/marketplace/settlement',  [MarketplaceController::class, 'settlement'])->name('marketplace.settlement');
-    Route::get('/marketplace/penghasilan',  [MarketplaceController::class, 'incomeDetail'])->name('marketplace.income-detail');
-    Route::get('/marketplace/penghasilan/produk', [MarketplaceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
-    Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
+    Route::get('/marketplace/settlement',  [MarketplaceFinanceController::class, 'settlement'])->name('marketplace.settlement');
+    Route::get('/marketplace/penghasilan',  [MarketplaceFinanceController::class, 'incomeDetail'])->name('marketplace.income-detail');
+    Route::get('/marketplace/penghasilan/produk', [MarketplaceFinanceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
+    Route::get('/marketplace/profit',      [MarketplaceFinanceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
-    Route::get('/marketplace/roas-calculator', [MarketplaceController::class, 'roasCalculator'])->name('marketplace.roas-calculator');
-    Route::get('/marketplace/api/roas-calculator/ads-data', [MarketplaceController::class, 'fetchAdsDataForRoas'])->name('marketplace.api.roas-calculator.ads-data');
-    Route::get('/marketplace/cache-monitor', [MarketplaceController::class, 'cacheMonitor'])->name('marketplace.cache-monitor');
-    Route::post('/marketplace/cache-monitor/run', [MarketplaceController::class, 'runCacheCleanup'])->name('marketplace.cache-monitor.run')
+    Route::get('/marketplace/roas-calculator', [MarketplaceFinanceController::class, 'roasCalculator'])->name('marketplace.roas-calculator');
+    Route::get('/marketplace/api/roas-calculator/ads-data', [MarketplaceFinanceController::class, 'fetchAdsDataForRoas'])->name('marketplace.api.roas-calculator.ads-data');
+    Route::get('/marketplace/cache-monitor', [MarketplaceSystemController::class, 'cacheMonitor'])->name('marketplace.cache-monitor');
+    Route::post('/marketplace/cache-monitor/run', [MarketplaceSystemController::class, 'runCacheCleanup'])->name('marketplace.cache-monitor.run')
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
-    Route::get('/marketplace/settings',    [MarketplaceController::class, 'settings'])->name('marketplace.settings');
-    Route::post('/marketplace/settings',   [MarketplaceController::class, 'updateSettings'])->name('marketplace.settings.update');
-    Route::get('marketplace/settings/sample-greeting', [MarketplaceController::class, 'printSampleGreetingCard'])->name('marketplace.settings.sample_greeting');
-    Route::post('/marketplace/settings/preview-pdf', [MarketplaceController::class, 'previewSettingsPdf'])->name('marketplace.settings.previewPdf');
-    Route::post('/marketplace/settings/delete-template', [MarketplaceController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
+    Route::get('/marketplace/settings',    [MarketplaceSettingsController::class, 'settings'])->name('marketplace.settings');
+    Route::post('/marketplace/settings',   [MarketplaceSettingsController::class, 'updateSettings'])->name('marketplace.settings.update');
+    Route::get('marketplace/settings/sample-greeting', [MarketplaceSettingsController::class, 'printSampleGreetingCard'])->name('marketplace.settings.sample_greeting');
+    Route::post('/marketplace/settings/preview-pdf', [MarketplaceSettingsController::class, 'previewSettingsPdf'])->name('marketplace.settings.previewPdf');
+    Route::post('/marketplace/settings/delete-template', [MarketplaceSettingsController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceController::class, 'analytics'])->name('marketplace.analytics');
-    Route::get('/marketplace/issues',      [MarketplaceController::class, 'issueCenter'])->name('marketplace.issues');
+    Route::get('/marketplace/issues',      [MarketplaceSystemController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
     Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');
 });
@@ -161,6 +165,9 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/documents/bulk-greetings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printBulkGreetings']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
+    Route::get('/local-orders-paginated',      [MarketplaceController::class, 'localOrdersPaginated']);
+    Route::get('/local-order-counts',          [MarketplaceController::class, 'localOrderCounts']);
+
 
     // Produk Marketplace
     Route::get('/products',                        [\App\Http\Controllers\MarketplaceProductController::class, 'index']);
@@ -378,9 +385,9 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/fulfillments')->g
 // Dev/Owner Tools (Restricted to Owner, available in all environments)
 $noCsrf = [\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class];
 Route::middleware(['auth', 'role:owner'])->group(function () use ($noCsrf) {
-    Route::post('/api/dev/fresh-orders',       [MarketplaceController::class, 'devFreshOrders'])->withoutMiddleware($noCsrf);
-    Route::post('/api/dev/seed-orders',        [MarketplaceController::class, 'devSeedOrders'])->withoutMiddleware($noCsrf);
-    Route::post('/api/dev/reset-fulfillments', [MarketplaceController::class, 'devResetFulfillments'])->withoutMiddleware($noCsrf);
+    Route::post('/api/dev/fresh-orders',       [MarketplaceSystemController::class, 'devFreshOrders'])->withoutMiddleware($noCsrf);
+    Route::post('/api/dev/seed-orders',        [MarketplaceSystemController::class, 'devSeedOrders'])->withoutMiddleware($noCsrf);
+    Route::post('/api/dev/reset-fulfillments', [MarketplaceSystemController::class, 'devResetFulfillments'])->withoutMiddleware($noCsrf);
     Route::post('/api/dev/run-audit',          [\App\Http\Controllers\DashboardController::class, 'devRunAudit'])->withoutMiddleware($noCsrf);
     Route::get('/api/dev/next-order',          [MarketplaceController::class, 'devNextOrder']);
     Route::get('/api/dev/stats',               [MarketplaceController::class, 'devStats']);
