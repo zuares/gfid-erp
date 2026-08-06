@@ -440,22 +440,42 @@ class MarketplaceSyncService
             return null; // belum MATCHED
         }
 
-        // Order lokal belum ada → backfill via detail order (idempotent).
-        $exists = MarketplaceOrder::where('channel_order_id', $booking->order_sn)
-            ->orWhere('external_order_id', $booking->order_sn)
-            ->exists();
-        if (! $exists) {
-            $this->syncOrdersBySn($store, [$booking->order_sn]);
-        }
-
-        // Tautkan booking_sn ke order lokal (channel_order_id ATAU external_order_id).
-        MarketplaceOrder::where('store_id', $store->id)
+        // Order asli (channel_order_id == order_sn sebenarnya) sudah ada?
+        // Scope ke store_id: tanpa itu, order_sn milik toko lain bisa dikira "sudah ada".
+        $real = MarketplaceOrder::where('store_id', $store->id)
             ->where(function ($q) use ($booking) {
                 $q->where('channel_order_id', $booking->order_sn)
                   ->orWhere('external_order_id', $booking->order_sn);
             })
-            ->whereNull('booking_sn')
-            ->update(['booking_sn' => $bookingSn]);
+            ->first();
+
+        // Belum ada → tarik DETAIL LENGKAP via getOrderDetail (updateOrCreate, idempotent).
+        // Kita SELALU menarik detail penuh, bukan mempromosikan stub, supaya order di DB
+        // berisi data terkini dari Shopee (buyer/alamat/finansial/status) — tidak ada baris
+        // parsial "sudah update di Shopee tapi belum update di database".
+        if (! $real) {
+            $this->syncOrdersBySn($store, [$booking->order_sn]);
+            $real = MarketplaceOrder::where('store_id', $store->id)
+                ->where('channel_order_id', $booking->order_sn)
+                ->first();
+        }
+
+        // Order stub/hantu (channel_order_id = booking_sn, data minimal) → hapus setelah
+        // order asli lengkap tersedia, agar tinggal satu baris per pesanan.
+        if ($real && $bookingSn !== $booking->order_sn) {
+            $stub = MarketplaceOrder::where('store_id', $store->id)
+                ->where('channel_order_id', $bookingSn)
+                ->first();
+            if ($stub && $stub->id !== $real->id) {
+                $stub->items()->delete();
+                $stub->delete();
+            }
+        }
+
+        // Tautkan booking_sn ke order asli bila belum tertaut.
+        if ($real && blank($real->booking_sn)) {
+            $real->update(['booking_sn' => $bookingSn]);
+        }
 
         return $booking->order_sn;
     }

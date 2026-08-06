@@ -480,17 +480,18 @@ class SyncMarketplaceBookings implements ShouldQueue
     }
 
     /**
-     * Tautkan booking_sn ke order lokal DAN rekonsiliasi order "hantu".
+     * Tautkan booking_sn ke order lokal DAN bersihkan order "hantu".
      *
-     * Alur duplikat yang diperbaiki: saat order_sn belum diketahui, backfill JALUR 2
-     * membuat order stub dengan channel_order_id = booking_sn. Begitu order_sn muncul
-     * (dari get_booking_detail), sebelumnya method ini hanya mencari order dengan
-     * channel_order_id == order_sn — tidak menemukan stub — sehingga JALUR 1 membuat
-     * order kedua (channel_order_id = order_sn). Hasilnya dua record untuk satu pesanan.
+     * Alur duplikat: saat order_sn belum diketahui, backfill JALUR 2 membuat order stub
+     * dengan channel_order_id = booking_sn. Begitu order_sn muncul, JALUR 1 menarik detail
+     * lengkap via syncOrdersBySn (updateOrCreate keyed pada channel_order_id == order_sn)
+     * → terbentuk baris order ASLI yang datanya lengkap. Method ini lalu menautkan
+     * booking_sn ke order asli itu dan MENGHAPUS stub-nya, sehingga tinggal satu baris.
      *
-     * Sekarang: bila belum ada order asli, stub dipromosikan di tempat (channel_order_id
-     * & external_order_id diganti ke order_sn) sehingga updateOrCreate berikutnya memakai
-     * ulang baris yang sama. Bila order asli sudah ada, stub dihapus sebagai duplikat.
+     * PENTING: kita TIDAK mempromosikan (rename) stub, karena stub hanya berisi data
+     * minimal dari booking. Membiarkan JALUR 1 menariknya via getOrderDetail memastikan
+     * order di DB selalu berisi detail terkini dari Shopee — tidak ada baris parsial /
+     * "sudah update di Shopee tapi belum update di database".
      */
     protected function linkOrder(string $bookingSn, string $orderSn): void
     {
@@ -503,38 +504,27 @@ class SyncMarketplaceBookings implements ShouldQueue
             ->where('channel_order_id', $orderSn)
             ->first();
 
-        // Order stub/hantu yang masih memakai booking_sn sebagai channel_order_id.
-        $stub = ($bookingSn !== $orderSn)
-            ? MarketplaceOrder::where('store_id', $this->store->id)
+        // Belum ada order asli → jangan sentuh stub. Backfill JALUR 1 yang akan
+        // menariknya lewat getOrderDetail (data lengkap), lalu memanggil linkOrder lagi.
+        if (! $real) {
+            return;
+        }
+
+        if (blank($real->booking_sn)) {
+            $real->update(['booking_sn' => $bookingSn]);
+        }
+
+        // Order asli sudah lengkap → stub yang masih memakai booking_sn adalah
+        // duplikat hantu, hapus (beserta itemnya agar tidak jadi orphan).
+        if ($bookingSn !== $orderSn) {
+            $stub = MarketplaceOrder::where('store_id', $this->store->id)
                 ->where('channel_order_id', $bookingSn)
-                ->first()
-            : null;
-
-        if ($real) {
-            if (blank($real->booking_sn)) {
-                $real->update(['booking_sn' => $bookingSn]);
-            }
-
-            // Order asli DAN stub sama-sama ada → stub adalah duplikat hantu, hapus.
+                ->first();
             if ($stub && $stub->id !== $real->id) {
                 $stub->items()->delete();
                 $stub->delete();
                 Log::info("SyncMarketplaceBookings: hapus stub duplikat {$bookingSn} (order asli {$orderSn} sudah ada).");
             }
-
-            return;
-        }
-
-        // Belum ada order asli, tapi stub ada → promosikan di tempat supaya
-        // syncOrdersBySn (updateOrCreate berbasis channel_order_id == order_sn)
-        // memakai ulang baris ini alih-alih membuat order baru.
-        if ($stub) {
-            $stub->update([
-                'channel_order_id'  => $orderSn,
-                'external_order_id' => $orderSn,
-                'booking_sn'        => $bookingSn,
-            ]);
-            Log::info("SyncMarketplaceBookings: promosikan stub {$bookingSn} → order_sn {$orderSn}.");
         }
     }
 }
