@@ -2795,7 +2795,6 @@ window.AdsDashboardRoutes = {
 </script>
 <script src="{{ asset('js/marketplace-ads-dashboard-extra.js') }}"></script>
 
-@if(!empty($dailyChartData))
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const rawDaily = @json($dailyChartData ?? []);
@@ -4334,7 +4333,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-@endif
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
