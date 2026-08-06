@@ -1319,40 +1319,109 @@ body[data-theme="dark"] .dash-sec{
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tabBtns = document.querySelectorAll('.dash-tab-m[data-target]');
+    // === Navigasi 2 tingkat (grup induk -> sub-tab) ===
+    // Setiap panel .tab-pane lama tetap utuh; grup hanya mengatur navigasi.
+    // Format sub-tab: [paneId, label, iconClass]
+    const ADS_GROUPS = [
+        { id: 'grp-ringkasan', panes: [
+            ['tab-campaigns', 'Ringkasan', 'bi-grid-1x2'],
+            ['tab-analysis', 'Analisa', 'bi-graph-up'],
+            ['tab-alerts', 'Alerts & Actions', 'bi-bell'],
+        ]},
+        { id: 'grp-performa', panes: [
+            ['tab-campaign-performance', 'Campaign', 'bi-bar-chart-steps'],
+            ['tab-traffic', 'Traffic', 'bi-stoplights'],
+            ['tab-items', 'Produk', 'bi-box-seam'],
+        ]},
+        { id: 'grp-profit', panes: [
+            ['tab-profit', 'Profit', 'bi-cash-coin'],
+        ]},
+        { id: 'grp-funnel', panes: [
+            ['tab-funnel', 'Funnel', 'bi-funnel'],
+            ['tab-creative', 'Creative & Audience', 'bi-person-video2'],
+        ]},
+        { id: 'grp-ltv', panes: [
+            ['tab-ltv', 'Customer & LTV', 'bi-person-heart'],
+        ]},
+        { id: 'grp-settings', panes: [
+            ['tab-settings', 'Pengaturan', 'bi-sliders'],
+        ]},
+    ];
+
+    const paneToGroup = {};
+    ADS_GROUPS.forEach(g => g.panes.forEach(p => { paneToGroup[p[0]] = g.id; }));
+
+    const primaryBtns = document.querySelectorAll('#adsPrimaryTabs .dash-tab-m[data-group]');
+    const subTabsWrap = document.getElementById('adsSubTabsWrap');
+    const subTabsBar = document.getElementById('adsSubTabs');
     const tabPanes = document.querySelectorAll('.tab-pane');
 
-    const savedTab = localStorage.getItem('adsDashboardActiveTab');
-    if (savedTab) {
-        tabBtns.forEach(b => b.classList.remove('active'));
+    function showPane(paneId) {
         tabPanes.forEach(p => p.classList.remove('active'));
-        const targetBtn = document.querySelector(`.dash-tab-m[data-target="${savedTab}"]`);
-        const targetPane = document.getElementById(savedTab);
-        if (targetBtn && targetPane) {
-            targetBtn.classList.add('active');
-            targetPane.classList.add('active');
-        } else {
-            if (tabBtns.length > 0) tabBtns[0].classList.add('active');
-            if (tabPanes.length > 0) tabPanes[0].classList.add('active');
-        }
+        const pane = document.getElementById(paneId);
+        if (pane) pane.classList.add('active');
+        localStorage.setItem('adsDashboardActivePane', paneId);
+        // charts sering perlu re-layout saat panel baru tampil
+        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
     }
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabPanes.forEach(p => p.classList.remove('active'));
-            
-            btn.classList.add('active');
-            const targetId = btn.getAttribute('data-target');
-            document.getElementById(targetId).classList.add('active');
-            localStorage.setItem('adsDashboardActiveTab', targetId);
-        });
+    function renderSubTabs(groupId, activePaneId) {
+        const group = ADS_GROUPS.find(g => g.id === groupId) || ADS_GROUPS[0];
+        subTabsBar.innerHTML = '';
+        // Grup dengan 1 panel: sembunyikan baris sub-tab (tak perlu).
+        if (group.panes.length <= 1) {
+            subTabsWrap.style.display = 'none';
+        } else {
+            subTabsWrap.style.display = '';
+            group.panes.forEach(([paneId, label, icon]) => {
+                const b = document.createElement('button');
+                b.className = 'dash-tab-sm' + (paneId === activePaneId ? ' active' : '');
+                b.setAttribute('data-target', paneId);
+                b.innerHTML = '<i class="bi ' + icon + '"></i> ' + label;
+                b.addEventListener('click', () => {
+                    subTabsBar.querySelectorAll('.dash-tab-sm').forEach(x => x.classList.remove('active'));
+                    b.classList.add('active');
+                    showPane(paneId);
+                });
+                subTabsBar.appendChild(b);
+            });
+        }
+        showPane(activePaneId);
+    }
+
+    function activateGroup(groupId, preferredPaneId) {
+        const group = ADS_GROUPS.find(g => g.id === groupId) || ADS_GROUPS[0];
+        primaryBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-group') === group.id));
+        const paneIds = group.panes.map(p => p[0]);
+        const activePaneId = paneIds.includes(preferredPaneId) ? preferredPaneId : paneIds[0];
+        localStorage.setItem('adsDashboardActiveGroup', group.id);
+        renderSubTabs(group.id, activePaneId);
+    }
+
+    primaryBtns.forEach(btn => {
+        btn.addEventListener('click', () => activateGroup(btn.getAttribute('data-group')));
     });
 
-    // Shortcut: semua pintu "log" menuju satu tempat — tab Sync.
+    // Restore: prioritaskan panel terakhir; fallback ke grup lama; default grup pertama.
+    (function restore() {
+        const savedPane = localStorage.getItem('adsDashboardActivePane')
+            || localStorage.getItem('adsDashboardActiveTab'); // kompat lama
+        if (savedPane && paneToGroup[savedPane]) {
+            activateGroup(paneToGroup[savedPane], savedPane);
+            return;
+        }
+        activateGroup(ADS_GROUPS[0].id);
+    })();
+
+    // Buka panel tertentu dari mana saja (dipakai openSyncTab & auto-switch sync).
+    window.openAdsPane = function (paneId) {
+        const groupId = paneToGroup[paneId];
+        if (groupId) activateGroup(groupId, paneId);
+    };
+
+    // Shortcut: semua pintu "log" menuju satu tempat — tab Pengaturan.
     window.openSyncTab = function () {
-        const btn = document.querySelector('.dash-tab-m[data-target="tab-settings"]');
-        if (btn) btn.click();
+        window.openAdsPane('tab-settings');
         try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
     };
 
@@ -1684,20 +1753,20 @@ function sortTrafficTable(col) {
         {{-- ==============================================
              TABS (SEGMENTED CONTROL)
         ============================================== --}}
+        {{-- Navigasi 2 tingkat: 6 grup induk + sub-tab (dibangun oleh JS dari ADS_GROUPS).
+             Semua panel .tab-pane lama dipertahankan; grup hanya mengelompokkan navigasi. --}}
         <div class="ads-tabs-wrap" style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
-            <div class="dash-tabs-modern">
-                <button class="dash-tab-m active" data-target="tab-campaigns"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
-                <button class="dash-tab-m" data-target="tab-analysis"><i class="bi bi-graph-up"></i> Analisa</button>
-                <button class="dash-tab-m" data-target="tab-traffic"><i class="bi bi-stoplights"></i> Traffic</button>
-                <button class="dash-tab-m" data-target="tab-items"><i class="bi bi-box-seam"></i> Produk</button>
-                <button class="dash-tab-m" data-target="tab-profit"><i class="bi bi-cash-coin"></i> Profit</button>
-                <button class="dash-tab-m" data-target="tab-funnel"><i class="bi bi-funnel"></i> Funnel</button>
-                <button class="dash-tab-m" data-target="tab-creative"><i class="bi bi-person-video2"></i> Creative & Audience</button>
-                <button class="dash-tab-m" data-target="tab-ltv"><i class="bi bi-person-heart"></i> Customer & LTV</button>
-                <button class="dash-tab-m" data-target="tab-alerts"><i class="bi bi-bell"></i> Alerts & Actions</button>
-                <button class="dash-tab-m" data-target="tab-campaign-performance"><i class="bi bi-bar-chart-steps"></i> Campaign Performance</button>
-                <button class="dash-tab-m" data-target="tab-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
+            <div class="dash-tabs-modern" id="adsPrimaryTabs">
+                <button class="dash-tab-m active" data-group="grp-ringkasan"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
+                <button class="dash-tab-m" data-group="grp-performa"><i class="bi bi-bar-chart-steps"></i> Performa</button>
+                <button class="dash-tab-m" data-group="grp-profit"><i class="bi bi-cash-coin"></i> Profit</button>
+                <button class="dash-tab-m" data-group="grp-funnel"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
+                <button class="dash-tab-m" data-group="grp-ltv"><i class="bi bi-person-heart"></i> Customer &amp; LTV</button>
+                <button class="dash-tab-m" data-group="grp-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
+        </div>
+        <div class="ads-tabs-wrap" id="adsSubTabsWrap" style="overflow-x: auto; padding-top: 0.35rem; padding-bottom: 0.25rem; scrollbar-width: none;">
+            <div class="dash-tabs-modern" id="adsSubTabs" style="padding:.2rem;"></div>
         </div>
     @endif
 
@@ -2425,7 +2494,10 @@ function sortTrafficTable(col) {
             </div>
         </div>
 
-            @include('marketplace.partials._summary_profit_breakdown')
+            {{-- De-dup: blok "Ringkasan Profit" dipindah sepenuhnya ke tab Profit
+                 (_profitability_tab sudah punya Per Kategori / GMV Max ROAS / GMV Max Auto / Produk Belum Mapping
+                 versi lengkap dengan drilldown). Dihapus dari Ringkasan agar tidak redundan.
+                 @include('marketplace.partials._summary_profit_breakdown') --}}
 
             <div class="dash-panels mb-3">
                 <div class="dpanel p-3 d-flex flex-wrap align-items-center gap-3" style="background: var(--card-bg);">
@@ -4353,10 +4425,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (progressContainer) progressContainer.style.display = 'block';
 
             // Pindah ke tab pengaturan secara otomatis
-            const tabSettingsBtn = document.querySelector('button[data-bs-target="#tab-settings"]') || document.querySelector('a[href="#tab-settings"]') || document.querySelector('a[data-bs-target="#tab-settings"]');
-            if (tabSettingsBtn && typeof bootstrap !== 'undefined') {
-                const tab = new bootstrap.Tab(tabSettingsBtn);
-                tab.show();
+            if (typeof window.openSyncTab === 'function') {
+                window.openSyncTab();
             }
             
             const formData = new FormData(formSync);
