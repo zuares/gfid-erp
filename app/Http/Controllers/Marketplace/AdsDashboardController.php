@@ -183,14 +183,18 @@ class AdsDashboardController extends Controller
         $label = "Sync {$dayLabel} untuk {$storeLabel} sedang antre…";
 
         \Illuminate\Support\Facades\Cache::put($progressKey, [
-            'status'     => 'queued',
-            'phase'      => 'queued',
-            'percent'    => 3,
-            'label'      => $label,
-            'store_id'   => $isAllStores ? null : $store->id,
-            'store_name' => $storeLabel,
-            'mode'       => $type,
-            'updated_at' => now()->toISOString(),
+            'status'        => 'queued',
+            'phase'         => 'queued',
+            'percent'       => 3,
+            'label'         => $label,
+            'store_id'      => $isAllStores ? null : $store->id,
+            'store_name'    => $storeLabel,
+            'mode'          => $type,
+            'updated_at'    => now()->toISOString(),
+            // Reset total_jobs ke 1 agar sisa cache backfill sebelumnya
+            // (yang bisa total_jobs: 4) tidak membuat progress terbagi 4.
+            'total_jobs'    => 1,
+            'completed_jobs'=> 0,
         ], 1800);
 
         $params = [
@@ -252,6 +256,63 @@ class AdsDashboardController extends Controller
         return response()->json(array_merge($data, [
             'last_sync_time' => $lastSyncTime,
         ]));
+    }
+
+    /**
+     * Batalkan semua job sync ads yang sedang antre/berjalan.
+     * Menghapus job dari queue, menandai sync run sebagai 'cancelled',
+     * dan membersihkan cache progress + overlap lock agar sync baru
+     * bisa langsung dimulai.
+     */
+    public function syncCancel(Request $request): JsonResponse
+    {
+        $storeId = $request->input('store_id', 'all');
+        $isAllStores = $storeId === 'all';
+
+        // 1. Hapus semua job ShopeeAdsSyncJob dari queue ads
+        //    (baik yang pending maupun yang reserved/sedang diproses)
+        $deleted = DB::table('jobs')
+            ->where('queue', 'ads')
+            ->whereRaw("json_extract(payload, '$.displayName') = ?", [\App\Jobs\ShopeeAdsSyncJob::class])
+            ->delete();
+
+        // Fallback: hapus semua jobs di queue ads jika json_extract tidak support
+        if ($deleted === 0) {
+            $deleted = DB::table('jobs')->where('queue', 'ads')->delete();
+        }
+
+        // 2. Tandai semua sync run yang masih processing → cancelled
+        $cancelledRuns = \App\Models\MarketplaceAdsSyncRun::where('status', 'processing')
+            ->when(! $isAllStores, fn ($q) => $q->where('store_id', $storeId))
+            ->update([
+                'status'        => 'cancelled',
+                'error_message' => 'Dibatalkan oleh user',
+                'finished_at'   => now(),
+            ]);
+
+        // 3. Bersihkan progress cache & overlap lock untuk store terkait
+        $storeIds = $isAllStores
+            ? \App\Models\Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+                ->pluck('id')->all()
+            : [$storeId];
+
+        foreach ($storeIds as $sid) {
+            \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:' . $sid);
+            \Illuminate\Support\Facades\Cache::forget('shopee-ads-cooldown:' . $sid);
+            \Illuminate\Support\Facades\Cache::forget('laravel-queue-overlap:App\Jobs\ShopeeAdsSyncJob:shopee-ads-store:' . $sid);
+        }
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:all');
+
+        // 4. Kirim signal restart ke queue worker agar job yang sedang
+        //    dieksekusi tahu perlu berhenti (worker akan restart setelah job selesai)
+        \Illuminate\Support\Facades\Artisan::call('queue:restart');
+
+        return response()->json([
+            'status'        => 'cancelled',
+            'message'       => 'Sinkronisasi berhasil dibatalkan.',
+            'jobs_deleted'  => $deleted,
+            'runs_cancelled'=> $cancelledRuns,
+        ]);
     }
 
     public function clear(Request $request)

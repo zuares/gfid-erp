@@ -1379,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Jangan gunakan new Date('YYYY-MM-DD'): format ISO date-only diparse
     // sebagai UTC oleh browser dan dapat bergeser satu hari di Asia/Jakarta.
-    function parseLocalDate(value) {
+    window.parseLocalDate = function(value) {
         if (value instanceof Date) {
             return new Date(value.getFullYear(), value.getMonth(), value.getDate());
         }
@@ -1388,7 +1388,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
         }
         return value ? new Date(value) : null;
-    }
+    };
 
     function canonicalQuery(params) {
         return [...params.entries()]
@@ -2219,10 +2219,18 @@ function sortTrafficTable(col) {
                 </div>
                 <div class="p-4" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start;">
                     <!-- LIVE SYNC PROGRESS INDICATOR -->
-                    <div id="liveSyncProgressContainer" style="display: none; width: 100%; max-width: 600px; background: rgba(37,99,235,0.05); border: 1px solid rgba(37,99,235,0.2); border-radius: 12px; padding: 1rem;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: .5rem; font-size: .85rem; font-weight: 650; color: var(--dsh-accent);">
+                    <div id="liveSyncProgressContainer" style="display: none; width: 100%; max-width: 640px; background: rgba(37,99,235,0.05); border: 1px solid rgba(37,99,235,0.2); border-radius: 12px; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; font-size: .85rem; font-weight: 650; color: var(--dsh-accent);">
                             <span id="liveSyncLabel"><i class="spinner-border spinner-border-sm me-2" role="status"></i> Menyiapkan sinkronisasi...</span>
-                            <span id="liveSyncPercent">0%</span>
+                            <div style="display:flex; align-items:center; gap:.5rem;">
+                                <span id="liveSyncPercent">0%</span>
+                                <button id="btnCancelSync" onclick="window.__cancelSync(this)" title="Batalkan sinkronisasi"
+                                    style="display:inline-flex; align-items:center; gap:.3rem; padding:.25rem .65rem; font-size:.72rem; font-weight:600;
+                                           background:rgba(239,68,68,0.1); color:#dc2626; border:1px solid rgba(239,68,68,0.3);
+                                           border-radius:8px; cursor:pointer; transition:all .15s; line-height:1;">
+                                    <i class="bi bi-x-circle-fill"></i> Batal
+                                </button>
+                            </div>
                         </div>
                         <div class="progress" style="height: 10px; border-radius: 10px; background-color: rgba(37,99,235,0.1);">
                             <div id="liveSyncProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background-color: var(--dsh-accent);"></div>
@@ -2781,6 +2789,7 @@ window.AdsDashboardRoutes = {
     campaignHourly: @json(route('marketplace.ads.campaign.hourly')),
     clear: @json(route('marketplace.ads.clear')),
     sync: @json(route('marketplace.ads.sync')),
+    syncCancel: @json(route('marketplace.ads.sync.cancel')),
     feeSetting: @json(route('marketplace.ads.fee.setting')),
 };
 </script>
@@ -3889,6 +3898,10 @@ document.addEventListener("DOMContentLoaded", function() {
                         renderHistChart(this.dataset.val);
                     });
                 });
+            }
+        } else if (ctxHist) {
+             histContainer.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--dsh-muted);">Data rawHistorical tidak ditemukan atau kosong.</div>';
+        }
                 
                 // ==========================================
                 // CHART PRODUK (9 Bar Charts)
@@ -4302,12 +4315,18 @@ document.addEventListener("DOMContentLoaded", function() {
                             itEl.style.borderLeftColor = 'var(--dsh-border)';
                         }
                     }
+                } else if (insightDailyEl) {
+                    let emptyMsg = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Data Tidak Cukup</div>
+                                    <div style="font-size: 0.72rem; color: var(--dsh-muted);">Belum ada data harian yang memadai pada periode ini untuk memunculkan AI Insight.</div>`;
+                    insightDailyEl.innerHTML = emptyMsg;
+                    insightDailyEl.style.borderLeftColor = 'var(--dsh-border)';
+                    
+                    let itEl = document.getElementById('insightDailyTraffic');
+                    if (itEl) {
+                        itEl.innerHTML = emptyMsg;
+                        itEl.style.borderLeftColor = 'var(--dsh-border)';
+                    }
                 }
-
-            }
-        } else if (ctxHist) {
-             histContainer.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--dsh-muted);">Data rawHistorical tidak ditemukan atau kosong.</div>';
-        }
     } catch (err) {
         if (histContainer) {
             histContainer.innerHTML = '<div style="color:#dc2626; padding: 20px; font-family: monospace;"><b>JS Error:</b> ' + err.message + '<br>' + err.stack + '</div>';
@@ -4367,13 +4386,66 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Simpan referensi interval polling agar bisa dihentikan saat cancel
+let _syncPollInterval = null;
+let _syncPollStoreId  = null;
+
+window.__cancelSync = async function (btn) {
+    if (!confirm('Batalkan sinkronisasi yang sedang berjalan?')) return;
+
+    const original = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Membatalkan...'; }
+
+    const cancelRoute = (window.AdsDashboardRoutes || {}).syncCancel || '/marketplace/ads-dashboard/sync-cancel';
+    const csrfToken  = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    const storeId    = _syncPollStoreId || 'all';
+
+    try {
+        const res  = await fetch(cancelRoute, {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+            body   : JSON.stringify({ store_id: storeId }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        // Hentikan polling
+        if (_syncPollInterval) { clearInterval(_syncPollInterval); _syncPollInterval = null; }
+
+        // Update UI progress bar → cancelled
+        const progressBar    = document.getElementById('liveSyncProgressBar');
+        const progressLabel  = document.getElementById('liveSyncLabel');
+        const progressPercent= document.getElementById('liveSyncPercent');
+        const cancelBtn      = document.getElementById('btnCancelSync');
+
+        if (progressBar)  { progressBar.classList.remove('progress-bar-animated'); progressBar.style.backgroundColor = '#64748b'; }
+        if (progressLabel){ progressLabel.innerHTML = '<i class="bi bi-slash-circle me-2" style="color:#64748b"></i> Sinkronisasi dibatalkan.'; }
+        if (progressPercent) { progressPercent.textContent = ''; }
+        if (cancelBtn)    { cancelBtn.style.display = 'none'; }
+
+        if (typeof window.showToast === 'function') {
+            window.showToast(data.message || 'Sinkronisasi dibatalkan.');
+        }
+
+        setTimeout(() => window.location.reload(), 2000);
+    } catch (err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = original; }
+        alert('Gagal membatalkan: ' + err.message);
+    }
+};
+
 function pollSyncProgress(storeId) {
-    const progressLabel = document.getElementById('liveSyncLabel');
-    const progressPercent = document.getElementById('liveSyncPercent');
-    const progressBar = document.getElementById('liveSyncProgressBar');
+    const progressLabel  = document.getElementById('liveSyncLabel');
+    const progressPercent= document.getElementById('liveSyncPercent');
+    const progressBar    = document.getElementById('liveSyncProgressBar');
+    const cancelBtn      = document.getElementById('btnCancelSync');
     let idleTicks = 0;
-    
-    const interval = setInterval(() => {
+
+    _syncPollStoreId = storeId;
+
+    // Tampilkan tombol batal
+    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+
+    _syncPollInterval = setInterval(() => {
         fetch(`{{ route('marketplace.ads.syncProgress') }}?store_id=${storeId}`)
             .then(res => res.json())
             .then(data => {
@@ -4383,36 +4455,43 @@ function pollSyncProgress(storeId) {
                     progressLabel.innerHTML = `<i class="spinner-border spinner-border-sm me-2" role="status"></i> ${data.label || 'Memproses...'}`;
                     idleTicks = 0;
                 } else if (data.status === 'success') {
+                    clearInterval(_syncPollInterval); _syncPollInterval = null;
+                    if (cancelBtn) cancelBtn.style.display = 'none';
                     progressPercent.textContent = '100%';
                     progressBar.style.width = '100%';
-                    
                     if (data.stats) {
                         const totalSuccess = (data.stats.inserted || 0) + (data.stats.updated || 0);
-                        const totalFail = data.stats.failed || 0;
+                        const totalFail    = data.stats.failed || 0;
                         progressLabel.innerHTML = `Selesai! Berhasil menyimpan ${totalSuccess} data (Gagal: ${totalFail}).`;
                     } else {
                         progressLabel.innerHTML = `Selesai! Semua tahap berhasil.`;
                     }
-                    
                     setTimeout(() => finishSuccess(), 2500);
-                } else if (data.status === 'error') {
-                    clearInterval(interval);
-                    progressBar.classList.remove('progress-bar-animated', 'bg-primary');
-                    progressBar.classList.add('bg-danger');
-                    progressLabel.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2" style="color: #dc2626;"></i> ${data.label}`;
+                } else if (data.status === 'error' || data.status === 'cancelled') {
+                    clearInterval(_syncPollInterval); _syncPollInterval = null;
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.style.backgroundColor = data.status === 'cancelled' ? '#64748b' : '#dc2626';
+                    const icon = data.status === 'cancelled' ? 'bi-slash-circle' : 'bi-exclamation-triangle-fill';
+                    const color= data.status === 'cancelled' ? '#64748b' : '#dc2626';
+                    progressLabel.innerHTML = `<i class="bi ${icon} me-2" style="color:${color}"></i> ${data.label || (data.status === 'cancelled' ? 'Dibatalkan.' : 'Gagal.')} `;
+                    if (progressPercent) progressPercent.textContent = '';
+                    setTimeout(() => window.location.reload(), 2500);
                 } else if (data.status === 'partial_success') {
-                    clearInterval(interval);
+                    clearInterval(_syncPollInterval); _syncPollInterval = null;
+                    if (cancelBtn) cancelBtn.style.display = 'none';
                     progressPercent.textContent = '100%';
                     progressBar.style.width = '100%';
-                    progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+                    progressBar.classList.remove('progress-bar-animated');
                     progressBar.style.backgroundColor = '#ca8a04';
-                    progressLabel.innerHTML = `<i class="bi bi-exclamation-circle-fill me-2" style="color: #ca8a04;"></i> ${data.label || 'Sinkronisasi selesai sebagian.'}`;
+                    progressLabel.innerHTML = `<i class="bi bi-exclamation-circle-fill me-2" style="color:#ca8a04;"></i> ${data.label || 'Sinkronisasi selesai sebagian.'}`;
                     setTimeout(() => window.location.reload(), 2500);
                 } else {
                     // Idle state
                     idleTicks++;
-                    if (idleTicks > 15) { // 30 detik tidak ada progress
-                        clearInterval(interval);
+                    if (idleTicks > 15) {
+                        clearInterval(_syncPollInterval); _syncPollInterval = null;
+                        if (cancelBtn) cancelBtn.style.display = 'none';
                         progressLabel.innerHTML = 'Batas waktu / Selesai (No Response)';
                         setTimeout(() => window.location.reload(), 1500);
                     }
@@ -4420,14 +4499,14 @@ function pollSyncProgress(storeId) {
             })
             .catch(err => console.error('Error polling:', err));
     }, 2000);
-    
+
     function finishSuccess() {
-        clearInterval(interval);
+        clearInterval(_syncPollInterval); _syncPollInterval = null;
         progressPercent.textContent = '100%';
         progressBar.style.width = '100%';
         progressBar.classList.remove('progress-bar-animated');
-        progressBar.style.backgroundColor = '#16a34a'; // Success green
-        progressLabel.innerHTML = `<i class="bi bi-check-circle-fill me-2" style="color: #16a34a;"></i> Sinkronisasi Selesai! Memuat ulang...`;
+        progressBar.style.backgroundColor = '#16a34a';
+        progressLabel.innerHTML = `<i class="bi bi-check-circle-fill me-2" style="color:#16a34a;"></i> Sinkronisasi Selesai! Memuat ulang...`;
         setTimeout(() => window.location.reload(), 1500);
     }
 }

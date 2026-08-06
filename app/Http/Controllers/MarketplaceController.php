@@ -114,6 +114,68 @@ class MarketplaceController extends Controller
         return view('marketplace.profit');
     }
 
+    public function roasCalculator(): \Illuminate\View\View
+    {
+        $products = \App\Models\Item::where('active', true)
+            ->whereIn('type', ['finished_good'])
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'hpp']);
+
+        return view('marketplace.roas-calculator', compact('products'));
+    }
+
+    public function fetchAdsDataForRoas(Request $request): JsonResponse
+    {
+        $request->validate([
+            'item_id' => 'required|exists:items,id',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
+        ]);
+
+        $itemId = $request->item_id;
+        $dateFrom = $request->date_from ?: now()->subDays(30)->toDateString();
+        $dateTo = $request->date_to ?: now()->toDateString();
+
+        // 1. Get from MarketplaceAdItemMap
+        $channelItemIds = \App\Models\MarketplaceAdItemMap::where('internal_item_id', $itemId)
+            ->pluck('channel_item_id')
+            ->filter()
+            ->toArray();
+
+        // 2. Get from SkuMapping -> MarketplaceProduct
+        $skus = \App\Models\SkuMapping::where('item_id', $itemId)->pluck('marketplace_sku');
+        if ($skus->isNotEmpty()) {
+            $mpItemIds = \App\Models\MarketplaceProduct::whereIn('item_sku', $skus)
+                ->pluck('item_id')
+                ->filter()
+                ->toArray();
+            $channelItemIds = array_merge($channelItemIds, $mpItemIds);
+        }
+
+        $channelItemIds = array_unique($channelItemIds);
+
+        if (empty($channelItemIds)) {
+            return response()->json([
+                'expense' => 0,
+                'gmv' => 0,
+                'orders' => 0,
+                'status' => 'not_mapped'
+            ]);
+        }
+
+        $data = \App\Models\MarketplaceAdsItemDaily::whereIn('channel_item_id', $channelItemIds)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('SUM(expense) as expense, SUM(broad_gmv) as gmv, SUM(broad_order) as orders')
+            ->first();
+
+        return response()->json([
+            'expense' => (float) $data->expense,
+            'gmv' => (float) $data->gmv,
+            'orders' => (int) $data->orders,
+            'status' => 'success'
+        ]);
+    }
+
     public function incomeDetail(): \Illuminate\View\View
     {
         return view('marketplace.income-detail');

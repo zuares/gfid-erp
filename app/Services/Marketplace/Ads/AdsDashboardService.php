@@ -43,6 +43,53 @@ class AdsDashboardService
         return $this->deriveNetRevenueRatioWithSource($channelItemId, $storeId);
     }
 
+    /**
+     * Rasio dana cair terhadap nilai barang berdasarkan data settlement aktual.
+     * Fallback ke DEFAULT_NET_REVENUE_RATIO bila belum ada data settlement.
+     *
+     * @return array{0: float, 1: string} [ratio, 'item'|'default']
+     */
+    private function deriveNetRevenueRatioWithSource(?string $channelItemId, ?int $storeId = null): array
+    {
+        if ($channelItemId) {
+            return \Illuminate\Support\Facades\Cache::remember(
+                'ads-nrr:' . $channelItemId,
+                1800,
+                fn () => $this->computeNetRevenueRatio($channelItemId)
+            );
+        }
+
+        return [self::DEFAULT_NET_REVENUE_RATIO, 'default'];
+    }
+
+    /**
+     * Hitung rasio cair dari data settlement riil per item.
+     * Menggunakan buyer_payment_amount (harga jual item) sebagai penyebut,
+     * bukan subtotal_items (harga coret) agar rasio tidak terlalu rendah.
+     *
+     * @return array{0: float, 1: string}
+     */
+    private function computeNetRevenueRatio(string $channelItemId): array
+    {
+        $settlements = \App\Models\MarketplaceOrderSettlement::whereIn(
+                'order_id',
+                \App\Models\MarketplaceOrderItem::where('external_item_id', $channelItemId)
+                    ->whereNotNull('order_id')
+                    ->select('order_id')
+            )
+            ->where('final_income', '>', 0)
+            ->get(['final_income', 'buyer_payment_amount']);
+
+        $totalFinalIncome = (float) $settlements->sum('final_income');
+        $totalItemValue   = (float) $settlements->sum('buyer_payment_amount');
+
+        if ($totalItemValue > 0) {
+            return [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
+        }
+
+        return [self::DEFAULT_NET_REVENUE_RATIO, 'default'];
+    }
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,

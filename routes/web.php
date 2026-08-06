@@ -93,6 +93,8 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/penghasilan/produk', [MarketplaceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
     Route::get('/marketplace/profit',      [MarketplaceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
+    Route::get('/marketplace/roas-calculator', [MarketplaceController::class, 'roasCalculator'])->name('marketplace.roas-calculator');
+    Route::get('/marketplace/api/roas-calculator/ads-data', [MarketplaceController::class, 'fetchAdsDataForRoas'])->name('marketplace.api.roas-calculator.ads-data');
     Route::get('/marketplace/cache-monitor', [MarketplaceController::class, 'cacheMonitor'])->name('marketplace.cache-monitor');
     Route::post('/marketplace/cache-monitor/run', [MarketplaceController::class, 'runCacheCleanup'])->name('marketplace.cache-monitor.run')
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

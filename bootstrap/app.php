@@ -61,8 +61,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // 1. Sinkronisasi data terbaru setiap jam (hari ini & kemarin)
         $schedule->call(function () {
             \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
-                '--from' => now()->subDay()->toDateString(),
-                '--to'   => now()->toDateString(),
+                '--from'   => now()->subDay()->toDateString(),
+                '--to'     => now()->toDateString(),
+                '--hourly' => true,
             ]);
         })
         ->hourly()
