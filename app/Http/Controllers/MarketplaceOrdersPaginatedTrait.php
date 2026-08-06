@@ -36,12 +36,22 @@ trait MarketplaceOrdersPaginatedTrait
             $q->where('data_status', '!=', 'valid')->orWhereNull('data_status');
         })->count();
 
+        // Calculate processed_instant count
+        $processedInstantCount = MarketplaceOrder::whereIn('order_status', ['PROCESSED', 'READY_TO_HANDOVER'])
+            ->where(function($q) {
+                $q->where('shipping_carrier', 'like', '%instant%')
+                  ->orWhere('shipping_carrier', 'like', '%same day%')
+                  ->orWhere('shipping_carrier', 'like', '%sameday%');
+            })->count();
+
         return response()->json([
             'ready' => ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
             'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
+            'processed_instant' => $processedInstantCount,
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
             'unpaid' => $counts['UNPAID'] ?? 0,
+            'rrc' => ($counts['CANCELLED'] ?? 0) + ($counts['IN_CANCEL'] ?? 0) + ($counts['CANCELLED_BEFORE_SHIPPING'] ?? 0) + ($counts['TO_RETURN'] ?? 0) + ($counts['RETURNED'] ?? 0),
             'issues' => $issuesCount
         ]);
     }
@@ -131,10 +141,19 @@ trait MarketplaceOrdersPaginatedTrait
             } elseif ($subTab === 'ready') {
                 $query->whereNotNull('shipping_awb_no');
             }
+        } elseif ($tab === 'processed_instant') {
+            $query->whereIn('order_status', ['PROCESSED', 'READY_TO_HANDOVER'])
+                  ->where(function($q) {
+                      $q->where('shipping_carrier', 'like', '%instant%')
+                        ->orWhere('shipping_carrier', 'like', '%same day%')
+                        ->orWhere('shipping_carrier', 'like', '%sameday%');
+                  });
         } elseif ($tab === 'shipped') {
             $query->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
         } elseif ($tab === 'completed') {
             $query->where('order_status', 'COMPLETED');
+        } elseif ($tab === 'rrc') {
+            $query->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING', 'TO_RETURN', 'RETURNED']);
         }
 
         $paginator = $query->latest('ordered_at')->paginate($limit);
