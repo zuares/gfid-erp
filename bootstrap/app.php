@@ -80,7 +80,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 2. Verifikasi backfill harian (mundur 14 hari untuk update data telat dari Shopee)
         $schedule->command('marketplace:sync-ads')
-            ->dailyAt('00:00')
+            ->everyFiveMinutes()
+            ->when(function () {
+                $key = 'sync_ads_daily_' . now()->format('Y-m-d');
+                if (\Illuminate\Support\Facades\Cache::has($key)) {
+                    return false;
+                }
+                \Illuminate\Support\Facades\Cache::put($key, true, 86400);
+                return true;
+            })
             ->name('sync-ads-midnight-verify')
             ->withoutOverlapping(60)
             ->runInBackground()
