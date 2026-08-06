@@ -66,7 +66,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 '--hourly' => true,
             ]);
         })
-        ->hourly()
+        ->everyFiveMinutes()
+        ->when(function () {
+            $key = 'sync_ads_hourly_' . now()->format('Y-m-d-H');
+            if (\Illuminate\Support\Facades\Cache::has($key)) {
+                return false;
+            }
+            \Illuminate\Support\Facades\Cache::put($key, true, 3600);
+            return true;
+        })
         ->name('sync-ads-hourly-latest')
         ->withoutOverlapping(30);
 
