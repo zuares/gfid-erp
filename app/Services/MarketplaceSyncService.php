@@ -2220,6 +2220,13 @@ class MarketplaceSyncService
                 
                 $logisticsStatus = $firstPkg['logistics_status'] ?? '';
                 
+                // Jika pesanan sudah diserahkan ke kurir (berdasarkan logistics status API Shopee), 
+                // tapi order_status-nya telat update dari Shopee dan masih tertahan di PROCESSED atau READY_TO_SHIP,
+                // paksa majukan ke SHIPPED agar tidak "nyangkut" di tab Dikemas.
+                if (in_array($logisticsStatus, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_DROP_OFF_DONE', 'LOGISTICS_DELIVERY_DONE', 'LOGISTICS_SHIPPED'])) {
+                    $orderStatus = 'SHIPPED';
+                }
+
                 // Jika status dari Shopee adalah READY_TO_SHIP, tetapi logistiknya sudah diatur (REQUEST_CREATED dsb),
                 // maka secara logika aplikasi kita (GFID) statusnya adalah PROCESSED
                 // [UPDATE]: User meminta agar pesanan instan (atau pesanan yang otomatis ter-arrange)

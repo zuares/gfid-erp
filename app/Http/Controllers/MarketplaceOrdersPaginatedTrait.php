@@ -38,7 +38,7 @@ trait MarketplaceOrdersPaginatedTrait
 
         return response()->json([
             'ready' => ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
-            'processed' => $counts['PROCESSED'] ?? 0,
+            'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
             'unpaid' => $counts['UNPAID'] ?? 0,
@@ -125,7 +125,7 @@ trait MarketplaceOrdersPaginatedTrait
                 }
             }
         } elseif ($tab === 'processed') {
-            $query->where('order_status', 'PROCESSED');
+            $query->whereIn('order_status', ['PROCESSED', 'READY_TO_HANDOVER']);
             if ($subTab === 'packing') {
                 $query->whereNull('shipping_awb_no');
             } elseif ($subTab === 'ready') {
