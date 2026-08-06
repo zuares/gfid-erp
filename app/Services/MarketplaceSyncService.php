@@ -127,7 +127,7 @@ class MarketplaceSyncService
         // Untuk Shopee, kita tarik spesifik per status agar tidak ada order (termasuk kilat) yang terlewat
         // Catatan: TO_CONFIRM_RECEIVE bukan parameter valid untuk filter di get_order_list (akan memicu error API)
         $statuses = $store->channel?->code === 'shopee'
-            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'IN_CANCEL', 'CANCELLED', 'INVOICE_PENDING', '']
+            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'IN_CANCEL', 'CANCELLED', 'INVOICE_PENDING']
             : ['']; // Channel lain panggil tanpa filter status
 
         // Rentang panjang (mis. 30/60 hari) dipecah menjadi jendela <=14 hari
