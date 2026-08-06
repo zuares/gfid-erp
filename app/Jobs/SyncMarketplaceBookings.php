@@ -221,6 +221,11 @@ class SyncMarketplaceBookings implements ShouldQueue
                     // agar tab UI otomatis berubah tanpa menunggu webhook.
                     if (! empty($d['order_sn']) || ! empty($m->order_sn)) {
                         $realOrderSn = $d['order_sn'] ?? $m->order_sn;
+                        
+                        // Panggil linkOrder untuk membersihkan duplicate order sisa jika get_booking_list
+                        // sebelumnya gagal membawa order_sn, tetapi get_booking_detail berhasil.
+                        $this->linkOrder($sn, $realOrderSn);
+
                         $bookingStatusUpper = strtoupper((string) ($d['booking_status'] ?? $m->booking_status ?? ''));
                         
                         if (! empty($bookingStatusUpper)) {
