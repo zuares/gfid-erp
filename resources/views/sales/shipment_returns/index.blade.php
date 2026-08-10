@@ -470,7 +470,8 @@
                             <th>Store</th>
                             <th>Shipment Asal</th>
                             <th>Status</th>
-                            <th class="text-end">Qty</th>
+                            <th class="text-end">Jumlah Order</th>
+                            <th class="text-end">Jumlah Item</th>
                             <th class="text-end">Aksi</th>
                         </tr>
                     </thead>
@@ -535,7 +536,11 @@
                                 </td>
 
                                 <td class="text-end mono mobile-hide">
-                                    {{ number_format((int) $ret->total_qty, 0, ',', '.') }}
+                                    {{ number_format((int) ($ret->order_scans_count ?? 0), 0, ',', '.') }}
+                                </td>
+
+                                <td class="text-end mono mobile-hide">
+                                    {{ number_format((int) ($ret->lines_qty_sum ?? $ret->total_qty), 0, ',', '.') }}
                                 </td>
 
                                 <td>
@@ -548,7 +553,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="empty">
                                         Belum ada retur shipment.
                                     </div>

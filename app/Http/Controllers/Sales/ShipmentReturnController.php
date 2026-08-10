@@ -43,6 +43,8 @@ class ShipmentReturnController extends Controller
     public function index(Request $request)
     {
         $returns = ShipmentReturn::with(['store', 'shipment'])
+            ->withSum('lines as lines_qty_sum', 'qty')
+            ->withCount('orderScans')
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->paginate(20);
@@ -598,6 +600,10 @@ class ShipmentReturnController extends Controller
 
             $totalQty = (int) ShipmentReturnLine::where('shipment_return_id', $shipmentReturn->id)->sum('qty');
             $totalLines = (int) ShipmentReturnLine::where('shipment_return_id', $shipmentReturn->id)->count();
+
+            // Simpan total qty ke kolom retur supaya kolom Qty di halaman index akurat.
+            $shipmentReturn->total_qty = $totalQty;
+            $shipmentReturn->save();
 
             session()->put('last_scanned_return_line_id', $line->id);
 

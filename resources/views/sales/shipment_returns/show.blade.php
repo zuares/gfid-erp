@@ -710,7 +710,12 @@
             <div class="sr-actions-group">
                 @if (in_array($status, ['draft', 'submitted'], true))
                     @if ($status === 'draft')
-                        <a href="{{ route('sales.shipment_returns.edit', $shipmentReturn) }}" class="sr-btn">Scan Retur</a>
+                        @php
+                            $scanContinueRoute = ($shipmentReturn->scan_mode ?? 'item_first') === 'item_first'
+                                ? route('sales.shipment_returns.scan_items', $shipmentReturn)
+                                : route('sales.shipment_returns.edit', $shipmentReturn);
+                        @endphp
+                        <a href="{{ $scanContinueRoute }}" class="sr-btn">Scan Retur</a>
                     @endif
                     <form action="{{ route('sales.shipment_returns.receive', $shipmentReturn) }}" method="POST" class="sr-inline-form" onsubmit="return confirm('Terima retur ini ke WH-RTS dan tambah stok?');">
                         @csrf

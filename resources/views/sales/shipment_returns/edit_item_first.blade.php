@@ -109,6 +109,7 @@
                 <p class="srif-help" id="scanHelp">Scan barcode atau kode item satu per satu. Item belum ditautkan ke order.</p>
                 <input type="text" id="scanInput" class="form-control srif-input" placeholder="Scan barcode / kode item" inputmode="text" autocomplete="off" autofocus>
                 <div class="srif-actions">
+                    <button type="button" class="srif-btn" id="backItemBtn" hidden>Kembali Scan Item</button>
                     <button type="button" class="srif-btn srif-btn-primary" id="nextBtn">Next: Scan Order</button>
                 </div>
             </div>
@@ -173,17 +174,10 @@
     const workflowStorageKey = @json('shipment_return_item_first_' . $shipmentReturn->id);
 
     function loadWorkflowStage() {
-        let saved = null;
-        try {
-            saved = JSON.parse(localStorage.getItem(workflowStorageKey) || 'null');
-        } catch (error) {}
-        const stage = saved?.stage;
-        if (['item', 'order', 'confirm'].includes(stage)) {
-            if (stage === 'item' || initialLines.length === 0) return 'item';
-            if (stage === 'order' && initialOrders.length > 0) return 'order';
-            if (stage === 'confirm' && initialOrders.length > 0) return 'confirm';
-        }
-        return initialOrders.length > 0 ? 'order' : 'item';
+        // Halaman ini adalah mode "Scan Item Dulu": saat dibuka/dilanjutkan selalu
+        // mulai dari tahap Item. Data item & order yang sudah discan tetap tersimpan
+        // dan bisa dilanjutkan dengan tombol Next.
+        return 'item';
     }
 
     function loadWorkflowTab(stage) {
@@ -281,6 +275,11 @@
         setTimeout(() => input.focus({ preventScroll: true }), 20);
     }
 
+    // Alarm mencolok khusus duplikat (nada rendah berulang, independen dari GFID).
+    function playDuplicateAlarm() {
+        [0, .18, .36].forEach(delay => fallbackTone(196, .16, .32, delay));
+    }
+
     function toast(message, error = false) {
         const node = $('toast');
         if (!node) return;
@@ -340,6 +339,7 @@
         }
         input.disabled = state.stage === 'confirm' || state.busy;
         next.hidden = state.stage === 'confirm';
+        $('backItemBtn').hidden = state.stage !== 'order';
         $('backBtn').hidden = state.stage !== 'confirm';
         const confirmEnabled = qty > 0 && state.orders.length > 0;
         $('confirmBtn').classList.toggle('is-disabled', !confirmEnabled);
@@ -402,11 +402,12 @@
             if (!existingOrder) {
                 state.orders.push({ code: orderCode, label: order.label || 'Pencatatan order', scanned_at: order.scanned_at });
                 playScanSound('order');
+                toast(payload.message || ('Order ' + orderCode + ' dicatat.'));
             } else {
                 existingOrder.scanned_at = order.scanned_at;
-                playScanSound('duplicate');
+                playDuplicateAlarm();
+                toast('Order / Resi ' + orderCode + ' SUDAH pernah discan!', true);
             }
-            toast(payload.message || ('Order ' + orderCode + ' dicatat.'));
         } catch (error) {
             toast(error.message, true);
         } finally {
@@ -416,6 +417,7 @@
     }
 
     $('nextBtn')?.addEventListener('click', () => setStage(state.stage === 'item' ? 'order' : 'confirm'));
+    $('backItemBtn')?.addEventListener('click', () => setStage('item'));
     $('backBtn')?.addEventListener('click', () => setStage('order'));
     document.querySelectorAll('[data-content-tab]').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -424,14 +426,40 @@
             render();
         });
     });
-    $('scanInput')?.addEventListener('input', event => { event.target.value = event.target.value.toUpperCase(); });
-    $('scanInput')?.addEventListener('keydown', event => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        const code = normalize(event.target.value);
-        event.target.value = '';
+    // Submit satu hasil scan: masukkan ke tabel & kosongkan input.
+    let scanTimer = null;
+    let lastInputAt = 0;
+    let fastKeyStreak = 0;
+    const SCAN_IDLE_MS = 160; // jeda setelah burst scanner dianggap selesai
+
+    function submitScan() {
+        if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+        fastKeyStreak = 0;
+        const input = $('scanInput');
+        if (!input) return;
+        const code = normalize(input.value);
+        input.value = '';
+        if (!code) return;
         if (state.stage === 'item') scanItem(code);
-        if (state.stage === 'order') scanOrder(code);
+        else if (state.stage === 'order') scanOrder(code);
+    }
+
+    $('scanInput')?.addEventListener('input', event => {
+        event.target.value = event.target.value.toUpperCase();
+        // Deteksi burst scanner: karakter masuk sangat cepat berturut-turut.
+        // Jika scanner tidak mengirim Enter/Tab, submit otomatis saat burst berhenti.
+        const now = Date.now();
+        if (now - lastInputAt < 50) fastKeyStreak++; else fastKeyStreak = 0;
+        lastInputAt = now;
+        if (scanTimer) clearTimeout(scanTimer);
+        if (fastKeyStreak >= 2) scanTimer = setTimeout(submitScan, SCAN_IDLE_MS);
+    });
+    $('scanInput')?.addEventListener('keydown', event => {
+        // Dukung scanner yang mengirim Enter atau Tab sebagai akhiran.
+        if (event.key === 'Enter' || event.key === 'NumpadEnter' || event.keyCode === 13 || event.key === 'Tab') {
+            event.preventDefault();
+            submitScan();
+        }
     });
     $('confirmBtn')?.addEventListener('click', event => {
         if ($('confirmBtn').getAttribute('aria-disabled') === 'true') event.preventDefault();
