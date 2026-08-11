@@ -2257,6 +2257,17 @@
                 </li>
             @endif
 
+            {{-- TOOLS (owner-only) --}}
+            @if ($isOwner && $router->has('tools.pricing-calculator'))
+                <x-sidebar.label text="Tools" />
+                <li>
+                    <x-sidebar.simple-link href="{{ route('tools.pricing-calculator') }}" icon="bi bi-calculator"
+                        :active="request()->routeIs('tools.pricing-calculator')">
+                        Pricing &amp; ROAS Calculator
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
+
 {{-- PAYROLL --}}
             @if ($canShow($hasPayrollDashboard, $hasPieceworkIndex, $hasPieceRatesIndex, $hasPayrollReportsOperators))
                 <x-sidebar.label text="Penggajian" />

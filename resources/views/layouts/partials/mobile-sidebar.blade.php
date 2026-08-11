@@ -2195,6 +2195,17 @@
                     </li>
 
                 @endif
+
+                {{-- Tools (owner-only) --}}
+                @if ($isOwner && $router->has('tools.pricing-calculator'))
+                    <li class="mt-2 text-uppercase small menu-label">Tools</li>
+                    <li>
+                        <a href="{{ route('tools.pricing-calculator') }}"
+                           class="mobile-sidebar-link {{ request()->routeIs('tools.pricing-calculator') ? 'active' : '' }}">
+                            <span class="icon">🧮</span><span>Pricing &amp; ROAS Calculator</span>
+                        </a>
+                    </li>
+                @endif
             @endauth
         </ul>
     </div>
