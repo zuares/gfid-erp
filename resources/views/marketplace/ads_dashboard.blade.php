@@ -1804,6 +1804,7 @@ function sortTrafficTable(col) {
                             <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
                             <button class="dash-tab-sm" data-val="ctr"><i class="bi bi-hand-index"></i> CTR</button>
                             <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
+                            <button class="dash-tab-sm" data-val="profit"><i class="bi bi-cash-stack"></i> Profit</button>
                         </div>
                     </div>
                 </div>
@@ -3801,6 +3802,14 @@ document.addEventListener("DOMContentLoaded", function() {
                         return im > 0 ? (clicks / im) * 100 : 0;
                     } else if (metric === 'cvr') {
                         return clicks > 0 ? (orders / clicks) * 100 : 0;
+                    } else if (metric === 'profit') {
+                        // Net Profit (Est) per hari — rasio margin global (blended),
+                        // konsisten dgn chart "Trend Harian" di tab Profit.
+                        const pd = window.__profitChartData || {};
+                        const rev = parseFloat(pd.totalRev || 0);
+                        const cogsRatio = rev > 0 ? (parseFloat(pd.totalCogs || 0) / rev) : 0;
+                        const feeRatio  = rev > 0 ? (parseFloat(pd.feeAmt || 0) / rev) : 0;
+                        return gm - (gm * cogsRatio) - (gm * feeRatio) - (sp * 1.11);
                     }
                     return 0;
                 };
@@ -3874,10 +3883,11 @@ document.addEventListener("DOMContentLoaded", function() {
                                                 } else if (metric === 'impressions' || metric === 'clicks') {
                                                     return ctx.dataset.label + ': ' + val.toLocaleString('id-ID');
                                                 } else {
-                                                    let str = val;
-                                                    if(val >= 1000000) str = (val/1000000).toFixed(1) + ' Jt';
-                                                    else if(val >= 1000) str = (val/1000).toFixed(1) + ' Rb';
-                                                    return ctx.dataset.label + ': Rp ' + str;
+                                                    let neg = val < 0; let a = Math.abs(val); let str;
+                                                    if(a >= 1000000) str = (a/1000000).toFixed(1) + ' Jt';
+                                                    else if(a >= 1000) str = (a/1000).toFixed(1) + ' Rb';
+                                                    else str = a.toFixed(0);
+                                                    return ctx.dataset.label + ': ' + (neg ? '−' : '') + 'Rp ' + str;
                                                 }
                                             }
                                         }
@@ -3898,7 +3908,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                                     if (value >= 1000) return (value/1000).toFixed(1) + 'K';
                                                     return value;
                                                 }
-                                                return formatShortIDR(value);
+                                                return (value < 0 ? '−' : '') + 'Rp ' + formatShortIDR(Math.abs(value));
                                             }
                                         }
                                     }
@@ -3928,7 +3938,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             if (metric === 'roas') return v.toFixed(2) + 'x';
                             if (metric === 'cvr' || metric === 'ctr') return v.toFixed(2) + '%';
                             if (metric === 'impressions' || metric === 'clicks') return Math.round(v).toLocaleString('id-ID');
-                            return 'Rp ' + formatShortIDR(v);
+                            return (v < 0 ? '−' : '') + 'Rp ' + formatShortIDR(Math.abs(v));
                         };
 
                         let isAvg = (metric === 'roas' || metric === 'cvr' || metric === 'ctr');
