@@ -12,13 +12,16 @@ class MarketplaceAdsSetting extends Model
     protected $fillable = [
         'store_id',
         'target_roas',
+        'target_profit_pct',
+        'target_roas_mode',
         'admin_fee_mode',
         'admin_fee_pct',
         'notes',
     ];
 
     protected $casts = [
-        'target_roas'   => 'float',
-        'admin_fee_pct' => 'float',
+        'target_roas'       => 'float',
+        'target_profit_pct' => 'float',
+        'admin_fee_pct'     => 'float',
     ];
 }

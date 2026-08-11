@@ -131,6 +131,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.cpc.campaign.edit');
         Route::post('ads-dashboard/fee-setting', [AdsDashboardController::class, 'saveFeeSetting'])
             ->name('ads.fee.setting');
+        Route::post('ads-dashboard/target-setting', [AdsDashboardController::class, 'saveTargetSetting'])
+            ->name('ads.target.setting');
         Route::post('ads-dashboard/sync-cancel', [AdsDashboardController::class, 'syncCancel'])
             ->name('ads.sync.cancel');
 

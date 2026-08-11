@@ -1749,7 +1749,48 @@ function sortTrafficTable(col) {
         </div>
     @endif
 
+    @php
+        // ================= Target Profit & ROAS (per toko) =================
+        // net & COGS ratio dari KPI agregat (data yang sudah dihitung service).
+        $adsCurGmv  = (float) data_get($kpi ?? [], 'current.gmv', 0);
+        $adsCurNet  = (float) data_get($kpi ?? [], 'current.net_revenue', 0);
+        $adsCurCogs = (float) data_get($kpi ?? [], 'current.total_cogs', 0);
+        $adsNetRatio  = $adsCurGmv > 0 ? $adsCurNet / $adsCurGmv : null;
+        $adsCogsRatio = $adsCurGmv > 0 ? $adsCurCogs / $adsCurGmv : null;
+
+        $targetProfitPct  = $adsSetting->target_profit_pct ?? null;
+        $targetRoasMode   = $adsSetting->target_roas_mode ?? 'auto';
+        $targetRoasManual = $adsSetting->target_roas ?? null;
+
+        // Auto: target ROAS = 1 / ACOS, ACOS = (netRatio - cogsRatio - profit) / 1.11 (PPN).
+        $targetRoasAuto = null;
+        if ($targetProfitPct !== null && $adsNetRatio !== null && $adsCogsRatio !== null) {
+            $acos = ($adsNetRatio - $adsCogsRatio - ((float) $targetProfitPct / 100)) / 1.11;
+            $targetRoasAuto = $acos > 0 ? round(1 / $acos, 2) : null;
+        }
+
+        $targetRoasEffective = $targetRoasMode === 'manual'
+            ? ($targetRoasManual ?? $targetRoasAuto)
+            : ($targetRoasAuto ?? $targetRoasManual);
+    @endphp
+
     @if(!empty($storeId))
+        @if($storeId !== 'all' && $targetRoasEffective)
+            <div style="display:flex; justify-content:flex-end; gap:.4rem; margin-bottom:.35rem; flex-wrap:wrap;">
+                <span title="Target ROAS acuan untuk toko ini (tampil di semua tab)"
+                    style="display:inline-flex; align-items:center; gap:.35rem; padding:.28rem .7rem; border-radius:999px;
+                           font-size:.72rem; font-weight:700; background:rgba(37,99,235,.1); color:var(--dsh-accent);
+                           border:1px solid rgba(37,99,235,.28);">
+                    <i class="bi bi-bullseye"></i>
+                    Target ROAS {{ number_format($targetRoasEffective, 2, ',', '.') }}x
+                    @if($targetProfitPct !== null)
+                        <span style="opacity:.75;">· profit {{ rtrim(rtrim(number_format($targetProfitPct, 2, ',', '.'), '0'), ',') }}%</span>
+                    @endif
+                    <span style="opacity:.6; text-transform:uppercase; font-size:.62rem;">{{ $targetRoasMode }}</span>
+                </span>
+            </div>
+        @endif
+
         {{-- ==============================================
              TABS (SEGMENTED CONTROL)
         ============================================== --}}
@@ -2280,6 +2321,13 @@ function sortTrafficTable(col) {
                     : 21.9;
             @endphp
             @include('marketplace.partials._ads_fee_setting', ['autoFeeValue' => $settingsAutoFee])
+            @include('marketplace.partials._ads_target_setting', [
+                'targetStoreId'    => $storeId,
+                'targetProfitPct'  => $targetProfitPct,
+                'targetRoasMode'   => $targetRoasMode,
+                'targetRoasManual' => $targetRoasManual,
+                'targetRoasAuto'   => $targetRoasAuto,
+            ])
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>

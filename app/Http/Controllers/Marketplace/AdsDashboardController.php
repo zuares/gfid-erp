@@ -144,6 +144,32 @@ class AdsDashboardController extends Controller
         return back()->with('success', 'Pengaturan admin fee disimpan.');
     }
 
+    /**
+     * Simpan target profit & target ROAS per toko.
+     * - mode auto  : target ROAS diturunkan dari target profit + fee + COGS.
+     * - mode manual: target ROAS dipakai apa adanya (override).
+     */
+    public function saveTargetSetting(Request $request)
+    {
+        $data = $request->validate([
+            'store_id'          => 'required|exists:stores,id',
+            'target_roas_mode'  => 'required|in:auto,manual',
+            'target_profit_pct' => 'nullable|numeric|min:0|max:99',
+            'target_roas'       => 'required_if:target_roas_mode,manual|nullable|numeric|min:0|max:100',
+        ]);
+
+        \App\Models\MarketplaceAdsSetting::updateOrCreate(
+            ['store_id' => $data['store_id']],
+            [
+                'target_roas_mode'  => $data['target_roas_mode'],
+                'target_profit_pct' => $data['target_profit_pct'] ?? null,
+                'target_roas'       => $data['target_roas'] ?? null,
+            ]
+        );
+
+        return back()->with('success', 'Target profit & ROAS disimpan.');
+    }
+
     public function sync(Request $request)
     {
         $request->validate([
