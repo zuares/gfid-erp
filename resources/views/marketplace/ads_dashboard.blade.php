@@ -1755,8 +1755,13 @@ function sortTrafficTable(col) {
         $adsCurGmv  = (float) data_get($kpi ?? [], 'current.gmv', 0);
         $adsCurNet  = (float) data_get($kpi ?? [], 'current.net_revenue', 0);
         $adsCurCogs = (float) data_get($kpi ?? [], 'current.total_cogs', 0);
+        // GMV khusus campaign yang PUNYA HPP — dipakai sebagai pembagi cogs ratio
+        // agar rasio HPP tidak "encer" karena ikut terbagi GMV item tanpa HPP.
+        $adsProfitGmv = (float) data_get($kpi ?? [], 'current.profit_gmv', 0);
         $adsNetRatio  = $adsCurGmv > 0 ? $adsCurNet / $adsCurGmv : null;
-        $adsCogsRatio = $adsCurGmv > 0 ? $adsCurCogs / $adsCurGmv : null;
+        $adsCogsRatio = $adsProfitGmv > 0
+            ? $adsCurCogs / $adsProfitGmv
+            : ($adsCurGmv > 0 ? $adsCurCogs / $adsCurGmv : null);
 
         $targetProfitPct  = $adsSetting->target_profit_pct ?? null;
         $targetRoasMode   = $adsSetting->target_roas_mode ?? 'auto';

@@ -134,6 +134,13 @@
             }
         }
 
+        // Live preview target ROAS saat mengetik profit (belum menyimpan).
+        profit.addEventListener('input', () => {
+            if (mode.value === 'auto') {
+                const a = autoRoas();
+                roas.value = a !== null ? a.toFixed(2) : '';
+            }
+        });
         toggle.addEventListener('change', () => { syncMode(); save(); });
         profit.addEventListener('change', () => { syncMode(); save(); });
         roas.addEventListener('change', () => { if (mode.value === 'manual') save(); });
