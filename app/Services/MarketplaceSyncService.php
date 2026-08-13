@@ -2530,6 +2530,10 @@ class MarketplaceSyncService
                     $pairKey = ($itemExtId ?: 'null') . '_' . ($modelExtId ?: 'null');
                     $lineSeq[$pairKey] = ($lineSeq[$pairKey] ?? 0) + 1;
 
+                    $itemQty = (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0);
+                    $itemOriginalPrice = (float) ($item['model_original_price'] ?? $item['original_price'] ?? $item['price'] ?? 0);
+                    $itemDiscountedPrice = (float) ($item['model_discounted_price'] ?? $item['discounted_price'] ?? $itemOriginalPrice);
+
                     $itemRow = MarketplaceOrderItem::updateOrCreate(
                         [
                             'marketplace_order_id' => $order->id,
@@ -2543,8 +2547,11 @@ class MarketplaceSyncService
                             'item_sku'             => $item['item_sku']  ?? null,
                             'model_sku'            => $item['model_sku'] ?? null,
                             'variant_name'         => $item['model_name'] ?? null,
-                            'qty'                  => (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0),
-                            'price'                => $item['model_original_price'] ?? $item['model_discounted_price'] ?? 0,
+                            'qty'                  => $itemQty,
+                            'price'                => $itemOriginalPrice,
+                            'price_after_discount' => $itemDiscountedPrice,
+                            'line_gross_amount'    => $itemOriginalPrice * $itemQty,
+                            'line_net_amount'      => $itemDiscountedPrice * $itemQty,
                             'image_url'            => data_get($item, 'image_info.image_url'),
                             // Detail item sudah dinormalisasi ke kolom item.
                             // Jangan menyimpan salinan payload yang sama di setiap baris.

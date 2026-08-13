@@ -166,6 +166,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/documents/bulk-greetings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'printBulkGreetings']);
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
+    Route::get('/analytics-orders',            [MarketplaceController::class, 'analyticsOrders']);
+    Route::get('/analytics-ad-cost',           [MarketplaceController::class, 'analyticsAdCost']);
     Route::get('/local-orders-paginated',      [MarketplaceController::class, 'localOrdersPaginated']);
     Route::get('/local-order-counts',          [MarketplaceController::class, 'localOrderCounts']);
 

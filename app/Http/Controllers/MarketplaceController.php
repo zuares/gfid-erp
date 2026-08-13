@@ -2177,7 +2177,6 @@ class MarketplaceController extends Controller
         $with = [
             'store.channel',
             'items',
-            'settlement',
             'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
             'fulfillment:' . $fulfillmentSelect,
             'fulfillment.lines',
@@ -2531,6 +2530,226 @@ class MarketplaceController extends Controller
         }
 
         return response()->json($mapped->values());
+    }
+
+    /**
+     * Lightweight payload for the analytics dashboard.
+     * Deliberately excludes settlement/income and fulfillment relations.
+     */
+    public function analyticsOrders(): JsonResponse
+    {
+        $dateFrom = request()->query('date_from');
+        $dateTo = request()->query('date_to');
+        $limit = max(1, min(3000, (int) request()->query('limit', 2000)));
+
+        $orderColumns = [
+            'id', 'store_id', 'order_status', 'status', 'ordered_at', 'created_at',
+            'total_amount', 'total_paid_customer', 'raw_json',
+        ];
+        if (Schema::hasColumn('marketplace_orders', 'voucher_discount')) {
+            $orderColumns[] = 'voucher_discount';
+        }
+
+        $orders = MarketplaceOrder::query()
+            ->select($orderColumns)
+            ->with([
+                'store:id,name,channel_id',
+                'store.channel:id,name,code',
+                'items:id,marketplace_order_id,order_id,item_name,item_sku,model_sku,marketplace_sku,variant_name,external_sku,internal_item_id,item_code_snapshot,qty,price,price_after_discount,line_gross_amount,line_net_amount,hpp_snapshot,hpp_unit_snapshot,hpp_total_snapshot',
+                'items.internalItem:id,code,item_category_id,hpp,base_unit_cost',
+                'items.internalItem.category:id,code,name',
+                'items.internalItem.activeCostSnapshot:id,item_id,unit_cost,is_active,snapshot_date',
+            ])
+            ->when($dateFrom || $dateTo, function ($query) use ($dateFrom, $dateTo) {
+                $query->where(function ($q) use ($dateFrom, $dateTo) {
+                    $q->whereNull('ordered_at')->orWhere(function ($range) use ($dateFrom, $dateTo) {
+                        if ($dateFrom) $range->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
+                        if ($dateTo) $range->where('ordered_at', '<=', $dateTo . ' 23:59:59');
+                    });
+                });
+            })
+            ->latest('ordered_at')
+            ->limit($limit)
+            ->get();
+
+        $payload = $orders->map(function (MarketplaceOrder $order) {
+            $storedItems = collect();
+            foreach ($order->items as $storedItem) {
+                foreach ([$storedItem->model_sku, $storedItem->item_sku, $storedItem->marketplace_sku, $storedItem->external_sku, $storedItem->item_name] as $key) {
+                    if (filled($key)) {
+                        $storedItems->put((string) $key, $storedItem);
+                    }
+                }
+            }
+            $rawItems = data_get($order->raw_json, 'item_list', []);
+            $rawItems = is_array($rawItems) ? $rawItems : [];
+            $items = collect($rawItems)->filter(fn ($item) => is_array($item))->map(function (array $item) use ($storedItems) {
+                $sku = $item['model_sku'] ?? $item['item_sku'] ?? $item['item_name'] ?? '—';
+                $stored = $storedItems->get($sku);
+                $internalHpp = (float) ($stored?->internalItem?->activeCostSnapshot?->unit_cost
+                    ?: $stored?->internalItem?->base_unit_cost
+                    ?: $stored?->internalItem?->hpp
+                    ?: 0);
+                return [
+                    'item_name' => $item['item_name'] ?? $stored?->item_name,
+                    'variant_name' => $item['model_name'] ?? $stored?->variant_name,
+                    'item_sku' => $item['item_sku'] ?? $stored?->item_sku,
+                    'model_sku' => $item['model_sku'] ?? $stored?->model_sku,
+                    'internal_sku' => $stored?->internalItem?->code,
+                    'internal_category' => $stored?->internalItem?->category?->name
+                        ?: $stored?->internalItem?->category?->code,
+                    'qty' => (int) ($item['model_quantity_purchased'] ?? $item['quantity_purchased'] ?? $item['active_qty'] ?? $stored?->qty ?? 0),
+                    'model_original_price' => (float) ($item['model_original_price'] ?? $item['original_price'] ?? $stored?->price ?? 0),
+                    'model_discounted_price' => (float) ($item['model_discounted_price'] ?? $item['discounted_price'] ?? $stored?->price_after_discount ?? 0),
+                    'price_after_discount' => (float) ($stored?->price_after_discount ?? 0),
+                    'hpp_snapshot' => (float) ($stored?->hpp_snapshot ?? 0),
+                    'hpp_unit_snapshot' => (float) ($stored?->hpp_unit_snapshot ?? 0),
+                    'hpp_total_snapshot' => (float) ($stored?->hpp_total_snapshot ?? 0),
+                    'internal_hpp' => $internalHpp,
+                ];
+            });
+            if ($items->isEmpty()) {
+                $items = $order->items->map(function ($item) {
+                    $internalHpp = (float) ($item->internalItem?->activeCostSnapshot?->unit_cost
+                        ?: $item->internalItem?->base_unit_cost
+                        ?: $item->internalItem?->hpp
+                        ?: 0);
+                    return [
+                    'item_name' => $item->item_name,
+                    'variant_name' => $item->variant_name,
+                    'item_sku' => $item->item_sku,
+                    'model_sku' => $item->model_sku,
+                    'internal_sku' => $item->internalItem?->code,
+                    'internal_category' => $item->internalItem?->category?->name
+                        ?: $item->internalItem?->category?->code,
+                    'qty' => (int) $item->qty,
+                    'model_original_price' => (float) $item->price,
+                    'price_after_discount' => (float) $item->price_after_discount,
+                    'hpp_snapshot' => (float) $item->hpp_snapshot,
+                    'hpp_unit_snapshot' => (float) $item->hpp_unit_snapshot,
+                    'hpp_total_snapshot' => (float) $item->hpp_total_snapshot,
+                    'internal_hpp' => $internalHpp,
+                ];
+                });
+            }
+
+            return [
+                'id' => $order->id,
+                'store_id' => $order->store_id,
+                'order_status' => $order->order_status,
+                'status' => $order->status,
+                'ordered_at' => $order->ordered_at,
+                'created_at' => $order->created_at,
+                'total_amount' => $order->total_amount,
+                'total_paid_customer' => $order->total_paid_customer,
+                'voucher_discount' => $order->voucher_discount,
+                'store' => $order->store,
+                'items' => $items->values(),
+            ];
+        });
+
+        return response()->json($payload->values());
+    }
+
+    /**
+     * Lightweight ad-spend summary using the same daily tables as Ads Dashboard.
+     * Shop-level daily spend is preferred; campaign regular + GMS data is only
+     * used as a fallback for dates without a shop-level row.
+     */
+    public function analyticsAdCost(): JsonResponse
+    {
+        try {
+            $dateFrom = Carbon::parse(request()->query('date_from'))->toDateString();
+            $dateTo = Carbon::parse(request()->query('date_to'))->toDateString();
+        } catch (\Throwable) {
+            $dateFrom = now()->subDays(6)->toDateString();
+            $dateTo = now()->toDateString();
+        }
+        if ($dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $requestedStore = request()->query('store_id');
+        $storeIds = Store::query()
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('status', 'active')
+            ->where('is_active', true)
+            ->when($requestedStore && is_numeric($requestedStore), fn ($q) => $q->whereKey((int) $requestedStore))
+            ->pluck('id')
+            ->values();
+
+        if ($storeIds->isEmpty()) {
+            return response()->json([
+                'spend' => 0,
+                'ad_spend_by_sku' => [],
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'source' => 'ads_dashboard',
+            ]);
+        }
+
+        $byDate = function (string $table, string $column, ?string $campaignLike = null) use ($storeIds, $dateFrom, $dateTo) {
+            return DB::table($table)
+                ->whereIn('store_id', $storeIds)
+                ->whereBetween('date', [$dateFrom, $dateTo])
+                ->when($campaignLike === 'regular', fn ($q) => $q->whereNotLike('channel_campaign_id', 'GMS-%'))
+                ->when($campaignLike === 'gms', fn ($q) => $q->whereLike('channel_campaign_id', 'GMS-%'))
+                ->selectRaw("date, SUM({$column}) spend")
+                ->groupBy('date')
+                ->get()
+                ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+        };
+
+        $shop = $byDate('marketplace_ads_dailies', 'spend');
+        $regular = $byDate('marketplace_ad_campaign_dailies', 'expense', 'regular');
+        $gms = $byDate('marketplace_ad_campaign_dailies', 'expense', 'gms');
+        $dates = $shop->keys()->merge($regular->keys())->merge($gms->keys())->unique();
+
+        $spend = $dates->sum(function (string $date) use ($shop, $regular, $gms) {
+            if ($shop->has($date)) {
+                return (float) ($shop->get($date)->spend ?? 0);
+            }
+
+            return (float) ($regular->get($date)->spend ?? 0)
+                + (float) ($gms->get($date)->spend ?? 0);
+        });
+
+        $adSpendBySku = DB::table('marketplace_ad_campaign_dailies as cd')
+            ->join('marketplace_ad_campaigns as c', function ($join) {
+                $join->on('cd.channel_campaign_id', '=', 'c.channel_campaign_id')
+                    ->on('cd.store_id', '=', 'c.store_id');
+            })
+            ->leftJoin('marketplace_products as p', function ($join) {
+                $join->on('c.channel_item_id', '=', 'p.item_id')
+                    ->on('c.store_id', '=', 'p.store_id');
+            })
+            ->whereIn('cd.store_id', $storeIds)
+            ->whereNotNull('c.channel_item_id')
+            ->whereNotNull('p.item_sku')
+            ->where('p.item_sku', '!=', '')
+            ->whereBetween('cd.date', [$dateFrom, $dateTo])
+            ->selectRaw('MAX(p.item_sku) as marketplace_sku, SUM(cd.expense) as spend')
+            ->groupBy('c.store_id', 'c.channel_item_id')
+            ->get()
+            ->reduce(function (array $carry, $row): array {
+                $sku = trim((string) ($row->marketplace_sku ?? ''));
+                if ($sku === '') {
+                    return $carry;
+                }
+
+                $key = mb_strtoupper($sku);
+                $carry[$key] = ($carry[$key] ?? 0) + (float) ($row->spend ?? 0);
+
+                return $carry;
+            }, []);
+
+        return response()->json([
+            'spend' => round($spend, 2),
+            'ad_spend_by_sku' => collect($adSpendBySku)->map(fn ($value) => round((float) $value, 2))->all(),
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'source' => 'ads_dashboard',
+        ]);
     }
 
     /**
