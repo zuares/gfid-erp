@@ -148,6 +148,33 @@
     .pt-pane.active{ display:block; animation:ptfade .2s ease; }
     @keyframes ptfade{ from{ opacity:0; transform:translateY(3px);} to{ opacity:1; transform:none;} }
 
+    /* ── Stok tab ── */
+    .st-dirty-row td{ background:rgba(37,99,235,.07)!important; }
+    body[data-theme="dark"] .st-dirty-row td{ background:rgba(37,99,235,.16)!important; }
+    .st-stock-input{ text-align:right; }
+    .st-cat-head{ cursor:pointer; }
+    .st-cat-head td{ background:rgba(51,65,85,.07); border-top:2px solid rgba(148,163,184,.3); padding:.5rem .62rem; }
+    body[data-theme="dark"] .st-cat-head td{ background:rgba(51,65,85,.4); border-top-color:rgba(51,65,85,.9); }
+    .st-cat-head:hover td{ background:rgba(51,65,85,.12); }
+    .st-cat-inner{ display:flex; align-items:center; gap:.55rem; }
+    .st-caret{ color:#64748b; width:.9rem; font-size:.72rem; }
+    .st-cat-name{ font-weight:800; font-size:.82rem; }
+    .st-cat-meta{ font-size:.67rem; color:#94a3b8; }
+    .st-cat-sum{ margin-left:auto; font-size:.72rem; color:#475569; display:inline-flex; align-items:center; gap:.5rem; white-space:nowrap; }
+    body[data-theme="dark"] .st-cat-sum{ color:#cbd5e1; }
+    .st-badge-empty{ background:rgba(239,68,68,.12); color:#b91c1c; border-radius:6px; padding:1px 7px; font-weight:700; font-size:.65rem; }
+    .st-item-head td{ background:rgba(148,163,184,.05); padding:.32rem .62rem .32rem 1rem; }
+    body[data-theme="dark"] .st-item-head td{ background:rgba(30,41,59,.55); }
+    .st-item-name{ font-weight:700; font-size:.76rem; }
+    .st-grp-row td:nth-child(2){ padding-left:1.15rem; }
+    .st-stok-cell{ display:flex; align-items:center; gap:.4rem; justify-content:flex-end; }
+    .st-stok-cell .st-stock-input{ width:76px; text-align:right; font-weight:700; font-size:.8rem; padding:2px 7px; border-radius:7px; }
+    .st-gd-cell{ text-align:right; font-weight:700; font-size:.8rem; white-space:nowrap; }
+    .st-inp-zero{ border-color:rgba(239,68,68,.55)!important; color:#b91c1c!important; background:rgba(239,68,68,.06)!important; }
+    .st-inp-low{ border-color:rgba(245,158,11,.6)!important; color:#b45309!important; background:rgba(245,158,11,.07)!important; }
+    .st-save-btn{ opacity:.4; transition:opacity .15s; }
+    tr:hover .st-save-btn, .st-dirty-row .st-save-btn{ opacity:1; }
+
     /* ── Boost pane (minimalis) ── */
     .bo-bar{ display:flex; align-items:center; gap:.5rem; margin-bottom:1rem; }
     .bo-slotcount{ font-size:.78rem; font-weight:700; color:#ea580c; }
@@ -218,6 +245,7 @@
     {{-- Tabs --}}
     <div class="pt-tabs">
         <button class="pt-tab active" data-tab="produk" onclick="switchTab('produk')">🏷 Daftar Produk</button>
+        <button class="pt-tab" data-tab="stok" onclick="switchTab('stok')">📦 Stok</button>
         <button class="pt-tab" data-tab="boost" onclick="switchTab('boost')">🚀 Naikkan Produk</button>
     </div>
 
@@ -277,6 +305,55 @@
         </table>
     </div>
     </div>{{-- /tabProduk --}}
+
+    {{-- ══ TAB: Stok ══ --}}
+    <div id="tabStok" class="pt-pane">
+        <div id="stStoreTabs" class="d-flex gap-2 mb-2" style="overflow-x:auto; border-bottom:1px solid var(--prd-border); padding-bottom:0px; scrollbar-width:none;"></div>
+        <div class="kpis" id="stKpiRow" style="margin-bottom:.65rem;"></div>
+        <div style="background:rgba(148,163,184,.03); padding:.55rem .75rem; border-radius:8px; border:1px solid var(--prd-border); margin-bottom:.65rem;">
+            <div class="filter-bar" style="flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; margin-bottom: 0;">
+                <div style="position:relative; flex-shrink:0;">
+                    <input type="text" class="form-control form-control-sm filter-search w-100" style="padding-left:26px;" placeholder="Cari nama / SKU / varian…" id="stSearch">
+                    <i class="bi bi-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                </div>
+                <div style="position:relative; flex-shrink:0; min-width:135px;">
+                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="stStock">
+                        <option value="">Semua Stok</option>
+                        <option value="empty">● Habis (0)</option>
+                        <option value="low">● Menipis (≤5)</option>
+                        <option value="in">● Tersedia</option>
+                    </select>
+                    <i class="bi bi-box-seam" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                </div>
+                <div style="position:relative; flex-shrink:0; min-width:125px;">
+                    <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="stSort">
+                        <option value="stock_asc" selected>Stok terendah</option>
+                        <option value="stock_desc">Stok tertinggi</option>
+                        <option value="sales">Terlaris</option>
+                        <option value="name">Nama A–Z</option>
+                    </select>
+                    <i class="bi bi-sort-down" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.8rem"></i>
+                </div>
+                <label class="ms-auto" style="display:flex;align-items:center;gap:.35rem;font-size:.72rem;flex-shrink:0;white-space:nowrap;cursor:pointer;color:var(--prd-muted)" title="Kelompokkan per kategori & produk hasil mapping">
+                    <input type="checkbox" id="stGroup" checked style="cursor:pointer"> 📂 Grup kategori
+                </label>
+                <button class="btn btn-sm btn-prd-primary" id="stSaveAll" onclick="stSaveAll()" style="flex-shrink:0; white-space:nowrap;" disabled>💾 Simpan Semua (<span id="stDirtyCount">0</span>)</button>
+            </div>
+        </div>
+
+        {{-- Tabel stok --}}
+        <div class="card-main table-wrap" style="max-height: calc(100vh - 240px); overflow-y: auto;">
+            <table class="table-list table-hover">
+                <thead><tr>
+                    <th style="width:46px"></th>
+                    <th>Produk</th>
+                    <th style="width:78px; text-align:right;" title="Stok gudang internal (tersedia = fisik − dialokasi)">Gudang</th>
+                    <th style="width:150px; text-align:right;">Marketplace</th>
+                </tr></thead>
+                <tbody id="stBody"><tr><td colspan="4" class="empty">Memuat…</td></tr></tbody>
+            </table>
+        </div>
+    </div>{{-- /tabStok --}}
 
     {{-- ══ TAB: Naikkan Produk (Boost) ══ --}}
     <div id="tabBoost" class="pt-pane">
@@ -395,6 +472,7 @@
             products = await api(API);
             buildStoreOptions();
             render();
+            if ($('tabStok') && $('tabStok').classList.contains('active')) stRender();
         } catch (e) {
             $('prdBody').innerHTML = `<tr><td colspan="10" class="empty text-danger">${esc(e.message)}</td></tr>`;
         }
@@ -1230,6 +1308,312 @@
     });
 
     // ══════════════════════════════════════════════════════════════════════
+    // TAB: Stok — kelola & ubah stok cepat (reuse `products`, `api`, `esc`)
+    // ══════════════════════════════════════════════════════════════════════
+    let stStore = '';               // filter toko aktif di tab Stok
+    const stDirty = new Map();      // key `${pid}:${modelId}` -> nilai stok baru
+
+    // Ratakan produk menjadi baris per varian (atau satu baris jika tanpa varian).
+    function stFlatRows() {
+        const rows = [];
+        // Hanya produk aktif (tampil) — bukan yang diarsipkan/banned di marketplace.
+        products.filter(p => p.item_status === 'NORMAL').forEach(p => {
+            const models = p.models || [];
+            if (models.length) {
+                models.forEach(m => rows.push({
+                    pid: p.id, product: p, modelId: String(m.model_id),
+                    name: p.item_name, variant: m.model_name, sku: m.model_sku || p.item_sku,
+                    stock: m.stock ?? 0, image: p.image_url, store: p.store,
+                    sales: p.sales, status: p.item_status, mapping: m.mapping || null,
+                }));
+            } else {
+                rows.push({
+                    pid: p.id, product: p, modelId: '0',
+                    name: p.item_name, variant: null, sku: p.item_sku,
+                    stock: p.stock_total ?? 0, image: p.image_url, store: p.store,
+                    sales: p.sales, status: p.item_status, mapping: p.mapping || null,
+                });
+            }
+        });
+        return rows;
+    }
+
+    function stBuildStores() {
+        const stores = [...new Map(products.filter(p => p.store).map(p => [p.store.id, p.store.name])).entries()];
+        let html = `<button class="store-tab ${stStore === '' ? 'active' : ''}" onclick="stSetStore('')">Semua Toko</button>`;
+        stores.forEach(([id, name]) => {
+            html += `<button class="store-tab ${stStore === String(id) ? 'active' : ''}" onclick="stSetStore('${id}')">${esc(name)}</button>`;
+        });
+        if ($('stStoreTabs')) $('stStoreTabs').innerHTML = html;
+    }
+
+    window.stSetStore = function (id) { stStore = String(id); stRender(); };
+
+    function stFilteredRows() {
+        const q = $('stSearch').value.trim().toLowerCase();
+        const band = $('stStock').value;
+        return stFlatRows().filter(r => {
+            if (stStore && String(r.store?.id) !== stStore) return false;
+            const s = r.stock ?? 0;
+            if (band === 'empty' && s !== 0) return false;
+            if (band === 'low'   && !(s > 0 && s <= 5)) return false;
+            if (band === 'in'    && s <= 0) return false;
+            if (q) {
+                const hay = [r.name, r.sku, r.variant, r.product.item_id,
+                    r.mapping?.item_name, r.mapping?.item_code, r.mapping?.category_name]
+                    .filter(Boolean).join(' ').toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }
+
+    function stSortRows(rows) {
+        const sort = $('stSort').value;
+        const num = v => v == null ? -1 : Number(v);
+        rows.sort((a, b) => {
+            switch (sort) {
+                case 'stock_desc': return num(b.stock) - num(a.stock);
+                case 'sales':      return num(b.sales) - num(a.sales);
+                case 'name':       return (a.name || '').localeCompare(b.name || '');
+                default:           return num(a.stock) - num(b.stock); // stock_asc
+            }
+        });
+        return rows;
+    }
+
+    function stStockClass(n) {
+        if ((n ?? 0) === 0) return 'stock-zero';
+        if (n <= 5) return 'stock-low';
+        return '';
+    }
+
+    function stRenderKpis() {
+        const rows = stFlatRows().filter(r => !stStore || String(r.store?.id) === stStore);
+        const totalSku = rows.length;
+        const empty = rows.filter(r => (r.stock ?? 0) === 0).length;
+        const low   = rows.filter(r => (r.stock ?? 0) > 0 && (r.stock ?? 0) <= 5).length;
+        const units = rows.reduce((s, r) => s + (Number(r.stock) || 0), 0);
+        const kpi = (lbl, val) => `<span class="kpi" style="cursor:default"><span class="lbl">${lbl}</span><span class="val">${val}</span></span>`;
+        if ($('stKpiRow')) $('stKpiRow').innerHTML =
+            kpi('Total SKU', totalSku) +
+            kpi('Stok Habis', empty) +
+            kpi('Menipis', low) +
+            kpi('Total Unit', units.toLocaleString('id-ID'));
+    }
+
+    function stUpdateDirtyCount() {
+        if ($('stDirtyCount')) $('stDirtyCount').textContent = stDirty.size;
+        if ($('stSaveAll')) $('stSaveAll').disabled = stDirty.size === 0;
+    }
+
+    // ── Grouping helpers (kategori & nama produk hasil mapping) ──────────
+    const stExpanded = new Set(); // kategori yang sedang dibuka (default: semua tertutup)
+
+    function stCatKey(r) {
+        if (!r.mapping) return '❓ Belum di-mapping';
+        return r.mapping.category_name || '📦 Tanpa Kategori';
+    }
+    function stItemKey(r) {
+        if (!r.mapping) return r.name || '—';
+        return (r.mapping.item_code ? r.mapping.item_code + ' · ' : '') + (r.mapping.item_name || ('Item #' + r.mapping.item_id));
+    }
+
+    function stInputClass(n) {
+        if ((n ?? 0) === 0) return 'st-inp-zero';
+        if (n <= 5) return 'st-inp-low';
+        return '';
+    }
+
+    function stRowHtml(r, compact) {
+        const key = `${r.pid}:${r.modelId}`;
+        const dirty = stDirty.has(key);
+        const inputVal = dirty ? stDirty.get(key) : (r.stock ?? 0);
+        const line1 = compact ? (r.variant ? '↳ ' + esc(r.variant) : esc(r.name || '—')) : esc(r.name || '—');
+        const meta = [];
+        if (!compact && r.variant) meta.push('↳ ' + esc(r.variant));
+        meta.push('SKU: ' + esc(r.sku || '—'));
+        if (r.store?.name) meta.push(esc(r.store.name));
+        const gd = r.mapping;
+        const gdAvail = (gd && gd.internal_available != null) ? gd.internal_available : null;
+        const gdCls = gdAvail == null ? 'muted' : (gdAvail <= 0 ? 'stock-zero' : (gdAvail <= 5 ? 'stock-low' : ''));
+        const gdTip = gdAvail == null ? 'Belum di-mapping ke item internal' : `Fisik: ${(gd.internal_physical ?? 0).toLocaleString('id-ID')} · Dialokasi: ${(gd.internal_allocated ?? 0).toLocaleString('id-ID')}`;
+        const gdTxt = gdAvail == null ? '—' : gdAvail.toLocaleString('id-ID');
+        return `<tr data-st-key="${key}" class="${dirty ? 'st-dirty-row' : ''} ${compact ? 'st-grp-row' : ''}">
+            <td>${r.image ? `<img class="prd-img" src="${esc(r.image)}" loading="lazy">` : '<div class="prd-img"></div>'}</td>
+            <td>
+                <div class="prd-name" style="-webkit-line-clamp:1" title="${esc(r.name || '')}">${line1}</div>
+                <div class="prd-sku">${meta.join(' · ')}</div>
+            </td>
+            <td class="st-gd-cell"><span class="${gdCls}" title="${gdTip}">${gdTxt}</span></td>
+            <td>
+                <div class="st-stok-cell">
+                    <input type="number" min="0" class="form-control form-control-sm st-stock-input ${stInputClass(r.stock)}" value="${inputVal}" data-pid="${r.pid}" data-model-id="${r.modelId}" data-orig="${r.stock ?? 0}" title="Stok sekarang: ${r.stock ?? 0}">
+                    <button class="btn btn-outline-primary btn-mini st-save-btn" onclick="stSaveOne('${key}', this)" title="Simpan ke Shopee">💾</button>
+                </div>
+            </td>
+        </tr>`;
+    }
+
+    window.stRender = function () {
+        stBuildStores();
+        stRenderKpis();
+        const grouped = $('stGroup') ? $('stGroup').checked : true;
+        const rows = stFilteredRows();
+        if (!rows.length) {
+            $('stBody').innerHTML = `<tr><td colspan="4" class="empty">${products.length ? 'Tidak ada produk yang cocok dengan filter.' : 'Belum ada produk. Klik "⟳ Sync Shopee".'}</td></tr>`;
+            stUpdateDirtyCount();
+            return;
+        }
+
+        if (!grouped) {
+            $('stBody').innerHTML = stSortRows(rows).map(r => stRowHtml(r, false)).join('');
+            stUpdateDirtyCount();
+            return;
+        }
+
+        // Grouping 2 tingkat: Kategori (mapping) → Nama produk (mapping) → varian
+        const cats = new Map(); // catName -> Map(itemKey -> rows[])
+        rows.forEach(r => {
+            const ck = stCatKey(r), ik = stItemKey(r);
+            if (!cats.has(ck)) cats.set(ck, new Map());
+            const items = cats.get(ck);
+            if (!items.has(ik)) items.set(ik, []);
+            items.get(ik).push(r);
+        });
+
+        const catNames = [...cats.keys()].sort((a, b) => {
+            const au = a.startsWith('❓'), bu = b.startsWith('❓'); // bucket belum-mapping paling bawah
+            if (au !== bu) return au ? 1 : -1;
+            return a.localeCompare(b);
+        });
+
+        let html = '';
+        catNames.forEach(ck => {
+            const items = cats.get(ck);
+            let catUnits = 0, catEmpty = 0, catSku = 0;
+            items.forEach(rs => rs.forEach(r => { catUnits += Number(r.stock) || 0; if ((r.stock ?? 0) === 0) catEmpty++; catSku++; }));
+            const expanded = stExpanded.has(ck);
+            html += `<tr class="st-cat-head" data-cat="${esc(ck)}">
+                <td colspan="4"><div class="st-cat-inner">
+                    <span class="st-caret">${expanded ? '▾' : '▸'}</span>
+                    <span class="st-cat-name">${esc(ck)}</span>
+                    <span class="st-cat-meta">${items.size} produk · ${catSku} SKU</span>
+                    <span class="st-cat-sum">${catEmpty ? `<span class="st-badge-empty">${catEmpty} habis</span>` : ''}<b>${catUnits.toLocaleString('id-ID')}</b> unit</span>
+                </div></td></tr>`;
+            if (!expanded) return;
+
+            [...items.keys()].sort((a, b) => a.localeCompare(b)).forEach(ik => {
+                const rs = stSortRows(items.get(ik));
+                const itUnits = rs.reduce((s, r) => s + (Number(r.stock) || 0), 0);
+                const itEmpty = rs.filter(r => (r.stock ?? 0) === 0).length;
+                const itInternal = rs[0]?.mapping?.internal_available;
+                const itIntTxt = (itInternal == null) ? '—' : itInternal.toLocaleString('id-ID');
+                const itIntCls = (itInternal == null) ? 'muted' : (itInternal <= 0 ? 'stock-zero' : (itInternal <= 5 ? 'stock-low' : ''));
+                html += `<tr class="st-item-head">
+                    <td></td>
+                    <td><span class="st-item-name">${esc(ik)}</span> <span class="muted">· ${rs.length} varian</span></td>
+                    <td class="st-gd-cell"><span class="${itIntCls}" title="Stok gudang internal">${itIntTxt}</span></td>
+                    <td style="text-align:right"><span class="${itEmpty ? 'stock-low' : 'muted'}" title="${itEmpty} varian habis">${itUnits.toLocaleString('id-ID')} unit</span></td>
+                </tr>`;
+                html += rs.map(r => stRowHtml(r, true)).join('');
+            });
+        });
+        $('stBody').innerHTML = html;
+        stUpdateDirtyCount();
+    };
+
+    // Lacak perubahan input stok (event delegation — baris dirender ulang tiap saat).
+    document.addEventListener('input', e => {
+        const inp = e.target.closest('.st-stock-input');
+        if (!inp) return;
+        const key = `${inp.dataset.pid}:${inp.dataset.modelId}`;
+        const orig = Number(inp.dataset.orig);
+        const val = inp.value === '' ? NaN : parseInt(inp.value);
+        const row = inp.closest('tr');
+        if (isNaN(val) || val === orig) {
+            stDirty.delete(key);
+            row && row.classList.remove('st-dirty-row');
+        } else {
+            stDirty.set(key, val);
+            row && row.classList.add('st-dirty-row');
+        }
+        stUpdateDirtyCount();
+    });
+
+    // Simpan stok ke Shopee + sinkron state lokal supaya tab lain ikut ter-update.
+    async function stPersist(pid, stockList) {
+        await api(`${API}/${pid}/stock`, { method: 'POST', body: JSON.stringify({ stock_list: stockList }) });
+        const p = products.find(x => x.id === pid);
+        if (!p) return;
+        if (p.models && p.models.length) {
+            stockList.forEach(({ model_id, stock }) => {
+                const m = p.models.find(x => String(x.model_id) === String(model_id));
+                if (m) m.stock = stock;
+            });
+            p.stock_total = p.models.reduce((s, m) => s + (Number(m.stock) || 0), 0);
+        } else if (stockList.length) {
+            p.stock_total = stockList[0].stock;
+        }
+    }
+
+    window.stSaveOne = async function (key, btn) {
+        const [pid, modelId] = key.split(':');
+        const inp = document.querySelector(`.st-stock-input[data-pid="${pid}"][data-model-id="${modelId}"]`);
+        if (!inp) return;
+        const val = parseInt(inp.value);
+        if (isNaN(val) || val < 0) return alert('Stok tidak valid');
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳'; }
+        try {
+            await stPersist(Number(pid), [{ model_id: modelId, stock: val }]);
+            stDirty.delete(key);
+            toast('Stok tersimpan ke Shopee ✔');
+            stRender();
+        } catch (e) {
+            alert('Gagal simpan stok: ' + e.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+        }
+    };
+
+    window.stSaveAll = async function () {
+        if (!stDirty.size) return;
+        const btn = $('stSaveAll');
+        const groups = {};
+        stDirty.forEach((stock, key) => {
+            const [pid, modelId] = key.split(':');
+            (groups[pid] ||= []).push({ model_id: modelId, stock });
+        });
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menyimpan…'; }
+        let ok = 0, fail = 0;
+        for (const [pid, list] of Object.entries(groups)) {
+            try {
+                await stPersist(Number(pid), list);
+                list.forEach(l => stDirty.delete(`${pid}:${l.model_id}`));
+                ok += list.length;
+            } catch (e) { fail += list.length; }
+        }
+        if (btn) btn.innerHTML = origHtml;
+        toast(fail ? `${ok} stok tersimpan, ${fail} gagal` : `${ok} stok tersimpan ke Shopee ✔`, fail ? 'warning' : 'success');
+        stRender();
+    };
+
+    // Event listener filter tab Stok
+    ['stSearch','stStock','stSort'].forEach(id => {
+        if ($(id)) $(id).addEventListener(id === 'stSearch' ? 'input' : 'change', stRender);
+    });
+    if ($('stGroup')) $('stGroup').addEventListener('change', stRender);
+    // Lipat/buka kategori (event delegation; tbody dirender ulang tiap saat)
+    if ($('stBody')) $('stBody').addEventListener('click', e => {
+        const head = e.target.closest('.st-cat-head');
+        if (!head) return;
+        const ck = head.dataset.cat;
+        if (stExpanded.has(ck)) stExpanded.delete(ck); else stExpanded.add(ck);
+        stRender();
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
     // TAB: Naikkan Produk (Boost) — memakai ulang `products`, `api`, `esc`
     // ══════════════════════════════════════════════════════════════════════
     const BAPI = '/api/marketplace/boost';
@@ -1238,7 +1622,9 @@
     window.switchTab = function (tab) {
         document.querySelectorAll('.pt-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
         $('tabProduk').classList.toggle('active', tab === 'produk');
+        $('tabStok').classList.toggle('active', tab === 'stok');
         $('tabBoost').classList.toggle('active', tab === 'boost');
+        if (tab === 'stok') stRender();
         if (tab === 'boost') {
             boBuildStores();
             boLoaded = true;

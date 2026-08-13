@@ -41,32 +41,56 @@ class MarketplaceProductController extends Controller
 
         $mappings = \App\Models\SkuMapping::whereIn('marketplace_sku', $skus)
             ->where(fn ($w) => $w->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) = ?', ['shopee']))
-            ->with('item:id,code,name')
+            ->with(['item:id,code,name,item_category_id', 'item.category:id,code,name'])
             ->get()
             // channel-spesifik menang atas global
             ->sortBy(fn ($m) => $m->channel_code === null ? 1 : 0)
             ->keyBy(fn ($mapping) => mb_strtolower(trim((string) $mapping->marketplace_sku)));
 
+        // Stok gudang internal per item (fisik = SUM qty, tersedia = fisik - dialokasi).
+        $mappedItemIds = $mappings->pluck('item_id')->filter()->unique()->values();
+        $internalStocks = \DB::table('inventory_stocks')
+            ->whereIn('item_id', $mappedItemIds)
+            ->selectRaw('item_id, COALESCE(SUM(qty),0) as physical, COALESCE(SUM(allocated_qty),0) as allocated')
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $internalFor = function ($mapping) use ($internalStocks): array {
+            $s = $mapping ? $internalStocks->get($mapping->item_id) : null;
+            $physical  = (float) ($s->physical ?? 0);
+            $allocated = (float) ($s->allocated ?? 0);
+            return [
+                'internal_physical'  => $physical,
+                'internal_allocated' => $allocated,
+                'internal_available' => $physical - $allocated,
+            ];
+        };
+
         foreach ($products as $p) {
             $parentMapping = $p->item_sku
                 ? ($mappings[mb_strtolower(trim((string) $p->item_sku))] ?? null)
                 : null;
-            $p->setAttribute('mapping', $parentMapping ? [
-                'id'        => $parentMapping->id,
-                'item_id'   => $parentMapping->item_id,
-                'item_code' => $parentMapping->item?->code,
-                'item_name' => $parentMapping->item?->name,
-            ] : null);
+            $p->setAttribute('mapping', $parentMapping ? array_merge([
+                'id'            => $parentMapping->id,
+                'item_id'       => $parentMapping->item_id,
+                'item_code'     => $parentMapping->item?->code,
+                'item_name'     => $parentMapping->item?->name,
+                'category_id'   => $parentMapping->item?->item_category_id,
+                'category_name' => $parentMapping->item?->category?->name,
+            ], $internalFor($parentMapping)) : null);
             foreach ($p->models as $m) {
                 $map = $m->model_sku
                     ? ($mappings[mb_strtolower(trim((string) $m->model_sku))] ?? null)
                     : null;
-                $m->setAttribute('mapping', $map ? [
-                    'id'        => $map->id,
-                    'item_id'   => $map->item_id,
-                    'item_code' => $map->item?->code,
-                    'item_name' => $map->item?->name,
-                ] : null);
+                $m->setAttribute('mapping', $map ? array_merge([
+                    'id'            => $map->id,
+                    'item_id'       => $map->item_id,
+                    'item_code'     => $map->item?->code,
+                    'item_name'     => $map->item?->name,
+                    'category_id'   => $map->item?->item_category_id,
+                    'category_name' => $map->item?->category?->name,
+                ], $internalFor($map)) : null);
             }
         }
 

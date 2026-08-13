@@ -3101,12 +3101,9 @@ class ShipmentController extends Controller
 
     public function report(Request $request)
     {
-        // TODO: sesuaikan view yang kamu punya
-        // return view('sales.shipments.report');
-
-        // sementara biar route tidak 500:
-        return redirect()->route('sales.shipments.index')
-            ->with('info', 'Report belum diimplementasikan.');
+        // Laporan Pengiriman kini berada di grup Sales Reports
+        // (route: sales.reports.shipment). Redirect agar URL lama tetap valid.
+        return redirect()->route('sales.reports.shipment', $request->query());
     }
 
 }

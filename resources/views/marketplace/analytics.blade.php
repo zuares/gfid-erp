@@ -1,381 +1,206 @@
 @extends('layouts.app')
-@section('title', 'Marketplace • Sales Analytics')
+@section('title', 'Marketplace • Analytics')
 
 @include('marketplace._shared')
 
 @push('head')
 <style>
-/* ── KPI ── */
-.an-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:.75rem; margin-bottom:1.5rem; }
-.an-kpi-card {
-    background:#fff; border:1.5px solid #e2e8f0; border-radius:16px;
-    padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.25rem;
-}
-.an-kpi-label { font-size:.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; }
-.an-kpi-value { font-size:1.3rem; font-weight:900; color:#0f172a; line-height:1.1; }
-.an-kpi-note  { font-size:.7rem; color:#94a3b8; }
-.an-kpi-card.highlight { background:#0f172a; border-color:#0f172a; }
-.an-kpi-card.highlight .an-kpi-label,
-.an-kpi-card.highlight .an-kpi-value,
-.an-kpi-card.highlight .an-kpi-note { color:#fff; }
-.an-kpi-card.highlight .an-kpi-note { color:rgba(255,255,255,.5); }
-
-/* ── Tabs ── */
-.an-tabs { display:flex; gap:.3rem; margin-bottom:1.25rem; border-bottom:1.5px solid #e2e8f0; padding-bottom:.1rem; }
-.an-tab {
-    background:none; border:none; padding:.45rem .9rem; font-size:.8rem; font-weight:700;
-    color:#64748b; border-radius:8px 8px 0 0; cursor:pointer; border-bottom:2.5px solid transparent;
-    margin-bottom:-1.5px;
-}
-.an-tab.active { color:#0f172a; border-bottom-color:#0f172a; }
-.an-tab-panel { display:none; }
-.an-tab-panel.active { display:block; }
-
-/* ── Chart placeholder ── */
-.an-chart-wrap {
-    background:#f8fafc; border:1.5px dashed #e2e8f0; border-radius:14px;
-    height:220px; display:flex; align-items:center; justify-content:center;
-    color:#94a3b8; font-size:.8rem; font-weight:600; margin-bottom:1.25rem;
-}
-
-/* ── Filter bar ── */
-.an-filter-bar { display:flex; gap:.6rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1.25rem; }
-.an-filter-bar label { font-size:.68rem; font-weight:700; color:#94a3b8; display:block; margin-bottom:.2rem; }
-.an-filter-bar input,
-.an-filter-bar select { font-size:.8rem; border-radius:10px; border:1.5px solid #e2e8f0; padding:.3rem .65rem; background:#fff; }
-
-/* ── Table ── */
-.an-empty { text-align:center; padding:2.5rem 1rem; color:#94a3b8; font-size:.82rem; }
+    .an-shell { display:grid; gap:1rem; }
+    .an-toolbar { display:flex; align-items:end; justify-content:space-between; gap:.75rem; flex-wrap:wrap; }
+    .an-toolbar-controls { display:flex; gap:.5rem; align-items:end; flex-wrap:wrap; }
+    .an-field label { display:block; color:#64748b; font-size:.68rem; font-weight:850; margin:0 0 .25rem; }
+    .an-field input, .an-field select { min-height:38px; border:1px solid rgba(15,23,42,.12); border-radius:12px; padding:.45rem .7rem; background:#fff; color:#0f172a; font-size:.78rem; font-weight:700; }
+    .an-field input { min-width:190px; }
+    .an-btn { min-height:38px; border:1px solid rgba(15,23,42,.1); border-radius:12px; padding:.45rem .8rem; background:#fff; color:#0f172a; font-size:.76rem; font-weight:850; cursor:pointer; }
+    .an-btn:hover { background:#f8fafc; }
+    .an-btn-dark { background:#0f172a; border-color:#0f172a; color:#fff; }
+    .an-btn-dark:hover { background:#1e293b; color:#fff; }
+    .an-sync-note { color:#94a3b8; font-size:.7rem; font-weight:700; margin-top:.3rem; }
+    .an-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.7rem; }
+    .an-kpi { min-height:112px; border:1px solid rgba(15,23,42,.08); border-radius:18px; background:#fff; padding:1rem; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 8px 22px rgba(15,23,42,.035); }
+    .an-kpi.primary { background:#0f172a; color:#fff; border-color:#0f172a; }
+    .an-kpi-label { color:#64748b; font-size:.67rem; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+    .an-kpi.primary .an-kpi-label { color:#94a3b8; }
+    .an-kpi-value { color:#0f172a; font-size:1.35rem; font-weight:950; letter-spacing:-.035em; line-height:1.1; }
+    .an-kpi.primary .an-kpi-value { color:#fff; }
+    .an-kpi-note { color:#94a3b8; font-size:.69rem; font-weight:700; }
+    .an-kpi-note.good { color:#16a34a; }
+    .an-kpi-note.bad { color:#dc2626; }
+    .an-grid-main { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(280px,.9fr); gap:1rem; }
+    .an-grid-secondary { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr); gap:1rem; }
+    .an-card { min-width:0; border:1px solid var(--gf-border,#e5e7eb); border-radius:20px; background:#fff; box-shadow:0 8px 24px rgba(15,23,42,.035); overflow:hidden; }
+    .an-card-head { padding:1rem 1.15rem .75rem; display:flex; justify-content:space-between; align-items:start; gap:.75rem; }
+    .an-card-title { color:#0f172a; font-size:.9rem; font-weight:950; }
+    .an-card-sub { color:#94a3b8; font-size:.7rem; font-weight:700; margin-top:.2rem; }
+    .an-card-body { padding:0 1.15rem 1.15rem; }
+    .an-chart { min-height:250px; position:relative; padding:1rem 0 .35rem; }
+    .an-chart-grid { position:absolute; inset:1rem 0 2rem; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none; }
+    .an-chart-grid span { border-top:1px dashed #e2e8f0; width:100%; }
+    .an-chart-svg { width:100%; height:220px; position:relative; z-index:1; overflow:visible; }
+    .an-chart-axis { display:flex; justify-content:space-between; color:#94a3b8; font-size:.64rem; font-weight:750; padding:0 .1rem; }
+    .an-legend { display:flex; gap:.85rem; color:#64748b; font-size:.68rem; font-weight:750; }
+    .an-legend i { display:inline-block; width:8px; height:8px; border-radius:99px; margin-right:.3rem; background:#0f172a; }
+    .an-legend i.green { background:#16a34a; }
+    .an-list { display:grid; gap:.3rem; }
+    .an-list-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.8rem; padding:.68rem 0; border-bottom:1px solid #f1f5f9; }
+    .an-list-row:last-child { border-bottom:0; }
+    .an-list-main { min-width:0; }
+    .an-list-name { color:#0f172a; font-size:.76rem; font-weight:850; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .an-list-meta { color:#94a3b8; font-size:.65rem; font-weight:700; margin-top:.15rem; }
+    .an-list-value { text-align:right; color:#0f172a; font-size:.75rem; font-weight:900; }
+    .an-bar { height:6px; margin-top:.38rem; border-radius:999px; background:#f1f5f9; overflow:hidden; }
+    .an-bar > span { display:block; height:100%; border-radius:inherit; background:#0f172a; }
+    .an-bar.green > span { background:#16a34a; }
+    .an-table-wrap { overflow:auto; }
+    .an-table { width:100%; border-collapse:collapse; min-width:560px; }
+    .an-table th { padding:.55rem .5rem; text-align:left; border-bottom:1px solid #e2e8f0; color:#94a3b8; font-size:.64rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+    .an-table td { padding:.68rem .5rem; border-bottom:1px solid #f1f5f9; color:#334155; font-size:.73rem; font-weight:700; vertical-align:middle; }
+    .an-table th:not(:first-child), .an-table td:not(:first-child) { text-align:right; }
+    .an-table tr:last-child td { border-bottom:0; }
+    .an-rank { width:24px; height:24px; display:inline-grid; place-items:center; border-radius:8px; background:#f1f5f9; color:#64748b; font-size:.65rem; font-weight:950; }
+    .an-product { display:inline-flex; align-items:center; gap:.55rem; min-width:180px; text-align:left; }
+    .an-product-copy { min-width:0; }
+    .an-product-name { color:#0f172a; font-size:.74rem; font-weight:850; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:250px; }
+    .an-product-sku { color:#94a3b8; font-size:.63rem; font-weight:700; margin-top:.1rem; }
+    .an-dot { width:8px; height:8px; border-radius:99px; background:#16a34a; flex:0 0 auto; }
+    .an-dot.red { background:#ef4444; }
+    .an-funnel { display:flex; flex-direction:column; gap:.55rem; }
+    .an-funnel-row { display:grid; grid-template-columns:90px 1fr auto; align-items:center; gap:.6rem; font-size:.7rem; font-weight:800; color:#475569; }
+    .an-funnel-track { height:28px; border-radius:8px; background:#f1f5f9; overflow:hidden; }
+    .an-funnel-track span { display:block; height:100%; border-radius:inherit; background:#16a34a; }
+    .an-funnel-row:nth-child(2) .an-funnel-track span { background:#86efac; }
+    .an-funnel-row:nth-child(3) .an-funnel-track span { background:#facc15; }
+    .an-funnel-row:nth-child(4) .an-funnel-track span { background:#fda4af; }
+    .an-funnel-value { color:#0f172a; text-align:right; white-space:nowrap; }
+    .an-costs { display:grid; gap:.72rem; }
+    .an-cost-row { display:grid; grid-template-columns:1fr auto; gap:.5rem; font-size:.73rem; color:#64748b; font-weight:750; }
+    .an-cost-row strong { color:#0f172a; font-weight:900; }
+    .an-empty { padding:1.6rem 0; text-align:center; color:#94a3b8; font-size:.75rem; font-weight:750; }
+    .an-error { padding:.8rem .9rem; border:1px solid #fecaca; border-radius:12px; background:#fef2f2; color:#b91c1c; font-size:.73rem; font-weight:750; }
+    @media (max-width: 1050px) { .an-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media (max-width: 760px) { .an-grid-main, .an-grid-secondary { grid-template-columns:1fr; } .an-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpi-value { font-size:1.12rem; } .an-field input { min-width:150px; } }
+    @media (max-width: 420px) { .an-kpis { grid-template-columns:1fr 1fr; gap:.45rem; } .an-kpi { padding:.72rem; min-height:100px; } .an-toolbar, .an-toolbar-controls { align-items:stretch; } .an-field, .an-field input, .an-btn { width:100%; } }
 </style>
 @endpush
 
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="Sales Analytics"
-    description="Gambaran penjualan untuk pengambilan keputusan bisnis.">
+<x-gf.page eyebrow="Marketplace" title="Analytics" description="Pantau omzet, laba, order, dan kesehatan produk dari satu layar.">
+    <div class="an-shell">
+        <div class="an-toolbar">
+            <div>
+                <div class="an-sync-note" id="anSyncNote">Memuat data marketplace…</div>
+            </div>
+            <div class="an-toolbar-controls">
+                <div class="an-field"><label for="anStore">Toko</label><select id="anStore"><option value="">Semua toko</option></select></div>
+                <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
+                <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
+                <button class="an-btn an-btn-dark" id="anRefresh" type="button">↻ Refresh</button>
+            </div>
+        </div>
 
-    <x-slot:actions>
-        {{-- Date range --}}
-        <input type="text" id="anDateRange" autocomplete="off"
-            value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"
-            style="min-width:190px;border-radius:999px;font-size:.78rem;font-weight:700;
-                   border:1px solid rgba(15,23,42,.1);padding:.35rem .9rem;background:#fff">
-        <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}">
-        <input type="hidden" id="anDateTo"   value="{{ $filters['date_to'] }}">
-        <button class="btn btn-light border btn-sm" style="border-radius:999px;font-size:.78rem;font-weight:700"
-            onclick="loadAll()">↻ Refresh</button>
-    </x-slot:actions>
+        <div class="an-kpis">
+            <div class="an-kpi primary"><span class="an-kpi-label">Omzet selesai</span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote">COMPLETED</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Laba bersih</span><strong class="an-kpi-value" id="kpiProfit">—</strong><span class="an-kpi-note" id="kpiProfitNote">setelah biaya & HPP</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Total order</span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote">semua status</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Rata-rata order</span><strong class="an-kpi-value" id="kpiAov">—</strong><span class="an-kpi-note">omzet / order selesai</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Pembatalan</span><strong class="an-kpi-value" id="kpiCancelled">—</strong><span class="an-kpi-note bad" id="kpiCancelledNote">cancel rate</span></div>
+        </div>
 
-    {{-- KPI --}}
-    <div class="an-kpi-grid">
-        <div class="an-kpi-card highlight">
-            <div class="an-kpi-label">Total Revenue</div>
-            <div class="an-kpi-value" id="kpiRevenue">—</div>
-            <div class="an-kpi-note">yang dibayar konsumen</div>
+        <div class="an-grid-main">
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Omzet vs laba harian</div><div class="an-card-sub">Order selesai dalam periode terpilih</div></div><div class="an-legend"><span><i></i>Omzet</span><span><i class="green"></i>Laba</span></div></div><div class="an-card-body"><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Funnel penjualan</div><div class="an-card-sub">Dari order masuk hingga payout</div></div></div><div class="an-card-body"><div class="an-funnel" id="salesFunnel"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
-        <div class="an-kpi-card">
-            <div class="an-kpi-label">Jumlah Order</div>
-            <div class="an-kpi-value" id="kpiOrders">—</div>
-            <div class="an-kpi-note">order masuk</div>
+
+        <div class="an-grid-secondary">
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Bandingkan kontribusi revenue dan tingkat selesai</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order</th><th>Selesai</th><th>Cancel</th><th>Omzet</th><th>Laba</th></tr></thead><tbody id="storeBody"><tr><td colspan="6"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya terbesar</div><div class="an-card-sub">Potongan dari settlement tersinkron</div></div></div><div class="an-card-body"><div class="an-costs" id="costBody"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
-        <div class="an-kpi-card">
-            <div class="an-kpi-label">Rata-rata Transaksi</div>
-            <div class="an-kpi-value" id="kpiAov" style="font-size:1rem">—</div>
-            <div class="an-kpi-note">revenue / order</div>
-        </div>
-        <div class="an-kpi-card">
-            <div class="an-kpi-label">Order Selesai</div>
-            <div class="an-kpi-value" id="kpiCompleted">—</div>
-            <div class="an-kpi-note" id="kpiCompletedRate">dari total order</div>
-        </div>
-        <div class="an-kpi-card">
-            <div class="an-kpi-label">Order Dibatal</div>
-            <div class="an-kpi-value" id="kpiCancelled" style="color:#ef4444">—</div>
-            <div class="an-kpi-note" id="kpiCancelledRate">cancel rate</div>
+
+        <div class="an-grid-secondary">
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Produk paling menguntungkan</div><div class="an-card-sub">Estimasi laba berdasarkan HPP snapshot dan settlement</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Produk</th><th>Qty</th><th>Omzet</th><th>Laba</th><th>Margin</th></tr></thead><tbody id="bestProductBody"><tr><td colspan="5"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Produk perlu perhatian</div><div class="an-card-sub">Laba rendah atau data HPP belum lengkap</div></div></div><div class="an-card-body"><div class="an-list" id="worstProductBody"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
     </div>
-
-    {{-- Tabs --}}
-    <div class="an-tabs">
-        <button class="an-tab active" onclick="switchTab('overview', this)">Overview</button>
-        <button class="an-tab" onclick="switchTab('products', this)">Produk Terlaris</button>
-        <button class="an-tab" onclick="switchTab('buyers', this)">Daya Beli</button>
-        <button class="an-tab" onclick="switchTab('shipping', this)">Pengiriman</button>
-    </div>
-
-    {{-- Tab: Overview --}}
-    <div id="tab-overview" class="an-tab-panel active">
-        <x-gf.panel title="Tren Penjualan" subtitle="Revenue harian dalam periode terpilih.">
-            <div class="an-chart-wrap" id="chartRevenue">
-                <span>📊 Grafik akan ditampilkan di sini</span>
-            </div>
-        </x-gf.panel>
-
-        <x-gf.panel title="Per Toko" subtitle="Breakdown revenue dan order per toko/channel.">
-            <div id="storeBreakdownBody">
-                <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
-            </div>
-        </x-gf.panel>
-    </div>
-
-    {{-- Tab: Produk Terlaris --}}
-    <div id="tab-products" class="an-tab-panel">
-        <x-gf.panel title="Produk Terlaris" subtitle="Berdasarkan jumlah qty terjual.">
-            <div id="topProductsBody">
-                <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
-            </div>
-        </x-gf.panel>
-    </div>
-
-    {{-- Tab: Daya Beli --}}
-    <div id="tab-buyers" class="an-tab-panel">
-        <x-gf.panel title="Distribusi Nilai Transaksi" subtitle="Berapa yang biasanya dibayar konsumen per order?">
-            <div id="buyerPowerBody">
-                <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
-            </div>
-        </x-gf.panel>
-    </div>
-
-    {{-- Tab: Pengiriman --}}
-    <div id="tab-shipping" class="an-tab-panel">
-        <x-gf.panel title="Status Pengiriman" subtitle="Breakdown order berdasarkan status terakhir.">
-            <div id="shippingBody">
-                <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
-            </div>
-        </x-gf.panel>
-    </div>
-
 </x-gf.page>
 @endsection
 
 @push('scripts')
 <script>
 (function () {
-    const { api, fmtDate, fmtRp, esc, channelPill, statusBadge } = window.mpHelpers;
+    const { api, fmtRp, esc } = window.mpHelpers;
     const $ = id => document.getElementById(id);
-    const getFrom = () => $('anDateFrom').value;
-    const getTo   = () => $('anDateTo').value;
+    let orders = [], stores = [];
+    const from = () => $('anDateFrom').value;
+    const to = () => $('anDateTo').value;
+    const n = v => Number.parseFloat(v || 0) || 0;
+    const status = o => String(o.order_status || o.status || '').toUpperCase();
+    const completed = o => ['COMPLETED', 'DELIVERED', 'CLOSED'].includes(status(o));
+    const money = v => fmtRp(Math.round(v || 0));
+    const pct = (a,b) => b ? (a / b * 100).toFixed(1) + '%' : '0%';
+    const dateKey = o => { const d = new Date(o.ordered_at || o.created_at); return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0,10); };
+    const selectedStore = () => $('anStore').value;
+    const inRange = o => { const d = dateKey(o); return !d || (d >= from() && d <= to()); };
+    const filtered = () => orders.filter(o => inRange(o) && (!selectedStore() || String(o.store_id || o.store?.id) === selectedStore()));
+    const settlement = o => o.settlement || {};
+    const itemRevenue = i => n(i.line_net_amount || i.line_gross_amount || i.price_after_discount || i.price || i.model_discounted_price || i.model_original_price) * n(i.qty || 0);
+    const itemCost = i => n(i.hpp_total_snapshot) > 0 ? n(i.hpp_total_snapshot) : n(i.hpp_snapshot || i.hpp_unit_snapshot) * n(i.qty || 0);
+    const revenue = o => n(settlement(o).buyer_payment_amount || settlement(o).final_income || o.total_amount || o.total_paid_customer);
+    const fees = o => { const s = settlement(o); return ['commission_fee','service_fee','transaction_fee','affiliate_fee','activity_fee','ad_cost','shipping_insurance_fee','reverse_shipping_fee','escrow_tax'].reduce((sum,k) => sum + n(s[k]), 0) + n(s.seller_voucher) + n(s.seller_coin_cash_back); };
+    const profit = o => { const items = o.items || []; const cost = items.reduce((s,i) => s + itemCost(i), 0); const s = settlement(o); const base = n(s.final_income) > 0 ? n(s.final_income) : revenue(o) - fees(o); return base - cost; };
 
-    let orders = [];
-
-    // ── Flatpickr ─────────────────────────────────────────────────────────
-    if (window.flatpickr) {
-        flatpickr($('anDateRange'), {
-            mode: 'range', dateFormat: 'Y-m-d',
-            defaultDate: [getFrom(), getTo()],
-            onChange(dates) {
-                if (dates.length === 2) {
-                    $('anDateFrom').value = dates[0].toISOString().slice(0,10);
-                    $('anDateTo').value   = dates[1].toISOString().slice(0,10);
-                    $('anDateRange').value = getFrom() + ' — ' + getTo();
-                    history.replaceState(null, '', location.pathname + '?date_from=' + getFrom() + '&date_to=' + getTo());
-                    render();
-                }
-            }
-        });
+    function setLoading(message) { $('anSyncNote').textContent = message; }
+    function fillStores() {
+        const current = selectedStore();
+        const unique = new Map();
+        orders.forEach(o => { const id = o.store_id || o.store?.id; if (id && !unique.has(String(id))) unique.set(String(id), o.store?.name || `Toko #${id}`); });
+        $('anStore').innerHTML = '<option value="">Semua toko</option>' + [...unique.entries()].sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join('');
+        $('anStore').value = unique.has(current) ? current : '';
     }
-
-    // ── Tab switch ────────────────────────────────────────────────────────
-    window.switchTab = function (name, btn) {
-        document.querySelectorAll('.an-tab-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.an-tab').forEach(b => b.classList.remove('active'));
-        $('tab-' + name).classList.add('active');
-        btn.classList.add('active');
-    };
-
-    // ── Load ──────────────────────────────────────────────────────────────
-    window.loadAll = async function () {
-        orders = await api('/api/marketplace/local-orders').catch(() => []);
-        render();
-    };
-
-    function inRange(o) {
-        if (!o.ordered_at) return true;
-        const d = new Date(o.ordered_at);
-        return d >= new Date(getFrom() + 'T00:00:00') && d <= new Date(getTo() + 'T23:59:59');
+    function renderKpis(rows) {
+        const done = rows.filter(completed), cancel = rows.filter(o => status(o) === 'CANCELLED');
+        const rev = done.reduce((s,o) => s + revenue(o), 0), prof = done.reduce((s,o) => s + profit(o), 0);
+        $('kpiRevenue').textContent = money(rev); $('kpiProfit').textContent = money(prof); $('kpiOrders').textContent = rows.length.toLocaleString('id-ID');
+        $('kpiAov').textContent = money(done.length ? rev / done.length : 0); $('kpiCancelled').textContent = cancel.length.toLocaleString('id-ID');
+        $('kpiRevenueNote').textContent = `${done.length} order selesai`; $('kpiProfitNote').textContent = pct(prof, rev) + ' margin'; $('kpiOrdersNote').textContent = `${pct(done.length, rows.length)} selesai`; $('kpiCancelledNote').textContent = pct(cancel.length, rows.length) + ' cancel rate';
     }
-
-    function render() {
-        const rows = orders.filter(inRange);
-        renderKpi(rows);
-        renderStoreBreakdown(rows);
-        renderTopProducts(rows);
-        renderBuyerPower(rows);
-        renderShipping(rows);
+    function renderChart(rows) {
+        const done = rows.filter(completed), map = {};
+        done.forEach(o => { const k = dateKey(o); if (!k) return; if (!map[k]) map[k] = {rev:0, prof:0}; map[k].rev += revenue(o); map[k].prof += profit(o); });
+        const points = Object.entries(map).sort((a,b) => a[0].localeCompare(b[0]));
+        if (!points.length) { $('revenueChart').innerHTML = '<div class="an-empty">Belum ada order selesai di periode ini.</div>'; return; }
+        const max = Math.max(...points.flatMap(([,v]) => [v.rev,v.prof]), 1), w = 720, h = 210, pad = 12;
+        const line = key => points.map(([,v],i) => { const x = pad + (i * (w-pad*2) / Math.max(points.length-1,1)); const y = h-pad - (Math.max(v[key],0) / max) * (h-pad*2); return `${x},${y}`; }).join(' ');
+        const labels = points.map(([d]) => `<span>${new Date(d+'T00:00:00').toLocaleDateString('id-ID',{day:'2-digit',month:'short'})}</span>`).join('');
+        $('revenueChart').innerHTML = `<div class="an-chart-grid"><span></span><span></span><span></span><span></span></div><svg class="an-chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Grafik omzet dan laba"><polyline fill="none" stroke="#0f172a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="${line('rev')}"/><polyline fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${line('prof')}"/></svg><div class="an-chart-axis">${labels}</div>`;
     }
-
-    // ── KPI ───────────────────────────────────────────────────────────────
-    function renderKpi(rows) {
-        const completed  = rows.filter(o => o.order_status === 'COMPLETED');
-        const cancelled  = rows.filter(o => o.order_status === 'CANCELLED');
-        const revenue    = completed.reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
-        const aov        = completed.length ? revenue / completed.length : 0;
-        const cancelRate = rows.length ? (cancelled.length / rows.length * 100).toFixed(1) : 0;
-        const doneRate   = rows.length ? (completed.length / rows.length * 100).toFixed(1) : 0;
-
-        $('kpiRevenue').textContent        = fmtRp(revenue);
-        $('kpiOrders').textContent         = rows.length;
-        $('kpiAov').textContent            = fmtRp(aov);
-        $('kpiCompleted').textContent      = completed.length;
-        $('kpiCompletedRate').textContent  = doneRate + '% dari total';
-        $('kpiCancelled').textContent      = cancelled.length;
-        $('kpiCancelledRate').textContent  = cancelRate + '% cancel rate';
+    function renderFunnel(rows) {
+        const done = rows.filter(completed), rev = done.reduce((s,o)=>s+revenue(o),0), payout = done.reduce((s,o)=>s+(n(settlement(o).final_income) > 0 ? n(settlement(o).final_income) : revenue(o) - fees(o)),0), max = Math.max(rev,1);
+        const data = [['Order masuk', rows.length, rows.length],['Order selesai', done.length, done.length],['Omzet selesai', money(rev), rev],['Dana setelah biaya', money(Math.max(payout,0)), Math.max(payout,0)]];
+        $('salesFunnel').innerHTML = data.map(([label,value,amount]) => `<div class="an-funnel-row"><span>${label}</span><div class="an-funnel-track"><span style="width:${Math.max(5,Math.round(amount / max * 100))}%"></span></div><strong class="an-funnel-value">${typeof value === 'number' ? value.toLocaleString('id-ID') : value}</strong></div>`).join('');
     }
-
-    // ── Store Breakdown ───────────────────────────────────────────────────
-    function renderStoreBreakdown(rows) {
-        const el = $('storeBreakdownBody');
-        const map = {};
-        rows.forEach(o => {
-            const key  = o.store?.name || '—';
-            const ch   = o.store?.channel || '';
-            if (!map[key]) map[key] = { name: key, channel: ch, orders: 0, revenue: 0, completed: 0, cancelled: 0 };
-            map[key].orders++;
-            if (o.order_status === 'COMPLETED') { map[key].revenue += parseFloat(o.total_amount || 0); map[key].completed++; }
-            if (o.order_status === 'CANCELLED')   map[key].cancelled++;
-        });
-        const stores = Object.values(map).sort((a, b) => b.revenue - a.revenue);
-        if (!stores.length) { el.innerHTML = '<div class="an-empty">Belum ada data.</div>'; return; }
-        el.innerHTML = `
-        <div class="gf-table-scroll">
-        <table class="gf-clean-table w-100">
-            <thead><tr>
-                <th>Toko</th>
-                <th class="text-end">Order</th>
-                <th class="text-end">Selesai</th>
-                <th class="text-end">Batal</th>
-                <th class="text-end">Revenue</th>
-            </tr></thead>
-            <tbody>
-            ${stores.map(s => `<tr>
-                <td>
-                    <span class="fw-bold" style="font-size:.82rem">${esc(s.name)}</span>
-                    <span class="ms-1">${channelPill(s.channel)}</span>
-                </td>
-                <td class="text-end" style="font-size:.82rem">${s.orders}</td>
-                <td class="text-end" style="font-size:.82rem;color:#166534">${s.completed}</td>
-                <td class="text-end" style="font-size:.82rem;color:#b91c1c">${s.cancelled}</td>
-                <td class="text-end fw-bold" style="font-size:.82rem">${fmtRp(s.revenue)}</td>
-            </tr>`).join('')}
-            </tbody>
-        </table></div>`;
+    function renderStores(rows) {
+        const map = {}; rows.forEach(o => { const id = String(o.store_id || o.store?.id || '0'); const s = map[id] ||= {name:o.store?.name || 'Tanpa toko',orders:0,done:0,cancel:0,rev:0,prof:0}; s.orders++; if (completed(o)) { s.done++; s.rev += revenue(o); s.prof += profit(o); } if (status(o)==='CANCELLED') s.cancel++; });
+        const list = Object.values(map).sort((a,b)=>b.rev-a.rev); $('storeBody').innerHTML = list.length ? list.map(s=>`<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(s.name)}</td><td>${s.orders}</td><td>${s.done} <small style="color:#94a3b8">(${pct(s.done,s.orders)})</small></td><td style="color:${s.cancel?'#dc2626':'inherit'}">${s.cancel}</td><td style="font-weight:900">${money(s.rev)}</td><td style="font-weight:900;color:${s.prof>=0?'#15803d':'#dc2626'}">${money(s.prof)}</td></tr>`).join('') : '<tr><td colspan="6"><div class="an-empty">Belum ada data toko.</div></td></tr>';
     }
-
-    // ── Top Products ──────────────────────────────────────────────────────
-    function renderTopProducts(rows) {
-        const el = $('topProductsBody');
-        const map = {};
-        rows.filter(o => o.order_status !== 'CANCELLED').forEach(o => {
-            (o.items || []).forEach(i => {
-                const key = i.model_sku || i.item_sku || '—';
-                if (!map[key]) map[key] = { sku: key, name: i.variant_name || i.item_name || '—', qty: 0, revenue: 0 };
-                map[key].qty     += parseInt(i.qty || 0);
-                map[key].revenue += parseFloat(i.model_discounted_price || i.model_original_price || 0) * parseInt(i.qty || 0);
-            });
-        });
-        const products = Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 20);
-        if (!products.length) { el.innerHTML = '<div class="an-empty">Belum ada data item.</div>'; return; }
-
-        const maxQty = products[0].qty || 1;
-        el.innerHTML = `
-        <div class="gf-table-scroll">
-        <table class="gf-clean-table w-100">
-            <thead><tr>
-                <th>#</th><th>SKU / Varian</th>
-                <th class="text-end">Qty Terjual</th>
-                <th class="text-end">Est. Revenue</th>
-            </tr></thead>
-            <tbody>
-            ${products.map((p, idx) => `<tr>
-                <td style="color:#94a3b8;font-size:.78rem;font-weight:700">${idx + 1}</td>
-                <td>
-                    <div class="fw-bold" style="font-size:.8rem">${esc(p.sku)}</div>
-                    <div style="font-size:.72rem;color:#64748b">${esc(p.name)}</div>
-                    <div style="margin-top:.3rem;height:4px;border-radius:999px;background:#f1f5f9;width:100%;max-width:200px">
-                        <div style="height:100%;border-radius:999px;background:#0f172a;width:${Math.round(p.qty/maxQty*100)}%"></div>
-                    </div>
-                </td>
-                <td class="text-end fw-bold" style="font-size:.82rem">${p.qty} pcs</td>
-                <td class="text-end" style="font-size:.82rem">${fmtRp(p.revenue)}</td>
-            </tr>`).join('')}
-            </tbody>
-        </table></div>`;
+    function renderCosts(rows) {
+        const keys = [['commission_fee','Komisi & administrasi'],['service_fee','Biaya layanan'],['transaction_fee','Biaya transaksi'],['affiliate_fee','Affiliate'],['activity_fee','Campaign / aktivitas'],['ad_cost','Iklan'],['seller_voucher','Voucher seller']];
+        const data = keys.map(([key,label])=>({label,value:rows.reduce((s,o)=>s+n(settlement(o)[key]),0)})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,6); const total=data.reduce((s,x)=>s+x.value,0);
+        $('costBody').innerHTML = data.length ? data.map(x=>`<div class="an-cost-row"><span>${x.label}</span><strong>${money(x.value)}</strong><div class="an-bar" style="grid-column:1/-1"><span style="width:${pct(x.value,total)}"></span></div></div>`).join('') : '<div class="an-empty">Belum ada data biaya settlement.</div>';
     }
-
-    // ── Buyer Power (distribusi nilai transaksi) ──────────────────────────
-    function renderBuyerPower(rows) {
-        const el = $('buyerPowerBody');
-        const buckets = [
-            { label: '< Rp50rb',           min: 0,       max: 50000 },
-            { label: 'Rp50rb – 100rb',     min: 50000,   max: 100000 },
-            { label: 'Rp100rb – 200rb',    min: 100000,  max: 200000 },
-            { label: 'Rp200rb – 500rb',    min: 200000,  max: 500000 },
-            { label: 'Rp500rb – 1jt',      min: 500000,  max: 1000000 },
-            { label: '> Rp1jt',            min: 1000000, max: Infinity },
-        ];
-        const completed = rows.filter(o => o.order_status === 'COMPLETED');
-        buckets.forEach(b => {
-            b.count   = completed.filter(o => { const v = parseFloat(o.total_amount||0); return v >= b.min && v < b.max; }).length;
-            b.revenue = completed.filter(o => { const v = parseFloat(o.total_amount||0); return v >= b.min && v < b.max; })
-                                 .reduce((s, o) => s + parseFloat(o.total_amount||0), 0);
-        });
-        const total = completed.length || 1;
-        const maxCount = Math.max(...buckets.map(b => b.count), 1);
-        if (!completed.length) { el.innerHTML = '<div class="an-empty">Belum ada order selesai di periode ini.</div>'; return; }
-
-        el.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:.6rem;padding:.25rem 0">
-        ${buckets.map(b => {
-            const pct = Math.round(b.count / total * 100);
-            const bar = Math.round(b.count / maxCount * 100);
-            return `<div style="display:grid;grid-template-columns:140px 1fr 70px 100px;gap:.75rem;align-items:center">
-                <span style="font-size:.78rem;font-weight:700;color:#475569">${b.label}</span>
-                <div style="height:8px;border-radius:999px;background:#f1f5f9">
-                    <div style="height:100%;border-radius:999px;background:#0f172a;width:${bar}%;transition:width .4s"></div>
-                </div>
-                <span style="font-size:.78rem;color:#0f172a;font-weight:800;text-align:right">${b.count} <span style="font-weight:400;color:#94a3b8">(${pct}%)</span></span>
-                <span style="font-size:.75rem;color:#64748b;text-align:right">${fmtRp(b.revenue)}</span>
-            </div>`;
-        }).join('')}
-        </div>
-        <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid #f1f5f9;font-size:.75rem;color:#94a3b8">
-            Berdasarkan ${completed.length} order selesai (COMPLETED) di periode ini.
-        </div>`;
+    function products(rows) {
+        const map = {}; rows.filter(completed).forEach(o => (o.items||[]).forEach(i => { const key=i.model_sku||i.item_sku||i.external_sku||i.item_name||'—'; const p=map[key] ||= {sku:key,name:i.variant_name||i.item_name||'Produk',qty:0,rev:0,cost:0,missing:false}; p.qty+=n(i.qty); p.rev+=itemRevenue(i); p.cost+=itemCost(i); p.missing ||= !itemCost(i); }));
+        return Object.values(map).map(p=>({...p,profit:p.rev-p.cost}));
     }
-
-    // ── Shipping Status ───────────────────────────────────────────────────
-    function renderShipping(rows) {
-        const el = $('shippingBody');
-        const map = {};
-        rows.forEach(o => {
-            const s = o.order_status || 'UNKNOWN';
-            if (!map[s]) map[s] = { status: s, count: 0, revenue: 0 };
-            map[s].count++;
-            map[s].revenue += parseFloat(o.total_amount || 0);
-        });
-        const statuses = Object.values(map).sort((a, b) => b.count - a.count);
-        if (!statuses.length) { el.innerHTML = '<div class="an-empty">Belum ada data.</div>'; return; }
-        const total = rows.length || 1;
-        el.innerHTML = `
-        <div class="gf-table-scroll">
-        <table class="gf-clean-table w-100">
-            <thead><tr>
-                <th>Status</th>
-                <th class="text-end">Jumlah</th>
-                <th class="text-end">%</th>
-                <th class="text-end">Total Nilai</th>
-            </tr></thead>
-            <tbody>
-            ${statuses.map(s => `<tr>
-                <td>${statusBadge(s.status)}</td>
-                <td class="text-end fw-bold" style="font-size:.82rem">${s.count}</td>
-                <td class="text-end" style="font-size:.82rem;color:#64748b">${(s.count/total*100).toFixed(1)}%</td>
-                <td class="text-end" style="font-size:.82rem">${fmtRp(s.revenue)}</td>
-            </tr>`).join('')}
-            </tbody>
-        </table></div>`;
+    function renderProducts(rows) {
+        const list=products(rows), best=[...list].sort((a,b)=>b.profit-a.profit).slice(0,7), worst=[...list].sort((a,b)=>a.profit-b.profit).slice(0,6); const max=Math.max(...best.map(p=>p.profit),1);
+        $('bestProductBody').innerHTML=best.length?best.map((p,i)=>`<tr><td><span class="an-product"><span class="an-rank">${i+1}</span><span class="an-product-copy"><span class="an-product-name">${esc(p.name)}</span><span class="an-product-sku">${esc(p.sku)}</span></span></span></td><td>${p.qty}</td><td>${money(p.rev)}</td><td style="color:#15803d;font-weight:900">${money(p.profit)}</td><td>${pct(p.profit,p.rev)}</td></tr>`).join(''):'<tr><td colspan="5"><div class="an-empty">Belum ada item selesai.</div></td></tr>';
+        $('worstProductBody').innerHTML=worst.length?worst.map(p=>`<div class="an-list-row"><div class="an-list-main"><div class="an-list-name"><span class="an-dot ${p.profit<0?'red':''}"></span> ${esc(p.name)}</div><div class="an-list-meta">${esc(p.sku)} · ${p.qty} pcs${p.missing?' · HPP belum lengkap':''}</div><div class="an-bar"><span style="width:${Math.max(4,Math.min(100,Math.round(Math.abs(p.profit)/max*100)))}%;background:${p.profit<0?'#ef4444':'#facc15'}"></span></div></div><div class="an-list-value" style="color:${p.profit<0?'#dc2626':'#a16207'}">${money(p.profit)}</div></div>`).join(''):'<div class="an-empty">Belum ada produk untuk ditinjau.</div>';
     }
-
-    loadAll();
+    function render() { const rows=filtered(); renderKpis(rows); renderChart(rows); renderFunnel(rows); renderStores(rows); renderCosts(rows); renderProducts(rows); $('anSyncNote').textContent=`${rows.length.toLocaleString('id-ID')} order · data lokal tersinkron`; }
+    async function load() { setLoading('Mengambil order marketplace…'); $('anRefresh').disabled=true; try { orders=await api(`/api/marketplace/local-orders?date_from=${encodeURIComponent(from())}&date_to=${encodeURIComponent(to())}&limit=2000`); orders=Array.isArray(orders)?orders:(orders.data||[]); fillStores(); render(); } catch(e) { $('anSyncNote').textContent='Data gagal dimuat'; document.querySelectorAll('#storeBody,#bestProductBody').forEach(el=>el.innerHTML='<tr><td colspan="6"><div class="an-error">Tidak dapat memuat data analytics. Coba refresh atau periksa koneksi sinkronisasi marketplace.</div></td></tr>'); } finally { $('anRefresh').disabled=false; } }
+    $('anRefresh').addEventListener('click',load); $('anStore').addEventListener('change',render);
+    if (window.flatpickr) flatpickr($('anDateRange'),{mode:'range',dateFormat:'Y-m-d',defaultDate:[from(),to()],onChange(dates){if(dates.length===2){$('anDateFrom').value=dates[0].toISOString().slice(0,10);$('anDateTo').value=dates[1].toISOString().slice(0,10);$('anDateRange').value=from()+' — '+to();history.replaceState(null,'',location.pathname+'?date_from='+from()+'&date_to='+to());load();}}});
+    load();
 })();
 </script>
 @endpush

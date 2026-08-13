@@ -4,6 +4,7 @@ use App\Http\Controllers\Sales\Reports\ChannelProfitReportController;
 use App\Http\Controllers\Sales\Reports\ItemProfitReportController;
 use App\Http\Controllers\Sales\Reports\SalesReportController;
 use App\Http\Controllers\Sales\Reports\ShipmentAnalyticsController;
+use App\Http\Controllers\Sales\Reports\ShipmentReportController;
 use App\Http\Controllers\Sales\SalesInvoiceController;
 use App\Http\Controllers\Admin\StorefrontWebsiteSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +42,10 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
             Route::get('shipment-analytics', [ShipmentAnalyticsController::class, 'index'])
                 ->name('shipment_analytics');
+
+            // Laporan Pengiriman (ringkasan + daftar shipment per periode)
+            Route::get('shipment', [ShipmentReportController::class, 'index'])
+                ->name('shipment');
 
             // ✅ NEW: Penjualan & Performa Produk (daily_item_sales)
             Route::get('sales-performance', [SalesReportController::class, 'index'])

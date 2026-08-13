@@ -42,6 +42,12 @@
     .srif-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; font-weight: 750; }
     .srif-name, .srif-muted { color: #64748b; font-size: .72rem; }
     .srif-qty { min-width: 40px; padding: .18rem .45rem; border-radius: 6px; background: #334155; color: #fff; text-align: center; font-weight: 750; }
+    .srif-qty-controls { display: flex; align-items: center; gap: .3rem; }
+    .srif-qbtn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid rgba(148,163,184,.45); border-radius: 7px; background: #fff; color: #334155; font-size: 1.05rem; font-weight: 750; line-height: 1; cursor: pointer; }
+    .srif-qbtn:hover { background: #f1f5f9; }
+    .srif-qbtn:disabled { opacity: .4; pointer-events: none; }
+    .srif-qbtn-danger { color: #991b1b; border-color: rgba(153,27,27,.4); }
+    .srif-qbtn-danger:hover { background: #fef2f2; }
     .srif-order { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .52rem .65rem; border: 1px solid rgba(148,163,184,.14); border-radius: 7px; }
     .srif-empty { padding: .8rem; color: #94a3b8; font-size: .75rem; text-align: center; }
     .srif-confirm { border-color: rgba(51,65,85,.2); background: #f8fafc; }
@@ -168,6 +174,7 @@
     const isDraft = @json($shipmentReturn->status === 'draft');
     const scanItemUrl = @json(route('sales.shipment_returns.scan_item', $shipmentReturn));
     const scanOrderUrl = @json(route('sales.shipment_returns.scan_order', $shipmentReturn));
+    const updateLineUrlTemplate = @json(route('sales.shipment_returns.update_line_qty', ['line' => '__LINE_ID__']));
     const csrf = @json(csrf_token());
     const initialLines = @json($initialLines);
     const initialOrders = @json($initialOrders);
@@ -298,7 +305,19 @@
         $('tabItemsCount').textContent = state.lines.length.toLocaleString('id-ID');
         $('tabOrdersCount').textContent = state.orders.length.toLocaleString('id-ID');
         $('itemsWrap').innerHTML = state.lines.length
-            ? state.lines.map(line => '<div class="srif-row"><div><div class="srif-code">' + esc(line.code) + '</div><div class="srif-name">' + esc(line.name) + '</div><div class="srif-name">Scan: ' + esc(formatScanTime(line.scanned_at)) + '</div></div><div class="srif-qty">' + Number(line.qty || 0).toLocaleString('id-ID') + '</div></div>').join('')
+            ? state.lines.map(line => {
+                const qtyVal = Number(line.qty || 0);
+                const info = '<div><div class="srif-code">' + esc(line.code) + '</div><div class="srif-name">' + esc(line.name) + '</div><div class="srif-name">Scan: ' + esc(formatScanTime(line.scanned_at)) + '</div></div>';
+                const right = isDraft
+                    ? '<div class="srif-qty-controls">'
+                        + '<button type="button" class="srif-qbtn" data-action="dec" data-id="' + esc(line.id) + '" title="Kurangi qty" aria-label="Kurangi qty"' + (state.busy ? ' disabled' : '') + '>&minus;</button>'
+                        + '<div class="srif-qty">' + qtyVal.toLocaleString('id-ID') + '</div>'
+                        + '<button type="button" class="srif-qbtn" data-action="inc" data-id="' + esc(line.id) + '" title="Tambah qty" aria-label="Tambah qty"' + (state.busy ? ' disabled' : '') + '>&plus;</button>'
+                        + '<button type="button" class="srif-qbtn srif-qbtn-danger" data-action="del" data-id="' + esc(line.id) + '" title="Hapus item" aria-label="Hapus item"' + (state.busy ? ' disabled' : '') + '>&times;</button>'
+                        + '</div>'
+                    : '<div class="srif-qty">' + qtyVal.toLocaleString('id-ID') + '</div>';
+                return '<div class="srif-row">' + info + right + '</div>';
+            }).join('')
             : '<div class="srif-empty">Belum ada item. Silakan scan item retur.</div>';
         $('ordersWrap').innerHTML = state.orders.length
             ? state.orders.map((order, index) => '<div class="srif-order"><span><span class="srif-code">' + esc(order.code) + '</span><br><span class="srif-name">' + esc(order.label || 'Pencatatan order') + '</span><br><span class="srif-name">Scan: ' + esc(formatScanTime(order.scanned_at)) + '</span></span><span class="srif-muted">#' + (index + 1) + '</span></div>').join('')
@@ -415,6 +434,64 @@
             render();
         }
     }
+
+    async function patch(url, body) {
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf },
+            body: JSON.stringify(body),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Gagal memperbarui item.');
+        return payload;
+    }
+
+    // Kurangi qty / hapus item retur langsung dari daftar (hanya saat draft).
+    async function updateLineQty(id, qty) {
+        if (!isDraft || state.busy) return;
+        const line = state.lines.find(item => String(item.id) === String(id));
+        if (!line) return;
+        const targetQty = Math.max(0, Number(qty));
+        state.busy = true;
+        render();
+        try {
+            const url = updateLineUrlTemplate.replace('__LINE_ID__', encodeURIComponent(id));
+            const payload = await patch(url, { qty: targetQty });
+            if (payload.deleted || targetQty === 0) {
+                state.lines = state.lines.filter(item => String(item.id) !== String(id));
+                playScanSound('duplicate');
+                toast(payload.message || ('Item ' + line.code + ' dihapus.'));
+            } else {
+                line.qty = payload.qty ?? targetQty;
+                playScanSound('item');
+                toast(payload.message || ('Qty ' + line.code + ' diperbarui.'));
+            }
+        } catch (error) {
+            playScanSound('error');
+            toast(error.message, true);
+        } finally {
+            state.busy = false;
+            render();
+        }
+    }
+
+    $('itemsWrap')?.addEventListener('click', event => {
+        const btn = event.target.closest('[data-action]');
+        if (!btn) return;
+        event.preventDefault();
+        const id = btn.dataset.id;
+        const line = state.lines.find(item => String(item.id) === String(id));
+        if (!line) return;
+        if (btn.dataset.action === 'inc') {
+            updateLineQty(id, Number(line.qty || 0) + 1);
+        } else if (btn.dataset.action === 'dec') {
+            updateLineQty(id, Number(line.qty || 0) - 1);
+        } else if (btn.dataset.action === 'del') {
+            if (window.confirm('Hapus item ' + line.code + ' dari retur ini?')) {
+                updateLineQty(id, 0);
+            }
+        }
+    });
 
     $('nextBtn')?.addEventListener('click', () => setStage(state.stage === 'item' ? 'order' : 'confirm'));
     $('backItemBtn')?.addEventListener('click', () => setStage('item'));

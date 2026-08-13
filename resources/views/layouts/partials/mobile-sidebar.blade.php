@@ -334,7 +334,7 @@
     $hasSalesShipmentReturnsIndex = $router->has('sales.shipment_returns.index');
     $hasSalesShipmentReturnsCreate = $router->has('sales.shipment_returns.create');
     $hasSalesOperationalSettings = $isOwner && $router->has('sales.settings.operational');
-    $hasSalesShipmentsReport = $router->has('sales.shipments.report');
+    $hasSalesShipmentsReport = $router->has('sales.reports.shipment');
 
     // Sales reports (opsional—kamu punya beberapa, tapi bukan index)
     $hasSalesReportItemProfit = $router->has('sales.reports.item_profit');
@@ -528,7 +528,7 @@
     $salesShipmentOpen = request()->routeIs('sales.shipments.*');
     $salesShipmentReturnOpen = request()->routeIs('sales.shipment_returns.*');
     $salesOperationalSettingsOpen = request()->routeIs('sales.settings.*');
-    $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.shipments.report');
+    $salesReportOpen = request()->routeIs('sales.reports.*') || request()->routeIs('sales.reports.shipment');
     $salesOpen = $salesInvoiceOpen || $salesShipmentOpen || $salesShipmentReturnOpen || $salesOperationalSettingsOpen || $salesReportOpen;
 
     $invStocksOpen = request()->routeIs('inventory.stocks.*');
@@ -1744,8 +1744,8 @@
                             <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Laporan Penjualan</div>
 
                             @if ($hasSalesShipmentsReport)
-                                <a href="{{ route('sales.shipments.report') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipments.report') ? 'active' : '' }}">
+                                <a href="{{ route('sales.reports.shipment') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.reports.shipment') ? 'active' : '' }}">
                                     <span class="icon">📊</span><span>Laporan Pengiriman</span>
                                 </a>
                             @endif

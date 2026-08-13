@@ -64,7 +64,7 @@
     $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
     $hasSalesInvoicesCreate = $router->has('sales.invoices.create');
 
-    $hasSalesShipmentsReport = $router->has('sales.shipments.report');
+    $hasSalesShipmentsReport = $router->has('sales.reports.shipment');
 
     $hasSalesReportPerformance = $router->has('sales.reports.sales_performance.index');
     $hasSalesReportItemProfit = $router->has('sales.reports.item_profit');
@@ -331,7 +331,7 @@
         $open('sales.shipment_returns.*') ||
         $open('sales.settings.*') ||
         $open('sales.reports.*') ||
-        $open('sales.shipments.report');
+        $open('sales.reports.shipment');
 
     $openPersediaan =
         $open('inventory.intelligence') ||
@@ -1714,8 +1714,8 @@
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasSalesShipmentsReport)
-                            <x-sidebar.sub-link href="{{ route('sales.shipments.report') }}" icon="bi bi-bar-chart"
-                                :active="request()->routeIs('sales.shipments.report')">
+                            <x-sidebar.sub-link href="{{ route('sales.reports.shipment') }}" icon="bi bi-bar-chart"
+                                :active="request()->routeIs('sales.reports.shipment')">
                                 Laporan Pengiriman
                             </x-sidebar.sub-link>
                         @endif

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Helpers\CodeGenerator;
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
 use App\Models\InventoryAdjustment;
@@ -11,6 +12,7 @@ use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
+use App\Models\Lot;
 use App\Models\StockOpname;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
@@ -622,6 +624,50 @@ class InventoryAdjustmentController extends Controller
     }
 
     /**
+     * Tentukan LOT tujuan untuk mutasi koreksi stok.
+     *
+     * Kain (RM) di sistem ini di-track per-LOT. Halaman lain yang membaca stok
+     * kain — mis. Cutting Job Create (getAvailableLots) — HANYA menampilkan
+     * saldo yang menempel pada sebuah LOT (whereNotNull('lot_id')). Kalau koreksi
+     * stok opname / adjustment menambah stok kain tapi mutasinya lot_id = null,
+     * maka tambahan itu tidak akan pernah muncul sebagai LOT yang bisa dipilih.
+     *
+     * Aturan:
+     *  - Kalau baris sudah menunjuk lot_id → pakai LOT itu.
+     *  - Kalau item RM DAN ini penambahan stok (signedDiff > 0) → buat LOT baru
+     *    supaya tambahannya lot-tracked dan muncul di daftar LOT.
+     *  - Selain itu → null (biarkan perilaku lama; pengurangan tidak bikin LOT baru).
+     */
+    protected function resolveLotIdForAdjustment(?Item $item, ?int $existingLotId, float $signedDiff): ?int
+    {
+        if ($existingLotId) {
+            return $existingLotId;
+        }
+
+        // Hanya untuk PENAMBAHAN stok item RM (kain lot-tracked).
+        if ($signedDiff <= 0.000001) {
+            return null;
+        }
+
+        if (!$item || ($item->role_code ?? null) !== ItemRole::RM) {
+            return null;
+        }
+
+        $lot = Lot::create([
+            'code'         => CodeGenerator::generate('LOT'),
+            'item_id'      => (int) $item->id,
+            'initial_qty'  => 0,
+            'initial_cost' => 0,
+            'qty_onhand'   => 0,
+            'total_cost'   => 0,
+            'avg_cost'     => 0,
+            'status'       => 'open',
+        ]);
+
+        return (int) $lot->id;
+    }
+
+    /**
      * APPROVE untuk Adjustment Manual (source_type NULL).
      * ✅ Update qty_before / qty_after + eksekusi mutasi dengan unit_cost (biar total_cost ada).
      */
@@ -654,7 +700,11 @@ class InventoryAdjustmentController extends Controller
                 sourceType: InventoryAdjustment::class,
                 sourceId: $adjustment->id,
                 notes: $line->notes ?? $adjustment->reason,
-                lotId: $line->lot_id ?? null,
+                lotId: $this->resolveLotIdForAdjustment(
+                    $line->item,
+                    $line->lot_id ? (int) $line->lot_id : null,
+                    $signed
+                ),
                 allowNegative: false,
                 unitCostOverride: $unitCostOverride,
                 affectLotCost: false,
@@ -741,7 +791,7 @@ class InventoryAdjustmentController extends Controller
                 sourceType: InventoryAdjustment::class,
                 sourceId: $adjustment->id,
                 notes: $adjustment->reason ?? ('Saldo awal dari SO opening ' . ($opname->code ?? '')),
-                lotId: null,
+                lotId: $this->resolveLotIdForAdjustment($line->item, null, $signedDiff),
                 allowNegative: false,
                 unitCostOverride: $unitCost, // ✅ ini kuncinya
                 affectLotCost: false,
@@ -815,7 +865,7 @@ class InventoryAdjustmentController extends Controller
                 sourceType: InventoryAdjustment::class,
                 sourceId: $adjustment->id,
                 notes: $adjustment->reason ?? ('Penyesuaian stok dari stock opname ' . ($opname?->code ?? '')),
-                lotId: null,
+                lotId: $this->resolveLotIdForAdjustment($line->item, null, $physicalQty - (float) $qtyBefore),
                 unitCostOverride: $unitCost, // ← override cost di mutasi periodic
                 affectLotCost: false,
             );
