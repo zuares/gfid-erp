@@ -203,6 +203,12 @@
     .an-kpi-label { color:var(--dsh-muted); font-size:.62rem; font-weight:900; letter-spacing:.08em; }
     .an-kpi-value { color:var(--text,#0f172a); font-size:1.28rem; font-weight:950; line-height:1; letter-spacing:-.03em; margin-top:.34rem; }
     .an-kpi-note { color:var(--dsh-muted); font-size:.62rem; font-weight:700; border-top:1px dashed var(--dsh-border); padding-top:.55rem; margin-top:.55rem; }
+    .an-tab-pane[data-an-pane="stores"] .an-kpi { min-height:118px; justify-content:center; gap:.12rem; text-align:center; }
+    .an-tab-pane[data-an-pane="stores"] .an-kpi-label, .an-tab-pane[data-an-pane="stores"] .an-kpi-note { text-align:center; }
+    .an-kpi-compare { display:block; max-width:100%; margin-top:.38rem; padding-top:.38rem; border-top:1px dashed var(--dsh-border); color:var(--dsh-muted); font-size:.61rem; font-weight:800; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .an-kpi-compare.good { color:#15803d; }
+    .an-kpi-compare.bad { color:#b91c1c; }
+    .an-kpi-compare i { margin-right:.16rem; }
     .an-kpi { overflow:visible; }
     .an-kpi-info { position:relative; display:inline-block; margin-left:.18rem; color:#94a3b8; cursor:help; font-size:.7rem; vertical-align:middle; }
     .an-kpi-info::after { content:attr(data-tooltip); position:absolute; z-index:40; left:50%; bottom:calc(100% + .45rem); width:220px; padding:.55rem .65rem; border-radius:9px; background:#0f172a; color:#fff; box-shadow:0 8px 20px rgba(15,23,42,.18); font-size:.65rem; font-weight:650; line-height:1.4; letter-spacing:0; text-transform:none; text-align:left; opacity:0; visibility:hidden; transform:translate(-50%,4px); transition:opacity .16s ease, transform .16s ease, visibility .16s ease; pointer-events:none; }
@@ -670,6 +676,78 @@
         $('kpiEstimatedCashInfo').dataset.tooltip = `Total ${money(estimatedPayout)} · cair ${money(netSettled)} · est. belum ${money(estimatedUnsettledNet)} · return ${money(returnRefundAmount)}`;
         $('kpiHppInfo').dataset.tooltip = `Total ${money(hppTotal)} · cair ${money(hppSettled)} · belum ${money(hppUnsettled)} · return ${money(hppReturnRefund)}`;
         $('kpiGrossProfitInfo').dataset.tooltip = `Laba ${money(grossProfit)} · net ${money(estimatedPayout)} · HPP ${money(hppTotal)}`;
+
+        const previous = summary?.previous || {};
+        const previousGrossOrderRevenue = Number(previous.cash_order_revenue || 0) + Number(previous.cash_unsettled_order_revenue || 0) || Number(previous.gmv || 0);
+        const previousReturnRefundAmount = Number(previous.return_refund_amount ?? previous.cash_refund ?? previous.refund ?? 0);
+        const previousNetOrderRevenue = Math.max(0, previousGrossOrderRevenue - previousReturnRefundAmount);
+        const previousSettledOrderRevenue = Number(previous.cash_order_revenue || 0);
+        const previousUnsettledOrderRevenue = Number(previous.cash_unsettled_order_revenue || 0);
+        const previousActualFee = Number(previous.cash_marketplace_fees ?? previous.marketplace_fees_actual ?? 0);
+        const previousFeeRate = previousSettledOrderRevenue > 0 ? previousActualFee / previousSettledOrderRevenue : 0.21;
+        const previousEstimatedFee = previousGrossOrderRevenue * previousFeeRate;
+        const previousNetSettledBeforeRefund = Math.max(0, previousSettledOrderRevenue - previousActualFee);
+        const previousEstimatedUnsettledNetBeforeRefund = Math.max(0, previousUnsettledOrderRevenue * (1 - previousFeeRate));
+        const previousUnsettledRefund = Math.min(previousReturnRefundAmount, previousEstimatedUnsettledNetBeforeRefund);
+        const previousSettledRefund = Math.max(0, previousReturnRefundAmount - previousUnsettledRefund);
+        const previousNetSettled = Math.max(0, previousNetSettledBeforeRefund - previousSettledRefund);
+        const previousEstimatedUnsettledNet = Math.max(0, previousEstimatedUnsettledNetBeforeRefund - previousUnsettledRefund);
+        const previousEstimatedPayout = previousNetSettled + previousEstimatedUnsettledNet;
+        const previousReportedHpp = Number(previous.hpp_total ?? previous.hpp ?? 0);
+        const previousHppSettledRaw = Number(previous.hpp_settled ?? 0);
+        const previousHppUnsettledRaw = previous.hpp_unsettled !== undefined
+            ? Number(previous.hpp_unsettled || 0)
+            : Math.max(0, previousReportedHpp - previousHppSettledRaw);
+        const previousHppReturnRefund = Number(previous.hpp_return_refund ?? 0);
+        const previousHppReturnRefundSettled = Number(previous.hpp_return_refund_settled ?? 0);
+        const previousHppReturnRefundUnsettled = Number(previous.hpp_return_refund_unsettled ?? 0);
+        const previousHppSettled = Math.max(0, previousHppSettledRaw - previousHppReturnRefundSettled);
+        const previousHppUnsettled = Math.max(0, previousHppUnsettledRaw - previousHppReturnRefundUnsettled);
+        const previousHppTotal = previousHppSettled + previousHppUnsettled + previousHppReturnRefund || previousReportedHpp;
+        const previousAdCost = Number(previous.ad_cost || 0);
+        const previousCashPayout = Number(previous.cash_payout ?? previous.payout ?? 0);
+        const previousGrossProfit = previousEstimatedPayout - previousHppTotal;
+        const previousEstimatedProfit = Number(previous.estimated_profit ?? (previousGrossProfit - previousAdCost));
+        const previousOperatingProfit = previousCashPayout - previousHppTotal - previousAdCost;
+        const previousReturnRate = previousGrossOrderRevenue > 0 ? previousReturnRefundAmount / previousGrossOrderRevenue * 100 : 0;
+        const comparisonText = (value, baseline, formatter = money) => {
+            const currentValue = Number(value || 0);
+            const previousValue = Number(baseline || 0);
+            const previousText = formatter(previousValue);
+            if (previousValue === 0) {
+                return { text: `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${previousText} · ${currentValue === 0 ? '0,0%' : 'baru'}`, className: currentValue > 0 ? 'good' : '' };
+            }
+            const change = (currentValue - previousValue) / Math.abs(previousValue) * 100;
+            return { text: `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${previousText} · ${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%`, className: change > 0 ? 'good' : (change < 0 ? 'bad' : '') };
+        };
+        const setKpiComparison = (valueId, value, baseline, formatter = money) => {
+            const valueElement = $(valueId);
+            const card = valueElement?.closest('.an-kpi');
+            if (!card) return;
+            let element = card.querySelector('.an-kpi-compare');
+            if (!element) {
+                element = document.createElement('span');
+                card.appendChild(element);
+            }
+            const comparison = comparisonText(value, baseline, formatter);
+            element.className = `an-kpi-compare ${comparison.className}`;
+            element.title = 'Nilai periode pembanding dan perubahan';
+            element.innerHTML = comparison.text;
+        };
+        const countFormatter = value => Number(value || 0).toLocaleString('id-ID');
+        const percentFormatter = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
+        setKpiComparison('kpiOrders', totalOrderCount, previous.order_total, countFormatter);
+        setKpiComparison('kpiProductsSold', totalQty, previous.product_qty ?? previous.qty, countFormatter);
+        setKpiComparison('kpiRevenue', netOrderRevenue, previousNetOrderRevenue);
+        setKpiComparison('kpiAdminFee', estimatedFee, previousEstimatedFee);
+        setKpiComparison('kpiEstimatedCash', estimatedPayout, previousEstimatedPayout);
+        setKpiComparison('kpiHpp', hppTotal, previousHppTotal);
+        setKpiComparison('kpiAdCost', adCost, previousAdCost);
+        setKpiComparison('kpiPayout', cashPayout, previousCashPayout);
+        setKpiComparison('kpiReturnRate', returnRefundRate, previousReturnRate, percentFormatter);
+        setKpiComparison('kpiGrossProfit', grossProfit, previousGrossProfit);
+        setKpiComparison('kpiEstimatedProfit', estimatedProfit, previousEstimatedProfit);
+        setKpiComparison('kpiOperatingProfit', operatingProfit, previousOperatingProfit);
     }
     const dateTime = value => {
         if (!value) return '—';
