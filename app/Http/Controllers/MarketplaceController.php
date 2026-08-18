@@ -140,7 +140,7 @@ class MarketplaceController extends Controller
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
-            'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_year'],
+            'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_quarter,prev_year'],
         ]);
 
         return response()
@@ -160,6 +160,48 @@ class MarketplaceController extends Controller
             ->json([
                 'data' => $summaryService->products($filters),
             ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    public function analyticsCashOrders(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
+    {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'settlement' => ['nullable', 'in:settled,unsettled'],
+        ]);
+
+        return response()
+            ->json($summaryService->cashOrders(
+                $filters,
+                (int) $request->input('page', 1),
+                (int) $request->input('per_page', 50),
+                (string) $request->input('settlement', 'settled'),
+            ))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    public function analyticsReturnOrders(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
+    {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'type' => ['nullable', 'in:return_refund,failed_delivery'],
+        ]);
+
+        return response()
+            ->json($summaryService->returnOrders(
+                $filters,
+                (int) $request->input('page', 1),
+                (int) $request->input('per_page', 50),
+                (string) $request->input('type', 'return_refund'),
+            ))
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
