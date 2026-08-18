@@ -35,13 +35,6 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     // ✅ COA (Master Accounts)
     Route::resource('accounts', AccountController::class);
 
-    // ✅ Cash Expenses
-    Route::get('cash-expenses/{cashExpense}/proof', [CashExpenseController::class, 'proof'])
-        ->name('cash-expenses.proof');
-    Route::resource('cash-expenses', CashExpenseController::class);
-    Route::post('cash-expenses/{cashExpense}/post', [CashExpenseController::class, 'post'])->name('cash-expenses.post');
-    Route::post('cash-expenses/{cashExpense}/void', [CashExpenseController::class, 'void'])->name('cash-expenses.void');
-
     // ✅ Cash Receipts
     Route::resource('cash-receipts', CashReceiptController::class);
     Route::post('cash-receipts/{cashReceipt}/post', [CashReceiptController::class, 'post'])->name('cash-receipts.post');
@@ -61,6 +54,15 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::get('opening-balances/create', [OpeningBalanceController::class, 'create'])->name('opening-balances.create');
     Route::post('opening-balances', [OpeningBalanceController::class, 'store'])->name('opening-balances.store');
     Route::post('opening-balances/{journal}/void', [OpeningBalanceController::class, 'void'])->name('opening-balances.void');
+});
+
+// ✅ Cash Expenses — akses khusus untuk owner, admin, operating, dan user Accounting.
+Route::middleware(['auth', 'access:cash-expenses'])->prefix('accounting')->name('accounting.')->group(function () {
+    Route::get('cash-expenses/{cashExpense}/proof', [CashExpenseController::class, 'proof'])
+        ->name('cash-expenses.proof');
+    Route::resource('cash-expenses', CashExpenseController::class);
+    Route::post('cash-expenses/{cashExpense}/post', [CashExpenseController::class, 'post'])->name('cash-expenses.post');
+    Route::post('cash-expenses/{cashExpense}/void', [CashExpenseController::class, 'void'])->name('cash-expenses.void');
 });
 
 // routes/web.php

@@ -138,7 +138,9 @@
             }
             .ce-mobile-meta b { display: block; color: #334155; font-size: .8rem; }
             .ce-form-grid { grid-template-columns: 1fr; }
-            body.modal-open .mobile-bottom-nav { display: none; }
+            body.modal-open .mobile-bottom-nav { display: none !important; }
+            body.modal-open .ce-modal,
+            body.modal-open .ce-category-modal { z-index: 1060; }
             .ce-modal .modal-dialog,
             .ce-category-modal .modal-dialog {
                 width: calc(100% - 1.5rem);
@@ -147,7 +149,8 @@
             }
             .ce-modal .modal-content,
             .ce-category-modal .modal-content {
-                max-height: calc(var(--app-vh, 100vh) - 1.5rem - env(safe-area-inset-bottom));
+                max-height: calc(100vh - 1.5rem - env(safe-area-inset-bottom));
+                max-height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom));
                 border-radius: 16px;
             }
             .ce-modal .modal-body,
@@ -169,6 +172,7 @@
                 background: #fff;
                 z-index: 2;
                 gap: .5rem;
+                padding-bottom: max(.8rem, env(safe-area-inset-bottom));
             }
             .ce-modal .modal-footer .ce-btn,
             .ce-category-modal .modal-footer .ce-btn {
@@ -377,7 +381,7 @@
                 });
             });
 
-            @if ($errors->any())
+            @if ($errors->any() || request()->boolean('open_modal'))
                 const modalEl = document.getElementById('cashExpenseCreateModal');
                 if (modalEl && window.bootstrap) {
                     window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -634,4 +638,3 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-

@@ -109,6 +109,12 @@ class User extends Authenticatable
 
         $module = strtolower(trim($module));
 
+        // Cash Expenses dipakai lintas role operasional tanpa membuka seluruh modul Accounting.
+        if ($module === 'cash-expenses') {
+            return in_array(strtolower((string) $this->role), ['admin', 'operating', 'accounting'], true)
+                || $this->canAccessModule('accounting');
+        }
+
         // Modul yang dikunci oleh role tidak bisa di-override lewat DB.
         $locked = self::lockedModulesForRole((string) $this->role);
         if (isset($locked[$module])) {

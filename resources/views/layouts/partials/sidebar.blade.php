@@ -210,6 +210,7 @@
 
     $canModule = fn (string $module) => $user ? $user->canAccessModule($module) : false;
     $hasDashboardRoute = $hasDashboardRoute && $canModule('dashboard');
+    $hasCashExpensesIndex = $hasCashExpensesIndex && $canModule('cash-expenses');
 
     if (!$canModule('inventory')) {
         $hasInvStocksItems = $hasInvStocksLots = $hasInvStockCard = false;
@@ -272,7 +273,7 @@
     }
 
     if (!$canModule('accounting')) {
-        $hasAccountsIndex = $hasCashExpensesIndex = $hasCashBasisReportIndex = false;
+        $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
         $hasOpeningBalancesBatchIndex = false;
     }

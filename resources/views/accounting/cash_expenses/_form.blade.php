@@ -70,7 +70,7 @@
     </label>
 
     <label class="ce-field ce-field-full">
-        <span>Bukti Foto {{ $isEdit && ($cashExpense->proof_photo_path ?? null) ? 'opsional jika tidak diganti' : '' }}</span>
+        <span>Bukti Foto <small>opsional</small></span>
         <div class="d-flex flex-wrap align-items-center gap-2">
             <button type="button" class="btn btn-light border fw-semibold" data-ce-proof-trigger tabindex="7">
                 Buka Kamera / Pilih Foto
@@ -79,7 +79,7 @@
         </div>
         <input class="form-control ce-form-control mt-2" type="file" name="proof_photo"
             accept="image/*" capture="environment" data-ce-proof-input
-            {{ $isEdit && ($cashExpense->proof_photo_path ?? null) ? '' : 'required' }} tabindex="-1">
+            tabindex="-1">
         @if ($isEdit && ($cashExpense->proof_photo_path ?? null))
             <small>
                 Foto saat ini:
@@ -88,7 +88,7 @@
                 </a>
             </small>
         @else
-            <small>Wajib upload foto struk/bukti pembayaran.</small>
+            <small>Upload foto struk/bukti pembayaran jika ada.</small>
         @endif
     </label>
 

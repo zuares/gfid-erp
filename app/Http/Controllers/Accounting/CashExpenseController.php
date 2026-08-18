@@ -76,7 +76,7 @@ class CashExpenseController extends Controller
             'cash_account_id' => ['required', 'integer', 'exists:accounts,id'],
             'description' => ['nullable', 'string', 'max:255'],
             'reference' => ['nullable', 'string', 'max:100'],
-            'proof_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -98,7 +98,9 @@ class CashExpenseController extends Controller
         }
 
         $data['expense_account_id'] = $expenseAccountId;
-        $data['proof_photo_path'] = $request->file('proof_photo')->store('cash-expenses/proofs', 'local');
+        if ($request->hasFile('proof_photo')) {
+            $data['proof_photo_path'] = $request->file('proof_photo')->store('cash-expenses/proofs', 'local');
+        }
         unset($data['category_new']);
         unset($data['proof_photo']);
         $data['status'] = 'draft';
@@ -165,7 +167,7 @@ class CashExpenseController extends Controller
             'cash_account_id' => ['required', 'integer', 'exists:accounts,id'],
             'description' => ['nullable', 'string', 'max:255'],
             'reference' => ['nullable', 'string', 'max:100'],
-            'proof_photo' => [$cashExpense->proof_photo_path ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'proof_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'notes' => ['nullable', 'string'],
         ]);
 

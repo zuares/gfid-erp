@@ -1701,6 +1701,11 @@
             // Pill buttons — Jenis PO
             const hiddenOrderType = document.getElementById('po-order-type-hidden');
             function switchOrderType(nextType) {
+                if (nextType === 'service') {
+                    window.location.href = @json(route('accounting.cash-expenses.index', ['open_modal' => 1]));
+                    return;
+                }
+
                 filterSuppliersByOrderType(nextType);
                 if (nextType === currentOrderType) return;
 
