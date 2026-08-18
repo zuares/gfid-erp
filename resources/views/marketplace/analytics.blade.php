@@ -123,6 +123,9 @@
     .an-pulse-value { color:var(--text,#0f172a); font-size:1rem; font-weight:900; margin-top:.22rem; }
     .an-pulse-note { color:var(--dsh-muted); font-size:.62rem; font-weight:650; margin-top:.18rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .an-pulse-note i { margin-right:.18rem; font-size:.62rem; }
+    .an-pulse-compare { font-weight:850; }
+    .an-pulse-compare.good { color:#15803d; }
+    .an-pulse-compare.bad { color:#b91c1c; }
     .an-pulse-note.good { color:#15803d; } .an-pulse-note.bad { color:#b91c1c; } .an-pulse-note.warn { color:#a16207; }
     .an-health-list { display:grid; gap:.65rem; }
     .an-health-row { display:grid; grid-template-columns:minmax(110px,.6fr) minmax(0,1fr) auto; align-items:center; gap:.55rem; color:var(--text,#0f172a); font-size:.67rem; font-weight:750; }
@@ -1028,16 +1031,20 @@
         const compare = (value, baseline, formatter = money) => {
             const currentValue = Number(value || 0);
             const previousValue = Number(baseline || 0);
-            if (previousValue === 0) return currentValue === 0 ? '0,0% vs lalu' : 'baru';
+            if (previousValue === 0) {
+                const className = currentValue > 0 ? 'good' : '';
+                return `<span class="an-pulse-compare ${className}"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${currentValue === 0 ? '0,0% vs lalu' : 'baru'}</span>`;
+            }
             const change = (currentValue - previousValue) / Math.abs(previousValue) * 100;
-            return `${formatter(previousValue)} · ${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%`;
+            const className = change > 0 ? 'good' : (change < 0 ? 'bad' : '');
+            return `<span class="an-pulse-compare ${className}"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${formatter(previousValue)} · ${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%</span>`;
         };
         const cards = [
-            ['bi-megaphone', 'Spend iklan', money(adSpend), `incl. PPN · ${compare(adSpend, previousAdSpend)}`, 'Biaya iklan termasuk PPN 11%'],
-            ['bi-box-seam', 'COGS', money(cogs), `cair ${money(current.hpp_settled || 0)} · ${compare(cogs, previousCogs)}`, 'Total HPP / COGS periode ini'],
-            ['bi-piggy-bank', 'Est. laba bersih', money(estimatedNetProfit), compare(estimatedNetProfit, previousEstimatedNetProfit), 'Net profit setelah fee, return/refund, COGS, dan iklan'],
-            ['bi-graph-up-arrow', 'ROI', `${roi.toFixed(1).replace('.', ',')}%`, `vs lalu ${previousRoi.toFixed(1).replace('.', ',')}% · ${compare(roi, previousRoi, value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`).split(' · ').pop()}`, 'Net profit ÷ (COGS + spend iklan)'],
-            ['bi-person-check', 'ROE estimasi', `${roe.toFixed(1).replace('.', ',')}%`, `vs lalu ${previousRoe.toFixed(1).replace('.', ',')}% · ${compare(roe, previousRoe, value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`).split(' · ').pop()}`, 'Proxy modal barang: net profit ÷ COGS'],
+            ['bi-megaphone', 'Spend iklan', money(adSpend), compare(adSpend, previousAdSpend), 'Biaya iklan periode ini'],
+            ['bi-box-seam', 'COGS', money(cogs), compare(cogs, previousCogs), 'Total HPP / COGS periode ini'],
+            ['bi-piggy-bank', 'Net Profit', money(estimatedNetProfit), compare(estimatedNetProfit, previousEstimatedNetProfit), 'Net profit setelah fee, return/refund, COGS, dan iklan'],
+            ['bi-graph-up-arrow', 'ROI', `${roi.toFixed(1).replace('.', ',')}%`, compare(roi, previousRoi, value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`), 'Net profit ÷ (COGS + spend iklan)'],
+            ['bi-person-check', 'ROE estimasi', `${roe.toFixed(1).replace('.', ',')}%`, compare(roe, previousRoe, value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`), 'Proxy modal barang: net profit ÷ COGS'],
         ];
         $('anFinancePulse').innerHTML = cards.map(([icon, label, value, note, title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label"><i class="bi ${icon} me-1" aria-hidden="true"></i>${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note">${note}</div></div>`).join('');
     }
