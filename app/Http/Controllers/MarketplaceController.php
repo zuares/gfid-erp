@@ -20,6 +20,7 @@ use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use App\Services\Marketplace\Ads\ItemHppResolver;
 use App\Services\Channels\ChannelManager;
 use App\Support\GmvMaxAnalytics;
@@ -75,6 +76,8 @@ class MarketplaceController extends Controller
         $filters = [
             'date_from' => $request->query('date_from', $weekAgo),
             'date_to'   => $request->query('date_to', $today),
+            'store_id'  => $request->query('store_id'),
+            'compare_mode' => $request->query('compare_mode', 'prev_period'),
         ];
         $isDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
 
@@ -125,8 +128,35 @@ class MarketplaceController extends Controller
         $filters = [
             'date_from' => $request->query('date_from', $weekAgo),
             'date_to'   => $request->query('date_to', $today),
+            'store_id'  => $request->query('store_id'),
+            'compare_mode' => $request->query('compare_mode', 'prev_period'),
         ];
         return view('marketplace.analytics', compact('filters'));
+    }
+
+    public function analyticsSummary(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
+    {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_year'],
+        ]);
+
+        return response()->json($summaryService->summary($filters));
+    }
+
+    public function analyticsProducts(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
+    {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        return response()->json([
+            'data' => $summaryService->products($filters),
+        ]);
     }
 
     public function ads(): \Illuminate\View\View
