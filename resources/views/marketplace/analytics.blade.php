@@ -482,6 +482,7 @@
     let chartLibraryPromise = null;
     let chartRenderToken = 0;
     let selectedPulseMetric = null;
+    const APP_TIMEZONE = @json(config('app.timezone', 'Asia/Jakarta'));
     const from = () => $('anDateFrom').value;
     const to = () => $('anDateTo').value;
     const n = v => Number.parseFloat(v || 0) || 0;
@@ -490,7 +491,22 @@
     const money = v => fmtRp(Math.round(v || 0));
     const pct = (a,b) => b ? (a / b * 100).toFixed(1) + '%' : '0%';
     const skuKey = value => String(value || '').trim().toUpperCase();
-    const dateKey = o => { const d = new Date(o.ordered_at || o.created_at); return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0,10); };
+    const parseAppDate = value => {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const normalized = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+        const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+        const date = new Date(hasTimezone ? normalized : `${normalized}+07:00`);
+        return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const dateInAppTimezone = value => {
+        const date = parseAppDate(value);
+        if (!date) return null;
+        const parts = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(date);
+        const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+        return `${values.year}-${values.month}-${values.day}`;
+    };
+    const dateKey = o => dateInAppTimezone(o.ordered_at || o.created_at);
     const selectedStore = () => $('anStore').value;
     const productPageUrl = @json(route('marketplace.products'));
     const productUrl = product => `${productPageUrl}?search=${encodeURIComponent(product.sku || product.product_name || '')}`;
@@ -1300,7 +1316,31 @@
     });
     $('anProductSearch').addEventListener('input', () => renderProductSummary(productData));
     $('anProductSort').addEventListener('change', () => renderProductSummary(productData));
-    if (window.flatpickr) flatpickr($('anDateRange'),{mode:'range',dateFormat:'Y-m-d',defaultDate:[from(),to()],onChange(dates){if(dates.length===2){$('anDateFrom').value=dates[0].toISOString().slice(0,10);$('anDateTo').value=dates[1].toISOString().slice(0,10);$('anDateRange').value=from()+' — '+to();syncUrl();load();}}});
+    if (window.flatpickr) flatpickr($('anDateRange'), {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        locale: (flatpickr.l10ns && flatpickr.l10ns.id) ? 'id' : { firstDayOfWeek: 1 },
+        allowInput: false,
+        defaultDate: [from(), to()],
+        onReady(dates, _, fp) {
+            if (dates.length === 2) fp.input.value = `${fp.formatDate(dates[0], 'j F Y')} — ${fp.formatDate(dates[1], 'j F Y')}`;
+        },
+        onChange(dates, _, fp) {
+            if (dates.length === 1) {
+                $('anDateFrom').value = fp.formatDate(dates[0], 'Y-m-d');
+                $('anDateTo').value = '';
+                fp.input.value = `${fp.formatDate(dates[0], 'j F Y')} …`;
+                return;
+            }
+            if (dates.length === 2) {
+                $('anDateFrom').value = fp.formatDate(dates[0], 'Y-m-d');
+                $('anDateTo').value = fp.formatDate(dates[1], 'Y-m-d');
+                fp.input.value = `${fp.formatDate(dates[0], 'j F Y')} — ${fp.formatDate(dates[1], 'j F Y')}`;
+                syncUrl();
+                load();
+            }
+        },
+    });
     $('anStore').value = initialStore || '';
     load();
 })();
