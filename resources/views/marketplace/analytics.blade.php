@@ -19,7 +19,7 @@
     .an-btn-dark { background:#0f172a; border-color:#0f172a; color:#fff; }
     .an-btn-dark:hover { background:#1e293b; color:#fff; }
     .an-sync-note { color:#94a3b8; font-size:.7rem; font-weight:700; margin-top:.3rem; }
-    .an-kpis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.7rem; }
+    .an-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.7rem; }
     .an-kpi { min-height:112px; border:1px solid rgba(15,23,42,.08); border-radius:18px; background:#fff; padding:1rem; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 8px 22px rgba(15,23,42,.035); }
     .an-kpi.primary { background:#0f172a; color:#fff; border-color:#0f172a; }
     .an-kpi-label { color:#64748b; font-size:.67rem; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
@@ -154,7 +154,7 @@
     .an-btn { min-height:32px; border-radius:7px; padding:.35rem .7rem; font-size:.7rem; font-weight:700; }
     .an-btn-dark { background:var(--dsh-accent); border-color:var(--dsh-accent); color:#fff; }
     .an-btn-dark:hover { background:var(--dsh-accent-2); color:#fff; }
-    .an-kpis { grid-template-columns:repeat(6,minmax(0,1fr)); gap:.6rem; }
+    .an-kpis { grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; }
     .an-kpi { min-height:95px; padding:.85rem 1rem; border:1px solid var(--dsh-border); border-radius:14px; background:var(--card,#fff); box-shadow:0 10px 22px rgba(15,23,42,.05); position:relative; overflow:hidden; }
     .an-kpi::before { content:''; position:absolute; inset:0 auto auto 0; width:100%; height:3px; background:linear-gradient(90deg,#64748b,#94a3b8); }
     .an-kpi:nth-child(2)::before { background:linear-gradient(90deg,#2563eb,#38bdf8); }
@@ -233,11 +233,13 @@
             </div>
           </div>
           <div class="an-kpis">
-            <div class="an-kpi primary"><span class="an-kpi-label">Order Masuk</span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote">—</span></div>
+            <div class="an-kpi primary"><span class="an-kpi-label">Total Order</span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote">semua status kecuali batal</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Omzet Marketplace</span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote">semua status selain batal</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Fee Marketplace</span><strong class="an-kpi-value" id="kpiAdminFee">—</strong><span class="an-kpi-note">aktual settlement</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Omzet Cair</span><strong class="an-kpi-value" id="kpiPayout">—</strong><span class="an-kpi-note">settlement complete</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Estimasi Profit</span><strong class="an-kpi-value" id="kpiEstimatedProfit">—</strong><span class="an-kpi-note">GMV − fee − HPP − iklan</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Fee Marketplace (estimasi)</span><strong class="an-kpi-value" id="kpiAdminFee">—</strong><span class="an-kpi-note">21% dari GMV</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Laba Kotor</span><strong class="an-kpi-value" id="kpiGrossProfit">—</strong><span class="an-kpi-note" id="kpiHppNote">HPP: —</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Biaya Iklan</span><strong class="an-kpi-value" id="kpiAdCost">—</strong><span class="an-kpi-note">dari settlement</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Biaya Iklan</span><strong class="an-kpi-value" id="kpiAdCost">—</strong><span class="an-kpi-note">dari Ads Daily</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Laba Operasional</span><strong class="an-kpi-value" id="kpiNetProfit">—</strong><span class="an-kpi-note" id="kpiNetProfitNote">payout − HPP − iklan</span></div>
           </div>
 
@@ -264,7 +266,7 @@
 
         <div class="an-contribution-grid an-tab-pane" data-an-pane="summary">
             <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Kontribusi toko</div><div class="an-enterprise-sub">Toko dengan kontribusi omzet terbesar</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anTopStores"><div class="an-empty">Memuat…</div></div></div></section>
-            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Unit economics</div><div class="an-enterprise-sub">Komposisi payout dan biaya terhadap omzet</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anEconomics"><div class="an-empty">Memuat…</div></div></div></section>
+            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Unit economics</div><div class="an-enterprise-sub">Berbasis omzet yang sudah cair</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anEconomics"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
 
         <div class="an-enterprise-grid an-tab-pane is-hidden" data-an-pane="stores">
@@ -274,7 +276,7 @@
 
         <div class="an-grid-secondary an-tab-pane is-hidden" data-an-pane="stores">
             <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Performa per toko</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order</th><th>Selesai</th><th>Cancel</th><th>Omzet marketplace</th><th>Laba Bersih</th></tr></thead><tbody id="storeBody"><tr><td colspan="6"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
-            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Nilai aktual dari settlement yang sudah complete</div></div></div><div class="an-card-body"><div class="an-costs" id="costBody"><div class="an-empty">Memuat…</div></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee diestimasi 21% dari GMV; biaya aktual settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="costBody"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
 
         <div class="an-enterprise-grid an-tab-pane is-hidden" data-an-pane="products">
@@ -283,7 +285,7 @@
         </div>
 
         <div class="an-grid-secondary an-tab-pane is-hidden" data-an-pane="products">
-            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Semua penjualan produk</div><div class="an-card-sub">Hanya produk dari order dengan settlement dan HPP tervalidasi</div></div><div class="an-product-toolbar"><input id="anProductSearch" type="search" placeholder="Cari produk / SKU…"><select id="anProductSort"><option value="gross_sales">Urutkan: Omzet</option><option value="operating_profit">Urutkan: Laba</option><option value="margin_pct">Urutkan: Margin</option><option value="qty">Urutkan: Qty</option></select></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table an-product-table"><thead><tr><th>#</th><th>Produk</th><th>Qty</th><th>Omzet</th><th>HPP</th><th>Iklan</th><th>Laba Kotor</th><th>Laba Operasional</th></tr></thead><tbody id="bestProductBody"><tr><td colspan="8"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr></tbody></table></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Semua penjualan produk</div><div class="an-card-sub">Hanya produk dari order dengan settlement dan HPP tervalidasi; iklan dialokasikan berdasar omzet produk</div></div><div class="an-product-toolbar"><input id="anProductSearch" type="search" placeholder="Cari produk / SKU…"><select id="anProductSort"><option value="gross_sales">Urutkan: Omzet</option><option value="operating_profit">Urutkan: Laba</option><option value="margin_pct">Urutkan: Margin</option><option value="qty">Urutkan: Qty</option></select></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table an-product-table"><thead><tr><th>#</th><th>Produk</th><th>Qty</th><th>Omzet</th><th>HPP</th><th>Iklan (alokasi)</th><th>Laba Kotor</th><th>Laba Operasional</th></tr></thead><tbody id="bestProductBody"><tr><td colspan="8"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr></tbody></table></div></div></section>
             <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Produk perlu perhatian</div></div></div><div class="an-card-body"><div class="an-list" id="worstProductBody"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
         </div>
@@ -376,14 +378,17 @@
     function renderKpis(rows) {
         const current = summary?.current || {};
         const quality = summary?.quality || {};
+        const adCost = Number(current.ad_cost ?? current.ads_spend ?? 0);
         $('kpiOrders').textContent = Number(current.order_total || 0).toLocaleString('id-ID');
         $('kpiRevenue').textContent = money(current.gmv);
-        $('kpiAdminFee').textContent = money(current.marketplace_fees);
-        $('kpiAdCost').textContent = money(current.ad_cost);
+        $('kpiPayout').textContent = money(current.payout);
+        $('kpiEstimatedProfit').textContent = money(current.estimated_profit);
+        $('kpiAdminFee').textContent = money(current.marketplace_fee_estimate);
+        $('kpiAdCost').textContent = money(adCost);
         $('kpiGrossProfit').textContent = money(current.gross_profit);
         $('kpiNetProfit').textContent = money(current.operating_profit);
-        $('kpiRevenueNote').textContent = `${Number(current.order_total || 0).toLocaleString('id-ID')} order aktif · ${Number(current.order_count || 0).toLocaleString('id-ID')} siap profit`;
-        $('kpiOrdersNote').textContent = `${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai · ${from()} — ${to()}`;
+        $('kpiRevenueNote').textContent = `${from()} — ${to()}`;
+        $('kpiOrdersNote').textContent = `${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai · ${Number(current.cancelled_count || 0).toLocaleString('id-ID')} batal`;
         $('kpiHppNote').textContent = `HPP: ${money(current.hpp)}`;
         $('kpiNetProfitNote').textContent = `${Number(quality.incomplete || 0).toLocaleString('id-ID')} order incomplete`;
     }
@@ -430,7 +435,7 @@
         const storeBase = Math.max(totalGross, 1);
         $('anStoreCostPulse').innerHTML = [
             ['Payout rate', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
-            ['Fee rate', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
+            ['Fee rate (estimasi)', list.reduce((sum, store) => sum + Number(store.marketplace_fee_estimate || 0), 0) / storeBase * 100],
             ['HPP rate', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
             ['Ad rate', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
         ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>terhadap omzet</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
@@ -438,9 +443,9 @@
     }
     function renderCosts() {
         const current = summary?.current || {};
-        const base = Math.max(Number(current.gross_sales || 0), 1);
+        const base = Math.max(Number(current.gmv || current.gross_sales || 0), 1);
         const rows = [
-            ['Fee marketplace', current.marketplace_fees],
+            ['Fee marketplace (estimasi 21%)', current.marketplace_fee_estimate],
             ['Refund / adjustment', current.refund],
             ['Biaya iklan', current.ad_cost],
             ['HPP', current.hpp],
@@ -490,12 +495,12 @@
         const maxStore = Math.max(...topStores.map(store => Number(store.gmv || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_total || 0).toLocaleString('id-ID')} order · profit verified ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gmv || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gmv)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
         const economics = [
-            ['Payout terhadap omzet', Number(current.gross_sales || 0) ? Number(current.payout || 0) / current.gross_sales * 100 : 0, '#16a34a'],
-            ['Fee marketplace', Number(current.gross_sales || 0) ? Number(current.marketplace_fees || 0) / current.gross_sales * 100 : 0, '#f59e0b'],
-            ['HPP', Number(current.gross_sales || 0) ? Number(current.hpp || 0) / current.gross_sales * 100 : 0, '#64748b'],
-            ['Biaya iklan', Number(current.gross_sales || 0) ? Number(current.ad_cost || 0) / current.gross_sales * 100 : 0, '#dc2626'],
+            ['Omzet cair', Number(current.payout || 0), 100, '#16a34a'],
+            ['Fee marketplace · 21% dari cair', Number(current.marketplace_fee_estimate_on_payout || 0), Number(current.payout || 0) ? Number(current.marketplace_fee_estimate_on_payout || 0) / current.payout * 100 : 0, '#f59e0b'],
+            ['HPP', Number(current.hpp || 0), Number(current.payout || 0) ? Number(current.hpp || 0) / current.payout * 100 : 0, '#64748b'],
+            ['Biaya iklan', Number(current.ad_cost || 0), Number(current.payout || 0) ? Number(current.ad_cost || 0) / current.payout * 100 : 0, '#dc2626'],
         ];
-        $('anEconomics').innerHTML = economics.map(([label,value,color]) => `<div class="an-contribution-row"><div><div class="an-contribution-name">${label}</div><div class="an-contribution-bar"><span style="width:${Math.min(100, Math.max(0, value))}%;background:${color}"></span></div></div><div class="an-contribution-value">${value.toFixed(1)}%</div></div>`).join('');
+        $('anEconomics').innerHTML = economics.map(([label,amount,rate,color]) => `<div class="an-contribution-row"><div><div class="an-contribution-name">${label}</div><div class="an-contribution-bar"><span style="width:${Math.min(100, Math.max(0, rate))}%;background:${color}"></span></div></div><div class="an-contribution-value">${money(amount)}<span class="an-table-subline">${rate.toFixed(1)}% dari cair</span></div></div>`).join('');
     }
     function products(rows) {
         const map = {};
@@ -610,7 +615,8 @@
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to() });
             if (selectedStore()) params.set('store_id', selectedStore());
-            const result = await api('/api/marketplace/analytics-products?' + params.toString());
+            params.set('_ts', Date.now().toString());
+            const result = await api('/api/marketplace/analytics-products?' + params.toString(), { cache: 'no-store' });
             productData = result?.data || [];
             productsLoaded = true;
             renderProductSummary(productData);
@@ -625,9 +631,9 @@
         productData = [];
         orders = [];
         try {
-            const params = new URLSearchParams({ date_from: from(), date_to: to(), compare_mode: $('anCompare').value });
+            const params = new URLSearchParams({ date_from: from(), date_to: to(), compare_mode: $('anCompare').value, _ts: Date.now().toString() });
             if (selectedStore()) params.set('store_id', selectedStore());
-            summary = await api('/api/marketplace/analytics-summary?' + params.toString());
+            summary = await api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' });
             fillStores();
             render();
             $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr>';

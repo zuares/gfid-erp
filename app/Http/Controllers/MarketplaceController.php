@@ -143,7 +143,9 @@ class MarketplaceController extends Controller
             'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_year'],
         ]);
 
-        return response()->json($summaryService->summary($filters));
+        return response()
+            ->json($summaryService->summary($filters))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function analyticsProducts(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
@@ -154,9 +156,11 @@ class MarketplaceController extends Controller
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
         ]);
 
-        return response()->json([
-            'data' => $summaryService->products($filters),
-        ]);
+        return response()
+            ->json([
+                'data' => $summaryService->products($filters),
+            ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function ads(): \Illuminate\View\View

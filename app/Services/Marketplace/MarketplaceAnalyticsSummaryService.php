@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
  */
 class MarketplaceAnalyticsSummaryService
 {
+    private const ESTIMATED_MARKETPLACE_FEE_RATE = 0.21;
+
     private const FEE_FIELDS = [
         'commission_fee',
         'service_fee',
@@ -37,17 +39,19 @@ class MarketplaceAnalyticsSummaryService
         $previousFinancial = $this->financialAggregate(array_merge($filters, $previous));
         $currentOperational = $this->operationalAggregate($filters);
         $previousOperational = $this->operationalAggregate(array_merge($filters, $previous));
+        $currentAds = $this->adsAggregate($filters);
+        $previousAds = $this->adsAggregate(array_merge($filters, $previous));
         $quality = $this->qualitySummary($filters);
-        $current = $this->withRates(array_merge($currentFinancial, $currentOperational));
-        $previousSnapshot = $this->withRates(array_merge($previousFinancial, $previousOperational));
+        $current = $this->withRates($this->applyAdCost(array_merge($currentFinancial, $currentOperational), $currentAds));
+        $previousSnapshot = $this->withRates($this->applyAdCost(array_merge($previousFinancial, $previousOperational), $previousAds));
 
         return [
             'filters' => $filters,
             'current' => $current,
             'previous' => $previousSnapshot,
             'changes' => $this->changes($current, $previousSnapshot),
-            'daily' => $this->mergeDaily($this->financialDaily($filters), $this->operationalDaily($filters)),
-            'previous_daily' => $this->mergeDaily($this->financialDaily(array_merge($filters, $previous)), $this->operationalDaily(array_merge($filters, $previous))),
+            'daily' => $this->mergeDaily($this->financialDaily($filters), $this->operationalDaily($filters), $this->adsDaily($filters)),
+            'previous_daily' => $this->mergeDaily($this->financialDaily(array_merge($filters, $previous)), $this->operationalDaily(array_merge($filters, $previous)), $this->adsDaily(array_merge($filters, $previous))),
             'stores' => $this->storeSummary($filters),
             'quality' => $quality,
         ];
@@ -63,23 +67,35 @@ class MarketplaceAnalyticsSummaryService
             'date_from' => $filters['date_from'],
             'date_to' => $filters['date_to'],
         ])['items'];
+        $adsCost = (float) ($this->adsAggregate($filters)['ad_cost'] ?? 0);
+        $totalGrossSales = (float) collect($items)->sum(fn (array $row) => (float) ($row['gross_sales'] ?? 0));
 
         return collect($items)
             ->sortByDesc('gross_sales')
             ->take($limit)
-            ->map(fn (array $row) => [
-                'product_key' => (string) ($row['item_key'] ?? ''),
-                'product_name' => (string) ($row['item_name'] ?? '-'),
-                'sku' => (string) ($row['sku'] ?? '-'),
-                'qty' => (int) ($row['qty'] ?? 0),
-                'gross_sales' => round((float) ($row['gross_sales'] ?? 0), 2),
-                'payout' => round((float) ($row['payout'] ?? 0), 2),
-                'hpp' => round((float) ($row['hpp'] ?? 0), 2),
-                'ad_cost' => round((float) ($row['ad_cost'] ?? 0), 2),
-                'gross_profit' => round((float) ($row['gross_profit'] ?? 0), 2),
-                'operating_profit' => round((float) ($row['operating_profit'] ?? 0), 2),
-                'margin_pct' => round((float) ($row['margin_pct'] ?? 0), 2),
-            ])->values()->all();
+            ->map(function (array $row) use ($adsCost, $totalGrossSales): array {
+                $grossSales = (float) ($row['gross_sales'] ?? 0);
+                $payout = (float) ($row['payout'] ?? 0);
+                $hpp = (float) ($row['hpp'] ?? 0);
+                $allocatedAdCost = $totalGrossSales > 0 ? $adsCost * ($grossSales / $totalGrossSales) : 0.0;
+                $grossProfit = $payout - $hpp;
+                $operatingProfit = $grossProfit - $allocatedAdCost;
+
+                return [
+                    'product_key' => (string) ($row['item_key'] ?? ''),
+                    'product_name' => (string) ($row['item_name'] ?? '-'),
+                    'sku' => (string) ($row['sku'] ?? '-'),
+                    'qty' => (int) ($row['qty'] ?? 0),
+                    'gross_sales' => round($grossSales, 2),
+                    'payout' => round($payout, 2),
+                    'hpp' => round($hpp, 2),
+                    'ad_cost' => round($allocatedAdCost, 2),
+                    'ad_cost_settlement' => round((float) ($row['ad_cost'] ?? 0), 2),
+                    'gross_profit' => round($grossProfit, 2),
+                    'operating_profit' => round($operatingProfit, 2),
+                    'margin_pct' => $grossSales > 0 ? round(($operatingProfit / $grossSales) * 100, 2) : 0.0,
+                ];
+            })->values()->all();
     }
 
     private function normalizeFilters(array $filters): array
@@ -202,21 +218,23 @@ class MarketplaceAnalyticsSummaryService
             ->keyBy(fn ($row) => (string) $row->store_id);
 
         $operational = $this->operationalStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
-        $ids = $financial->keys()->merge($operational->keys())->unique();
+        $ads = $this->adsStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
+        $ids = $financial->keys()->merge($operational->keys())->merge($ads->keys())->unique();
 
-        return $ids->map(function (string $id) use ($financial, $operational) {
+        return $ids->map(function (string $id) use ($financial, $operational, $ads) {
             $finance = $financial->get($id);
             $ops = $operational->get($id);
+            $ad = $ads->get($id);
             $aggregate = $this->normalizeAggregate($finance);
 
-            return array_merge([
+            return $this->withRates($this->applyAdCost(array_merge([
                 'store_id' => (int) $id,
-                'store_name' => $finance->store_name ?? $ops->store_name ?? 'Tanpa toko',
+                'store_name' => $finance?->store_name ?? $ops?->store_name ?? $ad?->store_name ?? 'Tanpa toko',
                 'order_total' => (int) ($ops->order_total ?? 0),
                 'completed_count' => (int) ($ops->completed_count ?? 0),
                 'cancelled_count' => (int) ($ops->cancelled_count ?? 0),
                 'gmv' => round((float) ($ops->gmv ?? 0), 2),
-            ], $aggregate);
+            ], $aggregate), ['ad_cost' => (float) ($ad->ad_cost ?? 0)]));
         })->sortByDesc('gross_sales')->values()->all();
     }
 
@@ -247,7 +265,7 @@ class MarketplaceAnalyticsSummaryService
             ->all();
     }
 
-    private function mergeDaily(array $financial, array $operational): array
+    private function mergeDaily(array $financial, array $operational, array $ads = []): array
     {
         $rows = collect($financial)->keyBy('date');
         foreach ($operational as $row) {
@@ -262,11 +280,47 @@ class MarketplaceAnalyticsSummaryService
                 'payout' => 0,
                 'hpp' => 0,
                 'ad_cost' => 0,
+                'ad_cost_settlement' => 0,
                 'gross_profit' => 0,
                 'operating_profit' => 0,
                 'margin_pct' => 0,
                 'aov' => 0,
             ], ['gmv' => (float) ($row['gmv'] ?? 0)]);
+        }
+
+        if ($ads !== []) {
+            foreach ($ads as $row) {
+                $date = (string) $row['date'];
+                $rows[$date] = array_merge($rows[$date] ?? [
+                    'date' => $date,
+                    'order_count' => 0,
+                    'qty' => 0,
+                    'gross_sales' => 0,
+                    'marketplace_fees' => 0,
+                    'refund' => 0,
+                    'payout' => 0,
+                    'hpp' => 0,
+                    'ad_cost' => 0,
+                    'ad_cost_settlement' => 0,
+                    'gross_profit' => 0,
+                    'operating_profit' => 0,
+                    'margin_pct' => 0,
+                    'aov' => 0,
+                ], ['ad_cost' => (float) ($row['ad_cost'] ?? 0)]);
+            }
+
+            $rows = $rows->map(function (array $row) use ($ads) {
+                $adCostByDate = collect($ads)->firstWhere('date', $row['date']);
+                $row['ad_cost_settlement'] = round((float) ($row['ad_cost_settlement'] ?? $row['ad_cost'] ?? 0), 2);
+                $row['ad_cost'] = round((float) ($adCostByDate['ad_cost'] ?? 0), 2);
+                $row['gross_profit'] = round((float) ($row['payout'] ?? 0) - (float) ($row['hpp'] ?? 0), 2);
+                $row['operating_profit'] = round($row['gross_profit'] - $row['ad_cost'], 2);
+                $row['margin_pct'] = (float) ($row['gross_sales'] ?? 0) > 0
+                    ? round(($row['operating_profit'] / $row['gross_sales']) * 100, 2)
+                    : 0.0;
+
+                return $row;
+            });
         }
 
         return $rows->sortKeys()->values()->all();
@@ -280,6 +334,46 @@ class MarketplaceAnalyticsSummaryService
             ->selectRaw($this->operationalSelect(false))
             ->groupBy('mo.store_id', 'st.name')
             ->get();
+    }
+
+    private function adsAggregate(array $filters): array
+    {
+        $row = $this->adsBase($filters)
+            ->selectRaw('COALESCE(SUM(spend), 0) AS ad_cost')
+            ->first();
+
+        return ['ad_cost' => round((float) ($row->ad_cost ?? 0), 2)];
+    }
+
+    private function adsDaily(array $filters): array
+    {
+        return $this->adsBase($filters)
+            ->selectRaw('date, COALESCE(SUM(spend), 0) AS ad_cost')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->map(fn ($row) => [
+                'date' => (string) $row->date,
+                'ad_cost' => round((float) ($row->ad_cost ?? 0), 2),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function adsStoreSummary(array $filters)
+    {
+        return $this->adsBase($filters)
+            ->join('stores as st', 'st.id', '=', 'marketplace_ads_dailies.store_id')
+            ->selectRaw('marketplace_ads_dailies.store_id, st.name as store_name, COALESCE(SUM(marketplace_ads_dailies.spend), 0) AS ad_cost')
+            ->groupBy('marketplace_ads_dailies.store_id', 'st.name')
+            ->get();
+    }
+
+    private function adsBase(array $filters)
+    {
+        return DB::table('marketplace_ads_dailies')
+            ->whereBetween('date', [$filters['date_from'], $filters['date_to']])
+            ->when($filters['store_id'], fn ($q, $storeId) => $q->where('store_id', $storeId));
     }
 
     private function operationalBase(array $filters)
@@ -338,7 +432,7 @@ class MarketplaceAnalyticsSummaryService
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
 
         return implode(', ', [
-            'COUNT(*) AS order_total',
+            'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS order_total',
             "SUM(CASE WHEN {$status} = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count",
             "SUM(CASE WHEN {$status} IN ('CANCELLED', 'CANCELED', 'BATAL') THEN 1 ELSE 0 END) AS cancelled_count",
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv',
@@ -373,6 +467,7 @@ class MarketplaceAnalyticsSummaryService
             'payout' => round($payout, 2),
             'hpp' => round($hpp, 2),
             'ad_cost' => round($adCost, 2),
+            'ad_cost_settlement' => round($adCost, 2),
             'gross_profit' => round($payout - $hpp, 2),
             'operating_profit' => round($operating, 2),
             'margin_pct' => $gross > 0 ? round(($operating / $gross) * 100, 2) : 0.0,
@@ -382,7 +477,7 @@ class MarketplaceAnalyticsSummaryService
 
     private function changes(array $current, array $previous): array
     {
-        return collect(['gmv', 'gross_sales', 'payout', 'operating_profit', 'order_count', 'ad_cost', 'aov', 'completion_rate', 'cancel_rate', 'profit_margin'])
+        return collect(['gmv', 'gross_sales', 'payout', 'estimated_profit', 'operating_profit', 'order_count', 'ad_cost', 'aov', 'completion_rate', 'cancel_rate', 'profit_margin'])
             ->mapWithKeys(function (string $key) use ($current, $previous) {
                 $now = (float) ($current[$key] ?? 0);
                 $before = (float) ($previous[$key] ?? 0);
@@ -395,10 +490,46 @@ class MarketplaceAnalyticsSummaryService
         $orders = (int) ($aggregate['order_total'] ?? 0);
         $gross = (float) ($aggregate['gross_sales'] ?? 0);
 
-        return array_merge($aggregate, [
+        return array_merge($this->withEstimatedFee($aggregate), [
             'completion_rate' => $orders > 0 ? round(((int) ($aggregate['completed_count'] ?? 0) / $orders) * 100, 2) : 0.0,
             'cancel_rate' => $orders > 0 ? round(((int) ($aggregate['cancelled_count'] ?? 0) / $orders) * 100, 2) : 0.0,
             'profit_margin' => $gross > 0 ? round(((float) ($aggregate['operating_profit'] ?? 0) / $gross) * 100, 2) : 0.0,
+        ]);
+    }
+
+    private function applyAdCost(array $aggregate, array $ads): array
+    {
+        $aggregate['ad_cost_settlement'] = round((float) ($aggregate['ad_cost_settlement'] ?? $aggregate['ad_cost'] ?? 0), 2);
+        $aggregate['ad_cost'] = round((float) ($ads['ad_cost'] ?? 0), 2);
+        $payout = (float) ($aggregate['payout'] ?? 0);
+        $hpp = (float) ($aggregate['hpp'] ?? 0);
+        $aggregate['gross_profit'] = round($payout - $hpp, 2);
+        $aggregate['operating_profit'] = round($aggregate['gross_profit'] - $aggregate['ad_cost'], 2);
+
+        $gross = (float) ($aggregate['gross_sales'] ?? 0);
+        $aggregate['margin_pct'] = $gross > 0
+            ? round(($aggregate['operating_profit'] / $gross) * 100, 2)
+            : 0.0;
+
+        return $aggregate;
+    }
+
+    private function withEstimatedFee(array $aggregate): array
+    {
+        $gmv = (float) ($aggregate['gmv'] ?? 0);
+        $payout = (float) ($aggregate['payout'] ?? 0);
+        $hpp = (float) ($aggregate['hpp'] ?? 0);
+        $adCost = (float) ($aggregate['ad_cost'] ?? 0);
+        $estimatedFee = $gmv * self::ESTIMATED_MARKETPLACE_FEE_RATE;
+        $estimatedProfit = $gmv - $estimatedFee - $hpp - $adCost;
+
+        return array_merge($aggregate, [
+            'marketplace_fee_estimate_rate' => self::ESTIMATED_MARKETPLACE_FEE_RATE * 100,
+            'marketplace_fee_estimate' => round($estimatedFee, 2),
+            'marketplace_fee_estimate_on_payout' => round($payout * self::ESTIMATED_MARKETPLACE_FEE_RATE, 2),
+            'estimated_profit' => round($estimatedProfit, 2),
+            'estimated_profit_margin' => $gmv > 0 ? round(($estimatedProfit / $gmv) * 100, 2) : 0.0,
+            'marketplace_fees_actual' => round((float) ($aggregate['marketplace_fees'] ?? 0), 2),
         ]);
     }
 }
