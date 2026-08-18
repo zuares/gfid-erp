@@ -60,6 +60,8 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
 Route::middleware(['auth', 'access:cash-expenses'])->prefix('accounting')->name('accounting.')->group(function () {
     Route::get('cash-expenses/{cashExpense}/proof', [CashExpenseController::class, 'proof'])
         ->name('cash-expenses.proof');
+    Route::post('cash-expenses/categories', [CashExpenseController::class, 'storeCategory'])
+        ->name('cash-expenses.categories.store');
     Route::resource('cash-expenses', CashExpenseController::class);
     Route::post('cash-expenses/{cashExpense}/post', [CashExpenseController::class, 'post'])->name('cash-expenses.post');
     Route::post('cash-expenses/{cashExpense}/void', [CashExpenseController::class, 'void'])->name('cash-expenses.void');

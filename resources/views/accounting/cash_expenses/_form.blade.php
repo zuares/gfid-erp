@@ -3,7 +3,7 @@
 
     $isEdit = isset($cashExpense) && $cashExpense->exists;
     $selectedExpenseAccountId = old('expense_account_id', $cashExpense->expense_account_id ?? 0);
-    $defaultCashAccountId = $cashAccounts->firstWhere('code', '1101')?->id ?? $cashAccounts->first()?->id;
+    $defaultCashAccountId = $cashAccounts->firstWhere('code', '1111')?->id ?? $cashAccounts->first()?->id;
     $selectedCashAccountId = old('cash_account_id', $cashExpense->cash_account_id ?? ($isEdit ? 0 : $defaultCashAccountId));
     $newCategoryName = old('category_new');
 @endphp
@@ -128,6 +128,7 @@
                 <label class="form-label small fw-semibold mb-1">Nama kategori</label>
                 <input type="text" class="form-control form-control-lg ce-form-control"
                     placeholder="Contoh: Bonus Karyawan" autocomplete="off" data-ce-new-category-input>
+                <small class="text-danger d-none" data-ce-category-error></small>
             </div>
 
             <div class="modal-footer border-0 pt-0">
@@ -190,10 +191,23 @@
                         const hidden = form?.querySelector('[data-ce-new-category-hidden]');
                         const description = form?.querySelector('[data-ce-description]');
                         const modalEl = form?.querySelector('[data-ce-category-modal]') || document.querySelector('[data-ce-category-modal]');
+                        // Jangan biarkan modal kategori menjadi child modal utama.
+                        // Bootstrap akan mengaktifkan focus trap pada keduanya dan
+                        // input kategori akhirnya langsung kehilangan fokus.
+                        if (modalEl && modalEl.parentElement !== document.body) {
+                            document.body.appendChild(modalEl);
+                        }
                         const input = modalEl?.querySelector('[data-ce-new-category-input]');
                         const save = modalEl?.querySelector('[data-ce-save-new-category]');
+                        const categoryError = modalEl?.querySelector('[data-ce-category-error]');
+                        const csrf = form?.querySelector('input[name="_token"]')?.value;
+                        const categoryUrl = @json(route('accounting.cash-expenses.categories.store'));
                         const modal = modalEl && window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
                         let previousValue = select.value || '';
+
+                        // Modal kategori berada di dalam modal utama. Hentikan focus trap
+                        // modal utama agar input kategori bisa menerima fokus.
+                        modalEl?.addEventListener('focusin', (event) => event.stopPropagation());
 
                         select.addEventListener('focus', () => {
                             previousValue = select.value || '';
@@ -209,35 +223,82 @@
                             if (!modal || !input) return;
 
                             input.value = hidden?.value || '';
-                            modal.show();
+                            const parentModalEl = select.closest('.modal.show');
+                            const parentModal = parentModalEl && window.bootstrap
+                                ? window.bootstrap.Modal.getInstance(parentModalEl)
+                                : null;
                             modalEl.addEventListener('shown.bs.modal', () => {
-                                input.focus();
+                                input.focus({ preventScroll: true });
                                 input.select?.();
                             }, { once: true });
+                            modalEl.addEventListener('hidden.bs.modal', () => {
+                                if (parentModalEl?.classList.contains('show')) {
+                                    parentModal?._focustrap?.activate();
+                                }
+                            }, { once: true });
+                            parentModal?._focustrap?.deactivate();
+                            modal.show();
                         });
 
-                        save?.addEventListener('click', () => {
+                        save?.addEventListener('click', async () => {
                             const name = sentenceCase(input?.value || '').trim();
                             if (!name) {
                                 input?.focus();
                                 return;
                             }
 
-                            let option = Array.from(select.options).find((opt) => opt.value === '__new_category__');
-                            if (!option) {
-                                option = new Option('', '__new_category__');
-                                select.add(option, select.options[select.options.length - 1] || null);
+                            if (save.dataset.busy === '1') return;
+                            save.dataset.busy = '1';
+                            save.disabled = true;
+                            if (categoryError) {
+                                categoryError.textContent = '';
+                                categoryError.classList.add('d-none');
                             }
 
-                            option.textContent = `${name} · kategori baru`;
-                            option.selected = true;
-                            if (hidden) hidden.value = name;
-                            previousValue = '__new_category__';
-                            modal?.hide();
+                            try {
+                                const response = await fetch(categoryUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': csrf || '',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                    body: JSON.stringify({ name }),
+                                });
+                                const payload = await response.json().catch(() => ({}));
 
-                            setTimeout(() => {
-                                description?.focus();
-                            }, 180);
+                                if (!response.ok) {
+                                    const validationMessage = Object.values(payload.errors || {}).flat()[0];
+                                    throw new Error(validationMessage || payload.message || 'Kategori gagal disimpan.');
+                                }
+
+                                const accountId = String(payload.id);
+                                let option = Array.from(select.options).find((opt) => opt.value === accountId);
+                                if (!option) {
+                                    option = new Option('', accountId);
+                                    select.add(option, select.options[select.options.length - 1] || null);
+                                }
+
+                                option.textContent = `${payload.name || name}${payload.code ? ` · ${payload.code}` : ''}`;
+                                option.selected = true;
+                                if (hidden) hidden.value = '';
+                                previousValue = accountId;
+                                modal?.hide();
+
+                                setTimeout(() => {
+                                    description?.focus();
+                                }, 180);
+                            } catch (error) {
+                                if (categoryError) {
+                                    categoryError.textContent = error.message || 'Kategori gagal disimpan.';
+                                    categoryError.classList.remove('d-none');
+                                }
+                                input?.focus();
+                            } finally {
+                                save.dataset.busy = '0';
+                                save.disabled = false;
+                            }
                         });
 
                         input?.addEventListener('keydown', (event) => {

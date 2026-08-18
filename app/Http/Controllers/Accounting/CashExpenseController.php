@@ -114,6 +114,45 @@ class CashExpenseController extends Controller
             ->with('message', 'Pengeluaran tersimpan (DRAFT).');
     }
 
+    public function storeCategory(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+        ]);
+
+        $name = trim($data['name']);
+        $existing = Account::query()
+            ->where('type', 'expense')
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+
+        if ($existing) {
+            if (!$existing->is_active) {
+                $existing->update(['is_active' => true]);
+            }
+
+            return response()->json([
+                'id' => $existing->id,
+                'name' => $existing->name,
+                'code' => $existing->code,
+            ]);
+        }
+
+        $account = Account::create([
+            'code' => $this->nextExpenseAccountCode(),
+            'name' => $name,
+            'type' => 'expense',
+            'is_cash' => false,
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'id' => $account->id,
+            'name' => $account->name,
+            'code' => $account->code,
+        ], 201);
+    }
+
     public function show(CashExpense $cashExpense)
     {
         $cashExpense->load(['expenseAccount', 'cashAccount', 'journal.lines.account']);

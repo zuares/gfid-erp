@@ -201,6 +201,10 @@
         description="{{ $cashExpense->description ?: 'Pengeluaran kas harian' }}">
         <x-slot:actions>
             <div class="ce-actions">
+                <a class="ce-btn ce-btn-primary"
+                    href="{{ route('accounting.cash-expenses.index', ['open_modal' => 1]) }}">
+                    + Tambah Pengeluaran
+                </a>
                 <a class="ce-btn" href="{{ route('accounting.cash-expenses.index') }}">Daftar Pengeluaran</a>
                 @if ($cashExpense->status === 'draft')
                     <a class="ce-btn" href="{{ route('accounting.cash-expenses.edit', $cashExpense) }}">Edit</a>
@@ -220,6 +224,47 @@
         </x-slot:actions>
 
         <div class="ce-detail-page">
+            <x-gf.panel title="Aksi Berikutnya" subtitle="Draft bisa diposting. Transaksi tercatat bisa dibatalkan dengan void/reversal.">
+                <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div class="ce-post-note">
+                        @if ($cashExpense->status === 'draft')
+                            Posting akan mengunci transaksi dan membuat jurnal: debit biaya, kredit kas/bank.
+                        @elseif ($cashExpense->status === 'posted')
+                            Jika salah, gunakan Void. Sistem akan membuat jurnal pembalik agar saldo kembali netral.
+                        @else
+                            Transaksi ini sudah dibatalkan.
+                        @endif
+                    </div>
+
+                    @if ($cashExpense->status === 'draft')
+                        <form method="POST"
+                            action="{{ route('accounting.cash-expenses.post', $cashExpense) }}"
+                            data-gf-confirm
+                            data-gf-confirm-title="Posting pengeluaran?"
+                            data-gf-confirm-text="Setelah posting, transaksi akan terkunci dan jurnal dibuat."
+                            data-gf-confirm-ok="Ya, posting">
+                            @csrf
+                            <button class="ce-btn ce-btn-primary" type="submit">Posting</button>
+                        </form>
+                    @endif
+
+                    @if ($cashExpense->status === 'posted')
+                        <form method="POST"
+                            action="{{ route('accounting.cash-expenses.void', $cashExpense) }}"
+                            class="ce-inline-form"
+                            data-gf-confirm
+                            data-gf-confirm-title="Void pengeluaran?"
+                            data-gf-confirm-text="Sistem akan membuat jurnal pembalik untuk membatalkan transaksi ini."
+                            data-gf-confirm-icon="warning"
+                            data-gf-confirm-ok="Ya, void">
+                            @csrf
+                            <input class="ce-reason" type="text" name="reason" maxlength="255" placeholder="Alasan batal (opsional)">
+                            <button class="ce-btn ce-btn-danger" type="submit">Void</button>
+                        </form>
+                    @endif
+                </div>
+            </x-gf.panel>
+
 <div class="ce-kpi-grid">
                 <div class="ce-kpi">
                     <div class="ce-kpi-label">Status</div>
@@ -338,46 +383,6 @@
                 </x-gf.panel>
             @endif
 
-            <x-gf.panel title="Aksi Berikutnya" subtitle="Draft bisa diposting. Transaksi tercatat bisa dibatalkan dengan void/reversal.">
-                <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
-                    <div class="ce-post-note">
-                        @if ($cashExpense->status === 'draft')
-                            Posting akan mengunci transaksi dan membuat jurnal: debit biaya, kredit kas/bank.
-                        @elseif ($cashExpense->status === 'posted')
-                            Jika salah, gunakan Void. Sistem akan membuat jurnal pembalik agar saldo kembali netral.
-                        @else
-                            Transaksi ini sudah dibatalkan.
-                        @endif
-                    </div>
-
-                    @if ($cashExpense->status === 'draft')
-                        <form method="POST"
-                            action="{{ route('accounting.cash-expenses.post', $cashExpense) }}"
-                            data-gf-confirm
-                            data-gf-confirm-title="Posting pengeluaran?"
-                            data-gf-confirm-text="Setelah posting, transaksi akan terkunci dan jurnal dibuat."
-                            data-gf-confirm-ok="Ya, posting">
-                            @csrf
-                            <button class="ce-btn ce-btn-primary" type="submit">Posting</button>
-                        </form>
-                    @endif
-
-                    @if ($cashExpense->status === 'posted')
-                        <form method="POST"
-                            action="{{ route('accounting.cash-expenses.void', $cashExpense) }}"
-                            class="ce-inline-form"
-                            data-gf-confirm
-                            data-gf-confirm-title="Void pengeluaran?"
-                            data-gf-confirm-text="Sistem akan membuat jurnal pembalik untuk membatalkan transaksi ini."
-                            data-gf-confirm-icon="warning"
-                            data-gf-confirm-ok="Ya, void">
-                            @csrf
-                            <input class="ce-reason" type="text" name="reason" maxlength="255" placeholder="Alasan batal (opsional)">
-                            <button class="ce-btn ce-btn-danger" type="submit">Void</button>
-                        </form>
-                    @endif
-                </div>
-            </x-gf.panel>
         </div>
     </x-gf.page>
 @endsection
