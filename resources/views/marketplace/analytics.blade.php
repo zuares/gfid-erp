@@ -18,6 +18,7 @@
     .an-btn:hover { background:#f8fafc; }
     .an-btn-dark { background:#0f172a; border-color:#0f172a; color:#fff; }
     .an-btn-dark:hover { background:#1e293b; color:#fff; }
+    .an-btn:disabled { cursor:wait; opacity:.7; }
     .an-sync-note { color:#94a3b8; font-size:.7rem; font-weight:700; margin-top:.3rem; }
     .an-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.7rem; }
     .an-kpi { min-height:112px; border:1px solid rgba(15,23,42,.08); border-radius:18px; background:#fff; padding:1rem; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 8px 22px rgba(15,23,42,.035); }
@@ -174,6 +175,11 @@
     .an-hero .an-field label { color:var(--dsh-muted); margin:0; font-size:.68rem; font-weight:700; }
     .an-hero .an-field input, .an-hero .an-field select { min-height:32px; border:1px solid var(--dsh-border-strong); border-radius:7px; padding:.35rem .6rem; background:var(--card,#fff); color:var(--text,#0f172a); font-size:.74rem; font-weight:700; }
     .an-hero .an-field input { min-width:175px; }
+    .an-hero { flex-wrap:nowrap; min-height:58px; }
+    .an-hero-copy { flex:1 1 auto; }
+    .an-hero-controls { flex:0 0 auto; justify-content:flex-end; }
+    .an-chart-panel-head { display:grid; grid-template-columns:minmax(0,1fr) 220px; align-items:center; min-height:24px; }
+    .an-chart-summary { width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .an-tabs-wrap { overflow-x:auto; padding:.25rem 0 .35rem; border-bottom:1px solid var(--dsh-border); scrollbar-width:none; }
     .an-tabs-wrap::-webkit-scrollbar { display:none; }
     .an-tabs { display:inline-flex; gap:.35rem; padding:.3rem; border:1px solid rgba(148,163,184,.18); border-radius:16px; background:linear-gradient(180deg,rgba(248,250,252,.96),rgba(241,245,249,.92)); box-shadow:0 10px 22px rgba(15,23,42,.05); }
@@ -228,7 +234,7 @@
     body[data-theme="dark"] .an-card, body[data-theme="dark"] .an-kpi { background:var(--card,#1e293b); }
     body[data-theme="dark"] .an-hero .an-field input, body[data-theme="dark"] .an-hero .an-field select { background:#0f172a; color:#e2e8f0; }
     @media (min-width:1200px) { .an-page { min-width:1040px; } }
-    @media (max-width:760px) { .an-page { padding-inline:.5rem; } .an-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-hero { margin-inline:-.5rem; padding:.6rem .75rem; } .an-hero-controls { align-items:stretch; width:100%; } .an-hero .an-field, .an-hero .an-field input, .an-hero .an-field select, .an-hero .an-btn { width:100%; } .an-hero .an-field { display:block; } }
+    @media (max-width:760px) { .an-page { padding-inline:.5rem; } .an-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-hero { margin-inline:-.5rem; padding:.6rem .75rem; flex-wrap:wrap; min-height:0; } .an-hero-controls { align-items:stretch; width:100%; flex:1 1 100%; } .an-hero .an-field, .an-hero .an-field input, .an-hero .an-field select, .an-hero .an-btn { width:100%; } .an-hero .an-field { display:block; } .an-chart-panel-head { display:flex; min-height:0; } .an-chart-summary { width:auto; white-space:normal; overflow:visible; text-overflow:clip; } }
     body[data-theme="dark"] .an-tabs { background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(30,41,59,.92)); border-color:rgba(51,65,85,.85); }
     body[data-theme="dark"] .an-tab:hover { color:#e2e8f0; background:rgba(255,255,255,.06); }
     @media (min-width:761px) {
@@ -323,7 +329,7 @@
             <div class="an-hero-controls">
                 <div class="an-field"><label for="anStore">Toko</label><select id="anStore"><option value="">Semua toko</option></select></div>
                 <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
-                <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? 'prev_period') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? '') === 'prev_month')>Bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tahun lalu</option></select></div>
+                <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? 'prev_period') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? '') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></select></div>
                 <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
                 <button class="an-btn an-btn-dark" id="anRefresh" type="button">↻ Refresh</button>
             </div>
@@ -452,13 +458,13 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function () {
     const { api, fmtRp, esc } = window.mpHelpers;
     const $ = id => document.getElementById(id);
     let summary = null;
     let stores = [];
+    let storesLoaded = false;
     let orders = [];
     let productsLoaded = false;
     let productData = [];
@@ -473,6 +479,8 @@
     let returnLoading = false;
     let returnType = 'return_refund';
     let revenueChartInstance = null;
+    let chartLibraryPromise = null;
+    let chartRenderToken = 0;
     let selectedPulseMetric = null;
     const from = () => $('anDateFrom').value;
     const to = () => $('anDateTo').value;
@@ -819,13 +827,35 @@
             prof: n(row.operating_profit),
         }));
     }
+    function loadChartLibrary() {
+        if (window.Chart) return Promise.resolve(window.Chart);
+        if (chartLibraryPromise) return chartLibraryPromise;
+        chartLibraryPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.async = true;
+            script.onload = () => resolve(window.Chart);
+            script.onerror = () => reject(new Error('Chart.js gagal dimuat'));
+            document.head.appendChild(script);
+        });
+        return chartLibraryPromise;
+    }
     function renderChart(rows, previousRows) {
+        const renderToken = ++chartRenderToken;
         const points = chartPoints(rows), previousPoints = chartPoints(previousRows || []);
         if (!points.length && !previousPoints.length) { $('revenueChart').innerHTML = '<div class="an-empty">Belum ada order selesai untuk dibandingkan.</div>'; return; }
         const labelsSource = points.length ? points : previousPoints;
-        const modeLabel = {prev_period:'periode lalu',prev_month:'bulan lalu',prev_quarter:'3 bulan lalu',prev_year:'tahun lalu'}[$('anCompare')?.value] || 'periode lalu';
-        const focusLabel = { orders:'Total order', products:'Produk terjual', revenue:'Omzet net', ads:'Biaya iklan incl. PPN', aov:'AOV net', apc:'APC pembeli', 'estimated-profit':'Estimasi profit', 'estimated-margin':'Margin estimasi' }[selectedPulseMetric];
-        $('chartCompareNote').textContent = `${focusLabel ? `${focusLabel} · ` : ''}vs ${modeLabel}`;
+        const modeLabel = {prev_period:'periode lalu',prev_month:'tanggal sama bulan lalu',prev_quarter:'tanggal sama 3 bulan lalu',prev_year:'tanggal sama tahun lalu'}[$('anCompare')?.value] || 'periode lalu';
+        $('chartCompareNote').textContent = `vs ${modeLabel}`;
+        if (!window.Chart) {
+            $('revenueChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';
+            loadChartLibrary().then(() => {
+                if (renderToken === chartRenderToken) renderChart(rows, previousRows);
+            }).catch(() => {
+                $('revenueChart').innerHTML = '<div class="an-empty">Grafik belum tersedia.</div>';
+            });
+            return;
+        }
         const labels = labelsSource.map(v => new Date(v.date + 'T00:00:00').toLocaleDateString('id-ID', { day:'2-digit', month:'short' }));
         $('revenueChart').innerHTML = '<div class="an-chart-canvas"><canvas id="anRevenueChart" aria-label="Grafik interaktif omzet dan laba"></canvas></div>';
         if (revenueChartInstance) revenueChartInstance.destroy();
@@ -938,7 +968,7 @@
         const actualFeeRate = Number(current.cash_order_revenue || 0) > 0
             ? Number(current.cash_marketplace_fees || 0) / Number(current.cash_order_revenue)
             : 0.21;
-        const estimatedProfit = netOrderRevenue - (grossOrderRevenue * actualFeeRate) - totalHpp - Number(current.ad_cost || 0);
+        const estimatedProfitFallback = netOrderRevenue - (grossOrderRevenue * actualFeeRate) - totalHpp - Number(current.ad_cost || 0);
         const totalOrder = Number(current.order_total || 0);
         const totalProducts = Number(current.product_qty ?? current.qty ?? 0);
         const cancelledOrders = Number(current.cancelled_count || 0);
@@ -950,10 +980,12 @@
         const previousFeeRate = Number(previous.cash_order_revenue || 0) > 0
             ? Number(previous.cash_marketplace_fees || 0) / Number(previous.cash_order_revenue)
             : 0.21;
-        const previousEstimatedProfit = previousNetOrderRevenue - (previousGrossOrderRevenue * previousFeeRate) - previousHpp - Number(previous.ad_cost || 0);
+        const previousEstimatedProfitFallback = previousNetOrderRevenue - (previousGrossOrderRevenue * previousFeeRate) - previousHpp - Number(previous.ad_cost || 0);
         const previousAovNet = Number(previous.order_total || 0) > 0 ? previousNetOrderRevenue / Number(previous.order_total) : 0;
-        const estimatedMargin = netOrderRevenue > 0 ? estimatedProfit / netOrderRevenue * 100 : 0;
-        const previousEstimatedMargin = previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0;
+        const estimatedProfit = Number(current.estimated_profit ?? estimatedProfitFallback);
+        const previousEstimatedProfit = Number(previous.estimated_profit ?? previousEstimatedProfitFallback);
+        const estimatedMargin = Number(current.estimated_profit_margin ?? (netOrderRevenue > 0 ? estimatedProfit / netOrderRevenue * 100 : 0));
+        const previousEstimatedMargin = Number(previous.estimated_profit_margin ?? (previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0));
         const previousBuyerPayment = Number(previous.cash_gross_sales || 0) + Number(previous.cash_unsettled_gross_sales || 0);
         const previousBuyerPaymentOrders = Number(previous.cash_order_count || 0) + Number(previous.cash_unsettled_order_count || 0);
         const previousApc = previousBuyerPaymentOrders > 0 ? previousBuyerPayment / previousBuyerPaymentOrders : 0;
@@ -989,7 +1021,7 @@
             ['Estimasi profit', money(estimatedProfit), estimatedProfitChange, 'estimated-profit'],
             ['Margin estimasi', `${estimatedMargin.toFixed(1)}%`, estimatedMarginChange, 'estimated-margin'],
         ];
-        $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan 3 bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
+        $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const scoreClass = healthClass(readyRate);
         $('anOverallScore').className = `an-health-score ${scoreClass}`;
         $('anOverallScore').textContent = `Data ready ${readyRate.toFixed(0)}%`;
@@ -1145,8 +1177,11 @@
             }));
     };
     async function loadStores() {
+        if (storesLoaded) return stores;
         stores = await api('/api/marketplace/stores').catch(() => []);
+        storesLoaded = true;
         fillStores();
+        return stores;
     }
     async function loadProducts() {
         if (productsLoaded) return;
@@ -1172,13 +1207,20 @@
         returnPayload = null;
         setLoading('Mengambil ringkasan settlement…');
         $('anRefresh').disabled = true;
+        $('anRefresh').textContent = 'Memuat…';
+        document.querySelector('.an-shell')?.setAttribute('aria-busy', 'true');
         productsLoaded = false;
         productData = [];
         orders = [];
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), compare_mode: $('anCompare').value, _ts: Date.now().toString() });
             if (selectedStore()) params.set('store_id', selectedStore());
-            summary = await api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' });
+            const [storeRows, summaryPayload] = await Promise.all([
+                loadStores(),
+                api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' }),
+            ]);
+            stores = storeRows;
+            summary = summaryPayload;
             fillStores();
             render();
             $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr>';
@@ -1190,6 +1232,8 @@
             $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
         } finally {
             $('anRefresh').disabled = false;
+            $('anRefresh').textContent = '↻ Refresh';
+            document.querySelector('.an-shell')?.removeAttribute('aria-busy');
         }
     }
     function activateTab(name) {
@@ -1209,8 +1253,8 @@
     const focusPulse = card => {
         if (!card) return;
         selectedPulseMetric = card?.dataset?.pulseMetric || null;
-        if ($('anCompare').value !== 'prev_quarter') {
-            $('anCompare').value = 'prev_quarter';
+        if ($('anCompare').value !== 'prev_month') {
+            $('anCompare').value = 'prev_month';
             syncUrl();
             load();
         } else {
@@ -1258,7 +1302,7 @@
     $('anProductSort').addEventListener('change', () => renderProductSummary(productData));
     if (window.flatpickr) flatpickr($('anDateRange'),{mode:'range',dateFormat:'Y-m-d',defaultDate:[from(),to()],onChange(dates){if(dates.length===2){$('anDateFrom').value=dates[0].toISOString().slice(0,10);$('anDateTo').value=dates[1].toISOString().slice(0,10);$('anDateRange').value=from()+' — '+to();syncUrl();load();}}});
     $('anStore').value = initialStore || '';
-    loadStores().finally(load);
+    load();
 })();
 </script>
 @endpush

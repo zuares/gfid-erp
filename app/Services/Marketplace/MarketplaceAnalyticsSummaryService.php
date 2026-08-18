@@ -38,21 +38,26 @@ class MarketplaceAnalyticsSummaryService
     {
         $filters = $this->normalizeFilters($filters);
         $previous = $this->previousRange($filters);
+        $previousFilters = array_merge($filters, $previous);
 
         $currentFinancial = $this->financialAggregate($filters);
-        $previousFinancial = $this->financialAggregate(array_merge($filters, $previous));
+        $previousFinancial = $this->financialAggregate($previousFilters);
         $currentCash = $this->cashAggregate($filters);
-        $previousCash = $this->cashAggregate(array_merge($filters, $previous));
+        $previousCash = $this->cashAggregate($previousFilters);
         $currentUnsettledCash = $this->cashAggregate($filters, 'unsettled');
-        $previousUnsettledCash = $this->cashAggregate(array_merge($filters, $previous), 'unsettled');
+        $previousUnsettledCash = $this->cashAggregate($previousFilters, 'unsettled');
         $currentHpp = $this->hppAggregate($filters);
+        $previousHpp = $this->hppAggregate($previousFilters);
         $currentReturnHpp = $this->returnRefundHppAggregate($filters);
+        $previousReturnHpp = $this->returnRefundHppAggregate($previousFilters);
         $currentReturns = $this->returnRefundAggregate($filters);
+        $previousReturns = $this->returnRefundAggregate($previousFilters);
         $currentProductQty = $this->productQuantityAggregate($filters);
+        $previousProductQty = $this->productQuantityAggregate($previousFilters);
         $currentOperational = $this->operationalAggregate($filters);
-        $previousOperational = $this->operationalAggregate(array_merge($filters, $previous));
+        $previousOperational = $this->operationalAggregate($previousFilters);
         $currentAds = $this->adsAggregate($filters);
-        $previousAds = $this->adsAggregate(array_merge($filters, $previous));
+        $previousAds = $this->adsAggregate($previousFilters);
         $quality = $this->qualitySummary($filters);
         $current = $this->withRates($this->applyAdCost(array_merge($currentFinancial, $currentCash, [
             'cash_unsettled_order_count' => $currentUnsettledCash['cash_order_count'],
@@ -79,6 +84,22 @@ class MarketplaceAnalyticsSummaryService
             'cash_unsettled_order_count' => $previousUnsettledCash['cash_order_count'],
             'cash_unsettled_gross_sales' => $previousUnsettledCash['cash_gross_sales'],
             'cash_unsettled_order_revenue' => $previousUnsettledCash['cash_order_revenue'],
+            'hpp_total' => $previousHpp['hpp_total'],
+            'hpp_settled' => $previousHpp['hpp_settled'],
+            'hpp_unsettled' => $previousHpp['hpp_unsettled'],
+            'hpp_shipped' => $previousHpp['hpp_shipped'],
+            'hpp_return_refund' => $previousReturnHpp['total'],
+            'hpp_return_refund_settled' => $previousReturnHpp['settled'],
+            'hpp_return_refund_unsettled' => $previousReturnHpp['unsettled'],
+            'return_refund_count' => $previousReturns['return_refund_count'],
+            'return_refund_order_count' => $previousReturns['return_refund_order_count'],
+            'return_refund_settled_order_count' => $previousReturns['return_refund_settled_order_count'],
+            'return_refund_unsettled_order_count' => $previousReturns['return_refund_unsettled_order_count'],
+            'return_refund_amount' => $previousReturns['return_refund_amount'],
+            'product_qty' => $previousProductQty['total'],
+            'product_qty_settled' => $previousProductQty['settled'],
+            'product_qty_unsettled' => $previousProductQty['unsettled'],
+            'product_qty_return_refund' => $previousProductQty['return_refund'],
         ], $previousOperational), $previousAds));
 
         return [
@@ -800,6 +821,8 @@ class MarketplaceAnalyticsSummaryService
         $to = Carbon::parse($filters['date_to']);
 
         if ($filters['compare_mode'] === 'prev_month') {
+            // Keep the active date numbers and shift both endpoints one month
+            // back; Carbon clamps dates such as 31 to the last valid day.
             return [
                 'date_from' => $from->copy()->subMonthsNoOverflow()->toDateString(),
                 'date_to' => $to->copy()->subMonthsNoOverflow()->toDateString(),
@@ -1443,20 +1466,25 @@ class MarketplaceAnalyticsSummaryService
 
     private function withEstimatedFee(array $aggregate): array
     {
-        $gmv = (float) ($aggregate['gmv'] ?? 0);
+        $grossOrderRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0)
+            + (float) ($aggregate['cash_unsettled_order_revenue'] ?? 0);
+        $grossOrderRevenue = $grossOrderRevenue > 0
+            ? $grossOrderRevenue
+            : (float) ($aggregate['gmv'] ?? 0);
         $cashPayout = (float) ($aggregate['cash_payout'] ?? $aggregate['payout'] ?? 0);
         // Fee actual is known from settlement, but its rate is compared with
         // marketplace order revenue—not the final payout after deductions.
         $marketplaceRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0);
         $actualMarketplaceFee = (float) ($aggregate['cash_marketplace_fees'] ?? 0);
-        $hpp = (float) ($aggregate['hpp'] ?? 0);
+        $hpp = (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
         $adCost = (float) ($aggregate['ad_cost'] ?? 0);
         $returnRefund = (float) ($aggregate['return_refund_amount'] ?? 0);
         $feeRate = $marketplaceRevenue > 0 && $actualMarketplaceFee > 0
             ? $actualMarketplaceFee / $marketplaceRevenue
             : self::ESTIMATED_MARKETPLACE_FEE_RATE;
-        $estimatedFee = $gmv * $feeRate;
-        $estimatedProfit = $gmv - $estimatedFee - $returnRefund - $hpp - $adCost;
+        $estimatedFee = $grossOrderRevenue * $feeRate;
+        $estimatedProfit = $grossOrderRevenue - $estimatedFee - $returnRefund - $hpp - $adCost;
+        $netOrderRevenue = max(0, $grossOrderRevenue - $returnRefund);
 
         return array_merge($aggregate, [
             'marketplace_fee_estimate_rate' => round($feeRate * 100, 2),
@@ -1464,7 +1492,7 @@ class MarketplaceAnalyticsSummaryService
             'marketplace_fee_estimate_on_payout' => round($cashPayout * $feeRate, 2),
             'marketplace_fee_estimate_on_cash' => round($cashPayout * $feeRate, 2),
             'estimated_profit' => round($estimatedProfit, 2),
-            'estimated_profit_margin' => $gmv > 0 ? round(($estimatedProfit / $gmv) * 100, 2) : 0.0,
+            'estimated_profit_margin' => $netOrderRevenue > 0 ? round(($estimatedProfit / $netOrderRevenue) * 100, 2) : 0.0,
             'marketplace_fees_actual' => round((float) ($aggregate['cash_marketplace_fees'] ?? $aggregate['marketplace_fees'] ?? 0), 2),
             'affiliate_fees_actual' => round((float) ($aggregate['cash_affiliate_fees'] ?? $aggregate['affiliate_fees'] ?? 0), 2),
         ]);
