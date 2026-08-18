@@ -46,8 +46,8 @@ class MarketplaceAnalyticsSummaryService
             'current' => $current,
             'previous' => $previousSnapshot,
             'changes' => $this->changes($current, $previousSnapshot),
-            'daily' => $this->financialDaily($filters),
-            'previous_daily' => $this->financialDaily(array_merge($filters, $previous)),
+            'daily' => $this->mergeDaily($this->financialDaily($filters), $this->operationalDaily($filters)),
+            'previous_daily' => $this->mergeDaily($this->financialDaily(array_merge($filters, $previous)), $this->operationalDaily(array_merge($filters, $previous))),
             'stores' => $this->storeSummary($filters),
             'quality' => $quality,
         ];
@@ -215,6 +215,7 @@ class MarketplaceAnalyticsSummaryService
                 'order_total' => (int) ($ops->order_total ?? 0),
                 'completed_count' => (int) ($ops->completed_count ?? 0),
                 'cancelled_count' => (int) ($ops->cancelled_count ?? 0),
+                'gmv' => round((float) ($ops->gmv ?? 0), 2),
             ], $aggregate);
         })->sortByDesc('gross_sales')->values()->all();
     }
@@ -229,7 +230,46 @@ class MarketplaceAnalyticsSummaryService
             'order_total' => (int) ($row->order_total ?? 0),
             'completed_count' => (int) ($row->completed_count ?? 0),
             'cancelled_count' => (int) ($row->cancelled_count ?? 0),
+            'gmv' => round((float) ($row->gmv ?? 0), 2),
         ];
+    }
+
+    private function operationalDaily(array $filters): array
+    {
+        return $this->operationalBase($filters)
+            ->selectRaw('DATE(mo.ordered_at) AS date')
+            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv')
+            ->groupByRaw('DATE(mo.ordered_at)')
+            ->orderByRaw('DATE(mo.ordered_at)')
+            ->get()
+            ->map(fn ($row) => ['date' => $row->date, 'gmv' => round((float) ($row->gmv ?? 0), 2)])
+            ->values()
+            ->all();
+    }
+
+    private function mergeDaily(array $financial, array $operational): array
+    {
+        $rows = collect($financial)->keyBy('date');
+        foreach ($operational as $row) {
+            $date = (string) $row['date'];
+            $rows[$date] = array_merge($rows[$date] ?? [
+                'date' => $date,
+                'order_count' => 0,
+                'qty' => 0,
+                'gross_sales' => 0,
+                'marketplace_fees' => 0,
+                'refund' => 0,
+                'payout' => 0,
+                'hpp' => 0,
+                'ad_cost' => 0,
+                'gross_profit' => 0,
+                'operating_profit' => 0,
+                'margin_pct' => 0,
+                'aov' => 0,
+            ], ['gmv' => (float) ($row['gmv'] ?? 0)]);
+        }
+
+        return $rows->sortKeys()->values()->all();
     }
 
     private function operationalStoreSummary(array $filters)
@@ -299,9 +339,21 @@ class MarketplaceAnalyticsSummaryService
 
         return implode(', ', [
             'COUNT(*) AS order_total',
-            "SUM(CASE WHEN {$status} IN ('COMPLETED', 'DELIVERED', 'CLOSED') THEN 1 ELSE 0 END) AS completed_count",
-            "SUM(CASE WHEN {$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'RETURNED', 'IN_CANCEL') THEN 1 ELSE 0 END) AS cancelled_count",
+            "SUM(CASE WHEN {$status} = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count",
+            "SUM(CASE WHEN {$status} IN ('CANCELLED', 'CANCELED', 'BATAL') THEN 1 ELSE 0 END) AS cancelled_count",
+            'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv',
         ]);
+    }
+
+    private function orderValueExpression(): string
+    {
+        return 'COALESCE(NULLIF(mo.total_amount, 0), NULLIF(mo.total_paid_customer, 0), mo.subtotal_items, 0)';
+    }
+
+    private function isRevenueStatus(): string
+    {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL')";
     }
 
     private function normalizeAggregate($row): array
@@ -330,7 +382,7 @@ class MarketplaceAnalyticsSummaryService
 
     private function changes(array $current, array $previous): array
     {
-        return collect(['gross_sales', 'payout', 'operating_profit', 'order_count', 'ad_cost', 'aov', 'completion_rate', 'cancel_rate', 'profit_margin'])
+        return collect(['gmv', 'gross_sales', 'payout', 'operating_profit', 'order_count', 'ad_cost', 'aov', 'completion_rate', 'cancel_rate', 'profit_margin'])
             ->mapWithKeys(function (string $key) use ($current, $previous) {
                 $now = (float) ($current[$key] ?? 0);
                 $before = (float) ($previous[$key] ?? 0);
