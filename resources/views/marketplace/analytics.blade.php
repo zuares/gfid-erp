@@ -234,12 +234,12 @@
           </div>
           <div class="an-kpis">
             <div class="an-kpi primary"><span class="an-kpi-label">Total Order</span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote">semua status kecuali batal</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Omzet Marketplace</span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote">semua status selain batal</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Omzet Cair</span><strong class="an-kpi-value" id="kpiPayout">—</strong><span class="an-kpi-note">settlement complete</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Estimasi Profit</span><strong class="an-kpi-value" id="kpiEstimatedProfit">—</strong><span class="an-kpi-note">GMV − fee − HPP − iklan</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Fee Marketplace (estimasi)</span><strong class="an-kpi-value" id="kpiAdminFee">—</strong><span class="an-kpi-note">21% dari GMV</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Omzet Marketplace</span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote">GMV · non-batal</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Omzet Cair</span><strong class="an-kpi-value" id="kpiPayout">—</strong><span class="an-kpi-note" id="kpiPayoutNote">settlement complete</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Estimasi Profit</span><strong class="an-kpi-value" id="kpiEstimatedProfit">—</strong><span class="an-kpi-note" id="kpiEstimatedProfitNote">margin estimasi</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Fee Marketplace (estimasi)</span><strong class="an-kpi-value" id="kpiAdminFee">—</strong><span class="an-kpi-note" id="kpiAdminFeeNote">21% dari GMV</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Laba Kotor</span><strong class="an-kpi-value" id="kpiGrossProfit">—</strong><span class="an-kpi-note" id="kpiHppNote">HPP: —</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Biaya Iklan</span><strong class="an-kpi-value" id="kpiAdCost">—</strong><span class="an-kpi-note">dari Ads Daily</span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Biaya Iklan</span><strong class="an-kpi-value" id="kpiAdCost">—</strong><span class="an-kpi-note" id="kpiAdCostNote">dari Ads Daily</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Laba Operasional</span><strong class="an-kpi-value" id="kpiNetProfit">—</strong><span class="an-kpi-note" id="kpiNetProfitNote">payout − HPP − iklan</span></div>
           </div>
 
@@ -377,20 +377,27 @@
     }
     function renderKpis(rows) {
         const current = summary?.current || {};
-        const quality = summary?.quality || {};
         const adCost = Number(current.ad_cost ?? current.ads_spend ?? 0);
+        const gmv = Number(current.gmv || 0);
+        const cashPayout = Number(current.cash_payout ?? current.payout ?? 0);
+        const estimatedProfit = Number(current.estimated_profit || 0);
+        const actualFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         $('kpiOrders').textContent = Number(current.order_total || 0).toLocaleString('id-ID');
-        $('kpiRevenue').textContent = money(current.gmv);
-        $('kpiPayout').textContent = money(current.payout);
-        $('kpiEstimatedProfit').textContent = money(current.estimated_profit);
+        $('kpiRevenue').textContent = money(gmv);
+        $('kpiPayout').textContent = money(cashPayout);
+        $('kpiEstimatedProfit').textContent = money(estimatedProfit);
         $('kpiAdminFee').textContent = money(current.marketplace_fee_estimate);
         $('kpiAdCost').textContent = money(adCost);
         $('kpiGrossProfit').textContent = money(current.gross_profit);
         $('kpiNetProfit').textContent = money(current.operating_profit);
         $('kpiRevenueNote').textContent = `${from()} — ${to()}`;
         $('kpiOrdersNote').textContent = `${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai · ${Number(current.cancelled_count || 0).toLocaleString('id-ID')} batal`;
+        $('kpiPayoutNote').textContent = `${Number(current.cash_order_count || 0).toLocaleString('id-ID')} cair · ${gmv > 0 ? (cashPayout / gmv * 100).toFixed(1) : '0.0'}% GMV`;
+        $('kpiEstimatedProfitNote').textContent = `${Number(current.estimated_profit_margin || 0).toFixed(1)}% margin · estimasi`;
+        $('kpiAdminFeeNote').textContent = `21% GMV · actual ${money(actualFee)}`;
+        $('kpiAdCostNote').textContent = `${cashPayout > 0 ? (adCost / cashPayout * 100).toFixed(1) : '0.0'}% omzet cair`;
         $('kpiHppNote').textContent = `HPP: ${money(current.hpp)}`;
-        $('kpiNetProfitNote').textContent = `${Number(quality.incomplete || 0).toLocaleString('id-ID')} order incomplete`;
+        $('kpiNetProfitNote').textContent = `${Number(current.profit_margin || 0).toFixed(1)}% margin · payout − HPP − iklan`;
     }
     function chartPoints(rows) {
         return (rows || []).map(row => ({
@@ -465,6 +472,8 @@
     function renderEnterprise() {
         const current = summary?.current || {};
         const quality = summary?.quality || {};
+        const cashPayout = Number(current.cash_payout ?? current.payout ?? 0);
+        const actualCashFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
         const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
@@ -495,10 +504,11 @@
         const maxStore = Math.max(...topStores.map(store => Number(store.gmv || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_total || 0).toLocaleString('id-ID')} order · profit verified ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gmv || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gmv)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
         const economics = [
-            ['Omzet cair', Number(current.payout || 0), 100, '#16a34a'],
-            ['Fee marketplace · 21% dari cair', Number(current.marketplace_fee_estimate_on_payout || 0), Number(current.payout || 0) ? Number(current.marketplace_fee_estimate_on_payout || 0) / current.payout * 100 : 0, '#f59e0b'],
-            ['HPP', Number(current.hpp || 0), Number(current.payout || 0) ? Number(current.hpp || 0) / current.payout * 100 : 0, '#64748b'],
-            ['Biaya iklan', Number(current.ad_cost || 0), Number(current.payout || 0) ? Number(current.ad_cost || 0) / current.payout * 100 : 0, '#dc2626'],
+            ['Omzet cair', cashPayout, 100, '#16a34a'],
+            ['Fee marketplace estimasi · 21% total order', Number(current.marketplace_fee_estimate || 0), cashPayout ? Number(current.marketplace_fee_estimate || 0) / cashPayout * 100 : 0, '#f59e0b'],
+            ['Fee marketplace actual · omzet cair', actualCashFee, cashPayout ? actualCashFee / cashPayout * 100 : 0, '#d97706'],
+            ['HPP', Number(current.hpp || 0), cashPayout ? Number(current.hpp || 0) / cashPayout * 100 : 0, '#64748b'],
+            ['Biaya iklan', Number(current.ad_cost || 0), cashPayout ? Number(current.ad_cost || 0) / cashPayout * 100 : 0, '#dc2626'],
         ];
         $('anEconomics').innerHTML = economics.map(([label,amount,rate,color]) => `<div class="an-contribution-row"><div><div class="an-contribution-name">${label}</div><div class="an-contribution-bar"><span style="width:${Math.min(100, Math.max(0, rate))}%;background:${color}"></span></div></div><div class="an-contribution-value">${money(amount)}<span class="an-table-subline">${rate.toFixed(1)}% dari cair</span></div></div>`).join('');
     }

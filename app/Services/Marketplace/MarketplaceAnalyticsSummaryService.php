@@ -37,13 +37,15 @@ class MarketplaceAnalyticsSummaryService
 
         $currentFinancial = $this->financialAggregate($filters);
         $previousFinancial = $this->financialAggregate(array_merge($filters, $previous));
+        $currentCash = $this->cashAggregate($filters);
+        $previousCash = $this->cashAggregate(array_merge($filters, $previous));
         $currentOperational = $this->operationalAggregate($filters);
         $previousOperational = $this->operationalAggregate(array_merge($filters, $previous));
         $currentAds = $this->adsAggregate($filters);
         $previousAds = $this->adsAggregate(array_merge($filters, $previous));
         $quality = $this->qualitySummary($filters);
-        $current = $this->withRates($this->applyAdCost(array_merge($currentFinancial, $currentOperational), $currentAds));
-        $previousSnapshot = $this->withRates($this->applyAdCost(array_merge($previousFinancial, $previousOperational), $previousAds));
+        $current = $this->withRates($this->applyAdCost(array_merge($currentFinancial, $currentCash, $currentOperational), $currentAds));
+        $previousSnapshot = $this->withRates($this->applyAdCost(array_merge($previousFinancial, $previousCash, $previousOperational), $previousAds));
 
         return [
             'filters' => $filters,
@@ -206,6 +208,41 @@ class MarketplaceAnalyticsSummaryService
             ->map(fn ($row) => array_merge(['date' => $row->date], $this->normalizeAggregate($row)))
             ->values()
             ->all();
+    }
+
+    private function cashAggregate(array $filters): array
+    {
+        $fees = collect(self::FEE_FIELDS)
+            ->map(fn (string $field) => "COALESCE(ms.{$field}, 0)")
+            ->implode(' + ');
+
+        $row = $this->cashBase($filters)
+            ->selectRaw('COUNT(DISTINCT mo.id) AS cash_order_count')
+            ->selectRaw('SUM(COALESCE(ms.buyer_payment_amount, mo.total_amount, mo.total_paid_customer, mo.subtotal_items, 0)) AS cash_gross_sales')
+            ->selectRaw('SUM(COALESCE(ms.final_income, 0)) AS cash_payout')
+            ->selectRaw("SUM({$fees}) AS cash_marketplace_fees")
+            ->selectRaw('SUM(COALESCE(ms.drc_adjustable_refund, 0)) AS cash_refund')
+            ->first();
+
+        return [
+            'cash_order_count' => (int) ($row->cash_order_count ?? 0),
+            'cash_gross_sales' => round((float) ($row->cash_gross_sales ?? 0), 2),
+            'cash_payout' => round((float) ($row->cash_payout ?? 0), 2),
+            'cash_marketplace_fees' => round((float) ($row->cash_marketplace_fees ?? 0), 2),
+            'cash_refund' => round((float) ($row->cash_refund ?? 0), 2),
+        ];
+    }
+
+    private function cashBase(array $filters)
+    {
+        return $this->applyDateAndStoreFilters(
+            DB::table('marketplace_orders as mo')
+                ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+                ->where('ms.data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                ->whereRaw($this->isRevenueStatus()),
+            $filters,
+            'mo'
+        );
     }
 
     private function storeSummary(array $filters): array
@@ -517,7 +554,7 @@ class MarketplaceAnalyticsSummaryService
     private function withEstimatedFee(array $aggregate): array
     {
         $gmv = (float) ($aggregate['gmv'] ?? 0);
-        $payout = (float) ($aggregate['payout'] ?? 0);
+        $cashPayout = (float) ($aggregate['cash_payout'] ?? $aggregate['payout'] ?? 0);
         $hpp = (float) ($aggregate['hpp'] ?? 0);
         $adCost = (float) ($aggregate['ad_cost'] ?? 0);
         $estimatedFee = $gmv * self::ESTIMATED_MARKETPLACE_FEE_RATE;
@@ -526,10 +563,11 @@ class MarketplaceAnalyticsSummaryService
         return array_merge($aggregate, [
             'marketplace_fee_estimate_rate' => self::ESTIMATED_MARKETPLACE_FEE_RATE * 100,
             'marketplace_fee_estimate' => round($estimatedFee, 2),
-            'marketplace_fee_estimate_on_payout' => round($payout * self::ESTIMATED_MARKETPLACE_FEE_RATE, 2),
+            'marketplace_fee_estimate_on_payout' => round($cashPayout * self::ESTIMATED_MARKETPLACE_FEE_RATE, 2),
+            'marketplace_fee_estimate_on_cash' => round($cashPayout * self::ESTIMATED_MARKETPLACE_FEE_RATE, 2),
             'estimated_profit' => round($estimatedProfit, 2),
             'estimated_profit_margin' => $gmv > 0 ? round(($estimatedProfit / $gmv) * 100, 2) : 0.0,
-            'marketplace_fees_actual' => round((float) ($aggregate['marketplace_fees'] ?? 0), 2),
+            'marketplace_fees_actual' => round((float) ($aggregate['cash_marketplace_fees'] ?? $aggregate['marketplace_fees'] ?? 0), 2),
         ]);
     }
 }
