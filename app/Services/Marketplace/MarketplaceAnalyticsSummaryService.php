@@ -790,14 +790,14 @@ class MarketplaceAnalyticsSummaryService
 
     private function normalizeFilters(array $filters): array
     {
-        $from = $filters['date_from'] ?? now()->subDays(29)->toDateString();
+        $from = $filters['date_from'] ?? now()->startOfMonth()->toDateString();
         $to = $filters['date_to'] ?? now()->toDateString();
 
         try {
             $from = Carbon::parse($from)->toDateString();
             $to = Carbon::parse($to)->toDateString();
         } catch (\Throwable) {
-            $from = now()->subDays(29)->toDateString();
+            $from = now()->startOfMonth()->toDateString();
             $to = now()->toDateString();
         }
 

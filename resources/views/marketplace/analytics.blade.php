@@ -111,6 +111,7 @@
     .an-enterprise-body { padding:.8rem .85rem; }
     .an-pulse-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
     .an-pulse-grid-executive { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .an-pulse-grid-finance { grid-template-columns:repeat(5,minmax(0,1fr)); }
     .an-pulse-grid-executive .an-pulse { min-height:96px; display:flex; flex-direction:column; justify-content:space-between; }
     .an-pulse-grid-executive .an-pulse-label { font-size:.66rem; text-transform:none; letter-spacing:0; }
     .an-pulse-grid-executive .an-pulse-note { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.35; }
@@ -156,7 +157,7 @@
     body[data-theme="dark"] .an-pulse, body[data-theme="dark"] .an-alert { border-color:var(--dsh-border); }
     .an-empty { padding:1.6rem 0; text-align:center; color:#94a3b8; font-size:.75rem; font-weight:750; }
     .an-error { padding:.8rem .9rem; border:1px solid #fecaca; border-radius:12px; background:#fef2f2; color:#b91c1c; font-size:.73rem; font-weight:750; }
-    @media (max-width: 1100px) and (min-width: 761px) { .an-pulse-grid-executive { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media (max-width: 1100px) and (min-width: 761px) { .an-pulse-grid-executive, .an-pulse-grid-finance { grid-template-columns:repeat(3,minmax(0,1fr)); } }
     @media (max-width: 760px) { .an-grid-main, .an-grid-secondary, .an-enterprise-grid, .an-contribution-grid { grid-template-columns:1fr; } .an-pulse-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpi-value { font-size:1.12rem; } .an-field input { min-width:150px; } .an-product-toolbar { width:100%; justify-content:flex-start; margin-top:.35rem; } .an-product-toolbar input, .an-product-toolbar select { flex:1 1 140px; width:auto; } .an-chart-panel-head { flex-direction:column; gap:.35rem; } .an-chart-summary { text-align:left; } .an-health-wide .an-funnel { grid-template-columns:1fr; } }
     @media (max-width: 420px) { .an-kpis { grid-template-columns:1fr 1fr; gap:.45rem; } .an-kpi { padding:.72rem; min-height:100px; } .an-toolbar, .an-toolbar-controls { align-items:stretch; } .an-field, .an-field input, .an-btn { width:100%; } }
 
@@ -345,7 +346,7 @@
           <div class="an-tabs-wrap">
             <div class="an-tabs" id="analyticsTabs" role="tablist" aria-label="Navigasi analytics">
                 <button class="an-tab active" type="button" data-an-tab="summary" role="tab" aria-selected="true"><i class="bi bi-grid-1x2 me-1"></i>Ringkasan</button>
-                <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Toko &amp; Biaya</button>
+                <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Akun &amp; Biaya</button>
                 <button class="an-tab" type="button" data-an-tab="products" role="tab" aria-selected="false"><i class="bi bi-box-seam me-1"></i>Produk</button>
             </div>
           </div>
@@ -422,20 +423,25 @@
             <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Unit economics</div><div class="an-enterprise-sub">Omzet total, pencairan, dan biaya aktual</div></div><div class="an-economics-legend" aria-label="Legenda status omzet"><span><i></i>Cair</span><span><i class="pending"></i>Belum cair</span></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anEconomics"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
 
+        <section class="an-enterprise-card an-tab-pane is-hidden" data-an-pane="stores">
+            <div class="an-enterprise-head"><div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Ringkasan efisiensi akun dan profitabilitas</div></div></div>
+            <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance" id="anFinancePulse"><div class="an-empty">Memuat…</div></div></div>
+        </section>
+
         <div class="an-tab-pane is-hidden" data-an-pane="stores">
           <div class="an-kpis">
             <div class="an-kpi primary"><span class="an-kpi-label">Total Order <i id="kpiOrdersInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Total Order" data-tooltip="Order non-batal · cair · belum cair · return/refund"></i></span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Produk Terjual <i id="kpiProductsSoldInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Produk Terjual" data-tooltip="Total unit · cair · pending · refund"></i></span><strong class="an-kpi-value" id="kpiProductsSold">—</strong><span class="an-kpi-note" id="kpiProductsSoldNote"><span title="Produk sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Produk pending"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Produk refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Omzet Marketplace <i id="kpiRevenueInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Omzet Marketplace" data-tooltip="Omzet non-batal setelah return/refund"></i></span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Omzet / Gross Sales <i id="kpiRevenueInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Omzet atau Gross Sales" data-tooltip="Omzet non-batal setelah return/refund"></i></span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Prakiraan Admin Fee <i id="kpiAdminFeeInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Prakiraan Admin Fee" data-tooltip="Omzet × rate fee actual · komposisi fee"></i></span><strong class="an-kpi-value" id="kpiAdminFee">—</strong><span class="an-kpi-note" id="kpiAdminFeeNote">komposisi fee actual</span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Prakiraan Cair / Net Revenue <i id="kpiEstimatedCashInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Prakiraan Cair atau Net Revenue" data-tooltip="Omzet − admin fee · net cair + estimasi"></i></span><strong class="an-kpi-value" id="kpiEstimatedCash">—</strong><span class="an-kpi-note" id="kpiEstimatedCashNote"><span title="Net sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi net belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Total HPP <i id="kpiHppInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Total HPP" data-tooltip="Total HPP · cair · belum cair · return/refund"></i></span><strong class="an-kpi-value" id="kpiHpp">—</strong><span class="an-kpi-note" id="kpiHppKpiNote"><span title="HPP sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="HPP belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="HPP return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Prakiraan Cair / Net sales <i id="kpiEstimatedCashInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Prakiraan Cair atau Net sales" data-tooltip="Omzet − admin fee · net cair + estimasi"></i></span><strong class="an-kpi-value" id="kpiEstimatedCash">—</strong><span class="an-kpi-note" id="kpiEstimatedCashNote"><span title="Net sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi net belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Total HPP / COGS <i id="kpiHppInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Total HPP atau COGS" data-tooltip="Total HPP · cair · belum cair · return/refund"></i></span><strong class="an-kpi-value" id="kpiHpp">—</strong><span class="an-kpi-note" id="kpiHppKpiNote"><span title="HPP sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="HPP belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="HPP return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Biaya Iklan (incl. PPN)</span><strong class="an-kpi-value" id="kpiAdCost">—</strong><span class="an-kpi-note" id="kpiAdCostNote"><span title="Biaya iklan sebelum PPN"><i class="bi bi-receipt" aria-hidden="true"></i> —</span> · <span title="PPN 11%"><i class="bi bi-percent" aria-hidden="true"></i> —</span> · <span title="Biaya per order"><i class="bi bi-bag" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Omzet Cair</span><strong class="an-kpi-value" id="kpiPayout">—</strong><span class="an-kpi-note" id="kpiPayoutNote"><span title="Order settlement complete"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Payout rate"><i class="bi bi-percent" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Omzet Cair / Net Revenue</span><strong class="an-kpi-value" id="kpiPayout">—</strong><span class="an-kpi-note" id="kpiPayoutNote"><span title="Order settlement complete"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Payout rate"><i class="bi bi-percent" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Return / Refund Rate</span><strong class="an-kpi-value" id="kpiReturnRate">—</strong><span class="an-kpi-note" id="kpiReturnRateNote"><span title="Nilai return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span> · <span title="Jumlah order"><i class="bi bi-bag" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Laba Kotor <i id="kpiGrossProfitInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Laba Kotor" data-tooltip="Net revenue − total HPP"></i></span><strong class="an-kpi-value" id="kpiGrossProfit">—</strong><span class="an-kpi-note" id="kpiHppNote"><span title="Net revenue"><i class="bi bi-cash-stack" aria-hidden="true"></i> —</span> · <span title="Total HPP"><i class="bi bi-box-seam" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Estimasi Profit</span><strong class="an-kpi-value" id="kpiEstimatedProfit">—</strong><span class="an-kpi-note" id="kpiEstimatedProfitNote"><span title="Margin estimasi"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> —</span> · <span title="Net revenue − HPP − iklan"><i class="bi bi-calculator" aria-hidden="true"></i> estimasi</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Laba Operasional</span><strong class="an-kpi-value" id="kpiOperatingProfit">—</strong><span class="an-kpi-note" id="kpiOperatingProfitNote"><span title="Omzet cair"><i class="bi bi-cash-coin" aria-hidden="true"></i> —</span> · <span title="Total HPP + iklan"><i class="bi bi-dash-circle" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Laba Kotor / Gross Profit <i id="kpiGrossProfitInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Laba Kotor atau Gross Profit" data-tooltip="Net revenue − total HPP"></i></span><strong class="an-kpi-value" id="kpiGrossProfit">—</strong><span class="an-kpi-note" id="kpiHppNote"><span title="Net revenue"><i class="bi bi-cash-stack" aria-hidden="true"></i> —</span> · <span title="Total HPP"><i class="bi bi-box-seam" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Est. Laba Bersih / Est. Net Profit</span><strong class="an-kpi-value" id="kpiEstimatedProfit">—</strong><span class="an-kpi-note" id="kpiEstimatedProfitNote"><span title="Margin estimasi"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> —</span> · <span title="Net revenue − HPP − iklan"><i class="bi bi-calculator" aria-hidden="true"></i> estimasi</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Laba Operasional / Net Operasional</span><strong class="an-kpi-value" id="kpiOperatingProfit">—</strong><span class="an-kpi-note" id="kpiOperatingProfitNote"><span title="Omzet cair"><i class="bi bi-cash-coin" aria-hidden="true"></i> —</span> · <span title="Total HPP + iklan"><i class="bi bi-dash-circle" aria-hidden="true"></i> —</span></span></div>
           </div>
         </div>
 
@@ -1004,6 +1010,37 @@
         ];
         $('salesFunnel').innerHTML = data.map(([label,value,amount]) => `<div class="an-funnel-row"><span>${label}</span><div class="an-funnel-track"><span style="width:${Math.max(5,Math.round(amount / max * 100))}%"></span></div><strong class="an-funnel-value">${typeof value === 'number' ? value.toLocaleString('id-ID') : value}</strong></div>`).join('');
     }
+    function renderFinancePulse() {
+        const current = summary?.current || {};
+        const previous = summary?.previous || {};
+        const adSpend = Number(current.ad_cost || 0);
+        const previousAdSpend = Number(previous.ad_cost || 0);
+        const cogs = Number(current.hpp_total ?? current.hpp ?? 0);
+        const previousCogs = Number(previous.hpp_total ?? previous.hpp ?? 0);
+        const estimatedNetProfit = Number(current.estimated_profit ?? 0);
+        const previousEstimatedNetProfit = Number(previous.estimated_profit ?? 0);
+        const roiBase = cogs + adSpend;
+        const previousRoiBase = previousCogs + previousAdSpend;
+        const roi = roiBase > 0 ? estimatedNetProfit / roiBase * 100 : 0;
+        const previousRoi = previousRoiBase > 0 ? previousEstimatedNetProfit / previousRoiBase * 100 : 0;
+        const roe = cogs > 0 ? estimatedNetProfit / cogs * 100 : 0;
+        const previousRoe = previousCogs > 0 ? previousEstimatedNetProfit / previousCogs * 100 : 0;
+        const compare = (value, baseline, formatter = money) => {
+            const currentValue = Number(value || 0);
+            const previousValue = Number(baseline || 0);
+            if (previousValue === 0) return currentValue === 0 ? '0,0% vs lalu' : 'baru';
+            const change = (currentValue - previousValue) / Math.abs(previousValue) * 100;
+            return `${formatter(previousValue)} · ${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%`;
+        };
+        const cards = [
+            ['bi-megaphone', 'Spend iklan', money(adSpend), `incl. PPN · ${compare(adSpend, previousAdSpend)}`, 'Biaya iklan termasuk PPN 11%'],
+            ['bi-box-seam', 'COGS', money(cogs), `cair ${money(current.hpp_settled || 0)} · ${compare(cogs, previousCogs)}`, 'Total HPP / COGS periode ini'],
+            ['bi-piggy-bank', 'Est. laba bersih', money(estimatedNetProfit), compare(estimatedNetProfit, previousEstimatedNetProfit), 'Net profit setelah fee, return/refund, COGS, dan iklan'],
+            ['bi-graph-up-arrow', 'ROI', `${roi.toFixed(1).replace('.', ',')}%`, `vs lalu ${previousRoi.toFixed(1).replace('.', ',')}% · ${compare(roi, previousRoi, value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`).split(' · ').pop()}`, 'Net profit ÷ (COGS + spend iklan)'],
+            ['bi-person-check', 'ROE estimasi', `${roe.toFixed(1).replace('.', ',')}%`, `vs lalu ${previousRoe.toFixed(1).replace('.', ',')}% · ${compare(roe, previousRoe, value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`).split(' · ').pop()}`, 'Proxy modal barang: net profit ÷ COGS'],
+        ];
+        $('anFinancePulse').innerHTML = cards.map(([icon, label, value, note, title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label"><i class="bi ${icon} me-1" aria-hidden="true"></i>${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note">${note}</div></div>`).join('');
+    }
     function renderStores() {
         const list = summary?.stores || [];
         const totalGross = list.reduce((sum, store) => sum + Number(store.gmv || 0), 0);
@@ -1253,6 +1290,7 @@
     function render() {
         const current = summary?.current || {};
         renderKpis();
+        renderFinancePulse();
         renderEnterprise();
         renderChart(summary?.daily || [], summary?.previous_daily || []);
         renderFunnel();

@@ -123,10 +123,10 @@ class MarketplaceController extends Controller
 
     public function analytics(Request $request): \Illuminate\View\View
     {
-        $today   = now()->toDateString();
-        $weekAgo = now()->subDays(29)->toDateString();
+        $today     = now()->toDateString();
+        $monthFrom = now()->startOfMonth()->toDateString();
         $filters = [
-            'date_from' => $request->query('date_from', $weekAgo),
+            'date_from' => $request->query('date_from', $monthFrom),
             'date_to'   => $request->query('date_to', $today),
             'store_id'  => $request->query('store_id'),
             'compare_mode' => $request->query('compare_mode', 'prev_period'),
