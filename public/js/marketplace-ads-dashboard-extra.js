@@ -1,6 +1,29 @@
 (function () {
     const routes = window.AdsDashboardRoutes || {};
 
+    // Shopee membatasi perubahan konfigurasi campaign dalam waktu berdekatan.
+    // Gunakan satu guard untuk seluruh tab Ads Dashboard agar double-click,
+    // Enter berulang, atau perpindahan cepat antar field tidak membuat request
+    // beruntun ke endpoint edit campaign.
+    window.__adsCampaignEditGuard = window.__adsCampaignEditGuard || {
+        active: new Set(),
+        cooldownUntil: new Map(),
+        nextRequestAt: 0,
+        acquire(key, interval = 1200) {
+            const now = Date.now();
+            if (this.active.has(key)) return false;
+            if ((this.cooldownUntil.get(key) || 0) > now) return false;
+            if (this.nextRequestAt > now) return false;
+            this.active.add(key);
+            this.nextRequestAt = now + interval;
+            return true;
+        },
+        release(key, cooldown = 2200) {
+            this.active.delete(key);
+            this.cooldownUntil.set(key, Date.now() + cooldown);
+        },
+    };
+
     function getCsrfToken() {
         const meta = document.querySelector('meta[name="csrf-token"]');
         return meta ? meta.content : '';
@@ -517,6 +540,13 @@
             return;
         }
 
+        const editGuard = window.__adsCampaignEditGuard;
+        const editGuardKey = `${storeId}:${campId}`;
+        if (editGuard && !editGuard.acquire(editGuardKey)) {
+            getToast('Tunggu sebentar sebelum mengubah campaign lagi agar tidak terkena batas API.');
+            return;
+        }
+
         const payload = {
             _token: getCsrfToken(),
             store_id: storeId,
@@ -564,6 +594,9 @@
             console.error('Error:', error);
             getToast('Terjadi kesalahan saat menyimpan pengaturan.');
             wrapper.querySelector('.inline-edit-text').innerHTML = originalContent;
+        })
+        .finally(() => {
+            editGuard?.release(editGuardKey);
         });
     };
 

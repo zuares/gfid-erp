@@ -1343,6 +1343,9 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'grp-ltv', panes: [
             ['tab-ltv', 'Customer & LTV', 'bi-person-heart'],
         ]},
+        { id: 'grp-experiment', panes: [
+            ['tab-experiments', 'Experiment', 'bi-bezier2'],
+        ]},
         { id: 'grp-settings', panes: [
             ['tab-settings', 'Pengaturan', 'bi-sliders'],
         ]},
@@ -1887,6 +1890,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button class="dash-tab-m" data-group="grp-profit"><i class="bi bi-cash-coin"></i> Profit</button>
                 <button class="dash-tab-m" data-group="grp-funnel"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
                 <button class="dash-tab-m" data-group="grp-ltv"><i class="bi bi-person-heart"></i> Customer &amp; LTV</button>
+                <button class="dash-tab-m" data-group="grp-experiment"><i class="bi bi-bezier2"></i> Experiment</button>
                 <button class="dash-tab-m" data-group="grp-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
         </div>
@@ -2536,6 +2540,114 @@ document.addEventListener('DOMContentLoaded', function() {
 
         <!-- (Tab Sync has been merged into Tab Pengaturan) -->
 
+        <!-- TAB ADS EXPERIMENT -->
+        <div class="tab-pane" id="tab-experiments">
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-bezier2 text-primary"></i> Ads Experiment &amp; Impact</div>
+                        <div class="ads-tab-panel-note">Bandingkan 7 hari sebelum dan sesudah perubahan harga atau target ROAS.</div>
+                    </div>
+                    <button type="button" id="btnReloadExperiments" class="btn btn-sm" style="border:1px solid var(--dsh-border); color:var(--text); background:var(--card-bg); border-radius:9px; font-size:.74rem; font-weight:700;">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div class="p-3">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-12 col-md-3">
+                            <label for="experimentChangeFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Perubahan</label>
+                            <select id="experimentChangeFilter" class="form-select form-select-sm" style="border-radius:9px; font-size:.76rem;">
+                                <option value="">Semua perubahan</option>
+                                <option value="price">Harga</option>
+                                <option value="target_roas">Target ROAS</option>
+                                <option value="price_and_target_roas">Harga + Target ROAS</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label for="experimentStatusFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Status</label>
+                            <select id="experimentStatusFilter" class="form-select form-select-sm" style="border-radius:9px; font-size:.76rem;">
+                                <option value="">Semua status</option>
+                                <option value="LEARNING">Learning</option>
+                                <option value="EARLY_SIGNAL">Early Signal</option>
+                                <option value="READY_TO_EVALUATE">Ready to Evaluate</option>
+                                <option value="INSUFFICIENT_DATA">Insufficient Data</option>
+                                <option value="CONFOUNDED">Confounded</option>
+                                <option value="COMPLETED">Completed</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div id="experimentDataNote" style="font-size:.74rem; color:var(--dsh-muted); line-height:1.45;">
+                                Data performa dibaca langsung dari fact table iklan. Hari perubahan tidak dihitung.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="experimentsLoading" style="display:none; padding:2.4rem 1rem; text-align:center; color:var(--dsh-muted);">
+                        <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                        <div style="font-size:.78rem;">Memuat experiment...</div>
+                    </div>
+
+                    <div id="experimentsEmpty" style="display:none; padding:2.6rem 1rem; text-align:center; border:1px dashed var(--dsh-border); border-radius:14px; color:var(--dsh-muted);">
+                        <i class="bi bi-bezier2" style="font-size:2rem; color:#93c5fd;"></i>
+                        <div style="font-weight:800; color:var(--text); margin-top:.55rem;">Belum ada experiment</div>
+                        <div style="font-size:.75rem; max-width:34rem; margin:.35rem auto 0; line-height:1.55;">
+                            Experiment akan tercatat setelah perubahan harga atau target ROAS dilakukan melalui Ads Dashboard.
+                            History lama belum di-backfill karena timestamp perubahan belum tersedia.
+                        </div>
+                    </div>
+
+                    <div id="experimentsError" style="display:none; padding:.8rem 1rem; border-radius:10px; border:1px solid rgba(220,38,38,.25); background:rgba(220,38,38,.06); color:#b91c1c; font-size:.76rem; font-weight:700;"></div>
+
+                    <div id="experimentsTableWrap" class="table-responsive" style="display:none;">
+                        <table class="dpanel-table align-middle mb-0" style="min-width:860px;">
+                            <thead>
+                                <tr>
+                                    <th>Perubahan</th>
+                                    <th>Scope</th>
+                                    <th>Waktu</th>
+                                    <th>Status</th>
+                                    <th>Baseline</th>
+                                    <th>Observation</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="experimentsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="experimentDetailPanel" class="ads-tab-panel mb-3" style="display:none;">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-layout-split text-primary"></i> Detail Experiment</div>
+                        <div class="ads-tab-panel-note" id="experimentDetailSubtitle">Baseline vs observation.</div>
+                    </div>
+                    <button type="button" id="btnCloseExperimentDetail" class="btn btn-sm" style="border:1px solid var(--dsh-border); color:var(--text); background:var(--card-bg); border-radius:9px; font-size:.74rem; font-weight:700;">
+                        Tutup
+                    </button>
+                </div>
+                <div class="p-3">
+                    <div id="experimentDetailMeta" class="row g-2 mb-3"></div>
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-6">
+                            <div style="border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
+                                <div style="padding:.7rem .85rem; background:rgba(148,163,184,.08); font-size:.75rem; font-weight:850;">Baseline</div>
+                                <div id="experimentBaselineMetrics" class="p-2"></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div style="border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
+                                <div style="padding:.7rem .85rem; background:rgba(37,99,235,.08); font-size:.75rem; font-weight:850;">Observation</div>
+                                <div id="experimentObservationMetrics" class="p-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="experimentQualityNote" class="mt-3" style="font-size:.74rem; line-height:1.55;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB PENGATURAN -->
         <div class="tab-pane" id="tab-settings">
             @php
@@ -3137,6 +3249,8 @@ window.AdsDashboardRoutes = {
     sync: @json(route('marketplace.ads.sync')),
     syncCancel: @json(route('marketplace.ads.sync.cancel')),
     feeSetting: @json(route('marketplace.ads.fee.setting')),
+    experimentsIndex: @json(route('marketplace.ads.experiments.index')),
+    experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
 };
 </script>
 <script src="{{ asset('js/marketplace-ads-dashboard-extra.js') }}"></script>
@@ -4912,5 +5026,270 @@ function pollSyncProgress(storeId) {
     pollGlobalSync();
     setInterval(pollGlobalSync, 30000);
 })();
+</script>
+<script>
+// Ads Experiment UI
+document.addEventListener('DOMContentLoaded', function () {
+    const routes = window.AdsDashboardRoutes || {};
+    const selectedStoreId = @json($storeId ?? 'all');
+    const loading = document.getElementById('experimentsLoading');
+    const empty = document.getElementById('experimentsEmpty');
+    const error = document.getElementById('experimentsError');
+    const tableWrap = document.getElementById('experimentsTableWrap');
+    const tableBody = document.getElementById('experimentsTableBody');
+    const detailPanel = document.getElementById('experimentDetailPanel');
+    const detailMeta = document.getElementById('experimentDetailMeta');
+    const detailSubtitle = document.getElementById('experimentDetailSubtitle');
+    const baselineMetrics = document.getElementById('experimentBaselineMetrics');
+    const observationMetrics = document.getElementById('experimentObservationMetrics');
+    const qualityNote = document.getElementById('experimentQualityNote');
+    const changeFilter = document.getElementById('experimentChangeFilter');
+    const statusFilter = document.getElementById('experimentStatusFilter');
+    const dataNote = document.getElementById('experimentDataNote');
+    let lastRows = [];
+
+    if (!loading || !routes.experimentsIndex) return;
+
+    const statusMap = {
+        LEARNING: ['Learning', '#2563eb', 'rgba(37,99,235,.1)'],
+        EARLY_SIGNAL: ['Early Signal', '#d97706', 'rgba(217,119,6,.12)'],
+        READY_TO_EVALUATE: ['Ready to Evaluate', '#15803d', 'rgba(21,128,61,.12)'],
+        INSUFFICIENT_DATA: ['Insufficient Data', '#b45309', 'rgba(180,83,9,.12)'],
+        CONFOUNDED: ['Confounded', '#b91c1c', 'rgba(185,28,28,.1)'],
+        COMPLETED: ['Completed', '#475569', 'rgba(71,85,105,.12)'],
+    };
+
+    const qualityLabels = {
+        partial_day_excluded: 'hari perubahan dikecualikan',
+        estimated_qty: 'qty memakai fallback order',
+        missing_mapping: 'mapping HPP belum tersedia',
+        missing_metric: 'metric belum tersedia',
+        low_volume: 'volume masih rendah',
+        confounded: 'ada perubahan lain yang overlap',
+    };
+
+    function esc(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function number(value, digits) {
+        if (value === null || value === undefined || value === '') return 'N/A';
+        return new Intl.NumberFormat('id-ID', {
+            maximumFractionDigits: digits === undefined ? 0 : digits,
+            minimumFractionDigits: 0,
+        }).format(Number(value));
+    }
+
+    function money(value) {
+        if (value === null || value === undefined) return 'N/A';
+        return 'Rp ' + number(value, 0);
+    }
+
+    function metricValue(key, value) {
+        if (value === null || value === undefined) return 'N/A';
+        if (key === 'ctr' || key === 'cvr') return number(Number(value) * 100, 1) + '%';
+        if (key === 'roas') return number(value, 2) + 'x';
+        if (key === 'revenue' || key === 'spend') return money(value);
+        return number(value, key === 'qty' ? 1 : 0);
+    }
+
+    function statusBadge(status) {
+        const info = statusMap[status] || [status || 'Unknown', '#475569', 'rgba(71,85,105,.12)'];
+        return '<span style="display:inline-flex; align-items:center; padding:.28rem .5rem; border-radius:999px; color:' + info[1] + '; background:' + info[2] + '; font-size:.66rem; font-weight:850; white-space:nowrap;">' + esc(info[0]) + '</span>';
+    }
+
+    function changeLabel(experiment) {
+        const type = experiment.change_type;
+        if (type === 'price') {
+            return 'Harga · ' + (experiment.old_price === null ? 'N/A' : money(experiment.old_price)) + ' → ' + (experiment.new_price === null ? 'N/A' : money(experiment.new_price));
+        }
+        if (type === 'target_roas') {
+            return 'Target ROAS · ' + (experiment.old_target_roas === null ? 'N/A' : number(experiment.old_target_roas, 2) + 'x') + ' → ' + (experiment.new_target_roas === null ? 'N/A' : number(experiment.new_target_roas, 2) + 'x');
+        }
+        return 'Harga + Target ROAS';
+    }
+
+    function scopeLabel(experiment) {
+        const parts = [];
+        if (experiment.channel_campaign_id) parts.push('Campaign ' + experiment.channel_campaign_id);
+        if (experiment.channel_item_id) parts.push('Item ' + experiment.channel_item_id);
+        if (!parts.length) parts.push('Store-level');
+        return parts.join(' · ');
+    }
+
+    function periodSummary(period) {
+        const metrics = (period || {}).metrics || {};
+        return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
+            '<b style="color:var(--text);">ROAS ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
+            'Order ' + esc(metricValue('orders', metrics.orders)) + ' · ' +
+            'Spend ' + esc(metricValue('spend', metrics.spend)) +
+            '</div>';
+    }
+
+    function setLoading(active) {
+        loading.style.display = active ? 'block' : 'none';
+        if (active) {
+            empty.style.display = 'none';
+            tableWrap.style.display = 'none';
+            error.style.display = 'none';
+        }
+    }
+
+    function renderList(rows) {
+        lastRows = rows || [];
+        tableBody.innerHTML = '';
+        if (!lastRows.length) {
+            empty.style.display = 'block';
+            tableWrap.style.display = 'none';
+            dataNote.textContent = 'Belum ada event perubahan yang tercatat untuk filter ini.';
+            return;
+        }
+
+        empty.style.display = 'none';
+        tableWrap.style.display = 'block';
+        dataNote.textContent = lastRows.length + ' experiment ditemukan. Profit actual belum dianggap siap sampai allocation ad cost lengkap.';
+
+        lastRows.forEach(function (row) {
+            const experiment = row.experiment || {};
+            const details = row.details || {};
+            const changedAt = (details.change || {}).effective_date || experiment.effective_date || '-';
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td><div style="font-weight:800; font-size:.72rem; color:var(--text);">' + esc(changeLabel(experiment)) + '</div>' +
+                    '<div style="font-size:.64rem; color:var(--dsh-muted); margin-top:.15rem;">' + esc(experiment.change_event_id || '') + '</div></td>' +
+                '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment)) + '">' + esc(scopeLabel(experiment)) + '</div></td>' +
+                '<td><div style="font-size:.7rem; font-weight:700;">' + esc(changedAt) + '</div><div style="font-size:.64rem; color:var(--dsh-muted);">' + esc(experiment.profit_basis || 'incomplete') + '</div></td>' +
+                '<td>' + statusBadge(details.lifecycle_status || experiment.lifecycle_status) + '</td>' +
+                '<td>' + periodSummary(details.baseline) + '</td>' +
+                '<td>' + periodSummary(details.observation) + '</td>' +
+                '<td><button type="button" class="btn btn-sm js-view-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(37,99,235,.25); color:var(--dsh-accent); background:rgba(37,99,235,.06); border-radius:8px; font-size:.68rem; font-weight:800;">Detail</button></td>';
+            tableBody.appendChild(tr);
+        });
+
+        tableBody.querySelectorAll('.js-view-experiment').forEach(function (button) {
+            button.addEventListener('click', function () {
+                loadDetail(button.dataset.id);
+            });
+        });
+    }
+
+    function loadList() {
+        setLoading(true);
+        const params = new URLSearchParams();
+        if (selectedStoreId && selectedStoreId !== 'all') params.set('store_id', selectedStoreId);
+        if (changeFilter.value) params.set('change_type', changeFilter.value);
+        if (statusFilter.value) params.set('lifecycle_status', statusFilter.value);
+        params.set('limit', '100');
+
+        fetch(routes.experimentsIndex + '?' + params.toString(), {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function (payload) {
+                setLoading(false);
+                renderList(payload.data || []);
+            })
+            .catch(function (err) {
+                setLoading(false);
+                empty.style.display = 'none';
+                tableWrap.style.display = 'none';
+                error.textContent = 'Experiment gagal dimuat. Silakan refresh halaman. (' + err.message + ')';
+                error.style.display = 'block';
+            });
+    }
+
+    function renderMetricGrid(target, period) {
+        const metrics = (period || {}).metrics || {};
+        const rows = [
+            ['Impressions', 'impressions'],
+            ['Clicks', 'clicks'],
+            ['Orders', 'orders'],
+            ['Qty', 'qty'],
+            ['Revenue', 'revenue'],
+            ['Spend', 'spend'],
+            ['CTR', 'ctr'],
+            ['CVR', 'cvr'],
+            ['ROAS', 'roas'],
+        ];
+        target.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.45rem;">' +
+            rows.map(function (item) {
+                return '<div style="padding:.55rem .6rem; border:1px solid var(--dsh-border); border-radius:9px;">' +
+                    '<div style="font-size:.62rem; color:var(--dsh-muted);">' + item[0] + '</div>' +
+                    '<div style="font-size:.78rem; font-weight:850; color:var(--text); margin-top:.1rem;">' + esc(metricValue(item[1], metrics[item[1]])) + '</div>' +
+                '</div>';
+            }).join('') + '</div>' +
+            '<div style="font-size:.65rem; color:var(--dsh-muted); margin-top:.55rem;">Data: ' + esc((period || {}).source_table || 'belum tersedia') + ' · ' + number((period || {}).days_with_data || 0) + ' hari memiliki data</div>';
+    }
+
+    function loadDetail(id) {
+        if (!routes.experimentsShow || !id) return;
+        const url = routes.experimentsShow.replace('__EXPERIMENT_ID__', encodeURIComponent(id));
+        detailPanel.style.display = 'block';
+        detailSubtitle.textContent = 'Memuat detail experiment...';
+        detailMeta.innerHTML = '';
+        baselineMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
+        observationMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
+        qualityNote.innerHTML = '';
+        detailPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(function (payload) {
+                const data = payload.data || {};
+                const experiment = data.experiment || {};
+                const change = data.change || {};
+                const quality = data.data_quality || {};
+                detailSubtitle.textContent = changeLabel(experiment) + ' · ' + (change.effective_date || '-');
+                detailMeta.innerHTML =
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Status</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Profit basis</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(data.profit_basis || 'incomplete') + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Scope</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment)) + '">' + esc(scopeLabel(experiment)) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Verdict</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(data.verdict || 'INCONCLUSIVE') + '</div></div>';
+                renderMetricGrid(baselineMetrics, data.baseline);
+                renderMetricGrid(observationMetrics, data.observation);
+
+                const flags = []
+                    .concat(quality.experiment_flags || [])
+                    .concat(quality.baseline_flags || [])
+                    .concat(quality.observation_flags || [])
+                    .filter(function (value, index, all) { return value && all.indexOf(value) === index; });
+                const flagText = flags.length
+                    ? flags.map(function (flag) { return qualityLabels[flag] || flag; }).join(' · ')
+                    : 'Tidak ada flag tambahan.';
+                qualityNote.innerHTML =
+                    '<div style="padding:.7rem .8rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted);">' +
+                    '<b style="color:var(--text);">Kualitas data:</b> ' + esc(flagText) + '<br>' +
+                    '<b style="color:var(--text);">Mapping:</b> ' + esc(quality.mapping_status || 'unknown') + ' · ' +
+                    '<b style="color:var(--text);">Actual profit:</b> ' + (quality.actual_profit_ready ? 'ready' : 'belum siap karena allocation ad cost belum lengkap') +
+                    '</div>';
+            })
+            .catch(function (err) {
+                detailSubtitle.textContent = 'Detail tidak dapat dimuat.';
+                qualityNote.innerHTML = '<div style="color:#b91c1c; font-size:.75rem;">Gagal memuat detail: ' + esc(err.message) + '</div>';
+            });
+    }
+
+    document.getElementById('btnReloadExperiments')?.addEventListener('click', loadList);
+    document.getElementById('btnCloseExperimentDetail')?.addEventListener('click', function () {
+        detailPanel.style.display = 'none';
+    });
+    changeFilter?.addEventListener('change', loadList);
+    statusFilter?.addEventListener('change', loadList);
+    document.querySelector('#adsPrimaryTabs [data-group="grp-experiment"]')?.addEventListener('click', loadList);
+
+    loadList();
+});
 </script>
 @endpush
