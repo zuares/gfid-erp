@@ -1257,6 +1257,166 @@ body[data-theme="dark"] .ads-tab-panel-note{
     color:#cbd5e1;
 }
 
+.ads-phase2-simulation{
+    margin-top:.85rem;
+    padding:.8rem;
+    border:1px solid rgba(37,99,235,.16);
+    border-radius:13px;
+    background:linear-gradient(135deg, rgba(239,246,255,.72), rgba(248,250,252,.92));
+}
+
+body[data-theme="dark"] .ads-phase2-simulation{
+    border-color:rgba(96,165,250,.25);
+    background:linear-gradient(135deg, rgba(30,58,138,.22), rgba(15,23,42,.78));
+}
+
+.ads-phase2-simulation-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.7rem;
+    flex-wrap:wrap;
+    margin-bottom:.65rem;
+}
+
+.ads-phase2-simulation-title{
+    display:flex;
+    align-items:center;
+    gap:.4rem;
+    color:var(--text);
+    font-size:.78rem;
+    font-weight:900;
+}
+
+.ads-phase2-simulation .form-label{
+    margin-bottom:.25rem;
+    color:var(--dsh-muted);
+    font-size:.64rem;
+    font-weight:850;
+}
+
+.ads-phase2-simulation .form-control,
+.ads-phase2-simulation .form-select{
+    min-height:35px;
+    border-radius:9px;
+    border-color:rgba(148,163,184,.28);
+    color:var(--text);
+    font-size:.75rem;
+    font-weight:750;
+}
+
+.ads-phase2-result-grid{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:.45rem;
+    margin-top:.7rem;
+}
+
+.ads-phase2-result-card{
+    min-width:0;
+    padding:.55rem .6rem;
+    border:1px solid rgba(148,163,184,.2);
+    border-radius:10px;
+    background:rgba(255,255,255,.68);
+}
+
+body[data-theme="dark"] .ads-phase2-result-card{
+    background:rgba(15,23,42,.58);
+    border-color:rgba(51,65,85,.9);
+}
+
+.ads-phase2-result-label{
+    color:var(--dsh-muted);
+    font-size:.61rem;
+    font-weight:750;
+}
+
+.ads-phase2-result-value{
+    margin-top:.12rem;
+    color:var(--text);
+    font-size:.82rem;
+    font-weight:900;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+@media (max-width: 767.98px){
+    .ads-phase2-result-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}
+
+.ads-phase3-impact{
+    margin-top:.85rem;
+    padding:.8rem;
+    border:1px solid rgba(15,118,110,.18);
+    border-radius:13px;
+    background:linear-gradient(135deg, rgba(240,253,250,.72), rgba(248,250,252,.92));
+}
+
+body[data-theme="dark"] .ads-phase3-impact{
+    border-color:rgba(45,212,191,.25);
+    background:linear-gradient(135deg, rgba(19,78,74,.22), rgba(15,23,42,.78));
+}
+
+.ads-phase3-impact-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.7rem;
+    flex-wrap:wrap;
+    margin-bottom:.65rem;
+}
+
+.ads-phase3-impact-title{
+    display:flex;
+    align-items:center;
+    gap:.4rem;
+    color:var(--text);
+    font-size:.78rem;
+    font-weight:900;
+}
+
+.ads-phase3-impact-grid{
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:.4rem;
+}
+
+.ads-phase3-impact-step{
+    min-width:0;
+    padding:.5rem .55rem;
+    border:1px solid rgba(148,163,184,.2);
+    border-radius:10px;
+    background:rgba(255,255,255,.68);
+}
+
+body[data-theme="dark"] .ads-phase3-impact-step{
+    background:rgba(15,23,42,.58);
+    border-color:rgba(51,65,85,.9);
+}
+
+.ads-phase3-impact-label{ color:var(--dsh-muted); font-size:.6rem; font-weight:750; }
+.ads-phase3-impact-value{ margin-top:.12rem; color:var(--text); font-size:.76rem; font-weight:900; white-space:nowrap; }
+.ads-phase3-impact-delta{ margin-top:.12rem; font-size:.62rem; font-weight:800; white-space:nowrap; }
+
+.ads-phase3-note{
+    margin-top:.6rem;
+    padding:.6rem .7rem;
+    border:1px solid var(--dsh-border);
+    border-radius:10px;
+    color:var(--dsh-muted);
+    font-size:.66rem;
+    line-height:1.5;
+}
+
+@media (max-width: 991.98px){
+    .ads-phase3-impact-grid{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 575.98px){
+    .ads-phase3-impact-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}
+
 .dash-sec{
     display:flex;
     align-items:center;
@@ -2644,6 +2804,56 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                     <div id="experimentQualityNote" class="mt-3" style="font-size:.74rem; line-height:1.55;"></div>
+
+                    <div id="experimentImpactPanel" class="ads-phase3-impact" style="display:none;">
+                        <div class="ads-phase3-impact-head">
+                            <div>
+                                <div class="ads-phase3-impact-title"><i class="bi bi-signpost-split text-success"></i> Impact &amp; Verdict</div>
+                                <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;">Traffic → CTR → CVR → Qty → ROAS → Profit</div>
+                            </div>
+                            <span id="experimentVerdictBadge" class="ads-tab-panel-note">INCONCLUSIVE</span>
+                        </div>
+                        <div id="experimentImpactGrid" class="ads-phase3-impact-grid"></div>
+                        <div id="experimentSufficiencyNote" class="ads-phase3-note"></div>
+                        <div id="experimentConflictNote" class="ads-phase3-note" style="display:none; border-color:rgba(220,38,38,.25); color:#b91c1c;"></div>
+                    </div>
+
+                    <div id="experimentSimulationPanel" class="ads-phase2-simulation" style="display:none;">
+                        <div class="ads-phase2-simulation-head">
+                            <div>
+                                <div class="ads-phase2-simulation-title"><i class="bi bi-sliders2-vertical text-primary"></i> Simulasi Phase 2</div>
+                                <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;">Hitung dampak harga dan target ROAS tanpa menyimpan perubahan.</div>
+                            </div>
+                            <span class="ads-tab-panel-note">Read-only</span>
+                        </div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-6 col-md-3">
+                                <label for="experimentSimulationPeriod" class="form-label">Basis data</label>
+                                <select id="experimentSimulationPeriod" class="form-select form-select-sm">
+                                    <option value="observation">Observation</option>
+                                    <option value="baseline">Baseline</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="experimentSimulationPrice" class="form-label">Harga simulasi</label>
+                                <input id="experimentSimulationPrice" class="form-control form-control-sm" inputmode="decimal" placeholder="Harga">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="experimentSimulationRoas" class="form-label">Target ROAS</label>
+                                <input id="experimentSimulationRoas" class="form-control form-control-sm" inputmode="decimal" placeholder="ROAS x">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <button type="button" id="btnRunExperimentSimulation" class="btn btn-primary btn-sm w-100" style="min-height:35px; border-radius:9px; font-size:.72rem; font-weight:850;">
+                                    <i class="bi bi-calculator"></i> Hitung simulasi
+                                </button>
+                            </div>
+                        </div>
+                        <div id="experimentSimulationError" style="display:none; margin-top:.6rem; color:#b91c1c; font-size:.7rem; font-weight:750;"></div>
+                        <div id="experimentSimulationLoading" style="display:none; margin-top:.65rem; color:var(--dsh-muted); font-size:.7rem;">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span> Menghitung...
+                        </div>
+                        <div id="experimentSimulationResult" style="display:none;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3251,6 +3461,7 @@ window.AdsDashboardRoutes = {
     feeSetting: @json(route('marketplace.ads.fee.setting')),
     experimentsIndex: @json(route('marketplace.ads.experiments.index')),
     experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
+    experimentsSimulate: @json(route('marketplace.ads.experiments.simulate')),
 };
 </script>
 <script src="{{ asset('js/marketplace-ads-dashboard-extra.js') }}"></script>
@@ -5043,10 +5254,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const baselineMetrics = document.getElementById('experimentBaselineMetrics');
     const observationMetrics = document.getElementById('experimentObservationMetrics');
     const qualityNote = document.getElementById('experimentQualityNote');
+    const impactPanel = document.getElementById('experimentImpactPanel');
+    const impactGrid = document.getElementById('experimentImpactGrid');
+    const verdictBadge = document.getElementById('experimentVerdictBadge');
+    const sufficiencyNote = document.getElementById('experimentSufficiencyNote');
+    const conflictNote = document.getElementById('experimentConflictNote');
+    const simulationPanel = document.getElementById('experimentSimulationPanel');
+    const simulationPeriod = document.getElementById('experimentSimulationPeriod');
+    const simulationPrice = document.getElementById('experimentSimulationPrice');
+    const simulationRoas = document.getElementById('experimentSimulationRoas');
+    const simulationButton = document.getElementById('btnRunExperimentSimulation');
+    const simulationError = document.getElementById('experimentSimulationError');
+    const simulationLoading = document.getElementById('experimentSimulationLoading');
+    const simulationResult = document.getElementById('experimentSimulationResult');
     const changeFilter = document.getElementById('experimentChangeFilter');
     const statusFilter = document.getElementById('experimentStatusFilter');
     const dataNote = document.getElementById('experimentDataNote');
     let lastRows = [];
+    let activeExperiment = null;
 
     if (!loading || !routes.experimentsIndex) return;
 
@@ -5062,10 +5287,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const qualityLabels = {
         partial_day_excluded: 'hari perubahan dikecualikan',
         estimated_qty: 'qty memakai fallback order',
+        estimated_price: 'harga diestimasi dari GMV / qty',
+        estimated_profit: 'profit masih estimasi',
         missing_mapping: 'mapping HPP belum tersedia',
+        missing_hpp: 'HPP belum tersedia',
+        missing_price: 'harga belum tersedia',
         missing_metric: 'metric belum tersedia',
         low_volume: 'volume masih rendah',
         confounded: 'ada perubahan lain yang overlap',
+    };
+
+    const verdictMap = {
+        POSITIVE: ['Positive', '#15803d', 'rgba(21,128,61,.12)'],
+        NEGATIVE: ['Negative', '#b91c1c', 'rgba(185,28,28,.1)'],
+        MIXED: ['Mixed', '#b45309', 'rgba(180,83,9,.12)'],
+        NO_CLEAR_IMPACT: ['No clear impact', '#475569', 'rgba(71,85,105,.12)'],
+        INCONCLUSIVE: ['Inconclusive', '#b45309', 'rgba(180,83,9,.12)'],
+        INSUFFICIENT_DATA: ['Insufficient data', '#b45309', 'rgba(180,83,9,.12)'],
+        CONFOUNDED: ['Confounded', '#b91c1c', 'rgba(185,28,28,.1)'],
     };
 
     function esc(value) {
@@ -5093,8 +5332,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function metricValue(key, value) {
         if (value === null || value === undefined) return 'N/A';
         if (key === 'ctr' || key === 'cvr') return number(Number(value) * 100, 1) + '%';
-        if (key === 'roas') return number(value, 2) + 'x';
-        if (key === 'revenue' || key === 'spend') return money(value);
+        if (key === 'cvr_bep') return number(Number(value) * 100, 1) + '%';
+        if (key === 'roas' || key === 'break_even_roas') return number(value, 2) + 'x';
+        if (['revenue', 'spend', 'net_revenue', 'ad_cost_incl_vat', 'total_cogs', 'profit'].indexOf(key) >= 0) return money(value);
+        if (key === 'break_even_qty') return number(value, 2);
         return number(value, key === 'qty' ? 1 : 0);
     }
 
@@ -5219,6 +5460,10 @@ document.addEventListener('DOMContentLoaded', function () {
             ['CTR', 'ctr'],
             ['CVR', 'cvr'],
             ['ROAS', 'roas'],
+            ['Profit', 'profit'],
+            ['BEP Qty', 'break_even_qty'],
+            ['CVR BEP', 'cvr_bep'],
+            ['BEP ROAS', 'break_even_roas'],
         ];
         target.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.45rem;">' +
             rows.map(function (item) {
@@ -5230,6 +5475,159 @@ document.addEventListener('DOMContentLoaded', function () {
             '<div style="font-size:.65rem; color:var(--dsh-muted); margin-top:.55rem;">Data: ' + esc((period || {}).source_table || 'belum tersedia') + ' · ' + number((period || {}).days_with_data || 0) + ' hari memiliki data</div>';
     }
 
+    function renderImpact(data) {
+        const impact = data.impact || {};
+        const steps = impact.steps || {};
+        const labels = ['traffic', 'ctr', 'cvr', 'qty', 'roas', 'profit'];
+        const verdict = data.verdict || 'INCONCLUSIVE';
+        const verdictInfo = verdictMap[verdict] || [verdict, '#475569', 'rgba(71,85,105,.12)'];
+        verdictBadge.textContent = verdictInfo[0];
+        verdictBadge.style.color = verdictInfo[1];
+        verdictBadge.style.background = verdictInfo[2];
+        verdictBadge.style.borderColor = verdictInfo[2];
+
+        impactGrid.innerHTML = labels.map(function (key) {
+            const step = steps[key] || {};
+            const direction = step.direction || 'unavailable';
+            const tone = direction === 'up' ? '#15803d' : (direction === 'down' ? '#b91c1c' : 'var(--dsh-muted)');
+            const delta = step.change_percent === null || step.change_percent === undefined
+                ? 'N/A'
+                : (step.change_percent > 0 ? '+' : '') + number(step.change_percent, 1) + '%';
+            const value = key === 'ctr' || key === 'cvr'
+                ? metricValue(key, step.after)
+                : metricValue(key === 'traffic' ? 'impressions' : key, step.after);
+            const measurement = key === 'profit'
+                ? ' · ' + (step.measurement === 'actual' ? 'actual' : (step.measurement === 'estimated' ? 'estimasi' : 'N/A'))
+                : '';
+
+            return '<div class="ads-phase3-impact-step">' +
+                '<div class="ads-phase3-impact-label">' + esc(step.label || key) + esc(measurement) + '</div>' +
+                '<div class="ads-phase3-impact-value">' + esc(value) + '</div>' +
+                '<div class="ads-phase3-impact-delta" style="color:' + tone + ';">' + esc(delta) + '</div>' +
+            '</div>';
+        }).join('');
+
+        const sufficiency = data.data_sufficiency || {};
+        const reasons = sufficiency.reasons || [];
+        const reasonText = reasons.length ? ' · Alasan: ' + reasons.join(', ') : '';
+        sufficiencyNote.innerHTML = '<b style="color:var(--text);">Data sufficiency:</b> ' +
+            (sufficiency.metric_ready ? 'cukup untuk evaluasi metrik' : 'belum cukup untuk verdict') +
+            (sufficiency.profit_ready ? ' · profit actual siap' : ' · profit masih estimasi atau belum lengkap') +
+            esc(reasonText);
+
+        const conflicts = data.conflicts || [];
+        if (conflicts.length) {
+            conflictNote.textContent = 'Conflict terdeteksi: ' + conflicts.map(function (conflict) {
+                return conflict.reason + (conflict.experiment_id ? ' #' + conflict.experiment_id : '');
+            }).join(', ') + '. Verdict tidak dianggap kausal.';
+            conflictNote.style.display = 'block';
+        } else {
+            conflictNote.textContent = '';
+            conflictNote.style.display = 'none';
+        }
+        impactPanel.style.display = 'block';
+    }
+
+    function parseInputNumber(value) {
+        let raw = String(value === null || value === undefined ? '' : value).trim()
+            .replace(/[^0-9,.-]/g, '');
+        if (!raw) return null;
+
+        if (raw.includes(',') && raw.includes('.')) {
+            raw = raw.replace(/\./g, '').replace(',', '.');
+        } else if (raw.includes(',')) {
+            raw = raw.replace(',', '.');
+        } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+            raw = raw.replace(/\./g, '');
+        }
+
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function simulationCard(label, value, tone) {
+        return '<div class="ads-phase2-result-card">' +
+            '<div class="ads-phase2-result-label">' + esc(label) + '</div>' +
+            '<div class="ads-phase2-result-value" style="color:' + (tone || 'var(--text)') + ';">' + esc(value) + '</div>' +
+        '</div>';
+    }
+
+    function renderSimulation(result) {
+        const current = result.current_quantity || {};
+        const target = result.target_roas || {};
+        const bep = result.break_even || {};
+        const profitLabel = current.actual_profit_ready ? 'Aktual' : 'Estimasi';
+        const profitTone = current.actual_profit_ready ? '#15803d' : '#b45309';
+
+        simulationResult.innerHTML =
+            '<div class="ads-phase2-result-grid">' +
+                simulationCard('Profit ' + profitLabel, metricValue('profit', current.profit), profitTone) +
+                simulationCard('BEP Qty', metricValue('break_even_qty', bep.qty), '#2563eb') +
+                simulationCard('CVR BEP', metricValue('cvr_bep', bep.cvr), '#2563eb') +
+                simulationCard('BEP ROAS', metricValue('break_even_roas', bep.roas), '#2563eb') +
+            '</div>' +
+            '<div class="ads-phase2-result-grid">' +
+                simulationCard('GMV pada Target ROAS', money(target.target_gmv), '#0f766e') +
+                simulationCard('Qty pada Target ROAS', number(target.target_qty, 2), '#0f766e') +
+                simulationCard('CVR pada Target ROAS', target.target_cvr === null || target.target_cvr === undefined ? 'N/A' : number(target.target_cvr * 100, 1) + '%', '#0f766e') +
+                simulationCard('Profit Target', money(target.estimated_profit), target.estimated_profit !== null && target.estimated_profit < 0 ? '#b91c1c' : '#0f766e') +
+            '</div>' +
+            '<div style="display:flex; gap:.45rem; flex-wrap:wrap; margin-top:.6rem; color:var(--dsh-muted); font-size:.65rem;">' +
+                '<span>Spend: ' + esc(money(result.assumptions?.spend)) + '</span>' +
+                '<span>·</span><span>Qty: ' + esc(number(result.assumptions?.qty, 2)) + (result.assumptions?.qty_estimated ? ' (estimasi)' : '') + '</span>' +
+                '<span>·</span><span>Basis: ' + esc(result.profit_basis || 'net_hpp_ads') + '</span>' +
+            '</div>';
+        simulationResult.style.display = 'block';
+    }
+
+    function setSimulationLoading(active) {
+        simulationLoading.style.display = active ? 'block' : 'none';
+        simulationButton.disabled = active;
+        if (active) simulationError.style.display = 'none';
+    }
+
+    function runSimulation() {
+        if (!activeExperiment || !routes.experimentsSimulate) return;
+
+        const payload = {
+            experiment_id: Number(activeExperiment.id),
+            period: simulationPeriod.value || 'observation',
+        };
+        const price = parseInputNumber(simulationPrice.value);
+        const targetRoas = parseInputNumber(simulationRoas.value);
+        if (price !== null) payload.price = price;
+        if (targetRoas !== null) payload.target_roas = targetRoas;
+
+        setSimulationLoading(true);
+        fetch(routes.experimentsSimulate, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload),
+        })
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) throw new Error(data.message || 'Simulasi gagal diproses.');
+                    return data;
+                });
+            })
+            .then(function (payload) {
+                renderSimulation(payload.data?.result || {});
+            })
+            .catch(function (err) {
+                simulationResult.style.display = 'none';
+                simulationError.textContent = err.message || 'Simulasi gagal diproses.';
+                simulationError.style.display = 'block';
+            })
+            .finally(function () {
+                setSimulationLoading(false);
+            });
+    }
+
     function loadDetail(id) {
         if (!routes.experimentsShow || !id) return;
         const url = routes.experimentsShow.replace('__EXPERIMENT_ID__', encodeURIComponent(id));
@@ -5239,6 +5637,14 @@ document.addEventListener('DOMContentLoaded', function () {
         baselineMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
         observationMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
         qualityNote.innerHTML = '';
+        impactPanel.style.display = 'none';
+        impactGrid.innerHTML = '';
+        sufficiencyNote.innerHTML = '';
+        conflictNote.style.display = 'none';
+        simulationPanel.style.display = 'none';
+        simulationResult.style.display = 'none';
+        simulationError.style.display = 'none';
+        activeExperiment = null;
         detailPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
@@ -5251,6 +5657,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const experiment = data.experiment || {};
                 const change = data.change || {};
                 const quality = data.data_quality || {};
+                activeExperiment = experiment;
                 detailSubtitle.textContent = changeLabel(experiment) + ' · ' + (change.effective_date || '-');
                 detailMeta.innerHTML =
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Status</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
@@ -5259,6 +5666,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Verdict</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(data.verdict || 'INCONCLUSIVE') + '</div></div>';
                 renderMetricGrid(baselineMetrics, data.baseline);
                 renderMetricGrid(observationMetrics, data.observation);
+                renderImpact(data);
+                const observationPrice = data.observation?.metrics?.price;
+                simulationPrice.value = number(change.new_price ?? change.old_price ?? observationPrice, 0) === 'N/A'
+                    ? ''
+                    : number(change.new_price ?? change.old_price ?? observationPrice, 0);
+                simulationRoas.value = change.new_target_roas === null || change.new_target_roas === undefined
+                    ? ''
+                    : number(change.new_target_roas, 2);
+                simulationPanel.style.display = 'block';
 
                 const flags = []
                     .concat(quality.experiment_flags || [])
@@ -5272,7 +5688,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div style="padding:.7rem .8rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted);">' +
                     '<b style="color:var(--text);">Kualitas data:</b> ' + esc(flagText) + '<br>' +
                     '<b style="color:var(--text);">Mapping:</b> ' + esc(quality.mapping_status || 'unknown') + ' · ' +
-                    '<b style="color:var(--text);">Actual profit:</b> ' + (quality.actual_profit_ready ? 'ready' : 'belum siap karena allocation ad cost belum lengkap') +
+                    '<b style="color:var(--text);">Profit:</b> ' + (quality.actual_profit_ready ? 'actual' : 'estimasi') +
                     '</div>';
             })
             .catch(function (err) {
@@ -5284,6 +5700,11 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnReloadExperiments')?.addEventListener('click', loadList);
     document.getElementById('btnCloseExperimentDetail')?.addEventListener('click', function () {
         detailPanel.style.display = 'none';
+    });
+    simulationButton?.addEventListener('click', runSimulation);
+    simulationPeriod?.addEventListener('change', function () {
+        simulationResult.style.display = 'none';
+        simulationError.style.display = 'none';
     });
     changeFilter?.addEventListener('change', loadList);
     statusFilter?.addEventListener('change', loadList);

@@ -17,6 +17,16 @@ class AdsExperimentPhase2Test extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_dashboard_renders_phase2_simulation_controls(): void
+    {
+        $response = $this->actingAs($this->user())
+            ->get(route('marketplace.ads.dashboard'));
+
+        $response->assertOk()
+            ->assertSee('Simulasi Phase 2')
+            ->assertSee('experimentSimulationPrice');
+    }
+
     public function test_single_item_period_metrics_include_profit_and_break_even_values(): void
     {
         $store = $this->store('PHASE2-SINGLE');
@@ -162,6 +172,192 @@ class AdsExperimentPhase2Test extends TestCase
             'id' => $experiment->id,
             'new_price' => 120,
         ]);
+    }
+
+    public function test_phase3_returns_funnel_impact_sufficiency_and_positive_verdict(): void
+    {
+        $store = $this->store('PHASE3-POSITIVE');
+        $item = Item::create([
+            'code' => 'PHASE3-ITEM-POS',
+            'name' => 'Phase 3 Positive Item',
+            'type' => 'finished',
+            'hpp' => 20,
+            'active' => true,
+        ]);
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-POS',
+            'channel_item_id' => 'ITEM-PHASE3-POS',
+            'old_price' => 100,
+            'new_price' => 120,
+        ]);
+        $effective = Carbon::parse($experiment->effective_date);
+
+        foreach (range(1, 7) as $days) {
+            $this->campaignFact($store, 'C-PHASE3-POS', $effective->copy()->subDays($days), [
+                'clicks' => 100,
+                'impressions' => 1000,
+                'expense' => 100,
+                'broad_order' => 4,
+                'broad_order_amount' => 4,
+                'broad_gmv' => 400,
+            ]);
+            $this->campaignFact($store, 'C-PHASE3-POS', $effective->copy()->addDays($days), [
+                'clicks' => 100,
+                'impressions' => 1000,
+                'expense' => 100,
+                'broad_order' => 6,
+                'broad_order_amount' => 6,
+                'broad_gmv' => 720,
+            ]);
+        }
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame('POSITIVE', $details['verdict']);
+        $this->assertTrue($details['data_sufficiency']['metric_ready']);
+        $this->assertTrue($details['data_sufficiency']['profit_ready']);
+        $this->assertSame('actual', $details['impact']['profit_measurement']);
+        $this->assertSame('up', $details['impact']['steps']['profit']['direction']);
+        $this->assertEquals(42, $details['impact']['steps']['qty']['after']);
+        $this->assertSame([], $details['conflicts']);
+
+        $this->actingAs($this->user())
+            ->getJson(route('marketplace.ads.experiments.show', ['experiment' => $experiment]))
+            ->assertOk()
+            ->assertJsonPath('data.verdict', 'POSITIVE')
+            ->assertJsonPath('data.impact.profit_measurement', 'actual')
+            ->assertJsonPath('data.data_sufficiency.metric_ready', true);
+    }
+
+    public function test_phase3_marks_overlapping_experiment_as_confounded(): void
+    {
+        $store = $this->store('PHASE3-CONFLICT');
+        $item = Item::create([
+            'code' => 'PHASE3-ITEM-CONFLICT',
+            'name' => 'Phase 3 Conflict Item',
+            'type' => 'finished',
+            'hpp' => 20,
+            'active' => true,
+        ]);
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-CONFLICT',
+            'channel_item_id' => 'ITEM-PHASE3-CONFLICT',
+            'old_price' => 100,
+            'new_price' => 120,
+        ]);
+        $effective = Carbon::parse($experiment->effective_date);
+        MarketplaceAdExperiment::create([
+            'store_id' => $store->id,
+            'change_event_id' => (string) Str::uuid(),
+            'channel_campaign_id' => 'C-PHASE3-CONFLICT',
+            'channel_item_id' => 'ITEM-PHASE3-CONFLICT',
+            'internal_item_id' => $item->id,
+            'change_type' => MarketplaceAdExperiment::CHANGE_TARGET_ROAS,
+            'old_target_roas' => 4,
+            'new_target_roas' => 5,
+            'changed_at' => $effective->copy()->addDays(2),
+            'effective_date' => $effective->copy()->addDays(2)->toDateString(),
+            'lifecycle_status' => MarketplaceAdExperiment::STATUS_LEARNING,
+            'profit_basis' => 'net_hpp_ads',
+            'source_granularity' => 'campaign',
+            'mapping_status' => 'mapped',
+            'baseline_days' => 7,
+            'observation_days' => 7,
+            'calculation_version' => 'phase3-v1',
+        ]);
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame('CONFOUNDED', $details['verdict']);
+        $this->assertSame(MarketplaceAdExperiment::STATUS_CONFOUNDED, $details['lifecycle_status']);
+        $this->assertTrue(collect($details['conflicts'])->contains('reason', 'overlapping_experiment'));
+    }
+
+    public function test_same_day_target_roas_changes_are_grouped_into_one_experiment(): void
+    {
+        $store = $this->store('PHASE3-GROUP');
+        $item = Item::create([
+            'code' => 'PHASE3-ITEM-GROUP',
+            'name' => 'Phase 3 Grouped Item',
+            'type' => 'finished',
+            'hpp' => 20,
+            'active' => true,
+        ]);
+        $changedAt = now()->subDays(2)->startOfDay()->addHours(9);
+        $service = app(\App\Services\Marketplace\Ads\AdsExperimentService::class);
+
+        $first = $service->recordTargetRoasChange(
+            $store,
+            'C-PHASE3-GROUP',
+            'ITEM-PHASE3-GROUP',
+            4,
+            5,
+            [],
+            null,
+            $changedAt,
+        );
+        $second = $service->recordTargetRoasChange(
+            $store,
+            'C-PHASE3-GROUP',
+            'ITEM-PHASE3-GROUP',
+            5,
+            6,
+            [],
+            null,
+            $changedAt->copy()->addHours(4),
+        );
+
+        $this->assertNotNull($first);
+        $this->assertNotNull($second);
+        $this->assertSame($first->id, $second->id);
+        $this->assertDatabaseCount('marketplace_ad_experiments', 1);
+        $this->assertDatabaseHas('marketplace_ad_experiments', [
+            'id' => $first->id,
+            'old_target_roas' => 4,
+            'new_target_roas' => 6,
+        ]);
+
+        $this->actingAs($this->user())
+            ->getJson(route('marketplace.ads.experiments.index', ['store_id' => $store->id]))
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_active_experiment_scope_excludes_confounded_experiment(): void
+    {
+        $store = $this->store('PHASE3-LOCK');
+        $item = Item::create([
+            'code' => 'PHASE3-ITEM-LOCK',
+            'name' => 'Phase 3 Lock Item',
+            'type' => 'finished',
+            'hpp' => 20,
+            'active' => true,
+        ]);
+        $active = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-LOCK',
+            'channel_item_id' => 'ITEM-PHASE3-LOCK',
+            'changed_at' => now()->subDays(2),
+            'effective_date' => now()->subDays(2)->toDateString(),
+            'lifecycle_status' => MarketplaceAdExperiment::STATUS_LEARNING,
+        ]);
+        $confounded = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-CONFOUNDED',
+            'channel_item_id' => 'ITEM-PHASE3-CONFOUNDED',
+            'changed_at' => now()->subDays(2),
+            'effective_date' => now()->subDays(2)->toDateString(),
+            'lifecycle_status' => MarketplaceAdExperiment::STATUS_CONFOUNDED,
+            'confounded' => true,
+        ]);
+
+        $service = app(\App\Services\Marketplace\Ads\AdsExperimentService::class);
+
+        $this->assertSame(
+            $active->id,
+            $service->activeExperimentForScope($store, 'C-PHASE3-LOCK', 'ITEM-PHASE3-LOCK')?->id,
+        );
+        $this->assertNull(
+            $service->activeExperimentForScope($store, 'C-PHASE3-CONFOUNDED', 'ITEM-PHASE3-CONFOUNDED'),
+        );
     }
 
     private function store(string $code): Store

@@ -20,6 +20,8 @@ class AdsExperimentService
     public const MAX_OBSERVATION_DAYS = 14;
     public const MIN_CLICKS = 30;
     public const MIN_ORDERS = 3;
+    public const MIN_DAYS_FOR_VERDICT = 7;
+    public const MATERIAL_CHANGE_PERCENT = 5.0;
 
     public function __construct(
         protected ItemHppResolver $hppResolver,
@@ -147,6 +149,39 @@ class AdsExperimentService
             return null;
         }
 
+        $changedAtLocal = $this->asLocalDateTime($changedAt);
+        $sameDay = $this->sameDayExperimentForScope(
+            $store,
+            $channelCampaignId,
+            $channelItemId,
+            $changedAtLocal,
+        );
+
+        // Multiple ROAS edits on one calendar day are one change event from
+        // an experiment perspective. Keep the first old value and move the
+        // final target forward so the next observation has one clean start.
+        if ($sameDay) {
+            $conflictReasons = array_values(array_unique(array_merge(
+                $sameDay->conflict_reason ?? [],
+                $confounders,
+            )));
+            $sameDay->fill([
+                'new_target_roas' => $newTargetRoas,
+                'changed_at' => $changedAtLocal,
+                'calculation_snapshot' => $this->targetRoasSnapshot(
+                    $sameDay->old_target_roas !== null ? (float) $sameDay->old_target_roas : $oldTargetRoas,
+                    $newTargetRoas,
+                    $sameDay->internal_item_id ? (int) $sameDay->internal_item_id : null,
+                    $sameDay->source_granularity ?: ($channelCampaignId ? 'campaign' : ($channelItemId ? 'item' : 'store')),
+                ),
+                'confounded' => $sameDay->confounded || $conflictReasons !== [],
+                'conflict_reason' => $conflictReasons ?: null,
+            ]);
+            $sameDay->save();
+
+            return $sameDay->refresh();
+        }
+
         $internalItemId = $this->mappedInternalItemId(
             (int) $store->id,
             $channelItemId,
@@ -176,6 +211,47 @@ class AdsExperimentService
             ),
             'created_by' => $createdBy,
         ]);
+    }
+
+    public function activeExperimentForScope(
+        Store $store,
+        ?string $channelCampaignId,
+        ?string $channelItemId,
+        CarbonInterface|string|null $at = null,
+    ): ?MarketplaceAdExperiment {
+        $atLocal = $this->asLocalDateTime($at);
+        $date = $atLocal->toDateString();
+
+        return $this->scopeExperimentQuery($store, $channelCampaignId, $channelItemId)
+            ->whereNotIn('lifecycle_status', [
+                MarketplaceAdExperiment::STATUS_COMPLETED,
+                MarketplaceAdExperiment::STATUS_CONFOUNDED,
+            ])
+            ->whereDate('effective_date', '<=', $date)
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id')
+            ->get()
+            ->first(function (MarketplaceAdExperiment $experiment) use ($atLocal): bool {
+                $effectiveDate = Carbon::parse($experiment->effective_date->toDateString(), $atLocal->getTimezone());
+                return $effectiveDate->copy()->addDays((int) $experiment->observation_days)->toDateString()
+                    >= $atLocal->toDateString();
+            });
+    }
+
+    public function sameDayExperimentForScope(
+        Store $store,
+        ?string $channelCampaignId,
+        ?string $channelItemId,
+        CarbonInterface|string|null $at = null,
+    ): ?MarketplaceAdExperiment {
+        $date = $this->asLocalDateTime($at)->toDateString();
+
+        return $this->scopeExperimentQuery($store, $channelCampaignId, $channelItemId)
+            ->where('change_type', MarketplaceAdExperiment::CHANGE_TARGET_ROAS)
+            ->whereDate('changed_at', $date)
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**
@@ -215,7 +291,22 @@ class AdsExperimentService
         $completedObservationDays = $observationFrom->lte($observationTo)
             ? $observationFrom->diffInDays($observationTo) + 1
             : 0;
-        $status = $this->lifecycleStatus($experiment, $baseline, $observation, $completedObservationDays);
+        $conflicts = $this->detectConflicts($experiment, $effectiveDate, $observationWindowEnd);
+        $dataSufficiency = $this->dataSufficiency(
+            $baseline,
+            $observation,
+            $completedObservationDays,
+            $experiment,
+        );
+        $impact = $this->impactAnalysis($baseline, $observation);
+        $status = $this->lifecycleStatus(
+            $experiment,
+            $baseline,
+            $observation,
+            $completedObservationDays,
+            $conflicts,
+        );
+        $verdict = $this->determineVerdict($impact, $dataSufficiency, $conflicts);
 
         return [
             'experiment' => $experiment,
@@ -249,14 +340,18 @@ class AdsExperimentService
             ],
             'lifecycle_status' => $status,
             'profit_basis' => $experiment->profit_basis,
-            'verdict' => $experiment->verdict,
+            'verdict' => $verdict,
             'baseline' => $baseline,
             'observation' => $observation,
             'metric_delta' => $this->metricDelta($baseline['metrics'], $observation['metrics']),
+            'impact' => $impact,
+            'data_sufficiency' => $dataSufficiency,
+            'conflicts' => $conflicts,
             'data_quality' => [
                 'experiment_flags' => $experiment->data_quality_flags ?? [],
                 'baseline_flags' => $baseline['data_quality'],
                 'observation_flags' => $observation['data_quality'],
+                'conflict_flags' => collect($conflicts)->pluck('reason')->values()->all(),
                 'mapping_status' => $experiment->mapping_status,
                 'actual_profit_ready' => (bool) ($observation['metrics']['actual_profit_ready'] ?? false),
                 'profit_estimated' => (bool) ($observation['metrics']['profit_estimated'] ?? true),
@@ -627,8 +722,9 @@ class AdsExperimentService
         array $baseline,
         array $observation,
         int $completedObservationDays,
+        array $conflicts = [],
     ): string {
-        if ($experiment->confounded) {
+        if ($experiment->confounded || $conflicts !== []) {
             return MarketplaceAdExperiment::STATUS_CONFOUNDED;
         }
         if ($completedObservationDays <= 2) {
@@ -648,6 +744,266 @@ class AdsExperimentService
         return $sufficient
             ? MarketplaceAdExperiment::STATUS_READY_TO_EVALUATE
             : MarketplaceAdExperiment::STATUS_INSUFFICIENT_DATA;
+    }
+
+    /**
+     * Build the causal-ish funnel used by the UI. The service intentionally
+     * reports observed deltas and does not claim that every delta is caused
+     * by the change; conflict and sufficiency checks qualify the verdict.
+     *
+     * @return array<string, mixed>
+     */
+    private function impactAnalysis(array $baseline, array $observation): array
+    {
+        $before = $baseline['metrics'] ?? [];
+        $after = $observation['metrics'] ?? [];
+        $steps = [
+            'traffic' => ['label' => 'Traffic', 'metric' => 'impressions'],
+            'ctr' => ['label' => 'CTR', 'metric' => 'ctr'],
+            'cvr' => ['label' => 'CVR', 'metric' => 'cvr'],
+            'qty' => ['label' => 'Qty', 'metric' => 'qty'],
+            'roas' => ['label' => 'ROAS', 'metric' => 'roas'],
+            'profit' => ['label' => 'Profit', 'metric' => 'profit'],
+        ];
+
+        $impact = [];
+        foreach ($steps as $key => $step) {
+            $metric = $step['metric'];
+            $beforeValue = $before[$metric] ?? null;
+            $afterValue = $after[$metric] ?? null;
+            $delta = $beforeValue !== null && $afterValue !== null
+                ? (float) $afterValue - (float) $beforeValue
+                : null;
+            $changePercent = $beforeValue !== null && (float) $beforeValue != 0.0 && $delta !== null
+                ? round(($delta / (float) $beforeValue) * 100, 2)
+                : null;
+
+            $impact[$key] = [
+                'label' => $step['label'],
+                'metric' => $metric,
+                'before' => $beforeValue,
+                'after' => $afterValue,
+                'delta' => $delta !== null ? round($delta, 6) : null,
+                'change_percent' => $changePercent,
+                'direction' => $this->direction($delta, $changePercent),
+                'available' => $beforeValue !== null && $afterValue !== null,
+            ];
+        }
+
+        $profitReady = (bool) ($before['actual_profit_ready'] ?? false)
+            && (bool) ($after['actual_profit_ready'] ?? false);
+        $impact['profit']['measurement'] = $profitReady
+            ? 'actual'
+            : (($before['profit'] !== null && $after['profit'] !== null) ? 'estimated' : 'unavailable');
+        $impact['profit']['estimated'] = $impact['profit']['measurement'] !== 'actual';
+
+        return [
+            'sequence' => ['traffic', 'ctr', 'cvr', 'qty', 'roas', 'profit'],
+            'steps' => $impact,
+            'profit_measurement' => $impact['profit']['measurement'],
+            'note' => 'Delta adalah perbandingan baseline dan observation; verdict dibatasi oleh sufficiency dan conflict check.',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dataSufficiency(
+        array $baseline,
+        array $observation,
+        int $completedObservationDays,
+        MarketplaceAdExperiment $experiment,
+    ): array {
+        $baselineMetrics = $baseline['metrics'] ?? [];
+        $observationMetrics = $observation['metrics'] ?? [];
+        $checks = [
+            'baseline_clicks' => [
+                'passed' => (int) ($baselineMetrics['clicks'] ?? 0) >= self::MIN_CLICKS,
+                'actual' => (int) ($baselineMetrics['clicks'] ?? 0),
+                'required' => self::MIN_CLICKS,
+            ],
+            'observation_clicks' => [
+                'passed' => (int) ($observationMetrics['clicks'] ?? 0) >= self::MIN_CLICKS,
+                'actual' => (int) ($observationMetrics['clicks'] ?? 0),
+                'required' => self::MIN_CLICKS,
+            ],
+            'baseline_orders' => [
+                'passed' => (int) ($baselineMetrics['orders'] ?? 0) >= self::MIN_ORDERS,
+                'actual' => (int) ($baselineMetrics['orders'] ?? 0),
+                'required' => self::MIN_ORDERS,
+            ],
+            'observation_orders' => [
+                'passed' => (int) ($observationMetrics['orders'] ?? 0) >= self::MIN_ORDERS,
+                'actual' => (int) ($observationMetrics['orders'] ?? 0),
+                'required' => self::MIN_ORDERS,
+            ],
+            'observation_window' => [
+                'passed' => $completedObservationDays >= min((int) $experiment->observation_days, self::MIN_DAYS_FOR_VERDICT),
+                'actual' => $completedObservationDays,
+                'required' => min((int) $experiment->observation_days, self::MIN_DAYS_FOR_VERDICT),
+            ],
+        ];
+        $metricReady = collect($checks)->every(fn (array $check): bool => $check['passed']);
+        $profitReady = $metricReady
+            && (bool) ($baselineMetrics['actual_profit_ready'] ?? false)
+            && (bool) ($observationMetrics['actual_profit_ready'] ?? false);
+
+        $reasons = collect($checks)
+            ->filter(fn (array $check): bool => ! $check['passed'])
+            ->keys()
+            ->values()
+            ->all();
+        if ($experiment->mapping_status !== 'mapped') {
+            $reasons[] = 'missing_mapping';
+        }
+        if (! $profitReady) {
+            $reasons[] = 'profit_not_actual';
+        }
+
+        return [
+            'metric_ready' => $metricReady,
+            'profit_ready' => $profitReady,
+            'ready' => $profitReady,
+            'checks' => $checks,
+            'reasons' => array_values(array_unique($reasons)),
+            'thresholds' => [
+                'min_clicks_per_period' => self::MIN_CLICKS,
+                'min_orders_per_period' => self::MIN_ORDERS,
+                'min_observation_days' => min((int) $experiment->observation_days, self::MIN_DAYS_FOR_VERDICT),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $impact
+     * @param array<string, mixed> $sufficiency
+     * @param array<int, array<string, mixed>> $conflicts
+     */
+    private function determineVerdict(array $impact, array $sufficiency, array $conflicts): string
+    {
+        if ($conflicts !== []) {
+            return 'CONFOUNDED';
+        }
+        if (! ($sufficiency['metric_ready'] ?? false)) {
+            return 'INSUFFICIENT_DATA';
+        }
+        if (! ($sufficiency['profit_ready'] ?? false)) {
+            return 'INCONCLUSIVE';
+        }
+
+        $steps = $impact['steps'] ?? [];
+        $profit = $steps['profit']['change_percent'] ?? null;
+        $roas = $steps['roas']['change_percent'] ?? null;
+        $cvr = $steps['cvr']['change_percent'] ?? null;
+        if ($profit === null) {
+            return 'INCONCLUSIVE';
+        }
+        if (abs((float) $profit) < self::MATERIAL_CHANGE_PERCENT) {
+            return 'NO_CLEAR_IMPACT';
+        }
+        if ((float) $profit > 0) {
+            return ($roas !== null && $roas < -self::MATERIAL_CHANGE_PERCENT)
+                || ($cvr !== null && $cvr < -self::MATERIAL_CHANGE_PERCENT)
+                ? 'MIXED'
+                : 'POSITIVE';
+        }
+
+        return ($roas !== null && $roas > self::MATERIAL_CHANGE_PERCENT)
+            || ($cvr !== null && $cvr > self::MATERIAL_CHANGE_PERCENT)
+            ? 'MIXED'
+            : 'NEGATIVE';
+    }
+
+    private function direction(?float $delta, ?float $changePercent): string
+    {
+        if ($delta === null) {
+            return 'unavailable';
+        }
+        if ($changePercent !== null && abs($changePercent) < self::MATERIAL_CHANGE_PERCENT) {
+            return 'flat';
+        }
+
+        return $delta > 0 ? 'up' : ($delta < 0 ? 'down' : 'flat');
+    }
+
+    /**
+     * Detect another experiment change overlapping this observation window.
+     * Same event rows are ignored because a single price update can create
+     * multiple scoped rows for one campaign/item.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function detectConflicts(
+        MarketplaceAdExperiment $experiment,
+        CarbonInterface $effectiveDate,
+        CarbonInterface $observationWindowEnd,
+    ): array {
+        $conflicts = collect($experiment->conflict_reason ?? [])
+            ->map(fn ($reason): array => [
+                'reason' => (string) $reason,
+                'type' => 'recorded',
+            ])
+            ->values();
+        if ($experiment->confounded && $conflicts->isEmpty()) {
+            $conflicts->push([
+                'reason' => 'recorded_confounder',
+                'type' => 'recorded',
+            ]);
+        }
+
+        $query = MarketplaceAdExperiment::query()
+            ->where('store_id', $experiment->store_id)
+            ->where('id', '!=', $experiment->id)
+            ->where('change_event_id', '!=', $experiment->change_event_id)
+            ->whereBetween('changed_at', [
+                $effectiveDate->copy()->startOfDay(),
+                $observationWindowEnd->copy()->endOfDay(),
+            ]);
+
+        if ($experiment->source_granularity === 'item' && $experiment->channel_item_id) {
+            $query->where('channel_item_id', $experiment->channel_item_id);
+        } elseif ($experiment->source_granularity === 'campaign' && $experiment->channel_campaign_id) {
+            $query->where('channel_campaign_id', $experiment->channel_campaign_id);
+        }
+
+        foreach ($query->get(['id', 'change_type', 'changed_at', 'channel_campaign_id', 'channel_item_id']) as $row) {
+            // Same-day target ROAS edits are treated as one grouped change.
+            // This also keeps historical rows created before the guard from
+            // making every row in that group look confounded on read.
+            if (Carbon::parse($row->changed_at)->toDateString() === $effectiveDate->toDateString()) {
+                continue;
+            }
+            $conflicts->push([
+                'reason' => 'overlapping_experiment',
+                'type' => 'experiment',
+                'experiment_id' => (int) $row->id,
+                'change_type' => $row->change_type,
+                'changed_at' => Carbon::parse($row->changed_at)->toIso8601String(),
+                'channel_campaign_id' => $row->channel_campaign_id,
+                'channel_item_id' => $row->channel_item_id,
+            ]);
+        }
+
+        return $conflicts->values()->all();
+    }
+
+    private function scopeExperimentQuery(
+        Store $store,
+        ?string $channelCampaignId,
+        ?string $channelItemId,
+    ) {
+        return MarketplaceAdExperiment::query()
+            ->where('store_id', $store->id)
+            ->when(
+                $channelCampaignId !== null,
+                fn ($query) => $query->where('channel_campaign_id', $channelCampaignId),
+                fn ($query) => $query->whereNull('channel_campaign_id'),
+            )
+            ->when(
+                $channelItemId !== null,
+                fn ($query) => $query->where('channel_item_id', $channelItemId),
+                fn ($query) => $query->whereNull('channel_item_id'),
+            );
     }
 
     private function mappedInternalItemId(int $storeId, ?string $channelItemId, ?string $channelCampaignId): ?int

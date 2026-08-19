@@ -59,6 +59,18 @@ class AdsActionService
             ? (float) $localCampaign->target_roas
             : null;
 
+        $experimentGuard = $this->activeExperimentGuard(
+            $store,
+            (string) $campaignId,
+            $localCampaign?->channel_item_id !== null ? (string) $localCampaign->channel_item_id : null,
+            $roasTarget !== null && $roasTarget !== ''
+                || $dailyBudget !== null && $dailyBudget !== ''
+                || $statusAction !== null,
+        );
+        if ($experimentGuard) {
+            return $experimentGuard;
+        }
+
         if ($roasTarget !== null && $roasTarget !== '') {
             $params = ['roas_target' => (float) $roasTarget];
             $resRoas = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_roas_target', $params);
@@ -176,6 +188,17 @@ class AdsActionService
             ? (float) $localCampaign->target_roas
             : null;
 
+        $experimentGuard = $this->activeExperimentGuard(
+            $store,
+            $campaignId !== null ? (string) $campaignId : null,
+            $localCampaign?->channel_item_id !== null ? (string) $localCampaign->channel_item_id : null,
+            $roasTarget !== null && $roasTarget !== ''
+                || $dailyBudget !== null && $dailyBudget !== '',
+        );
+        if ($experimentGuard) {
+            return $experimentGuard;
+        }
+
         if ($roasTarget !== null && $roasTarget !== '') {
             $params = ['roas_target' => (float) $roasTarget];
             if ($campaignId) {
@@ -280,6 +303,37 @@ class AdsActionService
         return [
             'status' => 'success',
             'data' => $res['response'] ?? [],
+        ];
+    }
+
+    private function activeExperimentGuard(
+        Store $store,
+        ?string $channelCampaignId,
+        ?string $channelItemId,
+        bool $hasChanges,
+    ): ?array {
+        if (! $hasChanges) {
+            return null;
+        }
+
+        $experiments = app(AdsExperimentService::class);
+        if ($experiments->sameDayExperimentForScope($store, $channelCampaignId, $channelItemId)) {
+            // Same-day edits are folded into the existing experiment record.
+            return null;
+        }
+
+        $active = $experiments->activeExperimentForScope($store, $channelCampaignId, $channelItemId);
+        if (! $active) {
+            return null;
+        }
+
+        $effectiveDate = $active->effective_date?->toDateString() ?? '-';
+
+        return [
+            'status' => 'error',
+            'message' => 'Experiment aktif untuk scope ini sejak ' . $effectiveDate . '. Tunggu observation selesai sebelum mengubah target ROAS, modal, atau status campaign.',
+            'http_status' => 409,
+            'experiment_id' => (int) $active->id,
         ];
     }
 }

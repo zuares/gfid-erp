@@ -23,18 +23,42 @@ class AdsExperimentController extends Controller
             ->with(['store:id,name', 'internalItem:id,code,name'])
             ->when(isset($data['store_id']), fn ($q) => $q->where('store_id', $data['store_id']))
             ->when(isset($data['change_type']), fn ($q) => $q->where('change_type', $data['change_type']))
-            ->when(isset($data['lifecycle_status']), fn ($q) => $q->where('lifecycle_status', $data['lifecycle_status']))
             ->orderByDesc('changed_at')
             ->orderByDesc('id')
             ->limit($data['limit'] ?? 50)
             ->get();
 
-        return response()->json([
-            'data' => $rows->map(fn (MarketplaceAdExperiment $experiment) => [
+        // Historical clients may have written several target-ROAS rows on
+        // one day before the active-experiment guard existed. Present that
+        // group as one latest row without deleting or mutating history.
+        $rows = $rows
+            ->groupBy(function (MarketplaceAdExperiment $experiment): string {
+                if ($experiment->change_type !== MarketplaceAdExperiment::CHANGE_TARGET_ROAS) {
+                    return 'experiment:' . $experiment->id;
+                }
+
+                return implode(':', [
+                    'target_roas',
+                    $experiment->store_id,
+                    $experiment->channel_campaign_id ?? '-',
+                    $experiment->channel_item_id ?? '-',
+                    $experiment->changed_at?->toDateString() ?? '-',
+                ]);
+            })
+            ->map(fn ($group) => $group->sortByDesc('changed_at')->sortByDesc('id')->first())
+            ->values();
+
+        $payload = $rows->map(fn (MarketplaceAdExperiment $experiment) => [
                 'experiment' => $experiment,
                 'details' => $experiments->details($experiment),
-            ])->values(),
-        ]);
+            ]);
+        if (isset($data['lifecycle_status'])) {
+            $payload = $payload->filter(
+                fn (array $row): bool => ($row['details']['lifecycle_status'] ?? null) === $data['lifecycle_status']
+            );
+        }
+
+        return response()->json(['data' => $payload->values()]);
     }
 
     public function show(MarketplaceAdExperiment $experiment, AdsExperimentService $experiments): JsonResponse
