@@ -39,8 +39,8 @@
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        min-height: 52px;
-        padding: 8px 14px 8px 8px;
+        min-height: 44px;
+        padding: 6px 11px 6px 6px;
         border: 1px solid rgba(15, 23, 42, .10);
         border-radius: 18px;
         background: rgba(255, 255, 255, .94);
@@ -65,8 +65,8 @@
     }
 
     .gf-dev-pet-orb {
-        width: 38px;
-        height: 38px;
+        width: 32px;
+        height: 32px;
         border-radius: 14px;
         display: inline-flex;
         align-items: center;
@@ -98,8 +98,8 @@
     }
 
     .gf-dev-pet-panel {
-        width: min(390px, calc(100vw - 24px));
-        max-height: min(72vh, 640px);
+        width: min(350px, calc(100vw - 24px));
+        max-height: min(58vh, 520px);
         display: none;
         flex-direction: column;
         overflow: hidden;
@@ -414,7 +414,7 @@
 
         .gf-dev-pet-panel {
             width: min(100vw - 20px, 372px);
-            max-height: 66vh;
+            max-height: 58vh;
         }
     }
 </style>

@@ -180,11 +180,15 @@
     .gf-owner-floating-tools {
         position: fixed;
         right: 18px;
-        bottom: 86px;
+        top: calc(66px + env(safe-area-inset-top, 0px));
         z-index: 1040;
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        transform: scale(.88);
+        transform-origin: top right;
+        opacity: .72;
+        transition: opacity .16s ease, transform .16s ease;
     }
 
     .gf-owner-mode-trigger,
@@ -193,16 +197,16 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        min-height: 42px;
+        min-height: 36px;
         border-radius: 999px;
-        padding: 0 15px;
+        padding: 0 12px;
         color: #0f172a;
         background: rgba(255,255,255,.92);
         border: 1px solid rgba(15,23,42,.10);
         box-shadow: 0 14px 34px rgba(15,23,42,.14);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 950;
         text-decoration: none;
         letter-spacing: -.01em;
@@ -214,6 +218,12 @@
         color: #0f172a;
         transform: translateY(-1px);
         box-shadow: 0 18px 40px rgba(15,23,42,.18);
+    }
+
+    .gf-owner-floating-tools:focus-within,
+    .gf-owner-floating-tools:hover {
+        opacity: 1;
+        transform: scale(1);
     }
 
     .gf-owner-worklog-nav.is-active {
@@ -288,16 +298,16 @@
 
     @media (max-width: 768px) {
         .gf-owner-floating-tools {
-            left: 8px;
-            right: auto;
-            top: calc(56px + env(safe-area-inset-top));
+            left: auto;
+            right: 8px;
+            top: calc(62px + env(safe-area-inset-top, 0px));
             bottom: auto;
             width: auto;
             justify-content: flex-start;
             gap: 5px;
-            transform: scale(.82);
-            transform-origin: left top;
-            opacity: .60;
+            transform: scale(.78);
+            transform-origin: top right;
+            opacity: .55;
         }
 
         .gf-owner-mode-wrap,
@@ -345,11 +355,6 @@
             max-width: 194px;
         }
 
-        .gf-owner-floating-tools:focus-within,
-        .gf-owner-floating-tools:hover {
-            opacity: 1;
-            transform: scale(.94);
-        }
     }
 </style>
 
@@ -1055,7 +1060,7 @@
         @endif
 
         <div class="gf-owner-floating-tools">
-            <div class="dropup gf-owner-mode-wrap">
+            <div class="dropdown gf-owner-mode-wrap">
                 <button type="button"
                     class="gf-owner-mode-trigger is-{{ $gfDbMode }}"
                     data-bs-toggle="dropdown"
