@@ -584,6 +584,7 @@ class AdsDashboardService
             })
             ->whereIn('cd.store_id', $storeIds)
             ->whereNotNull('c.channel_item_id')
+            ->where('c.channel_campaign_id', 'not like', 'GMS-%')
             ->whereBetween('cd.date', [$dateFrom, $dateTo])
             ->selectRaw('
                 cd.store_id,
@@ -695,10 +696,10 @@ class AdsDashboardService
             ->selectRaw('store_id, channel_item_id, MAX(channel_campaign_id) as channel_campaign_id,
                 SUM(impressions) as impressions, SUM(clicks) as clicks, SUM(expense) as spend,
                 SUM(broad_order) as orders, SUM(broad_gmv) as gmv, SUM(direct_gmv) as direct_gmv')
-            ->groupBy('store_id', 'channel_item_id')
+            ->groupBy('store_id', 'channel_campaign_id', 'channel_item_id')
             ->get();
 
-        if ($gmsProductRaw->isNotEmpty()) {
+        if ($gmsProductRaw->isNotEmpty() || $campaigns->contains(fn ($campaign) => str_starts_with((string) ($campaign->channel_campaign_id ?? ''), 'GMS-'))) {
             $gmsItemIds = $gmsProductRaw->pluck('channel_item_id')->filter()->map(fn ($id) => (string) $id)->unique()->values();
             $gmsProducts = MarketplaceProduct::query()
                 ->whereIn('store_id', $storeIds)
@@ -772,7 +773,66 @@ class AdsDashboardService
                     return $row;
                 });
 
-            $itemPerformance = $itemPerformance->concat($gmsProductRows)->sortByDesc('spend')->values();
+            // Lengkapi selisih antara parent GMS dan rincian item. Beberapa
+            // periode Shopee hanya mengirim sebagian item-level, sehingga
+            // parent tidak boleh hilang dari total hanya karena detailnya
+            // belum lengkap.
+            $gmsParents = $campaigns->filter(fn ($campaign) => str_starts_with((string) ($campaign->channel_campaign_id ?? ''), 'GMS-'));
+            $gmsFallbackRows = collect();
+            foreach ($gmsParents as $parent) {
+                $parentKey = $parent->store_id . '|' . $parent->channel_campaign_id;
+                $itemRows = $gmsProductRows->filter(fn ($product) => $product->store_id . '|' . $product->channel_campaign_id === $parentKey);
+                $itemSpend = (float) $itemRows->sum('spend');
+                $itemGmv = (float) $itemRows->sum('gmv');
+                $itemOrders = (int) $itemRows->sum('orders');
+                $parentSpend = (float) ($parent->spend ?? 0);
+                $parentGmv = (float) ($parent->gmv ?? 0);
+                $parentOrders = (int) ($parent->orders ?? 0);
+                $remainingSpend = max(0, $parentSpend - $itemSpend);
+                $remainingGmv = max(0, $parentGmv - $itemGmv);
+                $remainingOrders = max(0, $parentOrders - $itemOrders);
+
+                $parentHasMetrics = $parentSpend > 0.01 || $parentGmv > 0.01 || $parentOrders > 0;
+                if ($parentHasMetrics && ($itemRows->isEmpty() || $remainingSpend > 0.01 || $remainingGmv > 0.01 || $remainingOrders > 0)) {
+                    $fallbackImpressions = max(0, (int) ($parent->impressions ?? 0) - (int) $itemRows->sum('impressions'));
+                    $fallbackClicks = max(0, (int) ($parent->clicks ?? 0) - (int) $itemRows->sum('clicks'));
+                    $fallbackRow = (object) [
+                        'store_id' => $parent->store_id,
+                        'channel_item_id' => 'GMS-FALLBACK-' . $parent->channel_campaign_id,
+                        'channel_campaign_id' => $parent->channel_campaign_id,
+                        'item_sku' => null,
+                        'item_name' => 'GMV Max Auto — item belum terurai',
+                        'image_url' => null,
+                        'stock_total' => 0,
+                        'item_category' => 'GMV Max Auto',
+                        'has_gms' => true,
+                        'is_gms_fallback' => true,
+                        'price_min' => 0,
+                        'impressions' => $fallbackImpressions,
+                        'clicks' => $fallbackClicks,
+                        'spend' => $remainingSpend,
+                        'gmv' => $remainingGmv,
+                        'orders' => $remainingOrders,
+                        'items_sold' => $remainingOrders,
+                        'direct_gmv' => 0,
+                        'unit_cogs' => 0,
+                        'net_revenue' => $remainingGmv * self::DEFAULT_NET_REVENUE_RATIO,
+                        'gross_profit' => null,
+                        'profit_after_ads' => null,
+                        'poas' => null,
+                        'roas' => $remainingSpend > 0 ? $remainingGmv / $remainingSpend : 0,
+                        'ctr' => $fallbackImpressions > 0 ? ($fallbackClicks / $fallbackImpressions) * 100 : 0,
+                        'cvr' => $fallbackClicks > 0 ? ($remainingOrders / $fallbackClicks) * 100 : 0,
+                        'cpc' => $fallbackClicks > 0 ? $remainingSpend / $fallbackClicks : 0,
+                        'cpa' => $remainingOrders > 0 ? $remainingSpend / $remainingOrders : 0,
+                        'classification' => 'Review',
+                        'class_color' => 'secondary',
+                    ];
+                    $gmsFallbackRows->push($fallbackRow);
+                }
+            }
+
+            $itemPerformance = $itemPerformance->concat($gmsProductRows)->concat($gmsFallbackRows)->sortByDesc('spend')->values();
         }
 
         // Pass an empty gmsItems so we don't break other parts if they exist
