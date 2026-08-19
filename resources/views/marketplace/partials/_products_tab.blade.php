@@ -1,16 +1,76 @@
 @php
-    $totalActiveProducts = $itemPerformance->count();
-    $totalStock = $itemPerformance->sum('stock_total');
-    $knownProfitItems = $itemPerformance->filter(fn ($r) => $r->profit_after_ads !== null);
+    // GMV Max Auto pada dashboard disimpan sebagai agregat campaign GMS.
+    // Gunakan baris parent campaign yang sudah tersedia, tanpa memuat ulang
+    // performa item-level agar tab Product tetap ringan.
+    $gmsChannelItemIds = collect($campaigns ?? [])
+        ->filter(fn ($campaign) => str_starts_with(strtoupper((string) ($campaign->channel_campaign_id ?? '')), 'GMS-'))
+        ->pluck('channel_item_id')
+        ->filter()
+        ->map(fn ($id) => (string) $id)
+        ->all();
+
+    $gmsProductRows = collect($campaigns ?? [])
+        ->filter(fn ($campaign) => str_starts_with(strtoupper((string) ($campaign->channel_campaign_id ?? '')), 'GMS-'))
+        ->filter(fn ($campaign) => (float) ($campaign->spend ?? 0) > 0 || (float) ($campaign->gmv ?? 0) > 0)
+        ->map(function ($campaign) {
+            $row = clone $campaign;
+            $reco = is_array($campaign->reco ?? null) ? $campaign->reco : [];
+            $recoLabel = $reco['label'] ?? (is_string($campaign->reco ?? null) ? $campaign->reco : 'Review');
+            $recoClass = $reco['class'] ?? null;
+            $row->is_gms = true;
+            $row->has_gms = true;
+            $row->item_name = $campaign->campaign_name ?: 'GMV Max Auto';
+            $row->item_sku = 'Campaign ' . ($campaign->channel_campaign_id ?: 'GMS');
+            $row->item_category = 'GMV Max Auto';
+            $row->image_url = null;
+            $row->stock_total = 0;
+            $row->ctr = ($campaign->impressions ?? 0) > 0
+                ? (($campaign->clicks ?? 0) / $campaign->impressions) * 100
+                : 0;
+            $row->cvr = ($campaign->clicks ?? 0) > 0
+                ? (($campaign->orders ?? 0) / $campaign->clicks) * 100
+                : 0;
+            $row->gross_profit = $campaign->profit_after_ads !== null && $campaign->spend > 0
+                ? (float) $campaign->profit_after_ads + ((float) $campaign->spend * 1.11)
+                : null;
+            $row->poas = $campaign->profit_after_ads !== null && $campaign->spend > 0
+                ? (float) $campaign->profit_after_ads / ((float) $campaign->spend * 1.11)
+                : null;
+            $row->classification = $recoLabel;
+            $row->class_color = match ($recoClass) {
+                'reco-scale' => 'success',
+                'reco-ok' => 'info',
+                'reco-warn' => 'warning',
+                'reco-stop' => 'danger',
+                default => 'secondary',
+            };
+
+            return $row;
+        });
+
+    $productSourceRows = $itemPerformance
+        ->reject(function ($row) use ($gmsChannelItemIds) {
+            $itemId = (string) ($row->channel_item_id ?? '');
+            return !empty($row->has_gms)
+                || str_starts_with(strtoupper($itemId), 'GMS-')
+                || in_array($itemId, $gmsChannelItemIds, true);
+        })
+        ->concat($gmsProductRows)
+        ->sortByDesc('spend')
+        ->values();
+
+    $totalActiveProducts = $productSourceRows->count();
+    $totalStock = $productSourceRows->sum('stock_total');
+    $knownProfitItems = $productSourceRows->filter(fn ($r) => $r->profit_after_ads !== null);
     $totalProfit = $knownProfitItems->sum('profit_after_ads');
     $totalGrossProfit = $knownProfitItems->sum('gross_profit');
-    $unknownProfitItems = $itemPerformance->count() - $knownProfitItems->count();
-    $totalAdSpend = $itemPerformance->sum('spend');
+    $unknownProfitItems = $productSourceRows->count() - $knownProfitItems->count();
+    $totalAdSpend = $productSourceRows->sum('spend');
     $knownAdSpend = $knownProfitItems->sum('spend');
-    $totalOrders = $itemPerformance->sum('orders');
-    $totalGmv = $itemPerformance->sum('gmv');
-    $productRows = $itemPerformance->map(function ($row) {
-        $isGms = !empty($row->has_gms);
+    $totalOrders = $productSourceRows->sum('orders');
+    $totalGmv = $productSourceRows->sum('gmv');
+    $productRows = $productSourceRows->map(function ($row) {
+        $isGms = !empty($row->has_gms) || !empty($row->is_gms);
         $isProblematic = (float) ($row->unit_cogs ?? 0) <= 0;
         return [
             'row' => $row,
@@ -76,7 +136,7 @@
     ];
     $productInitialKpi = $productSegmentKpis['category'];
 
-    $scatterDataJson = json_encode($itemPerformance->map(function($r) {
+    $scatterDataJson = json_encode($productSourceRows->map(function($r) {
         return [
             'x' => $r->spend,
             'y' => $r->profit_after_ads,
