@@ -1665,15 +1665,55 @@ function sortTrafficTable(col) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
+function trafficToggleCategory(row) {
+    row.classList.toggle('open');
+    const detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('traffic-category-detail')) {
+        detail.style.display = (detail.style.display === 'none' || !detail.style.display) ? 'table-row' : 'none';
+    }
+}
+
+function trafficFormatNumber(value, decimals) {
+    return Number(value || 0).toLocaleString('id-ID', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+}
+
+function trafficUpdateKpis(view) {
+    const kpi = (window.__trafficKpiData || {})[view] || (window.__trafficKpiData || {}).category || {};
+    const setValue = function(key, value) {
+        document.querySelectorAll('[data-traffic-kpi-value="' + key + '"]').forEach(function(el) {
+            el.textContent = value;
+        });
+    };
+
+    setValue('campaigns', trafficFormatNumber(kpi.campaigns, 0));
+    setValue('spend', 'Rp ' + trafficFormatNumber(kpi.spend, 0));
+    setValue('impressions', trafficFormatNumber(kpi.impressions, 0));
+    setValue('clicks', trafficFormatNumber(kpi.clicks, 0));
+    setValue('ctr', trafficFormatNumber(kpi.ctr, 2) + '%');
+    setValue('cpc', 'Rp ' + trafficFormatNumber(kpi.cpc, 0));
+}
+
 window.__trafficPerformanceView = function(view) {
-    const rows = Array.from(document.querySelectorAll('.traffic-performance-row'));
+    const rows = Array.from(document.querySelectorAll('.traffic-performance-row, .traffic-category-row'));
+    const categoryDetails = Array.from(document.querySelectorAll('.traffic-category-detail'));
     const emptyState = document.querySelector('.traffic-view-empty');
     const noDataState = document.querySelector('.traffic-no-data');
     let visibleCount = 0;
 
+    trafficUpdateKpis(view);
+    categoryDetails.forEach(function(detail) { detail.style.display = 'none'; });
+
     rows.forEach(function(row) {
-        const visible = (row.dataset.trafficViews || '').split(/\s+/).includes(view);
+        const isCategoryView = view === 'category';
+        const visible = isCategoryView
+            ? row.classList.contains('traffic-category-row')
+            : row.classList.contains('traffic-performance-row')
+                && (row.dataset.trafficViews || '').split(/\s+/).includes(view);
         row.style.display = visible ? '' : 'none';
+        row.classList.remove('open');
         if (visible) visibleCount++;
     });
 
@@ -2267,6 +2307,84 @@ document.addEventListener('DOMContentLoaded', function() {
                 @endif
             </div>
 
+            @php
+                $trafficRows = collect($campaigns)->map(function ($row) {
+                    $isGms = str_starts_with((string) ($row->channel_campaign_id ?? ''), 'GMS-');
+                    $isProblematic = !$isGms && (float) ($row->unit_cogs ?? 0) <= 0;
+                    $impressions = (int) ($row->sum_impressions ?? 0);
+                    $clicks = (int) ($row->clicks ?? 0);
+                    $spend = (float) ($row->spend ?? 0);
+                    $orders = (int) ($row->orders ?? 0);
+                    $ctr = $impressions > 0 ? ($clicks / $impressions) * 100 : 0;
+                    $cvr = $clicks > 0 ? ($orders / $clicks) * 100 : 0;
+
+                    return [
+                        'row' => $row,
+                        'name' => $row->campaign_name ?: 'Tanpa Nama',
+                        'id' => $row->channel_campaign_id,
+                        'category' => $row->item_category ?? $row->internalItem?->category?->name ?? 'Belum termapping',
+                        'is_gms' => $isGms,
+                        'views' => $isGms
+                            ? ['gms']
+                            : array_values(array_unique(array_merge(['category', 'roas'], $isProblematic ? ['unmapped'] : []))),
+                        'spend' => $spend,
+                        'impressions' => $impressions,
+                        'clicks' => $clicks,
+                        'ctr' => $ctr,
+                        'orders' => $orders,
+                        'cvr' => $cvr,
+                        'cpc' => $clicks > 0 ? $spend / $clicks : 0,
+                        'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
+                    ];
+                })->values();
+                $trafficRegularRows = $trafficRows->filter(fn ($row) => !$row['is_gms']);
+                $trafficCategoryCampaignRows = $trafficRegularRows->groupBy('category');
+                $trafficCategoryRows = $trafficCategoryCampaignRows->map(function ($group, $category) {
+                    $impressions = $group->sum('impressions');
+                    $clicks = $group->sum('clicks');
+                    $spend = $group->sum('spend');
+                    return [
+                        'category' => $category,
+                        'campaigns' => $group->count(),
+                        'spend' => $spend,
+                        'impressions' => $impressions,
+                        'clicks' => $clicks,
+                        'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
+                        'orders' => $group->sum('orders'),
+                        'cvr' => $clicks > 0 ? ($group->sum('orders') / $clicks) * 100 : 0,
+                        'cpc' => $clicks > 0 ? $spend / $clicks : 0,
+                        'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
+                    ];
+                })->sortByDesc('spend')->values();
+                $trafficSegmentRows = [
+                    'category' => $trafficRegularRows,
+                    'roas' => $trafficRows->filter(fn ($row) => in_array('roas', $row['views'], true)),
+                    'gms' => $trafficRows->filter(fn ($row) => in_array('gms', $row['views'], true)),
+                    'unmapped' => $trafficRows->filter(fn ($row) => in_array('unmapped', $row['views'], true)),
+                ];
+                $trafficSegmentKpis = collect($trafficSegmentRows)->map(function ($rows) {
+                    $impressions = $rows->sum('impressions');
+                    $clicks = $rows->sum('clicks');
+                    $spend = $rows->sum('spend');
+                    return [
+                        'campaigns' => $rows->count(),
+                        'spend' => $spend,
+                        'impressions' => $impressions,
+                        'clicks' => $clicks,
+                        'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
+                        'cpc' => $clicks > 0 ? $spend / $clicks : 0,
+                    ];
+                })->all();
+                $trafficInitialKpi = $trafficSegmentKpis['category'];
+            @endphp
+            <script>window.__trafficKpiData = {!! json_encode($trafficSegmentKpis) !!};</script>
+            <style>
+                .traffic-category-row { cursor:pointer; }
+                .traffic-category-row:hover { background:rgba(37,99,235,.04); }
+                .traffic-caret { transition:transform .15s; }
+                .traffic-category-row.open .traffic-caret { transform:rotate(90deg); }
+            </style>
+
             {{-- TABEL TRAFFIC --}}
             <div class="ads-tab-panel mb-4">
                 <div class="ads-tab-panel-head">
@@ -2279,7 +2397,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
                     <button type="button" id="btnTrafficRoas" class="btn fw-bold" onclick="__trafficPerformanceView('roas')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
                     <button type="button" id="btnTrafficGms" class="btn fw-bold" onclick="__trafficPerformanceView('gms')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
-                    <button type="button" id="btnTrafficUnmapped" class="btn fw-bold" onclick="__trafficPerformanceView('unmapped')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Belum Mapping</button>
+                    <button type="button" id="btnTrafficUnmapped" class="btn fw-bold" onclick="__trafficPerformanceView('unmapped')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Bermasalah</button>
+                </div>
+                <div class="px-3 pb-2">
+                    <div class="ads-kpi-grid mb-2">
+                        <div class="dpanel ads-kpi kpi-revenue">
+                            <div class="ads-kpi-label"><i class="bi bi-list-nested"></i> Campaign</div>
+                            <div class="ads-kpi-value" data-traffic-kpi-value="campaigns">{{ number_format($trafficInitialKpi['campaigns'], 0, ',', '.') }}</div>
+                            <div class="ads-kpi-sub">sesuai subtab aktif</div>
+                        </div>
+                        <div class="dpanel ads-kpi kpi-spend">
+                            <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
+                            <div class="ads-kpi-value" data-traffic-kpi-value="spend">Rp {{ number_format($trafficInitialKpi['spend'], 0, ',', '.') }}</div>
+                            <div class="ads-kpi-sub">CPC <span data-traffic-kpi-value="cpc">Rp {{ number_format($trafficInitialKpi['cpc'], 0, ',', '.') }}</span></div>
+                        </div>
+                        <div class="dpanel ads-kpi">
+                            <div class="ads-kpi-label"><i class="bi bi-eye"></i> Jangkauan</div>
+                            <div class="ads-kpi-value" data-traffic-kpi-value="impressions">{{ number_format($trafficInitialKpi['impressions'], 0, ',', '.') }}</div>
+                            <div class="ads-kpi-sub"><span data-traffic-kpi-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span> klik</div>
+                        </div>
+                        <div class="dpanel ads-kpi">
+                            <div class="ads-kpi-label"><i class="bi bi-percent"></i> CTR</div>
+                            <div class="ads-kpi-value" data-traffic-kpi-value="ctr">{{ number_format($trafficInitialKpi['ctr'], 2, ',', '.') }}%</div>
+                            <div class="ads-kpi-sub">klik dibanding jangkauan</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
@@ -2299,51 +2441,76 @@ document.addEventListener('DOMContentLoaded', function() {
                             </tr>
                         </thead>
                         <tbody>
-                            @if(empty($campaigns) || count($campaigns) == 0)
+                            @if($trafficRows->isEmpty())
                                 <tr class="traffic-no-data">
                                     <td colspan="10" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
                                 </tr>
                             @else
-                                @foreach($campaigns as $row)
-                                    @php
-                                        $trafficIsGms = str_starts_with((string) ($row->channel_campaign_id ?? ''), 'GMS-');
-                                        $trafficIsUnmapped = !$trafficIsGms && empty($row->item_category);
-                                        $trafficViews = $trafficIsGms
-                                            ? ['gms']
-                                            : array_values(array_unique(array_merge(['category', 'roas'], $trafficIsUnmapped ? ['unmapped'] : [])));
-                                        $cImp = $row->sum_impressions ?? 0;
-                                        $cClicks = $row->clicks ?? 0;
-                                        $cSpend = $row->spend ?? 0;
-                                        $cCtr = $cImp > 0 ? ($cClicks / $cImp) * 100 : 0;
-                                        $cOrders = $row->orders ?? 0;
-                                        $cCvr = $cClicks > 0 ? ($cOrders / $cClicks) * 100 : 0;
-                                        $cCpc = $cClicks > 0 ? $cSpend / $cClicks : 0;
-                                        $cCpm = $cImp > 0 ? ($cSpend / $cImp) * 1000 : 0;
-                                    @endphp
-                                    <tr class="traffic-performance-row" data-traffic-views="{{ implode(' ', $trafficViews) }}" data-campaign_name="{{ strtolower($row->campaign_name ?? '') }}"
-                                        data-spend="{{ $cSpend }}"
-                                        data-impressions="{{ $cImp }}"
-                                        data-clicks="{{ $cClicks }}"
-                                        data-ctr="{{ $cCtr }}"
-                                        data-orders="{{ $cOrders }}"
-                                        data-cvr="{{ $cCvr }}"
-                                        data-cpc="{{ $cCpc }}"
-                                        data-cpm="{{ $cCpm }}">
+                                @foreach($trafficCategoryRows as $categoryRow)
+                                    <tr class="traffic-category-row" data-traffic-views="category" onclick="trafficToggleCategory(this)">
                                         <td>
                                             <span class="badge" style="background: rgba(255, 102, 0, 0.1); color: #ff6600; font-size: 0.65rem;">SHOPEE</span>
                                         </td>
                                         <td>
-                                            <div class="fw-bold" style="font-size: 0.78rem;">{{ $row->campaign_name ?: 'Tanpa Nama' }}</div>
-                                            <div class="text-muted" style="font-size: 0.65rem;">ID: {{ $row->channel_campaign_id }}</div>
+                                            <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div></div>
+                                            <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
                                         </td>
-                                        <td class="text-end">Rp {{ number_format($cSpend, 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cImp, 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cClicks, 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cCtr, 2, ',', '.') }}%</td>
-                                        <td class="text-end">{{ number_format($cOrders, 0, ',', '.') }}</td>
-                                        <td class="text-end">{{ number_format($cCvr, 2, ',', '.') }}%</td>
-                                        <td class="text-end">Rp {{ number_format($cCpc, 0, ',', '.') }}</td>
-                                        <td class="text-end">Rp {{ number_format($cCpm, 0, ',', '.') }}</td>
+                                        <td class="text-end">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($categoryRow['impressions'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($categoryRow['clicks'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($categoryRow['ctr'], 2, ',', '.') }}%</td>
+                                        <td class="text-end">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($categoryRow['cvr'], 2, ',', '.') }}%</td>
+                                        <td class="text-end">Rp {{ number_format($categoryRow['cpc'], 0, ',', '.') }}</td>
+                                        <td class="text-end">Rp {{ number_format($categoryRow['cpm'], 0, ',', '.') }}</td>
+                                    </tr>
+                                    <tr class="traffic-category-detail" style="display:none;">
+                                        <td colspan="10" class="bg-light">
+                                            <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover align-middle mb-0" style="font-size:.72rem;">
+                                                    <thead>
+                                                        <tr><th>Campaign</th><th class="text-end">Spend</th><th class="text-end">Jangkauan</th><th class="text-end">Klik</th><th class="text-end">CTR</th><th class="text-end">Orders</th><th class="text-end">CPC</th><th class="text-end">CPM</th></tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($trafficCategoryCampaignRows->get($categoryRow['category'], collect()) as $campaignRow)
+                                                            <tr>
+                                                                <td><div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $campaignRow['name'] }}">{{ $campaignRow['name'] }}</div><div class="text-muted" style="font-size:.62rem;">ID: {{ $campaignRow['id'] }}</div></td>
+                                                                <td class="text-end">Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</td>
+                                                                <td class="text-end">{{ number_format($campaignRow['impressions'], 0, ',', '.') }}</td>
+                                                                <td class="text-end">{{ number_format($campaignRow['clicks'], 0, ',', '.') }}</td>
+                                                                <td class="text-end">{{ number_format($campaignRow['ctr'], 2, ',', '.') }}%</td>
+                                                                <td class="text-end">{{ number_format($campaignRow['orders'], 0, ',', '.') }}</td>
+                                                                <td class="text-end">Rp {{ number_format($campaignRow['cpc'], 0, ',', '.') }}</td>
+                                                                <td class="text-end">Rp {{ number_format($campaignRow['cpm'], 0, ',', '.') }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                @foreach($trafficRows as $trafficRow)
+                                    <tr class="traffic-performance-row" data-traffic-views="{{ implode(' ', $trafficRow['views']) }}" data-campaign_name="{{ strtolower($trafficRow['name']) }}"
+                                        data-spend="{{ $trafficRow['spend'] }}"
+                                        data-impressions="{{ $trafficRow['impressions'] }}"
+                                        data-clicks="{{ $trafficRow['clicks'] }}"
+                                        data-ctr="{{ $trafficRow['ctr'] }}"
+                                        data-orders="{{ $trafficRow['orders'] }}"
+                                        data-cvr="{{ $trafficRow['cvr'] }}"
+                                        data-cpc="{{ $trafficRow['cpc'] }}"
+                                        data-cpm="{{ $trafficRow['cpm'] }}">
+                                        <td><span class="badge" style="background: rgba(255, 102, 0, 0.1); color: #ff6600; font-size: 0.65rem;">SHOPEE</span></td>
+                                        <td><div class="fw-bold" style="font-size: 0.78rem;">{{ $trafficRow['name'] }}</div><div class="text-muted" style="font-size: 0.65rem;">ID: {{ $trafficRow['id'] }}</div></td>
+                                        <td class="text-end">Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($trafficRow['impressions'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($trafficRow['clicks'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($trafficRow['ctr'], 2, ',', '.') }}%</td>
+                                        <td class="text-end">{{ number_format($trafficRow['orders'], 0, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($trafficRow['cvr'], 2, ',', '.') }}%</td>
+                                        <td class="text-end">Rp {{ number_format($trafficRow['cpc'], 0, ',', '.') }}</td>
+                                        <td class="text-end">Rp {{ number_format($trafficRow['cpm'], 0, ',', '.') }}</td>
                                     </tr>
                                 @endforeach
                             @endif
@@ -2602,7 +2769,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
 
             {{-- De-dup: blok "Ringkasan Profit" dipindah sepenuhnya ke tab Profit
-                 (_profitability_tab sudah punya Per Kategori / GMV Max ROAS / GMV Max Auto / Produk Belum Mapping
+                 (_profitability_tab sudah punya Per Kategori / GMV Max ROAS / GMV Max Auto / Produk Bermasalah
                  versi lengkap dengan drilldown). Dihapus dari Ringkasan agar tidak redundan.
                  @include('marketplace.partials._summary_profit_breakdown') --}}
 

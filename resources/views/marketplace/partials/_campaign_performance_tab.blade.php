@@ -136,7 +136,10 @@
         $campaignName = (string) ($camp->campaign_name ?? '');
         $isGmvMax = str_starts_with(strtoupper($campaignId), 'GMS-')
             || str_contains(strtolower($campaignName), 'gmv max');
-        $isUnmapped = !$isGmvMax && ($camp->internalItem === null || (float) ($camp->unit_cogs ?? 0) <= 0);
+        // Produk dianggap bermasalah bila HPP efektif belum tersedia. HPP bisa
+        // berasal dari mapping SKU, jadi jangan hanya bergantung pada relasi
+        // internalItem yang masih bisa kosong setelah mapping diperbaiki.
+        $isUnmapped = !$isGmvMax && (float) ($camp->unit_cogs ?? 0) <= 0;
         $performanceViews = $isGmvMax
             ? ['gms']
             : array_values(array_unique(array_merge(['category', 'roas'], $isUnmapped ? ['unmapped'] : [])));
@@ -233,6 +236,31 @@
         'unmapped' => $perfRows->filter(fn ($row) => in_array('unmapped', $row['performance_views'] ?? [], true))->count(),
     ];
 
+    // KPI mengikuti subtab aktif, seperti pada tab Profit. Baris campaign
+    // tetap menjadi sumber daftar detail di tabel bawahnya.
+    $perfSegmentRows = [
+        'category' => $perfRows->filter(fn ($row) => in_array('category', $row['performance_views'] ?? [], true)),
+        'roas' => $perfRows->filter(fn ($row) => in_array('roas', $row['performance_views'] ?? [], true)),
+        'gms' => $perfRows->filter(fn ($row) => in_array('gms', $row['performance_views'] ?? [], true)),
+        'unmapped' => $perfRows->filter(fn ($row) => in_array('unmapped', $row['performance_views'] ?? [], true)),
+    ];
+    $perfSegmentKpis = collect($perfSegmentRows)->map(function ($rows) {
+        $knownProfitRows = $rows->filter(fn ($row) => $row['profit_available']);
+        $spend = $rows->sum('spend');
+        $gmv = $rows->sum('gmv');
+
+        return [
+            'campaigns' => $rows->count(),
+            'spend' => $spend,
+            'gmv' => $gmv,
+            'orders' => $rows->sum('orders'),
+            'roas' => $spend > 0 ? $gmv / $spend : 0,
+            'profit' => $knownProfitRows->sum('profit'),
+            'profit_unknown' => $rows->count() - $knownProfitRows->count(),
+        ];
+    })->all();
+    $perfInitialKpi = $perfSegmentKpis['category'];
+
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
             'x' => $r['spend'],
@@ -271,7 +299,7 @@
     .perf-chip > b { font-weight: 700; }
 </style>
 
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4" id="campaignPerformanceOverallKpis">
     <div class="col-6 col-md-3">
         <div class="dpanel p-3 h-100">
             <div class="text-muted small fw-bold text-uppercase mb-1">Total Spend</div>
@@ -348,7 +376,36 @@
         <button type="button" id="btnPerformanceCategory" class="btn fw-bold" onclick="__campaignPerformanceView('category')" data-perf-count="{{ $perfSegmentCounts['category'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
         <button type="button" id="btnPerformanceRoas" class="btn fw-bold" onclick="__campaignPerformanceView('roas')" data-perf-count="{{ $perfSegmentCounts['roas'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
         <button type="button" id="btnPerformanceGms" class="btn fw-bold" onclick="__campaignPerformanceView('gms')" data-perf-count="{{ $perfSegmentCounts['gms'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
-        <button type="button" id="btnPerformanceUnmapped" class="btn fw-bold" onclick="__campaignPerformanceView('unmapped')" data-perf-count="{{ $perfSegmentCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Belum Mapping</button>
+        <button type="button" id="btnPerformanceUnmapped" class="btn fw-bold" onclick="__campaignPerformanceView('unmapped')" data-perf-count="{{ $perfSegmentCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Bermasalah</button>
+    </div>
+    <div class="px-3 pb-2" id="campaignPerformanceSubtabKpis">
+        <div class="ads-kpi-grid mb-2">
+            <div class="dpanel ads-kpi kpi-revenue">
+                <div class="ads-kpi-label"><i class="bi bi-list-nested"></i> Campaign</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</div>
+                <div class="ads-kpi-sub">sesuai subtab aktif</div>
+            </div>
+            <div class="dpanel ads-kpi kpi-spend">
+                <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="spend">Rp {{ number_format($perfInitialKpi['spend'], 0, ',', '.') }}</div>
+                <div class="ads-kpi-sub">{{ number_format($perfInitialKpi['orders'], 0, ',', '.') }} order</div>
+            </div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label"><i class="bi bi-graph-up-arrow"></i> Omzet GMV</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="gmv">Rp {{ number_format($perfInitialKpi['gmv'], 0, ',', '.') }}</div>
+                <div class="ads-kpi-sub">{{ number_format($perfInitialKpi['orders'], 0, ',', '.') }} order</div>
+            </div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label"><i class="bi bi-speedometer2"></i> ROAS</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="roas">{{ number_format($perfInitialKpi['roas'], 2, ',', '.') }}x</div>
+                <div class="ads-kpi-sub">GMV dibanding iklan</div>
+            </div>
+            <div class="dpanel ads-kpi kpi-profit">
+                <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="profit">Rp {{ number_format($perfInitialKpi['profit'], 0, ',', '.') }}</div>
+                <div class="ads-kpi-sub"><span data-perf-kpi-value="profit_unknown">{{ $perfInitialKpi['profit_unknown'] }}</span> belum ada HPP</div>
+            </div>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
@@ -519,11 +576,47 @@ function perfToggleCategory(row) {
     }
 }
 
+const perfKpiData = {!! json_encode($perfSegmentKpis) !!};
+
+function perfKpiNumber(value, decimals) {
+    return Number(value || 0).toLocaleString('id-ID', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+}
+
+function perfUpdateKpis(segment) {
+    const kpi = perfKpiData[segment] || perfKpiData.category || {};
+    const setValue = function(key, value) {
+        document.querySelectorAll('[data-perf-kpi-value="' + key + '"]').forEach(function(el) {
+            el.textContent = value;
+        });
+    };
+
+    setValue('campaigns', perfKpiNumber(kpi.campaigns, 0));
+    setValue('spend', 'Rp ' + perfKpiNumber(kpi.spend, 0));
+    setValue('gmv', 'Rp ' + perfKpiNumber(kpi.gmv, 0));
+    setValue('orders', perfKpiNumber(kpi.orders, 0));
+    setValue('roas', perfKpiNumber(kpi.roas, 2) + 'x');
+    setValue('profit', 'Rp ' + perfKpiNumber(kpi.profit, 0));
+    setValue('profit_unknown', perfKpiNumber(kpi.profit_unknown, 0));
+
+    const profitValue = document.querySelector('[data-perf-kpi-value="profit"]');
+    if (profitValue) {
+        profitValue.classList.remove('text-warning', 'text-success', 'text-danger');
+        profitValue.classList.add(Number(kpi.profit_unknown || 0) > 0
+            ? 'text-warning'
+            : Number(kpi.profit || 0) >= 0 ? 'text-success' : 'text-danger');
+    }
+}
+
 function perfApplySegment(segment) {
     const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row'));
     const categoryDetails = Array.from(document.querySelectorAll('.perf-category-detail'));
     const emptyState = document.querySelector('.perf-segment-empty');
     const noDataState = document.querySelector('.perf-no-data');
+
+    perfUpdateKpis(segment);
 
     if (!rows.length) {
         if (emptyState) emptyState.style.display = 'none';

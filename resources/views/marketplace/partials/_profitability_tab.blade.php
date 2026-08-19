@@ -946,7 +946,7 @@ window.__profitChartData = {
         <button type="button" id="btnViewGms" class="btn fw-bold" onclick="__profitView('gms')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#0369a1; border:1px solid rgba(3,105,161,.35); background:rgba(3,105,161,.06);">GMV Max Auto</button>
     @endif
     @if($hasProductUnmappedTab)
-        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Produk Belum Mapping</button>
+        <button type="button" id="btnViewProductUnmapped" class="btn fw-bold" onclick="__profitView('product-unmapped')" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:#b45309; border:1px solid rgba(180,83,9,.35); background:rgba(217,119,6,.06);">Produk Bermasalah</button>
     @endif
 </div>
 @if($mappableProfitRows->isNotEmpty())
@@ -962,7 +962,7 @@ window.__profitChartData = {
     <div class="ads-tab-panel mb-3">
         <div class="ads-tab-panel-head">
             <div>
-                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#b45309;"></i> Produk Belum Mapping</div>
+                <div class="ads-tab-panel-title"><i class="bi bi-box-seam" style="color:#b45309;"></i> Produk Bermasalah</div>
                 <div class="ads-tab-panel-note">Produk tanpa HPP · pilih item untuk mapping.</div>
             </div>
             <span id="productUnmappedBadge" style="font-size:.7rem;font-weight:800;color:#92400e;background:rgba(217,119,6,.1);padding:.3rem .6rem;border-radius:999px;">Memuat…</span>
