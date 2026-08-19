@@ -423,10 +423,15 @@
 
         const route = routes.gmsCampaignEdit || '/marketplace/ads-dashboard/gms-campaign-edit';
         const btn = document.getElementById('btnSubmitGmsSettings');
-        const storeId = document.getElementById('gmsStoreId')?.value;
-        const dailyBudget = document.getElementById('gmsDailyBudget')?.value;
+        const storeId = document.getElementById('gmsStoreId')?.value || getStoreId();
+        const dailyBudget = document.getElementById('gmsDailyBudget')?.value || null;
         const roasTarget = document.getElementById('gmsRoasTarget')?.value;
         const campaignId = document.getElementById('gmsCampaignId')?.value;
+
+        if (!storeId || storeId === 'all') {
+            getToast('Pilih satu toko terlebih dahulu untuk mengubah Target ROAS.');
+            return;
+        }
 
         if (!dailyBudget && !roasTarget) {
             getToast('Harap isi minimal salah satu pengaturan (Budget atau ROAS).');
@@ -454,6 +459,7 @@
         .then(res => {
             if (res.status === 'success') {
                 getToast(res.message);
+                setTimeout(() => window.location.reload(), 900);
             } else {
                 getToast('Error: ' + (res.message || 'Unknown error'));
             }

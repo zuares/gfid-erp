@@ -5,6 +5,7 @@ use App\Http\Controllers\Marketplace\MpReconciliationController;
 use App\Http\Controllers\Marketplace\MpReconciliationItemsController;
 use App\Http\Controllers\Marketplace\MpReconciliationQueueController;
 use App\Http\Controllers\Marketplace\AdsDashboardController;
+use App\Http\Controllers\Marketplace\AdsExperimentController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialQualityController;
 use App\Http\Controllers\Marketplace\MarketplaceProfitReportController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialStatementController;
@@ -135,6 +136,10 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.target.setting');
         Route::post('ads-dashboard/sync-cancel', [AdsDashboardController::class, 'syncCancel'])
             ->name('ads.sync.cancel');
+        Route::get('ads-dashboard/experiments', [AdsExperimentController::class, 'index'])
+            ->name('ads.experiments.index');
+        Route::get('ads-dashboard/experiments/{experiment}', [AdsExperimentController::class, 'show'])
+            ->name('ads.experiments.show');
 
         // Log API Shopee
         Route::get('shopee-api-logs', [\App\Http\Controllers\Marketplace\ShopeeApiLogController::class, 'index'])

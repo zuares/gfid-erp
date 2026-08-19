@@ -6,6 +6,7 @@ use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceProductModel;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\Ads\AdsExperimentService;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
 
@@ -280,6 +281,10 @@ class MarketplaceProductService
     public function updatePrice(MarketplaceProduct $product, array $priceList): array
     {
         $driver = $this->channelDriver($product->store);
+        $oldModels = MarketplaceProductModel::where('marketplace_product_id', $product->id)
+            ->whereIn('model_id', collect($priceList)->pluck('model_id')->map(fn ($id) => (string) $id)->all())
+            ->get()
+            ->keyBy(fn (MarketplaceProductModel $model) => (string) $model->model_id);
 
         $originalPriceList = array_map(function ($p) {
             return [
@@ -353,6 +358,37 @@ class MarketplaceProductService
             'price_max' => $prices->max(),
             'synced_at' => now(),
         ]);
+
+        try {
+            $experimentChanges = collect($priceList)->map(function (array $price) use ($oldModels): array {
+                $oldModel = $oldModels->get((string) ($price['model_id'] ?? '0'));
+                $oldRaw = is_string($oldModel?->raw_json)
+                    ? json_decode($oldModel->raw_json, true)
+                    : ($oldModel?->raw_json ?? []);
+                $oldEffectivePrice = data_get($oldRaw, 'price_info.0.current_price');
+                if ($oldEffectivePrice === null) {
+                    $oldEffectivePrice = $oldModel?->price;
+                }
+
+                return [
+                    'model_id' => (string) ($price['model_id'] ?? '0'),
+                    'old_price' => $oldEffectivePrice,
+                    'new_price' => $price['discount_price'] ?? $price['original_price'] ?? null,
+                ];
+            })->all();
+
+            app(AdsExperimentService::class)->recordPriceChange(
+                product: $product->fresh(),
+                changes: $experimentChanges,
+                createdBy: auth()->id(),
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[MarketplaceProductService] failed to record price experiment', [
+                'product_id' => $product->id,
+                'store_id' => $product->store_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return ['success' => true];
     }

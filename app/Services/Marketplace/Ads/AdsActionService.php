@@ -52,6 +52,12 @@ class AdsActionService
         ShopeeChannel $shopeeChannel
     ): array {
         $results = [];
+        $localCampaign = MarketplaceAdCampaign::where('store_id', $store->id)
+            ->where('channel_campaign_id', (string) $campaignId)
+            ->first();
+        $oldTargetRoas = $localCampaign?->target_roas !== null
+            ? (float) $localCampaign->target_roas
+            : null;
 
         if ($roasTarget !== null && $roasTarget !== '') {
             $params = ['roas_target' => (float) $roasTarget];
@@ -101,10 +107,6 @@ class AdsActionService
             ];
         }
 
-        $localCampaign = MarketplaceAdCampaign::where('store_id', $store->id)
-            ->where('channel_campaign_id', $campaignId)
-            ->first();
-
         if ($localCampaign) {
             if ($roasTarget !== null && $roasTarget !== '') {
                 $localCampaign->target_roas = (float) $roasTarget;
@@ -118,6 +120,31 @@ class AdsActionService
                 $localCampaign->campaign_status = 'ongoing';
             }
             $localCampaign->save();
+        }
+
+        if ($roasTarget !== null && $roasTarget !== '') {
+            try {
+                app(AdsExperimentService::class)->recordTargetRoasChange(
+                    store: $store,
+                    channelCampaignId: (string) $campaignId,
+                    channelItemId: $localCampaign?->channel_item_id !== null
+                        ? (string) $localCampaign->channel_item_id
+                        : null,
+                    oldTargetRoas: $oldTargetRoas,
+                    newTargetRoas: (float) $roasTarget,
+                    confounders: array_values(array_filter([
+                        $dailyBudget !== null && $dailyBudget !== '' ? 'daily_budget_changed' : null,
+                        $statusAction !== null ? 'campaign_status_changed' : null,
+                    ])),
+                    createdBy: auth()->id(),
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[AdsActionService] failed to record target ROAS experiment', [
+                    'store_id' => $store->id,
+                    'campaign_id' => $campaignId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return [
@@ -138,6 +165,14 @@ class AdsActionService
         }
 
         $results = [];
+        $localCampaign = $campaignId !== null
+            ? MarketplaceAdCampaign::where('store_id', $store->id)
+                ->where('channel_campaign_id', (string) $campaignId)
+                ->first()
+            : null;
+        $oldTargetRoas = $localCampaign?->target_roas !== null
+            ? (float) $localCampaign->target_roas
+            : null;
 
         if ($roasTarget !== null && $roasTarget !== '') {
             $params = ['roas_target' => (float) $roasTarget];
@@ -179,6 +214,35 @@ class AdsActionService
                 'message' => 'Tidak ada data yang diubah.',
                 'http_status' => 400,
             ];
+        }
+
+        if ($localCampaign && $roasTarget !== null && $roasTarget !== '') {
+            $localCampaign->target_roas = (float) $roasTarget;
+            $localCampaign->save();
+        }
+
+        if ($roasTarget !== null && $roasTarget !== '') {
+            try {
+                app(AdsExperimentService::class)->recordTargetRoasChange(
+                    store: $store,
+                    channelCampaignId: $campaignId !== null ? (string) $campaignId : null,
+                    channelItemId: $localCampaign?->channel_item_id !== null
+                        ? (string) $localCampaign->channel_item_id
+                        : null,
+                    oldTargetRoas: $oldTargetRoas,
+                    newTargetRoas: (float) $roasTarget,
+                    confounders: $dailyBudget !== null && $dailyBudget !== ''
+                        ? ['daily_budget_changed']
+                        : [],
+                    createdBy: auth()->id(),
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[AdsActionService] failed to record GMS target ROAS experiment', [
+                    'store_id' => $store->id,
+                    'campaign_id' => $campaignId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return [
