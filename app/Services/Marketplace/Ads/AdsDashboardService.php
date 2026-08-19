@@ -685,6 +685,96 @@ class AdsDashboardService
             return $prod;
         })->sortByDesc('spend')->values();
 
+        // GMV Max Auto menyimpan detail produk di tabel item-daily, bukan di
+        // campaign-daily. Gabungkan item tersebut agar subtab Produk > GMV Max
+        // Auto tidak kosong ketika data item-level tersedia.
+        $gmsProductRaw = MarketplaceAdsItemDaily::query()
+            ->whereIn('store_id', $storeIds)
+            ->where('channel_campaign_id', 'like', 'GMS-%')
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('store_id, channel_item_id, MAX(channel_campaign_id) as channel_campaign_id,
+                SUM(impressions) as impressions, SUM(clicks) as clicks, SUM(expense) as spend,
+                SUM(broad_order) as orders, SUM(broad_gmv) as gmv, SUM(direct_gmv) as direct_gmv')
+            ->groupBy('store_id', 'channel_item_id')
+            ->get();
+
+        if ($gmsProductRaw->isNotEmpty()) {
+            $gmsItemIds = $gmsProductRaw->pluck('channel_item_id')->filter()->map(fn ($id) => (string) $id)->unique()->values();
+            $gmsProducts = MarketplaceProduct::query()
+                ->whereIn('store_id', $storeIds)
+                ->whereIn('item_id', $gmsItemIds->all())
+                ->get(['store_id', 'item_id', 'item_sku', 'item_name', 'image_url', 'stock_total', 'price_min'])
+                ->keyBy(fn ($product) => $product->store_id . '|' . (string) $product->item_id);
+            $gmsMaps = MarketplaceAdItemMap::query()
+                ->with('item:id,hpp,base_unit_cost')
+                ->whereIn('store_id', $storeIds)
+                ->whereIn('channel_item_id', $gmsItemIds->map(fn ($id) => (int) $id)->all())
+                ->get()
+                ->keyBy(fn ($map) => $map->store_id . '|' . (string) $map->channel_item_id);
+
+            $existingProductKeys = $itemPerformance
+                ->map(fn ($product) => $product->store_id . '|' . (string) $product->channel_item_id)
+                ->flip();
+
+            $gmsProductRows = $gmsProductRaw
+                ->reject(fn ($prod) => $existingProductKeys->has($prod->store_id . '|' . (string) $prod->channel_item_id))
+                ->map(function ($prod) use ($gmsProducts, $gmsMaps, $manualFeeRatio, $revenueRatioByKey) {
+                    $key = $prod->store_id . '|' . (string) $prod->channel_item_id;
+                    $product = $gmsProducts->get($key);
+                    $map = $gmsMaps->get($key);
+                    $unitCogs = $map?->item ? $this->resolveItemUnitCogs($map->item) : 0.0;
+                    $impressions = (int) ($prod->impressions ?? 0);
+                    $clicks = (int) ($prod->clicks ?? 0);
+                    $orders = (int) ($prod->orders ?? 0);
+                    $spend = (float) ($prod->spend ?? 0);
+                    $gmv = (float) ($prod->gmv ?? 0);
+                    $price = (float) ($product?->price_min ?? 0);
+                    $avgPrice = $orders > 0 && $gmv > 0 ? $gmv / $orders : $price;
+                    $netRatio = $manualFeeRatio !== null
+                        ? $manualFeeRatio
+                        : ($revenueRatioByKey[(string) $prod->channel_item_id][0] ?? self::DEFAULT_NET_REVENUE_RATIO);
+                    $netRevenue = $gmv * $netRatio;
+                    $totalCogs = $unitCogs > 0 && $orders > 0 ? $unitCogs * $orders : null;
+                    $grossProfit = $totalCogs !== null ? $netRevenue - $totalCogs : null;
+                    $profitAfterAds = $grossProfit !== null ? round($grossProfit - ($spend * 1.11), 2) : null;
+
+                    $row = (object) [
+                        'store_id' => $prod->store_id,
+                        'channel_item_id' => $prod->channel_item_id,
+                        'channel_campaign_id' => $prod->channel_campaign_id,
+                        'item_sku' => $product?->item_sku,
+                        'item_name' => $product?->item_name ?: ('Item ' . $prod->channel_item_id),
+                        'image_url' => $product?->image_url,
+                        'stock_total' => (int) ($product?->stock_total ?? 0),
+                        'item_category' => 'GMV Max Auto',
+                        'has_gms' => true,
+                        'price_min' => $price,
+                        'impressions' => $impressions,
+                        'clicks' => $clicks,
+                        'spend' => $spend,
+                        'gmv' => $gmv,
+                        'orders' => $orders,
+                        'items_sold' => $orders,
+                        'direct_gmv' => (float) ($prod->direct_gmv ?? 0),
+                        'unit_cogs' => $unitCogs,
+                        'net_revenue' => $netRevenue,
+                        'gross_profit' => $grossProfit,
+                        'profit_after_ads' => $profitAfterAds,
+                        'poas' => $profitAfterAds !== null && $spend > 0 ? $profitAfterAds / ($spend * 1.11) : null,
+                        'roas' => $spend > 0 ? $gmv / $spend : 0,
+                        'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
+                        'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
+                        'cpc' => $clicks > 0 ? $spend / $clicks : 0,
+                        'cpa' => $orders > 0 ? $spend / $orders : 0,
+                    ];
+                    $row->classification = $profitAfterAds !== null && $profitAfterAds > 0 ? 'Profit Driver' : 'Review';
+                    $row->class_color = $profitAfterAds !== null && $profitAfterAds > 0 ? 'primary' : 'secondary';
+                    return $row;
+                });
+
+            $itemPerformance = $itemPerformance->concat($gmsProductRows)->sortByDesc('spend')->values();
+        }
+
         // Pass an empty gmsItems so we don't break other parts if they exist
         $gmsItems = collect();
 
