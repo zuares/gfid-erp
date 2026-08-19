@@ -138,6 +138,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.sync.cancel');
         Route::get('ads-dashboard/experiments', [AdsExperimentController::class, 'index'])
             ->name('ads.experiments.index');
+        Route::post('ads-dashboard/experiments/simulate', [AdsExperimentController::class, 'simulate'])
+            ->name('ads.experiments.simulate');
         Route::get('ads-dashboard/experiments/{experiment}', [AdsExperimentController::class, 'show'])
             ->name('ads.experiments.show');
 

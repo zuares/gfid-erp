@@ -185,6 +185,10 @@ class AdsDashboardController extends Controller
         }
 
         $type = $request->input('sync_type');
+        if ($type === 'custom' && ! $request->user()?->hasRole(['owner', 'admin'])) {
+            return back()->with('error', 'Hanya owner atau admin yang dapat menjalankan backfill Ads.');
+        }
+
         $dateFrom = match($type) {
             'yesterday' => now()->subDay()->toDateString(),
             'last_7_days' => now()->subDays(7)->toDateString(),

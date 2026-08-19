@@ -21,7 +21,11 @@ class AdsExperimentService
     public const MIN_CLICKS = 30;
     public const MIN_ORDERS = 3;
 
-    public function __construct(protected ItemHppResolver $hppResolver) {}
+    public function __construct(
+        protected ItemHppResolver $hppResolver,
+        protected AdsExperimentCalculator $calculator,
+        protected AdsDashboardService $dashboardService,
+    ) {}
 
     /**
      * Record one price change for every campaign scope that targets the item.
@@ -193,9 +197,19 @@ class AdsExperimentService
             ? $observationWindowEnd
             : $lastCompletedDate;
 
-        $baseline = $this->periodMetrics($experiment, $baselineFrom, $baselineTo);
+        $baseline = $this->periodMetrics(
+            $experiment,
+            $baselineFrom,
+            $baselineTo,
+            $experiment->old_price !== null ? (float) $experiment->old_price : ($experiment->new_price !== null ? (float) $experiment->new_price : null),
+        );
         $observation = $observationFrom->lte($observationTo)
-            ? $this->periodMetrics($experiment, $observationFrom, $observationTo)
+            ? $this->periodMetrics(
+                $experiment,
+                $observationFrom,
+                $observationTo,
+                $experiment->new_price !== null ? (float) $experiment->new_price : ($experiment->old_price !== null ? (float) $experiment->old_price : null),
+            )
             : $this->emptyPeriod($observationFrom, $observationTo);
 
         $completedObservationDays = $observationFrom->lte($observationTo)
@@ -244,9 +258,78 @@ class AdsExperimentService
                 'baseline_flags' => $baseline['data_quality'],
                 'observation_flags' => $observation['data_quality'],
                 'mapping_status' => $experiment->mapping_status,
-                'actual_profit_ready' => false,
+                'actual_profit_ready' => (bool) ($observation['metrics']['actual_profit_ready'] ?? false),
+                'profit_estimated' => (bool) ($observation['metrics']['profit_estimated'] ?? true),
             ],
             'calculation_snapshot' => $experiment->calculation_snapshot ?? [],
+        ];
+    }
+
+    /**
+     * Simulate price/target-ROAS inputs from one observed experiment period.
+     * This method only reads fact data and never writes to the experiment or
+     * ad platform.
+     *
+     * @return array<string, mixed>
+     */
+    public function simulate(MarketplaceAdExperiment $experiment, array $input = []): array
+    {
+        $details = $this->details($experiment);
+        $periodName = ($input['period'] ?? 'observation') === 'baseline' ? 'baseline' : 'observation';
+        $period = $details[$periodName];
+        $metrics = $period['metrics'];
+
+        $price = array_key_exists('price', $input)
+            ? $this->nullableFloat($input['price'])
+            : ($experiment->new_price !== null
+                ? (float) $experiment->new_price
+                : ($experiment->old_price !== null ? (float) $experiment->old_price : null));
+        if (($price === null || $price <= 0) && ($metrics['qty'] ?? 0) > 0 && ($metrics['revenue'] ?? 0) > 0) {
+            $price = (float) $metrics['revenue'] / (float) $metrics['qty'];
+        }
+
+        $hpp = $experiment->internal_item_id
+            ? $this->hppResolver->resolve((int) $experiment->internal_item_id)
+            : 0.0;
+        [$netRevenueRatio, $ratioSource] = $this->dashboardService->resolveConfiguredNetRevenueRatio(
+            $experiment->channel_item_id,
+            (int) $experiment->store_id,
+        );
+
+        $spend = array_key_exists('spend', $input) ? (float) $input['spend'] : (float) ($metrics['spend'] ?? 0);
+        $clicks = array_key_exists('clicks', $input) ? (int) $input['clicks'] : (int) ($metrics['clicks'] ?? 0);
+        $qty = array_key_exists('qty', $input) ? (float) $input['qty'] : (float) ($metrics['qty'] ?? 0);
+        $targetRoas = array_key_exists('target_roas', $input)
+            ? $this->nullableFloat($input['target_roas'])
+            : ($experiment->new_target_roas !== null ? (float) $experiment->new_target_roas : null);
+
+        $result = $this->calculator->simulate(
+            (float) ($price ?? 0),
+            $hpp,
+            $netRevenueRatio,
+            max(0.0, $spend),
+            max(0, $clicks),
+            max(0.0, $qty),
+            $targetRoas,
+            (bool) ($metrics['qty_estimated'] ?? true),
+        );
+
+        $result['assumptions']['price_source'] = array_key_exists('price', $input)
+            ? 'input'
+            : (($experiment->new_price !== null || $experiment->old_price !== null) ? 'experiment' : 'observed_gmv_per_qty');
+        $result['assumptions']['net_revenue_ratio_source'] = $ratioSource;
+        $result['assumptions']['mapping_status'] = $experiment->mapping_status;
+        $result['assumptions']['actual_profit_ready'] = (bool) ($period['metrics']['actual_profit_ready'] ?? false);
+
+        return [
+            'experiment_id' => (int) $experiment->id,
+            'period' => $periodName,
+            'source_period' => [
+                'from' => $period['from'],
+                'to' => $period['to'],
+                'days_with_data' => $period['days_with_data'],
+            ],
+            'result' => $result,
         ];
     }
 
@@ -271,13 +354,13 @@ class AdsExperimentService
             'changed_at' => $changedAt,
             'effective_date' => $changedAt->toDateString(),
             'lifecycle_status' => MarketplaceAdExperiment::STATUS_LEARNING,
-            'profit_basis' => 'incomplete',
+            'profit_basis' => AdsExperimentCalculator::PROFIT_BASIS,
             'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
             'confounded' => false,
             'data_quality_flags' => array_values(array_unique($flags)),
             'baseline_days' => self::DEFAULT_BASELINE_DAYS,
             'observation_days' => self::DEFAULT_OBSERVATION_DAYS,
-            'calculation_version' => 'phase1-v1',
+            'calculation_version' => 'phase2-v1',
         ], $attributes));
     }
 
@@ -291,14 +374,14 @@ class AdsExperimentService
             'price_changes' => $changes,
             'hpp' => $hpp['hpp'] > 0 ? $hpp['hpp'] : null,
             'hpp_source' => $hpp['hpp_source'],
-            'fee_mode' => 'pending',
-            'fee_source' => 'pending',
+            'fee_mode' => 'configured_net_revenue_ratio',
+            'fee_source' => 'store_setting_or_settlement',
             'ads_vat_factor' => 1.11,
             'price_basis' => 'marketplace_product_model',
-            'profit_basis' => 'incomplete',
+            'profit_basis' => AdsExperimentCalculator::PROFIT_BASIS,
             'source_granularity' => $sourceGranularity,
             'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
-            'calculation_version' => 'phase1-v1',
+            'calculation_version' => 'phase2-v1',
         ];
     }
 
@@ -315,14 +398,14 @@ class AdsExperimentService
             'new_target_roas' => $newTargetRoas,
             'hpp' => $hpp['hpp'] > 0 ? $hpp['hpp'] : null,
             'hpp_source' => $hpp['hpp_source'],
-            'fee_mode' => 'pending',
-            'fee_source' => 'pending',
+            'fee_mode' => 'configured_net_revenue_ratio',
+            'fee_source' => 'store_setting_or_settlement',
             'ads_vat_factor' => 1.11,
             'price_basis' => 'observed_gmv_per_order',
-            'profit_basis' => 'incomplete',
+            'profit_basis' => AdsExperimentCalculator::PROFIT_BASIS,
             'source_granularity' => $sourceGranularity,
             'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
-            'calculation_version' => 'phase1-v1',
+            'calculation_version' => 'phase2-v1',
         ];
     }
 
@@ -330,6 +413,7 @@ class AdsExperimentService
         MarketplaceAdExperiment $experiment,
         CarbonInterface $from,
         CarbonInterface $to,
+        ?float $priceOverride = null,
     ): array {
         if ($from->gt($to)) {
             return $this->emptyPeriod($from, $to);
@@ -337,6 +421,7 @@ class AdsExperimentService
 
         [$table, $query] = $this->factQuery($experiment, $from, $to);
         $isCampaignFact = $table === 'marketplace_ad_campaign_dailies';
+        $isItemFact = $table === 'marketplace_ads_item_dailies';
         $aggregate = (clone $query)
             ->selectRaw('COALESCE(SUM(impressions), 0) as impressions')
             ->selectRaw('COALESCE(SUM(clicks), 0) as clicks')
@@ -347,18 +432,58 @@ class AdsExperimentService
             ->first();
         $daysWithData = (int) (clone $query)->distinct()->count('date');
 
+        $qtyFromItemReports = 0.0;
+        if ($isItemFact) {
+            $itemRows = (clone $query)->get(['raw_json']);
+            foreach ($itemRows as $itemRow) {
+                $raw = $itemRow->raw_json;
+                if (is_string($raw)) {
+                    $raw = json_decode($raw, true) ?: [];
+                }
+                $reportedQty = $this->reportedQty($raw);
+                if ($reportedQty !== null) {
+                    $qtyFromItemReports += $reportedQty;
+                }
+            }
+        }
+
         $orders = (int) ($aggregate->orders ?? 0);
-        $qtyReported = (float) ($aggregate->qty_reported ?? 0);
-        $usesQtyFallback = ! $isCampaignFact || $qtyReported <= 0;
+        $qtyReported = $isItemFact
+            ? $qtyFromItemReports
+            : (float) ($aggregate->qty_reported ?? 0);
+        $usesQtyFallback = $qtyReported <= 0;
         $qty = $usesQtyFallback ? (float) $orders : $qtyReported;
         $impressions = (int) ($aggregate->impressions ?? 0);
         $clicks = (int) ($aggregate->clicks ?? 0);
         $spend = (float) ($aggregate->spend ?? 0);
         $revenue = (float) ($aggregate->revenue ?? 0);
 
+        $price = $priceOverride !== null && $priceOverride > 0 ? $priceOverride : null;
+        $priceEstimated = false;
+        if (($price === null || $price <= 0) && $qty > 0 && $revenue > 0) {
+            $price = $revenue / $qty;
+            $priceEstimated = true;
+        }
+        $hpp = $experiment->internal_item_id
+            ? $this->hppResolver->resolve((int) $experiment->internal_item_id)
+            : 0.0;
+        [$netRevenueRatio] = $this->dashboardService->resolveConfiguredNetRevenueRatio(
+            $experiment->channel_item_id,
+            (int) $experiment->store_id,
+        );
+
         $quality = ['partial_day_excluded'];
         if ($usesQtyFallback) {
             $quality[] = 'estimated_qty';
+        }
+        if ($priceEstimated) {
+            $quality[] = 'estimated_price';
+        }
+        if ($hpp <= 0) {
+            $quality[] = 'missing_hpp';
+        }
+        if ($price === null) {
+            $quality[] = 'missing_price';
         }
         if ($clicks < self::MIN_CLICKS || $orders < self::MIN_ORDERS) {
             $quality[] = 'low_volume';
@@ -367,22 +492,38 @@ class AdsExperimentService
             $quality[] = 'missing_metric';
         }
 
+        $baseMetrics = [
+            'impressions' => $impressions,
+            'clicks' => $clicks,
+            'orders' => $orders,
+            'qty' => $qty,
+            'revenue' => round($revenue, 2),
+            'spend' => round($spend, 2),
+            'ctr' => $impressions > 0 ? round($clicks / $impressions, 6) : null,
+            'cvr' => $clicks > 0 ? round($orders / $clicks, 6) : null,
+            'roas' => $spend > 0 ? round($revenue / $spend, 4) : null,
+            'qty_source' => $usesQtyFallback ? 'order_fallback' : 'reported',
+            'qty_estimated' => $usesQtyFallback,
+        ];
+        $calculatedMetrics = $this->calculator->periodMetrics(
+            $baseMetrics,
+            $price,
+            $hpp,
+            $netRevenueRatio,
+            $usesQtyFallback,
+            $priceEstimated,
+            $experiment->mapping_status === 'mapped' && $hpp > 0,
+        );
+        if ($calculatedMetrics['profit_estimated']) {
+            $quality[] = 'estimated_profit';
+        }
+
         return [
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'days_with_data' => $daysWithData,
             'source_table' => $table,
-            'metrics' => [
-                'impressions' => $impressions,
-                'clicks' => $clicks,
-                'orders' => $orders,
-                'qty' => $qty,
-                'revenue' => round($revenue, 2),
-                'spend' => round($spend, 2),
-                'ctr' => $impressions > 0 ? round($clicks / $impressions, 6) : null,
-                'cvr' => $clicks > 0 ? round($orders / $clicks, 6) : null,
-                'roas' => $spend > 0 ? round($revenue / $spend, 4) : null,
-            ],
+            'metrics' => array_merge($baseMetrics, $calculatedMetrics),
             'data_quality' => array_values(array_unique($quality)),
         ];
     }
@@ -435,6 +576,23 @@ class AdsExperimentService
                 'ctr' => null,
                 'cvr' => null,
                 'roas' => null,
+                'qty_source' => 'none',
+                'qty_estimated' => true,
+                'net_revenue' => 0.0,
+                'ad_cost_incl_vat' => 0.0,
+                'total_cogs' => null,
+                'profit' => null,
+                'profit_estimated' => true,
+                'actual_profit_ready' => false,
+                'price' => null,
+                'hpp' => null,
+                'net_revenue_ratio' => null,
+                'contribution_per_unit' => null,
+                'break_even_qty' => null,
+                'cvr_bep' => null,
+                'break_even_roas' => null,
+                'profit_basis' => AdsExperimentCalculator::PROFIT_BASIS,
+                'ads_vat_factor' => AdsExperimentCalculator::ADS_VAT_FACTOR,
             ],
             'data_quality' => ['partial_day_excluded', 'missing_metric', 'low_volume'],
         ];
@@ -443,7 +601,7 @@ class AdsExperimentService
     private function metricDelta(array $before, array $after): array
     {
         $delta = [];
-        foreach (['impressions', 'clicks', 'orders', 'qty', 'revenue', 'spend', 'ctr', 'cvr', 'roas'] as $metric) {
+        foreach (['impressions', 'clicks', 'orders', 'qty', 'revenue', 'spend', 'ctr', 'cvr', 'roas', 'profit', 'break_even_qty', 'cvr_bep', 'break_even_roas'] as $metric) {
             $beforeValue = $before[$metric] ?? null;
             $afterValue = $after[$metric] ?? null;
             $absolute = $beforeValue !== null && $afterValue !== null
@@ -544,6 +702,21 @@ class AdsExperimentService
     private function nullableFloat(mixed $value): ?float
     {
         return $value === null || $value === '' ? null : (float) $value;
+    }
+
+    private function reportedQty(mixed $raw): ?float
+    {
+        if (! is_array($raw)) {
+            return null;
+        }
+
+        foreach (['broad_order_amount', 'quantity', 'qty', 'item_quantity', 'sold_quantity'] as $key) {
+            if (array_key_exists($key, $raw) && is_numeric($raw[$key])) {
+                return max(0.0, (float) $raw[$key]);
+            }
+        }
+
+        return null;
     }
 
     private function asLocalDateTime(CarbonInterface|string|null $value): Carbon

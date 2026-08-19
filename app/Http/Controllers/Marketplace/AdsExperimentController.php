@@ -45,4 +45,23 @@ class AdsExperimentController extends Controller
             'data' => $experiments->details($experiment),
         ]);
     }
+
+    public function simulate(Request $request, AdsExperimentService $experiments): JsonResponse
+    {
+        $data = $request->validate([
+            'experiment_id' => ['required', 'integer', 'exists:marketplace_ad_experiments,id'],
+            'period' => ['nullable', 'in:baseline,observation'],
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'target_roas' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'spend' => ['nullable', 'numeric', 'min:0'],
+            'clicks' => ['nullable', 'integer', 'min:0'],
+            'qty' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $experiment = MarketplaceAdExperiment::query()->findOrFail($data['experiment_id']);
+
+        return response()->json([
+            'data' => $experiments->simulate($experiment, $data),
+        ]);
+    }
 }

@@ -55,7 +55,10 @@ class ShopeeAdsSyncService
             }
             
             $list = data_get($res, 'response.campaign_list', []);
-            $extractedIds = array_map(function($c) { return $c['campaign_id'] ?? null; }, $list);
+            $rawIdList = data_get($res, 'response.campaign_id_list', []);
+            $extractedIds = $list !== []
+                ? array_map(function ($c) { return $c['campaign_id'] ?? null; }, $list)
+                : array_map(function ($c) { return is_array($c) ? ($c['campaign_id'] ?? null) : $c; }, $rawIdList);
             $extractedIds = array_filter($extractedIds); // remove nulls
             $campaignIds = array_merge($campaignIds, $extractedIds);
             

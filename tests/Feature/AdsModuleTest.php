@@ -79,15 +79,16 @@ class AdsModuleTest extends TestCase
     {
         $store = $this->createStore('AUTODATE');
         $store->update(['token_expires_at' => now()->addHour()]);
+        $selectedDate = now()->subDay()->toDateString();
 
         $pending = \Mockery::mock();
         $pending->shouldReceive('onQueue')->once()->with('ads');
 
         \Illuminate\Support\Facades\Artisan::shouldReceive('queue')
             ->once()
-            ->with('marketplace:sync-ads', \Mockery::on(function (array $params) use ($store) {
-                return ($params['--from'] ?? null) === '2026-07-30'
-                    && ($params['--to'] ?? null) === '2026-07-30'
+            ->with('marketplace:sync-ads', \Mockery::on(function (array $params) use ($store, $selectedDate) {
+                return ($params['--from'] ?? null) === $selectedDate
+                    && ($params['--to'] ?? null) === $selectedDate
                     && ($params['--store'] ?? null) == $store->id;
             }))
             ->andReturn($pending);
@@ -106,8 +107,8 @@ class AdsModuleTest extends TestCase
 
         $request = \Illuminate\Http\Request::create('/marketplace/ads-dashboard', 'GET', [
             'store_id' => $store->id,
-            'date_from' => '2026-07-30',
-            'date_to' => '2026-07-30',
+            'date_from' => $selectedDate,
+            'date_to' => $selectedDate,
         ]);
 
         $result = app(\App\Http\Controllers\Marketplace\AdsDashboardController::class)
@@ -178,7 +179,9 @@ class AdsModuleTest extends TestCase
 
         $response1 = $this->actingAs($userNonAdmin)->post(route('marketplace.ads.sync'), [
             'store_id' => $store->id,
-            'sync_type' => 'backfill'
+            'sync_type' => 'custom',
+            'date_from_custom' => now()->subMonth()->toDateString(),
+            'date_to_custom' => now()->toDateString(),
         ]);
         $response1->assertSessionHas('error'); // Cannot backfill
 
@@ -188,7 +191,9 @@ class AdsModuleTest extends TestCase
 
         $response2 = $this->actingAs($userAdmin)->post(route('marketplace.ads.sync'), [
             'store_id' => $store->id,
-            'sync_type' => 'backfill'
+            'sync_type' => 'custom',
+            'date_from_custom' => now()->subMonth()->toDateString(),
+            'date_to_custom' => now()->toDateString(),
         ]);
         $response2->assertSessionHas('success'); // Authorized
     }
@@ -251,7 +256,10 @@ class AdsModuleTest extends TestCase
 
         $api->shouldReceive('getCampaignIdList')
             ->once()
-            ->andReturn(['response' => ['campaign_id_list' => array_fill(0, 150, 1), 'page_info' => ['has_more' => false]]]);
+            ->andReturn(['response' => ['campaign_list' => array_map(
+                fn (int $id) => ['campaign_id' => $id],
+                range(1, 150)
+            ), 'page_info' => ['has_more' => false]]]);
 
         $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
 
@@ -1140,7 +1148,7 @@ class AdsModuleTest extends TestCase
         $this->assertSame(20000.0, (float) $history[1]['data']->first()['spend']);
     }
 
-    public function test_summary_prefers_shop_total_and_adds_gms_once()
+    public function test_summary_prefers_shop_total_without_double_counting_gms()
     {
         $store = $this->createStore('SUMMARYSOURCE');
         $now = now();
@@ -1177,8 +1185,8 @@ class AdsModuleTest extends TestCase
         $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
             ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
 
-        $this->assertSame(15000.0, (float) $data['kpi']['current']->spend);
-        $this->assertSame(150000.0, (float) $data['kpi']['current']->gmv);
+        $this->assertSame(10000.0, (float) $data['kpi']['current']->spend);
+        $this->assertSame(100000.0, (float) $data['kpi']['current']->gmv);
     }
 
     public function test_summary_roas_change_is_not_always_zero()
