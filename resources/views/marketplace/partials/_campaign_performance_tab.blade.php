@@ -538,7 +538,14 @@ function perfApplySegment(segment) {
     let visibleCount = 0;
 
     rows.forEach(function(row) {
-        const isVisible = (row.dataset.perfViews || '').split(/\s+/).includes(segment);
+        // Tab kategori hanya menampilkan baris agregasi kategori. Baris campaign
+        // detail tetap tersedia melalui accordion kategori, agar detail CPC dan
+        // metrik campaign tidak ikut muncul di tampilan utama kategori.
+        const isCategoryView = segment === 'category';
+        const isVisible = isCategoryView
+            ? row.classList.contains('perf-category-row')
+            : row.classList.contains('perf-row')
+                && (row.dataset.perfViews || '').split(/\s+/).includes(segment);
         const detail = row.classList.contains('perf-row') ? row.nextElementSibling : null;
         row.style.display = isVisible ? '' : 'none';
         row.classList.remove('open');
