@@ -580,6 +580,70 @@ class AdsModuleTest extends TestCase
         $this->assertSame(-23000.0, (float) $data['kpi']['current']->net_profit);
     }
 
+    public function test_all_store_profit_uses_each_stores_manual_fee_setting()
+    {
+        $storeA = $this->createStore('PROFITSTOREA');
+        $storeB = $this->createStore('PROFITSTOREB');
+
+        foreach ([$storeA->id => 10, $storeB->id => 30] as $storeId => $feePct) {
+            \App\Models\MarketplaceAdsSetting::create([
+                'store_id' => $storeId,
+                'admin_fee_mode' => 'manual',
+                'admin_fee_pct' => $feePct,
+            ]);
+
+            $item = \App\Models\Item::create([
+                'code' => 'ITEM-' . $storeId,
+                'name' => 'Profit Store ' . $storeId,
+                'type' => 'finished',
+                'hpp' => 20000,
+                'active' => true,
+            ]);
+
+            \App\Models\MarketplaceAdCampaign::create([
+                'store_id' => $storeId,
+                'channel_campaign_id' => 'C-PROFIT-' . $storeId,
+                'channel_item_id' => 998877,
+                'internal_item_id' => $item->id,
+                'campaign_name' => 'Campaign Store ' . $storeId,
+                'campaign_status' => 'ongoing',
+            ]);
+
+            \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+                'store_id' => $storeId,
+                'channel_campaign_id' => 'C-PROFIT-' . $storeId,
+                'date' => '2026-07-30',
+                'impressions' => 100,
+                'clicks' => 10,
+                'expense' => 10000,
+                'broad_order' => 1,
+                'broad_order_amount' => 1,
+                'broad_gmv' => 100000,
+                'direct_order' => 1,
+                'direct_order_amount' => 1,
+                'direct_gmv' => 100000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $service = app(\App\Services\Marketplace\Ads\AdsDashboardService::class);
+        $analytics = app(AdsAnalyticsService::class);
+        $selectedA = $service->buildDashboardData(collect([$storeA]), $storeA->id, '2026-07-30', '2026-07-30', 'prev_period', $analytics);
+        $selectedB = $service->buildDashboardData(collect([$storeB]), $storeB->id, '2026-07-30', '2026-07-30', 'prev_period', $analytics);
+        $allStores = $service->buildDashboardData(collect([$storeA, $storeB]), 'all', '2026-07-30', '2026-07-30', 'prev_period', $analytics);
+
+        // Store A: 100.000 x 90% - 20.000 - 11.100 = 58.900.
+        // Store B: 100.000 x 70% - 20.000 - 11.100 = 38.900.
+        $this->assertSame(58900.0, (float) $selectedA['kpi']['current']->net_profit);
+        $this->assertSame(38900.0, (float) $selectedB['kpi']['current']->net_profit);
+        $this->assertSame(97800.0, (float) $allStores['kpi']['current']->net_profit);
+        $this->assertSame(
+            (float) $selectedA['kpi']['current']->net_profit + (float) $selectedB['kpi']['current']->net_profit,
+            (float) $allStores['kpi']['current']->net_profit
+        );
+    }
+
     public function test_single_day_profit_falls_back_to_orders_when_pcs_is_missing()
     {
         $store = $this->createStore('PROFITPCS');

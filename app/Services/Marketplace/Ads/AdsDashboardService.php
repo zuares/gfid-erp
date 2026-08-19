@@ -53,9 +53,9 @@ class AdsDashboardService
     {
         if ($channelItemId) {
             return \Illuminate\Support\Facades\Cache::remember(
-                'ads-nrr:' . $channelItemId,
+                'ads-nrr:' . ($storeId ?? 'all') . ':' . $channelItemId,
                 1800,
-                fn () => $this->computeNetRevenueRatio($channelItemId)
+                fn () => $this->computeNetRevenueRatio($channelItemId, $storeId)
             );
         }
 
@@ -69,14 +69,18 @@ class AdsDashboardService
      *
      * @return array{0: float, 1: string}
      */
-    private function computeNetRevenueRatio(string $channelItemId): array
+    private function computeNetRevenueRatio(string $channelItemId, ?int $storeId = null): array
     {
         $settlements = \App\Models\MarketplaceOrderSettlement::whereIn(
                 'order_id',
-                \App\Models\MarketplaceOrderItem::where('external_item_id', $channelItemId)
+                \App\Models\MarketplaceOrderItem::query()
+                    ->join('marketplace_orders as mo', 'mo.id', '=', 'marketplace_order_items.order_id')
+                    ->when($storeId !== null, fn ($q) => $q->where('mo.store_id', $storeId))
+                    ->where('external_item_id', $channelItemId)
                     ->whereNotNull('order_id')
                     ->select('order_id')
             )
+            ->when($storeId !== null, fn ($q) => $q->where('store_id', $storeId))
             ->where('final_income', '>', 0)
             ->get(['final_income', 'buyer_payment_amount']);
 
@@ -202,9 +206,18 @@ class AdsDashboardService
         }
 
         $adsSetting = $isAllStores ? null : MarketplaceAdsSetting::where('store_id', $storeId)->first();
-        $manualFeeRatio = ($adsSetting && ($adsSetting->admin_fee_mode ?? 'auto') === 'manual' && $adsSetting->admin_fee_pct !== null)
-            ? max(0.0, 1 - ((float) $adsSetting->admin_fee_pct / 100))
-            : null;
+        // Saat Semua Toko dipilih, fee manual harus tetap dihitung per toko.
+        // Satu ratio global akan membuat profit gabungan berbeda dari
+        // penjumlahan profit masing-masing toko.
+        $manualFeeRatioByStore = MarketplaceAdsSetting::query()
+            ->whereIn('store_id', $storeIds)
+            ->where('admin_fee_mode', 'manual')
+            ->whereNotNull('admin_fee_pct')
+            ->get(['store_id', 'admin_fee_pct'])
+            ->mapWithKeys(fn ($setting) => [
+                (string) $setting->store_id => max(0.0, 1 - ((float) $setting->admin_fee_pct / 100)),
+            ])
+            ->all();
 
         $aggFor = function (string $from, string $to) use ($storeIds) {
             return DB::table('marketplace_ad_campaign_dailies')
@@ -269,7 +282,7 @@ class AdsDashboardService
         [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
 
         $campaigns = $campaigns
-            ->map(function ($camp) use ($manualFeeRatio, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey) {
+            ->map(function ($camp) use ($manualFeeRatioByStore, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey) {
                 $k = $camp->store_id . '|' . $camp->channel_campaign_id;
                 $a = $aggCur->get($k);
                 $p = $aggPrev->get($k);
@@ -347,6 +360,7 @@ class AdsDashboardService
                 }
                 $camp->cogs_ratio = $trueAvgPrice > 0 ? ($camp->unit_cogs / $trueAvgPrice) : 0;
 
+                $manualFeeRatio = $manualFeeRatioByStore[(string) $camp->store_id] ?? null;
                 if ($manualFeeRatio !== null) {
                     [$ratio, $ratioSource] = [$manualFeeRatio, 'manual'];
                 } else {
@@ -611,7 +625,7 @@ class AdsDashboardService
             ->orderByDesc('spend')
             ->get();
 
-        $itemPerformance = $itemPerformanceRaw->map(function ($prod) use ($unitCogsByKey, $revenueRatioByKey, $avgPriceByKey, $manualFeeRatio, $catByChan) {
+        $itemPerformance = $itemPerformanceRaw->map(function ($prod) use ($unitCogsByKey, $revenueRatioByKey, $avgPriceByKey, $manualFeeRatioByStore, $catByChan) {
             $prod->roas = $prod->spend > 0 ? $prod->gmv / $prod->spend : 0;
             $prod->ctr = $prod->impressions > 0 ? ($prod->clicks / $prod->impressions) * 100 : 0;
             $prod->cvr = $prod->clicks > 0 ? ($prod->orders / $prod->clicks) * 100 : 0;
@@ -627,10 +641,11 @@ class AdsDashboardService
                 $trueAvgPrice = ($prod->orders > 0 && $prod->gmv > 0) ? ($prod->gmv / $prod->orders) : (float) $prod->price_min;
             }
             
+            $manualFeeRatio = $manualFeeRatioByStore[(string) $prod->store_id] ?? null;
             if ($manualFeeRatio !== null) {
                 $netRevRatio = $manualFeeRatio;
             } else {
-                $netRevRatio = $revenueRatioByKey[(string) $prod->channel_item_id][0] ?? self::DEFAULT_NET_REVENUE_RATIO;
+                $netRevRatio = $revenueRatioByKey[$key][0] ?? self::DEFAULT_NET_REVENUE_RATIO;
             }
             
             $prod->net_revenue = $prod->gmv * $netRevRatio;
@@ -653,7 +668,7 @@ class AdsDashboardService
                 $prod->poas = null;
             }
             
-            $prod->item_category = $catByChan[(string) $prod->channel_item_id] ?? 'Uncategorized';
+            $prod->item_category = $catByChan[$key] ?? 'Uncategorized';
             
             // Product Classification Logic
             $prod->classification = 'Review';
@@ -865,10 +880,11 @@ class AdsDashboardService
 
         $orderItemsSub = MarketplaceOrderItem::query()
             ->join('marketplace_orders as mo', 'mo.id', '=', 'marketplace_order_items.order_id')
-            ->select('mo.store_id', 'external_item_id', 'order_id')
+            ->select('mo.store_id', 'marketplace_order_items.external_item_id', 'marketplace_order_items.order_id')
             ->distinct()
-            ->whereIn('external_item_id', $itemIds)
-            ->whereNotNull('order_id');
+            ->whereIn('marketplace_order_items.external_item_id', $itemIds)
+            ->whereIn('mo.store_id', $storeIds)
+            ->whereNotNull('marketplace_order_items.order_id');
 
         $ratioRows = MarketplaceOrderSettlement::query()
             ->joinSub($orderItemsSub, 'oi', function ($join) {
