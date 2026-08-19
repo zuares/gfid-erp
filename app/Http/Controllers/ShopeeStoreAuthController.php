@@ -166,16 +166,18 @@ class ShopeeStoreAuthController extends Controller
             \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', ['--store' => $storeModel->id]);
             \App\Jobs\SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
 
-            // Ads: backfill awal 90 hari lewat chain queue (chunk 30 hari,
-            // dedupe + progress bar ditangani command). Tanpa ini toko baru
-            // tampil kosong di dashboard ads.
+            // Ads: antrekan backfill awal 90 hari lewat chain queue (chunk 30
+            // hari, dedupe + progress bar ditangani command). Jangan jalankan
+            // command ini inline karena callback OAuth harus segera merespons;
+            // backfill dapat memakan waktu lebih lama dari timeout nginx/ngrok.
             try {
-                \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
+                $queuedAdsSync = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', [
                     '--store'    => $storeModel->id,
                     '--backfill' => true,
                     '--from'     => now()->subDays(90)->toDateString(),
                     '--to'       => now()->toDateString(),
                 ]);
+                $queuedAdsSync->onQueue('ads');
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('[ShopeeAuth] Gagal antre backfill ads awal: ' . $e->getMessage());
             }

@@ -4906,8 +4906,61 @@ class MarketplaceController extends Controller
      * Sync performa iklan harian ke DB (semua toko Shopee atau satu toko).
      * Simpan snapshot saldo sekalian.
      */
-    public function syncAdsDaily(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function syncAdsDaily(Request $request): JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
     {
+        // Endpoint legacy ini sebelumnya mengeksekusi seluruh panggilan API
+        // Shopee di proses PHP-FPM. Di Herd/macOS, request cURL dari FPM dapat
+        // membuat worker crash dan nginx mengembalikan 502. Kirim pekerjaan ke
+        // queue seperti dashboard Ads; API Shopee kemudian dijalankan oleh
+        // worker CLI, bukan oleh request web.
+        $dateFrom = $request->input('date_from', now()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
+
+        try {
+            $rangeDays = Carbon::parse($dateFrom)->diffInDays(Carbon::parse($dateTo));
+        } catch (\Throwable) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Rentang tanggal tidak valid.',
+            ], 422);
+        }
+
+        $params = [
+            '--from' => $dateFrom,
+            '--to' => $dateTo,
+        ];
+        $storeId = $request->input('store_id');
+        if ($storeId !== null && $storeId !== '' && $storeId !== 'all') {
+            $params['--store'] = $storeId;
+        }
+        if ($rangeDays > 65) {
+            $params['--backfill'] = true;
+        }
+
+        try {
+            $queued = Artisan::queue('marketplace:sync-ads', $params);
+            $queued->onQueue('ads');
+        } catch (\Throwable $e) {
+            Log::error('[Ads] Gagal memasukkan sync ke queue: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sync Ads gagal dimasukkan ke antrean. Periksa queue worker lokal.',
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => 'queued',
+            'message' => $rangeDays > 65
+                ? 'Backfill Ads dimasukkan ke antrean background.'
+                : 'Sync Ads dimasukkan ke antrean background.',
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'store_id' => $storeId ?: 'all',
+        ]);
+
+        // Jalur streaming lama dipertahankan di bawah untuk referensi/backward
+        // compatibility kode lokal yang memanggil method ini secara langsung.
         set_time_limit(300);
         // Jangan hentikan proses di tengah jalan kalau user menutup modal/tab —
         // run yang terputus akan tertinggal berstatus 'processing' selamanya.

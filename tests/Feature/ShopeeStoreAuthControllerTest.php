@@ -69,12 +69,15 @@ class ShopeeStoreAuthControllerTest extends TestCase
         Queue::fake();
         Bus::fake();
 
-        Artisan::shouldReceive('queue')
-            ->twice()
-            ->andReturnNull();
-        Artisan::shouldReceive('call')
+        $queuedAdsSync = \Mockery::mock();
+        $queuedAdsSync->shouldReceive('onQueue')
             ->once()
-            ->andReturn(0);
+            ->with('ads')
+            ->andReturnSelf();
+
+        Artisan::shouldReceive('queue')
+            ->times(3)
+            ->andReturn(null, null, $queuedAdsSync);
 
         $response = $this->actingAs($user)
             ->withSession(['shopee_connect_store_id' => $store->id])

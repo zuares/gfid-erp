@@ -427,8 +427,8 @@
             const d = await api(`/api/marketplace/ads-daily/sync?date_from=${$('dateFrom').value}&date_to=${$('dateTo').value}` + (sid ? `&store_id=${sid}` : ''), { method: 'POST' });
             if (d.errors?.length) console.warn('Sync errors:', d.errors);
             $('shopPerfInfo').textContent = d.message;
-            loadShopPerf();
-            loadBalance();
+            // Sync berjalan di queue ads; data dimuat ulang setelah worker selesai.
+            setTimeout(() => { loadShopPerf(); loadBalance(); }, 3000);
         } catch (e) { alert('Sync gagal: ' + e.message); }
         finally { btn.disabled = false; btn.textContent = '↓ Sync ke DB'; }
     };
@@ -487,19 +487,15 @@
         const btn = $('btnBackfill');
         btn.disabled = true;
         const sid = $('adsStoreId').value;
-        let total = 0;
         try {
-            for (let i = 5; i >= 0; i--) {
-                const start = new Date(); start.setMonth(start.getMonth() - i, 1);
-                const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-                const today = new Date(); if (end > today) end.setTime(today.getTime());
-                const f = toDateStr(start), t = toDateStr(end);
-                btn.textContent = `⏳ ${f.substring(0,7)}…`;
-                const d = await api(`/api/marketplace/ads-daily/sync?date_from=${f}&date_to=${t}` + (sid ? `&store_id=${sid}` : ''), { method: 'POST' });
-                total += d.saved || 0;
-            }
-            $('shopPerfInfo').textContent = `Riwayat 6 bulan tertarik: ${total} baris tersimpan.`;
-            loadShopPerf();
+            const start = new Date();
+            start.setMonth(start.getMonth() - 5, 1);
+            const today = new Date();
+            const f = toDateStr(start), t = toDateStr(today);
+            btn.textContent = '⏳ Memasukkan ke antrean…';
+            const d = await api(`/api/marketplace/ads-daily/sync?date_from=${f}&date_to=${t}` + (sid ? `&store_id=${sid}` : ''), { method: 'POST' });
+            $('shopPerfInfo').textContent = d.message + ` (${f} s/d ${t})`;
+            setTimeout(() => loadShopPerf(), 3000);
         } catch (e) {
             alert('Backfill berhenti: ' + e.message + ' — data yang sudah tersimpan tetap aman, ulangi untuk melanjutkan.');
         } finally {
