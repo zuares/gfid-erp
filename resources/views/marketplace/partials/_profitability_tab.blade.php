@@ -68,9 +68,16 @@
     // KPI profit di atas, tetapi tidak ditampilkan sebagai baris campaign.
     $displayRows = $rows->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))->values();
 
-    // ── Group by KATEGORI (hasil mapping SKU produk marketplace → item internal) ──
-    $byCategory = $displayRows
-        ->groupBy(fn ($r) => $r->camp->item_category ?? 'Belum termapping')
+    // ── Group by KATEGORI + GMV Max Auto ──
+    // GMV Max Auto tetap satu ringkasan tersendiri karena row GMS adalah
+    // agregat campaign/produk, bukan kategori SKU regular.
+    $byCategory = $rows
+        ->groupBy(function ($r) {
+            $campaignId = (string) ($r->camp->channel_campaign_id ?? '');
+            return str_starts_with($campaignId, 'GMS-')
+                ? 'GMV Max Auto'
+                : ($r->camp->item_category ?? 'Belum termapping');
+        })
         ->map(function ($grp, $name) {
             $known = $grp->filter(fn ($r) => $r->profit !== null);
             return (object) [
@@ -87,9 +94,15 @@
                 'lossCount'  => $known->where('isProfitable', false)->count(),
                 'unknownCount'=> $grp->count() - $known->count(),
                 'unmapped'   => $name === 'Belum termapping',
+                'isGms'      => $name === 'GMV Max Auto',
             ];
         })
-        ->sortBy([['unmapped', 'asc'], ['profit', 'asc']])
+        ->sortBy(function ($category) {
+            return [
+                $category->isGms ? 1 : ($category->unmapped ? 2 : 0),
+                $category->profit,
+            ];
+        })
         ->values();
 
     $totalCampaigns  = $rows->count();
@@ -1046,9 +1059,13 @@ window.__profitChartData = {
                     <tr style="border-bottom: 1px solid var(--dsh-border); {{ $cat->unknownCount > 0 && $cat->profit == 0 ? 'background: rgba(217, 119, 6, 0.045);' : ($cat->profit >= 0 ? '' : 'background: rgba(220, 38, 38, 0.045);') }}">
                         <td class="profit-index-cell">{{ $index + 1 }}</td>
                         <td style="padding:.6rem .5rem;">
-                            <span style="font-weight:700; color:{{ $cat->unmapped ? '#b45309' : 'var(--text)' }}; font-size:.85rem;">{{ $cat->name }}</span>
+                            <span style="font-weight:700; color:{{ $cat->isGms ? '#0369a1' : ($cat->unmapped ? '#b45309' : 'var(--text)') }}; font-size:.85rem;">
+                                @if($cat->isGms)<i class="bi bi-stars me-1"></i>@endif{{ $cat->name }}
+                            </span>
                             @if($cat->unmapped)
                                 <div style="font-size:.62rem; color:var(--dsh-muted);">lengkapi <a href="{{ route('marketplace.sku-mapping') }}" style="color:var(--dsh-accent);">SKU Mapping</a> agar terkelompok</div>
+                            @elseif($cat->isGms)
+                                <div style="font-size:.62rem; color:var(--dsh-muted);">termasuk ringkasan biaya dan omzet GMV Max Auto</div>
                             @elseif($cat->lossCount > 0)
                                 <div style="font-size:.62rem; color:#b91c1c;">{{ $cat->lossCount }} kampanye rugi</div>
                             @endif
