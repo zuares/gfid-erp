@@ -147,6 +147,7 @@
             'cvr' => $cvr,
             'cpm' => $cpm,
             'roas' => $roas,
+            'campaign_target_roas' => $camp->target_roas !== null ? (float) $camp->target_roas : null,
             'target_roas' => $targetRoas,
             'target_is_break_even' => $targetIsBreakEven,
             'roas_gap' => $roasGap,
@@ -202,6 +203,15 @@
     .perf-chip { display: flex; align-items: baseline; gap: .35rem; background: var(--card-bg, #fff); border: 1px solid var(--dsh-border, rgba(0,0,0,.08)); border-radius: 8px; padding: .3rem .55rem; font-size: .68rem; }
     .perf-chip > span { color: var(--dsh-muted, #6b7280); }
     .perf-chip > b { font-weight: 700; }
+    .perf-target-roas { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .45rem; border: 1px solid rgba(37, 99, 235, .24); border-radius: 7px; background: rgba(37, 99, 235, .06); color: var(--dsh-accent, #2563eb); font-weight: 700; cursor: pointer; }
+    .perf-target-roas:hover { background: rgba(37, 99, 235, .12); }
+    .perf-target-roas .perf-target-label { color: var(--dsh-muted, #6b7280); font-size: .58rem; font-weight: 600; }
+    .perf-target-roas-input { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .3rem; border: 1px solid rgba(37, 99, 235, .3); border-radius: 7px; background: var(--card-bg, #fff); }
+    .perf-target-roas-input .perf-target-input-label { color: var(--dsh-muted, #6b7280); font-size: .6rem; font-weight: 700; }
+    .perf-target-roas-input .perf-target-input-wrap { display: inline-flex; align-items: center; gap: .1rem; }
+    .perf-target-roas-input input { width: 54px; height: 24px; padding: 0 .25rem; font-size: .7rem; font-weight: 700; border: 1px solid rgba(37, 99, 235, .35); border-radius: 5px; background: var(--card-bg, #fff); color: var(--text, #111827); }
+    .perf-target-roas-input .perf-target-unit { color: var(--dsh-muted, #6b7280); font-size: .65rem; font-weight: 700; }
+    .perf-target-roas-input button { height: 24px; padding: 0 .35rem; border: 0; border-radius: 5px; font-size: .62rem; line-height: 1; }
 </style>
 
 <div class="row g-3 mb-4">
@@ -275,7 +285,7 @@
         </div>
     </div>
     <div class="p-2 px-3 border-bottom text-muted" style="font-size:.62rem;">
-        <i class="bi bi-info-circle"></i> Klik baris untuk lihat detail (Jangkauan, CPC, CTR, CPM, CPA, POAS) &amp; perbandingan vs {{ $perfCompareLabel }}.
+        <i class="bi bi-info-circle"></i> Klik baris untuk lihat detail. Klik nilai <strong>Target iklan</strong> untuk edit langsung tanpa membuka detail.
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
@@ -284,7 +294,7 @@
                     <th style="min-width:180px;">Campaign / Item</th>
                     <th class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan (atas) & Omzet (bawah) · Δ vs {{ $perfCompareLabel }}">Biaya / Omzet</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="ROAS aktual & Target ROAS (menyesuaikan HPP, PPN 11%)">ROAS / Target</th>
+                    <th class="text-end" data-bs-toggle="tooltip" title="ROAS aktual, target iklan editable, dan target impas">ROAS / Target</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Est. Net Profit & Margin · Δ vs {{ $perfCompareLabel }}">Profit</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Jumlah order & CVR">Orders</th>
                 </tr>
@@ -327,11 +337,26 @@
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val {{ $row['target_roas'] === null ? '' : ($meetsTarget ? 'text-success' : 'text-danger') }}">{{ number_format($row['roas'], 2) }}x</span>{!! $fmtDelta($row['roas'], $row['prev_roas'], true) !!}</div>
                             <div class="perf-sub">
-                                @if($row['target_roas'] === null)
-                                    tgt —
-                                @else
-                                    tgt {{ number_format($row['target_roas'], 2) }}x{{ $row['target_is_break_even'] ? ' (impas)' : '' }}
-                                @endif
+                                <div class="d-flex align-items-center justify-content-end gap-1" onclick="event.stopPropagation();">
+                                    <span>Target iklan</span>
+                                    <div class="inline-edit-wrapper" data-type="roas_target" data-camp="{{ $row['id'] }}" data-campaign-kind="{{ str_starts_with((string) $row['id'], 'GMS-') ? 'gms' : 'cpc' }}" data-val="{{ $row['campaign_target_roas'] ?? 0 }}" onclick="event.stopPropagation();">
+                                        <button type="button" class="inline-edit-text perf-target-roas border-0" title="Klik untuk edit Target ROAS" aria-label="Edit Target ROAS" onclick="event.stopPropagation(); showInlineEdit(this)">
+                                            <span class="perf-target-label">{{ $row['campaign_target_roas'] !== null ? 'Target' : 'Auto' }}</span>
+                                            <strong>{{ $row['campaign_target_roas'] !== null ? number_format($row['campaign_target_roas'], 2) . 'x' : 'Atur' }}</strong>
+                                            <i class="bi bi-pencil-square" style="font-size:.58rem;"></i>
+                                        </button>
+                                        <div class="inline-edit-input perf-target-roas-input" style="display:none;" onclick="event.stopPropagation();">
+                                            <span class="perf-target-input-label">Target ROAS</span>
+                                            <span class="perf-target-input-wrap">
+                                                <input type="text" inputmode="decimal" value="{{ $row['campaign_target_roas'] ?? 0 }}" aria-label="Target ROAS" placeholder="contoh 5,5" onclick="event.stopPropagation();">
+                                                <span class="perf-target-unit">x</span>
+                                            </span>
+                                            <button type="button" class="btn btn-success text-success" aria-label="Simpan Target ROAS" onclick="event.stopPropagation(); saveInlineEdit(this)"><i class="bi bi-check2"></i><span class="d-none d-xl-inline ms-1">Simpan</span></button>
+                                            <button type="button" class="btn btn-light text-secondary" aria-label="Batal edit Target ROAS" onclick="event.stopPropagation(); cancelInlineEdit(this)"><i class="bi bi-x-lg"></i><span class="d-none d-xl-inline ms-1">Batal</span></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="font-size:.58rem; color:var(--dsh-muted);">Impas {{ $row['target_roas'] === null ? '—' : number_format($row['target_roas'], 2) . 'x' }}</div>
                             </div>
                         </td>
 

@@ -17,6 +17,34 @@
     background: rgba(148, 163, 184, 0.15);
     border-color: rgba(148, 163, 184, 0.3);
 }
+.config-pill-roas {
+    border-color: rgba(37, 99, 235, 0.25);
+    background: rgba(37, 99, 235, 0.07);
+}
+.config-pill-label {
+    color: var(--dsh-muted);
+    font-size: .62rem;
+    font-weight: 700;
+}
+.campaign-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: .58rem;
+    font-weight: 750;
+    letter-spacing: .01em;
+}
+.campaign-type-cpc {
+    color: #0369a1;
+    background: rgba(14, 165, 233, .12);
+}
+.campaign-type-gms {
+    color: #7c3aed;
+    background: rgba(139, 92, 246, .13);
+}
 .growth-badge {
     display: inline-block;
     padding: 1px 5px;
@@ -34,6 +62,10 @@
     color: #dc2626;
 }
 </style>
+<div class="d-flex align-items-center gap-2 mb-2" style="font-size:.68rem; color:var(--dsh-muted);">
+    <i class="bi bi-info-circle text-primary"></i>
+    <span>Klik nilai pada kolom <strong style="color:var(--text);">Target ROAS</strong> untuk mengubahnya langsung dari tabel.</span>
+</div>
 <div class="table-responsive">
     <table class="dpanel-table dpanel-table-sm table-hover" style="white-space: nowrap;">
         <thead>
@@ -47,13 +79,15 @@
                 <th class="text-end" style="cursor:pointer;" title="Pesanan Direct" onclick="sortCampaignTable('orders_d', this)">Pesanan (D) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
                 <th class="text-end" style="cursor:pointer;" title="Pendapatan Direct" onclick="sortCampaignTable('gmv_d', this)">GMV (D) <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
                 <th class="text-end" style="cursor:pointer;" title="Biaya per klik" onclick="sortCampaignTable('cpc', this)">CPC <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
-                <th class="text-end" style="cursor:pointer;" title="Return on Ad Spend" onclick="sortCampaignTable('roas', this)">ROAS <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Target ROAS — klik nilai untuk mengubah" onclick="sortCampaignTable('target_roas', this)">Target ROAS <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
+                <th class="text-end" style="cursor:pointer;" title="Return on Ad Spend aktual" onclick="sortCampaignTable('roas', this)">ROAS Aktual <i class="bi bi-arrow-down-up ms-1" style="font-size:0.6rem; opacity:0.3;"></i></th>
             </tr>
         </thead>
         <tbody>
             @forelse($campaigns as $camp)
                 @php
                     $cpc = $camp->sum_clicks > 0 ? $camp->sum_expense / $camp->sum_clicks : 0;
+                    $isGmsCampaign = str_starts_with((string) ($camp->channel_campaign_id ?? ''), 'GMS-');
                     
                     // Growth calculations
                     $imp_growth = $camp->sum_prev_impressions > 0 ? (($camp->sum_impressions - $camp->sum_prev_impressions) / $camp->sum_prev_impressions) * 100 : ($camp->sum_impressions > 0 ? 100 : 0);
@@ -76,6 +110,7 @@
                     data-orders_d="{{ $camp->sum_direct_orders }}"
                     data-gmv_d="{{ $camp->sum_direct_gmv }}"
                     data-cpc="{{ $cpc }}"
+                    data-target_roas="{{ $camp->target_roas ?? 0 }}"
                     data-roas="{{ $camp->roas }}"
                     data-gmv="{{ $camp->sum_broad_gmv + $camp->sum_direct_gmv }}"
                     style="border-bottom: 1px solid var(--dsh-border);">
@@ -85,12 +120,16 @@
                                 <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; background:rgba(22, 163, 74, 0.15); border-radius:50%;" title="Berjalan">
                                     <i class="bi bi-play-fill text-success" style="font-size: .8rem;"></i>
                                 </span>
+                                @if(!$isGmsCampaign)
                                 <i class="bi bi-pause-circle-fill text-warning status-toggle-btn" style="cursor:pointer; font-size: 1rem; opacity: 0.5; transition: 0.2s; margin-left:-4px;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5" title="Klik untuk Jeda" onclick="toggleCampaignStatus(this, '{{ $camp->channel_campaign_id }}', 'pause')"></i>
+                                @endif
                             @elseif($camp->campaign_status === 'paused')
                                 <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; background:rgba(234, 179, 8, 0.15); border-radius:50%;" title="Jeda">
                                     <i class="bi bi-pause-fill text-warning" style="font-size: .8rem;"></i>
                                 </span>
+                                @if(!$isGmsCampaign)
                                 <i class="bi bi-play-circle-fill text-success status-toggle-btn" style="cursor:pointer; font-size: 1rem; opacity: 0.5; transition: 0.2s; margin-left:-4px;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5" title="Klik untuk Lanjut" onclick="toggleCampaignStatus(this, '{{ $camp->channel_campaign_id }}', 'resume')"></i>
+                                @endif
                             @else
                                 <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; background:rgba(148, 163, 184, 0.15); border-radius:50%;" title="{{ ucfirst($camp->campaign_status) }}">
                                     <span style="display:inline-block; width:6px; height:6px; background:#94a3b8; border-radius:50%;"></span>
@@ -100,6 +139,10 @@
                             <span style="font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size:.85rem;" title="{{ $camp->campaign_name ?: 'Kampanye Tidak Ditemukan' }} (Camp ID: {{ $camp->channel_campaign_id }} | Item ID: {{ $camp->channel_item_id ?: '-' }})">
                                 {{ $camp->campaign_name ?: 'Kampanye Tidak Ditemukan' }}
                             </span>
+                            <span class="campaign-type-badge {{ $isGmsCampaign ? 'campaign-type-gms' : 'campaign-type-cpc' }}">
+                                <i class="bi {{ $isGmsCampaign ? 'bi-stars' : 'bi-mouse2' }}"></i>
+                                {{ $isGmsCampaign ? 'GMV Max' : 'CPC' }}
+                            </span>
                         </div>
                         @if(($camp->channel_item_id ?? null) !== null)
                             <div style="font-size:.65rem; color:var(--dsh-muted); margin:-4px 0 7px 28px;">
@@ -108,8 +151,8 @@
                         @endif
 
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <div class="inline-edit-wrapper" data-type="daily_budget" data-camp="{{ $camp->channel_campaign_id }}" data-val="{{ $camp->campaign_budget > 0 ? $camp->campaign_budget : 0 }}">
-                                <div class="inline-edit-text config-pill" title="Klik untuk edit" onclick="showInlineEdit(this)">
+                            <div class="inline-edit-wrapper" data-type="daily_budget" data-camp="{{ $camp->channel_campaign_id }}" data-campaign-kind="{{ $isGmsCampaign ? 'gms' : 'cpc' }}" data-val="{{ $camp->campaign_budget > 0 ? $camp->campaign_budget : 0 }}">
+                                <div class="inline-edit-text config-pill" title="{{ $isGmsCampaign ? 'Edit budget GMV Max' : 'Edit budget CPC' }}" onclick="showInlineEdit(this)">
                                     <i class="bi bi-wallet2 text-muted"></i> 
                                     <span>{{ $camp->campaign_budget > 0 ? 'Rp ' . number_format($camp->campaign_budget, 0, ',', '.') : 'Unlimited' }}</span>
                                 </div>
@@ -120,17 +163,6 @@
                                 </div>
                             </div>
 
-                            <div class="inline-edit-wrapper" data-type="roas_target" data-camp="{{ $camp->channel_campaign_id }}" data-val="{{ $camp->target_roas ?? 0 }}">
-                                <div class="inline-edit-text config-pill" title="Klik untuk edit" onclick="showInlineEdit(this)">
-                                    <i class="bi bi-bullseye text-muted"></i> 
-                                    <span>{{ $camp->target_roas ? number_format($camp->target_roas, 2).'x' : 'Auto' }}</span>
-                                </div>
-                                <div class="inline-edit-input" style="display:none; align-items:center; gap:4px; background:var(--bg); border:1px solid var(--dsh-border); border-radius:6px; padding:2px 4px;">
-                                    <input type="number" step="0.1" class="form-control form-control-sm" style="width: 50px; height: 22px; font-size: .7rem; padding: 0 4px; border:none; background:transparent;" value="{{ $camp->target_roas ?? 0 }}">
-                                    <i class="bi bi-check text-success" style="cursor:pointer; font-size:1.1rem; line-height:1;" onclick="saveInlineEdit(this)"></i>
-                                    <i class="bi bi-x text-danger" style="cursor:pointer; font-size:1.1rem; line-height:1;" onclick="cancelInlineEdit(this)"></i>
-                                </div>
-                            </div>
                         </div>
                     </td>
                     
@@ -216,6 +248,20 @@
                             Rp {{ number_format($cpc, 0, ',', '.') }}
                         </div>
                     </td>
+
+                    <td class="text-end" style="vertical-align: middle;">
+                        <div class="inline-edit-wrapper d-inline-flex" data-type="roas_target" data-camp="{{ $camp->channel_campaign_id }}" data-campaign-kind="{{ $isGmsCampaign ? 'gms' : 'cpc' }}" data-val="{{ $camp->target_roas ?? 0 }}">
+                            <div class="inline-edit-text config-pill config-pill-roas" title="{{ $isGmsCampaign ? 'Edit Target ROAS GMV Max' : 'Edit Target ROAS CPC' }}" onclick="showInlineEdit(this)">
+                                <i class="bi bi-pencil-square" style="font-size:.65rem;"></i>
+                                <span>{{ $camp->target_roas ? number_format($camp->target_roas, 2).'x' : 'Auto' }}</span>
+                            </div>
+                            <div class="inline-edit-input" style="display:none; align-items:center; gap:4px; background:var(--bg); border:1px solid var(--dsh-border); border-radius:6px; padding:2px 4px;">
+                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" style="width: 58px; height: 22px; font-size: .7rem; padding: 0 4px; border:none; background:transparent;" value="{{ $camp->target_roas ?? 0 }}">
+                                <i class="bi bi-check text-success" style="cursor:pointer; font-size:1.1rem; line-height:1;" onclick="saveInlineEdit(this)"></i>
+                                <i class="bi bi-x text-danger" style="cursor:pointer; font-size:1.1rem; line-height:1;" onclick="cancelInlineEdit(this)"></i>
+                            </div>
+                        </div>
+                    </td>
                     
                     <td class="text-end" style="vertical-align: middle;">
                         <div style="font-weight: 700; color: #16a34a; font-variant-numeric: tabular-nums;">
@@ -230,7 +276,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="10" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
+                    <td colspan="11" class="text-center py-4" style="color: var(--dsh-muted); font-size: .8rem;">
                         Belum ada data kampanye.
                     </td>
                 </tr>

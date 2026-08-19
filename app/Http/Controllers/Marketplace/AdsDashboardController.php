@@ -20,7 +20,7 @@ class AdsDashboardController extends Controller
 {
     public function index(Request $request, AdsAnalyticsService $analytics, AdsDashboardService $dashboardService)
     {
-        $stores = Store::select('id', 'name')
+        $stores = Store::select('id', 'name', 'meta')
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
             ->where('is_active', true)
@@ -76,7 +76,8 @@ class AdsDashboardController extends Controller
             // tetapi jangan membuat job auto-sync dengan tanggal yang tidak valid.
         }
 
-        if ($autoSyncRange) {
+        $hasDemoStore = $stores->contains(fn ($store) => (bool) data_get($store->meta, 'ads_demo'));
+        if ($autoSyncRange && ! $hasDemoStore) {
             $autoSyncKey = 'ads_dashboard_autosync:' . $storeId . ':' . $autoSyncRange['from'] . ':' . $autoSyncRange['to'];
             if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {
                 $syncParams = [
@@ -417,6 +418,7 @@ class AdsDashboardController extends Controller
 
     public function actionCpcCampaign(Request $request, AdsActionService $actions, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
     {
+        $this->normalizeAdsDecimalInput($request, 'roas_target');
         $request->validate([
             'store_id' => 'required|exists:stores,id',
             'campaign_id' => 'required|numeric',
@@ -448,6 +450,7 @@ class AdsDashboardController extends Controller
 
     public function actionGmsCampaign(Request $request, AdsActionService $actions, \App\Services\Channels\Shopee\ShopeeChannel $shopeeChannel)
     {
+        $this->normalizeAdsDecimalInput($request, 'roas_target');
         $request->validate([
             'store_id' => 'required|exists:stores,id',
             'campaign_id' => 'nullable|string',
@@ -461,10 +464,6 @@ class AdsDashboardController extends Controller
         }
 
         $campaignId = $request->input('campaign_id');
-        // Jika ID adalah pseudo-ID global seperti "GMS-5", kita kosongkan agar API mengedit kampanye GMS tingkat toko
-        if (is_string($campaignId) && str_starts_with($campaignId, 'GMS-')) {
-            $campaignId = null;
-        }
 
         $roasTarget = $request->input('roas_target');
         $dailyBudget = $request->input('daily_budget');
@@ -474,6 +473,18 @@ class AdsDashboardController extends Controller
             return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    private function normalizeAdsDecimalInput(Request $request, string $key): void
+    {
+        $value = $request->input($key);
+        if (is_string($value)) {
+            $value = trim($value);
+            if (str_contains($value, ',') && str_contains($value, '.')) {
+                $value = str_replace('.', '', $value);
+            }
+            $request->merge([$key => str_replace(',', '.', $value)]);
         }
     }
 

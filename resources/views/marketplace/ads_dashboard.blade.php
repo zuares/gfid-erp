@@ -2786,6 +2786,21 @@ function sortTrafficTable(col) {
             <div class="modal-body">
                 <form id="formGmsSettings" onsubmit="submitGmsSettings(event)">
                         <input type="hidden" id="gmsStoreId" value="{{ $storeId !== 'all' ? $storeId : '' }}">
+                        <div class="d-flex align-items-start gap-2 mb-4 p-3" style="border-radius:12px; border:1px solid {{ $storeId !== 'all' ? 'rgba(124,58,237,.22)' : 'rgba(234,179,8,.35)' }}; background:{{ $storeId !== 'all' ? 'rgba(124,58,237,.07)' : 'rgba(234,179,8,.08)' }}; color:var(--text);">
+                            <i class="bi {{ $storeId !== 'all' ? 'bi-shop text-primary' : 'bi-exclamation-triangle text-warning' }}" style="font-size:1rem; margin-top:1px;"></i>
+                            <div style="font-size:.72rem; line-height:1.45;">
+                                @if($storeId !== 'all')
+                                    <div style="font-weight:750;">Toko aktif: {{ optional($stores->firstWhere('id', $storeId))->name ?? 'Toko terpilih' }}</div>
+                                    <div style="color:var(--dsh-muted);">Perubahan Target ROAS akan diterapkan ke GMV Max toko ini.</div>
+                                    @if(data_get(optional($stores->firstWhere('id', $storeId))->meta, 'ads_demo'))
+                                        <div style="color:#7c3aed; font-weight:700; margin-top:.2rem;"><i class="bi bi-info-circle"></i> Mode demo lokal — perubahan tidak dikirim ke Shopee.</div>
+                                    @endif
+                                @else
+                                    <div style="font-weight:750;">Pilih satu toko terlebih dahulu</div>
+                                    <div style="color:var(--dsh-muted);">Pengaturan GMV Max tidak dapat disimpan dalam mode Semua Toko.</div>
+                                @endif
+                            </div>
+                        </div>
                         <div class="mb-4">
                             <label style="font-size: .75rem; font-weight: 650; color: var(--dsh-muted); display: block; margin-bottom: .4rem;">ID Kampanye GMV Max (Opsional)</label>
                             <input type="text" id="gmsCampaignId" class="form-control" placeholder="Contoh: 123456789" style="border-radius: 8px; font-size: .85rem; background: var(--bg); color: var(--text); border-color: var(--dsh-border);">
@@ -2798,7 +2813,7 @@ function sortTrafficTable(col) {
                         <small style="font-size: 0.65rem; color: var(--dsh-muted);">*Isi 0 untuk Auto Bidding. Maksimal 1 angka di belakang koma.</small>
                     </div>
 
-                    <button type="submit" id="btnSubmitGmsSettings" class="btn w-100 fw-bold" style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">
+                    <button type="submit" id="btnSubmitGmsSettings" class="btn w-100 fw-bold" {{ $storeId === 'all' ? 'disabled' : '' }} style="background: var(--dsh-accent); color: #fff; border-radius: 12px; padding: .6rem;">
                         <i class="bi bi-cloud-arrow-up"></i> Simpan Pengaturan
                     </button>
                 </form>
@@ -3035,7 +3050,7 @@ window.AdsDashboardRoutes = {
     experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
 };
 </script>
-<script src="{{ asset('js/marketplace-ads-dashboard-extra.js') }}"></script>
+<script src="{{ asset('js/marketplace-ads-dashboard-extra.js') }}?v={{ filemtime(public_path('js/marketplace-ads-dashboard-extra.js')) }}"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {

@@ -52,6 +52,7 @@ class AdsActionService
         ShopeeChannel $shopeeChannel
     ): array {
         $results = [];
+        $isDemoStore = app()->environment('local') && (bool) data_get($store->meta, 'ads_demo');
         $localCampaign = MarketplaceAdCampaign::where('store_id', $store->id)
             ->where('channel_campaign_id', (string) $campaignId)
             ->first();
@@ -60,43 +61,53 @@ class AdsActionService
             : null;
 
         if ($roasTarget !== null && $roasTarget !== '') {
-            $params = ['roas_target' => (float) $roasTarget];
-            $resRoas = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_roas_target', $params);
-            if (! empty($resRoas['error'])) {
-                return [
-                    'status' => 'error',
-                    'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error']),
-                    'http_status' => 400,
-                ];
+            if (! $isDemoStore) {
+                $params = ['roas_target' => (float) $roasTarget];
+                $resRoas = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_roas_target', $params);
+                if (! empty($resRoas['error'])) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error']),
+                        'http_status' => 400,
+                    ];
+                }
             }
             $results[] = 'Target ROAS (' . ($roasTarget == 0 ? 'Auto' : $roasTarget) . ')';
-            usleep(300000);
+            if (! $isDemoStore) {
+                usleep(300000);
+            }
         }
 
         if ($dailyBudget !== null && $dailyBudget !== '') {
-            $params = ['budget' => (float) $dailyBudget];
-            $resBudget = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_budget', $params);
-            if (! empty($resBudget['error'])) {
-                return [
-                    'status' => 'error',
-                    'message' => 'Gagal ubah Budget: ' . ($resBudget['message'] ?? $resBudget['error']),
-                    'http_status' => 400,
-                ];
+            if (! $isDemoStore) {
+                $params = ['budget' => (float) $dailyBudget];
+                $resBudget = $shopeeChannel->editManualProductAds($store, $campaignId, 'change_budget', $params);
+                if (! empty($resBudget['error'])) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Gagal ubah Budget: ' . ($resBudget['message'] ?? $resBudget['error']),
+                        'http_status' => 400,
+                    ];
+                }
             }
             $results[] = 'Batas Modal Harian (' . ($dailyBudget == 0 ? 'Tidak Terbatas' : number_format($dailyBudget, 0, ',', '.')) . ')';
         }
 
         if ($statusAction === 'pause' || $statusAction === 'resume') {
-            $resStatus = $shopeeChannel->editManualProductAds($store, $campaignId, $statusAction, []);
-            if (! empty($resStatus['error'])) {
-                return [
-                    'status' => 'error',
-                    'message' => 'Gagal ubah status: ' . ($resStatus['message'] ?? $resStatus['error']),
-                    'http_status' => 400,
-                ];
+            if (! $isDemoStore) {
+                $resStatus = $shopeeChannel->editManualProductAds($store, $campaignId, $statusAction, []);
+                if (! empty($resStatus['error'])) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Gagal ubah status: ' . ($resStatus['message'] ?? $resStatus['error']),
+                        'http_status' => 400,
+                    ];
+                }
             }
             $results[] = 'Status (' . ucfirst($statusAction) . ')';
-            usleep(300000);
+            if (! $isDemoStore) {
+                usleep(300000);
+            }
         }
 
         if (empty($results)) {
@@ -160,9 +171,12 @@ class AdsActionService
         ?float $dailyBudget,
         ShopeeChannel $shopeeChannel
     ): array {
-        if (is_string($campaignId) && str_starts_with($campaignId, 'GMS-')) {
-            $campaignId = null;
-        }
+        // Keep the pseudo-ID for local persistence/experiment scope, but omit
+        // it from the Shopee request because GMS-<store_id> is not an API ID.
+        $apiCampaignId = is_string($campaignId) && str_starts_with($campaignId, 'GMS-')
+            ? null
+            : $campaignId;
+        $isDemoStore = app()->environment('local') && (bool) data_get($store->meta, 'ads_demo');
 
         $results = [];
         $localCampaign = $campaignId !== null
@@ -176,34 +190,38 @@ class AdsActionService
 
         if ($roasTarget !== null && $roasTarget !== '') {
             $params = ['roas_target' => (float) $roasTarget];
-            if ($campaignId) {
-                $params['campaign_id'] = (int) $campaignId;
+            if ($apiCampaignId) {
+                $params['campaign_id'] = (int) $apiCampaignId;
             }
 
-            $resRoas = $shopeeChannel->editGmsProductCampaign($store, 'change_roas_target', $params);
-            if (! empty($resRoas['error'])) {
-                return [
-                    'status' => 'error',
-                    'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error']),
-                    'http_status' => 400,
-                ];
+            if (! $isDemoStore) {
+                $resRoas = $shopeeChannel->editGmsProductCampaign($store, 'change_roas_target', $params);
+                if (! empty($resRoas['error'])) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Gagal ubah ROAS: ' . ($resRoas['message'] ?? $resRoas['error']),
+                        'http_status' => 400,
+                    ];
+                }
             }
             $results[] = 'Target ROAS (' . ($roasTarget == 0 ? 'Auto' : $roasTarget) . ')';
         }
 
         if ($dailyBudget !== null && $dailyBudget !== '') {
             $params = ['daily_budget' => (float) $dailyBudget];
-            if ($campaignId) {
-                $params['campaign_id'] = (int) $campaignId;
+            if ($apiCampaignId) {
+                $params['campaign_id'] = (int) $apiCampaignId;
             }
 
-            $resBudget = $shopeeChannel->editGmsProductCampaign($store, 'change_budget', $params);
-            if (! empty($resBudget['error'])) {
-                return [
-                    'status' => 'error',
-                    'message' => 'Gagal ubah budget: ' . ($resBudget['message'] ?? $resBudget['error']),
-                    'http_status' => 400,
-                ];
+            if (! $isDemoStore) {
+                $resBudget = $shopeeChannel->editGmsProductCampaign($store, 'change_budget', $params);
+                if (! empty($resBudget['error'])) {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Gagal ubah budget: ' . ($resBudget['message'] ?? $resBudget['error']),
+                        'http_status' => 400,
+                    ];
+                }
             }
             $results[] = 'Batas Modal Harian';
         }

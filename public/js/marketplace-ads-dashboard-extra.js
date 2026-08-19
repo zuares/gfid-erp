@@ -23,6 +23,14 @@
         btn.disabled = disabled;
     }
 
+    function normalizeDecimal(value) {
+        const raw = String(value ?? '').trim().replace(/\s/g, '');
+        if (raw.includes(',') && raw.includes('.')) {
+            return raw.replace(/\./g, '').replace(',', '.');
+        }
+        return raw.replace(',', '.');
+    }
+
     function formatShortIDR(value) {
         const num = Number(value || 0);
         const abs = Math.abs(num);
@@ -480,14 +488,33 @@
         const inputContainer = wrapper.querySelector('.inline-edit-input');
         inputContainer.style.display = 'inline-flex';
         const input = inputContainer.querySelector('input');
-        input.focus();
-
-        input.addEventListener('keypress', function (e) {
+        const focusAndSelect = function () {
+            input.focus({ preventScroll: true });
+            if (typeof input.setSelectionRange === 'function') {
+                input.setSelectionRange(0, input.value.length);
+            } else {
+                input.select();
+            }
+        };
+        focusAndSelect();
+        // Tunggu satu frame agar browser tidak mengembalikan caret ke posisi lama.
+        window.requestAnimationFrame ? window.requestAnimationFrame(focusAndSelect) : setTimeout(focusAndSelect, 0);
+        input.onfocus = function () {
+            setTimeout(focusAndSelect, 0);
+        };
+        input.onclick = function (e) {
+            e.stopPropagation();
+        };
+        input.onkeydown = function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 window.saveInlineEdit(inputContainer.querySelector('.text-success'));
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                const cancelControl = inputContainer.querySelector('.text-secondary, .text-danger');
+                if (cancelControl) window.cancelInlineEdit(cancelControl);
             }
-        }, { once: true });
+        };
     };
 
     window.cancelInlineEdit = function (el) {
@@ -501,22 +528,33 @@
     };
 
     window.saveInlineEdit = function (el) {
-        const route = routes.cpcCampaignEdit || '/marketplace/ads-dashboard/cpc-campaign-edit';
         const wrapper = el.closest('.inline-edit-wrapper');
         if (!wrapper) return;
 
         const input = wrapper.querySelector('input');
-        const newVal = input.value;
+        const type = wrapper.getAttribute('data-type');
+        const newVal = type === 'roas_target' ? normalizeDecimal(input.value) : input.value;
         const oldVal = wrapper.getAttribute('data-val');
+
+        if (type === 'roas_target' && (newVal === '' || !Number.isFinite(Number(newVal)) || Number(newVal) < 0)) {
+            getToast('Target ROAS harus berupa angka 0 atau lebih. Contoh: 5,5');
+            input.focus();
+            input.select();
+            return;
+        }
 
         if (newVal === oldVal) {
             window.cancelInlineEdit(el);
             return;
         }
 
-        const type = wrapper.getAttribute('data-type');
         const campId = wrapper.getAttribute('data-camp');
         const storeId = getStoreId();
+        const campaignKind = wrapper.getAttribute('data-campaign-kind');
+        const isGms = campaignKind === 'gms' || String(campId || '').startsWith('GMS-');
+        const route = isGms
+            ? (routes.gmsCampaignEdit || '/marketplace/ads-dashboard/gms-campaign-edit')
+            : (routes.cpcCampaignEdit || '/marketplace/ads-dashboard/cpc-campaign-edit');
 
         if (storeId === 'all') {
             getToast('Mode Semua Toko — pilih satu toko dulu untuk aksi ini.');
@@ -560,7 +598,17 @@
                     const numVal = parseFloat(newVal);
                     displayVal = numVal > 0 ? numVal.toFixed(2) + 'x' : 'Auto';
                 }
-                wrapper.querySelector('.inline-edit-text').innerHTML = displayVal + ' <i class="bi bi-pencil-fill text-muted" style="font-size: .6rem; opacity: 0.5;"></i>';
+                const targetLabel = wrapper.querySelector('.perf-target-roas .perf-target-label');
+                if (targetLabel) {
+                    wrapper.querySelector('.inline-edit-text').innerHTML =
+                        '<span class="perf-target-label">' + (numVal > 0 ? 'Target' : 'Auto') + '</span>' +
+                        '<strong>' + displayVal + '</strong>' +
+                        '<i class="bi bi-pencil-square" style="font-size:.58rem;"></i>';
+                } else {
+                    wrapper.querySelector('.inline-edit-text').innerHTML = displayVal + ' <i class="bi bi-pencil-fill text-muted" style="font-size: .6rem; opacity: 0.5;"></i>';
+                }
+                const campaignRow = wrapper.closest('.perf-row');
+                if (campaignRow) campaignRow.setAttribute('data-target_roas', newVal);
             } else {
                 getToast('Gagal menyimpan: ' + (data.message || 'Unknown error'));
                 wrapper.querySelector('.inline-edit-text').innerHTML = originalContent;
