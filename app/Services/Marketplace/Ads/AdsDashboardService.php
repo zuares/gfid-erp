@@ -350,7 +350,7 @@ class AdsDashboardService
                 if ($manualFeeRatio !== null) {
                     [$ratio, $ratioSource] = [$manualFeeRatio, 'manual'];
                 } else {
-                    [$ratio, $ratioSource] = $revenueRatioByKey[(string) $camp->channel_item_id]
+                    [$ratio, $ratioSource] = $revenueRatioByKey[$camp->store_id . '|' . (string) $camp->channel_item_id]
                         ?? [self::DEFAULT_NET_REVENUE_RATIO, 'default'];
                 }
                 $camp->net_revenue_ratio = $ratio;
@@ -414,17 +414,23 @@ class AdsDashboardService
         $catByChan = collect();
         if ($chanIds->isNotEmpty()) {
             $catByChan = DB::table('marketplace_order_items as moi')
+                ->join('marketplace_orders as mo', 'mo.id', '=', 'moi.order_id')
                 ->join('items as i', 'i.id', '=', 'moi.internal_item_id')
                 ->leftJoin('item_categories as cat', 'cat.id', '=', 'i.item_category_id')
                 ->whereIn('moi.external_item_id', $chanIds)
+                ->whereIn('mo.store_id', $storeIds)
                 ->whereNotNull('moi.internal_item_id')
-                ->groupBy('moi.external_item_id')
-                ->selectRaw('moi.external_item_id, MAX(cat.name) as cat_name')
-                ->pluck('cat_name', 'external_item_id');
+                ->groupBy('mo.store_id', 'moi.external_item_id')
+                ->selectRaw('mo.store_id, moi.external_item_id, MAX(cat.name) as cat_name')
+                ->get()
+                ->mapWithKeys(fn ($row) => [
+                    $row->store_id . '|' . $row->external_item_id => $row->cat_name,
+                ]);
         }
         $campaigns = $campaigns->map(function ($camp) use ($catByChan) {
+            $categoryKey = $camp->store_id . '|' . (string) $camp->channel_item_id;
             $camp->item_category = $camp->internalItem?->category?->name
-                ?? ($catByChan[(string) $camp->channel_item_id] ?? null);
+                ?? ($catByChan[$categoryKey] ?? null);
             return $camp;
         });
 
@@ -858,7 +864,8 @@ class AdsDashboardService
         }
 
         $orderItemsSub = MarketplaceOrderItem::query()
-            ->select('external_item_id', 'order_id')
+            ->join('marketplace_orders as mo', 'mo.id', '=', 'marketplace_order_items.order_id')
+            ->select('mo.store_id', 'external_item_id', 'order_id')
             ->distinct()
             ->whereIn('external_item_id', $itemIds)
             ->whereNotNull('order_id');
@@ -868,8 +875,8 @@ class AdsDashboardService
                 $join->on('oi.order_id', '=', 'marketplace_order_settlements.order_id');
             })
             ->where('final_income', '>', 0)
-            ->groupBy('oi.external_item_id')
-            ->selectRaw('oi.external_item_id, SUM(marketplace_order_settlements.final_income) as total_final_income, SUM(marketplace_order_settlements.buyer_payment_amount) as total_item_value')
+            ->groupBy('oi.store_id', 'oi.external_item_id')
+            ->selectRaw('oi.store_id, oi.external_item_id, SUM(marketplace_order_settlements.final_income) as total_final_income, SUM(marketplace_order_settlements.buyer_payment_amount) as total_item_value')
             ->get();
 
         foreach ($ratioRows as $row) {
@@ -880,7 +887,7 @@ class AdsDashboardService
                 continue;
             }
 
-            $revenueRatioByKey[$itemId] = [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
+            $revenueRatioByKey[$row->store_id . '|' . $itemId] = [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
         }
 
         return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
