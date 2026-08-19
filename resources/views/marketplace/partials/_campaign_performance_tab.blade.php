@@ -183,6 +183,9 @@
     
     // Sort by Spend Descending by default
     $perfRows = $perfRows->sortByDesc('spend')->values();
+    $perfCategoryCampaignRows = $perfRows
+        ->filter(fn ($row) => in_array('category', $row['performance_views'] ?? [], true))
+        ->groupBy('category');
     $perfCategoryRows = $perfRows
         ->filter(fn ($row) => in_array('category', $row['performance_views'] ?? [], true))
         ->groupBy('category')
@@ -205,6 +208,7 @@
 
             return [
                 'category' => $category,
+                'key' => 'perf-cat-' . md5((string) $category),
                 'campaign_count' => $group->count(),
                 'spend' => $spend,
                 'gmv' => $gmv,
@@ -251,9 +255,16 @@
     .perf-table th { font-size: .66rem; text-transform: uppercase; letter-spacing: .02em; color: var(--dsh-muted, #6b7280); }
     .perf-row { cursor: pointer; }
     .perf-row:hover { background: rgba(37, 99, 235, .04); }
+    .perf-category-row { cursor: pointer; }
+    .perf-category-row:hover { background: rgba(37, 99, 235, .04); }
     .perf-caret { transition: transform .15s; }
     .perf-row.open .perf-caret { transform: rotate(90deg); }
+    .perf-category-row.open .perf-caret { transform: rotate(90deg); }
     .perf-detail > td { padding: .5rem .75rem; }
+    .perf-category-detail > td { padding: .55rem .75rem; }
+    .perf-category-campaign-table { font-size: .72rem; }
+    .perf-category-campaign-table th { color: var(--dsh-muted, #6b7280); font-size: .62rem; text-transform: uppercase; letter-spacing: .02em; }
+    .perf-category-campaign-table th, .perf-category-campaign-table td { padding: .4rem .45rem; }
     .perf-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
     .perf-chip { display: flex; align-items: baseline; gap: .35rem; background: var(--card-bg, #fff); border: 1px solid var(--dsh-border, rgba(0,0,0,.08)); border-radius: 8px; padding: .3rem .55rem; font-size: .68rem; }
     .perf-chip > span { color: var(--dsh-muted, #6b7280); }
@@ -353,9 +364,12 @@
             </thead>
             <tbody>
                 @foreach($perfCategoryRows as $categoryRow)
-                    <tr class="perf-category-row" data-perf-views="category">
+                    <tr class="perf-category-row" data-perf-views="category" onclick="perfToggleCategory(this)">
                         <td>
-                            <div class="fw-bold text-truncate" style="max-width:180px;" title="{{ $categoryRow['category'] }}">{{ $categoryRow['category'] }}</div>
+                            <div class="d-flex align-items-start gap-1">
+                                <i class="bi bi-chevron-right perf-caret text-muted" style="font-size:.7rem; margin-top:.15rem;"></i>
+                                <div class="fw-bold text-truncate" style="max-width:180px;" title="{{ $categoryRow['category'] }}">{{ $categoryRow['category'] }}</div>
+                            </div>
                             <div class="text-muted" style="font-size:.68rem;">{{ number_format($categoryRow['campaign_count'], 0, ',', '.') }} campaign</div>
                         </td>
                         <td class="text-center"><span class="badge bg-{{ $categoryRow['reco']['color'] }}">{{ $categoryRow['reco']['label'] }}</span></td>
@@ -363,6 +377,40 @@
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['roas'], 2) }}x</span></div><div class="perf-sub">tgt {{ $categoryRow['target_roas'] === null ? '—' : number_format($categoryRow['target_roas'], 2) . 'x' }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val {{ !$categoryRow['profit_available'] ? 'text-muted' : ($categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$categoryRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</span></div>@if($categoryRow['profit_available'])<div class="perf-sub">margin {{ $categoryRow['margin'] === null ? '—' : number_format($categoryRow['margin'], 1) . '%' }}</div>@endif</td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span></div><div class="perf-sub">CVR {{ number_format($categoryRow['cvr'], 2) }}%</div></td>
+                    </tr>
+                    <tr class="perf-category-detail" data-perf-views="category" style="display:none;">
+                        <td colspan="6" class="bg-light">
+                            <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0 perf-category-campaign-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Campaign / Item</th>
+                                            <th class="text-end">Spend</th>
+                                            <th class="text-end">GMV</th>
+                                            <th class="text-end">ROAS</th>
+                                            <th class="text-end">Target</th>
+                                            <th class="text-end">Orders</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($perfCategoryCampaignRows->get($categoryRow['category'], collect()) as $campaignRow)
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $campaignRow['name'] }}">{{ $campaignRow['name'] }}</div>
+                                                    <div class="text-muted text-truncate" style="font-size:.62rem; max-width:260px;">{{ $campaignRow['item_name'] }} @if($campaignRow['type']) · {{ strtoupper($campaignRow['type']) }}@endif</div>
+                                                </td>
+                                                <td class="text-end">Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</td>
+                                                <td class="text-end text-success">Rp {{ number_format($campaignRow['gmv'], 0, ',', '.') }}</td>
+                                                <td class="text-end fw-bold">{{ number_format($campaignRow['roas'], 2) }}x</td>
+                                                <td class="text-end">{{ $campaignRow['target_roas'] === null ? '—' : number_format($campaignRow['target_roas'], 2) . 'x' }}</td>
+                                                <td class="text-end">{{ number_format($campaignRow['orders'], 0, ',', '.') }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
                     </tr>
                 @endforeach
                 @forelse($perfRows as $row)
@@ -463,8 +511,17 @@ function perfToggle(row) {
     }
 }
 
+function perfToggleCategory(row) {
+    row.classList.toggle('open');
+    const detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('perf-category-detail')) {
+        detail.style.display = (detail.style.display === 'none' || !detail.style.display) ? 'table-row' : 'none';
+    }
+}
+
 function perfApplySegment(segment) {
     const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row'));
+    const categoryDetails = Array.from(document.querySelectorAll('.perf-category-detail'));
     const emptyState = document.querySelector('.perf-segment-empty');
     const noDataState = document.querySelector('.perf-no-data');
 
@@ -475,6 +532,9 @@ function perfApplySegment(segment) {
     }
 
     if (noDataState) noDataState.style.display = 'none';
+    categoryDetails.forEach(function(detail) {
+        detail.style.display = 'none';
+    });
     let visibleCount = 0;
 
     rows.forEach(function(row) {
