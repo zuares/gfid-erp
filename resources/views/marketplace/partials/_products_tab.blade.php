@@ -9,6 +9,13 @@
     $knownAdSpend = $knownProfitItems->sum('spend');
     $totalOrders = $itemPerformance->sum('orders');
     $totalGmv = $itemPerformance->sum('gmv');
+    $productViewCounts = [
+        'category' => $itemPerformance->count(),
+        'roas' => $itemPerformance->count(),
+        // GMV Max Auto tidak memiliki baris produk pada query item-level saat ini.
+        'gms' => $itemPerformance->filter(fn ($row) => !empty($row->has_gms))->count(),
+        'unmapped' => $itemPerformance->filter(fn ($row) => (float) ($row->unit_cogs ?? 0) <= 0)->count(),
+    ];
 
     $scatterDataJson = json_encode($itemPerformance->map(function($r) {
         return [
@@ -80,6 +87,12 @@
             <span class="badge bg-danger">Loss Maker</span>
         </div>
     </div>
+    <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan produk">
+        <button type="button" id="btnProductCategory" class="btn fw-bold" onclick="__productPerformanceView('category')" data-product-count="{{ $productViewCounts['category'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
+        <button type="button" id="btnProductRoas" class="btn fw-bold" onclick="__productPerformanceView('roas')" data-product-count="{{ $productViewCounts['roas'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
+        <button type="button" id="btnProductGms" class="btn fw-bold" onclick="__productPerformanceView('gms')" data-product-count="{{ $productViewCounts['gms'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
+        <button type="button" id="btnProductUnmapped" class="btn fw-bold" onclick="__productPerformanceView('unmapped')" data-product-count="{{ $productViewCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Belum Mapping</button>
+    </div>
     <div class="table-responsive" style="max-height: 600px;">
         <table class="table table-hover align-middle mb-0 text-nowrap" style="font-size: 0.85rem;" id="productsPerformanceTable">
             <thead class="table-light sticky-top" style="z-index: 2;">
@@ -99,7 +112,12 @@
             </thead>
             <tbody>
                 @forelse($itemPerformance as $row)
-                    <tr>
+                    @php
+                        $productViews = ['category', 'roas'];
+                        if ((float) ($row->unit_cogs ?? 0) <= 0) $productViews[] = 'unmapped';
+                        if (!empty($row->has_gms)) $productViews[] = 'gms';
+                    @endphp
+                    <tr class="product-performance-row" data-product-views="{{ implode(' ', $productViews) }}">
                         <td>
                             <div class="d-flex align-items-center">
                                 @if($row->image_url)
@@ -146,16 +164,58 @@
                         <td class="text-end">{{ $row->poas === null ? 'N/A' : number_format($row->poas, 2) . 'x' }}</td>
                     </tr>
                 @empty
-                    <tr>
+                    <tr class="product-no-data">
                         <td colspan="11" class="text-center py-4 text-muted">Belum ada data performa produk yang memadai untuk tanggal ini.</td>
                     </tr>
                 @endforelse
+                <tr class="product-view-empty" style="display:none;">
+                    <td colspan="11" class="text-center py-4 text-muted">Belum ada data untuk kategori ini.</td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
 
 <script>
+window.__productPerformanceView = function(view) {
+    const rows = Array.from(document.querySelectorAll('.product-performance-row'));
+    const emptyState = document.querySelector('.product-view-empty');
+    const noDataState = document.querySelector('.product-no-data');
+    let visibleCount = 0;
+
+    rows.forEach(function(row) {
+        const visible = (row.dataset.productViews || '').split(/\s+/).includes(view);
+        row.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+    });
+
+    if (noDataState) noDataState.style.display = rows.length ? 'none' : 'table-row';
+    if (emptyState) emptyState.style.display = rows.length && !visibleCount ? 'table-row' : 'none';
+
+    const buttonOn = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent); white-space:nowrap;';
+    const buttonOff = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;';
+    const buttons = {
+        category: document.getElementById('btnProductCategory'),
+        roas: document.getElementById('btnProductRoas'),
+        gms: document.getElementById('btnProductGms'),
+        unmapped: document.getElementById('btnProductUnmapped'),
+    };
+    Object.entries(buttons).forEach(function([key, button]) {
+        if (!button) return;
+        const active = key === view;
+        button.style.cssText = active ? buttonOn : buttonOff;
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    try { localStorage.setItem('adsProductView', view); } catch (e) {}
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    let savedView = null;
+    try { savedView = localStorage.getItem('adsProductView'); } catch (e) {}
+    const validViews = ['category', 'roas', 'gms', 'unmapped'];
+    window.__productPerformanceView(validViews.includes(savedView) ? savedView : 'category');
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const pScatterData = {!! $scatterDataJson !!};
 

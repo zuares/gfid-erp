@@ -132,10 +132,21 @@
             $reco = 'Optimasi';   $recoColor = 'warning';   // profit tapi di bawah target
         }
 
+        $campaignId = (string) $camp->channel_campaign_id;
+        $campaignName = (string) ($camp->campaign_name ?? '');
+        $isGmvMax = str_starts_with(strtoupper($campaignId), 'GMS-')
+            || str_contains(strtolower($campaignName), 'gmv max');
+        $isUnmapped = !$isGmvMax && ($camp->internalItem === null || (float) ($camp->unit_cogs ?? 0) <= 0);
+        $performanceViews = $isGmvMax
+            ? ['gms']
+            : array_values(array_unique(array_merge(['category', 'roas'], $isUnmapped ? ['unmapped'] : [])));
+
         $perfRows->push([
             'id' => $camp->channel_campaign_id,
             'name' => $camp->campaign_name,
             'type' => $camp->ad_type,
+            'performance_views' => $performanceViews,
+            'category' => $camp->item_category ?? $camp->internalItem?->category?->name ?? 'Belum termapping',
             'status' => $camp->campaign_status,
             'spend' => $spend,
             'gmv' => $gmv,
@@ -172,6 +183,51 @@
     
     // Sort by Spend Descending by default
     $perfRows = $perfRows->sortByDesc('spend')->values();
+    $perfCategoryRows = $perfRows
+        ->filter(fn ($row) => in_array('category', $row['performance_views'] ?? [], true))
+        ->groupBy('category')
+        ->map(function ($group, $category) {
+            $spend = $group->sum('spend');
+            $gmv = $group->sum('gmv');
+            $orders = $group->sum('orders');
+            $clicks = $group->sum('clicks');
+            $impressions = $group->sum('impressions');
+            $profitKnown = $group->filter(fn ($row) => $row['profit_available']);
+            $targets = $group->pluck('target_roas')->filter(fn ($target) => $target !== null);
+            $roas = $spend > 0 ? $gmv / $spend : 0;
+            $targetRoas = $targets->isNotEmpty() ? round($targets->avg(), 2) : null;
+            $profit = $profitKnown->sum('profit');
+            $reco = $targetRoas === null
+                ? ['label' => 'Data HPP', 'color' => 'secondary']
+                : ($profit <= 0 ? ['label' => 'Stop', 'color' => 'danger']
+                    : ($roas >= $targetRoas * 1.2 ? ['label' => 'Scale', 'color' => 'success']
+                        : ($roas >= $targetRoas ? ['label' => 'Aman', 'color' => 'info'] : ['label' => 'Optimasi', 'color' => 'warning'])));
+
+            return [
+                'category' => $category,
+                'campaign_count' => $group->count(),
+                'spend' => $spend,
+                'gmv' => $gmv,
+                'orders' => $orders,
+                'clicks' => $clicks,
+                'impressions' => $impressions,
+                'roas' => $roas,
+                'target_roas' => $targetRoas,
+                'profit' => $profit,
+                'profit_available' => $profitKnown->count() === $group->count(),
+                'margin' => $gmv > 0 ? ($profit / $gmv) * 100 : null,
+                'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
+                'reco' => $reco,
+            ];
+        })
+        ->sortByDesc('spend')
+        ->values();
+    $perfSegmentCounts = [
+        'category' => $perfCategoryRows->count(),
+        'roas' => $perfRows->filter(fn ($row) => in_array('roas', $row['performance_views'] ?? [], true))->count(),
+        'gms' => $perfRows->filter(fn ($row) => in_array('gms', $row['performance_views'] ?? [], true))->count(),
+        'unmapped' => $perfRows->filter(fn ($row) => in_array('unmapped', $row['performance_views'] ?? [], true))->count(),
+    ];
 
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
@@ -277,11 +333,17 @@
     <div class="p-2 px-3 border-bottom text-muted" style="font-size:.62rem;">
         <i class="bi bi-info-circle"></i> Klik baris untuk lihat detail (Jangkauan, CPC, CTR, CPM, CPA, POAS) &amp; perbandingan vs {{ $perfCompareLabel }}.
     </div>
+    <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan performa">
+        <button type="button" id="btnPerformanceCategory" class="btn fw-bold" onclick="__campaignPerformanceView('category')" data-perf-count="{{ $perfSegmentCounts['category'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
+        <button type="button" id="btnPerformanceRoas" class="btn fw-bold" onclick="__campaignPerformanceView('roas')" data-perf-count="{{ $perfSegmentCounts['roas'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
+        <button type="button" id="btnPerformanceGms" class="btn fw-bold" onclick="__campaignPerformanceView('gms')" data-perf-count="{{ $perfSegmentCounts['gms'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
+        <button type="button" id="btnPerformanceUnmapped" class="btn fw-bold" onclick="__campaignPerformanceView('unmapped')" data-perf-count="{{ $perfSegmentCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Belum Mapping</button>
+    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
             <thead class="table-light sticky-top" style="z-index: 2;">
                 <tr>
-                    <th style="min-width:180px;">Campaign / Item</th>
+                    <th style="min-width:180px;">Kategori / Campaign</th>
                     <th class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan (atas) & Omzet (bawah) · Δ vs {{ $perfCompareLabel }}">Biaya / Omzet</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="ROAS aktual & Target ROAS (menyesuaikan HPP, PPN 11%)">ROAS / Target</th>
@@ -290,11 +352,24 @@
                 </tr>
             </thead>
             <tbody>
+                @foreach($perfCategoryRows as $categoryRow)
+                    <tr class="perf-category-row" data-perf-views="category">
+                        <td>
+                            <div class="fw-bold text-truncate" style="max-width:180px;" title="{{ $categoryRow['category'] }}">{{ $categoryRow['category'] }}</div>
+                            <div class="text-muted" style="font-size:.68rem;">{{ number_format($categoryRow['campaign_count'], 0, ',', '.') }} campaign</div>
+                        </td>
+                        <td class="text-center"><span class="badge bg-{{ $categoryRow['reco']['color'] }}">{{ $categoryRow['reco']['label'] }}</span></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span></div><div class="perf-sub"><span class="text-success">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</span></div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['roas'], 2) }}x</span></div><div class="perf-sub">tgt {{ $categoryRow['target_roas'] === null ? '—' : number_format($categoryRow['target_roas'], 2) . 'x' }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val {{ !$categoryRow['profit_available'] ? 'text-muted' : ($categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$categoryRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</span></div>@if($categoryRow['profit_available'])<div class="perf-sub">margin {{ $categoryRow['margin'] === null ? '—' : number_format($categoryRow['margin'], 1) . '%' }}</div>@endif</td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span></div><div class="perf-sub">CVR {{ number_format($categoryRow['cvr'], 2) }}%</div></td>
+                    </tr>
+                @endforeach
                 @forelse($perfRows as $row)
                     @php
                         $meetsTarget = $row['target_roas'] !== null && $row['roas'] >= $row['target_roas'];
                     @endphp
-                    <tr class="perf-row" onclick="perfToggle(this)">
+                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" onclick="perfToggle(this)">
                         {{-- Campaign / Item --}}
                         <td>
                             <div class="d-flex align-items-start gap-1">
@@ -351,7 +426,7 @@
                     </tr>
 
                     {{-- Detail (expand) --}}
-                    <tr class="perf-detail" style="display:none;">
+                    <tr class="perf-detail" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" style="display:none;">
                         <td colspan="6" class="bg-light">
                             <div class="perf-chips">
                                 <div class="perf-chip"><span>Jangkauan</span><b>{{ number_format($row['impressions'], 0, ',', '.') }}</b>{!! $fmtDelta($row['impressions'], $row['prev_impressions'], true) !!}</div>
@@ -366,10 +441,13 @@
                         </td>
                     </tr>
                 @empty
-                    <tr>
+                    <tr class="perf-no-data">
                         <td colspan="6" class="text-center py-4 text-muted">Belum ada data performa campaign yang memadai.</td>
                     </tr>
                 @endforelse
+                <tr class="perf-segment-empty" style="display:none;">
+                    <td colspan="6" class="text-center py-4 text-muted">Belum ada data untuk kategori ini.</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -385,8 +463,71 @@ function perfToggle(row) {
     }
 }
 
+function perfApplySegment(segment) {
+    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row'));
+    const emptyState = document.querySelector('.perf-segment-empty');
+    const noDataState = document.querySelector('.perf-no-data');
+
+    if (!rows.length) {
+        if (emptyState) emptyState.style.display = 'none';
+        if (noDataState) noDataState.style.display = 'table-row';
+        return;
+    }
+
+    if (noDataState) noDataState.style.display = 'none';
+    let visibleCount = 0;
+
+    rows.forEach(function(row) {
+        const isVisible = (row.dataset.perfViews || '').split(/\s+/).includes(segment);
+        const detail = row.classList.contains('perf-row') ? row.nextElementSibling : null;
+        row.style.display = isVisible ? '' : 'none';
+        row.classList.remove('open');
+
+        if (detail && detail.classList.contains('perf-detail')) {
+            detail.style.display = 'none';
+            detail.style.visibility = isVisible ? '' : 'hidden';
+        }
+
+        if (isVisible) visibleCount++;
+    });
+
+    if (emptyState) emptyState.style.display = visibleCount ? 'none' : 'table-row';
+
+}
+
+window.__campaignPerformanceView = function(view) {
+    perfApplySegment(view);
+
+    const buttonOn = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
+    const buttonOff = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent;';
+    const buttons = {
+        category: document.getElementById('btnPerformanceCategory'),
+        roas: document.getElementById('btnPerformanceRoas'),
+        gms: document.getElementById('btnPerformanceGms'),
+        unmapped: document.getElementById('btnPerformanceUnmapped'),
+    };
+
+    Object.entries(buttons).forEach(function([key, button]) {
+        if (!button) return;
+        const active = key === view;
+        button.style.cssText = active ? buttonOn : buttonOff;
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    try { localStorage.setItem('adsPerformanceView', view); } catch (e) {}
+};
+
 // Kembali ke tab Campaign setelah reload akibat ganti periode pembanding.
 document.addEventListener('DOMContentLoaded', function() {
+    const categoryButton = document.getElementById('btnPerformanceCategory');
+    if (categoryButton) {
+        let savedView = null;
+        try { savedView = localStorage.getItem('adsPerformanceView'); } catch (e) {}
+        const validViews = ['category', 'roas', 'gms', 'unmapped'];
+        const initialView = validViews.includes(savedView) ? savedView : 'category';
+        window.__campaignPerformanceView(initialView);
+    }
+
     if (location.hash === '#tab-campaign-performance' && typeof window.openAdsPane === 'function') {
         setTimeout(function () { window.openAdsPane('tab-campaign-performance'); }, 150);
     }

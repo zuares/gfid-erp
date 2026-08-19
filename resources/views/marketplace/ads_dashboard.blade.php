@@ -1664,6 +1664,45 @@ function sortTrafficTable(col) {
 
     rows.forEach(row => tbody.appendChild(row));
 }
+
+window.__trafficPerformanceView = function(view) {
+    const rows = Array.from(document.querySelectorAll('.traffic-performance-row'));
+    const emptyState = document.querySelector('.traffic-view-empty');
+    const noDataState = document.querySelector('.traffic-no-data');
+    let visibleCount = 0;
+
+    rows.forEach(function(row) {
+        const visible = (row.dataset.trafficViews || '').split(/\s+/).includes(view);
+        row.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+    });
+
+    if (noDataState) noDataState.style.display = rows.length ? 'none' : 'table-row';
+    if (emptyState) emptyState.style.display = rows.length && !visibleCount ? 'table-row' : 'none';
+
+    const buttonOn = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent); white-space:nowrap;';
+    const buttonOff = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;';
+    const buttons = {
+        category: document.getElementById('btnTrafficCategory'),
+        roas: document.getElementById('btnTrafficRoas'),
+        gms: document.getElementById('btnTrafficGms'),
+        unmapped: document.getElementById('btnTrafficUnmapped'),
+    };
+    Object.entries(buttons).forEach(function([key, button]) {
+        if (!button) return;
+        const active = key === view;
+        button.style.cssText = active ? buttonOn : buttonOff;
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    try { localStorage.setItem('adsTrafficView', view); } catch (e) {}
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    let savedView = null;
+    try { savedView = localStorage.getItem('adsTrafficView'); } catch (e) {}
+    const validViews = ['category', 'roas', 'gms', 'unmapped'];
+    window.__trafficPerformanceView(validViews.includes(savedView) ? savedView : 'category');
+});
 </script>
 
 @endpush
@@ -2236,6 +2275,12 @@ function sortTrafficTable(col) {
                         <div class="ads-tab-panel-note">Jangkauan, klik, pesanan, konversi, dan efisiensi biaya per campaign.</div>
                     </div>
                 </div>
+                <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan traffic">
+                    <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
+                    <button type="button" id="btnTrafficRoas" class="btn fw-bold" onclick="__trafficPerformanceView('roas')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
+                    <button type="button" id="btnTrafficGms" class="btn fw-bold" onclick="__trafficPerformanceView('gms')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
+                    <button type="button" id="btnTrafficUnmapped" class="btn fw-bold" onclick="__trafficPerformanceView('unmapped')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Belum Mapping</button>
+                </div>
                 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                     <table class="dpanel-table" id="trafficTable">
@@ -2255,12 +2300,17 @@ function sortTrafficTable(col) {
                         </thead>
                         <tbody>
                             @if(empty($campaigns) || count($campaigns) == 0)
-                                <tr>
+                                <tr class="traffic-no-data">
                                     <td colspan="10" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
                                 </tr>
                             @else
                                 @foreach($campaigns as $row)
                                     @php
+                                        $trafficIsGms = str_starts_with((string) ($row->channel_campaign_id ?? ''), 'GMS-');
+                                        $trafficIsUnmapped = !$trafficIsGms && empty($row->item_category);
+                                        $trafficViews = $trafficIsGms
+                                            ? ['gms']
+                                            : array_values(array_unique(array_merge(['category', 'roas'], $trafficIsUnmapped ? ['unmapped'] : [])));
                                         $cImp = $row->sum_impressions ?? 0;
                                         $cClicks = $row->clicks ?? 0;
                                         $cSpend = $row->spend ?? 0;
@@ -2270,7 +2320,7 @@ function sortTrafficTable(col) {
                                         $cCpc = $cClicks > 0 ? $cSpend / $cClicks : 0;
                                         $cCpm = $cImp > 0 ? ($cSpend / $cImp) * 1000 : 0;
                                     @endphp
-                                    <tr data-campaign_name="{{ strtolower($row->campaign_name ?? '') }}"
+                                    <tr class="traffic-performance-row" data-traffic-views="{{ implode(' ', $trafficViews) }}" data-campaign_name="{{ strtolower($row->campaign_name ?? '') }}"
                                         data-spend="{{ $cSpend }}"
                                         data-impressions="{{ $cImp }}"
                                         data-clicks="{{ $cClicks }}"
@@ -2297,6 +2347,9 @@ function sortTrafficTable(col) {
                                     </tr>
                                 @endforeach
                             @endif
+                            <tr class="traffic-view-empty" style="display:none;">
+                                <td colspan="10" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
