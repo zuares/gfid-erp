@@ -2337,37 +2337,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
                     ];
                 })->values();
-                $trafficGmsProducts = collect($itemPerformance ?? [])
-                    ->filter(fn ($product) => !empty($product->has_gms))
-                    ->map(function ($product) {
-                        $impressions = (int) ($product->impressions ?? 0);
-                        $clicks = (int) ($product->clicks ?? 0);
-                        $spend = (float) ($product->spend ?? 0);
-                        $orders = (int) ($product->orders ?? 0);
-                        return [
-                            'row' => $product,
-                            'name' => $product->item_name ?: 'Produk GMV Max Auto',
-                            'id' => 'GMS-ITEM-' . $product->channel_item_id,
-                            'category' => 'GMV Max Auto',
-                            'is_gms' => true,
-                            'views' => ['gms'],
-                            'spend' => $spend,
-                            'impressions' => $impressions,
-                            'clicks' => $clicks,
-                            'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
-                            'orders' => $orders,
-                            'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
-                            'cpc' => $clicks > 0 ? $spend / $clicks : 0,
-                            'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
-                        ];
-                    })
-                    ->values();
-                if ($trafficGmsProducts->isNotEmpty()) {
-                    $trafficRows = $trafficRows
-                        ->reject(fn ($row) => $row['is_gms'])
-                        ->concat($trafficGmsProducts)
-                        ->values();
-                }
                 $trafficRegularRows = $trafficRows->filter(fn ($row) => !$row['is_gms']);
                 $trafficCategoryCampaignRows = $trafficRegularRows->groupBy('category');
                 $trafficCategoryRows = $trafficCategoryCampaignRows->map(function ($group, $category) {
@@ -2420,12 +2389,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="ads-tab-panel mb-4">
                 <div class="ads-tab-panel-head">
                     <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Tabel Performa Campaign (Traffic)</div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Campaign (Traffic)</div>
                         <div class="ads-tab-panel-note">Jangkauan, klik, pesanan, konversi, dan efisiensi biaya per campaign.</div>
                     </div>
-                </div>
-                <div class="p-2 px-3 border-bottom text-muted" style="font-size:.62rem;">
-                    <i class="bi bi-info-circle"></i> Tab kategori menampilkan ringkasan per kategori. Klik baris kategori untuk melihat daftar campaign.
                 </div>
                 <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan traffic">
                     <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
@@ -2448,12 +2414,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="dpanel ads-kpi">
                             <div class="ads-kpi-label"><i class="bi bi-eye"></i> Jangkauan</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="impressions">{{ number_format($trafficInitialKpi['impressions'], 0, ',', '.') }}</div>
-                            <div class="ads-kpi-sub">impression campaign</div>
-                        </div>
-                        <div class="dpanel ads-kpi">
-                            <div class="ads-kpi-label"><i class="bi bi-hand-index-thumb"></i> Klik</div>
-                            <div class="ads-kpi-value" data-traffic-kpi-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</div>
-                            <div class="ads-kpi-sub">interaksi iklan</div>
+                            <div class="ads-kpi-sub"><span data-traffic-kpi-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span> klik</div>
                         </div>
                         <div class="dpanel ads-kpi">
                             <div class="ads-kpi-label"><i class="bi bi-percent"></i> CTR</div>

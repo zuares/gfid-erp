@@ -183,68 +183,6 @@
             'unit_cogs' => (float) ($camp->unit_cogs ?? 0),
         ]);
     }
-
-    // Untuk GMV Max Auto, tampilkan item produk dari data item-level bila
-    // tersedia. Parent campaign GMS hanya menjadi agregat dan tidak ditampilkan
-    // sebagai nama campaign di daftar produk.
-    $perfGmsProducts = collect($itemPerformance ?? [])
-        ->filter(fn ($product) => !empty($product->has_gms))
-        ->map(function ($product) {
-            $profitAvailable = $product->profit_after_ads !== null;
-            $profit = $profitAvailable ? (float) $product->profit_after_ads : null;
-            return [
-                'id' => 'gms-item-' . $product->store_id . '-' . $product->channel_item_id,
-                'name' => $product->item_name,
-                'type' => 'auto',
-                'performance_views' => ['gms'],
-                'category' => 'GMV Max Auto',
-                'status' => 'ongoing',
-                'spend' => (float) ($product->spend ?? 0),
-                'gmv' => (float) ($product->gmv ?? 0),
-                'orders' => (int) ($product->orders ?? 0),
-                'clicks' => (int) ($product->clicks ?? 0),
-                'impressions' => (int) ($product->impressions ?? 0),
-                'cpc' => (float) ($product->cpc ?? 0),
-                'ctr' => (float) ($product->ctr ?? 0),
-                'cvr' => (float) ($product->cvr ?? 0),
-                'cpm' => $product->impressions > 0 ? ((float) $product->spend / (int) $product->impressions) * 1000 : 0,
-                'roas' => (float) ($product->roas ?? 0),
-                'target_roas' => null,
-                'target_is_break_even' => false,
-                'roas_gap' => null,
-                'cpa' => (float) ($product->cpa ?? 0),
-                'profit' => $profit,
-                'profit_available' => $profitAvailable,
-                'margin' => $profitAvailable && (float) ($product->gmv ?? 0) > 0 ? ($profit / (float) $product->gmv) * 100 : null,
-                'spend_ppn' => (float) ($product->spend ?? 0) * 1.11,
-                'poas' => $product->poas,
-                'prev_spend' => 0,
-                'prev_gmv' => 0,
-                'prev_orders' => 0,
-                'prev_clicks' => 0,
-                'prev_impressions' => 0,
-                'prev_profit' => null,
-                'prev_roas' => 0,
-                'reco' => $profitAvailable ? ($profit >= 0 ? 'Aman' : 'Optimasi') : 'Data HPP',
-                'recoColor' => $profitAvailable ? ($profit >= 0 ? 'info' : 'warning') : 'secondary',
-                'item_name' => $product->item_name ?: 'Produk GMV Max Auto',
-                'unit_cogs' => (float) ($product->unit_cogs ?? 0),
-            ];
-        })
-        ->sortByDesc('spend')
-        ->values();
-
-    if ($perfGmsProducts->isNotEmpty()) {
-        $perfRows = $perfRows
-            ->map(function ($row) {
-                if (in_array('gms', $row['performance_views'] ?? [], true)) {
-                    $row['performance_views'] = ['gms-parent'];
-                }
-                return $row;
-            })
-            ->concat($perfGmsProducts)
-            ->values();
-    }
     
     // Sort by Spend Descending by default
     $perfRows = $perfRows->sortByDesc('spend')->values();
