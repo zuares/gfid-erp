@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Channel;
 use App\Models\Item;
 use App\Models\MarketplaceAdExperiment;
+use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceAdsItemDaily;
+use App\Models\SkuMapping;
 use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -358,6 +360,57 @@ class AdsExperimentPhase2Test extends TestCase
         $this->assertNull(
             $service->activeExperimentForScope($store, 'C-PHASE3-CONFOUNDED', 'ITEM-PHASE3-CONFOUNDED'),
         );
+    }
+
+    public function test_detail_resolves_hpp_from_marketplace_sku_when_experiment_has_no_manual_mapping(): void
+    {
+        $store = $this->store('PHASE3-SKU-FALLBACK');
+        $item = Item::create([
+            'code' => 'PHASE3-ITEM-SKU',
+            'name' => 'Phase 3 SKU Fallback Item',
+            'type' => 'finished',
+            'hpp' => 30,
+            'active' => true,
+        ]);
+        MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => 'MARKETPLACE-ITEM-SKU',
+            'item_name' => 'Marketplace SKU Product',
+            'item_sku' => 'SKU-PHASE3-FALLBACK',
+            'price_min' => 100,
+            'price_max' => 100,
+        ]);
+        SkuMapping::create([
+            'marketplace_sku' => 'SKU-PHASE3-FALLBACK',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-SKU',
+            'channel_item_id' => 'MARKETPLACE-ITEM-SKU',
+            'internal_item_id' => null,
+            'mapping_status' => 'missing_mapping',
+            'old_price' => null,
+            'new_price' => null,
+        ]);
+        $effective = Carbon::parse($experiment->effective_date);
+
+        foreach (range(1, 7) as $days) {
+            $this->campaignFact($store, 'C-PHASE3-SKU', $effective->copy()->subDays($days), [
+                'clicks' => 50,
+                'impressions' => 500,
+                'expense' => 100,
+                'broad_order' => 3,
+                'broad_order_amount' => 3,
+                'broad_gmv' => 300,
+            ]);
+        }
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame('mapped', $details['data_quality']['mapping_status']);
+        $this->assertNotNull($details['baseline']['metrics']['profit']);
+        $this->assertSame(30.0, (float) $details['baseline']['metrics']['hpp']);
     }
 
     private function store(string $code): Store

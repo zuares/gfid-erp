@@ -6,6 +6,7 @@ use App\Models\MarketplaceAdCampaign;
 use App\Models\MarketplaceAdExperiment;
 use App\Models\MarketplaceAdItemMap;
 use App\Models\MarketplaceProduct;
+use App\Models\SkuMapping;
 use App\Models\Store;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -291,12 +292,14 @@ class AdsExperimentService
         $completedObservationDays = $observationFrom->lte($observationTo)
             ? $observationFrom->diffInDays($observationTo) + 1
             : 0;
+        $effectiveMappingStatus = $this->effectiveMappingStatus($experiment);
         $conflicts = $this->detectConflicts($experiment, $effectiveDate, $observationWindowEnd);
         $dataSufficiency = $this->dataSufficiency(
             $baseline,
             $observation,
             $completedObservationDays,
             $experiment,
+            $effectiveMappingStatus,
         );
         $impact = $this->impactAnalysis($baseline, $observation);
         $status = $this->lifecycleStatus(
@@ -314,7 +317,7 @@ class AdsExperimentService
                 'store_id' => (int) $experiment->store_id,
                 'channel_campaign_id' => $experiment->channel_campaign_id,
                 'channel_item_id' => $experiment->channel_item_id,
-                'internal_item_id' => $experiment->internal_item_id,
+                'internal_item_id' => $this->resolvedInternalItemId($experiment),
             ],
             'change' => [
                 'type' => $experiment->change_type,
@@ -352,7 +355,7 @@ class AdsExperimentService
                 'baseline_flags' => $baseline['data_quality'],
                 'observation_flags' => $observation['data_quality'],
                 'conflict_flags' => collect($conflicts)->pluck('reason')->values()->all(),
-                'mapping_status' => $experiment->mapping_status,
+                'mapping_status' => $effectiveMappingStatus,
                 'actual_profit_ready' => (bool) ($observation['metrics']['actual_profit_ready'] ?? false),
                 'profit_estimated' => (bool) ($observation['metrics']['profit_estimated'] ?? true),
             ],
@@ -383,8 +386,9 @@ class AdsExperimentService
             $price = (float) $metrics['revenue'] / (float) $metrics['qty'];
         }
 
-        $hpp = $experiment->internal_item_id
-            ? $this->hppResolver->resolve((int) $experiment->internal_item_id)
+        $resolvedInternalItemId = $this->resolvedInternalItemId($experiment);
+        $hpp = $resolvedInternalItemId
+            ? $this->hppResolver->resolve($resolvedInternalItemId)
             : 0.0;
         [$netRevenueRatio, $ratioSource] = $this->dashboardService->resolveConfiguredNetRevenueRatio(
             $experiment->channel_item_id,
@@ -413,7 +417,7 @@ class AdsExperimentService
             ? 'input'
             : (($experiment->new_price !== null || $experiment->old_price !== null) ? 'experiment' : 'observed_gmv_per_qty');
         $result['assumptions']['net_revenue_ratio_source'] = $ratioSource;
-        $result['assumptions']['mapping_status'] = $experiment->mapping_status;
+        $result['assumptions']['mapping_status'] = $resolvedInternalItemId ? 'mapped' : $experiment->mapping_status;
         $result['assumptions']['actual_profit_ready'] = (bool) ($period['metrics']['actual_profit_ready'] ?? false);
 
         return [
@@ -559,8 +563,10 @@ class AdsExperimentService
             $price = $revenue / $qty;
             $priceEstimated = true;
         }
-        $hpp = $experiment->internal_item_id
-            ? $this->hppResolver->resolve((int) $experiment->internal_item_id)
+        $resolvedInternalItemId = $this->resolvedInternalItemId($experiment);
+        $mappingReady = $resolvedInternalItemId !== null;
+        $hpp = $resolvedInternalItemId
+            ? $this->hppResolver->resolve($resolvedInternalItemId)
             : 0.0;
         [$netRevenueRatio] = $this->dashboardService->resolveConfiguredNetRevenueRatio(
             $experiment->channel_item_id,
@@ -607,7 +613,7 @@ class AdsExperimentService
             $netRevenueRatio,
             $usesQtyFallback,
             $priceEstimated,
-            $experiment->mapping_status === 'mapped' && $hpp > 0,
+            $mappingReady && $hpp > 0,
         );
         if ($calculatedMetrics['profit_estimated']) {
             $quality[] = 'estimated_profit';
@@ -813,6 +819,7 @@ class AdsExperimentService
         array $observation,
         int $completedObservationDays,
         MarketplaceAdExperiment $experiment,
+        string $mappingStatus,
     ): array {
         $baselineMetrics = $baseline['metrics'] ?? [];
         $observationMetrics = $observation['metrics'] ?? [];
@@ -853,7 +860,7 @@ class AdsExperimentService
             ->keys()
             ->values()
             ->all();
-        if ($experiment->mapping_status !== 'mapped') {
+        if ($mappingStatus !== 'mapped') {
             $reasons[] = 'missing_mapping';
         }
         if (! $profitReady) {
@@ -1006,6 +1013,26 @@ class AdsExperimentService
             );
     }
 
+    private function effectiveMappingStatus(MarketplaceAdExperiment $experiment): string
+    {
+        return $this->resolvedInternalItemId($experiment) !== null
+            ? 'mapped'
+            : $experiment->mapping_status;
+    }
+
+    private function resolvedInternalItemId(MarketplaceAdExperiment $experiment): ?int
+    {
+        if ($experiment->internal_item_id) {
+            return (int) $experiment->internal_item_id;
+        }
+
+        return $this->mappedInternalItemId(
+            (int) $experiment->store_id,
+            $experiment->channel_item_id,
+            $experiment->channel_campaign_id,
+        );
+    }
+
     private function mappedInternalItemId(int $storeId, ?string $channelItemId, ?string $channelCampaignId): ?int
     {
         $campaign = $channelCampaignId
@@ -1042,7 +1069,58 @@ class AdsExperimentService
             ->orderByRaw('CASE WHEN store_id = ? THEN 0 ELSE 1 END', [$storeId])
             ->first();
 
-        return $mapping?->internal_item_id ? (int) $mapping->internal_item_id : null;
+        if ($mapping?->internal_item_id) {
+            return (int) $mapping->internal_item_id;
+        }
+
+        if ($channelItemId) {
+            $product = MarketplaceProduct::query()
+                ->where('store_id', $storeId)
+                ->where('item_id', (string) $channelItemId)
+                ->with('models:id,marketplace_product_id,model_sku')
+                ->first();
+
+            if ($product) {
+                $skus = $product->models
+                    ->pluck('model_sku')
+                    ->push($product->item_sku)
+                    ->filter()
+                    ->map(fn ($sku) => trim((string) $sku))
+                    ->unique()
+                    ->values();
+
+                if ($skus->isNotEmpty()) {
+                    $skuMapping = SkuMapping::query()
+                        ->whereIn('marketplace_sku', $skus->all())
+                        ->where(function ($query) {
+                            $query->whereNull('channel_code')
+                                ->orWhereRaw('LOWER(channel_code) = ?', ['shopee']);
+                        })
+                        ->orderByRaw('CASE WHEN channel_code = ? THEN 0 ELSE 1 END', ['shopee'])
+                        ->first();
+
+                    if ($skuMapping?->item_id) {
+                        return (int) $skuMapping->item_id;
+                    }
+                }
+            }
+
+            // Historical orders can contain the internal item even when the
+            // SKU mapping table was created after the order was imported.
+            $orderItemId = DB::table('marketplace_order_items as moi')
+                ->join('marketplace_orders as mo', 'mo.id', '=', 'moi.order_id')
+                ->where('mo.store_id', $storeId)
+                ->where('moi.external_item_id', (string) $channelItemId)
+                ->whereNotNull('moi.item_id')
+                ->orderByDesc('moi.id')
+                ->value('moi.item_id');
+
+            if ($orderItemId) {
+                return (int) $orderItemId;
+            }
+        }
+
+        return null;
     }
 
     private function singleValue(Collection $changes, string $key): ?float
