@@ -279,10 +279,10 @@ class AdsDashboardService
             ->whereIn('store_id', $storeIds)
             ->get();
 
-        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
+        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
 
         $campaigns = $campaigns
-            ->map(function ($camp) use ($manualFeeRatioByStore, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey) {
+            ->map(function ($camp) use ($manualFeeRatioByStore, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey) {
                 $k = $camp->store_id . '|' . $camp->channel_campaign_id;
                 $a = $aggCur->get($k);
                 $p = $aggPrev->get($k);
@@ -353,6 +353,7 @@ class AdsDashboardService
                     : $camp->store_id . '|' . (string) $camp->channel_item_id;
                 $internalUnitCogs = $this->resolveItemUnitCogs($camp->internalItem);
                 $camp->unit_cogs = (float) ($unitCogsByKey[$campaignKey] ?? $internalUnitCogs);
+                $camp->variant_empty = (bool) ($variantEmptyByKey[$camp->store_id . '|' . (string) $camp->channel_item_id] ?? false);
 
                 $trueAvgPrice = (float) ($avgPriceByKey[$campaignKey] ?? 0);
                 if (! $trueAvgPrice || $trueAvgPrice <= 0) {
@@ -762,7 +763,7 @@ class AdsDashboardService
     }
 
     /**
-     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>}
+     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>, 3: array<string, bool>}
      */
     private function preloadCampaignAnalytics(Collection $campaigns, string $dateFrom, string $dateTo): array
     {
@@ -777,10 +778,11 @@ class AdsDashboardService
         $avgPriceByKey = [];
         $unitCogsByKey = [];
         $revenueRatioByKey = [];
+        $variantEmptyByKey = [];
 
         if ($storeIds->isEmpty() || $itemIds->isEmpty()) {
             $this->preloadGmsAnalytics($campaigns, $dateFrom, $dateTo, $avgPriceByKey, $unitCogsByKey);
-            return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
+            return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey];
         }
 
         $channelCodesByStore = $realCampaigns
@@ -795,10 +797,10 @@ class AdsDashboardService
             ->whereIn('item_id', $itemIds)
             ->with([
                 'models' => function ($q) {
-                    $q->select('id', 'marketplace_product_id', 'model_id', 'model_sku', 'price', 'raw_json');
+                    $q->select('id', 'marketplace_product_id', 'model_id', 'model_name', 'model_sku', 'price', 'raw_json');
                 },
             ])
-            ->get(['id', 'store_id', 'item_id', 'item_sku']);
+            ->get(['id', 'store_id', 'item_id', 'item_sku', 'has_model']);
 
         $productSkus = $products
             ->flatMap(fn ($product) => $product->models->pluck('model_sku')->push($product->item_sku))
@@ -825,6 +827,11 @@ class AdsDashboardService
         foreach ($products as $product) {
             $key = $product->store_id . '|' . $product->item_id;
             $channelCode = strtolower((string) ($channelCodesByStore[$product->store_id] ?? '')) ?: '__global';
+
+            $hasVariantRows = $product->models->isNotEmpty();
+            $variantEmptyByKey[$key] = ((bool) $product->has_model && ! $hasVariantRows)
+                || $product->models->contains(fn ($model) => trim((string) ($model->model_name ?? '')) === ''
+                    && trim((string) ($model->model_sku ?? '')) === '');
 
             $prices = [];
             $modelHpps = [];
@@ -906,7 +913,7 @@ class AdsDashboardService
             $revenueRatioByKey[$row->store_id . '|' . $itemId] = [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
         }
 
-        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey];
+        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey];
     }
 
     /**

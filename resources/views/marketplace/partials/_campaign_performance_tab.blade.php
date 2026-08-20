@@ -196,6 +196,7 @@
             'prev_roas' => $prevRoas,
             'reco' => $reco,
             'recoColor' => $recoColor,
+            'variant_empty' => (bool) ($camp->variant_empty ?? false),
             'item_name' => $camp->internalItem ? $camp->internalItem->name : 'N/A',
             'unit_cogs' => (float) ($camp->unit_cogs ?? 0),
         ]);
@@ -235,6 +236,7 @@
                 : ($profit <= 0 ? ['label' => 'Stop', 'color' => 'danger']
                     : ($roas >= $targetRoas * 1.2 ? ['label' => 'Scale', 'color' => 'success']
                         : ($roas >= $targetRoas ? ['label' => 'Aman', 'color' => 'info'] : ['label' => 'Optimasi', 'color' => 'warning'])));
+            $emptyVariantCount = $group->where('variant_empty', true)->count();
 
             return [
                 'category' => $category,
@@ -266,6 +268,7 @@
                 'prev_profit' => $prevProfit,
                 'prev_profit_available' => $prevProfitRows->count() > 0,
                 'reco' => $reco,
+                'empty_variant_count' => $emptyVariantCount,
             ];
         })
         ->sortByDesc('spend')
@@ -567,7 +570,12 @@
                             </div>
                             <div class="text-muted" style="font-size:.68rem;">{{ number_format($categoryRow['campaign_count'], 0, ',', '.') }} campaign</div>
                         </td>
-                        <td class="text-center"><span class="badge bg-{{ $categoryRow['reco']['color'] }}">{{ $categoryRow['reco']['label'] }}</span></td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ $categoryRow['reco']['color'] }}">{{ $categoryRow['reco']['label'] }}</span>
+                            @if(($categoryRow['empty_variant_count'] ?? 0) > 0)
+                                <span class="badge bg-warning text-dark mt-1" title="{{ $categoryRow['empty_variant_count'] }} campaign memiliki variant kosong">Variant kosong{{ $categoryRow['empty_variant_count'] > 1 ? ' (' . $categoryRow['empty_variant_count'] . ')' : '' }}</span>
+                            @endif
+                        </td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ $categoryRow['bep_roas'] === null ? '—' : number_format($categoryRow['bep_roas'], 2) . 'x' }}</span></div><div class="perf-sub">impas</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ $categoryRow['configured_roas'] === null ? 'Auto' : number_format($categoryRow['configured_roas'], 2) . 'x' }}</span></div><div class="perf-sub">rata-rata kategori</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ $categoryRow['campaign_budget'] > 0 ? 'Rp ' . number_format($categoryRow['campaign_budget'], 0, ',', '.') : 'Unlimited' }}</span></div><div class="perf-sub">total modal harian</div></td>
@@ -691,6 +699,9 @@
                         {{-- Sinyal --}}
                         <td class="text-center">
                             <span class="badge bg-{{ $row['recoColor'] }}">{{ $row['reco'] }}</span>
+                            @if($row['variant_empty'])
+                                <span class="badge bg-warning text-dark mt-1" title="Produk memiliki variant kosong">Variant kosong</span>
+                            @endif
                         </td>
 
                         {{-- BEP --}}
