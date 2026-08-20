@@ -374,77 +374,6 @@
     }
     $perfSegmentKpis['category'] = $categoryKpi;
     $perfInitialKpi = $perfSegmentKpis['category'];
-    $perfVisibleProfit = $perfRows->sum(fn ($row) => (float) ($row['profit'] ?? 0));
-    $perfVisiblePreviousProfit = $perfRows->sum(fn ($row) => (float) ($row['prev_profit'] ?? 0));
-    $perfProfitAdjustment = $overallCurrentKpi !== null
-        ? round($totalProfit - $perfVisibleProfit, 2)
-        : 0.0;
-    $perfPreviousProfitAdjustment = $overallPreviousKpi !== null
-        ? round($overallPreviousProfit - $perfVisiblePreviousProfit, 2)
-        : 0.0;
-    $perfSpendAdjustment = $overallCurrentKpi !== null
-        ? max(0, round($totalSpend - $perfRows->sum('spend'), 2))
-        : 0.0;
-    if (abs($perfProfitAdjustment) >= 0.01) {
-        $reconciliationCategory = 'Penyesuaian Seller Center';
-        $reconciliationCampaign = [
-            'id' => 'seller-center-adjustment',
-            'store_id' => null,
-            'campaign_id' => 'seller-center-adjustment',
-            'name' => 'Penyesuaian Seller Center',
-            'item_name' => 'Biaya/profit belum teralokasi ke campaign',
-            'type' => null,
-            'bep_roas' => null,
-            'configured_roas' => null,
-            'campaign_budget' => 0,
-            'roas' => 0,
-            'actual_vs_target_pct' => null,
-            'prev_roas' => 0,
-            'orders' => 0,
-            'prev_orders' => 0,
-            'spend' => $perfSpendAdjustment,
-            'prev_spend' => 0,
-            'aov' => 0,
-            'prev_aov' => 0,
-            'gmv' => 0,
-            'prev_gmv' => 0,
-            'profit' => $perfProfitAdjustment,
-            'profit_available' => true,
-            'prev_profit' => $perfPreviousProfitAdjustment,
-        ];
-        $perfCategoryRows = collect([[
-            'category' => $reconciliationCategory,
-            'key' => 'perf-cat-seller-center-adjustment',
-            'campaign_count' => 1,
-            'spend' => $perfSpendAdjustment,
-            'gmv' => 0,
-            'orders' => 0,
-            'aov' => 0,
-            'clicks' => 0,
-            'impressions' => 0,
-            'roas' => 0,
-            'target_roas' => null,
-            'bep_roas' => null,
-            'configured_roas' => null,
-            'campaign_budget' => 0,
-            'actual_vs_target_pct' => null,
-            'profit' => $perfProfitAdjustment,
-            'profit_available' => true,
-            'margin' => null,
-            'cvr' => 0,
-            'prev_spend' => 0,
-            'prev_gmv' => 0,
-            'prev_orders' => 0,
-            'prev_aov' => 0,
-            'prev_roas' => 0,
-            'prev_profit' => $perfPreviousProfitAdjustment,
-            'prev_profit_available' => true,
-            'reco' => ['label' => 'Rekonsiliasi', 'color' => 'warning'],
-            'empty_variant_count' => 0,
-        ]])->concat($perfCategoryRows)->values();
-        $perfCategoryCampaignRows = $perfCategoryCampaignRows->put($reconciliationCategory, collect([$reconciliationCampaign]));
-        $perfSegmentCounts['category']++;
-    }
 
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
@@ -1491,7 +1420,7 @@ function perfUpdateKpis(segment) {
 }
 
 function perfApplySegment(segment) {
-    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row, .perf-overall-row, .perf-reconciliation-row'));
+    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row, .perf-overall-row'));
     const categoryDetails = Array.from(document.querySelectorAll('.perf-category-detail'));
     const emptyState = document.querySelector('.perf-segment-empty');
     const noDataState = document.querySelector('.perf-no-data');
@@ -1518,8 +1447,6 @@ function perfApplySegment(segment) {
         const isCategoryView = segment === 'category';
         const isVisible = row.classList.contains('perf-overall-row')
             ? true
-            : row.classList.contains('perf-reconciliation-row')
-            ? isCategoryView
             : isCategoryView
             ? row.classList.contains('perf-category-row')
             : row.classList.contains('perf-row')

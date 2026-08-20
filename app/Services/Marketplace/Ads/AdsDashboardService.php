@@ -393,6 +393,12 @@ class AdsDashboardService
                 // Profit aktual tetap harus dihitung walaupun produk sudah
                 // melewati titik break-even. Break-even hanya metrik batas
                 // aman ACOS; ia bukan syarat agar profit bisa dihitung.
+                $isGmsCampaign = str_starts_with((string) $camp->channel_campaign_id, 'GMS-');
+                $isGmsNoSale = $isGmsCampaign
+                    && (float) ($camp->gmv ?? 0) <= 0
+                    && (int) ($camp->orders ?? 0) <= 0
+                    && (int) ($camp->items_sold ?? 0) <= 0
+                    && (float) ($camp->spend ?? 0) > 0;
                 if ($hasCogsData) {
                     $netRevenue = $camp->gmv * $netRevRatio;
                     $totalCogs = ($camp->unit_cogs > 0 && ($camp->items_sold ?? 0) > 0)
@@ -402,6 +408,13 @@ class AdsDashboardService
                     $camp->profit_after_ads = round($netRevenue - $totalCogs - $spendAfterTax, 2);
                     $camp->net_revenue = $netRevenue;
                     $camp->total_cogs = $totalCogs;
+                } elseif ($isGmsNoSale) {
+                    // GMV Max Auto tanpa penjualan tetap merupakan campaign
+                    // yang valid. Masukkan biaya iklannya langsung ke baris
+                    // GMS agar KPI dan daftar campaign memakai sumber yang sama.
+                    $camp->profit_after_ads = round(-((float) $camp->spend * 1.11), 2);
+                    $camp->net_revenue = 0.0;
+                    $camp->total_cogs = 0.0;
                 } else {
                     $camp->profit_after_ads = null;
                     $camp->net_revenue = $camp->gmv * $netRevRatio;
@@ -415,9 +428,14 @@ class AdsDashboardService
                     : $camp->prev_gmv * ($camp->cogs_ratio ?? 0);
                 $camp->prev_net_revenue = $prevNetRevenue;
                 $camp->prev_total_cogs = $prevTotalCogs;
+                $isGmsPreviousNoSale = $isGmsCampaign
+                    && (float) ($camp->prev_gmv ?? 0) <= 0
+                    && (int) ($camp->prev_orders ?? 0) <= 0
+                    && (int) ($camp->prev_items_sold ?? 0) <= 0
+                    && (float) ($camp->prev_spend ?? 0) > 0;
                 $camp->prev_profit_after_ads = $hasCogsData
                     ? round($prevNetRevenue - $prevTotalCogs - ($camp->prev_spend * 1.11), 2)
-                    : null;
+                    : ($isGmsPreviousNoSale ? round(-((float) $camp->prev_spend * 1.11), 2) : null);
 
                 $camp->reco = $this->adsRecommendation((float) $camp->spend, $acos, $beAcos, (int) $camp->orders);
 
@@ -426,6 +444,156 @@ class AdsDashboardService
             ->filter(fn ($camp) => in_array($camp->campaign_status, ['ongoing', 'normal']) || $camp->spend > 0 || $camp->prev_spend > 0)
             ->sortByDesc('spend')
             ->values();
+
+        // Seller Center menyimpan total spend per toko, sedangkan sebagian
+        // laporan campaign GMV Max Auto kadang belum mempunyai parent row.
+        // Masukkan selisihnya ke campaign GMS per toko agar KPI dan daftar
+        // campaign memiliki grain data yang sama tanpa baris penyesuaian.
+        $shopSpendByStore = DB::table('marketplace_ads_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('store_id, SUM(spend) as spend')
+            ->groupBy('store_id')
+            ->pluck('spend', 'store_id');
+        $shopPreviousSpendByStore = DB::table('marketplace_ads_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('date', [$prevDateFrom, $prevDateTo])
+            ->selectRaw('store_id, SUM(spend) as spend')
+            ->groupBy('store_id')
+            ->pluck('spend', 'store_id');
+
+        foreach ($storeIds as $storeIdValue) {
+            $storeCampaigns = $campaigns->filter(fn ($camp) => (string) $camp->store_id === (string) $storeIdValue);
+            $currentGap = max(0, (float) ($shopSpendByStore[$storeIdValue] ?? 0) - (float) $storeCampaigns->sum('spend'));
+            $previousGap = max(0, (float) ($shopPreviousSpendByStore[$storeIdValue] ?? 0) - (float) $storeCampaigns->sum('prev_spend'));
+            if ($currentGap <= 0 && $previousGap <= 0) {
+                continue;
+            }
+
+            $gms = $storeCampaigns->first(fn ($camp) => str_starts_with((string) $camp->channel_campaign_id, 'GMS-'));
+            if ($gms === null) {
+                $gms = new MarketplaceAdCampaign([
+                    'store_id' => $storeIdValue,
+                    'channel_campaign_id' => 'GMS-' . $storeIdValue,
+                    'channel_item_id' => null,
+                    'campaign_name' => 'GMV Max Auto',
+                    'campaign_status' => 'ongoing',
+                    'ad_type' => 'auto',
+                    'campaign_budget' => 0,
+                    'target_roas' => null,
+                    'spend' => 0,
+                    'prev_spend' => 0,
+                    'gmv' => 0,
+                    'prev_gmv' => 0,
+                    'orders' => 0,
+                    'prev_orders' => 0,
+                    'clicks' => 0,
+                    'prev_clicks' => 0,
+                    'impressions' => 0,
+                    'prev_impressions' => 0,
+                    'items_sold' => 0,
+                    'prev_items_sold' => 0,
+                    'unit_cogs' => 0,
+                    'net_revenue_ratio' => self::DEFAULT_NET_REVENUE_RATIO,
+                    'cogs_ratio' => 0,
+                    'profit_after_ads' => 0,
+                    'prev_profit_after_ads' => 0,
+                ]);
+                $gms->profit_after_ads = 0.0;
+                $gms->prev_profit_after_ads = 0.0;
+                $campaigns->push($gms);
+            }
+
+            $gms->spend = (float) ($gms->spend ?? 0) + $currentGap;
+            $gms->prev_spend = (float) ($gms->prev_spend ?? 0) + $previousGap;
+            if ($gms->profit_after_ads === null
+                && (float) ($gms->gmv ?? 0) <= 0
+                && (int) ($gms->orders ?? 0) <= 0
+                && (int) ($gms->items_sold ?? 0) <= 0
+            ) {
+                $gms->profit_after_ads = round(-($gms->spend * 1.11), 2);
+            } elseif ($gms->profit_after_ads !== null) {
+                $gms->profit_after_ads = (float) $gms->profit_after_ads - ($currentGap * 1.11);
+            }
+            if ($gms->prev_profit_after_ads === null
+                && (float) ($gms->prev_gmv ?? 0) <= 0
+                && (int) ($gms->prev_orders ?? 0) <= 0
+                && (int) ($gms->prev_items_sold ?? 0) <= 0
+            ) {
+                $gms->prev_profit_after_ads = round(-($gms->prev_spend * 1.11), 2);
+            } elseif ($gms->prev_profit_after_ads !== null) {
+                $gms->prev_profit_after_ads = (float) $gms->prev_profit_after_ads - ($previousGap * 1.11);
+            }
+            $gms->net_revenue = (float) ($gms->net_revenue ?? 0);
+            $gms->total_cogs = (float) ($gms->total_cogs ?? 0);
+            $gms->sum_expense = (float) ($gms->sum_expense ?? 0) + $currentGap;
+            $gms->sum_prev_expense = (float) ($gms->sum_prev_expense ?? 0) + $previousGap;
+            $gms->roas = $gms->spend > 0 ? (float) ($gms->gmv ?? 0) / $gms->spend : 0;
+            $gms->prev_roas = $gms->prev_spend > 0 ? (float) ($gms->prev_gmv ?? 0) / $gms->prev_spend : 0;
+        }
+        $campaigns = $campaigns->sortByDesc('spend')->values();
+
+        // Jaga konsistensi bila sebagian tanggal memakai fallback campaign
+        // atau bila sumber per toko tidak lengkap: sisa gap global tetap
+        // dimasukkan ke parent GMV Max Auto, bukan menjadi biaya anonim.
+        $remainingCurrentGap = max(0, (float) $summaryCurrent->spend - (float) $campaigns->sum('spend'));
+        $remainingPreviousGap = max(0, (float) $summaryPrevious->spend - (float) $campaigns->sum('prev_spend'));
+        if ($remainingCurrentGap > 0 || $remainingPreviousGap > 0) {
+            $gms = $campaigns->first(fn ($camp) => str_starts_with((string) $camp->channel_campaign_id, 'GMS-'));
+            if ($gms === null) {
+                $fallbackStoreId = $storeIds[0] ?? null;
+                $gms = new MarketplaceAdCampaign([
+                    'store_id' => $fallbackStoreId,
+                    'channel_campaign_id' => 'GMS-' . $fallbackStoreId,
+                    'channel_item_id' => null,
+                    'campaign_name' => 'GMV Max Auto',
+                    'campaign_status' => 'ongoing',
+                    'ad_type' => 'auto',
+                    'campaign_budget' => 0,
+                    'target_roas' => null,
+                    'spend' => 0,
+                    'gmv' => 0,
+                    'orders' => 0,
+                    'clicks' => 0,
+                    'impressions' => 0,
+                    'items_sold' => 0,
+                    'prev_spend' => 0,
+                    'prev_gmv' => 0,
+                    'prev_orders' => 0,
+                    'prev_clicks' => 0,
+                    'prev_impressions' => 0,
+                    'prev_items_sold' => 0,
+                    'profit_after_ads' => 0,
+                    'prev_profit_after_ads' => 0,
+                ]);
+                $gms->profit_after_ads = 0.0;
+                $gms->prev_profit_after_ads = 0.0;
+                $campaigns->push($gms);
+            }
+            $gms->spend = (float) ($gms->spend ?? 0) + $remainingCurrentGap;
+            $gms->prev_spend = (float) ($gms->prev_spend ?? 0) + $remainingPreviousGap;
+            if ($gms->profit_after_ads === null
+                && (float) ($gms->gmv ?? 0) <= 0
+                && (int) ($gms->orders ?? 0) <= 0
+                && (int) ($gms->items_sold ?? 0) <= 0
+            ) {
+                $gms->profit_after_ads = round(-($gms->spend * 1.11), 2);
+            } elseif ($gms->profit_after_ads !== null) {
+                $gms->profit_after_ads = (float) $gms->profit_after_ads - ($remainingCurrentGap * 1.11);
+            }
+            if ($gms->prev_profit_after_ads === null
+                && (float) ($gms->prev_gmv ?? 0) <= 0
+                && (int) ($gms->prev_orders ?? 0) <= 0
+                && (int) ($gms->prev_items_sold ?? 0) <= 0
+            ) {
+                $gms->prev_profit_after_ads = round(-($gms->prev_spend * 1.11), 2);
+            } elseif ($gms->prev_profit_after_ads !== null) {
+                $gms->prev_profit_after_ads = (float) $gms->prev_profit_after_ads - ($remainingPreviousGap * 1.11);
+            }
+            $gms->roas = $gms->spend > 0 ? (float) ($gms->gmv ?? 0) / $gms->spend : 0;
+            $gms->prev_roas = $gms->prev_spend > 0 ? (float) ($gms->prev_gmv ?? 0) / $gms->prev_spend : 0;
+        }
+        $campaigns = $campaigns->sortByDesc('spend')->values();
 
         $chanIds = $campaigns->pluck('channel_item_id')->filter()->unique()->map(fn ($v) => (string) $v)->values();
         $catByChan = collect();
@@ -508,18 +676,10 @@ class AdsDashboardService
         // sebagai biaya iklan dan mengurangi net profit setelah PPN.
         $unattributedSpend = max(0, (float) $summaryCurrent->spend - (float) $campaigns->sum('spend'));
         $unattributedPreviousSpend = max(0, (float) $summaryPrevious->spend - (float) $campaigns->sum('prev_spend'));
-        $gmsNoSaleSpend = $campaigns
-            ->filter(fn ($camp) => str_starts_with((string) $camp->channel_campaign_id, 'GMS-'))
-            ->filter(fn ($camp) => (float) ($camp->gmv ?? 0) <= 0 && (int) ($camp->orders ?? 0) <= 0 && (int) ($camp->items_sold ?? 0) <= 0)
-            ->sum('spend');
-        $gmsNoSalePreviousSpend = $campaigns
-            ->filter(fn ($camp) => str_starts_with((string) $camp->channel_campaign_id, 'GMS-'))
-            ->filter(fn ($camp) => (float) ($camp->prev_gmv ?? 0) <= 0 && (int) ($camp->prev_orders ?? 0) <= 0 && (int) ($camp->prev_items_sold ?? 0) <= 0)
-            ->sum('prev_spend');
         $kpi['current']->net_profit = $knownProfitCampaigns->sum('profit_after_ads')
-            - (($unattributedSpend + $gmsNoSaleSpend) * 1.11);
+            - ($unattributedSpend * 1.11);
         $kpi['previous']->net_profit = $campaigns->filter(fn ($camp) => $camp->prev_profit_after_ads !== null)->sum('prev_profit_after_ads')
-            - (($unattributedPreviousSpend + $gmsNoSalePreviousSpend) * 1.11);
+            - ($unattributedPreviousSpend * 1.11);
         $kpi['current']->unattributed_ad_spend = $unattributedSpend;
         $kpi['previous']->unattributed_ad_spend = $unattributedPreviousSpend;
         $kpi['current']->profit_campaign_count = $knownProfitCampaigns->count();

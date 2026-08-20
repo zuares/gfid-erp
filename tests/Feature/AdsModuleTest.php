@@ -1259,6 +1259,40 @@ class AdsModuleTest extends TestCase
         $this->assertSame(100000.0, (float) $historical[0]['data']->first()['gmv']);
     }
 
+    public function test_seller_center_spend_gap_is_added_to_gms_campaign_without_adjustment()
+    {
+        $store = $this->createStore('GMSGAP');
+        $now = now();
+
+        \App\Models\MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'campaign_name' => 'GMV Max Auto',
+            'campaign_status' => 'ongoing',
+            'ad_type' => 'auto',
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 0,
+            'spend' => 10000,
+            'orders' => 0,
+            'gmv' => 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+        $gms = $data['campaigns']->firstWhere('channel_campaign_id', 'GMS-' . $store->id);
+
+        $this->assertSame(10000.0, (float) $gms->spend);
+        $this->assertSame(-11100.0, (float) $gms->profit_after_ads);
+        $this->assertSame(-11100.0, (float) $data['kpi']['current']->net_profit);
+        $this->assertSame(0.0, (float) $data['kpi']['current']->unattributed_ad_spend);
+    }
+
     public function test_summary_roas_change_is_not_always_zero()
     {
         $store = $this->createStore('ROASCHANGE');
