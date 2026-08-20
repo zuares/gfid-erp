@@ -449,6 +449,9 @@
     .perf-previous { color: var(--dsh-muted, #6b7280); font-size: .59rem; white-space: nowrap; }
     /* Baris bisa di-klik untuk expand detail. */
     .perf-table th { font-size: .66rem; text-transform: uppercase; letter-spacing: .02em; color: var(--dsh-muted, #6b7280); }
+    .perf-table-group-title { background: rgba(37, 99, 235, .06) !important; color: var(--bs-primary, #2563eb) !important; font-size: .59rem !important; letter-spacing: .08em !important; }
+    .perf-table-subheader th { background: rgba(248, 250, 252, .92); }
+    .perf-category-campaign-table .perf-table-group-title { background: rgba(37, 99, 235, .05) !important; }
     .perf-row { cursor: pointer; }
     .perf-row:hover { background: rgba(37, 99, 235, .04); }
     .perf-category-row { cursor: pointer; }
@@ -702,9 +705,13 @@
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
             <thead class="table-light sticky-top" style="z-index: 2;">
                 <tr>
-                    <th style="min-width:270px;">Kategori / Campaign</th>
-                    <th class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="ROAS impas berdasarkan HPP, fee, dan PPN 11%">BEP</th>
+                    <th rowspan="2" style="min-width:270px;">Kategori / Campaign</th>
+                    <th rowspan="2" class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
+                    <th rowspan="2" class="text-end" data-bs-toggle="tooltip" title="ROAS impas berdasarkan HPP, fee, dan PPN 11%">BEP</th>
+                    <th colspan="4" class="text-center perf-table-group-title">Funnel</th>
+                    <th colspan="6" class="text-center perf-table-group-title">Hasil</th>
+                </tr>
+                <tr class="perf-table-subheader">
                     <th class="text-end" data-bs-toggle="tooltip" title="Total impresi iklan · Δ vs {{ $perfCompareLabel }}">Impresi</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Total klik iklan · Δ vs {{ $perfCompareLabel }}">Klik</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Click-through rate · Δ vs {{ $perfCompareLabel }}">CTR</th>
@@ -756,8 +763,12 @@
                                 <table class="table table-sm table-hover align-middle mb-0 perf-category-campaign-table">
                                     <thead>
                                         <tr>
-                                            <th>Campaign / Item</th>
-                                            <th class="text-end">BEP</th>
+                                            <th rowspan="2">Campaign / Item</th>
+                                            <th rowspan="2" class="text-end">BEP</th>
+                                            <th colspan="4" class="text-center perf-table-group-title">Funnel</th>
+                                            <th colspan="6" class="text-center perf-table-group-title">Hasil</th>
+                                        </tr>
+                                        <tr class="perf-table-subheader">
                                             <th class="text-end">Impresi</th>
                                             <th class="text-end">Klik</th>
                                             <th class="text-end">CTR</th>
