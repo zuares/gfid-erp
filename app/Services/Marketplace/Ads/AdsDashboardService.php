@@ -145,20 +145,20 @@ class AdsDashboardService
             $dates = $shop->keys()->merge($campaign->keys())->merge($gms->keys())->unique()->sort()->values();
 
             return $dates->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
-                // Shop daily berasal dari endpoint CPC level toko. Pada data
-                // tertentu endpoint ini belum memasukkan GMV Max Auto, jadi
-                // tambahkan baris GMS secara eksplisit. Campaign regular
-                // tetap memakai shop daily agar tidak double count.
+                // Shop daily adalah total Seller Center dan menjadi sumber
+                // utama seluruh tipe iklan. Jangan tambahkan GMS lagi di sini;
+                // GMV Max Auto hanya ditampilkan sebagai rincian terpisah.
+                // Campaign regular + GMS hanya menjadi fallback ketika shop
+                // daily tidak tersedia untuk tanggal tersebut.
                 $shopRow = $shop->get($date);
                 if ($shopRow) {
-                    $gmsRow = $gms->get($date);
                     return [$date => (object) [
                         'date' => $date,
                         'impressions' => (int) ($shopRow->impressions ?? 0),
-                        'clicks' => (int) ($shopRow->clicks ?? 0) + (int) ($gmsRow->clicks ?? 0),
-                        'spend' => (float) ($shopRow->spend ?? 0) + (float) ($gmsRow->spend ?? 0),
-                        'orders' => (int) ($shopRow->orders ?? 0) + (int) ($gmsRow->orders ?? 0),
-                        'gmv' => (float) ($shopRow->gmv ?? 0) + (float) ($gmsRow->gmv ?? 0),
+                        'clicks' => (int) ($shopRow->clicks ?? 0),
+                        'spend' => (float) ($shopRow->spend ?? 0),
+                        'orders' => (int) ($shopRow->orders ?? 0),
+                        'gmv' => (float) ($shopRow->gmv ?? 0),
                     ]];
                 }
 

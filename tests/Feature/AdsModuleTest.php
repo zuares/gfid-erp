@@ -1212,7 +1212,7 @@ class AdsModuleTest extends TestCase
         $this->assertSame(20000.0, (float) $history[1]['data']->first()['spend']);
     }
 
-    public function test_summary_uses_seller_center_total_including_gms()
+    public function test_summary_prefers_seller_center_without_double_counting_gms()
     {
         $store = $this->createStore('SUMMARYSOURCE');
         $now = now();
@@ -1249,8 +1249,8 @@ class AdsModuleTest extends TestCase
         $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
             ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
 
-        $this->assertSame(15000.0, (float) $data['kpi']['current']->spend);
-        $this->assertSame(150000.0, (float) $data['kpi']['current']->gmv);
+        $this->assertSame(10000.0, (float) $data['kpi']['current']->spend);
+        $this->assertSame(100000.0, (float) $data['kpi']['current']->gmv);
     }
 
     public function test_summary_roas_change_is_not_always_zero()
