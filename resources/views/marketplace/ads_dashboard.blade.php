@@ -3958,17 +3958,32 @@ document.addEventListener("DOMContentLoaded", function() {
     // 3. Golden Hour (Dayparting)
     let timeEl = document.getElementById('insightTime');
     if (timeEl) {
-        const goldenHourCandidates = hourlyMetricRows
-            .filter(row => row.spend > 1000 && row.gmv > (totalHourlyGmv * 0.05) && row.clicks > 0)
+        const hourlyCandidates = hourlyMetricRows
+            .filter(row => row.spend > 1000 && row.clicks >= 5);
+        const goldenHourCandidates = hourlyCandidates
+            .filter(row => row.gmv > (totalHourlyGmv * 0.05))
             .sort((a, b) => (b.cvr - a.cvr) || (b.clicks - a.clicks) || (b.orders - a.orders) || (b.roas - a.roas));
         const bestHour = goldenHourCandidates[0];
+        const worstHour = [...hourlyCandidates]
+            .filter(row => !bestHour || row.hour !== bestHour.hour)
+            .sort((a, b) => (a.cvr - b.cvr) || (a.orders - b.orders) || (b.clicks - a.clicks) || (a.roas - b.roas))[0];
 
         if (bestHour) {
             let gmvPct = totalHourlyGmv > 0 ? ((bestHour.gmv / totalHourlyGmv) * 100).toFixed(0) : '0';
             let outsideGmvPct = Math.max(0, 100 - Number(gmvPct));
+            let worstGmvPct = totalHourlyGmv > 0 ? ((worstHour.gmv / totalHourlyGmv) * 100).toFixed(0) : '0';
+            let bestHourEnd = String((bestHour.hour + 1) % 24).padStart(2, '0');
+            let worstHourEnd = worstHour ? String((worstHour.hour + 1) % 24).padStart(2, '0') : '00';
             timeEl.innerHTML = `<div style="font-weight: 700; color: #d97706; font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Waktu Emas (Dayparting)</div>
-                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${bestHour.hour}:00 - ${bestHour.hour + 1}:00</b> memiliki CVR tertinggi <b>${bestHour.cvr.toFixed(2)}%</b>. Kontribusi GMV: <b>${gmvPct}%</b> di waktu emas dan <b>${outsideGmvPct}%</b> di luar waktu emas. 💡 <b>Saran:</b> Prioritaskan budget di jam ini!</div>`;
+                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${String(bestHour.hour).padStart(2, '0')}:00 - ${bestHourEnd}:00</b> memiliki CVR tertinggi <b>${bestHour.cvr.toFixed(2)}%</b>. Kontribusi GMV: <b>${gmvPct}%</b> di waktu emas dan <b>${outsideGmvPct}%</b> di luar waktu emas.</div>
+                                ${worstHour ? `<div style="font-size: 0.72rem; color: #dc2626; margin-top: 0.25rem;">⚠️ Waktu terburuk: <b>${String(worstHour.hour).padStart(2, '0')}:00 - ${worstHourEnd}:00</b> dengan CVR <b>${worstHour.cvr.toFixed(2)}%</b> dan kontribusi GMV <b>${worstGmvPct}%</b>. 💡 <b>Saran:</b> Evaluasi atau kurangi budget di jam ini.</div>` : ''}`;
             timeEl.style.borderLeftColor = '#d97706';
+        } else if (worstHour) {
+            let worstGmvPct = totalHourlyGmv > 0 ? ((worstHour.gmv / totalHourlyGmv) * 100).toFixed(0) : '0';
+            let worstHourEnd = String((worstHour.hour + 1) % 24).padStart(2, '0');
+            timeEl.innerHTML = `<div style="font-weight: 700; color: #dc2626; font-size: 0.85rem; margin-bottom: 0.3rem;">⚠️ Waktu Terburuk</div>
+                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${String(worstHour.hour).padStart(2, '0')}:00 - ${worstHourEnd}:00</b> memiliki CVR terendah <b>${worstHour.cvr.toFixed(2)}%</b> dengan kontribusi GMV <b>${worstGmvPct}%</b>. Evaluasi budget dan materi iklan pada jam ini.</div>`;
+            timeEl.style.borderLeftColor = '#dc2626';
         } else {
             timeEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Data Waktu Berpencar</div>
                                 <div style="font-size: 0.72rem; color: var(--dsh-muted);">Performa iklan tersebar merata di berbagai jam. Belum ada "Waktu Emas" dominan yang bisa disimpulkan untuk rentang ini.</div>`;
