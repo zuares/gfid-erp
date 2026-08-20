@@ -148,7 +148,7 @@
         // internalItem yang masih bisa kosong setelah mapping diperbaiki.
         $isUnmapped = !$isGmvMax && (float) ($camp->unit_cogs ?? 0) <= 0;
         $performanceViews = $isGmvMax
-            ? ['gms']
+            ? ['category', 'gms']
             : array_values(array_unique(array_merge(['category', 'roas'], $isUnmapped ? ['unmapped'] : [])));
 
         $perfRows->push([
@@ -158,7 +158,7 @@
             'name' => $camp->campaign_name,
             'type' => $camp->ad_type,
             'performance_views' => $performanceViews,
-            'category' => $camp->item_category ?? $camp->internalItem?->category?->name ?? 'Belum termapping',
+            'category' => $isGmvMax ? 'GMV Max Auto' : ($camp->item_category ?? $camp->internalItem?->category?->name ?? 'Belum termapping'),
             'status' => $camp->campaign_status,
             'spend' => $spend,
             'gmv' => $gmv,

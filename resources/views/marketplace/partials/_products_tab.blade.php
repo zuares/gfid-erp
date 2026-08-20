@@ -103,7 +103,7 @@
             'category' => $row->item_category ?: 'Uncategorized',
             'is_gms' => $isGms,
             'views' => $isGms
-                ? ['gms']
+                ? ['category', 'gms']
                 : array_values(array_unique(array_merge(['category', 'roas'], $isProblematic ? ['unmapped'] : []))),
         ];
     })->values()->map(function ($entry) use ($productStockRisk, $productDayDivisor) {
@@ -116,8 +116,7 @@
         $entry['stock_risk'] = $productStockRisk($stock, $orders, !empty($entry['is_gms']));
         return $entry;
     })->values();
-    $productRegularRows = $productRows->filter(fn ($row) => !$row['is_gms']);
-    $productCategoryProductRows = $productRegularRows->groupBy('category');
+    $productCategoryProductRows = $productRows->groupBy('category');
     $productCategoryRows = $productCategoryProductRows->map(function ($group, $category) use ($productStockRisk) {
         $knownProfit = $group->filter(fn ($entry) => $entry['row']->profit_after_ads !== null);
         $spend = $group->sum(fn ($entry) => (float) $entry['row']->spend);
@@ -140,11 +139,15 @@
             'profit' => $profit,
             'profit_unknown' => $group->count() - $knownProfit->count(),
             'poas' => $spend > 0 ? $profit / ($spend * 1.11) : 0,
-            'stock_risk' => $productStockRisk($group->sum(fn ($entry) => (int) ($entry['row']->stock_total ?? 0)), $orders),
+            'stock_risk' => $productStockRisk(
+                $group->sum(fn ($entry) => (int) ($entry['row']->stock_total ?? 0)),
+                $orders,
+                $group->contains(fn ($entry) => !empty($entry['is_gms']))
+            ),
         ];
     })->sortByDesc('spend')->values();
     $productSegmentRows = [
-        'category' => $productRegularRows,
+        'category' => $productRows,
         'roas' => $productRows->filter(fn ($row) => in_array('roas', $row['views'], true)),
         'gms' => $productRows->filter(fn ($row) => in_array('gms', $row['views'], true)),
         'unmapped' => $productRows->filter(fn ($row) => in_array('unmapped', $row['views'], true)),

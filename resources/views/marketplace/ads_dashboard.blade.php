@@ -1932,6 +1932,7 @@ function trafficRenderQualityChart(view) {
                                 'CTR: ' + trafficFormatNumber(row.ctr, 2) + '% · CVR: ' + trafficFormatNumber(row.cvr, 2) + '%',
                                 'Jangkauan: ' + trafficFormatNumber(row.impressions, 0) + ' · Klik: ' + trafficFormatNumber(row.clicks, 0),
                                 'Orders: ' + trafficFormatNumber(row.orders, 0) + ' · CPC: ' + money(row.cpc),
+                                'AOV: ' + money(row.aov),
                             ];
                         },
                     },
@@ -2613,17 +2614,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         'row' => $row,
                         'name' => $row->campaign_name ?: 'Tanpa Nama',
                         'id' => $row->channel_campaign_id,
-                        'category' => $row->item_category ?? $row->internalItem?->category?->name ?? 'Belum termapping',
+                        'category' => $isGms ? 'GMV Max Auto' : ($row->item_category ?? $row->internalItem?->category?->name ?? 'Belum termapping'),
                         'is_gms' => $isGms,
                         'views' => $isGms
-                            ? ['gms']
+                            ? ['category', 'gms']
                             : array_values(array_unique(array_merge(['category', 'roas'], $isProblematic ? ['unmapped'] : []))),
                         'spend' => $spend,
                         'impressions' => $impressions,
                         'clicks' => $clicks,
                         'ctr' => $ctr,
                         'orders' => $orders,
+                        'gmv' => (float) ($row->gmv ?? 0),
                         'cvr' => $cvr,
+                        'aov' => $orders > 0 ? (float) ($row->gmv ?? 0) / $orders : 0,
                         'cpc' => $clicks > 0 ? $spend / $clicks : 0,
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
                     ];
@@ -2655,12 +2658,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 $trafficRows = $trafficRows->map(function ($row) use ($trafficSignal) {
                     return array_merge($row, ['signal' => $trafficSignal($row)]);
                 })->values();
-                $trafficRegularRows = $trafficRows->filter(fn ($row) => !$row['is_gms']);
-                $trafficCategoryCampaignRows = $trafficRegularRows->groupBy('category');
+                $trafficCategoryCampaignRows = $trafficRows->groupBy('category');
                 $trafficCategoryRows = $trafficCategoryCampaignRows->map(function ($group, $category) {
                     $impressions = $group->sum('impressions');
                     $clicks = $group->sum('clicks');
                     $spend = $group->sum('spend');
+                    $orders = $group->sum('orders');
+                    $gmv = $group->sum('gmv');
                     return [
                         'category' => $category,
                         'campaigns' => $group->count(),
@@ -2668,8 +2672,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         'impressions' => $impressions,
                         'clicks' => $clicks,
                         'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
-                        'orders' => $group->sum('orders'),
-                        'cvr' => $clicks > 0 ? ($group->sum('orders') / $clicks) * 100 : 0,
+                        'orders' => $orders,
+                        'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
+                        'gmv' => $gmv,
+                        'aov' => $orders > 0 ? $gmv / $orders : 0,
                         'cpc' => $clicks > 0 ? $spend / $clicks : 0,
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
                     ];
@@ -2677,7 +2683,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return array_merge($row, ['signal' => $trafficSignal($row)]);
                 })->sortByDesc('spend')->values();
                 $trafficSegmentRows = [
-                    'category' => $trafficRegularRows,
+                    'category' => $trafficRows,
                     'roas' => $trafficRows->filter(fn ($row) => in_array('roas', $row['views'], true)),
                     'gms' => $trafficRows->filter(fn ($row) => in_array('gms', $row['views'], true)),
                     'unmapped' => $trafficRows->filter(fn ($row) => in_array('unmapped', $row['views'], true)),
@@ -2705,8 +2711,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         'impressions' => $row['impressions'],
                         'clicks' => $row['clicks'],
                         'orders' => $row['orders'],
+                        'gmv' => $row['gmv'],
                         'ctr' => $row['ctr'],
                         'cvr' => $row['cvr'],
+                        'aov' => $row['aov'],
                         'spend' => $row['spend'],
                         'cpc' => $row['cpc'],
                         'cpm' => $row['cpm'],
@@ -2721,8 +2729,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         'impressions' => (int) ($row['impressions'] ?? 0),
                         'clicks' => (int) ($row['clicks'] ?? 0),
                         'orders' => (int) ($row['orders'] ?? 0),
+                        'gmv' => (float) ($row['gmv'] ?? 0),
                         'ctr' => (float) ($row['ctr'] ?? 0),
                         'cvr' => (float) ($row['cvr'] ?? 0),
+                        'aov' => (float) ($row['aov'] ?? 0),
                         'spend' => (float) ($row['spend'] ?? 0),
                         'cpc' => (float) ($row['cpc'] ?? 0),
                         'cpm' => (float) ($row['cpm'] ?? 0),
