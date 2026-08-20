@@ -425,7 +425,8 @@ class AdsDashboardController extends Controller
             'store_id' => 'required|exists:stores,id',
             'campaign_id' => 'required|numeric',
             'roas_target' => 'nullable|numeric|min:0',
-            'daily_budget' => 'nullable|numeric|min:0'
+            'daily_budget' => 'nullable|numeric|min:0',
+            'status_action' => 'nullable|in:pause,resume,stop',
         ]);
 
         $store = Store::find($request->input('store_id'));
@@ -456,7 +457,8 @@ class AdsDashboardController extends Controller
             'store_id' => 'required|exists:stores,id',
             'campaign_id' => 'nullable|string',
             'roas_target' => 'nullable|numeric|min:0',
-            'daily_budget' => 'nullable|numeric|min:0'
+            'daily_budget' => 'nullable|numeric|min:0',
+            'status_action' => 'nullable|in:pause,resume,stop',
         ]);
 
         $store = Store::find($request->input('store_id'));
@@ -472,9 +474,10 @@ class AdsDashboardController extends Controller
 
         $roasTarget = $request->input('roas_target');
         $dailyBudget = $request->input('daily_budget');
+        $statusAction = $request->input('status_action');
 
         try {
-            $result = $actions->actionGmsCampaign($store, $campaignId, $roasTarget !== null && $roasTarget !== '' ? (float) $roasTarget : null, $dailyBudget !== null && $dailyBudget !== '' ? (float) $dailyBudget : null, $shopeeChannel);
+            $result = $actions->actionGmsCampaign($store, $campaignId, $roasTarget !== null && $roasTarget !== '' ? (float) $roasTarget : null, $dailyBudget !== null && $dailyBudget !== '' ? (float) $dailyBudget : null, $statusAction, $shopeeChannel);
             return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);

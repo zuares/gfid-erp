@@ -640,6 +640,56 @@ class AdsDashboardService
             return $camp;
         });
 
+        // Gross profit harian untuk grafik memakai grain campaign-day yang
+        // sama dengan daftar campaign. Seller Center hanya menyediakan GMV
+        // agregat, sehingga HPP dan rasio pencairan perlu diturunkan kembali
+        // dari campaign yang sudah termapping.
+        $campaignByKey = $campaigns->keyBy(fn ($camp) => $camp->store_id . '|' . $camp->channel_campaign_id);
+        $dailyProfitRows = DB::table('marketplace_ad_campaign_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('date, store_id, channel_campaign_id, SUM(broad_gmv) as gmv, SUM(broad_order) as orders, SUM(broad_order_amount) as items_sold')
+            ->groupBy('date', 'store_id', 'channel_campaign_id')
+            ->get();
+
+        $dailyGrossProfit = [];
+        foreach ($dailyProfitRows as $dailyProfitRow) {
+            $campaign = $campaignByKey->get($dailyProfitRow->store_id . '|' . $dailyProfitRow->channel_campaign_id);
+            if (! $campaign) {
+                continue;
+            }
+
+            $gmv = (float) ($dailyProfitRow->gmv ?? 0);
+            $itemsSold = (float) ($dailyProfitRow->items_sold ?? 0);
+            if ($itemsSold <= 0) {
+                $itemsSold = (float) ($dailyProfitRow->orders ?? 0);
+            }
+
+            $unitCogs = (float) ($campaign->unit_cogs ?? 0);
+            $cogsRatio = (float) ($campaign->cogs_ratio ?? 0);
+            if ($unitCogs <= 0 && $cogsRatio <= 0) {
+                continue;
+            }
+
+            $totalCogs = $unitCogs > 0 && $itemsSold > 0
+                ? $unitCogs * $itemsSold
+                : $gmv * $cogsRatio;
+            $grossProfit = ($gmv * (float) ($campaign->net_revenue_ratio ?? self::DEFAULT_NET_REVENUE_RATIO)) - $totalCogs;
+            $dateKey = substr((string) $dailyProfitRow->date, 0, 10);
+            $dailyGrossProfit[$dateKey] = ($dailyGrossProfit[$dateKey] ?? 0) + $grossProfit;
+        }
+
+        $dailyChartData = collect($dailyChartData)
+            ->map(function (array $day) use ($dailyGrossProfit) {
+                $dateKey = substr((string) ($day['date'] ?? ''), 0, 10);
+                $day['gross_profit'] = array_key_exists($dateKey, $dailyGrossProfit)
+                    ? round((float) $dailyGrossProfit[$dateKey], 2)
+                    : null;
+                return $day;
+            })
+            ->values()
+            ->all();
+
         // -------------------------------------------------------------
         // KPI CALCULATION
         // Directly aggregate from $campaigns so that top KPI 

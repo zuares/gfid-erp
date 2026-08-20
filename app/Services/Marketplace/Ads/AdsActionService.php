@@ -111,6 +111,26 @@ class AdsActionService
             usleep(300000);
         }
 
+        if ($statusAction === 'stop') {
+            // Shopee tidak menyediakan endpoint stop terpisah. Hentikan
+            // campaign dengan mengisi end_date melalui endpoint edit yang
+            // sama; API menerima tanggal DD-MM-YYYY.
+            $resStop = $shopeeChannel->editManualProductAds(
+                $store,
+                $campaignId,
+                'change_end_date',
+                ['end_date' => now()->format('d-m-Y')]
+            );
+            if (! empty($resStop['error'])) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Gagal menghentikan iklan: ' . ($resStop['message'] ?? $resStop['error']),
+                    'http_status' => 400,
+                ];
+            }
+            $results[] = 'Status (Dihentikan)';
+        }
+
         if (empty($results)) {
             return [
                 'status' => 'error',
@@ -130,6 +150,8 @@ class AdsActionService
                 $localCampaign->campaign_status = 'paused';
             } elseif ($statusAction === 'resume') {
                 $localCampaign->campaign_status = 'ongoing';
+            } elseif ($statusAction === 'stop') {
+                $localCampaign->campaign_status = 'closed';
             }
             $localCampaign->save();
         }
@@ -170,6 +192,7 @@ class AdsActionService
         ?string $campaignId,
         ?float $roasTarget,
         ?float $dailyBudget,
+        ?string $statusAction,
         ShopeeChannel $shopeeChannel
     ): array {
         if (is_string($campaignId) && str_starts_with($campaignId, 'GMS-')) {
@@ -193,7 +216,8 @@ class AdsActionService
             $campaignId !== null ? (string) $campaignId : null,
             $localCampaign?->channel_item_id !== null ? (string) $localCampaign->channel_item_id : null,
             $roasTarget !== null && $roasTarget !== ''
-                || $dailyBudget !== null && $dailyBudget !== '',
+                || $dailyBudget !== null && $dailyBudget !== ''
+                || $statusAction !== null,
         );
         if ($experimentGuard) {
             return $experimentGuard;
@@ -233,6 +257,38 @@ class AdsActionService
             $results[] = 'Batas Modal Harian';
         }
 
+        if ($statusAction === 'pause' || $statusAction === 'resume') {
+            $params = [];
+            if ($campaignId) {
+                $params['campaign_id'] = (int) $campaignId;
+            }
+            $resStatus = $shopeeChannel->editGmsProductCampaign($store, $statusAction, $params);
+            if (! empty($resStatus['error'])) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Gagal ubah status: ' . ($resStatus['message'] ?? $resStatus['error']),
+                    'http_status' => 400,
+                ];
+            }
+            $results[] = 'Status (' . ucfirst($statusAction) . ')';
+        }
+
+        if ($statusAction === 'stop') {
+            $params = ['end_date' => now()->format('d-m-Y')];
+            if ($campaignId) {
+                $params['campaign_id'] = (int) $campaignId;
+            }
+            $resStop = $shopeeChannel->editGmsProductCampaign($store, 'change_end_date', $params);
+            if (! empty($resStop['error'])) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Gagal menghentikan iklan: ' . ($resStop['message'] ?? $resStop['error']),
+                    'http_status' => 400,
+                ];
+            }
+            $results[] = 'Status (Dihentikan)';
+        }
+
         if (empty($results)) {
             return [
                 'status' => 'error',
@@ -249,6 +305,13 @@ class AdsActionService
             }
             if ($dailyBudget !== null && $dailyBudget !== '') {
                 $localCampaign->campaign_budget = (float) $dailyBudget;
+            }
+            if ($statusAction === 'pause') {
+                $localCampaign->campaign_status = 'paused';
+            } elseif ($statusAction === 'resume') {
+                $localCampaign->campaign_status = 'ongoing';
+            } elseif ($statusAction === 'stop') {
+                $localCampaign->campaign_status = 'closed';
             }
             $localCampaign->save();
         }

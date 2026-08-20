@@ -1568,6 +1568,9 @@ document.addEventListener('DOMContentLoaded', function () {
         { id: 'grp-experiment', panes: [
             ['tab-experiments', 'Experiment', 'bi-bezier2'],
         ]},
+        { id: 'grp-control', panes: [
+            ['tab-control', 'Control Panel', 'bi-toggles'],
+        ]},
         { id: 'grp-settings', panes: [
             ['tab-settings', 'Pengaturan', 'bi-sliders'],
         ]},
@@ -2268,6 +2271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button class="dash-tab-m" data-group="grp-funnel"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
                 <button class="dash-tab-m" data-group="grp-ltv"><i class="bi bi-person-heart"></i> Customer &amp; LTV</button>
                 <button class="dash-tab-m" data-group="grp-experiment"><i class="bi bi-bezier2"></i> Experiment</button>
+                <button class="dash-tab-m" data-group="grp-control"><i class="bi bi-toggles"></i> Control Panel</button>
                 <button class="dash-tab-m" data-group="grp-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
         </div>
@@ -2440,6 +2444,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div style="height: 280px;">
                                 <canvas id="trafficChart"></canvas>
                             </div>
+                            <div id="trafficDataTable" class="table-responsive mt-3"></div>
                         </div>
                     </div>
                 </div>
@@ -3241,6 +3246,97 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
 
+        <!-- TAB CONTROL PANEL -->
+        <div class="tab-pane" id="tab-control">
+            <div class="ads-tab-panel mb-3">
+                <div class="ads-tab-panel-head">
+                    <div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-toggles text-primary"></i> Control Panel Campaign</div>
+                        <div class="ads-tab-panel-note">Atur target ROAS, modal harian, jeda, atau hentikan campaign langsung dari dashboard.</div>
+                    </div>
+                    <span class="badge rounded-pill text-bg-light" style="font-size:.65rem;">{{ $campaigns->count() }} campaign</span>
+                </div>
+                <div class="p-3">
+                    @if($storeId === 'all')
+                        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.72rem; border-radius:10px;">
+                            <i class="bi bi-info-circle me-1"></i> Aksi tetap dikirim ke toko pada baris campaign. Pastikan campaign dan tokonya benar sebelum menyimpan.
+                        </div>
+                    @endif
+                    <div class="table-responsive">
+                        <table class="dpanel-table dpanel-table-sm align-middle" style="min-width:980px;">
+                            <thead>
+                                <tr>
+                                    <th>Campaign</th>
+                                    <th>Toko</th>
+                                    <th>Jenis</th>
+                                    <th>Status</th>
+                                    <th style="min-width:145px;">Target ROAS</th>
+                                    <th style="min-width:170px;">Modal Harian</th>
+                                    <th style="min-width:230px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($campaigns as $controlCampaign)
+                                    @php
+                                        $controlId = (string) ($controlCampaign->channel_campaign_id ?? '');
+                                        $controlIsGms = str_starts_with($controlId, 'GMS-') || ($controlCampaign->ad_type ?? null) === 'auto';
+                                        $controlStatus = strtolower((string) ($controlCampaign->campaign_status ?? 'ongoing'));
+                                        $controlType = $controlIsGms ? 'GMV Max' : 'Regular';
+                                    @endphp
+                                    <tr data-control-row
+                                        data-store-id="{{ $controlCampaign->store_id }}"
+                                        data-campaign-id="{{ $controlId }}"
+                                        data-kind="{{ $controlIsGms ? 'gms' : 'cpc' }}"
+                                        data-status="{{ $controlStatus }}">
+                                        <td>
+                                            <div style="font-weight:800; font-size:.76rem;">{{ $controlCampaign->campaign_name ?: 'Campaign ' . $controlId }}</div>
+                                            <div style="font-size:.62rem;color:var(--dsh-muted);">ID {{ $controlId ?: '—' }}</div>
+                                        </td>
+                                        <td style="font-size:.7rem;">{{ $controlCampaign->store?->name ?? 'Toko #' . $controlCampaign->store_id }}</td>
+                                        <td><span class="badge rounded-pill" style="font-size:.6rem;background:{{ $controlIsGms ? '#ecfdf5' : '#eff6ff' }};color:{{ $controlIsGms ? '#047857' : '#1d4ed8' }};">{{ $controlType }}</span></td>
+                                        <td>
+                                            <span data-control-status class="badge rounded-pill" style="font-size:.6rem;background:{{ $controlStatus === 'ongoing' ? '#dcfce7' : ($controlStatus === 'paused' ? '#fef3c7' : '#f1f5f9') }};color:{{ $controlStatus === 'ongoing' ? '#166534' : ($controlStatus === 'paused' ? '#92400e' : '#64748b') }};">
+                                                {{ match($controlStatus) { 'ongoing' => 'Aktif', 'paused' => 'Jeda', 'closed', 'ended' => 'Selesai', default => ucfirst($controlStatus ?: '—') } }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" data-control-roas class="form-control" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" style="font-size:.7rem; min-width:85px;">
+                                                <button type="button" class="btn btn-outline-primary" data-control-action="roas" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" data-control-budget class="form-control" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" style="font-size:.7rem; min-width:105px;">
+                                                <button type="button" class="btn btn-outline-primary" data-control-action="budget" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-1 flex-wrap">
+                                                @if($controlStatus === 'ongoing')
+                                                    <button type="button" class="btn btn-sm btn-outline-warning" data-control-action="pause"><i class="bi bi-pause-fill"></i> Jeda</button>
+                                                @elseif($controlStatus === 'paused')
+                                                    <button type="button" class="btn btn-sm btn-outline-success" data-control-action="resume"><i class="bi bi-play-fill"></i> Lanjut</button>
+                                                @endif
+                                                @if(!in_array($controlStatus, ['closed', 'ended'], true))
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" data-control-action="stop"><i class="bi bi-stop-fill"></i> Hentikan</button>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="text-center py-4" style="font-size:.75rem;color:var(--dsh-muted);">Belum ada campaign yang bisa dikontrol.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.65rem;">
+                        <i class="bi bi-shield-check me-1"></i> Perubahan hanya diproses setelah API Shopee berhasil. Hentikan iklan memakai tanggal akhir hari ini melalui endpoint edit campaign.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- TAB PENGATURAN -->
         <div class="tab-pane" id="tab-settings">
             @php
@@ -3853,6 +3949,96 @@ window.AdsDashboardRoutes = {
     experimentsSimulate: @json(route('marketplace.ads.experiments.simulate')),
 };
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const controlRows = document.querySelectorAll('[data-control-row]');
+    if (!controlRows.length) return;
+
+    const parseControlNumber = (value, kind) => {
+        let raw = String(value ?? '').trim().replace(/\s/g, '');
+        if (!raw) return null;
+        if (kind === 'roas') {
+            if (raw.includes(',') && raw.includes('.')) raw = raw.replace(/\./g, '').replace(',', '.');
+            else raw = raw.replace(',', '.');
+        } else {
+            raw = raw.replace(/[^0-9]/g, '');
+        }
+        const number = Number(raw);
+        return Number.isFinite(number) && number >= 0 ? number : null;
+    };
+
+    const controlFeedback = (title, text, icon = 'success') => {
+        if (window.Swal) return Swal.fire({ title, text, icon, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success' });
+        window.alert(title + (text ? '\n' + text : ''));
+        return Promise.resolve();
+    };
+
+    const runControlAction = async (button, action) => {
+        const row = button.closest('[data-control-row]');
+        if (!row || button.disabled) return;
+        const kind = row.dataset.kind;
+        const storeId = row.dataset.storeId;
+        const campaignId = row.dataset.campaignId;
+        const isGms = kind === 'gms';
+        const endpoint = isGms ? window.AdsDashboardRoutes.gmsCampaignEdit : window.AdsDashboardRoutes.cpcCampaignEdit;
+        const payload = {
+            store_id: storeId,
+            campaign_id: campaignId,
+        };
+
+        if (action === 'roas') {
+            const value = parseControlNumber(row.querySelector('[data-control-roas]')?.value, 'roas');
+            if (value === null) return controlFeedback('Target ROAS belum valid', 'Isi angka ROAS, atau 0 untuk Auto.', 'warning');
+            payload.roas_target = value;
+        } else if (action === 'budget') {
+            const input = row.querySelector('[data-control-budget]');
+            const value = input?.value?.trim() === '' ? 0 : parseControlNumber(input?.value, 'budget');
+            if (value === null) return controlFeedback('Modal harian belum valid', 'Isi angka tanpa simbol mata uang.', 'warning');
+            payload.daily_budget = value;
+        } else {
+            payload.status_action = action;
+            if (action === 'stop') {
+                const confirmed = window.Swal
+                    ? await Swal.fire({ title: 'Hentikan iklan?', text: 'Campaign akan diberi tanggal akhir hari ini.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Hentikan', cancelButtonText: 'Batal', confirmButtonColor: '#dc2626' }).then(result => result.isConfirmed)
+                    : window.confirm('Hentikan campaign ini hari ini?');
+                if (!confirmed) return;
+            }
+        }
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.status !== 'success') {
+                throw new Error(data.message || 'API Shopee menolak perubahan.');
+            }
+            await controlFeedback('Berhasil diperbarui', data.message || 'Pengaturan campaign tersimpan.');
+            window.location.reload();
+        } catch (error) {
+            await controlFeedback('Gagal memperbarui campaign', error.message || 'Terjadi kesalahan koneksi.', 'error');
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+        }
+    };
+
+    controlRows.forEach(row => {
+        row.querySelectorAll('[data-control-action]').forEach(button => {
+            button.addEventListener('click', () => runControlAction(button, button.dataset.controlAction));
+        });
+    });
+});
+</script>
 <script src="{{ asset('js/marketplace-ads-dashboard-extra.js') }}"></script>
 
 <script>
@@ -3926,6 +4112,8 @@ document.addEventListener("DOMContentLoaded", function() {
     let totalDailyOrders = dailyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let totalDailyAov = totalDailyOrders > 0 ? (totalDailyGmv / totalDailyOrders) : 0;
     let totalDailyRoas = totalDailySpend > 0 ? (totalDailyGmv / totalDailySpend).toFixed(2) : "0.00";
+    const hasDailyGrossProfit = dailyData.some(d => d.gross_profit !== null && d.gross_profit !== undefined);
+    let totalDailyGrossProfit = dailyData.reduce((sum, d) => sum + (parseFloat(d.gross_profit || 0)), 0);
     let dsEl = document.getElementById('dailySummary');
     if(dsEl) {
         dsEl.className = 'daily-trend-stats';
@@ -3933,6 +4121,7 @@ document.addEventListener("DOMContentLoaded", function() {
             <span class="daily-trend-stat"><span class="daily-trend-stat-label">Biaya</span><span class="daily-trend-stat-value" style="color:#dc2626">Rp ${formatShortIDR(totalDailySpend)}</span></span>
             <span class="daily-trend-stat"><span class="daily-trend-stat-label">GMV</span><span class="daily-trend-stat-value" style="color:#16a34a">Rp ${formatShortIDR(totalDailyGmv)}</span></span>
             <span class="daily-trend-stat"><span class="daily-trend-stat-label">AOV</span><span class="daily-trend-stat-value" style="color:#64748b">Rp ${formatShortIDR(totalDailyAov)}</span></span>
+            <span class="daily-trend-stat"><span class="daily-trend-stat-label">Gross Profit</span><span class="daily-trend-stat-value" style="color:${totalDailyGrossProfit >= 0 ? '#7c3aed' : '#dc2626'}">${hasDailyGrossProfit ? 'Rp ' + formatShortIDR(totalDailyGrossProfit) : '—'}</span></span>
             <span class="daily-trend-stat"><span class="daily-trend-stat-label">ROAS</span><span class="daily-trend-stat-value" style="color:#b45309">${totalDailyRoas}x</span></span>`;
     }
 
@@ -3953,6 +4142,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 impressions,
                 clicks,
                 orders,
+                grossProfit: day.gross_profit === null || day.gross_profit === undefined ? null : parseFloat(day.gross_profit || 0),
                 ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
                 aov: orders > 0 ? gmv / orders : 0,
                 roas: spend > 0 ? gmv / spend : 0,
@@ -3961,7 +4151,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const dailyHeader = (key, label, className = '') => {
             const active = dailySortKey === key;
             const indicator = active ? (dailySortDirection === 'asc' ? '↑' : '↓') : '↕';
-            const priority = ['roas', 'ctr'].includes(key);
+            const priority = ['roas', 'ctr', 'grossProfit'].includes(key);
             return `<th class="${className}" data-daily-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;${priority ? 'background:rgba(245,158,11,.07);' : ''}">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
         };
         const renderDailyDataTable = () => {
@@ -3974,7 +4164,7 @@ document.addEventListener("DOMContentLoaded", function() {
             dailyDataTableEl.innerHTML = rows.length
                 ? `<div style="font-size:.68rem; color:var(--dsh-muted); font-weight:700; margin-bottom:.35rem;">Data per tanggal</div>
                     <table class="table table-sm table-hover align-middle mb-0" style="font-size:.67rem;">
-                        <thead><tr>${dailyHeader('date', 'Tanggal')}${dailyHeader('roas', 'ROAS', 'text-end')}${dailyHeader('impressions', 'Impresi', 'text-end')}${dailyHeader('clicks', 'Klik', 'text-end')}${dailyHeader('ctr', 'CTR', 'text-end')}${dailyHeader('orders', 'Orders', 'text-end')}${dailyHeader('spend', 'Biaya', 'text-end')}${dailyHeader('gmv', 'GMV', 'text-end')}${dailyHeader('aov', 'AOV', 'text-end')}</tr></thead>
+                        <thead><tr>${dailyHeader('date', 'Tanggal')}${dailyHeader('roas', 'ROAS', 'text-end')}${dailyHeader('impressions', 'Impresi', 'text-end')}${dailyHeader('clicks', 'Klik', 'text-end')}${dailyHeader('ctr', 'CTR', 'text-end')}${dailyHeader('orders', 'Orders', 'text-end')}${dailyHeader('spend', 'Biaya', 'text-end')}${dailyHeader('gmv', 'GMV', 'text-end')}${dailyHeader('grossProfit', 'Gross Profit', 'text-end')}${dailyHeader('aov', 'AOV', 'text-end')}</tr></thead>
                         <tbody>${rows.map(row => `<tr>
                             <td class="fw-semibold">${formatIndoDate(row.date)}</td>
                             <td class="text-end fw-bold" style="background:rgba(245,158,11,.05);">${row.roas.toFixed(2)}x</td>
@@ -3984,6 +4174,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
                             <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                             <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
+                            <td class="text-end fw-bold" style="color:${row.grossProfit === null ? '#94a3b8' : (row.grossProfit >= 0 ? '#7c3aed' : '#dc2626')};">${row.grossProfit === null ? '—' : 'Rp ' + formatShortIDR(row.grossProfit)}</td>
                             <td class="text-end">Rp ${formatShortIDR(row.aov)}</td>
                         </tr>`).join('')}</tbody>
                     </table>`
@@ -4009,6 +4200,76 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         };
         renderDailyDataTable();
+    }
+
+    const trafficDataTableEl = document.getElementById('trafficDataTable');
+    if (trafficDataTableEl) {
+        let trafficSortKey = 'date';
+        let trafficSortDirection = 'desc';
+        const trafficRows = dailyData.map(day => {
+            const gmv = parseFloat(day.gmv || 0);
+            const impressions = parseInt(day.impressions || 0);
+            const clicks = parseInt(day.clicks || 0);
+            const orders = parseInt(day.orders || 0);
+            return {
+                date: day.date || '',
+                impressions,
+                clicks,
+                orders,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cvr: clicks > 0 ? (orders / clicks) * 100 : 0,
+                aov: orders > 0 ? gmv / orders : 0,
+            };
+        });
+        const trafficHeader = (key, label, className = '') => {
+            const active = trafficSortKey === key;
+            const indicator = active ? (trafficSortDirection === 'asc' ? '↑' : '↓') : '↕';
+            const priorityStyle = ['ctr', 'cvr'].includes(key) ? 'background:rgba(139,92,246,.07);' : '';
+            return `<th class="${className}" data-traffic-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;${priorityStyle}">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
+        };
+        const renderTrafficDataTable = () => {
+            const rows = [...trafficRows].sort((a, b) => {
+                const aValue = a[trafficSortKey];
+                const bValue = b[trafficSortKey];
+                const comparison = typeof aValue === 'string' ? aValue.localeCompare(bValue) : aValue - bValue;
+                return comparison * (trafficSortDirection === 'asc' ? 1 : -1);
+            });
+            trafficDataTableEl.innerHTML = rows.length
+                ? `<div style="font-size:.68rem; color:var(--dsh-muted); font-weight:700; margin-bottom:.35rem;">Data trafik per tanggal</div>
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size:.67rem;">
+                        <thead><tr>${trafficHeader('date', 'Tanggal')}${trafficHeader('impressions', 'Impresi', 'text-end')}${trafficHeader('clicks', 'Klik', 'text-end')}${trafficHeader('ctr', 'CTR', 'text-end')}${trafficHeader('orders', 'Orders', 'text-end')}${trafficHeader('cvr', 'CVR', 'text-end')}${trafficHeader('aov', 'AOV', 'text-end')}</tr></thead>
+                        <tbody>${rows.map(row => `<tr>
+                            <td class="fw-semibold">${formatIndoDate(row.date)}</td>
+                            <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
+                            <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
+                            <td class="text-end fw-bold" style="background:rgba(139,92,246,.06);">${row.ctr.toFixed(2)}%</td>
+                            <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
+                            <td class="text-end fw-bold" style="background:rgba(139,92,246,.06);">${row.cvr.toFixed(2)}%</td>
+                            <td class="text-end">Rp ${formatShortIDR(row.aov)}</td>
+                        </tr>`).join('')}</tbody>
+                    </table>`
+                : '<div style="font-size:.72rem;color:var(--dsh-muted);">Belum ada data trafik harian.</div>';
+            trafficDataTableEl.querySelectorAll('[data-traffic-sort]').forEach(header => {
+                const sortByHeader = () => {
+                    const nextKey = header.dataset.trafficSort;
+                    if (trafficSortKey === nextKey) {
+                        trafficSortDirection = trafficSortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        trafficSortKey = nextKey;
+                        trafficSortDirection = 'desc';
+                    }
+                    renderTrafficDataTable();
+                };
+                header.addEventListener('click', sortByHeader);
+                header.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        sortByHeader();
+                    }
+                });
+            });
+        };
+        renderTrafficDataTable();
     }
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + (parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER), 0);
@@ -4329,6 +4590,10 @@ document.addEventListener("DOMContentLoaded", function() {
         gradientGMV.addColorStop(0, 'rgba(22, 163, 74, 0.25)'); // Green pekat
         gradientGMV.addColorStop(1, 'rgba(22, 163, 74, 0.0)');  // Green pudar
 
+        let gradientGrossProfit = ctxDaily2D.createLinearGradient(0, 0, 0, 300);
+        gradientGrossProfit.addColorStop(0, 'rgba(124, 58, 237, 0.18)');
+        gradientGrossProfit.addColorStop(1, 'rgba(124, 58, 237, 0.0)');
+
         new Chart(ctxDaily2D, {
             type: 'line',
             data: {
@@ -4383,6 +4648,22 @@ document.addEventListener("DOMContentLoaded", function() {
                         pointHoverRadius: 4,
                         pointHoverBackgroundColor: '#dc2626',
                         yAxisID: 'y'
+                    },
+                    {
+                        label: 'Gross Profit',
+                        data: dailyData.map(d => d.gross_profit === null || d.gross_profit === undefined ? null : parseFloat(d.gross_profit || 0)),
+                        borderColor: '#7c3aed',
+                        backgroundColor: gradientGrossProfit,
+                        fill: false,
+                        tension: 0.35,
+                        borderWidth: 2,
+                        borderDash: [5, 3],
+                        pointRadius: dailyData.length <= 1 ? 5 : 0,
+                        pointHitRadius: 15,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#7c3aed',
+                        spanGaps: true,
+                        yAxisID: 'y'
                     }
                 ]
             },
@@ -4424,7 +4705,10 @@ document.addEventListener("DOMContentLoaded", function() {
                                 const day = dailyData[point.dataIndex] || {};
                                 const orders = parseInt(day.orders || 0);
                                 const aov = orders > 0 ? (parseFloat(day.gmv || 0) / orders) : 0;
-                                return ['AOV: ' + formatFullIDR(aov)];
+                                const grossProfit = day.gross_profit === null || day.gross_profit === undefined
+                                    ? 'N/A'
+                                    : formatFullIDR(parseFloat(day.gross_profit || 0));
+                                return ['AOV: ' + formatFullIDR(aov), 'Gross Profit: ' + grossProfit];
                             }
                         }
                     }
