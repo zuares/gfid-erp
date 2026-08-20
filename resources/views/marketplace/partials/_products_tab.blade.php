@@ -161,6 +161,14 @@
             'profit' => $profit,
             'profit_unknown' => $group->count() - $knownProfit->count(),
             'variant_stock_empty_products' => $group->filter(fn ($entry) => $entry['variant_stock_empty'])->count(),
+            'empty_variant_products' => $group
+                ->filter(fn ($entry) => $entry['variant_stock_empty'])
+                ->map(fn ($entry) => [
+                    'product' => $entry['name'],
+                    'variants' => $entry['empty_variant_skus'],
+                ])
+                ->values()
+                ->all(),
             'poas' => $spend > 0 ? $profit / $spend : 0,
             'stock_risk' => $productStockRisk(
                 $group->sum(fn ($entry) => (int) ($entry['row']->stock_total ?? 0)),
@@ -350,9 +358,11 @@
         .product-category-row:hover { background:rgba(37,99,235,.04); }
         .product-caret { transition:transform .15s; }
         .product-category-row.open .product-caret { transform:rotate(90deg); }
-        .product-variant-empty-button { border:0; padding:0; background:transparent; color:#b91c1c; font-size:.58rem; font-weight:700; white-space:nowrap; }
-        .product-variant-empty-button:hover { color:#7f1d1d; text-decoration:underline; }
+        .product-variant-empty-button { display:inline-flex; align-items:center; justify-content:center; border:0; padding:.1rem .2rem; background:transparent; color:#b91c1c; font-size:.78rem; line-height:1; }
+        .product-variant-empty-button:hover { color:#7f1d1d; transform:scale(1.08); }
         .product-variant-modal-list { display:flex; flex-wrap:wrap; gap:.35rem; }
+        .product-variant-modal-group { width:100%; }
+        .product-variant-modal-product { margin-bottom:.3rem; color:#334155; font-size:.72rem; font-weight:750; }
         .product-variant-modal-chip { display:inline-flex; align-items:center; padding:.25rem .45rem; border:1px solid rgba(220,38,38,.2); border-radius:999px; background:rgba(220,38,38,.06); color:#991b1b; font-size:.68rem; font-weight:650; }
     </style>
     <div class="table-responsive" style="max-height: 600px;">
@@ -377,7 +387,7 @@
                     <tr class="product-category-row" data-product-views="category" onclick="productToggleCategory(this)">
                         <td><div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right product-caret text-muted" style="font-size:.7rem;"></i><div><div class="fw-bold">{{ $categoryRow['category'] }}</div><div class="text-muted small">{{ number_format($categoryRow['products'], 0, ',', '.') }} produk</div></div></div></td>
                         <td><span class="badge bg-light text-dark border">Ringkasan</span><br><span class="badge bg-{{ $categoryRow['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $categoryRow['stock_risk']['label'] }}</span></td>
-                        <td class="text-end">{{ number_format($categoryRow['stock'], 0, ',', '.') }}@if($categoryRow['variant_stock_empty_products'] > 0)<br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.58rem;">Ada variant kosong · {{ $categoryRow['variant_stock_empty_products'] }} produk</span>@endif</td>
+                        <td class="text-end">{{ number_format($categoryRow['stock'], 0, ',', '.') }}@if($categoryRow['variant_stock_empty_products'] > 0)<br><button type="button" class="product-variant-empty-button" aria-label="Lihat variant kosong" data-product-name="{{ e($categoryRow['category']) }}" data-variant-groups="{{ e(json_encode($categoryRow['empty_variant_products'], JSON_UNESCAPED_UNICODE)) }}" onclick="event.stopPropagation(); productOpenVariantModal(this);"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></button>@endif</td>
                         <td class="text-end fw-bold">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($categoryRow['ctr'], 2) }}%</td>
                         <td class="text-end">{{ number_format($categoryRow['cvr'], 2) }}%</td>
@@ -399,7 +409,7 @@
                                             <tr>
                                                 <td><div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $detailProduct->item_name }}">{{ $detailProduct->item_name }}</div><div class="text-muted" style="font-size:.62rem;">{{ $detailProduct->item_sku }}</div></td>
                                                 <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span><br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.56rem;">{{ $productEntry['stock_risk']['label'] }}</span></td>
-                                                <td class="text-end">{{ number_format($detailProduct->stock_total ?? 0, 0, ',', '.') }}@if($productEntry['variant_stock_empty'])<br><button type="button" class="product-variant-empty-button" data-product-name="{{ e($detailProduct->item_name ?: 'Produk') }}" data-product-variants="{{ e(json_encode($productEntry['empty_variant_skus'], JSON_UNESCAPED_UNICODE)) }}" onclick="event.stopPropagation(); productOpenVariantModal(this);"><i class="bi bi-exclamation-triangle me-1"></i>Ada variant kosong</button>@endif</td>
+                                                <td class="text-end">{{ number_format($detailProduct->stock_total ?? 0, 0, ',', '.') }}@if($productEntry['variant_stock_empty'])<br><button type="button" class="product-variant-empty-button" aria-label="Lihat variant kosong" data-product-name="{{ e($detailProduct->item_name ?: 'Produk') }}" data-variant-groups="{{ e(json_encode([['product' => $detailProduct->item_name ?: 'Produk', 'variants' => $productEntry['empty_variant_skus']]], JSON_UNESCAPED_UNICODE)) }}" onclick="event.stopPropagation(); productOpenVariantModal(this);"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></button>@endif</td>
                                                 <td class="text-end">{{ number_format($detailProduct->orders, 0, ',', '.') }}</td>
                                                 <td class="text-end">Rp {{ number_format(($detailProduct->orders ?? 0) > 0 ? $detailProduct->gmv / $detailProduct->orders : 0, 0, ',', '.') }}</td>
                                                 <td class="text-end text-success">Rp {{ number_format($detailProduct->gmv, 0, ',', '.') }}</td>
@@ -452,7 +462,7 @@
                                 {{ $row->stock_total ?? 0 }}
                             @endif
                             @if($productEntry['variant_stock_empty'])
-                                <button type="button" class="product-variant-empty-button" data-product-name="{{ e($row->item_name ?: 'Produk') }}" data-product-variants="{{ e(json_encode($productEntry['empty_variant_skus'], JSON_UNESCAPED_UNICODE)) }}" onclick="event.stopPropagation(); productOpenVariantModal(this);"><i class="bi bi-exclamation-triangle me-1"></i>Ada variant kosong</button>
+                                <button type="button" class="product-variant-empty-button" aria-label="Lihat variant kosong" data-product-name="{{ e($row->item_name ?: 'Produk') }}" data-variant-groups="{{ e(json_encode([['product' => $row->item_name ?: 'Produk', 'variants' => $productEntry['empty_variant_skus']]], JSON_UNESCAPED_UNICODE)) }}" onclick="event.stopPropagation(); productOpenVariantModal(this);"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></button>
                             @endif
                         </td>
                         <td class="text-end fw-bold">{{ number_format($row->orders, 0, ',', '.') }}</td>
@@ -484,12 +494,11 @@
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 shadow-sm">
             <div class="modal-header py-2 px-3">
-                <h6 class="modal-title mb-0" id="productVariantEmptyModalLabel">Ada variant kosong</h6>
+                <h6 class="modal-title mb-0" id="productVariantEmptyModalLabel">Variant kosong</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
             </div>
             <div class="modal-body px-3 py-2">
-                <div id="productVariantEmptyProduct" class="text-muted mb-2" style="font-size:.72rem;"></div>
-                <div id="productVariantEmptyList" class="product-variant-modal-list"></div>
+            <div id="productVariantEmptyList" class="product-variant-modal-list"></div>
             </div>
         </div>
     </div>
@@ -503,17 +512,23 @@ let productStockChart = null;
 
 window.productOpenVariantModal = function(button) {
     const modalEl = document.getElementById('productVariantEmptyModal');
-    const productEl = document.getElementById('productVariantEmptyProduct');
     const listEl = document.getElementById('productVariantEmptyList');
-    if (!modalEl || !productEl || !listEl) return;
+    if (!modalEl || !listEl) return;
 
-    let variants = [];
-    try { variants = JSON.parse(button.dataset.productVariants || '[]'); } catch (e) { variants = []; }
-    productEl.textContent = button.dataset.productName || 'Produk';
-    listEl.innerHTML = variants.map(function (variant) {
-        const item = document.createElement('span');
-        item.textContent = variant;
-        return '<span class="product-variant-modal-chip">' + item.innerHTML + '</span>';
+    let groups = [];
+    try { groups = JSON.parse(button.dataset.variantGroups || '[]'); } catch (e) { groups = []; }
+    if (!Array.isArray(groups) || groups.length === 0) {
+        groups = [{ product: button.dataset.productName || 'Produk', variants: [] }];
+    }
+    listEl.innerHTML = groups.map(function (group) {
+        const product = document.createElement('div');
+        product.textContent = group.product || 'Produk';
+        const chips = (Array.isArray(group.variants) ? group.variants : []).map(function (variant) {
+            const item = document.createElement('span');
+            item.textContent = variant;
+            return '<span class="product-variant-modal-chip">' + item.innerHTML + '</span>';
+        }).join('');
+        return '<div class="product-variant-modal-group"><div class="product-variant-modal-product">' + product.innerHTML + '</div><div class="product-variant-modal-list">' + chips + '</div></div>';
     }).join('');
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
 };

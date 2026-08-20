@@ -320,12 +320,22 @@
             'prev_profit_available' => $prevProfitRows->count() > 0,
         ];
     })->all();
-    $perfInitialKpi = $perfSegmentKpis['category'];
-
     // KPI keseluruhan harus memakai sumber Seller Center yang sama dengan
     // tab Profit. KPI subtab tetap memakai agregasi baris GMV Max ROAS/Auto.
     $overallCurrentKpi = ($kpi ?? [])['current'] ?? null;
     $overallPreviousKpi = ($kpi ?? [])['previous'] ?? null;
+    $overallCurrentGmv = $overallCurrentKpi !== null
+        ? (float) ($overallCurrentKpi->gmv ?? 0)
+        : $totalGmv;
+    $overallCurrentOrders = $overallCurrentKpi !== null
+        ? (int) ($overallCurrentKpi->orders ?? 0)
+        : $totalOrders;
+    $overallPreviousGmv = $overallPreviousKpi !== null
+        ? (float) ($overallPreviousKpi->gmv ?? 0)
+        : $perfRows->sum('prev_gmv');
+    $overallPreviousOrders = $overallPreviousKpi !== null
+        ? (int) ($overallPreviousKpi->orders ?? 0)
+        : $perfRows->sum('prev_orders');
     $overallPreviousSpend = $overallPreviousKpi !== null
         ? (float) ($overallPreviousKpi->spend ?? 0) * 1.11
         : $perfRows->sum('prev_spend');
@@ -334,8 +344,36 @@
         : $perfRows->sum('prev_profit');
     if ($overallCurrentKpi !== null) {
         $totalSpend = (float) ($overallCurrentKpi->spend ?? 0) * 1.11;
+        $totalGmv = $overallCurrentGmv;
+        $totalOrders = $overallCurrentOrders;
         $totalProfit = (float) ($overallCurrentKpi->net_profit ?? 0);
     }
+
+    // Subtab Per Kategori merepresentasikan total dashboard, bukan hanya
+    // penjumlahan baris campaign. Dengan begitu KPI mini dan KPI utama tetap
+    // memakai basis Seller Center yang sama, termasuk biaya yang belum punya
+    // baris campaign.
+    $categoryKpi = $perfSegmentKpis['category'];
+    if ($overallCurrentKpi !== null) {
+        $categoryKpi['spend'] = $totalSpend;
+        $categoryKpi['gmv'] = $overallCurrentGmv;
+        $categoryKpi['orders'] = $overallCurrentOrders;
+        $categoryKpi['aov'] = $overallCurrentOrders > 0 ? $overallCurrentGmv / $overallCurrentOrders : 0;
+        $categoryKpi['cpa'] = $overallCurrentOrders > 0 ? $totalSpend / $overallCurrentOrders : 0;
+        $categoryKpi['roas'] = $totalSpend > 0 ? $overallCurrentGmv / $totalSpend : 0;
+        $categoryKpi['profit'] = $totalProfit;
+        $categoryKpi['profit_per_order'] = $overallCurrentOrders > 0 ? $totalProfit / $overallCurrentOrders : 0;
+        $categoryKpi['prev_spend'] = $overallPreviousSpend;
+        $categoryKpi['prev_gmv'] = $overallPreviousGmv;
+        $categoryKpi['prev_orders'] = $overallPreviousOrders;
+        $categoryKpi['prev_aov'] = $overallPreviousOrders > 0 ? $overallPreviousGmv / $overallPreviousOrders : 0;
+        $categoryKpi['prev_cpa'] = $overallPreviousOrders > 0 ? $overallPreviousSpend / $overallPreviousOrders : 0;
+        $categoryKpi['prev_roas'] = $overallPreviousSpend > 0 ? $overallPreviousGmv / $overallPreviousSpend : 0;
+        $categoryKpi['prev_profit'] = $overallPreviousProfit;
+        $categoryKpi['prev_profit_per_order'] = $overallPreviousOrders > 0 ? $overallPreviousProfit / $overallPreviousOrders : 0;
+    }
+    $perfSegmentKpis['category'] = $categoryKpi;
+    $perfInitialKpi = $perfSegmentKpis['category'];
 
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
@@ -454,7 +492,7 @@
                 <div class="text-muted small fw-bold text-uppercase mb-1">Total Orders (Ads)</div>
                 <div class="fs-4 fw-bolder text-dark">{{ number_format($totalOrders, 0, ',', '.') }}</div>
                 <div class="small text-muted mt-1">Biaya/order: Rp {{ number_format($totalOrders > 0 ? $totalSpend / $totalOrders : 0, 0, ',', '.') }}</div>
-                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($perfRows->sum('prev_orders'), 0, ',', '.') }} {!! $fmtDelta($totalOrders, $perfRows->sum('prev_orders'), true) !!}</div>
+                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($overallPreviousOrders, 0, ',', '.') }} {!! $fmtDelta($totalOrders, $overallPreviousOrders, true) !!}</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
@@ -462,7 +500,7 @@
                 <div class="text-muted small fw-bold text-uppercase mb-1">Total GMV (Ads)</div>
                 <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalGmv, 0, ',', '.') }}</div>
                 <div class="small text-muted mt-1">ROAS setelah PPN: {{ number_format($totalSpend > 0 ? $totalGmv / $totalSpend : 0, 2) }}x · AOV: Rp {{ number_format($totalOrders > 0 ? $totalGmv / $totalOrders : 0, 0, ',', '.') }}</div>
-                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfRows->sum('prev_gmv'), 0, ',', '.') }} {!! $fmtDelta($totalGmv, $perfRows->sum('prev_gmv'), true) !!}</div>
+                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($overallPreviousGmv, 0, ',', '.') }} {!! $fmtDelta($totalGmv, $overallPreviousGmv, true) !!}</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
