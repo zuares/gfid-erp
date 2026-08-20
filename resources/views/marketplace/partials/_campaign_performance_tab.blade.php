@@ -192,6 +192,8 @@
             'prev_aov' => $prevOrders > 0 ? $prevGmv / $prevOrders : 0,
             'prev_clicks' => $prevClicks,
             'prev_impressions' => $prevImpressions,
+            'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
+            'prev_cvr' => $prevClicks > 0 ? ($prevOrders / $prevClicks) * 100 : 0,
             'prev_profit' => $prevProfit,
             'prev_roas' => $prevRoas,
             'reco' => $reco,
