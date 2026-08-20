@@ -3251,15 +3251,26 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="tab-pane" id="tab-control">
             <style>
                 .ads-control-list { display:flex; flex-direction:column; gap:.5rem; }
-                .ads-control-row { display:grid; grid-template-columns:minmax(230px,1.5fr) minmax(90px,.45fr) minmax(150px,.75fr) minmax(165px,.8fr) minmax(150px,.7fr); align-items:center; gap:.65rem; padding:.65rem .75rem; border:1px solid var(--dsh-border); border-radius:12px; background:var(--card-bg); }
+                .ads-control-row { display:grid; grid-template-columns:minmax(230px,1.35fr) minmax(90px,.45fr) minmax(205px,1fr) minmax(150px,.7fr) minmax(165px,.8fr) minmax(150px,.7fr); align-items:center; gap:.65rem; padding:.65rem .75rem; border:1px solid var(--dsh-border); border-radius:12px; background:var(--card-bg); }
                 .ads-control-row:hover { border-color:rgba(37,99,235,.35); box-shadow:0 4px 12px rgba(15,23,42,.05); }
                 .ads-control-label { display:block; font-size:.58rem; color:var(--dsh-muted); margin-bottom:.2rem; }
                 .ads-control-input { max-width:125px; min-height:30px; padding:.25rem .45rem; border-radius:8px; font-size:.72rem; font-weight:700; color:var(--text); background:var(--card-bg); border:1px solid var(--dsh-border); }
                 .ads-control-input:focus { border-color:var(--dsh-accent); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+                .ads-control-value { min-height:30px; padding:.25rem .55rem; border:1px solid var(--dsh-border); border-radius:8px; color:var(--text); background:var(--card-bg); font-size:.7rem; font-weight:750; white-space:nowrap; }
+                .ads-control-value:hover { border-color:var(--dsh-accent); background:rgba(37,99,235,.05); }
                 .ads-control-icon { width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
                 .ads-control-actions { display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
+                .ads-control-metrics { display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; font-size:.63rem; line-height:1.25; }
+                .ads-control-metric { white-space:nowrap; color:var(--dsh-muted); }
+                .ads-control-metric strong { color:var(--text); font-weight:800; }
+                .ads-control-metric .is-negative { color:#dc2626; }
+                .ads-control-metric .is-positive { color:#15803d; }
+                .ads-control-funnel { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; font-size:.6rem; color:var(--dsh-muted); line-height:1.25; }
+                .ads-control-funnel strong { color:var(--text); font-weight:800; }
+                .ads-control-avatar { width:34px; height:34px; border-radius:9px; object-fit:cover; flex:none; border:1px solid var(--dsh-border); background:#f1f5f9; }
+                .ads-control-avatar-empty { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; flex:none; color:var(--dsh-muted); background:#f1f5f9; border:1px solid var(--dsh-border); }
                 @media (max-width: 900px) {
-                    .ads-control-row { grid-template-columns:minmax(210px,1fr) repeat(2,minmax(130px,.7fr)) minmax(140px,.7fr); }
+                    .ads-control-row { grid-template-columns:minmax(210px,1fr) minmax(80px,.4fr) minmax(165px,.8fr) repeat(2,minmax(130px,.7fr)); }
                     .ads-control-actions { grid-column:1 / -1; padding-top:.25rem; border-top:1px solid var(--dsh-border); }
                 }
                 @media (max-width: 620px) {
@@ -3330,6 +3341,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="ads-control-row d-none d-md-grid" style="background:transparent;border:0;box-shadow:none;padding:.1rem .75rem;">
                             <span class="ads-control-label mb-0">Campaign</span>
                             <span class="ads-control-label mb-0">Status</span>
+                            <span class="ads-control-label mb-0">Funnel &amp; hasil</span>
                             <span class="ads-control-label mb-0">Target ROAS</span>
                             <span class="ads-control-label mb-0">Modal harian</span>
                             <span class="ads-control-label mb-0">Aksi</span>
@@ -3340,6 +3352,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                 $controlIsGms = str_starts_with($controlId, 'GMS-') || ($controlCampaign->ad_type ?? null) === 'auto';
                                 $controlStatus = strtolower((string) ($controlCampaign->campaign_status ?? 'ongoing'));
                                 $controlType = $controlIsGms ? 'GMV Max' : 'Regular';
+                                $controlSpend = (float) ($controlCampaign->spend ?? $controlCampaign->sum_expense ?? 0) * 1.11;
+                                $controlGmv = (float) ($controlCampaign->gmv ?? ($controlCampaign->sum_broad_gmv ?? 0) + ($controlCampaign->sum_direct_gmv ?? 0));
+                                $controlOrders = (int) ($controlCampaign->orders ?? ($controlCampaign->sum_broad_orders ?? 0) + ($controlCampaign->sum_direct_orders ?? 0));
+                                $controlImpressions = (int) ($controlCampaign->impressions ?? $controlCampaign->sum_impressions ?? 0);
+                                $controlClicks = (int) ($controlCampaign->clicks ?? $controlCampaign->sum_clicks ?? 0);
+                                $controlCtr = $controlImpressions > 0 ? ($controlClicks / $controlImpressions) * 100 : 0;
+                                $controlCvr = $controlClicks > 0 ? ($controlOrders / $controlClicks) * 100 : 0;
+                                $controlActualRoas = $controlSpend > 0 ? $controlGmv / $controlSpend : 0;
+                                $controlProfit = $controlCampaign->profit_after_ads;
+                                $controlImage = $controlCampaign->marketplace_item_image_url ?? null;
                             @endphp
                             <div class="ads-control-row" data-control-row
                                 data-store-id="{{ $controlCampaign->store_id }}"
@@ -3347,8 +3369,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 data-kind="{{ $controlIsGms ? 'gms' : 'cpc' }}"
                                 data-status="{{ $controlStatus }}">
                                 <div class="ads-control-name">
-                                    <div style="font-weight:800;font-size:.76rem;line-height:1.2;">{{ $controlCampaign->campaign_name ?: 'Campaign ' . $controlId }}</div>
-                                    <div style="font-size:.6rem;color:var(--dsh-muted);margin-top:.2rem;">{{ $controlCampaign->store?->name ?? 'Toko #' . $controlCampaign->store_id }} · {{ $controlType }} · ID {{ $controlId ?: '—' }}</div>
+                                    <div style="display:flex;align-items:center;gap:.5rem;min-width:0;">
+                                        @if($controlImage)
+                                            <img src="{{ $controlImage }}" alt="" class="ads-control-avatar" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
+                                            <span class="ads-control-avatar-empty" style="display:none;"><i class="bi bi-image"></i></span>
+                                        @else
+                                            <span class="ads-control-avatar-empty"><i class="bi bi-image"></i></span>
+                                        @endif
+                                        <div style="min-width:0;">
+                                            <div style="font-weight:800;font-size:.76rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ $controlCampaign->campaign_name ?: 'Campaign ' . $controlId }}">{{ $controlCampaign->campaign_name ?: 'Campaign ' . $controlId }}</div>
+                                            <div style="font-size:.6rem;color:var(--dsh-muted);margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $controlCampaign->marketplace_item_name ?: 'Produk campaign' }} · {{ $controlCampaign->store?->name ?? 'Toko #' . $controlCampaign->store_id }} · {{ $controlType }}</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
                                     <span data-control-status class="badge rounded-pill" style="font-size:.6rem;background:{{ $controlStatus === 'ongoing' ? '#dcfce7' : ($controlStatus === 'paused' ? '#fef3c7' : '#f1f5f9') }};color:{{ $controlStatus === 'ongoing' ? '#166534' : ($controlStatus === 'paused' ? '#92400e' : '#64748b') }};">
@@ -3356,17 +3388,48 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </span>
                                 </div>
                                 <div>
+                                    <label class="ads-control-label d-md-none">Funnel &amp; hasil</label>
+                                    <div class="ads-control-funnel" title="Funnel campaign pada periode aktif">
+                                        <span>Impr <strong>{{ number_format($controlImpressions, 0, ',', '.') }}</strong></span>
+                                        <span>Klik <strong>{{ number_format($controlClicks, 0, ',', '.') }}</strong></span>
+                                        <span>CTR <strong>{{ number_format($controlCtr, 2, ',', '.') }}%</strong></span>
+                                        <span>CVR <strong>{{ number_format($controlCvr, 2, ',', '.') }}%</strong></span>
+                                    </div>
+                                    <div class="ads-control-metrics">
+                                        <span class="ads-control-metric" title="ROAS aktual setelah PPN 11%">ROAS <strong>{{ number_format($controlActualRoas, 2, ',', '.') }}x</strong></span>
+                                        <span class="ads-control-metric" title="Orders pada periode aktif">Order <strong>{{ number_format($controlOrders, 0, ',', '.') }}</strong></span>
+                                        <span class="ads-control-metric" title="Net profit setelah biaya iklan">Profit <strong class="{{ $controlProfit !== null && $controlProfit < 0 ? 'is-negative' : 'is-positive' }}">Rp {{ number_format((float) ($controlProfit ?? 0), 0, ',', '.') }}</strong></span>
+                                    </div>
+                                    <div style="font-size:.58rem;color:var(--dsh-muted);margin-top:.18rem;">Iklan Rp {{ number_format($controlSpend, 0, ',', '.') }} · GMV Rp {{ number_format($controlGmv, 0, ',', '.') }}</div>
+                                </div>
+                                <div>
                                     <label class="ads-control-label d-md-none">Target ROAS</label>
-                                    <div class="input-group input-group-sm" style="max-width:150px;">
-                                        <input type="text" data-control-roas class="ads-control-input" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" title="Isi 0 untuk Auto">
-                                        <button type="button" class="btn btn-outline-primary ads-control-icon" data-control-action="roas" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
+                                    <div class="ads-control-field" data-control-field="roas">
+                                        <div data-control-display>
+                                            <button type="button" class="btn btn-light btn-sm ads-control-value" data-control-toggle title="Klik untuk edit Target ROAS">
+                                                <i class="bi bi-bullseye text-primary me-1"></i>{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') . 'x' : 'Auto' }}
+                                            </button>
+                                        </div>
+                                        <div data-control-editor class="input-group input-group-sm" style="display:none;max-width:150px;">
+                                            <input type="text" data-control-roas class="ads-control-input" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" title="Isi 0 untuk Auto">
+                                            <button type="button" class="btn btn-outline-primary ads-control-icon" data-control-action="roas" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
+                                            <button type="button" class="btn btn-outline-secondary ads-control-icon" data-control-cancel title="Batal"><i class="bi bi-x"></i></button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
                                     <label class="ads-control-label d-md-none">Modal harian</label>
-                                    <div class="input-group input-group-sm" style="max-width:175px;">
-                                        <input type="text" data-control-budget class="ads-control-input" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" title="Kosong atau 0 untuk Unlimited">
-                                        <button type="button" class="btn btn-outline-primary ads-control-icon" data-control-action="budget" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
+                                    <div class="ads-control-field" data-control-field="budget">
+                                        <div data-control-display>
+                                            <button type="button" class="btn btn-light btn-sm ads-control-value" data-control-toggle title="Klik untuk edit Modal Harian">
+                                                <i class="bi bi-wallet2 text-primary me-1"></i>{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? 'Rp ' . number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : 'Unlimited' }}
+                                            </button>
+                                        </div>
+                                        <div data-control-editor class="input-group input-group-sm" style="display:none;max-width:175px;">
+                                            <input type="text" data-control-budget class="ads-control-input" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" title="Kosong atau 0 untuk Unlimited">
+                                            <button type="button" class="btn btn-outline-primary ads-control-icon" data-control-action="budget" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
+                                            <button type="button" class="btn btn-outline-secondary ads-control-icon" data-control-cancel title="Batal"><i class="bi bi-x"></i></button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="ads-control-actions">
@@ -4143,6 +4206,26 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     controlRows.forEach(row => {
+        row.querySelectorAll('[data-control-toggle]').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                const field = toggle.closest('[data-control-field]');
+                if (!field) return;
+                field.querySelector('[data-control-display]')?.style.setProperty('display', 'none');
+                const editor = field.querySelector('[data-control-editor]');
+                editor?.style.setProperty('display', 'flex');
+                const input = editor?.querySelector('input');
+                input?.focus();
+                input?.select();
+            });
+        });
+        row.querySelectorAll('[data-control-cancel]').forEach(cancel => {
+            cancel.addEventListener('click', () => {
+                const field = cancel.closest('[data-control-field]');
+                if (!field) return;
+                field.querySelector('[data-control-editor]')?.style.setProperty('display', 'none');
+                field.querySelector('[data-control-display]')?.style.setProperty('display', '');
+            });
+        });
         row.querySelectorAll('[data-control-action]').forEach(button => {
             button.addEventListener('click', () => runControlAction(button, button.dataset.controlAction));
         });
