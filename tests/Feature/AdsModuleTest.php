@@ -813,6 +813,77 @@ class AdsModuleTest extends TestCase
             ->assertJsonPath('data.0.unit_cogs', 3000);
     }
 
+    public function test_gmv_max_items_endpoint_reconciles_spend_to_seller_center_gap()
+    {
+        $store = $this->createStore('GMSITEMSPEND');
+
+        \App\Models\MarketplaceAdsItemDaily::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'GMS-' . $store->id,
+            'channel_item_id' => 7654322,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 5000,
+            'broad_order' => 1,
+            'broad_gmv' => 50000,
+            'direct_order' => 1,
+            'direct_gmv' => 50000,
+            'raw_json' => ['broad_order_amount' => 1],
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            [
+                'store_id' => $store->id,
+                'channel_campaign_id' => 'GMS-' . $store->id,
+                'date' => '2026-07-30',
+                'impressions' => 100,
+                'clicks' => 10,
+                'expense' => 5000,
+                'broad_order' => 1,
+                'broad_order_amount' => 1,
+                'broad_gmv' => 50000,
+                'direct_order' => 1,
+                'direct_order_amount' => 1,
+                'direct_gmv' => 50000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'store_id' => $store->id,
+                'channel_campaign_id' => 'REGULAR-SPEND-' . $store->id,
+                'date' => '2026-07-30',
+                'impressions' => 100,
+                'clicks' => 10,
+                'expense' => 2000,
+                'broad_order' => 1,
+                'broad_order_amount' => 1,
+                'broad_gmv' => 20000,
+                'direct_order' => 1,
+                'direct_order_amount' => 1,
+                'direct_gmv' => 20000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 200,
+            'clicks' => 20,
+            'spend' => 12000,
+            'orders' => 2,
+            'gmv' => 70000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/marketplace/ads-dashboard/gms-items/' . $store->id . '?date_from=2026-07-30&date_to=2026-07-30');
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.spend', 10000);
+    }
+
     public function test_gmv_max_product_can_be_mapped_from_product_detail()
     {
         $store = $this->createStore('GMSMAPITEM');

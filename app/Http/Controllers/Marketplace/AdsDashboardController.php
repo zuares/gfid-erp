@@ -926,19 +926,37 @@ class AdsDashboardController extends Controller
             ];
         })->sortByDesc('spend')->values();
 
-        // Detail item kadang berbeda 1–2 rupiah dari campaign parent karena
-        // pembulatan API. Gunakan total parent sebagai sumber biaya iklan agar
-        // tabel GMV Max Auto selalu sama dengan KPI dashboard.
-        $parentSpend = (float) DB::table('marketplace_ad_campaign_dailies')
-            ->where('store_id', $store->id)
-            ->where('channel_campaign_id', 'GMS-' . $store->id)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->sum('expense');
-        $previousParentSpend = (float) DB::table('marketplace_ad_campaign_dailies')
-            ->where('store_id', $store->id)
-            ->where('channel_campaign_id', 'GMS-' . $store->id)
-            ->whereBetween('date', [$previousFromDate, $previousToDate])
-            ->sum('expense');
+        // Detail item kadang berbeda dari campaign parent karena pembulatan
+        // API atau karena Seller Center memiliki spend yang belum masuk ke
+        // parent GMS. Gunakan sumber canonical yang sama dengan dashboard:
+        // Seller Center - campaign regular. Jika Seller Center belum ada,
+        // fallback ke parent GMS.
+        $canonicalGmsSpend = function (string $periodFrom, string $periodTo) use ($store): float {
+            $sellerCenterSpend = DB::table('marketplace_ads_dailies')
+                ->where('store_id', $store->id)
+                ->whereBetween('date', [$periodFrom, $periodTo])
+                ->selectRaw('SUM(spend) as spend')
+                ->value('spend');
+            $parentSpend = (float) DB::table('marketplace_ad_campaign_dailies')
+                ->where('store_id', $store->id)
+                ->where('channel_campaign_id', 'GMS-' . $store->id)
+                ->whereBetween('date', [$periodFrom, $periodTo])
+                ->sum('expense');
+
+            if ($sellerCenterSpend === null) {
+                return $parentSpend;
+            }
+
+            $regularSpend = (float) DB::table('marketplace_ad_campaign_dailies')
+                ->where('store_id', $store->id)
+                ->whereNotLike('channel_campaign_id', 'GMS-%')
+                ->whereBetween('date', [$periodFrom, $periodTo])
+                ->sum('expense');
+
+            return max(0.0, (float) $sellerCenterSpend - $regularSpend);
+        };
+        $parentSpend = $canonicalGmsSpend($fromDate, $toDate);
+        $previousParentSpend = $canonicalGmsSpend($previousFromDate, $previousToDate);
         $itemSpend = (float) $items->sum('spend');
         $previousItemSpend = (float) $items->sum('previous_spend');
         if ($parentSpend >= 0 && $itemSpend > 0 && abs($parentSpend - $itemSpend) > 0.001) {
