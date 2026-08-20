@@ -118,7 +118,7 @@
     })->values();
     $productRegularRows = $productRows->filter(fn ($row) => !$row['is_gms']);
     $productCategoryProductRows = $productRegularRows->groupBy('category');
-    $productCategoryRows = $productCategoryProductRows->map(function ($group, $category) {
+    $productCategoryRows = $productCategoryProductRows->map(function ($group, $category) use ($productStockRisk) {
         $knownProfit = $group->filter(fn ($entry) => $entry['row']->profit_after_ads !== null);
         $spend = $group->sum(fn ($entry) => (float) $entry['row']->spend);
         $impressions = $group->sum(fn ($entry) => (int) ($entry['row']->impressions ?? 0));
