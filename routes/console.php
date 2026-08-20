@@ -151,6 +151,12 @@ Schedule::call(fn () => Artisan::call('marketplace:run-boosts'))
     ->name('run-boosts')
     ->withoutOverlapping();
 
+// Claim jadwal pause/resume Ads dan kirim eksekusinya ke queue ads.
+Schedule::command('marketplace:run-ads-campaign-schedules')
+    ->everyMinute()
+    ->name('run-ads-campaign-schedules')
+    ->withoutOverlapping();
+
 // Proses antrean job CEPAT (order webhook, download resi) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
 // --queue=default,labels: queue default (webhook, promosi kilat) SELALU didahulukan;

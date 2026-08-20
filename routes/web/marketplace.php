@@ -132,6 +132,10 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.gms.campaign.edit');
         Route::post('ads-dashboard/cpc-campaign-edit', [AdsDashboardController::class, 'actionCpcCampaign'])
             ->name('ads.cpc.campaign.edit');
+        Route::post('ads-dashboard/campaign-schedules', [AdsDashboardController::class, 'createCampaignSchedule'])
+            ->name('ads.campaign.schedule');
+        Route::delete('ads-dashboard/campaign-schedules/{schedule}', [AdsDashboardController::class, 'cancelCampaignSchedule'])
+            ->name('ads.campaign.schedule.cancel');
         Route::post('ads-dashboard/fee-setting', [AdsDashboardController::class, 'saveFeeSetting'])
             ->name('ads.fee.setting');
         Route::post('ads-dashboard/target-setting', [AdsDashboardController::class, 'saveTargetSetting'])

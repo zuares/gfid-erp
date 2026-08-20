@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Models\Store;
+use App\Models\AdsCampaignSchedule;
 use App\Services\Marketplace\Ads\AdsActionService;
 use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\Ads\AdsAnalyticsService;
@@ -109,6 +110,15 @@ class AdsDashboardController extends Controller
             $compareMode,
             $analytics
         );
+
+        $dashboard['campaignSchedules'] = AdsCampaignSchedule::query()
+            ->with('store:id,name')
+            ->whereIn('store_id', $stores->pluck('id')->all())
+            ->whereIn('status', ['pending', 'queued', 'running', 'failed'])
+            ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'queued' THEN 1 WHEN 'running' THEN 2 ELSE 3 END")
+            ->orderBy('scheduled_at')
+            ->limit(100)
+            ->get();
         
         $lastSync = \App\Models\MarketplaceAdsSyncRun::where('status', 'success')
             ->whereNotNull('finished_at')
@@ -482,6 +492,86 @@ class AdsDashboardController extends Controller
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    public function createCampaignSchedule(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'campaign_id' => 'required|string|max:100',
+            'action' => 'required|in:pause,resume,budget',
+            'daily_budget' => 'nullable|numeric|min:0|required_if:action,budget',
+            'scheduled_at' => ['required', 'date_format:Y-m-d\\TH:i'],
+        ]);
+
+        $scheduledAt = Carbon::createFromFormat('Y-m-d\\TH:i', $data['scheduled_at'], config('app.timezone'));
+        if (! $scheduledAt || $scheduledAt->lte(now())) {
+            return response()->json(['status' => 'error', 'message' => 'Waktu jadwal harus lebih besar dari waktu sekarang.'], 422);
+        }
+
+        $campaignId = (string) $data['campaign_id'];
+        $isGms = str_starts_with($campaignId, 'GMS-');
+        if (! $isGms && ! ctype_digit($campaignId)) {
+            return response()->json(['status' => 'error', 'message' => 'Campaign ID regular tidak valid.'], 422);
+        }
+
+        $store = Store::findOrFail($data['store_id']);
+        $campaignExists = \App\Models\MarketplaceAdCampaign::query()
+            ->where('store_id', $store->id)
+            ->where('channel_campaign_id', $campaignId)
+            ->exists();
+        if (! $campaignExists && ! $isGms) {
+            return response()->json(['status' => 'error', 'message' => 'Campaign tidak ditemukan pada toko yang dipilih.'], 422);
+        }
+
+        $duplicate = AdsCampaignSchedule::query()
+            ->where('store_id', $store->id)
+            ->where('channel_campaign_id', $campaignId)
+            ->where('action', $data['action'])
+            ->whereIn('status', ['pending', 'queued', 'running'])
+            ->exists();
+        if ($duplicate) {
+            return response()->json(['status' => 'error', 'message' => 'Sudah ada jadwal aktif untuk campaign dan aksi ini.'], 422);
+        }
+
+        $schedule = AdsCampaignSchedule::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => $campaignId,
+            'action' => $data['action'],
+            'scheduled_at' => $scheduledAt,
+            'status' => 'pending',
+            'created_by' => $request->user()?->id,
+            'meta' => [
+                'daily_budget' => $data['action'] === 'budget' ? (float) $data['daily_budget'] : null,
+                'campaign_name' => \App\Models\MarketplaceAdCampaign::query()
+                    ->where('store_id', $store->id)
+                    ->where('channel_campaign_id', $campaignId)
+                    ->value('campaign_name'),
+            ],
+        ]);
+
+        $message = match ($data['action']) {
+            'pause' => 'jeda',
+            'resume' => 'lanjut',
+            'budget' => 'modal harian',
+        };
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Jadwal ' . $message . ' berhasil dibuat.',
+            'schedule_id' => $schedule->id,
+        ]);
+    }
+
+    public function cancelCampaignSchedule(AdsCampaignSchedule $schedule): JsonResponse
+    {
+        if (! in_array($schedule->status, ['pending', 'queued'], true)) {
+            return response()->json(['status' => 'error', 'message' => 'Jadwal sudah diproses dan tidak dapat dibatalkan.'], 422);
+        }
+
+        $schedule->update(['status' => 'cancelled']);
+
+        return response()->json(['status' => 'success', 'message' => 'Jadwal berhasil dibatalkan.']);
     }
 
     public function campaignHourly(Request $request, AdsActionService $actions, ShopeeAdsApiService $adsApi)

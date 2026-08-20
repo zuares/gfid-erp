@@ -16,6 +16,7 @@
     $lastSuccessRun = $lastSuccessRun ?? null;
     $insightTraffic = $insightTraffic ?? collect();
     $campaigns = $campaigns ?? collect();
+    $campaignSchedules = collect($campaignSchedules ?? []);
     $adsSetting = $adsSetting ?? (object)[];
     $metrics = $metrics ?? [];
     $heatmapInternalItems = collect($campaigns)->filter(function ($campaign) {
@@ -3248,31 +3249,109 @@ document.addEventListener('DOMContentLoaded', function() {
 
         <!-- TAB CONTROL PANEL -->
         <div class="tab-pane" id="tab-control">
+            @php
+                $controlRowsData = collect($campaigns);
+                $controlSpend = (float) $controlRowsData->sum(fn ($campaign) => (float) ($campaign->spend ?? 0)) * 1.11;
+                $controlGmv = (float) $controlRowsData->sum(fn ($campaign) => (float) ($campaign->gmv ?? 0));
+                $controlOrders = (int) $controlRowsData->sum(fn ($campaign) => (int) ($campaign->orders ?? 0));
+                $controlRoas = $controlSpend > 0 ? $controlGmv / $controlSpend : 0;
+                $controlProfit = $controlRowsData->sum(fn ($campaign) => (float) ($campaign->profit_after_ads ?? 0));
+            @endphp
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-toggles text-primary"></i> Control Panel Campaign</div>
-                        <div class="ads-tab-panel-note">Atur target ROAS, modal harian, jeda, atau hentikan campaign langsung dari dashboard.</div>
+                        <div class="ads-tab-panel-title">
+                            <i class="bi bi-toggles text-primary"></i> Control Panel Campaign
+                            <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" title="Atur target ROAS, modal harian, status, dan jadwal campaign dari panel ini."></i>
+                        </div>
+                        <div class="ads-tab-panel-note">Performa mengikuti periode aktif: {{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }} – {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}</div>
                     </div>
-                    <span class="badge rounded-pill text-bg-light" style="font-size:.65rem;">{{ $campaigns->count() }} campaign</span>
+                    <span class="badge rounded-pill text-bg-light" style="font-size:.65rem;" title="Jumlah campaign yang tersedia untuk dikontrol">{{ $campaigns->count() }} campaign</span>
                 </div>
                 <div class="p-3">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="Total biaya iklan periode aktif, termasuk PPN 11%.">
+                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-wallet2 me-1"></i>Biaya iklan</div>
+                                <div style="font-size:.84rem;font-weight:850;">Rp {{ number_format($controlSpend, 0, ',', '.') }}</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="Total GMV campaign pada periode aktif.">
+                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-receipt me-1"></i>GMV</div>
+                                <div style="font-size:.84rem;font-weight:850;">Rp {{ number_format($controlGmv, 0, ',', '.') }}</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="ROAS aktual = GMV dibagi biaya iklan termasuk PPN.">
+                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-bullseye me-1"></i>ROAS</div>
+                                <div style="font-size:.84rem;font-weight:850;">{{ number_format($controlRoas, 2, ',', '.') }}x</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="Orders dan net profit campaign pada periode aktif.">
+                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-cart-check me-1"></i>Orders · Profit</div>
+                                <div style="font-size:.84rem;font-weight:850;">{{ number_format($controlOrders, 0, ',', '.') }} · Rp {{ number_format($controlProfit, 0, ',', '.') }}</div>
+                            </div>
+                        </div>
+                    </div>
                     @if($storeId === 'all')
                         <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.72rem; border-radius:10px;">
                             <i class="bi bi-info-circle me-1"></i> Aksi tetap dikirim ke toko pada baris campaign. Pastikan campaign dan tokonya benar sebelum menyimpan.
                         </div>
                     @endif
+                    @if($campaignSchedules->isNotEmpty())
+                        <div class="dpanel mb-3 p-2" style="border:1px solid var(--dsh-border); border-radius:10px;">
+                            <div style="font-size:.7rem;font-weight:800;margin-bottom:.35rem;"><i class="bi bi-calendar2-week text-primary me-1"></i> Jadwal aktif</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0" style="font-size:.66rem;">
+                                    <thead><tr><th>Campaign</th><th>Toko</th><th>Aksi</th><th>Waktu</th><th>Status</th><th></th></tr></thead>
+                                    <tbody>
+                                        @foreach($campaignSchedules as $schedule)
+                                            <tr>
+                                                <td class="fw-semibold">{{ data_get($schedule->meta, 'campaign_name') ?: $schedule->channel_campaign_id }}</td>
+                                                <td>{{ $schedule->store?->name ?? 'Toko #' . $schedule->store_id }}</td>
+                                                <td>
+                                                    @if($schedule->action === 'budget')
+                                                        @php($scheduledBudget = (float) data_get($schedule->meta, 'daily_budget', 0))
+                                                        Modal {{ $scheduledBudget > 0 ? number_format($scheduledBudget, 0, ',', '.') : 'Unlimited' }}
+                                                    @else
+                                                        {{ $schedule->action === 'pause' ? 'Jeda' : 'Lanjut' }}
+                                                    @endif
+                                                </td>
+                                                <td>{{ $schedule->scheduled_at?->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
+                                                <td>
+                                                    <span class="badge rounded-pill" style="font-size:.58rem;background:{{ $schedule->status === 'failed' ? '#fee2e2' : '#eff6ff' }};color:{{ $schedule->status === 'failed' ? '#b91c1c' : '#1d4ed8' }};">
+                                                        {{ match($schedule->status) { 'pending' => 'Menunggu', 'queued' => 'Diantrekan', 'running' => 'Diproses', 'failed' => 'Gagal', default => ucfirst($schedule->status) } }}
+                                                    </span>
+                                                    @if($schedule->status === 'failed' && $schedule->error_message)
+                                                        <span title="{{ $schedule->error_message }}" style="cursor:help;color:#b91c1c;"><i class="bi bi-info-circle"></i></span>
+                                                    @endif
+                                                </td>
+                                                <td class="text-end">
+                                                    @if(in_array($schedule->status, ['pending', 'queued'], true))
+                                                        <button type="button" class="btn btn-sm btn-link text-danger p-0" data-schedule-cancel="{{ $schedule->id }}" title="Batalkan jadwal"><i class="bi bi-x-circle"></i></button>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
                     <div class="table-responsive">
-                        <table class="dpanel-table dpanel-table-sm align-middle" style="min-width:980px;">
+                        <table class="dpanel-table dpanel-table-sm align-middle" style="min-width:1510px;">
                             <thead>
                                 <tr>
                                     <th>Campaign</th>
                                     <th>Toko</th>
                                     <th>Jenis</th>
                                     <th>Status</th>
+                                    <th style="min-width:240px;" title="Metrik campaign berdasarkan periode aktif">Performa periode</th>
                                     <th style="min-width:145px;">Target ROAS</th>
                                     <th style="min-width:170px;">Modal Harian</th>
-                                    <th style="min-width:230px;">Aksi</th>
+                                    <th style="min-width:480px;">Aksi &amp; Jadwal</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3282,6 +3361,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                         $controlIsGms = str_starts_with($controlId, 'GMS-') || ($controlCampaign->ad_type ?? null) === 'auto';
                                         $controlStatus = strtolower((string) ($controlCampaign->campaign_status ?? 'ongoing'));
                                         $controlType = $controlIsGms ? 'GMV Max' : 'Regular';
+                                        $controlCampaignSpend = (float) ($controlCampaign->spend ?? 0) * 1.11;
+                                        $controlCampaignGmv = (float) ($controlCampaign->gmv ?? 0);
+                                        $controlCampaignOrders = (int) ($controlCampaign->orders ?? 0);
+                                        $controlCampaignRoas = $controlCampaignSpend > 0 ? $controlCampaignGmv / $controlCampaignSpend : 0;
+                                        $controlCampaignProfit = $controlCampaign->profit_after_ads;
                                     @endphp
                                     <tr data-control-row
                                         data-store-id="{{ $controlCampaign->store_id }}"
@@ -3300,32 +3384,51 @@ document.addEventListener('DOMContentLoaded', function() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="text" data-control-roas class="form-control" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" style="font-size:.7rem; min-width:85px;">
-                                                <button type="button" class="btn btn-outline-primary" data-control-action="roas" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
+                                            <div class="d-flex gap-2 flex-wrap" style="font-size:.64rem;line-height:1.25;">
+                                                <span title="Biaya iklan termasuk PPN 11%">Iklan <b>Rp {{ number_format($controlCampaignSpend, 0, ',', '.') }}</b></span>
+                                                <span title="GMV periode aktif">GMV <b>Rp {{ number_format($controlCampaignGmv, 0, ',', '.') }}</b></span>
+                                                <span title="ROAS aktual periode aktif">ROAS <b>{{ number_format($controlCampaignRoas, 2, ',', '.') }}x</b></span>
+                                                <span title="Jumlah pesanan periode aktif">Order <b>{{ number_format($controlCampaignOrders, 0, ',', '.') }}</b></span>
+                                                <span title="Net profit setelah biaya iklan termasuk PPN">Profit <b class="{{ $controlCampaignProfit !== null && $controlCampaignProfit < 0 ? 'text-danger' : 'text-success' }}">Rp {{ number_format((float) ($controlCampaignProfit ?? 0), 0, ',', '.') }}</b></span>
                                             </div>
                                         </td>
                                         <td>
                                             <div class="input-group input-group-sm">
-                                                <input type="text" data-control-budget class="form-control" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" style="font-size:.7rem; min-width:105px;">
-                                                <button type="button" class="btn btn-outline-primary" data-control-action="budget" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
+                                                <input type="text" data-control-roas class="form-control" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" style="font-size:.7rem; min-width:85px;" title="Target ROAS: isi 0 untuk Auto">
+                                                <button type="button" class="btn btn-outline-primary" data-control-action="roas" data-bs-toggle="tooltip" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" data-control-budget class="form-control" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" style="font-size:.7rem; min-width:105px;" title="Modal harian: isi 0 atau kosong untuk Unlimited">
+                                                <button type="button" class="btn btn-outline-primary" data-control-action="budget" data-bs-toggle="tooltip" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
                                             </div>
                                         </td>
                                         <td>
                                             <div class="d-flex gap-1 flex-wrap">
                                                 @if($controlStatus === 'ongoing')
-                                                    <button type="button" class="btn btn-sm btn-outline-warning" data-control-action="pause"><i class="bi bi-pause-fill"></i> Jeda</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-warning" data-control-action="pause" data-bs-toggle="tooltip" title="Jeda campaign sekarang"><i class="bi bi-pause-fill"></i> Jeda</button>
                                                 @elseif($controlStatus === 'paused')
-                                                    <button type="button" class="btn btn-sm btn-outline-success" data-control-action="resume"><i class="bi bi-play-fill"></i> Lanjut</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-success" data-control-action="resume" data-bs-toggle="tooltip" title="Lanjutkan campaign sekarang"><i class="bi bi-play-fill"></i> Lanjut</button>
                                                 @endif
                                                 @if(!in_array($controlStatus, ['closed', 'ended'], true))
-                                                    <button type="button" class="btn btn-sm btn-outline-danger" data-control-action="stop"><i class="bi bi-stop-fill"></i> Hentikan</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" data-control-action="stop" data-bs-toggle="tooltip" title="Hentikan campaign hari ini"><i class="bi bi-stop-fill"></i> Hentikan</button>
+                                                @endif
+                                                @if(!in_array($controlStatus, ['closed', 'ended'], true))
+                                                    <select data-control-schedule-action class="form-select form-select-sm" style="width:92px;font-size:.64rem;" title="Pilih aksi yang dijadwalkan">
+                                                        <option value="pause">Jeda</option>
+                                                        <option value="resume">Lanjut</option>
+                                                        <option value="budget">Modal</option>
+                                                    </select>
+                                                    <input type="text" data-control-schedule-budget class="form-control form-control-sm" inputmode="numeric" placeholder="0 = Unlimited" style="display:none;width:125px;font-size:.64rem;">
+                                                    <input type="datetime-local" data-control-schedule-at min="{{ now()->format('Y-m-d\TH:i') }}" class="form-control form-control-sm" style="width:165px;font-size:.64rem;" title="Pilih waktu eksekusi">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" data-control-action="schedule" data-bs-toggle="tooltip" title="Simpan jadwal"><i class="bi bi-calendar-plus"></i></button>
                                                 @endif
                                             </div>
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="7" class="text-center py-4" style="font-size:.75rem;color:var(--dsh-muted);">Belum ada campaign yang bisa dikontrol.</td></tr>
+                                    <tr><td colspan="8" class="text-center py-4" style="font-size:.75rem;color:var(--dsh-muted);">Belum ada campaign yang bisa dikontrol.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -3938,6 +4041,8 @@ window.AdsDashboardRoutes = {
     cpcCampaignEdit: @json(route('marketplace.ads.cpc.campaign.edit')),
     gmsItemAction: @json(route('marketplace.ads.gms.action')),
     gmsCampaignEdit: @json(route('marketplace.ads.gms.campaign.edit')),
+    campaignSchedule: @json(route('marketplace.ads.campaign.schedule')),
+    campaignScheduleCancel: @json(route('marketplace.ads.campaign.schedule.cancel', ['schedule' => '__SCHEDULE_ID__'])),
     historicalComparison: @json(route('marketplace.ads.historical.comparison')),
     campaignHourly: @json(route('marketplace.ads.campaign.hourly')),
     clear: @json(route('marketplace.ads.clear')),
@@ -3953,6 +4058,12 @@ window.AdsDashboardRoutes = {
 document.addEventListener('DOMContentLoaded', function () {
     const controlRows = document.querySelectorAll('[data-control-row]');
     if (!controlRows.length) return;
+
+    if (window.bootstrap?.Tooltip) {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
+            window.bootstrap.Tooltip.getOrCreateInstance(element, { boundary: 'viewport' });
+        });
+    }
 
     const parseControlNumber = (value, kind) => {
         let raw = String(value ?? '').trim().replace(/\s/g, '');
@@ -3980,13 +4091,25 @@ document.addEventListener('DOMContentLoaded', function () {
         const storeId = row.dataset.storeId;
         const campaignId = row.dataset.campaignId;
         const isGms = kind === 'gms';
-        const endpoint = isGms ? window.AdsDashboardRoutes.gmsCampaignEdit : window.AdsDashboardRoutes.cpcCampaignEdit;
+        let endpoint = isGms ? window.AdsDashboardRoutes.gmsCampaignEdit : window.AdsDashboardRoutes.cpcCampaignEdit;
         const payload = {
             store_id: storeId,
             campaign_id: campaignId,
         };
 
-        if (action === 'roas') {
+        if (action === 'schedule') {
+            endpoint = window.AdsDashboardRoutes.campaignSchedule;
+            const scheduledAt = row.querySelector('[data-control-schedule-at]')?.value || '';
+            const scheduleAction = row.querySelector('[data-control-schedule-action]')?.value || '';
+            if (!scheduledAt) return controlFeedback('Waktu jadwal belum dipilih', 'Pilih tanggal dan jam untuk aksi campaign.', 'warning');
+            payload.action = scheduleAction;
+            payload.scheduled_at = scheduledAt;
+            if (scheduleAction === 'budget') {
+                const budget = parseControlNumber(row.querySelector('[data-control-schedule-budget]')?.value, 'budget');
+                if (budget === null) return controlFeedback('Modal harian belum valid', 'Isi angka modal, gunakan 0 untuk Unlimited.', 'warning');
+                payload.daily_budget = budget;
+            }
+        } else if (action === 'roas') {
             const value = parseControlNumber(row.querySelector('[data-control-roas]')?.value, 'roas');
             if (value === null) return controlFeedback('Target ROAS belum valid', 'Isi angka ROAS, atau 0 untuk Auto.', 'warning');
             payload.roas_target = value;
@@ -4035,6 +4158,46 @@ document.addEventListener('DOMContentLoaded', function () {
     controlRows.forEach(row => {
         row.querySelectorAll('[data-control-action]').forEach(button => {
             button.addEventListener('click', () => runControlAction(button, button.dataset.controlAction));
+        });
+
+        const scheduleAction = row.querySelector('[data-control-schedule-action]');
+        const scheduleBudget = row.querySelector('[data-control-schedule-budget]');
+        const syncScheduleFields = () => {
+            if (!scheduleAction || !scheduleBudget) return;
+            scheduleBudget.style.display = scheduleAction.value === 'budget' ? '' : 'none';
+            if (scheduleAction.value !== 'budget') scheduleBudget.value = '';
+        };
+        scheduleAction?.addEventListener('change', syncScheduleFields);
+        syncScheduleFields();
+    });
+
+    document.querySelectorAll('[data-schedule-cancel]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const confirmed = window.Swal
+                ? await Swal.fire({ title: 'Batalkan jadwal?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Batalkan', cancelButtonText: 'Tutup' }).then(result => result.isConfirmed)
+                : window.confirm('Batalkan jadwal ini?');
+            if (!confirmed) return;
+
+            const scheduleId = button.dataset.scheduleCancel;
+            const endpoint = window.AdsDashboardRoutes.campaignScheduleCancel.replace('__SCHEDULE_ID__', scheduleId);
+            button.disabled = true;
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Jadwal gagal dibatalkan.');
+                await controlFeedback('Jadwal dibatalkan', data.message || '');
+                window.location.reload();
+            } catch (error) {
+                await controlFeedback('Gagal membatalkan jadwal', error.message, 'error');
+                button.disabled = false;
+            }
         });
     });
 });
