@@ -2267,8 +2267,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 <div class="p-3">
+                    <div id="hourlySummary" class="daily-trend-stats mb-3"></div>
                     <div style="position: relative; height: 250px;">
                         <canvas id="hourlyChart"></canvas>
+                    </div>
+                    <div id="insightTime" class="mb-3 p-2" style="border-left: 4px solid var(--dsh-border); background: var(--dsh-bg); border-radius: 4px;">
+                        <div style="color: var(--dsh-muted); font-size: .75rem;">Menganalisis jam terbaik...</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.72rem; font-weight:700; color:var(--dsh-muted); margin-bottom:.35rem;">Breakdown per jam</div>
+                        <div id="hourlyBreakdown" class="table-responsive"></div>
                     </div>
                 </div>
             </div>
@@ -3817,10 +3825,50 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + (parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER), 0);
     let totalHourlyGmv = hourlyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+    let totalHourlyClicks = hourlyData.reduce((sum, d) => sum + parseInt(d.clicks || 0), 0);
+    let totalHourlyOrders = hourlyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let totalHourlyRoas = totalHourlySpend > 0 ? (totalHourlyGmv / totalHourlySpend).toFixed(2) : "0.00";
     let hsEl = document.getElementById('hourlySummary');
     if(hsEl) {
-        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">Rp ${formatShortIDR(totalHourlyGmv)} GMV</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
+        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">Rp ${formatShortIDR(totalHourlyGmv)} GMV</span> &bull; <span style="color:#3b82f6">${totalHourlyOrders.toLocaleString('id-ID')} Orders</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
+    }
+
+    const hourlyMetricRows = hourlyData.map(d => {
+        const hour = parseInt(d.performance_hour || 0);
+        const spend = parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER;
+        const gmv = parseFloat(d.gmv || 0);
+        const clicks = parseInt(d.clicks || 0);
+        const orders = parseInt(d.orders || 0);
+        return {
+            hour,
+            label: String(hour).padStart(2, '0') + ':00–' + String((hour + 1) % 24).padStart(2, '0') + ':00',
+            spend,
+            gmv,
+            clicks,
+            orders,
+            roas: spend > 0 ? gmv / spend : 0,
+            cvr: clicks > 0 ? (orders / clicks) * 100 : 0,
+        };
+    });
+    const hourlyBreakdownEl = document.getElementById('hourlyBreakdown');
+    if (hourlyBreakdownEl) {
+        const breakdownRows = hourlyMetricRows
+            .filter(row => row.spend > 0 || row.gmv > 0 || row.clicks > 0 || row.orders > 0)
+            .sort((a, b) => (b.gmv - a.gmv) || (b.orders - a.orders) || (b.roas - a.roas))
+            .slice(0, 8);
+        hourlyBreakdownEl.innerHTML = breakdownRows.length
+            ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
+                <thead><tr><th>Jam</th><th class="text-end">Biaya</th><th class="text-end">GMV</th><th class="text-end">Orders</th><th class="text-end">CVR</th><th class="text-end">ROAS</th></tr></thead>
+                <tbody>${breakdownRows.map(row => `<tr>
+                    <td class="fw-bold">${row.label}</td>
+                    <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
+                    <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
+                    <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
+                    <td class="text-end">${row.cvr.toFixed(2)}%</td>
+                    <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
+                </tr>`).join('')}</tbody>
+            </table>`
+            : '<div style="font-size:.72rem; color:var(--dsh-muted); padding:.6rem 0;">Belum ada aktivitas per jam pada periode ini.</div>';
     }
 
     let totalDailyImpressions = dailyData.reduce((sum, d) => sum + parseInt(d.impressions || 0), 0);
@@ -4167,6 +4215,17 @@ document.addEventListener("DOMContentLoaded", function() {
                                 } else {
                                     return label + formatFullIDR(context.parsed.y);
                                 }
+                            },
+                            afterBody: function(items) {
+                                const row = hourlyMetricRows[items[0]?.dataIndex];
+                                if (!row) return [];
+                                return [
+                                    'Breakdown ' + row.label,
+                                    'Klik: ' + row.clicks.toLocaleString('id-ID'),
+                                    'Orders: ' + row.orders.toLocaleString('id-ID'),
+                                    'CVR: ' + row.cvr.toFixed(2) + '%',
+                                    'ROAS: ' + row.roas.toFixed(2) + 'x',
+                                ];
                             }
                         }
                     }
