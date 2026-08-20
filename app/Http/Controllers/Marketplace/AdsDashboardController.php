@@ -410,7 +410,10 @@ class AdsDashboardController extends Controller
         $request->validate([
             'store_id' => 'required|exists:stores,id',
             'item_id' => 'required|numeric',
-            'action' => 'required|in:add,remove'
+            'action' => 'required|in:add,remove',
+            'period_from' => 'nullable|date_format:Y-m-d',
+            'period_to' => 'nullable|date_format:Y-m-d',
+            'confirm_existing_ads' => 'nullable|boolean',
         ]);
 
         $store = Store::find($request->input('store_id'));
@@ -418,8 +421,26 @@ class AdsDashboardController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Store not found.'], 404);
         }
 
+        $periodFrom = $request->filled('period_from')
+            ? Carbon::parse($request->input('period_from'))->startOfDay()
+            : now()->startOfDay();
+        $periodTo = $request->filled('period_to')
+            ? Carbon::parse($request->input('period_to'))->endOfDay()
+            : now()->endOfDay();
+        if ($periodFrom->gt($periodTo)) {
+            return response()->json(['status' => 'error', 'message' => 'Periode iklan tidak valid.'], 422);
+        }
+
         try {
-            $result = $actions->actionGmsItem($store, (int) $request->input('item_id'), $request->input('action'), $shopeeChannel);
+            $result = $actions->actionGmsItem(
+                $store,
+                (int) $request->input('item_id'),
+                $request->input('action'),
+                $shopeeChannel,
+                $periodFrom,
+                $periodTo,
+                $request->boolean('confirm_existing_ads'),
+            );
             return response()->json(Arr::except($result, ['http_status']), $result['http_status'] ?? 200);
         } catch (\Exception $e) {
             return response()->json([

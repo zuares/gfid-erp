@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Ads;
 use App\Models\MarketplaceAdCampaign;
 use App\Models\Store;
 use App\Services\Channels\Shopee\ShopeeChannel;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class AdsActionService
@@ -25,8 +26,71 @@ class AdsActionService
         ];
     }
 
-    public function actionGmsItem(Store $store, int $itemId, string $action, ShopeeChannel $shopeeChannel): array
+    public function actionGmsItem(
+        Store $store,
+        int $itemId,
+        string $action,
+        ShopeeChannel $shopeeChannel,
+        ?Carbon $periodFrom = null,
+        ?Carbon $periodTo = null,
+        bool $confirmExistingAds = false,
+    ): array
     {
+        if ($action === 'add') {
+            $periodFrom ??= now()->startOfDay();
+            $periodTo ??= now()->endOfDay();
+
+            $activeRegularAds = MarketplaceAdCampaign::query()
+                ->where('store_id', $store->id)
+                ->where('channel_item_id', $itemId)
+                ->where(function ($query) {
+                    $query->whereNull('ad_type')
+                        ->orWhereNotIn('ad_type', ['auto', 'gms', 'gmv_max']);
+                })
+                ->where(function ($query) {
+                    $query->whereIn('campaign_status', ['ongoing', 'normal'])
+                        ->orWhere(function ($fallback) {
+                            $fallback->whereNull('campaign_status')
+                                ->whereIn('status', ['ongoing', 'normal', 'ONGOING', 'NORMAL']);
+                        });
+                })
+                ->where(function ($query) use ($periodTo) {
+                    $query->whereNull('started_at')
+                        ->orWhere('started_at', '<=', $periodTo);
+                })
+                ->where(function ($query) use ($periodFrom) {
+                    $query->whereNull('ended_at')
+                        ->orWhere('ended_at', '>=', $periodFrom);
+                })
+                ->get([
+                    'id',
+                    'channel_campaign_id',
+                    'campaign_name',
+                    'campaign_status',
+                    'status',
+                    'started_at',
+                    'ended_at',
+                ]);
+
+            if ($activeRegularAds->isNotEmpty() && ! $confirmExistingAds) {
+                return [
+                    'status' => 'warning',
+                    'code' => 'existing_regular_ads',
+                    'requires_confirmation' => true,
+                    'message' => 'Kamu memiliki Iklan yang sedang berlangsung untuk produk ini selama periode waktu yang sama. Mengaktifkan fitur GMV Max akan menjeda Iklan tersebut.',
+                    'campaigns' => $activeRegularAds->map(fn ($campaign) => [
+                        'id' => $campaign->id,
+                        'channel_campaign_id' => $campaign->channel_campaign_id,
+                        'name' => $campaign->campaign_name ?: 'Campaign ' . $campaign->channel_campaign_id,
+                        'status' => $campaign->campaign_status ?: $campaign->status,
+                        'started_at' => $campaign->started_at?->toIso8601String(),
+                        'ended_at' => $campaign->ended_at?->toIso8601String(),
+                    ])->values()->all(),
+                    'http_status' => 409,
+                ];
+            }
+        }
+
         $res = $shopeeChannel->editGmsItemProductCampaign($store, $action, [$itemId]);
 
         if (! empty($res['error'])) {
