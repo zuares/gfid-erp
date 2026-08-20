@@ -329,8 +329,12 @@
     $overallPreviousSpend = $overallPreviousKpi !== null
         ? (float) ($overallPreviousKpi->spend ?? 0) * 1.11
         : $perfRows->sum('prev_spend');
+    $overallPreviousProfit = $overallPreviousKpi !== null
+        ? (float) ($overallPreviousKpi->net_profit ?? 0)
+        : $perfRows->sum('prev_profit');
     if ($overallCurrentKpi !== null) {
         $totalSpend = (float) ($overallCurrentKpi->spend ?? 0) * 1.11;
+        $totalProfit = (float) ($overallCurrentKpi->net_profit ?? 0);
     }
 
     $scatterDataJson = json_encode($perfRows->map(function($r) {
@@ -463,12 +467,12 @@
     </div>
     <div class="col-6 col-md-3">
         <div class="dpanel p-3 h-100">
-            <div class="text-muted small fw-bold text-uppercase mb-1" data-bs-toggle="tooltip" title="Profit hanya dijumlahkan untuk campaign yang memiliki HPP">Net Profit Terhitung</div>
+            <div class="text-muted small fw-bold text-uppercase mb-1" data-bs-toggle="tooltip" title="Pendapatan bersih dikurangi HPP dan biaya iklan setelah PPN 11%">Net Profit Terhitung</div>
             <div class="fs-4 fw-bolder {{ $profitUnknownCount > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">
                 Rp {{ number_format($totalProfit, 0, ',', '.') }}
             </div>
             <div class="small text-muted mt-1">POAS: {{ number_format($totalSpend > 0 ? $totalProfit / $totalSpend : 0, 2) }}x · Profit/order: Rp {{ number_format($totalOrders > 0 ? $totalProfit / $totalOrders : 0, 0, ',', '.') }} · {{ $profitUnknownCount }} belum ada HPP</div>
-            <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfRows->sum('prev_profit'), 0, ',', '.') }} {!! $fmtDelta($totalProfit, $perfRows->sum('prev_profit'), true) !!}</div>
+            <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($overallPreviousProfit, 0, ',', '.') }} {!! $fmtDelta($totalProfit, $overallPreviousProfit, true) !!}</div>
         </div>
     </div>
 </div>
