@@ -18,6 +18,24 @@
     $campaigns = $campaigns ?? collect();
     $adsSetting = $adsSetting ?? (object)[];
     $metrics = $metrics ?? [];
+
+    $analysisCurrentPeriod = collect($historicalData)->get(0, []);
+    $analysisPreviousPeriod = collect($historicalData)->get(1, []);
+    $formatAnalysisDate = function ($date) {
+        if (!$date) {
+            return '-';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($date)->format('d/m/Y');
+        } catch (\Throwable) {
+            return (string) $date;
+        }
+    };
+    $analysisCurrentRange = $formatAnalysisDate(data_get($analysisCurrentPeriod, 'start', $dateFrom ?? null))
+        . ' – ' . $formatAnalysisDate(data_get($analysisCurrentPeriod, 'end', $dateTo ?? null));
+    $analysisPreviousRange = $formatAnalysisDate(data_get($analysisPreviousPeriod, 'start'))
+        . ' – ' . $formatAnalysisDate(data_get($analysisPreviousPeriod, 'end'));
     
     // Default JS empty arrays just in case they are used in scripts without ??
     $dailyChartDataJson = json_encode($dailyChartData);
@@ -2224,7 +2242,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div class="dpanel p-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div style="font-size: .72rem; color: var(--dsh-muted);">Ringkas perubahan antar periode.</div>
+                            <div>
+                                <div style="font-size: .72rem; color: var(--dsh-muted);">Ringkas perubahan antar periode.</div>
+                                <div id="histPeriodLabel" style="display:flex; flex-wrap:wrap; align-items:center; gap:.3rem; margin-top:.35rem; font-size:.64rem; color:var(--dsh-muted);">
+                                    <span class="badge bg-primary-subtle text-primary border">Aktif: {{ $analysisCurrentRange }}</span>
+                                    <span>vs</span>
+                                    <span class="badge bg-light text-dark border">Pembanding: {{ $analysisPreviousRange }}</span>
+                                </div>
+                            </div>
                             <div id="histSummary" style="font-size: .78rem; font-weight: 700; color: var(--text); text-align: right;"></div>
                         </div>
                         <div style="position: relative; height: 320px;">
@@ -4623,10 +4648,30 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
                 if (maxDays < 1) maxDays = 1;
                 
-                // Generate X-Axis: "Hari 1", "Hari 2", etc.
+                const formatHistDate = (value, withYear = false) => {
+                    const date = parseLocalDate(value);
+                    if (!date) return '-';
+                    return date.toLocaleDateString('id-ID', withYear
+                        ? { day: '2-digit', month: 'short', year: 'numeric' }
+                        : { day: '2-digit', month: 'short' });
+                };
+                const formatHistRange = (period) => {
+                    if (!period || !period.start || !period.end) return '-';
+                    return formatHistDate(period.start, true) + ' – ' + formatHistDate(period.end, true);
+                };
+                const histPeriodLabel = document.getElementById('histPeriodLabel');
+                if (histPeriodLabel && rawHistorical.length > 0) {
+                    histPeriodLabel.innerHTML = '<span class="badge bg-primary-subtle text-primary border">Aktif: ' + formatHistRange(rawHistorical[0]) + '</span>'
+                        + '<span>vs</span>'
+                        + '<span class="badge bg-light text-dark border">Pembanding: ' + formatHistRange(rawHistorical[1]) + '</span>';
+                }
+
+                // Generate X-Axis dengan tanggal aktual periode aktif.
                 let histLabels = [];
                 for (let i = 1; i <= maxDays; i++) {
-                    histLabels.push(`Hari ${i}`);
+                    const axisDate = new Date(dStartHist);
+                    axisDate.setDate(axisDate.getDate() + i - 1);
+                    histLabels.push(formatHistDate(axisDate));
                 }
 
                 // Colors for periods
@@ -4805,7 +4850,9 @@ document.addEventListener("DOMContentLoaded", function() {
                         };
 
                         let isAvg = (metric === 'roas' || metric === 'cvr' || metric === 'ctr');
-                        html += `<div style="margin-bottom:2px;">Sekarang: <span style="color:var(--dsh-accent)">${isAvg ? 'Rata-rata' : 'Total'} ${formatVal(isAvg ? currAvg : currSum)}</span></div>`;
+                        const currentRange = formatHistRange(rawHistorical[0]);
+                        const previousRange = formatHistRange(rawHistorical[1]);
+                        html += `<div style="margin-bottom:2px;">Aktif <span style="font-size:.68rem;color:var(--dsh-muted);">(${currentRange})</span>: <span style="color:var(--dsh-accent)">${isAvg ? 'Rata-rata' : 'Total'} ${formatVal(isAvg ? currAvg : currSum)}</span></div>`;
                         if (datasets.length > 1) {
                             let diff = 0;
                             let compareVal1 = isAvg ? currAvg : currSum;
@@ -4820,7 +4867,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             }
                             let sign = diff > 0 ? '+' : '';
 
-                            html += `<div style="font-size:0.75rem; color:var(--dsh-muted)">Sebelumnya: ${formatVal(isAvg ? prevAvg : prevSum)} 
+                            html += `<div style="font-size:0.75rem; color:var(--dsh-muted)">Pembanding <span style="font-size:.68rem;">(${previousRange})</span>: ${formatVal(isAvg ? prevAvg : prevSum)}
                                      <span style="color:${color}; font-weight:bold; margin-left:5px;">(${sign}${diff.toFixed(1)}%)</span></div>`;
                         }
                         
