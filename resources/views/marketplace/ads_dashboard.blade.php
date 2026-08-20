@@ -3863,25 +3863,63 @@ document.addEventListener("DOMContentLoaded", function() {
     });
     const hourlyBreakdownEl = document.getElementById('hourlyBreakdown');
     if (hourlyBreakdownEl) {
-        const breakdownRows = hourlyMetricRows
-            .filter(row => row.spend > 0 || row.gmv > 0 || row.impressions > 0 || row.clicks > 0 || row.orders > 0)
-            .sort((a, b) => (b.cvr - a.cvr) || (b.clicks - a.clicks) || (b.orders - a.orders) || (b.roas - a.roas))
-            .slice(0, 8);
-        hourlyBreakdownEl.innerHTML = breakdownRows.length
-            ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
-                <thead><tr><th>Jam</th><th class="text-end">Impresi</th><th class="text-end">Klik</th><th class="text-end">CVR</th><th class="text-end">Orders</th><th class="text-end">Biaya</th><th class="text-end">GMV</th><th class="text-end">ROAS</th></tr></thead>
-                <tbody>${breakdownRows.map((row, index) => `<tr${index === 0 ? ' style="background:rgba(245, 158, 11, 0.08);"' : ''}>
-                    <td class="fw-bold">${index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="CVR tertinggi"></i>' : ''}${row.label}</td>
-                    <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
-                    <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
-                    <td class="text-end fw-bold">${row.cvr.toFixed(2)}%</td>
-                    <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
-                    <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
-                    <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
-                    <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
-                </tr>`).join('')}</tbody>
-            </table>`
-            : '<div style="font-size:.72rem; color:var(--dsh-muted); padding:.6rem 0;">Belum ada aktivitas per jam pada periode ini.</div>';
+        let hourlySortKey = 'cvr';
+        let hourlySortDirection = 'desc';
+        const sortableHeader = (key, label, className = '') => {
+            const active = hourlySortKey === key;
+            const indicator = active ? (hourlySortDirection === 'asc' ? '↑' : '↓') : '↕';
+            return `<th class="${className}" data-hourly-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
+        };
+        const renderHourlyBreakdown = () => {
+            const breakdownRows = hourlyMetricRows
+                .filter(row => row.spend > 0 || row.gmv > 0 || row.impressions > 0 || row.clicks > 0 || row.orders > 0)
+                .sort((a, b) => {
+                    const aValue = a[hourlySortKey];
+                    const bValue = b[hourlySortKey];
+                    const comparison = typeof aValue === 'string'
+                        ? aValue.localeCompare(bValue)
+                        : aValue - bValue;
+                    return comparison * (hourlySortDirection === 'asc' ? 1 : -1);
+                })
+                .slice(0, 8);
+
+            hourlyBreakdownEl.innerHTML = breakdownRows.length
+                ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
+                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('roas', 'ROAS', 'text-end')}</tr></thead>
+                    <tbody>${breakdownRows.map((row, index) => `<tr${index === 0 ? ' style="background:rgba(245, 158, 11, 0.08);"' : ''}>
+                        <td class="fw-bold">${index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="Peringkat teratas"></i>' : ''}${row.label}</td>
+                        <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
+                        <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
+                        <td class="text-end fw-bold">${row.cvr.toFixed(2)}%</td>
+                        <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
+                        <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
+                        <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
+                        <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
+                    </tr>`).join('')}</tbody>
+                </table>`
+                : '<div style="font-size:.72rem; color:var(--dsh-muted); padding:.6rem 0;">Belum ada aktivitas per jam pada periode ini.</div>';
+
+            hourlyBreakdownEl.querySelectorAll('[data-hourly-sort]').forEach(header => {
+                const sortByHeader = () => {
+                    const nextKey = header.dataset.hourlySort;
+                    if (hourlySortKey === nextKey) {
+                        hourlySortDirection = hourlySortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        hourlySortKey = nextKey;
+                        hourlySortDirection = nextKey === 'hour' ? 'asc' : 'desc';
+                    }
+                    renderHourlyBreakdown();
+                };
+                header.addEventListener('click', sortByHeader);
+                header.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        sortByHeader();
+                    }
+                });
+            });
+        };
+        renderHourlyBreakdown();
     }
 
     let totalDailyImpressions = dailyData.reduce((sum, d) => sum + parseInt(d.impressions || 0), 0);
