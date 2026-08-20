@@ -3777,7 +3777,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const hourlyData = [];
     for (let i = 0; i < 24; i++) {
         let found = rawHourly.find(d => parseInt(d.performance_hour) === i);
-        hourlyData.push(found ? found : { performance_hour: i, clicks: 0, orders: 0, expense: 0, gmv: 0 });
+        hourlyData.push(found ? found : { performance_hour: i, impressions: 0, clicks: 0, orders: 0, expense: 0, gmv: 0 });
     }
     
     // Theme & UX Colors
@@ -3826,12 +3826,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + (parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER), 0);
     let totalHourlyGmv = hourlyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+    let totalHourlyImpressions = hourlyData.reduce((sum, d) => sum + parseInt(d.impressions || 0), 0);
     let totalHourlyClicks = hourlyData.reduce((sum, d) => sum + parseInt(d.clicks || 0), 0);
     let totalHourlyOrders = hourlyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let totalHourlyRoas = totalHourlySpend > 0 ? (totalHourlyGmv / totalHourlySpend).toFixed(2) : "0.00";
     let hsEl = document.getElementById('hourlySummary');
     if(hsEl) {
-        hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">Rp ${formatShortIDR(totalHourlyGmv)} GMV</span> &bull; <span style="color:#3b82f6">${totalHourlyOrders.toLocaleString('id-ID')} Orders</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
+        hsEl.innerHTML = `<span style="color:#f59e0b">${totalHourlyImpressions.toLocaleString('id-ID')} Impresi</span> &bull; <span style="color:#3b82f6">${totalHourlyClicks.toLocaleString('id-ID')} Klik</span> &bull; <span style="color:#10b981">${totalHourlyOrders.toLocaleString('id-ID')} Orders</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
     }
     const hourlyDataNotice = document.getElementById('hourlyDataNotice');
     if (hourlyDataNotice && rawHourly.length === 0) {
@@ -3845,6 +3846,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const hour = parseInt(d.performance_hour || 0);
         const spend = parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER;
         const gmv = parseFloat(d.gmv || 0);
+        const impressions = parseInt(d.impressions || 0);
         const clicks = parseInt(d.clicks || 0);
         const orders = parseInt(d.orders || 0);
         return {
@@ -3852,6 +3854,7 @@ document.addEventListener("DOMContentLoaded", function() {
             label: String(hour).padStart(2, '0') + ':00–' + String((hour + 1) % 24).padStart(2, '0') + ':00',
             spend,
             gmv,
+            impressions,
             clicks,
             orders,
             roas: spend > 0 ? gmv / spend : 0,
@@ -3861,14 +3864,16 @@ document.addEventListener("DOMContentLoaded", function() {
     const hourlyBreakdownEl = document.getElementById('hourlyBreakdown');
     if (hourlyBreakdownEl) {
         const breakdownRows = hourlyMetricRows
-            .filter(row => row.spend > 0 || row.gmv > 0 || row.clicks > 0 || row.orders > 0)
+            .filter(row => row.spend > 0 || row.gmv > 0 || row.impressions > 0 || row.clicks > 0 || row.orders > 0)
             .sort((a, b) => (b.gmv - a.gmv) || (b.orders - a.orders) || (b.roas - a.roas))
             .slice(0, 8);
         hourlyBreakdownEl.innerHTML = breakdownRows.length
             ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
-                <thead><tr><th>Jam</th><th class="text-end">Biaya</th><th class="text-end">GMV</th><th class="text-end">Orders</th><th class="text-end">CVR</th><th class="text-end">ROAS</th></tr></thead>
+                <thead><tr><th>Jam</th><th class="text-end">Impresi</th><th class="text-end">Klik</th><th class="text-end">Biaya</th><th class="text-end">GMV</th><th class="text-end">Orders</th><th class="text-end">CVR</th><th class="text-end">ROAS</th></tr></thead>
                 <tbody>${breakdownRows.map(row => `<tr>
                     <td class="fw-bold">${row.label}</td>
+                    <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
+                    <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
                     <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                     <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
                     <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
@@ -4160,6 +4165,19 @@ document.addEventListener("DOMContentLoaded", function() {
                     },
                     {
                         type: 'line',
+                        label: 'Impresi (Jangkauan)',
+                        data: hourlyData.map(d => parseInt(d.impressions || 0)),
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y2'
+                    },
+                    {
+                        type: 'line',
                         label: 'ROAS',
                         data: hourlyData.map(d => {
                             let sp = parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER;
@@ -4229,6 +4247,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                 if (!row) return [];
                                 return [
                                     'Breakdown ' + row.label,
+                                    'Impresi: ' + row.impressions.toLocaleString('id-ID'),
                                     'Klik: ' + row.clicks.toLocaleString('id-ID'),
                                     'Orders: ' + row.orders.toLocaleString('id-ID'),
                                     'CVR: ' + row.cvr.toFixed(2) + '%',

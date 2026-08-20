@@ -123,12 +123,13 @@ class AdsAnalyticsService
         return MarketplaceAdsHourlyPerformance::whereIn('store_id', (array) $storeId)
             ->whereNull('campaign_id')
             ->whereBetween('performance_date', [$dateFrom, $dateTo])
-            ->select('performance_hour', DB::raw('SUM(expense) as expense'), DB::raw('SUM(broad_gmv) as gmv'), DB::raw('SUM(clicks) as clicks'), DB::raw('SUM(broad_order) as orders'))
+            ->select('performance_hour', DB::raw('SUM(impression) as impressions'), DB::raw('SUM(expense) as expense'), DB::raw('SUM(broad_gmv) as gmv'), DB::raw('SUM(clicks) as clicks'), DB::raw('SUM(broad_order) as orders'))
             ->groupBy('performance_hour')
             ->orderBy('performance_hour')
             ->get()
             ->map(fn ($row) => [
                 'performance_hour' => (int) $row->performance_hour,
+                'impressions'      => (int) $row->impressions,
                 'expense'          => (float) $row->expense,
                 'gmv'              => (float) $row->gmv,
                 'clicks'           => (int) $row->clicks,

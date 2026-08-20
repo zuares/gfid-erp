@@ -221,6 +221,33 @@ class AdsModuleTest extends TestCase
         $this->assertDatabaseHas('marketplace_ads_hourly_performances', ['impression' => 150]);
     }
 
+    public function test_hourly_heatmap_includes_impressions_and_clicks()
+    {
+        $store = $this->createStore('HOURLYMETRICS');
+
+        $performance = MarketplaceAdsHourlyPerformance::create([
+            'store_id' => $store->id,
+            'campaign_id' => null,
+            'channel_campaign_id' => '-',
+            'performance_date' => '2026-07-01',
+            'performance_hour' => 12,
+            'impression' => 150,
+            'clicks' => 15,
+            'expense' => 7000,
+            'broad_gmv' => 50000,
+            'broad_order' => 2,
+        ]);
+
+        $storedDate = $performance->getRawOriginal('performance_date');
+
+        $row = app(AdsAnalyticsService::class)
+            ->getHourlyHeatmap($store->id, $storedDate, $storedDate)
+            ->first();
+
+        $this->assertSame(150, $row['impressions']);
+        $this->assertSame(15, $row['clicks']);
+    }
+
     // 9. Data dua store tidak tercampur
     public function test_data_two_stores_not_mixed()
     {
