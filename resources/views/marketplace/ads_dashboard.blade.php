@@ -67,6 +67,36 @@ body {
     font-family: 'Inter', sans-serif !important;
 }
 
+.compare-mode-tabs {
+    display: inline-flex;
+    gap: .2rem;
+    padding: .2rem;
+    border: 1px solid var(--dsh-border);
+    border-radius: 9px;
+    background: var(--dsh-bg);
+}
+.compare-mode-tab {
+    border: 0;
+    border-radius: 7px;
+    padding: .32rem .55rem;
+    background: transparent;
+    color: var(--dsh-muted);
+    font-size: .65rem;
+    font-weight: 750;
+    white-space: nowrap;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.compare-mode-tab:hover,
+.compare-mode-tab.active {
+    color: var(--text);
+    background: var(--card-bg);
+    box-shadow: 0 1px 3px rgba(15,23,42,.12);
+}
+@media (max-width: 768px) {
+    .compare-mode-tabs { display: none; }
+    #compareModeSelect { display: block !important; min-width: 180px !important; }
+}
+
 .spin-icon { animation: spin 1.5s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
@@ -1640,9 +1670,35 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterForm = document.getElementById('filterForm');
     const compareModeSelect = document.getElementById('compareModeSelect');
     const compareModeHidden = document.getElementById('compareModeHidden');
-    compareModeSelect?.addEventListener('change', function () {
-        if (compareModeHidden) compareModeHidden.value = this.value;
+    const compareModeStatus = document.getElementById('compareModeStatus');
+    const compareModeTabs = document.getElementById('compareModeTabs');
+    const submitCompareMode = value => {
+        if (compareModeHidden) compareModeHidden.value = value;
+        if (compareModeSelect) compareModeSelect.value = value;
+        compareModeTabs?.querySelectorAll('[data-compare-mode]').forEach(tab => {
+            const active = tab.dataset.compareMode === value;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        if (compareModeStatus) compareModeStatus.style.display = 'inline-flex';
+        const summaryTable = document.getElementById('historicalSummaryTable');
+        if (summaryTable) summaryTable.style.opacity = '.45';
+        if (compareModeSelect) compareModeSelect.disabled = true;
+        compareModeTabs?.querySelectorAll('[data-compare-mode]').forEach(tab => { tab.disabled = true; });
+        window.__dashLoading?.();
         window.submitAdsFilters(filterForm);
+    };
+    compareModeSelect?.addEventListener('change', function () {
+        submitCompareMode(this.value);
+    });
+    compareModeTabs?.querySelectorAll('[data-compare-mode]').forEach(tab => {
+        tab.addEventListener('click', () => submitCompareMode(tab.dataset.compareMode));
+        tab.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                submitCompareMode(tab.dataset.compareMode);
+            }
+        });
     });
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
@@ -2241,11 +2297,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="ads-tab-panel-note">Perbandingan rentang saat ini vs sebelumnya.</div>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                        <select id="compareModeSelect" class="form-select form-select-sm" style="width:auto; min-width:145px; font-size:.68rem; border-radius:8px;">
-                            <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode sebelumnya</option>
+                        <label for="compareModeSelect" class="d-flex align-items-center gap-1 mb-0" style="font-size:.66rem; color:var(--dsh-muted); font-weight:700;">
+                            <i class="bi bi-arrow-left-right"></i> Bandingkan dengan
+                        </label>
+                        <div id="compareModeTabs" class="compare-mode-tabs" role="tablist" aria-label="Pilih periode pembanding">
+                            <button type="button" class="compare-mode-tab {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'active' : '' }}" data-compare-mode="prev_period" role="tab" aria-selected="{{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'true' : 'false' }}"><i class="bi bi-calendar2-week me-1"></i>Rentang</button>
+                            <button type="button" class="compare-mode-tab {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'active' : '' }}" data-compare-mode="prev_month" role="tab" aria-selected="{{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'true' : 'false' }}"><i class="bi bi-calendar2-month me-1"></i>Bulan</button>
+                            <button type="button" class="compare-mode-tab {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'active' : '' }}" data-compare-mode="prev_year" role="tab" aria-selected="{{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'true' : 'false' }}"><i class="bi bi-calendar3 me-1"></i>Tahun</button>
+                        </div>
+                        <select id="compareModeSelect" class="form-select form-select-sm" aria-label="Pilih periode pembanding" style="display:none; width:auto; min-width:190px; font-size:.68rem; border-radius:8px;">
+                            <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode sebelumnya (rentang sama)</option>
                             <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bulan sebelumnya</option>
                             <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Tahun sebelumnya</option>
                         </select>
+                        <span id="compareModeStatus" aria-live="polite" style="display:none; font-size:.64rem; color:var(--dsh-muted);"><i class="bi bi-arrow-repeat spin-icon"></i> Memuat...</span>
                     <div style="overflow-x:auto; scrollbar-width:none;">
                         <input type="hidden" id="histMetricSelect" value="roas">
                         <div class="dash-tabs-modern" id="histMetricChips" style="padding:.2rem;">
