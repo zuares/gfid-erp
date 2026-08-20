@@ -47,6 +47,9 @@
         . ' – ' . $formatAnalysisDate(data_get($analysisCurrentPeriod, 'end', $dateTo ?? null));
     $analysisPreviousRange = $formatAnalysisDate(data_get($analysisPreviousPeriod, 'start'))
         . ' – ' . $formatAnalysisDate(data_get($analysisPreviousPeriod, 'end'));
+    $analysisTwoPeriodsAgo = collect($historicalData)->get(2, []);
+    $analysisTwoPeriodsAgoRange = $formatAnalysisDate(data_get($analysisTwoPeriodsAgo, 'start'))
+        . ' – ' . $formatAnalysisDate(data_get($analysisTwoPeriodsAgo, 'end'));
     
     // Default JS empty arrays just in case they are used in scripts without ??
     $dailyChartDataJson = json_encode($dailyChartData);
@@ -1635,6 +1638,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const fromEl = document.getElementById('fromHidden');
     const toEl = document.getElementById('toHidden');
     const filterForm = document.getElementById('filterForm');
+    const compareModeSelect = document.getElementById('compareModeSelect');
+    const compareModeHidden = document.getElementById('compareModeHidden');
+    compareModeSelect?.addEventListener('change', function () {
+        if (compareModeHidden) compareModeHidden.value = this.value;
+        window.submitAdsFilters(filterForm);
+    });
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 
@@ -2122,6 +2131,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="text" id="rangePicker" placeholder="Pilih tanggal" readonly style="width:150px; border:none; background:transparent; font-size:.75rem; padding:0; font-weight:700; color:var(--text); cursor:pointer; box-shadow:none; outline:none;">
                 <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}" data-gf-date="off">
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}" data-gf-date="off">
+                <input type="hidden" name="compare_mode" id="compareModeHidden" value="{{ $compareMode ?? 'prev_period' }}">
             </div>
 
         </form>
@@ -2230,6 +2240,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="ads-tab-panel-title"><i class="bi bi-clock-history text-primary"></i> Komparasi</div>
                         <div class="ads-tab-panel-note">Perbandingan rentang saat ini vs sebelumnya.</div>
                     </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                        <select id="compareModeSelect" class="form-select form-select-sm" style="width:auto; min-width:145px; font-size:.68rem; border-radius:8px;">
+                            <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode sebelumnya</option>
+                            <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bulan sebelumnya</option>
+                            <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Tahun sebelumnya</option>
+                        </select>
                     <div style="overflow-x:auto; scrollbar-width:none;">
                         <input type="hidden" id="histMetricSelect" value="roas">
                         <div class="dash-tabs-modern" id="histMetricChips" style="padding:.2rem;">
@@ -2242,6 +2258,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
                             <button class="dash-tab-sm" data-val="profit"><i class="bi bi-cash-stack"></i> Profit</button>
                         </div>
+                    </div>
                     </div>
                 </div>
                 <div class="p-3 pt-0">
@@ -2259,6 +2276,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <span class="badge bg-primary-subtle text-primary border">Aktif: {{ $analysisCurrentRange }}</span>
                                     <span>vs</span>
                                     <span class="badge bg-light text-dark border">Pembanding: {{ $analysisPreviousRange }}</span>
+                                    <span>·</span>
+                                    <span class="badge bg-light text-dark border">2 lalu: {{ $analysisTwoPeriodsAgoRange }}</span>
                                 </div>
                             </div>
                             <div id="histSummary" style="font-size: .78rem; font-weight: 700; color: var(--text); text-align: right;"></div>
@@ -3878,6 +3897,7 @@ document.addEventListener("DOMContentLoaded", function() {
             clicks,
             orders,
             roas: spend > 0 ? gmv / spend : 0,
+            aov: orders > 0 ? gmv / orders : 0,
             ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
             cvr: clicks > 0 ? (orders / clicks) * 100 : 0,
             grossProfit: gmv - spend,
@@ -3947,7 +3967,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             hourlyBreakdownEl.innerHTML = breakdownRows.length
                 ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
-                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('ctr', 'CTR', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('grossProfit', 'Gross Profit', 'text-end')}${sortableHeader('roas', 'ROAS', 'text-end')}</tr></thead>
+                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('roas', 'ROAS', 'text-end')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('ctr', 'CTR', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('aov', 'AOV', 'text-end')}${sortableHeader('grossProfit', 'Gross Profit', 'text-end')}</tr></thead>
                     <tbody>${breakdownRows.map((row, index) => {
                         const isWorst = tableWorstHour && row.hour === tableWorstHour.hour;
                         const isLoss = row.grossProfit < 0;
@@ -3964,6 +3984,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         const grossProfitCellStyle = isBestGrossProfit ? ' style="background:rgba(22, 163, 74, 0.12);"' : '';
                         return `<tr${rowStyle} data-hour="${row.hour}" class="hourly-detail-row" role="button" tabindex="0" title="Klik untuk melihat item internal">
                         <td class="fw-bold">${rowIcon}${row.label}</td>
+                        <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
                         <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
                         <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
                         <td class="text-end"${ctrCellStyle}>${row.ctr.toFixed(2)}%</td>
@@ -3971,8 +3992,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
                         <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                         <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
+                        <td class="text-end">Rp ${formatShortIDR(row.aov)}</td>
                         <td class="text-end fw-bold ${isLoss ? 'text-danger' : 'text-success'}"${grossProfitCellStyle} title="${isLoss ? 'Gross Profit negatif' : 'Gross Profit positif'}">${row.grossProfit < 0 ? '−' : ''}Rp ${formatShortIDR(Math.abs(row.grossProfit))}</td>
-                        <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
                     </tr>`;
                     }).join('')}</tbody>
                 </table>`
@@ -4379,6 +4400,7 @@ document.addEventListener("DOMContentLoaded", function() {
                                     'Klik: ' + row.clicks.toLocaleString('id-ID'),
                                     'CTR: ' + row.ctr.toFixed(2) + '%',
                                     'Orders: ' + row.orders.toLocaleString('id-ID'),
+                                    'AOV: ' + formatFullIDR(row.aov),
                                     'Gross Profit: ' + formatFullIDR(row.grossProfit) + ' (sebelum HPP)',
                                     'CVR: ' + row.cvr.toFixed(2) + '%',
                                     'ROAS: ' + row.roas.toFixed(2) + 'x',
@@ -4879,7 +4901,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (histPeriodLabel && rawHistorical.length > 0) {
                     histPeriodLabel.innerHTML = '<span class="badge bg-primary-subtle text-primary border">Aktif: ' + formatHistRange(rawHistorical[0]) + '</span>'
                         + '<span>vs</span>'
-                        + '<span class="badge bg-light text-dark border">Pembanding: ' + formatHistRange(rawHistorical[1]) + '</span>';
+                        + '<span class="badge bg-light text-dark border">Pembanding: ' + formatHistRange(rawHistorical[1]) + '</span>'
+                        + (rawHistorical[2] ? '<span>·</span><span class="badge bg-light text-dark border">2 lalu: ' + formatHistRange(rawHistorical[2]) + '</span>' : '');
                 }
 
                 // Generate X-Axis dengan tanggal aktual periode aktif.
@@ -4963,6 +4986,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     };
                     const currentSummary = aggregateHistoricalPeriod(rawHistorical[0]);
                     const previousSummary = aggregateHistoricalPeriod(rawHistorical[1]);
+                    const twoPeriodsAgoSummary = aggregateHistoricalPeriod(rawHistorical[2]);
+                    const compareMode = @json($compareMode ?? 'prev_period');
+                    const previousLabel = compareMode === 'prev_month' ? '1 Bulan Lalu' : (compareMode === 'prev_year' ? '1 Tahun Lalu' : '1 Periode Lalu');
+                    const twoPeriodsAgoLabel = compareMode === 'prev_month' ? '2 Bulan Lalu' : (compareMode === 'prev_year' ? '2 Tahun Lalu' : '2 Periode Lalu');
                     const summaryRows = [
                         ['roas', 'ROAS', 'ratio'],
                         ['gmv', 'GMV', 'money'],
@@ -4992,22 +5019,30 @@ document.addEventListener("DOMContentLoaded", function() {
                         if (previous === 0 || current === previous) return 'text-muted';
                         return current > previous ? 'text-success' : 'text-danger';
                     };
+                    const formatSummaryComparison = (current, previous) => previous === 0
+                        ? (current > 0 ? 'Baru' : '—')
+                        : ((current >= previous ? '↑ ' : '↓ ') + Math.abs(((current - previous) / Math.abs(previous)) * 100).toFixed(1) + '%');
 
                     historicalSummaryTable.innerHTML = `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.7rem;">
                         <thead><tr>
                             <th>Metrik</th>
                             <th class="text-end">Aktif</th>
-                            <th class="text-end">Pembanding</th>
-                            <th class="text-end">Perubahan</th>
+                            <th class="text-end">${previousLabel}</th>
+                            <th class="text-end">${twoPeriodsAgoLabel}</th>
+                            <th class="text-end">vs ${previousLabel}</th>
+                            <th class="text-end">vs ${twoPeriodsAgoLabel}</th>
                         </tr></thead>
                         <tbody>${summaryRows.map(([key, label, type]) => {
                             const current = currentSummary[key] || 0;
                             const previous = previousSummary[key] || 0;
+                            const twoPeriodsAgo = twoPeriodsAgoSummary[key] || 0;
                             return `<tr>
                                 <td class="fw-semibold">${label}</td>
                                 <td class="text-end fw-semibold">${formatSummaryValue(current, type)}</td>
                                 <td class="text-end text-muted">${formatSummaryValue(previous, type)}</td>
+                                <td class="text-end text-muted">${rawHistorical[2] ? formatSummaryValue(twoPeriodsAgo, type) : '—'}</td>
                                 <td class="text-end fw-semibold ${summaryChangeClass(current, previous)}">${formatSummaryChange(current, previous)}</td>
+                                <td class="text-end fw-semibold ${rawHistorical[2] ? summaryChangeClass(current, twoPeriodsAgo) : 'text-muted'}">${rawHistorical[2] ? formatSummaryComparison(current, twoPeriodsAgo) : '—'}</td>
                             </tr>`;
                         }).join('')}</tbody>
                     </table>`;
