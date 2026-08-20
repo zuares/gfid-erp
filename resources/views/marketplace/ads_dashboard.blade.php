@@ -2263,7 +2263,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-clock text-primary"></i> Heatmap Jam</div>
-                        <div class="ads-tab-panel-note">Jam paling ramai.</div>
+                        <div class="ads-tab-panel-note">Peringkat waktu berdasarkan CVR.</div>
                     </div>
                 </div>
                 <div class="p-3">
@@ -2276,7 +2276,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="color: var(--dsh-muted); font-size: .75rem;">Menganalisis jam terbaik...</div>
                     </div>
                     <div>
-                        <div style="font-size:.72rem; font-weight:700; color:var(--dsh-muted); margin-bottom:.35rem;">Breakdown per jam</div>
+                        <div style="font-size:.72rem; font-weight:700; color:var(--dsh-muted); margin-bottom:.35rem;">Peringkat waktu</div>
                         <div id="hourlyBreakdown" class="table-responsive"></div>
                     </div>
                 </div>
@@ -3865,19 +3865,19 @@ document.addEventListener("DOMContentLoaded", function() {
     if (hourlyBreakdownEl) {
         const breakdownRows = hourlyMetricRows
             .filter(row => row.spend > 0 || row.gmv > 0 || row.impressions > 0 || row.clicks > 0 || row.orders > 0)
-            .sort((a, b) => (b.gmv - a.gmv) || (b.orders - a.orders) || (b.roas - a.roas))
+            .sort((a, b) => (b.cvr - a.cvr) || (b.clicks - a.clicks) || (b.orders - a.orders) || (b.roas - a.roas))
             .slice(0, 8);
         hourlyBreakdownEl.innerHTML = breakdownRows.length
             ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
-                <thead><tr><th>Jam</th><th class="text-end">Impresi</th><th class="text-end">Klik</th><th class="text-end">Biaya</th><th class="text-end">GMV</th><th class="text-end">Orders</th><th class="text-end">CVR</th><th class="text-end">ROAS</th></tr></thead>
-                <tbody>${breakdownRows.map(row => `<tr>
-                    <td class="fw-bold">${row.label}</td>
+                <thead><tr><th>Jam</th><th class="text-end">Impresi</th><th class="text-end">Klik</th><th class="text-end">CVR</th><th class="text-end">Orders</th><th class="text-end">Biaya</th><th class="text-end">GMV</th><th class="text-end">ROAS</th></tr></thead>
+                <tbody>${breakdownRows.map((row, index) => `<tr${index === 0 ? ' style="background:rgba(245, 158, 11, 0.08);"' : ''}>
+                    <td class="fw-bold">${index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="CVR tertinggi"></i>' : ''}${row.label}</td>
                     <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
                     <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
+                    <td class="text-end fw-bold">${row.cvr.toFixed(2)}%</td>
+                    <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
                     <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                     <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
-                    <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
-                    <td class="text-end">${row.cvr.toFixed(2)}%</td>
                     <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
                 </tr>`).join('')}</tbody>
             </table>`
@@ -3958,30 +3958,15 @@ document.addEventListener("DOMContentLoaded", function() {
     // 3. Golden Hour (Dayparting)
     let timeEl = document.getElementById('insightTime');
     if (timeEl) {
-        let bestHour = '-';
-        let highestScore = 0;
-        let gmvAtBest = 0;
-        
-        hourlyData.forEach(d => {
-            let sp = parseFloat(d.expense || 0);
-            let gm = parseFloat(d.gmv || 0);
-            // Cek jika jam ini menghasilkan GMV setidaknya 5% dari total (bukan kebetulan 1 klik hoki)
-            if (sp > 1000 && gm > (totalHourlyGmv * 0.05)) { 
-                let r = gm / sp;
-                // Score kombinasi antara ROAS dan besaran GMV
-                let score = r * (gm / totalHourlyGmv);
-                if (score > highestScore) {
-                    highestScore = score;
-                    bestHour = d.performance_hour;
-                    gmvAtBest = gm;
-                }
-            }
-        });
-        
-        if (highestScore > 0) {
-            let gmvPct = ((gmvAtBest / totalHourlyGmv) * 100).toFixed(0);
+        const goldenHourCandidates = hourlyMetricRows
+            .filter(row => row.spend > 1000 && row.gmv > (totalHourlyGmv * 0.05) && row.clicks > 0)
+            .sort((a, b) => (b.cvr - a.cvr) || (b.clicks - a.clicks) || (b.orders - a.orders) || (b.roas - a.roas));
+        const bestHour = goldenHourCandidates[0];
+
+        if (bestHour) {
+            let gmvPct = totalHourlyGmv > 0 ? ((bestHour.gmv / totalHourlyGmv) * 100).toFixed(0) : '0';
             timeEl.innerHTML = `<div style="font-weight: 700; color: #d97706; font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Waktu Emas (Dayparting)</div>
-                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${bestHour}:00 - ${parseInt(bestHour)+1}:00</b> adalah lumbung emas Anda, menyumbang <b>${gmvPct}%</b> dari total pendapatan! 💡 <b>Saran:</b> Habiskan mayoritas budget di jam ini!</div>`;
+                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${bestHour.hour}:00 - ${bestHour.hour + 1}:00</b> memiliki CVR tertinggi <b>${bestHour.cvr.toFixed(2)}%</b> dan menyumbang <b>${gmvPct}%</b> dari total pendapatan. 💡 <b>Saran:</b> Prioritaskan budget di jam ini!</div>`;
             timeEl.style.borderLeftColor = '#d97706';
         } else {
             timeEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Data Waktu Berpencar</div>
