@@ -51,7 +51,9 @@
         if (!($camp->spend > 0 || $camp->gmv > 0)) continue;
 
         // Metrik Dasar
-        $spend = (float) $camp->spend;
+        // Biaya performa memakai biaya iklan riil setelah PPN 11%.
+        // Profit service juga sudah memakai basis biaya setelah PPN.
+        $spend = (float) $camp->spend * 1.11;
         $gmv = (float) $camp->gmv;
         $orders = (int) $camp->orders;
         $clicks = (int) $camp->clicks;
@@ -72,7 +74,7 @@
         $cpm = $impressions > 0 ? ($spend / $impressions) * 1000 : 0;
 
         // Data periode pembanding (untuk kolom perbandingan).
-        $prevSpend = (float) ($camp->prev_spend ?? 0);
+        $prevSpend = (float) ($camp->prev_spend ?? 0) * 1.11;
         $prevGmv = (float) ($camp->prev_gmv ?? 0);
         $prevOrders = (int) ($camp->prev_orders ?? 0);
         $prevClicks = (int) ($camp->prev_clicks ?? 0);
@@ -88,7 +90,7 @@
         } else {
             $profitUnknownCount++;
         }
-        $topup = $spend * 1.11;
+        $topup = $spend;
         $poas = $profitAvailable && $topup > 0 ? $profit / $topup : null;
 
         // Target ROAS per campaign (menyesuaikan HPP item):
@@ -119,7 +121,7 @@
 
         // Net margin (% dari GMV) & biaya iklan riil (termasuk PPN 11%).
         $margin = ($profitAvailable && $gmv > 0) ? ($profit / $gmv) * 100 : null;
-        $spendWithPpn = $spend * 1.11;
+        $spendWithPpn = $spend;
         // Selisih ROAS aktual vs target (positif = di atas target).
         $roasGap = ($targetRoas !== null) ? ($roas - $targetRoas) : null;
 
@@ -407,9 +409,9 @@
 <div class="row g-3 mb-4" id="campaignPerformanceOverallKpis">
     <div class="col-6 col-md-3">
             <div class="dpanel p-3 h-100">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Total Spend</div>
+                <div class="text-muted small fw-bold text-uppercase mb-1" title="Total biaya iklan setelah PPN 11%">Total Biaya + PPN</div>
                 <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalSpend, 0, ',', '.') }}</div>
-                <div class="small text-muted mt-1"><i class="bi bi-bullseye"></i> Ad Budget Used</div>
+                <div class="small text-muted mt-1"><i class="bi bi-bullseye"></i> Biaya iklan setelah PPN 11%</div>
                 <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfRows->sum('prev_spend'), 0, ',', '.') }} {!! $fmtDelta($totalSpend, $perfRows->sum('prev_spend'), null) !!}</div>
         </div>
     </div>
@@ -417,7 +419,7 @@
         <div class="dpanel p-3 h-100">
                 <div class="text-muted small fw-bold text-uppercase mb-1">Total Orders (Ads)</div>
                 <div class="fs-4 fw-bolder text-dark">{{ number_format($totalOrders, 0, ',', '.') }}</div>
-                <div class="small text-muted mt-1">CPA: Rp {{ number_format($totalOrders > 0 ? $totalSpend / $totalOrders : 0, 0, ',', '.') }}</div>
+                <div class="small text-muted mt-1">Biaya/order: Rp {{ number_format($totalOrders > 0 ? $totalSpend / $totalOrders : 0, 0, ',', '.') }}</div>
                 <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($perfRows->sum('prev_orders'), 0, ',', '.') }} {!! $fmtDelta($totalOrders, $perfRows->sum('prev_orders'), true) !!}</div>
         </div>
     </div>
@@ -425,7 +427,7 @@
         <div class="dpanel p-3 h-100">
                 <div class="text-muted small fw-bold text-uppercase mb-1">Total GMV (Ads)</div>
                 <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalGmv, 0, ',', '.') }}</div>
-                <div class="small text-muted mt-1">ROAS: {{ number_format($totalSpend > 0 ? $totalGmv / $totalSpend : 0, 2) }}x · AOV: Rp {{ number_format($totalOrders > 0 ? $totalGmv / $totalOrders : 0, 0, ',', '.') }}</div>
+                <div class="small text-muted mt-1">ROAS setelah PPN: {{ number_format($totalSpend > 0 ? $totalGmv / $totalSpend : 0, 2) }}x · AOV: Rp {{ number_format($totalOrders > 0 ? $totalGmv / $totalOrders : 0, 0, ',', '.') }}</div>
                 <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfRows->sum('prev_gmv'), 0, ',', '.') }} {!! $fmtDelta($totalGmv, $perfRows->sum('prev_gmv'), true) !!}</div>
         </div>
     </div>
@@ -435,7 +437,7 @@
             <div class="fs-4 fw-bolder {{ $profitUnknownCount > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">
                 Rp {{ number_format($totalProfit, 0, ',', '.') }}
             </div>
-            <div class="small text-muted mt-1">POAS: {{ number_format($totalSpend > 0 ? $totalProfit / ($totalSpend * 1.11) : 0, 2) }}x · Profit/order: Rp {{ number_format($totalOrders > 0 ? $totalProfit / $totalOrders : 0, 0, ',', '.') }} · {{ $profitUnknownCount }} belum ada HPP</div>
+            <div class="small text-muted mt-1">POAS: {{ number_format($totalSpend > 0 ? $totalProfit / $totalSpend : 0, 2) }}x · Profit/order: Rp {{ number_format($totalOrders > 0 ? $totalProfit / $totalOrders : 0, 0, ',', '.') }} · {{ $profitUnknownCount }} belum ada HPP</div>
             <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfRows->sum('prev_profit'), 0, ',', '.') }} {!! $fmtDelta($totalProfit, $perfRows->sum('prev_profit'), true) !!}</div>
         </div>
     </div>
@@ -490,9 +492,9 @@
     <div class="px-3 pb-2" id="campaignPerformanceSubtabKpis">
         <div class="ads-kpi-grid mb-2">
             <div class="dpanel ads-kpi kpi-spend">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Total biaya iklan pada campaign yang termasuk subtab aktif."><i class="bi bi-wallet2" aria-hidden="true"></i> Belanja Iklan</div>
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Total biaya iklan setelah PPN 11% pada campaign yang termasuk subtab aktif."><i class="bi bi-wallet2" aria-hidden="true"></i> Biaya + PPN</div>
                 <div class="ads-kpi-value" data-perf-kpi-value="spend">Rp {{ number_format($perfInitialKpi['spend'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub" title="Campaign adalah jumlah campaign pada subtab aktif; rugi berarti profit tidak lebih dari nol; biaya per order adalah Belanja Iklan dibagi Orders."><span title="Jumlah campaign pada subtab aktif"><i class="bi bi-megaphone me-1" aria-hidden="true"></i><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span> campaign</span> · <span title="Campaign dengan profit tidak lebih dari nol"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span data-perf-kpi-value="losses">{{ number_format($perfInitialKpi['losses'], 0, ',', '.') }}</span> rugi</span> · <span title="Biaya iklan rata-rata untuk mendapatkan satu order"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Rp <span data-perf-kpi-value="cpa">{{ number_format($perfInitialKpi['spend'] / max(1, $perfInitialKpi['orders']), 0, ',', '.') }}</span>/order</span></div>
+                <div class="ads-kpi-sub" title="Campaign adalah jumlah campaign pada subtab aktif; rugi berarti profit tidak lebih dari nol; biaya per order sudah termasuk PPN 11%."><span title="Jumlah campaign pada subtab aktif"><i class="bi bi-megaphone me-1" aria-hidden="true"></i><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span> campaign</span> · <span title="Campaign dengan profit tidak lebih dari nol"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span data-perf-kpi-value="losses">{{ number_format($perfInitialKpi['losses'], 0, ',', '.') }}</span> rugi</span> · <span title="Biaya iklan rata-rata setelah PPN 11% untuk mendapatkan satu order"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Rp <span data-perf-kpi-value="cpa">{{ number_format($perfInitialKpi['spend'] / max(1, $perfInitialKpi['orders']), 0, ',', '.') }}</span>/order</span></div>
                 <div class="perf-kpi-compare" data-perf-kpi-compare="spend" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_spend'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['spend'], $perfInitialKpi['prev_spend'], null) !!}</div>
             </div>
             <div class="dpanel ads-kpi">
@@ -508,7 +510,7 @@
                 <div class="perf-kpi-compare" data-perf-kpi-compare="aov" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_aov'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['aov'], $perfInitialKpi['prev_aov'], true) !!}</div>
             </div>
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Return on Ad Spend: GMV dibandingkan dengan biaya iklan."><i class="bi bi-speedometer2" aria-hidden="true"></i> ROAS</div>
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Return on Ad Spend: GMV dibandingkan dengan biaya iklan setelah PPN 11%."><i class="bi bi-speedometer2" aria-hidden="true"></i> ROAS</div>
                 <div class="ads-kpi-value" data-perf-kpi-value="roas">{{ number_format($perfInitialKpi['roas'], 2, ',', '.') }}x</div>
                 <div class="ads-kpi-sub">GMV dibanding iklan</div>
                 <div class="perf-kpi-compare" data-perf-kpi-compare="roas" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($perfInitialKpi['prev_roas'], 2, ',', '.') }}x {!! $fmtDelta($perfInitialKpi['roas'], $perfInitialKpi['prev_roas'], true) !!}</div>
@@ -532,7 +534,7 @@
                     <th class="text-end" data-bs-toggle="tooltip" title="Modal harian campaign yang tersimpan">Modal Harian</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="ROAS aktual berdasarkan GMV dibagi biaya iklan">ROAS Aktual</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Jumlah order dan perbandingannya">Orders</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan · Δ vs {{ $perfCompareLabel }}">Biaya</th>
+                    <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan setelah PPN 11% · Δ vs {{ $perfCompareLabel }}">Biaya + PPN</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Rata-rata omzet per order · Δ vs {{ $perfCompareLabel }}">AOV</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Omzet dari iklan · Δ vs {{ $perfCompareLabel }}">Omzet</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Est. Net Profit & Margin · Δ vs {{ $perfCompareLabel }}">Profit</th>
@@ -572,7 +574,7 @@
                                             <th class="text-end">Modal Harian</th>
                                             <th class="text-end">ROAS Aktual</th>
                                             <th class="text-end">Orders</th>
-                                            <th class="text-end">Spend</th>
+                                            <th class="text-end">Biaya + PPN</th>
                                             <th class="text-end">AOV</th>
                                             <th class="text-end">GMV</th>
                                             <th class="text-end">Profit</th>
@@ -726,7 +728,7 @@
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($row['prev_orders'], 0, ',', '.') }}</div>
                         </td>
 
-                        {{-- Biaya --}}
+                        {{-- Biaya setelah PPN 11% --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_spend'], 0, ',', '.') }}</div>
@@ -765,7 +767,7 @@
                                 <div class="perf-chip"><span>CTR</span><b>{{ number_format($row['ctr'], 2) }}%</b></div>
                                 <div class="perf-chip"><span>CPA</span><b>Rp {{ number_format($row['cpa'], 0, ',', '.') }}</b></div>
                                 <div class="perf-chip"><span>POAS</span><b>{{ $row['poas'] === null ? '—' : number_format($row['poas'], 2) . 'x' }}</b></div>
-                                <div class="perf-chip"><span>Spend riil (PPN)</span><b>Rp {{ number_format($row['spend_ppn'], 0, ',', '.') }}</b>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
+                                <div class="perf-chip"><span>Biaya riil (PPN 11%)</span><b>Rp {{ number_format($row['spend_ppn'], 0, ',', '.') }}</b>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
                             </div>
                         </td>
                     </tr>
