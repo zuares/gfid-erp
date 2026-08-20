@@ -593,14 +593,8 @@
             <div class="dpanel ads-kpi kpi-profit">
                 <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Net Profit setelah HPP dan biaya iklan setelah PPN 11%."><i class="bi bi-cash-coin" aria-hidden="true"></i> Net Profit</div>
                 <div class="ads-kpi-value" data-perf-kpi-value="profit">Rp {{ number_format($perfInitialKpi['profit'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub">Profit keseluruhan</div>
+                <div class="ads-kpi-sub">Profit/order: <span data-perf-kpi-value="profit_per_order">Rp {{ number_format($perfInitialKpi['profit_per_order'], 0, ',', '.') }}</span> <span class="perf-kpi-compare" data-perf-kpi-compare="profit_per_order" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit_per_order'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit_per_order'], $perfInitialKpi['prev_profit_per_order'], true) !!}</span></div>
                 <div class="perf-kpi-compare" data-perf-kpi-compare="profit" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit'], $perfInitialKpi['prev_profit'], true) !!}</div>
-            </div>
-            <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Net Profit setelah HPP dan biaya iklan dibagi jumlah order."><i class="bi bi-basket" aria-hidden="true"></i> Net Profit / Order</div>
-                <div class="ads-kpi-value" data-perf-kpi-value="profit_per_order">Rp {{ number_format($perfInitialKpi['profit_per_order'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub">Profit terhitung / order</div>
-                <div class="perf-kpi-compare" data-perf-kpi-compare="profit_per_order" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit_per_order'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit_per_order'], $perfInitialKpi['prev_profit_per_order'], true) !!}</div>
             </div>
         </div>
     </div>
