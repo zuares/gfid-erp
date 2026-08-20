@@ -3965,8 +3965,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (bestHour) {
             let gmvPct = totalHourlyGmv > 0 ? ((bestHour.gmv / totalHourlyGmv) * 100).toFixed(0) : '0';
+            let outsideGmvPct = Math.max(0, 100 - Number(gmvPct));
             timeEl.innerHTML = `<div style="font-weight: 700; color: #d97706; font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Waktu Emas (Dayparting)</div>
-                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${bestHour.hour}:00 - ${bestHour.hour + 1}:00</b> memiliki CVR tertinggi <b>${bestHour.cvr.toFixed(2)}%</b> dan menyumbang <b>${gmvPct}%</b> dari total pendapatan. 💡 <b>Saran:</b> Prioritaskan budget di jam ini!</div>`;
+                                <div style="font-size: 0.72rem; color: var(--dsh-muted);">Jam <b>${bestHour.hour}:00 - ${bestHour.hour + 1}:00</b> memiliki CVR tertinggi <b>${bestHour.cvr.toFixed(2)}%</b>. Kontribusi GMV: <b>${gmvPct}%</b> di waktu emas dan <b>${outsideGmvPct}%</b> di luar waktu emas. 💡 <b>Saran:</b> Prioritaskan budget di jam ini!</div>`;
             timeEl.style.borderLeftColor = '#d97706';
         } else {
             timeEl.innerHTML = `<div style="font-weight: 700; color: var(--dsh-muted); font-size: 0.85rem; margin-bottom: 0.3rem;">⏳ Data Waktu Berpencar</div>
