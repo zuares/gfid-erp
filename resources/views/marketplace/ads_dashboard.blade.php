@@ -3231,7 +3231,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     $metrics = [
                         ['title' => 'Omzet', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-wallet2'],
-                        ['title' => 'Biaya', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash-stack'],
+                        ['title' => 'Biaya Iklan', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash-stack'],
                         ['title' => 'Net Profit', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
                         ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-box-seam'],
                         ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'roas', 'icon' => 'bi-lightning-charge'],
@@ -3249,25 +3249,30 @@ document.addEventListener('DOMContentLoaded', function() {
                         $currOrders = $kpi['current']->orders ?? 0;
                         $currClicks = $kpi['current']->clicks ?? 0;
                         $currImpressions = $kpi['current']->impressions ?? 0;
+                        $currSpendAfterTax = $currSpend * 1.11;
 
                         $prevSpend = $kpi['previous']->spend ?? 0;
                         $prevGmv = $kpi['previous']->gmv ?? 0;
                         $prevOrders = $kpi['previous']->orders ?? 0;
                         $prevClicks = $kpi['previous']->clicks ?? 0;
                         $prevImpressions = $kpi['previous']->impressions ?? 0;
+                        $prevSpendAfterTax = $prevSpend * 1.11;
 
                         $val = $kpi['current']->{$m['key']} ?? 0;
                         $prevVal = $kpi['previous']->{$m['key']} ?? 0;
 
-                        if($m['key'] === 'roas') {
-                            $val = $currSpend > 0 ? round($currGmv / $currSpend, 2) : 0;
-                            $prevVal = $prevSpend > 0 ? round($prevGmv / $prevSpend, 2) : 0;
+                        if($m['key'] === 'spend') {
+                            $val = $currSpendAfterTax;
+                            $prevVal = $prevSpendAfterTax;
+                        } elseif($m['key'] === 'roas') {
+                            $val = $currSpendAfterTax > 0 ? round($currGmv / $currSpendAfterTax, 2) : 0;
+                            $prevVal = $prevSpendAfterTax > 0 ? round($prevGmv / $prevSpendAfterTax, 2) : 0;
                         } elseif ($m['key'] === 'spend_topup') {
-                            $val = $currSpend * 1.11;
-                            $prevVal = $prevSpend * 1.11;
+                            $val = $currSpendAfterTax;
+                            $prevVal = $prevSpendAfterTax;
                         } elseif ($m['key'] === 'cpc') {
-                            $val = $currClicks > 0 ? round($currSpend / $currClicks, 0) : 0;
-                            $prevVal = $prevClicks > 0 ? round($prevSpend / $prevClicks, 0) : 0;
+                            $val = $currClicks > 0 ? round($currSpendAfterTax / $currClicks, 0) : 0;
+                            $prevVal = $prevClicks > 0 ? round($prevSpendAfterTax / $prevClicks, 0) : 0;
                         } elseif ($m['key'] === 'ctr') {
                             $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
                             $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
@@ -3301,7 +3306,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         $valueDecimals = in_array($m['key'], ['gmv', 'spend', 'net_profit', 'cpc', 'orders', 'impressions', 'clicks']) ? 0 : 2;
                     @endphp
                     <div class="dpanel ads-kpi kpi-{{ $m['cls'] }}">
-                        <div class="ads-kpi-label">
+                        <div class="ads-kpi-label" @if($m['key'] === 'spend') title="Biaya iklan setelah PPN 11%, termasuk GMV Max Auto" @endif>
                             <i class="bi {{ $m['icon'] }}"></i> {{ $m['title'] }}
                         </div>
                         <div class="ads-kpi-value" style="font-variant-numeric: tabular-nums;">
@@ -3758,6 +3763,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if(value >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + ' Rb';
         return value;
     };
+    const ADS_COST_MULTIPLIER = 1.11;
 
     // Helper: Format Indo Date (YYYY-MM-DD to DD MMM)
     const formatIndoDate = (dateStr) => {
@@ -3769,7 +3775,7 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     // Calculate summaries for charts
-    let totalDailySpend = dailyData.reduce((sum, d) => sum + parseFloat(d.spend || 0), 0);
+    let totalDailySpend = dailyData.reduce((sum, d) => sum + (parseFloat(d.spend || 0) * ADS_COST_MULTIPLIER), 0);
     let totalDailyGmv = dailyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
     let totalDailyOrders = dailyData.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
     let totalDailyAov = totalDailyOrders > 0 ? (totalDailyGmv / totalDailyOrders) : 0;
@@ -3784,7 +3790,7 @@ document.addEventListener("DOMContentLoaded", function() {
             <span class="daily-trend-stat"><span class="daily-trend-stat-label">ROAS</span><span class="daily-trend-stat-value" style="color:#b45309">${totalDailyRoas}x</span></span>`;
     }
 
-    let totalHourlySpend = hourlyData.reduce((sum, d) => sum + parseFloat(d.expense || 0), 0);
+    let totalHourlySpend = hourlyData.reduce((sum, d) => sum + (parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER), 0);
     let totalHourlyGmv = hourlyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
     let totalHourlyRoas = totalHourlySpend > 0 ? (totalHourlyGmv / totalHourlySpend).toFixed(2) : "0.00";
     let hsEl = document.getElementById('hourlySummary');
@@ -3929,7 +3935,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     {
                         label: 'ROAS',
                         data: dailyData.map(d => {
-                            let sp = parseFloat(d.spend || 0);
+                let sp = parseFloat(d.spend || 0) * ADS_COST_MULTIPLIER;
                             let gm = parseFloat(d.gmv || 0);
                             return sp > 0 ? parseFloat((gm/sp).toFixed(2)) : 0;
                         }),
@@ -3960,7 +3966,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     },
                     {
                         label: 'Biaya (Spend)',
-                        data: dailyData.map(d => parseFloat(d.spend || 0)),
+                        data: dailyData.map(d => parseFloat(d.spend || 0) * ADS_COST_MULTIPLIER),
                         borderColor: '#dc2626',
                         backgroundColor: gradientSpend,
                         fill: true,
@@ -4075,7 +4081,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         type: 'line',
                         label: 'ROAS',
                         data: hourlyData.map(d => {
-                            let sp = parseFloat(d.expense || 0);
+                            let sp = parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER;
                             let gm = parseFloat(d.gmv || 0);
                             return sp > 0 ? parseFloat((gm/sp).toFixed(2)) : 0;
                         }),
@@ -4091,7 +4097,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     {
                         type: 'bar',
                         label: 'Biaya (Spend)',
-                        data: hourlyData.map(d => parseFloat(d.expense || 0)),
+                        data: hourlyData.map(d => parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER),
                         backgroundColor: 'rgba(220, 38, 38, 0.85)',
                         borderRadius: 4,
                         yAxisID: 'y'
@@ -4845,6 +4851,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 // CHART PRODUK (9 Bar Charts)
                 // ==========================================
                 const rawItems = @json($itemPerformance->toArray()).map(c => {
+                    c.spend = parseFloat(c.spend || 0) * ADS_COST_MULTIPLIER;
                     c.ctr = parseFloat(c.impressions) > 0 ? (parseFloat(c.clicks) / parseFloat(c.impressions)) * 100 : 0;
                     c.cvr = parseFloat(c.clicks) > 0 ? (parseFloat(c.orders) / parseFloat(c.clicks)) * 100 : 0;
                     c.roas = parseFloat(c.spend) > 0 ? (parseFloat(c.gmv) / parseFloat(c.spend)) : 0;

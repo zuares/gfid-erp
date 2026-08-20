@@ -24,6 +24,8 @@
             $row->item_category = 'GMV Max Auto';
             $row->image_url = null;
             $row->stock_total = 0;
+            $row->variant_stock_empty = false;
+            $row->empty_variant_skus = [];
             $row->ctr = ($campaign->impressions ?? 0) > 0
                 ? (($campaign->clicks ?? 0) / $campaign->impressions) * 100
                 : 0;
@@ -56,7 +58,11 @@
                 || in_array($itemId, $gmsChannelItemIds, true);
         })
         ->concat($gmsProductRows)
-        ->sortByDesc('spend')
+        ->map(function ($row) {
+            $row->spend_ppn = round((float) ($row->spend ?? 0) * 1.11, 2);
+            return $row;
+        })
+        ->sortByDesc('spend_ppn')
         ->values();
 
     $totalActiveProducts = $productSourceRows->count();
@@ -65,8 +71,8 @@
     $totalProfit = $knownProfitItems->sum('profit_after_ads');
     $totalGrossProfit = $knownProfitItems->sum('gross_profit');
     $unknownProfitItems = $productSourceRows->count() - $knownProfitItems->count();
-    $totalAdSpend = $productSourceRows->sum('spend');
-    $knownAdSpend = $knownProfitItems->sum('spend');
+    $totalAdSpend = $productSourceRows->sum('spend_ppn');
+    $knownAdSpend = $knownProfitItems->sum('spend_ppn');
     $totalOrders = $productSourceRows->sum('orders');
     $totalGmv = $productSourceRows->sum('gmv');
     $productPeriodDays = max(1, (int) (\Carbon\Carbon::parse($dateFrom ?? now()->toDateString())->diffInDays(\Carbon\Carbon::parse($dateTo ?? now()->toDateString())) + 1));
@@ -114,12 +120,19 @@
         $entry['velocity'] = $orders / $productDayDivisor;
         $entry['stock_days'] = $entry['velocity'] > 0 ? $stock / $entry['velocity'] : null;
         $entry['stock_risk'] = $productStockRisk($stock, $orders, !empty($entry['is_gms']));
+        $entry['empty_variant_skus'] = collect($row->empty_variant_skus ?? [])
+            ->filter(fn ($sku) => trim((string) $sku) !== '')
+            ->map(fn ($sku) => trim((string) $sku))
+            ->unique()
+            ->values()
+            ->all();
+        $entry['variant_stock_empty'] = ! empty($entry['empty_variant_skus']);
         return $entry;
     })->values();
     $productCategoryProductRows = $productRows->groupBy('category');
     $productCategoryRows = $productCategoryProductRows->map(function ($group, $category) use ($productStockRisk) {
         $knownProfit = $group->filter(fn ($entry) => $entry['row']->profit_after_ads !== null);
-        $spend = $group->sum(fn ($entry) => (float) $entry['row']->spend);
+        $spend = $group->sum(fn ($entry) => (float) ($entry['row']->spend_ppn ?? 0));
         $impressions = $group->sum(fn ($entry) => (int) ($entry['row']->impressions ?? 0));
         $clicks = $group->sum(fn ($entry) => (int) ($entry['row']->clicks ?? 0));
         $orders = $group->sum(fn ($entry) => (int) ($entry['row']->orders ?? 0));
@@ -138,7 +151,8 @@
             'gross_profit' => $knownProfit->sum(fn ($entry) => (float) ($entry['row']->gross_profit ?? 0)),
             'profit' => $profit,
             'profit_unknown' => $group->count() - $knownProfit->count(),
-            'poas' => $spend > 0 ? $profit / ($spend * 1.11) : 0,
+            'variant_stock_empty_products' => $group->filter(fn ($entry) => $entry['variant_stock_empty'])->count(),
+            'poas' => $spend > 0 ? $profit / $spend : 0,
             'stock_risk' => $productStockRisk(
                 $group->sum(fn ($entry) => (int) ($entry['row']->stock_total ?? 0)),
                 $orders,
@@ -154,7 +168,7 @@
     ];
     $productSegmentKpis = collect($productSegmentRows)->map(function ($rows) {
         $knownProfit = $rows->filter(fn ($entry) => $entry['row']->profit_after_ads !== null);
-        $spend = $rows->sum(fn ($entry) => (float) $entry['row']->spend);
+        $spend = $rows->sum(fn ($entry) => (float) ($entry['row']->spend_ppn ?? 0));
         $gmv = $rows->sum(fn ($entry) => (float) $entry['row']->gmv);
         return [
             'products' => $rows->count(),
@@ -204,13 +218,13 @@
             $row = $isAggregate ? null : $entry['row'];
             return [
                 'name' => $isAggregate ? $entry['name'] : ($row->item_name ?: 'Produk tanpa nama'),
-                'x' => (float) ($isAggregate ? $entry['spend'] : ($row->spend ?? 0)),
+                'x' => (float) ($isAggregate ? $entry['spend'] : ($row->spend_ppn ?? (($row->spend ?? 0) * 1.11))),
                 'y' => $isAggregate ? (float) $entry['profit'] : (float) ($row->profit_after_ads ?? 0),
                 'profit_available' => $isAggregate ? (bool) $entry['profit_available'] : $row->profit_after_ads !== null,
                 'orders' => (int) ($isAggregate ? $entry['orders'] : ($row->orders ?? 0)),
                 'gmv' => (float) ($isAggregate ? $entry['gmv'] : ($row->gmv ?? 0)),
                 'aov' => (float) ($isAggregate ? $entry['aov'] : (($row->orders ?? 0) > 0 ? $row->gmv / $row->orders : 0)),
-                'roas' => (float) ($isAggregate ? $entry['roas'] : (($row->spend ?? 0) > 0 ? $row->gmv / $row->spend : 0)),
+                'roas' => (float) ($isAggregate ? $entry['roas'] : (($row->spend_ppn ?? (($row->spend ?? 0) * 1.11)) > 0 ? $row->gmv / ($row->spend_ppn ?? (($row->spend ?? 0) * 1.11)) : 0)),
                 'stock' => (int) ($isAggregate ? $entry['stock'] : ($row->stock_total ?? 0)),
                 'velocity' => (float) ($isAggregate ? $entry['velocity'] : (($row->orders ?? 0) / $productDayDivisor)),
                 'reco' => $isAggregate ? $entry['classification'] : ($row->classification ?? 'Review'),
@@ -250,7 +264,7 @@
             <div class="fs-4 fw-bolder {{ $unknownProfitItems > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">
                 Rp {{ number_format($totalProfit, 0, ',', '.') }}
             </div>
-            <div class="small text-muted mt-1">POAS: {{ number_format($knownAdSpend > 0 ? $totalProfit / ($knownAdSpend * 1.11) : 0, 2) }}x · {{ $unknownProfitItems }} belum ada HPP · {{ $criticalStockProducts }} stok kritis</div>
+            <div class="small text-muted mt-1">POAS: {{ number_format($knownAdSpend > 0 ? $totalProfit / $knownAdSpend : 0, 2) }}x · {{ $unknownProfitItems }} belum ada HPP · {{ $criticalStockProducts }} stok kritis</div>
         </div>
     </div>
 </div>
@@ -350,12 +364,12 @@
                 @foreach($productCategoryRows as $categoryRow)
                     <tr class="product-category-row" data-product-views="category" onclick="productToggleCategory(this)">
                         <td><div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right product-caret text-muted" style="font-size:.7rem;"></i><div><div class="fw-bold">{{ $categoryRow['category'] }}</div><div class="text-muted small">{{ number_format($categoryRow['products'], 0, ',', '.') }} produk</div></div></div></td>
-                        <td><span class="badge bg-light text-dark border">Ringkasan</span><br><span class="badge bg-{{ $categoryRow['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $categoryRow['stock_risk']['label'] }}</span></td>
+                        <td><span class="badge bg-light text-dark border">Ringkasan</span><br><span class="badge bg-{{ $categoryRow['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $categoryRow['stock_risk']['label'] }}</span>@if($categoryRow['variant_stock_empty_products'] > 0)<br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.58rem;">{{ $categoryRow['variant_stock_empty_products'] }} variant kosong</span>@endif</td>
                         <td class="text-end">{{ number_format($categoryRow['stock'], 0, ',', '.') }}</td>
                         <td class="text-end fw-bold">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($categoryRow['ctr'], 2) }}%</td>
                         <td class="text-end">{{ number_format($categoryRow['cvr'], 2) }}%</td>
-                        <td class="text-end fw-bold text-danger">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold text-danger" title="Biaya iklan setelah PPN 11%">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
                         <td class="text-end">Rp {{ number_format($categoryRow['aov'], 0, ',', '.') }}</td>
                         <td class="text-end text-success fw-bold">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</td>
                         <td class="text-end fw-bold {{ $categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger' }}">{{ $categoryRow['profit_unknown'] > 0 ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</td>
@@ -372,7 +386,7 @@
                                             @php $detailProduct = $productEntry['row']; @endphp
                                             <tr>
                                                 <td><div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $detailProduct->item_name }}">{{ $detailProduct->item_name }}</div><div class="text-muted" style="font-size:.62rem;">{{ $detailProduct->item_sku }}</div></td>
-                                                <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span><br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.56rem;">{{ $productEntry['stock_risk']['label'] }}</span></td>
+                                                <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span><br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.56rem;">{{ $productEntry['stock_risk']['label'] }}</span>@if($productEntry['variant_stock_empty'])<br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.56rem;" title="{{ implode(', ', $productEntry['empty_variant_skus']) }}"><i class="bi bi-exclamation-triangle me-1"></i>Stok Variant Kosong</span>@endif</td>
                                                 <td class="text-end">{{ number_format($detailProduct->stock_total ?? 0, 0, ',', '.') }}</td>
                                                 <td class="text-end">{{ number_format($detailProduct->orders, 0, ',', '.') }}</td>
                                                 <td class="text-end">Rp {{ number_format(($detailProduct->orders ?? 0) > 0 ? $detailProduct->gmv / $detailProduct->orders : 0, 0, ',', '.') }}</td>
@@ -418,6 +432,9 @@
                                 {{ $row->classification }}
                             </span>
                             <br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $productEntry['stock_risk']['label'] }}</span>
+                            @if($productEntry['variant_stock_empty'])
+                                <br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.58rem;" title="{{ implode(', ', $productEntry['empty_variant_skus']) }}"><i class="bi bi-exclamation-triangle me-1"></i>Stok Variant Kosong</span>
+                            @endif
                         </td>
                         <td class="text-end">
                             @if(($row->stock_total ?? 0) < 5)
@@ -429,7 +446,7 @@
                         <td class="text-end fw-bold">{{ number_format($row->orders, 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($row->ctr, 2) }}%</td>
                         <td class="text-end">{{ number_format($row->cvr, 2) }}%</td>
-                        <td class="text-end fw-bold text-danger">Rp {{ number_format($row->spend, 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold text-danger" title="Biaya iklan setelah PPN 11%">Rp {{ number_format($row->spend_ppn ?? (($row->spend ?? 0) * 1.11), 0, ',', '.') }}</td>
                         <td class="text-end">Rp {{ number_format(($row->orders ?? 0) > 0 ? $row->gmv / $row->orders : 0, 0, ',', '.') }}</td>
                         <td class="text-end text-success fw-bold">Rp {{ number_format($row->gmv, 0, ',', '.') }}</td>
                         <td class="text-end fw-bold {{ $row->profit_after_ads === null ? 'text-muted' : ($row->profit_after_ads >= 0 ? 'text-success' : 'text-danger') }}">

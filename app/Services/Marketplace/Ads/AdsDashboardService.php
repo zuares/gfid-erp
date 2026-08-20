@@ -145,18 +145,20 @@ class AdsDashboardService
             $dates = $shop->keys()->merge($campaign->keys())->merge($gms->keys())->unique()->sort()->values();
 
             return $dates->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
-                // Shop daily adalah total Seller Center dan sudah mencakup
-                // seluruh tipe campaign, termasuk GMV Max. Jangan tambahkan
-                // baris GMS lagi ketika total toko tersedia.
+                // Shop daily berasal dari endpoint CPC level toko. Pada data
+                // tertentu endpoint ini belum memasukkan GMV Max Auto, jadi
+                // tambahkan baris GMS secara eksplisit. Campaign regular
+                // tetap memakai shop daily agar tidak double count.
                 $shopRow = $shop->get($date);
                 if ($shopRow) {
+                    $gmsRow = $gms->get($date);
                     return [$date => (object) [
                         'date' => $date,
                         'impressions' => (int) ($shopRow->impressions ?? 0),
-                        'clicks' => (int) ($shopRow->clicks ?? 0),
-                        'spend' => (float) ($shopRow->spend ?? 0),
-                        'orders' => (int) ($shopRow->orders ?? 0),
-                        'gmv' => (float) ($shopRow->gmv ?? 0),
+                        'clicks' => (int) ($shopRow->clicks ?? 0) + (int) ($gmsRow->clicks ?? 0),
+                        'spend' => (float) ($shopRow->spend ?? 0) + (float) ($gmsRow->spend ?? 0),
+                        'orders' => (int) ($shopRow->orders ?? 0) + (int) ($gmsRow->orders ?? 0),
+                        'gmv' => (float) ($shopRow->gmv ?? 0) + (float) ($gmsRow->gmv ?? 0),
                     ]];
                 }
 
@@ -279,7 +281,7 @@ class AdsDashboardService
             ->whereIn('store_id', $storeIds)
             ->get();
 
-        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
+        [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
 
         $campaigns = $campaigns
             ->map(function ($camp) use ($manualFeeRatioByStore, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey) {
@@ -626,7 +628,7 @@ class AdsDashboardService
             ->orderByDesc('spend')
             ->get();
 
-        $itemPerformance = $itemPerformanceRaw->map(function ($prod) use ($unitCogsByKey, $revenueRatioByKey, $avgPriceByKey, $manualFeeRatioByStore, $catByChan) {
+        $itemPerformance = $itemPerformanceRaw->map(function ($prod) use ($unitCogsByKey, $revenueRatioByKey, $avgPriceByKey, $manualFeeRatioByStore, $catByChan, $variantStockEmptySkusByKey) {
             $prod->roas = $prod->spend > 0 ? $prod->gmv / $prod->spend : 0;
             $prod->ctr = $prod->impressions > 0 ? ($prod->clicks / $prod->impressions) * 100 : 0;
             $prod->cvr = $prod->clicks > 0 ? ($prod->orders / $prod->clicks) * 100 : 0;
@@ -634,6 +636,9 @@ class AdsDashboardService
             $prod->cpa = $prod->orders > 0 ? $prod->spend / $prod->orders : 0;
             
             $key = $prod->store_id . '|' . $prod->channel_item_id;
+
+            $prod->empty_variant_skus = $variantStockEmptySkusByKey[$key] ?? [];
+            $prod->variant_stock_empty = ! empty($prod->empty_variant_skus);
             
             $prod->unit_cogs = (float) ($unitCogsByKey[$key] ?? 0);
             
@@ -763,7 +768,7 @@ class AdsDashboardService
     }
 
     /**
-     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>, 3: array<string, bool>}
+     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>, 3: array<string, bool>, 4: array<string, array<int, string>>}
      */
     private function preloadCampaignAnalytics(Collection $campaigns, string $dateFrom, string $dateTo): array
     {
@@ -779,10 +784,11 @@ class AdsDashboardService
         $unitCogsByKey = [];
         $revenueRatioByKey = [];
         $variantEmptyByKey = [];
+        $variantStockEmptySkusByKey = [];
 
         if ($storeIds->isEmpty() || $itemIds->isEmpty()) {
             $this->preloadGmsAnalytics($campaigns, $dateFrom, $dateTo, $avgPriceByKey, $unitCogsByKey);
-            return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey];
+            return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey];
         }
 
         $channelCodesByStore = $realCampaigns
@@ -797,7 +803,7 @@ class AdsDashboardService
             ->whereIn('item_id', $itemIds)
             ->with([
                 'models' => function ($q) {
-                    $q->select('id', 'marketplace_product_id', 'model_id', 'model_name', 'model_sku', 'price', 'raw_json');
+                    $q->select('id', 'marketplace_product_id', 'model_id', 'model_name', 'model_sku', 'price', 'stock', 'raw_json');
                 },
             ])
             ->get(['id', 'store_id', 'item_id', 'item_sku', 'has_model']);
@@ -832,6 +838,27 @@ class AdsDashboardService
             $variantEmptyByKey[$key] = ((bool) $product->has_model && ! $hasVariantRows)
                 || $product->models->contains(fn ($model) => trim((string) ($model->model_name ?? '')) === ''
                     && trim((string) ($model->model_sku ?? '')) === '');
+
+            $emptyVariantSkus = (bool) $product->has_model
+                ? $product->models
+                ->filter(fn ($model) => (float) ($model->stock ?? 0) <= 0)
+                ->map(function ($model) {
+                    $sku = trim((string) ($model->model_sku ?? ''));
+                    if ($sku !== '') {
+                        return $sku;
+                    }
+
+                    $name = trim((string) ($model->model_name ?? ''));
+                    return $name !== '' ? $name : trim((string) ($model->model_id ?? ''));
+                })
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
+                : [];
+            if (! empty($emptyVariantSkus)) {
+                $variantStockEmptySkusByKey[$key] = $emptyVariantSkus;
+            }
 
             $prices = [];
             $modelHpps = [];
@@ -913,7 +940,7 @@ class AdsDashboardService
             $revenueRatioByKey[$row->store_id . '|' . $itemId] = [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
         }
 
-        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey];
+        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey];
     }
 
     /**
