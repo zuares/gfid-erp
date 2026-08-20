@@ -41,7 +41,7 @@ class AdsAnalyticsService
     }
 
     /**
-     * Ringkasan level toko + GMS. Campaign non-GMS hanya menjadi fallback
+     * Ringkasan level toko. Campaign regular + GMS hanya menjadi fallback
      * ketika data level toko belum tersinkron untuk tanggal tersebut.
      */
     protected function aggregateDailyRows(int|array $storeId, string $dateFrom, string $dateTo): array
@@ -71,15 +71,27 @@ class AdsAnalyticsService
         $dates = $shop->keys()->merge($campaign->keys())->merge($gms->keys())->unique();
 
         return $dates->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
-            $base = $shop->get($date) ?? $campaign->get($date);
-            $extra = $gms->get($date);
+            $shopRow = $shop->get($date);
+            if ($shopRow) {
+                return [$date => (object) [
+                    'date' => $date,
+                    'spend' => (float) ($shopRow->spend ?? 0),
+                    'gmv' => (float) ($shopRow->gmv ?? 0),
+                    'impressions' => (int) ($shopRow->impressions ?? 0),
+                    'clicks' => (int) ($shopRow->clicks ?? 0),
+                    'orders' => (int) ($shopRow->orders ?? 0),
+                ]];
+            }
+
+            $regular = $campaign->get($date);
+            $gmsRow = $gms->get($date);
             return [$date => (object) [
                 'date' => $date,
-                'spend' => (float) ($base->spend ?? 0) + (float) ($extra->spend ?? 0),
-                'gmv' => (float) ($base->gmv ?? 0) + (float) ($extra->gmv ?? 0),
-                'impressions' => (int) ($base->impressions ?? 0) + (int) ($extra->impressions ?? 0),
-                'clicks' => (int) ($base->clicks ?? 0) + (int) ($extra->clicks ?? 0),
-                'orders' => (int) ($base->orders ?? 0) + (int) ($extra->orders ?? 0),
+                'spend' => (float) ($regular->spend ?? 0) + (float) ($gmsRow->spend ?? 0),
+                'gmv' => (float) ($regular->gmv ?? 0) + (float) ($gmsRow->gmv ?? 0),
+                'impressions' => (int) ($regular->impressions ?? 0) + (int) ($gmsRow->impressions ?? 0),
+                'clicks' => (int) ($regular->clicks ?? 0) + (int) ($gmsRow->clicks ?? 0),
+                'orders' => (int) ($regular->orders ?? 0) + (int) ($gmsRow->orders ?? 0),
             ]];
         })->all();
     }

@@ -322,6 +322,17 @@
     })->all();
     $perfInitialKpi = $perfSegmentKpis['category'];
 
+    // KPI keseluruhan harus memakai sumber Seller Center yang sama dengan
+    // tab Profit. KPI subtab tetap memakai agregasi baris GMV Max ROAS/Auto.
+    $overallCurrentKpi = ($kpi ?? [])['current'] ?? null;
+    $overallPreviousKpi = ($kpi ?? [])['previous'] ?? null;
+    $overallPreviousSpend = $overallPreviousKpi !== null
+        ? (float) ($overallPreviousKpi->spend ?? 0) * 1.11
+        : $perfRows->sum('prev_spend');
+    if ($overallCurrentKpi !== null) {
+        $totalSpend = (float) ($overallCurrentKpi->spend ?? 0) * 1.11;
+    }
+
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
             'x' => $r['spend'],
@@ -428,10 +439,10 @@
 <div class="row g-3 mb-4" id="campaignPerformanceOverallKpis">
     <div class="col-6 col-md-3">
             <div class="dpanel p-3 h-100">
-                <div class="text-muted small fw-bold text-uppercase mb-1" title="Total biaya iklan setelah PPN 11%">Total Biaya + PPN</div>
+                <div class="text-muted small fw-bold text-uppercase mb-1" title="Total biaya iklan Seller Center setelah PPN 11%">Total Seller Center + PPN</div>
                 <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalSpend, 0, ',', '.') }}</div>
-                <div class="small text-muted mt-1"><i class="bi bi-bullseye"></i> Biaya iklan setelah PPN 11%</div>
-                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfRows->sum('prev_spend'), 0, ',', '.') }} {!! $fmtDelta($totalSpend, $perfRows->sum('prev_spend'), null) !!}</div>
+                <div class="small text-muted mt-1"><i class="bi bi-bullseye"></i> GMV Max ROAS + GMV Max Auto</div>
+                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($overallPreviousSpend, 0, ',', '.') }} {!! $fmtDelta($totalSpend, $overallPreviousSpend, null) !!}</div>
         </div>
     </div>
     <div class="col-6 col-md-3">

@@ -1251,6 +1251,12 @@ class AdsModuleTest extends TestCase
 
         $this->assertSame(10000.0, (float) $data['kpi']['current']->spend);
         $this->assertSame(100000.0, (float) $data['kpi']['current']->gmv);
+
+        $historical = app(AdsAnalyticsService::class)
+            ->getHistoricalComparison($store->id, '2026-07-30', '2026-07-30', 1, 'prev_period');
+
+        $this->assertSame(10000.0, (float) $historical[0]['data']->first()['spend']);
+        $this->assertSame(100000.0, (float) $historical[0]['data']->first()['gmv']);
     }
 
     public function test_summary_roas_change_is_not_always_zero()

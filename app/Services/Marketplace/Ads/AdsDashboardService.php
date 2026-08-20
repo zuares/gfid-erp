@@ -196,8 +196,8 @@ class AdsDashboardService
         $dEnd = Carbon::parse($dateTo);
 
         if ($compareMode === 'prev_month') {
-            $prevDateFrom = $dStart->copy()->subMonth()->toDateString();
-            $prevDateTo = $dEnd->copy()->subMonth()->toDateString();
+            $prevDateFrom = $dStart->copy()->subMonthNoOverflow()->toDateString();
+            $prevDateTo = $dEnd->copy()->subMonthNoOverflow()->toDateString();
         } elseif ($compareMode === 'prev_year') {
             $prevDateFrom = $dStart->copy()->subYear()->toDateString();
             $prevDateTo = $dEnd->copy()->subYear()->toDateString();
