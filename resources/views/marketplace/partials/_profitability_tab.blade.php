@@ -38,7 +38,7 @@
             : ($camp->profit_after_ads !== null
             ? (float) $camp->profit_after_ads
             : null);
-        $acos          = $camp->gmv > 0 ? ($camp->spend / $camp->gmv) * 100 : 0;
+        $acos          = $camp->gmv > 0 ? ($spendAfterTax / $camp->gmv) * 100 : 0;
         $beAcos        = $camp->break_even_acos_pct; // batas aman (sudah faktor pajak)
 
         $rows->push((object) [
@@ -131,16 +131,19 @@
     // dikurangkan di sini agar tidak dihitung dua kali.
     $totalProfit    -= $unattributedSpend * 1.11;
     $totalSellerCenterSpend = max(0, $sellerCenterSpend);
-    $regularCampaignSpend = max(0, $sellerCenterSpend - $gmvAutoSpend);
+    // Rincian GMV Max ROAS harus mengikuti spend campaign GMV Max ROAS,
+    // sama dengan KPI pada tab campaign. Seller Center tetap menjadi total
+    // gabungan GMV Max ROAS + GMV Max Auto.
+    $regularCampaignSpend = $displayRows->sum(fn ($r) => (float) ($r->camp->spend ?? 0));
     $knownGmv        = $knownRows->sum(fn ($r) => (float) $r->camp->gmv);
     $knownNetRevenue = $knownRows->sum('netRevenue');
-    $avgAcos         = $totalGmv > 0 ? ($totalSpend / $totalGmv) * 100 : 0;
+    $avgAcos         = $totalGmv > 0 ? ($totalTopup / $totalGmv) * 100 : 0;
     $cogsPctOmzet    = $totalGmv > 0 ? ($totalCogsAll / $totalGmv) * 100 : 0;   // porsi modal terhadap omzet
     $grossMargin     = $knownNetRevenue - $totalCogsAll;                        // sisa setelah HPP, sebelum iklan
     $noHppCount      = $rows->filter(fn ($r) => $r->totalCogs === null)->count(); // kampanye tanpa HPP yang dapat dipakai
     $avgFeePct       = $totalGmv > 0 ? max(0, (1 - ($totalNetRevenue / $totalGmv)) * 100) : 0; // rata-rata tertimbang potongan admin
     $totalFeeAmt     = max(0, $totalGmv - $totalNetRevenue); // total rupiah potongan platform
-    $totalRoas       = $totalSpend > 0 ? $totalGmv / $totalSpend : 0;              // omzet per rupiah iklan
+    $totalRoas       = $totalTopup > 0 ? $totalGmv / $totalTopup : 0;              // omzet per rupiah iklan setelah PPN
     $netRoas         = $totalTopup > 0 ? $totalNetRevenue / $totalTopup : 0;       // uang cair per rupiah iklan (incl. PPN)
     
     // Additional metrics for POAS, Margin, CAC, Break-even ROAS
@@ -164,14 +167,14 @@
     $gmsTotalOrders = $gmsProfitRows->sum(fn ($r) => (int) $r->camp->orders);
     $gmsTotalProfit = $gmsKnownRows->sum('profit');
     $gmsUnknownCount = $gmsProfitRows->count() - $gmsKnownRows->count();
-    $gmsRoas = $gmsTotalSpend > 0 ? $gmsTotalGmv / $gmsTotalSpend : 0;
+    $gmsRoas = ($gmsTotalSpend * 1.11) > 0 ? $gmsTotalGmv / ($gmsTotalSpend * 1.11) : 0;
     $gmsMarginPct = $gmsTotalGmv > 0 ? ($gmsTotalProfit / $gmsTotalGmv) * 100 : 0;
     $gmsPreviousGmv = $gmsProfitRows->sum(fn ($r) => (float) ($r->camp->prev_gmv ?? 0));
     $gmsPreviousSpend = $gmsProfitRows->sum(fn ($r) => (float) ($r->camp->prev_spend ?? 0));
     $gmsPreviousKnownRows = $gmsProfitRows->filter(fn ($r) => $r->camp->prev_profit_after_ads !== null);
     $gmsPreviousProfit = $gmsPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_profit_after_ads ?? 0));
     $gmsPreviousCogs = $gmsPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_total_cogs ?? 0));
-    $gmsPreviousValue = $gmsPreviousSpend > 0 ? $gmsPreviousGmv / $gmsPreviousSpend : 0;
+    $gmsPreviousValue = ($gmsPreviousSpend * 1.11) > 0 ? $gmsPreviousGmv / ($gmsPreviousSpend * 1.11) : 0;
     $roasKnownRows = $displayRows->filter(fn ($r) => $r->profit !== null);
     $roasTotalGmv = $displayRows->sum(fn ($r) => (float) $r->camp->gmv);
     // KPI kampanye regular harus mengambil spend langsung dari baris GMV Max
@@ -183,14 +186,14 @@
     $roasUnknownCount = $displayRows->count() - $roasKnownRows->count();
     $roasTotalCogs = $roasKnownRows->sum('totalCogs');
     $roasKnownGmv = $roasKnownRows->sum(fn ($r) => (float) $r->camp->gmv);
-    $roasValue = $roasTotalSpend > 0 ? $roasTotalGmv / $roasTotalSpend : 0;
+    $roasValue = ($roasTotalSpend * 1.11) > 0 ? $roasTotalGmv / ($roasTotalSpend * 1.11) : 0;
     $roasMarginPct = $roasKnownGmv > 0 ? ($roasTotalProfit / $roasKnownGmv) * 100 : 0;
     $roasPreviousKnownRows = $displayRows->filter(fn ($r) => $r->camp->prev_profit_after_ads !== null);
     $roasPreviousGmv = $displayRows->sum(fn ($r) => (float) ($r->camp->prev_gmv ?? 0));
     $roasPreviousSpend = $displayRows->sum(fn ($r) => (float) ($r->camp->prev_spend ?? 0));
     $roasPreviousProfit = $roasPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_profit_after_ads ?? 0));
     $roasPreviousCogs = $roasPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_total_cogs ?? 0));
-    $roasPreviousValue = $roasPreviousSpend > 0 ? $roasPreviousGmv / $roasPreviousSpend : 0;
+    $roasPreviousValue = ($roasPreviousSpend * 1.11) > 0 ? $roasPreviousGmv / ($roasPreviousSpend * 1.11) : 0;
     $mappableProfitRows = $mappableProfitRows
         ->reject(fn ($r) => str_starts_with((string) ($r->camp->channel_campaign_id ?? ''), 'GMS-'))
         ->values();
@@ -229,7 +232,7 @@
     $previousGrossProfit = (float) ($previousKpi->net_revenue ?? 0) - (float) ($previousKpi->total_cogs ?? 0);
     $previousProfit = (float) ($previousKpi->net_profit ?? 0);
     $previousNetMarginPct = $previousGmv > 0 ? ($previousProfit / $previousGmv) * 100 : 0;
-    $previousRoas = $previousSpend > 0 ? $previousGmv / $previousSpend : 0;
+    $previousRoas = $previousTopup > 0 ? $previousGmv / $previousTopup : 0;
     $previousPoas = $previousTopup > 0 ? $previousProfit / $previousTopup : 0;
     $previousBeRoas = $previousGrossProfit > 0 ? (1.11 * $previousGmv) / $previousGrossProfit : 0;
     $previousCac = $previousOrders > 0 ? $previousTopup / $previousOrders : 0;
@@ -281,7 +284,7 @@ window.__profitChartData = {
     <div class="profit-recon-card">
         <div class="profit-recon-label"><i class="bi bi-shop"></i> Total Seller Center</div>
         <div class="profit-recon-value">{{ $fmt($totalSellerCenterSpend) }}</div>
-        <div class="profit-recon-label" style="margin-top:.15rem;">+PPN {{ $fmt($totalSellerCenterSpend * 1.11) }}</div>
+        <div class="profit-recon-label" style="margin-top:.15rem;">ROAS + Auto · +PPN {{ $fmt($totalSellerCenterSpend * 1.11) }}</div>
     </div>
     <div class="profit-recon-card">
         <div class="profit-recon-label"><i class="bi bi-megaphone"></i> GMV Max ROAS</div>
@@ -1457,7 +1460,7 @@ window.__profitView = function (mode) {
                 <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;" title="Total HPP produk"><div title="Total HPP">&minus;{{ $fmt($roasTotalCogs) }}</div><div style="font-size:.62rem;color:var(--dsh-muted);font-weight:500;" title="HPP rata-rata per pcs">{{ $displayRows->sum(fn ($r) => $r->camp->items_sold) > 0 ? $fmt($roasTotalCogs / $displayRows->sum(fn ($r) => $r->camp->items_sold)) : '—' }}</div></td>
                 <td class="text-end" style="font-weight: 700; font-size: .95rem; color: {{ $roasTotalProfit >= 0 ? '#16a34a' : '#dc2626' }}; font-variant-numeric: tabular-nums; border-left: 2px solid var(--dsh-border); background: rgba({{ $roasTotalProfit >= 0 ? '22, 163, 74' : '220, 38, 38' }}, 0.05);">{{ $roasTotalProfit < 0 ? '−' : '' }}{{ $fmt($roasTotalProfit) }}<div style="font-size:.62rem; color:var(--dsh-muted); font-weight:500;">{{ $roasUnknownCount > 0 ? $roasUnknownCount . ' campaign belum dihitung' : 'HPP tersedia' }}</div></td>
                 <td class="text-end" style="font-weight:700;color:var(--dsh-muted);">—</td>
-                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ $roasTotalGmv > 0 ? number_format(($roasTotalSpend / $roasTotalGmv) * 100, 1, ',', '.') : '0,0' }}%</td>
+                <td class="text-end" style="font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;">{{ $roasTotalGmv > 0 ? number_format((($roasTotalSpend * 1.11) / $roasTotalGmv) * 100, 1, ',', '.') : '0,0' }}%</td>
                 <td></td>
             </tr>
         </tfoot>
