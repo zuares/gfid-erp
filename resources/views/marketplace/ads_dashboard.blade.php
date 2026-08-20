@@ -2263,7 +2263,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-clock text-primary"></i> Heatmap Jam</div>
-                        <div class="ads-tab-panel-note">Peringkat waktu berdasarkan CVR.</div>
+                        <div class="ads-tab-panel-note">Peringkat waktu berdasarkan CVR · Gross Profit sebelum HPP.</div>
                     </div>
                 </div>
                 <div class="p-3">
@@ -3858,7 +3858,9 @@ document.addEventListener("DOMContentLoaded", function() {
             clicks,
             orders,
             roas: spend > 0 ? gmv / spend : 0,
+            ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
             cvr: clicks > 0 ? (orders / clicks) * 100 : 0,
+            grossProfit: gmv - spend,
         };
     });
     const hourlyBreakdownEl = document.getElementById('hourlyBreakdown');
@@ -3871,8 +3873,13 @@ document.addEventListener("DOMContentLoaded", function() {
             return `<th class="${className}" data-hourly-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
         };
         const renderHourlyBreakdown = () => {
-            const breakdownRows = hourlyMetricRows
+            const eligibleRows = hourlyMetricRows
                 .filter(row => row.spend > 0 || row.gmv > 0 || row.impressions > 0 || row.clicks > 0 || row.orders > 0)
+                ;
+            const tableWorstHour = eligibleRows
+                .filter(row => row.spend > 1000 && row.clicks >= 5)
+                .sort((a, b) => (a.cvr - b.cvr) || (a.orders - b.orders) || (b.clicks - a.clicks) || (a.roas - b.roas))[0];
+            const breakdownRows = [...eligibleRows]
                 .sort((a, b) => {
                     const aValue = a[hourlySortKey];
                     const bValue = b[hourlySortKey];
@@ -3882,20 +3889,34 @@ document.addEventListener("DOMContentLoaded", function() {
                     return comparison * (hourlySortDirection === 'asc' ? 1 : -1);
                 })
                 .slice(0, 8);
+            if (tableWorstHour && !breakdownRows.some(row => row.hour === tableWorstHour.hour)) {
+                breakdownRows.push(tableWorstHour);
+            }
 
             hourlyBreakdownEl.innerHTML = breakdownRows.length
                 ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
-                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('roas', 'ROAS', 'text-end')}</tr></thead>
-                    <tbody>${breakdownRows.map((row, index) => `<tr${index === 0 ? ' style="background:rgba(245, 158, 11, 0.08);"' : ''}>
-                        <td class="fw-bold">${index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="Peringkat teratas"></i>' : ''}${row.label}</td>
+                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('ctr', 'CTR', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('grossProfit', 'Gross Profit', 'text-end')}${sortableHeader('roas', 'ROAS', 'text-end')}</tr></thead>
+                    <tbody>${breakdownRows.map((row, index) => {
+                        const isWorst = tableWorstHour && row.hour === tableWorstHour.hour;
+                        const rowStyle = isWorst
+                            ? ' style="background:rgba(220, 38, 38, 0.07);"'
+                            : (index === 0 ? ' style="background:rgba(245, 158, 11, 0.08);"' : '');
+                        const rowIcon = isWorst
+                            ? '<i class="bi bi-exclamation-triangle-fill text-danger me-1" title="CVR terendah"></i>'
+                            : (index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="Peringkat teratas"></i>' : '');
+                        return `<tr${rowStyle}>
+                        <td class="fw-bold">${rowIcon}${row.label}</td>
                         <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
                         <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
+                        <td class="text-end">${row.ctr.toFixed(2)}%</td>
                         <td class="text-end fw-bold">${row.cvr.toFixed(2)}%</td>
                         <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
                         <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                         <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
+                        <td class="text-end fw-bold ${row.grossProfit >= 0 ? 'text-success' : 'text-danger'}">${row.grossProfit < 0 ? '−' : ''}Rp ${formatShortIDR(Math.abs(row.grossProfit))}</td>
                         <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
-                    </tr>`).join('')}</tbody>
+                    </tr>`;
+                    }).join('')}</tbody>
                 </table>`
                 : '<div style="font-size:.72rem; color:var(--dsh-muted); padding:.6rem 0;">Belum ada aktivitas per jam pada periode ini.</div>';
 
@@ -4275,7 +4296,9 @@ document.addEventListener("DOMContentLoaded", function() {
                                     'Breakdown ' + row.label,
                                     'Impresi: ' + row.impressions.toLocaleString('id-ID'),
                                     'Klik: ' + row.clicks.toLocaleString('id-ID'),
+                                    'CTR: ' + row.ctr.toFixed(2) + '%',
                                     'Orders: ' + row.orders.toLocaleString('id-ID'),
+                                    'Gross Profit: ' + formatFullIDR(row.grossProfit) + ' (sebelum HPP)',
                                     'CVR: ' + row.cvr.toFixed(2) + '%',
                                     'ROAS: ' + row.roas.toFixed(2) + 'x',
                                 ];
