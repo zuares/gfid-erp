@@ -507,6 +507,41 @@ class AdsDashboardController extends Controller
         }
     }
 
+    public function historicalComparison(Request $request, AdsAnalyticsService $analytics): JsonResponse
+    {
+        $storeId = $request->input('store_id', 'all');
+        $compareMode = in_array($request->input('compare_mode'), ['prev_period', 'prev_month', 'prev_year'], true)
+            ? $request->input('compare_mode')
+            : 'prev_period';
+        $dateFrom = $request->input('date_from', now()->subDays(6)->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
+
+        try {
+            $dateFrom = Carbon::parse($dateFrom)->toDateString();
+            $dateTo = Carbon::parse($dateTo)->toDateString();
+        } catch (\Throwable) {
+            return response()->json(['message' => 'Rentang tanggal tidak valid.'], 422);
+        }
+
+        $storeQuery = Store::query()
+            ->whereHas('channel', fn ($query) => $query->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('status', 'active')
+            ->where('is_active', true);
+
+        if ($storeId !== 'all') {
+            $storeQuery->whereKey((int) $storeId);
+        }
+
+        $storeIds = $storeQuery->pluck('id')->all();
+
+        return response()->json([
+            'data' => $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3, $compareMode),
+            'compare_mode' => $compareMode,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ]);
+    }
+
     /**
      * Detail harian untuk drilldown campaign GMV Max ROAS atau item GMV Max Auto.
      * Sumbernya adalah fakta harian hasil sync agar grafik mengikuti filter dashboard.

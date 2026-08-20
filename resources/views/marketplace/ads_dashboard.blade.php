@@ -1685,8 +1685,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (summaryTable) summaryTable.style.opacity = '.45';
         if (compareModeSelect) compareModeSelect.disabled = true;
         compareModeTabs?.querySelectorAll('[data-compare-mode]').forEach(tab => { tab.disabled = true; });
-        window.__dashLoading?.();
-        window.submitAdsFilters(filterForm);
+        if (typeof window.updateHistoricalComparison === 'function') {
+            window.updateHistoricalComparison(value);
+        } else {
+            window.__dashLoading?.();
+            window.submitAdsFilters(filterForm);
+        }
     };
     compareModeSelect?.addEventListener('change', function () {
         submitCompareMode(this.value);
@@ -2316,6 +2320,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="dash-tabs-modern" id="histMetricChips" style="padding:.2rem;">
                             <button class="dash-tab-sm active" data-val="roas"><i class="bi bi-lightning-charge"></i> ROAS</button>
                             <button class="dash-tab-sm" data-val="gmv"><i class="bi bi-bag-check"></i> GMV</button>
+                            <button class="dash-tab-sm" data-val="aov"><i class="bi bi-cart3"></i> AOV</button>
                             <button class="dash-tab-sm" data-val="spend"><i class="bi bi-wallet2"></i> Biaya</button>
                             <button class="dash-tab-sm" data-val="impressions"><i class="bi bi-eye"></i> Jangkauan</button>
                             <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
@@ -3836,6 +3841,7 @@ window.AdsDashboardRoutes = {
     cpcCampaignEdit: @json(route('marketplace.ads.cpc.campaign.edit')),
     gmsItemAction: @json(route('marketplace.ads.gms.action')),
     gmsCampaignEdit: @json(route('marketplace.ads.gms.campaign.edit')),
+    historicalComparison: @json(route('marketplace.ads.historical.comparison')),
     campaignHourly: @json(route('marketplace.ads.campaign.hourly')),
     clear: @json(route('marketplace.ads.clear')),
     sync: @json(route('marketplace.ads.sync')),
@@ -3853,7 +3859,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const rawDaily = @json($dailyChartData ?? []);
     const rawHourly = @json($heatmapData ?? []);
     const hourlyInternalItems = @json($heatmapInternalItems ?? []);
-    const rawHistorical = @json($historicalData ?? []);
+    let rawHistorical = @json($historicalData ?? []);
+    let historicalCompareMode = @json($compareMode ?? 'prev_period');
     
     // Pad Daily Data to show full range
     const dailyData = [];
@@ -5003,6 +5010,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         return sp > 0 ? (gm / sp) : 0;
                     } else if (metric === 'gmv') {
                         return gm;
+                    } else if (metric === 'aov') {
+                        return orders > 0 ? gm / orders : 0;
                     } else if (metric === 'spend') {
                         return sp;
                     } else if (metric === 'impressions') {
@@ -5026,6 +5035,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     return 0;
                 };
 
+                const renderHistoricalSummaryTable = () => {
                 const historicalSummaryTable = document.getElementById('historicalSummaryTable');
                 if (historicalSummaryTable) {
                     const aggregateHistoricalPeriod = (period) => {
@@ -5039,6 +5049,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                         return {
                             roas: spend > 0 ? gmv / spend : 0,
+                            aov: orders > 0 ? gmv / orders : 0,
                             gmv,
                             spend,
                             impressions,
@@ -5052,12 +5063,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     const currentSummary = aggregateHistoricalPeriod(rawHistorical[0]);
                     const previousSummary = aggregateHistoricalPeriod(rawHistorical[1]);
                     const twoPeriodsAgoSummary = aggregateHistoricalPeriod(rawHistorical[2]);
-                    const compareMode = @json($compareMode ?? 'prev_period');
-                    const previousLabel = compareMode === 'prev_month' ? '1 Bulan Lalu' : (compareMode === 'prev_year' ? '1 Tahun Lalu' : '1 Periode Lalu');
-                    const twoPeriodsAgoLabel = compareMode === 'prev_month' ? '2 Bulan Lalu' : (compareMode === 'prev_year' ? '2 Tahun Lalu' : '2 Periode Lalu');
+                    const previousLabel = historicalCompareMode === 'prev_month' ? '1 Bulan Lalu' : (historicalCompareMode === 'prev_year' ? '1 Tahun Lalu' : '1 Periode Lalu');
+                    const twoPeriodsAgoLabel = historicalCompareMode === 'prev_month' ? '2 Bulan Lalu' : (historicalCompareMode === 'prev_year' ? '2 Tahun Lalu' : '2 Periode Lalu');
                     const summaryRows = [
                         ['roas', 'ROAS', 'ratio'],
                         ['gmv', 'GMV', 'money'],
+                        ['aov', 'AOV', 'money'],
                         ['spend', 'Biaya iklan', 'money'],
                         ['impressions', 'Impresi', 'count'],
                         ['clicks', 'Klik', 'count'],
@@ -5112,6 +5123,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         }).join('')}</tbody>
                     </table>`;
                 }
+                };
+                renderHistoricalSummaryTable();
 
                 const renderHistChart = (metric) => {
                     let datasets = rawHistorical.map((period, idx) => {
@@ -5132,7 +5145,15 @@ document.addEventListener("DOMContentLoaded", function() {
                         }
                         
                         let label = idx === 0 ? 'Rentang Saat Ini' : `${idx} Rentang Lalu`;
-                        if (idx === 1) label = 'Rentang Sebelumnya';
+                        if (idx === 1) {
+                            label = historicalCompareMode === 'prev_month'
+                                ? '1 Bulan Lalu'
+                                : (historicalCompareMode === 'prev_year' ? '1 Tahun Lalu' : '1 Periode Lalu');
+                        } else if (idx === 2) {
+                            label = historicalCompareMode === 'prev_month'
+                                ? '2 Bulan Lalu'
+                                : (historicalCompareMode === 'prev_year' ? '2 Tahun Lalu' : '2 Periode Lalu');
+                        }
 
                         return {
                             label: label,
@@ -5240,7 +5261,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             return (v < 0 ? '−' : '') + 'Rp ' + formatShortIDR(Math.abs(v));
                         };
 
-                        let isAvg = (metric === 'roas' || metric === 'cvr' || metric === 'ctr');
+                        let isAvg = (metric === 'roas' || metric === 'aov' || metric === 'cvr' || metric === 'ctr');
                         const currentRange = formatHistRange(rawHistorical[0]);
                         const previousRange = formatHistRange(rawHistorical[1]);
                         html += `<div style="margin-bottom:2px;">Aktif <span style="font-size:.68rem;color:var(--dsh-muted);">(${currentRange})</span>: <span style="color:var(--dsh-accent)">${isAvg ? 'Rata-rata' : 'Total'} ${formatVal(isAvg ? currAvg : currSum)}</span></div>`;
@@ -5263,6 +5284,54 @@ document.addEventListener("DOMContentLoaded", function() {
                         }
                         
                         summaryEl.innerHTML = html;
+                    }
+                };
+
+                const updateHistoricalPeriodLabels = () => {
+                    const histPeriodLabel = document.getElementById('histPeriodLabel');
+                    if (!histPeriodLabel || rawHistorical.length === 0) return;
+                    histPeriodLabel.innerHTML = '<span class="badge bg-primary-subtle text-primary border">Aktif: ' + formatHistRange(rawHistorical[0]) + '</span>'
+                        + '<span>vs</span>'
+                        + '<span class="badge bg-light text-dark border">Pembanding: ' + formatHistRange(rawHistorical[1]) + '</span>'
+                        + (rawHistorical[2] ? '<span>·</span><span class="badge bg-light text-dark border">2 lalu: ' + formatHistRange(rawHistorical[2]) + '</span>' : '');
+                };
+
+                window.updateHistoricalComparison = async function (mode) {
+                    const routes = window.AdsDashboardRoutes || {};
+                    const selectedStore = document.querySelector('select[name="store_id"]')?.value || 'all';
+                    const dateFrom = document.getElementById('fromHidden')?.value || '';
+                    const dateTo = document.getElementById('toHidden')?.value || '';
+                    const url = new URL(routes.historicalComparison, window.location.origin);
+                    url.searchParams.set('store_id', selectedStore);
+                    url.searchParams.set('date_from', dateFrom);
+                    url.searchParams.set('date_to', dateTo);
+                    url.searchParams.set('compare_mode', mode);
+
+                    try {
+                        const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+                        const payload = await response.json();
+                        if (!response.ok) throw new Error(payload.message || 'Gagal memuat perbandingan periode.');
+                        rawHistorical = payload.data || [];
+                        historicalCompareMode = payload.compare_mode || mode;
+                        const pageUrl = new URL(window.location.href);
+                        pageUrl.searchParams.set('compare_mode', historicalCompareMode);
+                        window.history.replaceState({}, '', pageUrl.toString());
+                        updateHistoricalPeriodLabels();
+                        renderHistoricalSummaryTable();
+                        renderHistChart(document.getElementById('histMetricSelect')?.value || 'roas');
+                    } catch (error) {
+                        window.showToast?.(error.message || 'Gagal memuat perbandingan periode.');
+                    } finally {
+                        const status = document.getElementById('compareModeStatus');
+                        const select = document.getElementById('compareModeSelect');
+                        const tabs = document.querySelectorAll('#compareModeTabs [data-compare-mode]');
+                        if (status) status.style.display = 'none';
+                        if (select) select.disabled = false;
+                        tabs.forEach(tab => { tab.disabled = false; });
+                        const summaryTable = document.getElementById('historicalSummaryTable');
+                        if (summaryTable) summaryTable.style.opacity = '1';
+                        const loadingOverlay = document.getElementById('dashLoadingOverlay');
+                        if (loadingOverlay) loadingOverlay.style.display = 'none';
                     }
                 };
 

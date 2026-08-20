@@ -115,6 +115,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.clear');
         Route::get('ads-dashboard/realtime-status', [AdsDashboardController::class, 'realtimeStatus'])
             ->name('ads.realtime.status');
+        Route::get('ads-dashboard/historical-comparison', [AdsDashboardController::class, 'historicalComparison'])
+            ->name('ads.historical.comparison');
         Route::get('ads-dashboard/campaign-hourly', [AdsDashboardController::class, 'campaignHourly'])
             ->name('ads.campaign.hourly');
         Route::get('ads-dashboard/drilldown/{store}', [AdsDashboardController::class, 'drilldown'])
