@@ -342,6 +342,9 @@
         .product-category-row:hover { background:rgba(37,99,235,.04); }
         .product-caret { transition:transform .15s; }
         .product-category-row.open .product-caret { transform:rotate(90deg); }
+        .product-variant-empty-details { font-size:.58rem; text-align:left; white-space:normal; }
+        .product-variant-empty-details summary { cursor:pointer; color:#b91c1c; font-weight:700; list-style-position:inside; }
+        .product-variant-empty-list { margin-top:.2rem; padding:.25rem .35rem; border:1px solid rgba(220,38,38,.18); border-radius:6px; background:rgba(220,38,38,.04); color:#991b1b; line-height:1.35; }
     </style>
     <div class="table-responsive" style="max-height: 600px;">
         <table class="table table-hover align-middle mb-0 text-nowrap" style="font-size: 0.85rem;" id="productsPerformanceTable">
@@ -364,8 +367,8 @@
                 @foreach($productCategoryRows as $categoryRow)
                     <tr class="product-category-row" data-product-views="category" onclick="productToggleCategory(this)">
                         <td><div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right product-caret text-muted" style="font-size:.7rem;"></i><div><div class="fw-bold">{{ $categoryRow['category'] }}</div><div class="text-muted small">{{ number_format($categoryRow['products'], 0, ',', '.') }} produk</div></div></div></td>
-                        <td><span class="badge bg-light text-dark border">Ringkasan</span><br><span class="badge bg-{{ $categoryRow['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $categoryRow['stock_risk']['label'] }}</span>@if($categoryRow['variant_stock_empty_products'] > 0)<br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.58rem;">{{ $categoryRow['variant_stock_empty_products'] }} variant kosong</span>@endif</td>
-                        <td class="text-end">{{ number_format($categoryRow['stock'], 0, ',', '.') }}</td>
+                        <td><span class="badge bg-light text-dark border">Ringkasan</span><br><span class="badge bg-{{ $categoryRow['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $categoryRow['stock_risk']['label'] }}</span></td>
+                        <td class="text-end">{{ number_format($categoryRow['stock'], 0, ',', '.') }}@if($categoryRow['variant_stock_empty_products'] > 0)<br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.58rem;">Ada variant kosong · {{ $categoryRow['variant_stock_empty_products'] }} produk</span>@endif</td>
                         <td class="text-end fw-bold">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($categoryRow['ctr'], 2) }}%</td>
                         <td class="text-end">{{ number_format($categoryRow['cvr'], 2) }}%</td>
@@ -386,8 +389,8 @@
                                             @php $detailProduct = $productEntry['row']; @endphp
                                             <tr>
                                                 <td><div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $detailProduct->item_name }}">{{ $detailProduct->item_name }}</div><div class="text-muted" style="font-size:.62rem;">{{ $detailProduct->item_sku }}</div></td>
-                                                <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span><br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.56rem;">{{ $productEntry['stock_risk']['label'] }}</span>@if($productEntry['variant_stock_empty'])<br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.56rem;" title="{{ implode(', ', $productEntry['empty_variant_skus']) }}"><i class="bi bi-exclamation-triangle me-1"></i>Stok Variant Kosong</span>@endif</td>
-                                                <td class="text-end">{{ number_format($detailProduct->stock_total ?? 0, 0, ',', '.') }}</td>
+                                                <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span><br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.56rem;">{{ $productEntry['stock_risk']['label'] }}</span></td>
+                                                <td class="text-end">{{ number_format($detailProduct->stock_total ?? 0, 0, ',', '.') }}@if($productEntry['variant_stock_empty'])<details class="product-variant-empty-details" onclick="event.stopPropagation();"><summary><i class="bi bi-exclamation-triangle me-1"></i>Ada variant kosong</summary><div class="product-variant-empty-list">{{ implode(', ', $productEntry['empty_variant_skus']) }}</div></details>@endif</td>
                                                 <td class="text-end">{{ number_format($detailProduct->orders, 0, ',', '.') }}</td>
                                                 <td class="text-end">Rp {{ number_format(($detailProduct->orders ?? 0) > 0 ? $detailProduct->gmv / $detailProduct->orders : 0, 0, ',', '.') }}</td>
                                                 <td class="text-end text-success">Rp {{ number_format($detailProduct->gmv, 0, ',', '.') }}</td>
@@ -432,15 +435,15 @@
                                 {{ $row->classification }}
                             </span>
                             <br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $productEntry['stock_risk']['label'] }}</span>
-                            @if($productEntry['variant_stock_empty'])
-                                <br><span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:.58rem;" title="{{ implode(', ', $productEntry['empty_variant_skus']) }}"><i class="bi bi-exclamation-triangle me-1"></i>Stok Variant Kosong</span>
-                            @endif
                         </td>
                         <td class="text-end">
                             @if(($row->stock_total ?? 0) < 5)
                                 <span class="text-danger fw-bold">{{ $row->stock_total ?? 0 }}</span>
                             @else
                                 {{ $row->stock_total ?? 0 }}
+                            @endif
+                            @if($productEntry['variant_stock_empty'])
+                                <details class="product-variant-empty-details" onclick="event.stopPropagation();"><summary><i class="bi bi-exclamation-triangle me-1"></i>Ada variant kosong</summary><div class="product-variant-empty-list">{{ implode(', ', $productEntry['empty_variant_skus']) }}</div></details>
                             @endif
                         </td>
                         <td class="text-end fw-bold">{{ number_format($row->orders, 0, ',', '.') }}</td>
