@@ -1843,6 +1843,119 @@ function trafficFormatNumber(value, decimals) {
     });
 }
 
+let trafficQualityChart = null;
+
+function trafficMedian(values) {
+    const sorted = values.filter(value => Number.isFinite(value)).sort((a, b) => a - b);
+    if (!sorted.length) return 0;
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function trafficRenderFunnel(kpi) {
+    const values = {
+        impressions: Number(kpi.impressions || 0),
+        clicks: Number(kpi.clicks || 0),
+        orders: Number(kpi.orders || 0),
+    };
+    const maxValue = Math.max(values.impressions, 1);
+
+    Object.entries(values).forEach(function([key, value]) {
+        document.querySelectorAll('[data-traffic-funnel-value="' + key + '"]').forEach(function(el) {
+            el.textContent = trafficFormatNumber(value, 0);
+        });
+        document.querySelectorAll('[data-traffic-funnel-stage="' + key + '"]').forEach(function(el) {
+            el.style.width = Math.max(34, (value / maxValue) * 100) + '%';
+        });
+    });
+
+    document.querySelectorAll('[data-traffic-funnel-rate="ctr"]').forEach(function(el) {
+        el.textContent = 'CTR ' + trafficFormatNumber(kpi.ctr, 2) + '%';
+    });
+    document.querySelectorAll('[data-traffic-funnel-rate="cvr"]').forEach(function(el) {
+        el.textContent = 'CVR ' + trafficFormatNumber(kpi.cvr, 2) + '%';
+    });
+}
+
+function trafficRenderQualityChart(view) {
+    const canvas = document.getElementById('trafficQualityChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const rows = ((window.__trafficChartData || {})[view] || []).map(function(row) {
+        return {
+            ...row,
+            x: Number(row.ctr || 0),
+            y: Number(row.cvr || 0),
+            r: Math.max(4, Math.min(15, 4 + Math.log10(Number(row.impressions || 0) + 1) * 2)),
+        };
+    });
+    const ctrMedian = trafficMedian(rows.map(row => row.x));
+    const cvrMedian = trafficMedian(rows.map(row => row.y));
+    const colors = {
+        'CTR & CVR tinggi': 'rgba(16, 185, 129, .72)',
+        'CTR tinggi · CVR rendah': 'rgba(245, 158, 11, .72)',
+        'CTR rendah · CVR tinggi': 'rgba(139, 92, 246, .72)',
+        'CTR & CVR rendah': 'rgba(239, 68, 68, .72)',
+    };
+    const groupFor = row => row.x >= ctrMedian
+        ? (row.y >= cvrMedian ? 'CTR & CVR tinggi' : 'CTR tinggi · CVR rendah')
+        : (row.y >= cvrMedian ? 'CTR rendah · CVR tinggi' : 'CTR & CVR rendah');
+
+    if (trafficQualityChart) trafficQualityChart.destroy();
+    trafficQualityChart = new Chart(canvas, {
+        type: 'bubble',
+        data: {
+            datasets: Object.keys(colors).map(function(label) {
+                const color = colors[label];
+                return {
+                    label: label,
+                    data: rows.filter(row => groupFor(row) === label),
+                    backgroundColor: color,
+                    borderColor: color.replace('.72', '1'),
+                    borderWidth: 1,
+                };
+            }),
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'nearest', intersect: true },
+            plugins: {
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const row = context.raw;
+                            const money = value => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+                            return [
+                                row.name,
+                                'CTR: ' + trafficFormatNumber(row.ctr, 2) + '% · CVR: ' + trafficFormatNumber(row.cvr, 2) + '%',
+                                'Jangkauan: ' + trafficFormatNumber(row.impressions, 0) + ' · Klik: ' + trafficFormatNumber(row.clicks, 0),
+                                'Orders: ' + trafficFormatNumber(row.orders, 0) + ' · CPC: ' + money(row.cpc),
+                            ];
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'CTR (%)', font: { size: 10 } },
+                    ticks: { callback: value => value + '%' },
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'CVR (%)', font: { size: 10 } },
+                    ticks: { callback: value => value + '%' },
+                },
+            },
+        },
+    });
+
+    const hint = document.getElementById('trafficScatterHint');
+    if (hint) hint.textContent = 'Median CTR ' + trafficFormatNumber(ctrMedian, 2) + '% · CVR ' + trafficFormatNumber(cvrMedian, 2) + '%';
+}
+
 function trafficUpdateKpis(view) {
     const kpi = (window.__trafficKpiData || {})[view] || (window.__trafficKpiData || {}).category || {};
     const setValue = function(key, value) {
@@ -1855,8 +1968,12 @@ function trafficUpdateKpis(view) {
     setValue('spend', 'Rp ' + trafficFormatNumber(kpi.spend, 0));
     setValue('impressions', trafficFormatNumber(kpi.impressions, 0));
     setValue('clicks', trafficFormatNumber(kpi.clicks, 0));
+    setValue('orders', trafficFormatNumber(kpi.orders, 0));
     setValue('ctr', trafficFormatNumber(kpi.ctr, 2) + '%');
+    setValue('cvr', trafficFormatNumber(kpi.cvr, 2) + '%');
     setValue('cpc', 'Rp ' + trafficFormatNumber(kpi.cpc, 0));
+    trafficRenderFunnel(kpi);
+    trafficRenderQualityChart(view);
 }
 
 window.__trafficPerformanceView = function(view) {
@@ -2361,7 +2478,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="ads-kpi-grid p-3">
                     @php
                         // Kalkulasi Traffic KPI
-                        $trSpend = $kpi['current']->spend ?? 0;
+                        $trSpend = ($kpi['current']->spend ?? 0) * 1.11;
                         $trImp = $kpi['current']->impressions ?? 0;
                         $trClicks = $kpi['current']->clicks ?? 0;
                         $trOrders = $kpi['current']->orders ?? 0;
@@ -2373,7 +2490,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         $trCvr = $trClicks > 0 ? ($trOrders / $trClicks) * 100 : 0;
                         $trCpa = $trOrders > 0 ? $trSpend / $trOrders : 0;
                         $trNetProfit = $kpi['current']->net_profit ?? 0;
-                        $trSpendAfterTax = $trSpend * 1.11;
+                        $trSpendAfterTax = $trSpend;
                         $trPoas = $trSpendAfterTax > 0 ? $trNetProfit / $trSpendAfterTax : 0;
                     @endphp
                     <div class="kpi-card">
@@ -2418,22 +2535,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
 
-
-                {{-- CHARTS TRAFFIC --}}
-                <div class="row px-3 pb-3">
-                    <div class="col-md-6 mb-3">
-                        <div class="p-2 border rounded" style="background: var(--card-bg);">
-                            <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;">Volume Traffic (Imp & Clicks)</div>
-                            <div style="position: relative; height: 220px; width: 100%;">
-                                <canvas id="chartTrafficVolume"></canvas>
+                {{-- TREN HARIAN TRAFFIC --}}
+                <div class="row g-3 px-3 pb-3">
+                    <div class="col-12">
+                        <div class="dpanel p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div>
+                                    <div class="fw-bold" style="font-size:.78rem;"><i class="bi bi-calendar3 text-primary me-1"></i> Tren Harian Traffic</div>
+                                    <div class="text-muted" style="font-size:.65rem;">Impression, klik, CTR, dan CVR mengikuti periode yang dipilih.</div>
+                                </div>
+                                <span class="badge bg-light text-dark border" style="font-size:.6rem;">
+                                    {{ date('d M Y', strtotime($dateFrom)) }} – {{ date('d M Y', strtotime($dateTo)) }}
+                                </span>
                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="p-2 border rounded" style="background: var(--card-bg);">
-                            <div class="fw-bold mb-2 text-center text-muted" style="font-size: 0.75rem;">Quality Rates (CTR & CPM)</div>
-                            <div style="position: relative; height: 220px; width: 100%;">
-                                <canvas id="chartTrafficRates"></canvas>
+                            <div class="row g-3 mt-1">
+                                <div class="col-12 col-xl-6">
+                                    <div class="small text-muted fw-bold mb-1">Volume Traffic</div>
+                                    <div style="position:relative; height:220px; width:100%;">
+                                        <canvas id="chartTrafficVolume"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-xl-6">
+                                    <div class="small text-muted fw-bold mb-1">Kualitas Traffic</div>
+                                    <div style="position:relative; height:220px; width:100%;">
+                                        <canvas id="chartTrafficRates"></canvas>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2477,7 +2604,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     $isProblematic = !$isGms && (float) ($row->unit_cogs ?? 0) <= 0;
                     $impressions = (int) ($row->sum_impressions ?? 0);
                     $clicks = (int) ($row->clicks ?? 0);
-                    $spend = (float) ($row->spend ?? 0);
+                    $spend = (float) ($row->spend ?? 0) * 1.11;
                     $orders = (int) ($row->orders ?? 0);
                     $ctr = $impressions > 0 ? ($clicks / $impressions) * 100 : 0;
                     $cvr = $clicks > 0 ? ($orders / $clicks) * 100 : 0;
@@ -2501,6 +2628,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
                     ];
                 })->values();
+                $trafficCtrMedian = $trafficRows->filter(fn ($row) => $row['impressions'] > 0)->median('ctr') ?? 0;
+                $trafficCvrMedian = $trafficRows->filter(fn ($row) => $row['clicks'] > 0)->median('cvr') ?? 0;
+                $trafficImpressionsMedian = $trafficRows->filter(fn ($row) => $row['impressions'] > 0)->median('impressions') ?? 0;
+                $trafficSignal = function ($row) use ($trafficCtrMedian, $trafficCvrMedian, $trafficImpressionsMedian) {
+                    if ($row['impressions'] < max(100, $trafficImpressionsMedian * 0.25)) {
+                        return ['label' => 'Data Rendah', 'class' => 'secondary', 'icon' => 'bi-dash-circle'];
+                    }
+
+                    $ctrHigh = $trafficCtrMedian > 0 && $row['ctr'] >= $trafficCtrMedian;
+                    $cvrHigh = $trafficCvrMedian > 0 && $row['cvr'] >= $trafficCvrMedian;
+                    if ($ctrHigh && $cvrHigh) {
+                        return $row['impressions'] < $trafficImpressionsMedian
+                            ? ['label' => 'Potensi Scale', 'class' => 'info', 'icon' => 'bi-rocket-takeoff']
+                            : ['label' => 'Traffic Optimal', 'class' => 'success', 'icon' => 'bi-check-circle'];
+                    }
+                    if (!$ctrHigh && $cvrHigh) {
+                        return ['label' => 'Perbaiki Kreatif', 'class' => 'warning', 'icon' => 'bi-image'];
+                    }
+                    if ($ctrHigh && !$cvrHigh) {
+                        return ['label' => 'Evaluasi Produk', 'class' => 'danger', 'icon' => 'bi-cart-x'];
+                    }
+
+                    return ['label' => 'Optimasi Traffic', 'class' => 'danger', 'icon' => 'bi-exclamation-triangle'];
+                };
+                $trafficRows = $trafficRows->map(function ($row) use ($trafficSignal) {
+                    return array_merge($row, ['signal' => $trafficSignal($row)]);
+                })->values();
                 $trafficRegularRows = $trafficRows->filter(fn ($row) => !$row['is_gms']);
                 $trafficCategoryCampaignRows = $trafficRegularRows->groupBy('category');
                 $trafficCategoryRows = $trafficCategoryCampaignRows->map(function ($group, $category) {
@@ -2519,6 +2673,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         'cpc' => $clicks > 0 ? $spend / $clicks : 0,
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
                     ];
+                })->map(function ($row) use ($trafficSignal) {
+                    return array_merge($row, ['signal' => $trafficSignal($row)]);
                 })->sortByDesc('spend')->values();
                 $trafficSegmentRows = [
                     'category' => $trafficRegularRows,
@@ -2530,23 +2686,65 @@ document.addEventListener('DOMContentLoaded', function() {
                     $impressions = $rows->sum('impressions');
                     $clicks = $rows->sum('clicks');
                     $spend = $rows->sum('spend');
+                    $orders = $rows->sum('orders');
                     return [
                         'campaigns' => $rows->count(),
                         'spend' => $spend,
                         'impressions' => $impressions,
                         'clicks' => $clicks,
+                        'orders' => $orders,
                         'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
+                        'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
                         'cpc' => $clicks > 0 ? $spend / $clicks : 0,
                     ];
                 })->all();
                 $trafficInitialKpi = $trafficSegmentKpis['category'];
+                $trafficChartSegmentRows = [
+                    'category' => $trafficCategoryRows->map(fn ($row) => [
+                        'name' => $row['category'],
+                        'impressions' => $row['impressions'],
+                        'clicks' => $row['clicks'],
+                        'orders' => $row['orders'],
+                        'ctr' => $row['ctr'],
+                        'cvr' => $row['cvr'],
+                        'spend' => $row['spend'],
+                        'cpc' => $row['cpc'],
+                        'cpm' => $row['cpm'],
+                    ])->values(),
+                    'roas' => $trafficSegmentRows['roas'],
+                    'gms' => $trafficSegmentRows['gms'],
+                    'unmapped' => $trafficSegmentRows['unmapped'],
+                ];
+                $trafficChartData = collect($trafficChartSegmentRows)->map(function ($rows) {
+                    return collect($rows)->map(fn ($row) => [
+                        'name' => $row['name'] ?? $row['category'] ?? 'Tanpa Nama',
+                        'impressions' => (int) ($row['impressions'] ?? 0),
+                        'clicks' => (int) ($row['clicks'] ?? 0),
+                        'orders' => (int) ($row['orders'] ?? 0),
+                        'ctr' => (float) ($row['ctr'] ?? 0),
+                        'cvr' => (float) ($row['cvr'] ?? 0),
+                        'spend' => (float) ($row['spend'] ?? 0),
+                        'cpc' => (float) ($row['cpc'] ?? 0),
+                        'cpm' => (float) ($row['cpm'] ?? 0),
+                    ])->values();
+                })->all();
             @endphp
             <script>window.__trafficKpiData = {!! json_encode($trafficSegmentKpis) !!};</script>
+            <script>window.__trafficChartData = {!! json_encode($trafficChartData) !!};</script>
             <style>
                 .traffic-category-row { cursor:pointer; }
                 .traffic-category-row:hover { background:rgba(37,99,235,.04); }
                 .traffic-caret { transition:transform .15s; }
                 .traffic-category-row.open .traffic-caret { transform:rotate(90deg); }
+                .traffic-funnel { display:flex; flex-direction:column; gap:.45rem; align-items:center; padding:.4rem .25rem .2rem; }
+                .traffic-funnel-stage { width:100%; min-height:42px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.45rem .7rem; color:#fff; transition:width .2s ease; }
+                .traffic-funnel-stage:nth-child(1) { background:#2563eb; }
+                .traffic-funnel-stage:nth-child(2) { background:#0ea5e9; }
+                .traffic-funnel-stage:nth-child(3) { background:#10b981; }
+                .traffic-funnel-label { font-size:.68rem; font-weight:700; }
+                .traffic-funnel-value { font-size:.78rem; font-weight:800; }
+                .traffic-funnel-rate { font-size:.6rem; opacity:.9; white-space:nowrap; }
+                .traffic-funnel-arrow { color:var(--dsh-muted); font-size:.65rem; line-height:.5; }
             </style>
 
             {{-- TABEL TRAFFIC --}}
@@ -2587,64 +2785,97 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 </div>
+
+                <div class="row g-3 px-3 pb-3" id="trafficVisuals">
+                    <div class="col-12 col-xl-5">
+                        <div class="p-3 border rounded h-100" style="background:var(--card-bg);">
+                            <div class="fw-bold mb-1" style="font-size:.75rem;">Funnel Traffic</div>
+                            <div class="small text-muted mb-2" style="font-size:.65rem;">Impression → klik → order</div>
+                            <div class="traffic-funnel">
+                                <div class="traffic-funnel-stage" data-traffic-funnel-stage="impressions">
+                                    <span class="traffic-funnel-label">Jangkauan</span>
+                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="impressions">{{ number_format($trafficInitialKpi['impressions'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate">100%</span></span>
+                                </div>
+                                <div class="traffic-funnel-arrow">▼</div>
+                                <div class="traffic-funnel-stage" data-traffic-funnel-stage="clicks">
+                                    <span class="traffic-funnel-label">Klik</span>
+                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate" data-traffic-funnel-rate="ctr">CTR {{ number_format($trafficInitialKpi['ctr'], 2, ',', '.') }}%</span></span>
+                                </div>
+                                <div class="traffic-funnel-arrow">▼</div>
+                                <div class="traffic-funnel-stage" data-traffic-funnel-stage="orders">
+                                    <span class="traffic-funnel-label">Orders</span>
+                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="orders">{{ number_format($trafficInitialKpi['orders'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate" data-traffic-funnel-rate="cvr">CVR {{ number_format($trafficInitialKpi['cvr'], 2, ',', '.') }}%</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-xl-7">
+                        <div class="p-3 border rounded h-100" style="background:var(--card-bg);">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div class="fw-bold" style="font-size:.75rem;">Kualitas Traffic: CTR vs CVR</div>
+                                <span id="trafficScatterHint" class="badge bg-light text-dark border" style="font-size:.58rem;">Median subtab</span>
+                            </div>
+                            <div class="small text-muted mb-2" style="font-size:.65rem;">Bubble lebih besar = jangkauan lebih besar.</div>
+                            <div style="position:relative; height:230px; width:100%;"><canvas id="trafficQualityChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                     <table class="dpanel-table" id="trafficTable">
                         <thead style="position: sticky; top: 0; z-index: 10;">
                             <tr>
-                                <th>Platform</th>
-                                <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Spend <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Kategori / Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th>Sinyal</th>
                                 <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Jangkauan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Clicks <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Orders <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('cvr')" style="cursor:pointer">CVR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Biaya Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">CPC <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('cpm')" style="cursor:pointer">CPM <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                             </tr>
                         </thead>
                         <tbody>
                             @if($trafficRows->isEmpty())
                                 <tr class="traffic-no-data">
-                                    <td colspan="10" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
+                                    <td colspan="9" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
                                 </tr>
                             @else
                                 @foreach($trafficCategoryRows as $categoryRow)
                                     <tr class="traffic-category-row" data-traffic-views="category" onclick="trafficToggleCategory(this)">
                                         <td>
-                                            <span class="badge" style="background: rgba(255, 102, 0, 0.1); color: #ff6600; font-size: 0.65rem;">SHOPEE</span>
-                                        </td>
-                                        <td>
                                             <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div></div>
                                             <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
                                         </td>
-                                        <td class="text-end">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
+                                        <td><span class="badge bg-{{ $categoryRow['signal']['class'] }}" style="font-size:.6rem;"><i class="bi {{ $categoryRow['signal']['icon'] }} me-1"></i>{{ $categoryRow['signal']['label'] }}</span></td>
                                         <td class="text-end">{{ number_format($categoryRow['impressions'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($categoryRow['clicks'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($categoryRow['ctr'], 2, ',', '.') }}%</td>
                                         <td class="text-end">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($categoryRow['cvr'], 2, ',', '.') }}%</td>
+                                        <td class="text-end">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
                                         <td class="text-end">Rp {{ number_format($categoryRow['cpc'], 0, ',', '.') }}</td>
-                                        <td class="text-end">Rp {{ number_format($categoryRow['cpm'], 0, ',', '.') }}</td>
                                     </tr>
                                     <tr class="traffic-category-detail" style="display:none;">
-                                        <td colspan="10" class="bg-light">
+                                        <td colspan="9" class="bg-light">
                                             <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover align-middle mb-0" style="font-size:.72rem;">
                                                     <thead>
-                                                        <tr><th>Campaign</th><th class="text-end">Spend</th><th class="text-end">Jangkauan</th><th class="text-end">Klik</th><th class="text-end">CTR</th><th class="text-end">Orders</th><th class="text-end">CPC</th><th class="text-end">CPM</th></tr>
+                                                        <tr><th>Campaign</th><th>Sinyal</th><th class="text-end">Jangkauan</th><th class="text-end">Klik</th><th class="text-end">CTR</th><th class="text-end">Orders</th><th class="text-end">CVR</th><th class="text-end">Biaya</th><th class="text-end">CPC</th><th class="text-end">CPM</th></tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach($trafficCategoryCampaignRows->get($categoryRow['category'], collect()) as $campaignRow)
                                                             <tr>
                                                                 <td><div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $campaignRow['name'] }}">{{ $campaignRow['name'] }}</div><div class="text-muted" style="font-size:.62rem;">ID: {{ $campaignRow['id'] }}</div></td>
-                                                                <td class="text-end">Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</td>
+                                                                <td><span class="badge bg-{{ $campaignRow['signal']['class'] }}" style="font-size:.58rem;">{{ $campaignRow['signal']['label'] }}</span></td>
                                                                 <td class="text-end">{{ number_format($campaignRow['impressions'], 0, ',', '.') }}</td>
                                                                 <td class="text-end">{{ number_format($campaignRow['clicks'], 0, ',', '.') }}</td>
                                                                 <td class="text-end">{{ number_format($campaignRow['ctr'], 2, ',', '.') }}%</td>
                                                                 <td class="text-end">{{ number_format($campaignRow['orders'], 0, ',', '.') }}</td>
+                                                                <td class="text-end">{{ number_format($campaignRow['cvr'], 2, ',', '.') }}%</td>
+                                                                <td class="text-end">Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</td>
                                                                 <td class="text-end">Rp {{ number_format($campaignRow['cpc'], 0, ',', '.') }}</td>
                                                                 <td class="text-end">Rp {{ number_format($campaignRow['cpm'], 0, ',', '.') }}</td>
                                                             </tr>
@@ -2665,21 +2896,20 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-cvr="{{ $trafficRow['cvr'] }}"
                                         data-cpc="{{ $trafficRow['cpc'] }}"
                                         data-cpm="{{ $trafficRow['cpm'] }}">
-                                        <td><span class="badge" style="background: rgba(255, 102, 0, 0.1); color: #ff6600; font-size: 0.65rem;">SHOPEE</span></td>
                                         <td><div class="fw-bold" style="font-size: 0.78rem;">{{ $trafficRow['name'] }}</div><div class="text-muted" style="font-size: 0.65rem;">ID: {{ $trafficRow['id'] }}</div></td>
-                                        <td class="text-end">Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</td>
+                                        <td><span class="badge bg-{{ $trafficRow['signal']['class'] }}" style="font-size:.6rem;"><i class="bi {{ $trafficRow['signal']['icon'] }} me-1"></i>{{ $trafficRow['signal']['label'] }}</span></td>
                                         <td class="text-end">{{ number_format($trafficRow['impressions'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($trafficRow['clicks'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($trafficRow['ctr'], 2, ',', '.') }}%</td>
                                         <td class="text-end">{{ number_format($trafficRow['orders'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($trafficRow['cvr'], 2, ',', '.') }}%</td>
+                                        <td class="text-end">Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</td>
                                         <td class="text-end">Rp {{ number_format($trafficRow['cpc'], 0, ',', '.') }}</td>
-                                        <td class="text-end">Rp {{ number_format($trafficRow['cpm'], 0, ',', '.') }}</td>
                                     </tr>
                                 @endforeach
                             @endif
                             <tr class="traffic-view-empty" style="display:none;">
-                                <td colspan="10" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
+                                <td colspan="9" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -4298,14 +4528,14 @@ document.addEventListener("DOMContentLoaded", function() {
                         yAxisID: 'y'
                     },
                     {
-                        label: 'CPM (Rp)',
+                        label: 'CVR (%)',
                         data: dailyData.map(d => {
-                            let imp = parseInt(d.impressions) || 0;
-                            let spd = parseFloat(d.spend) || 0;
-                            return imp > 0 ? (spd/imp*1000).toFixed(0) : 0;
+                            let clk = parseInt(d.clicks) || 0;
+                            let ord = parseInt(d.orders) || 0;
+                            return clk > 0 ? (ord/clk*100).toFixed(2) : 0;
                         }),
                         borderColor: '#8b5cf6',
-                        backgroundColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
                         borderWidth: 2,
                         borderDash: [5,5],
                         tension: 0.3,
@@ -4325,7 +4555,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 scales: {
                     x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
                     y: { type: 'linear', display: true, position: 'left', grid: { color: gridColor }, title: { display: true, text: 'CTR (%)', font: {size:10} } },
-                    y1: { type: 'linear', display: true, position: 'right', grid: { display: false }, title: { display: true, text: 'CPM (Rp)', font: {size:10} } }
+                    y1: { type: 'linear', display: true, position: 'right', grid: { display: false }, title: { display: true, text: 'CVR (%)', font: {size:10} }, ticks: { callback: value => value + '%' } }
                 }
             }
         });
@@ -5364,6 +5594,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function periodSummary(period) {
+        if (!period || Number(period.days_with_data || 0) === 0) {
+            return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
+                '<b style="color:#b45309;">Menunggu data selesai</b><br>' +
+                esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-') +
+                '</div>';
+        }
         const metrics = (period || {}).metrics || {};
         return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
             '<b style="color:var(--text);">ROAS ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
@@ -5450,6 +5686,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderMetricGrid(target, period) {
         const metrics = (period || {}).metrics || {};
+        const hasData = Number((period || {}).days_with_data || 0) > 0;
         const rows = [
             ['Impressions', 'impressions'],
             ['Clicks', 'clicks'],
@@ -5467,12 +5704,17 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
         target.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.45rem;">' +
             rows.map(function (item) {
+                const value = hasData ? metricValue(item[1], metrics[item[1]]) : '—';
                 return '<div style="padding:.55rem .6rem; border:1px solid var(--dsh-border); border-radius:9px;">' +
                     '<div style="font-size:.62rem; color:var(--dsh-muted);">' + item[0] + '</div>' +
-                    '<div style="font-size:.78rem; font-weight:850; color:var(--text); margin-top:.1rem;">' + esc(metricValue(item[1], metrics[item[1]])) + '</div>' +
+                    '<div style="font-size:.78rem; font-weight:850; color:' + (hasData ? 'var(--text)' : '#b45309') + '; margin-top:.1rem;">' + esc(value) + '</div>' +
                 '</div>';
             }).join('') + '</div>' +
-            '<div style="font-size:.65rem; color:var(--dsh-muted); margin-top:.55rem;">Data: ' + esc((period || {}).source_table || 'belum tersedia') + ' · ' + number((period || {}).days_with_data || 0) + ' hari memiliki data</div>';
+            '<div style="font-size:.65rem; color:' + (hasData ? 'var(--dsh-muted)' : '#b45309') + '; margin-top:.55rem;">' +
+                (hasData
+                    ? 'Data: ' + esc((period || {}).source_table || 'belum tersedia') + ' · ' + number((period || {}).days_with_data || 0) + ' hari memiliki data'
+                    : 'Belum ada hari selesai dengan data · periode ' + esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-')) +
+            '</div>';
     }
 
     function renderImpact(data) {
@@ -5684,11 +5926,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 const flagText = flags.length
                     ? flags.map(function (flag) { return qualityLabels[flag] || flag; }).join(' · ')
                     : 'Tidak ada flag tambahan.';
+                const observationDays = Number(data.observation?.days_with_data || 0);
+                const observationNote = observationDays === 0
+                    ? '<br><b style="color:#b45309;">Observation:</b> menunggu data hari selesai setelah periode perubahan.'
+                    : '';
+                const profitNote = quality.actual_profit_ready
+                    ? 'actual'
+                    : 'belum aktual (mapping/HPP atau data observation belum lengkap)';
                 qualityNote.innerHTML =
                     '<div style="padding:.7rem .8rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted);">' +
                     '<b style="color:var(--text);">Kualitas data:</b> ' + esc(flagText) + '<br>' +
                     '<b style="color:var(--text);">Mapping:</b> ' + esc(quality.mapping_status || 'unknown') + ' · ' +
-                    '<b style="color:var(--text);">Profit:</b> ' + (quality.actual_profit_ready ? 'actual' : 'estimasi') +
+                    '<b style="color:var(--text);">Profit:</b> ' + esc(profitNote) +
+                    observationNote +
                     '</div>';
             })
             .catch(function (err) {

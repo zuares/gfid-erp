@@ -300,16 +300,20 @@
             'gmv' => $gmv,
             'orders' => $rows->sum('orders'),
             'aov' => $rows->sum('orders') > 0 ? $gmv / $rows->sum('orders') : 0,
+            'cpa' => $rows->sum('orders') > 0 ? $spend / $rows->sum('orders') : 0,
             'roas' => $spend > 0 ? $gmv / $spend : 0,
             'profit' => $knownProfitRows->sum('profit'),
+            'profit_per_order' => $rows->sum('orders') > 0 ? $knownProfitRows->sum('profit') / $rows->sum('orders') : 0,
             'profit_unknown' => $rows->count() - $knownProfitRows->count(),
             'losses' => $knownProfitRows->filter(fn ($row) => $row['profit'] <= 0)->count(),
             'prev_spend' => $prevSpend,
             'prev_gmv' => $prevGmv,
             'prev_orders' => $prevOrders,
             'prev_aov' => $prevOrders > 0 ? $prevGmv / $prevOrders : 0,
+            'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
             'prev_roas' => $prevSpend > 0 ? $prevGmv / $prevSpend : 0,
             'prev_profit' => $prevProfitRows->sum('prev_profit'),
+            'prev_profit_per_order' => $prevOrders > 0 ? $prevProfitRows->sum('prev_profit') / $prevOrders : 0,
             'prev_profit_available' => $prevProfitRows->count() > 0,
         ];
     })->all();
@@ -318,9 +322,21 @@
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
             'x' => $r['spend'],
-            'y' => $r['profit'],
+            // Campaign tanpa HPP diberi titik netral di garis 0, tetapi nilai
+            // tooltip tetap N/A agar tidak dianggap sebagai profit nol.
+            'y' => $r['profit_available'] ? $r['profit'] : 0,
             'name' => $r['name'],
             'reco' => $r['reco'],
+            'views' => $r['performance_views'],
+            'profit' => $r['profit'],
+            'profit_available' => $r['profit_available'],
+            'orders' => $r['orders'],
+            'roas' => $r['roas'],
+            'target_roas' => $r['configured_roas'] ?? $r['target_roas'],
+            'cpa' => $r['cpa'],
+            'profit_per_order' => $r['profit_available'] && $r['orders'] > 0
+                ? $r['profit'] / $r['orders']
+                : null,
             'r' => max(4, min(15, $r['orders'] * 2)) // Bubble size based on orders
         ];
     })->values());
@@ -448,12 +464,13 @@
     <div class="col-12 col-xl-12">
         <div class="dpanel p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Scatter: Spend vs Est. Profit</h6>
-                <span class="badge bg-light text-dark border">Kuadran Atas-Kanan = Potensial Scale</span>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Biaya Iklan vs Net Profit Terhitung</h6>
+                <span id="campaignScatterHint" class="badge bg-light text-dark border">Subtab: Per Kategori</span>
             </div>
             <div style="height: 300px; position: relative;">
                 <canvas id="campaignScatterChart"></canvas>
             </div>
+            <div class="small text-muted mt-2">X = biaya iklan setelah PPN · Y = net profit · ukuran bubble = orders · Data HPP ditandai abu-abu.</div>
         </div>
     </div>
 </div>
@@ -492,21 +509,21 @@
     <div class="px-3 pb-2" id="campaignPerformanceSubtabKpis">
         <div class="ads-kpi-grid mb-2">
             <div class="dpanel ads-kpi kpi-spend">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Total biaya iklan setelah PPN 11% pada campaign yang termasuk subtab aktif."><i class="bi bi-wallet2" aria-hidden="true"></i> Biaya + PPN</div>
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Total biaya iklan setelah PPN 11%."><i class="bi bi-wallet2" aria-hidden="true"></i> Biaya Iklan</div>
                 <div class="ads-kpi-value" data-perf-kpi-value="spend">Rp {{ number_format($perfInitialKpi['spend'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub" title="Campaign adalah jumlah campaign pada subtab aktif; rugi berarti profit tidak lebih dari nol; biaya per order sudah termasuk PPN 11%."><span title="Jumlah campaign pada subtab aktif"><i class="bi bi-megaphone me-1" aria-hidden="true"></i><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span> campaign</span> · <span title="Campaign dengan profit tidak lebih dari nol"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span data-perf-kpi-value="losses">{{ number_format($perfInitialKpi['losses'], 0, ',', '.') }}</span> rugi</span> · <span title="Biaya iklan rata-rata setelah PPN 11% untuk mendapatkan satu order"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Rp <span data-perf-kpi-value="cpa">{{ number_format($perfInitialKpi['spend'] / max(1, $perfInitialKpi['orders']), 0, ',', '.') }}</span>/order</span></div>
+                <div class="ads-kpi-sub" title="Campaign adalah jumlah campaign pada subtab aktif; rugi berarti profit tidak lebih dari nol."><span title="Jumlah campaign pada subtab aktif"><i class="bi bi-megaphone me-1" aria-hidden="true"></i><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span> campaign</span> · <span title="Campaign dengan profit tidak lebih dari nol"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span data-perf-kpi-value="losses">{{ number_format($perfInitialKpi['losses'], 0, ',', '.') }}</span> rugi</span></div>
                 <div class="perf-kpi-compare" data-perf-kpi-compare="spend" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_spend'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['spend'], $perfInitialKpi['prev_spend'], null) !!}</div>
             </div>
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Total omzet/GMV yang dihasilkan dari campaign pada subtab aktif."><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> Omzet GMV</div>
-                <div class="ads-kpi-value" data-perf-kpi-value="gmv">Rp {{ number_format($perfInitialKpi['gmv'], 0, ',', '.') }}</div>
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Biaya iklan setelah PPN 11% dibagi jumlah order."><i class="bi bi-receipt" aria-hidden="true"></i> Biaya per Order</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="cpa">Rp {{ number_format($perfInitialKpi['cpa'], 0, ',', '.') }}</div>
                 <div class="ads-kpi-sub">{{ number_format($perfInitialKpi['orders'], 0, ',', '.') }} order</div>
-                <div class="perf-kpi-compare" data-perf-kpi-compare="gmv" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_gmv'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['gmv'], $perfInitialKpi['prev_gmv'], true) !!}</div>
+                <div class="perf-kpi-compare" data-perf-kpi-compare="cpa" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_cpa'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['cpa'], $perfInitialKpi['prev_cpa'], null) !!}</div>
             </div>
             <div class="dpanel ads-kpi">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Average Order Value: rata-rata omzet untuk setiap order (GMV dibagi Orders)."><i class="bi bi-basket" aria-hidden="true"></i> AOV</div>
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Average Order Value: omzet GMV dibagi jumlah order."><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> AOV</div>
                 <div class="ads-kpi-value" data-perf-kpi-value="aov">Rp {{ number_format($perfInitialKpi['aov'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub">Rata-rata / order</div>
+                <div class="ads-kpi-sub">{{ number_format($perfInitialKpi['orders'], 0, ',', '.') }} order</div>
                 <div class="perf-kpi-compare" data-perf-kpi-compare="aov" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_aov'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['aov'], $perfInitialKpi['prev_aov'], true) !!}</div>
             </div>
             <div class="dpanel ads-kpi">
@@ -515,11 +532,11 @@
                 <div class="ads-kpi-sub">GMV dibanding iklan</div>
                 <div class="perf-kpi-compare" data-perf-kpi-compare="roas" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($perfInitialKpi['prev_roas'], 2, ',', '.') }}x {!! $fmtDelta($perfInitialKpi['roas'], $perfInitialKpi['prev_roas'], true) !!}</div>
             </div>
-            <div class="dpanel ads-kpi kpi-profit">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Estimasi laba bersih setelah HPP dan biaya iklan; campaign tanpa HPP tidak dihitung."><i class="bi bi-cash-stack" aria-hidden="true"></i> Net Profit</div>
-                <div class="ads-kpi-value" data-perf-kpi-value="profit">Rp {{ number_format($perfInitialKpi['profit'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub"><span data-perf-kpi-value="profit_unknown">{{ $perfInitialKpi['profit_unknown'] }}</span> belum ada HPP</div>
-                <div class="perf-kpi-compare" data-perf-kpi-compare="profit" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit'], $perfInitialKpi['prev_profit'], true) !!}</div>
+            <div class="dpanel ads-kpi">
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Net Profit setelah HPP dan biaya iklan dibagi jumlah order."><i class="bi bi-basket" aria-hidden="true"></i> Net Profit / Order</div>
+                <div class="ads-kpi-value" data-perf-kpi-value="profit_per_order">Rp {{ number_format($perfInitialKpi['profit_per_order'], 0, ',', '.') }}</div>
+                <div class="ads-kpi-sub">Profit terhitung / order</div>
+                <div class="perf-kpi-compare" data-perf-kpi-compare="profit_per_order" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit_per_order'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit_per_order'], $perfInitialKpi['prev_profit_per_order'], true) !!}</div>
             </div>
         </div>
     </div>
@@ -1227,6 +1244,17 @@ function perfToggleCategory(row) {
 }
 
 const perfKpiData = {!! json_encode($perfSegmentKpis) !!};
+let campaignScatterChart = null;
+let campaignScatterData = [];
+let perfActiveSegment = 'category';
+
+const campaignScatterColorMap = {
+    'Scale': 'rgba(25, 135, 84, 0.7)',
+    'Aman': 'rgba(13, 202, 240, 0.7)',
+    'Optimasi': 'rgba(255, 193, 7, 0.7)',
+    'Stop': 'rgba(220, 53, 69, 0.7)',
+    'Data HPP': 'rgba(108, 117, 125, 0.7)'
+};
 
 function perfKpiNumber(value, decimals) {
     return Number(value || 0).toLocaleString('id-ID', {
@@ -1270,18 +1298,19 @@ function perfUpdateKpis(segment) {
     setValue('spend', 'Rp ' + perfKpiNumber(kpi.spend, 0));
     setValue('gmv', 'Rp ' + perfKpiNumber(kpi.gmv, 0));
     setValue('aov', 'Rp ' + perfKpiNumber(kpi.aov, 0));
-    setValue('cpa', perfKpiNumber(kpi.orders > 0 ? kpi.spend / kpi.orders : 0, 0));
+    setValue('cpa', 'Rp ' + perfKpiNumber(kpi.cpa, 0));
     setValue('orders', perfKpiNumber(kpi.orders, 0));
     setValue('roas', perfKpiNumber(kpi.roas, 2) + 'x');
     setValue('profit', 'Rp ' + perfKpiNumber(kpi.profit, 0));
+    setValue('profit_per_order', 'Rp ' + perfKpiNumber(kpi.profit_per_order, 0));
     setValue('profit_unknown', perfKpiNumber(kpi.profit_unknown, 0));
 
     const compareValues = {
-        spend: perfKpiCompare(kpi.spend, kpi.prev_spend, value => 'Rp ' + perfKpiNumber(value, 0), null),
-        gmv: perfKpiCompare(kpi.gmv, kpi.prev_gmv, value => 'Rp ' + perfKpiNumber(value, 0), true),
+        cpa: perfKpiCompare(kpi.cpa, kpi.prev_cpa, value => 'Rp ' + perfKpiNumber(value, 0), null),
         aov: perfKpiCompare(kpi.aov, kpi.prev_aov, value => 'Rp ' + perfKpiNumber(value, 0), true),
         roas: perfKpiCompare(kpi.roas, kpi.prev_roas, value => perfKpiNumber(value, 2) + 'x', true),
         profit: perfKpiCompare(kpi.profit, kpi.prev_profit, value => 'Rp ' + perfKpiNumber(value, 0), true),
+        profit_per_order: perfKpiCompare(kpi.profit_per_order, kpi.prev_profit_per_order, value => 'Rp ' + perfKpiNumber(value, 0), true),
     };
     Object.entries(compareValues).forEach(function([key, value]) {
         document.querySelectorAll('[data-perf-kpi-compare="' + key + '"]').forEach(function(el) {
@@ -1305,6 +1334,7 @@ function perfApplySegment(segment) {
     const noDataState = document.querySelector('.perf-no-data');
 
     perfUpdateKpis(segment);
+    perfRenderScatter(segment);
 
     if (!rows.length) {
         if (emptyState) emptyState.style.display = 'none';
@@ -1344,6 +1374,7 @@ function perfApplySegment(segment) {
 }
 
 window.__campaignPerformanceView = function(view) {
+    perfActiveSegment = view;
     perfApplySegment(view);
 
     const buttonOn = 'border-radius:999px; font-size:.72rem; padding:.38rem .95rem; background:var(--dsh-accent); color:#fff; border:1px solid var(--dsh-accent);';
@@ -1382,34 +1413,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    const scatterData = {!! $scatterDataJson !!};
+    campaignScatterData = {!! $scatterDataJson !!};
 
     const ctx = document.getElementById('campaignScatterChart');
     if (!ctx) return;
 
-    // Define colors for recommendations
-    const colorMap = {
-        'Scale': 'rgba(25, 135, 84, 0.7)',      // Success
-        'Aman': 'rgba(13, 202, 240, 0.7)',      // Info
-        'Optimasi': 'rgba(255, 193, 7, 0.7)',   // Warning
-        'Stop': 'rgba(220, 53, 69, 0.7)',       // Danger
-        'Data HPP': 'rgba(108, 117, 125, 0.7)'  // Secondary
-    };
-
-    const datasets = Object.keys(colorMap).map(reco => {
-        return {
-            label: reco,
-            data: scatterData.filter(d => d.reco === reco),
-            backgroundColor: colorMap[reco],
-            borderColor: colorMap[reco].replace('0.7', '1'),
-            borderWidth: 1
-        };
-    });
-
-    new Chart(ctx, {
+    campaignScatterChart = new Chart(ctx, {
         type: 'bubble',
         data: {
-            datasets: datasets
+            datasets: []
         },
         options: {
             responsive: true,
@@ -1419,10 +1431,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     callbacks: {
                         label: function(context) {
                             const data = context.raw;
+                            const money = value => value === null || value === undefined
+                                ? 'N/A'
+                                : 'Rp ' + Number(value).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+                            const ratio = value => value === null || value === undefined
+                                ? 'N/A'
+                                : Number(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x';
                             return [
                                 data.name,
-                                'Spend: Rp ' + data.x.toLocaleString('id-ID'),
-                                'Profit: Rp ' + data.y.toLocaleString('id-ID')
+                                'Biaya iklan: ' + money(data.x),
+                                'Net profit: ' + (data.profit_available ? money(data.profit) : 'N/A · HPP belum tersedia'),
+                                'ROAS: ' + ratio(data.roas) + (data.target_roas !== null && data.target_roas !== undefined ? ' · Target: ' + ratio(data.target_roas) : ''),
+                                'Biaya/order: ' + money(data.cpa),
+                                'Profit/order: ' + money(data.profit_per_order),
+                                'Orders: ' + Number(data.orders || 0).toLocaleString('id-ID')
                             ];
                         }
                     }
@@ -1433,16 +1455,47 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             scales: {
                 x: {
-                    title: { display: true, text: 'Ad Spend (Rp)' },
+                    title: { display: true, text: 'Biaya Iklan setelah PPN (Rp)' },
                     ticks: { callback: function(value) { return 'Rp ' + (value/1000).toLocaleString('id-ID') + 'k'; } }
                 },
                 y: {
-                    title: { display: true, text: 'Est. Net Profit (Rp)' },
+                    title: { display: true, text: 'Net Profit Terhitung (Rp)' },
                     ticks: { callback: function(value) { return 'Rp ' + (value/1000).toLocaleString('id-ID') + 'k'; } },
                     grid: { color: function(context) { return context.tick.value === 0 ? '#ff0000' : 'rgba(0,0,0,0.1)'; } }
                 }
             }
         }
     });
+
+    perfRenderScatter(perfActiveSegment);
 });
+
+function perfRenderScatter(segment) {
+    if (!campaignScatterChart) return;
+
+    const viewLabels = {
+        category: 'Per Kategori',
+        roas: 'GMV Max ROAS',
+        gms: 'GMV Max Auto',
+        unmapped: 'Produk Bermasalah',
+    };
+    const visibleData = campaignScatterData.filter(function(data) {
+        return Array.isArray(data.views) && data.views.includes(segment);
+    });
+
+    campaignScatterChart.data.datasets = Object.keys(campaignScatterColorMap).map(function(reco) {
+        const color = campaignScatterColorMap[reco];
+        return {
+            label: reco,
+            data: visibleData.filter(data => data.reco === reco),
+            backgroundColor: color,
+            borderColor: color.replace('0.7', '1'),
+            borderWidth: 1
+        };
+    });
+    campaignScatterChart.update('none');
+
+    const hint = document.getElementById('campaignScatterHint');
+    if (hint) hint.textContent = 'Subtab: ' + (viewLabels[segment] || 'Per Kategori');
+}
 </script>

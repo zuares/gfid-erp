@@ -69,6 +69,31 @@
     $knownAdSpend = $knownProfitItems->sum('spend');
     $totalOrders = $productSourceRows->sum('orders');
     $totalGmv = $productSourceRows->sum('gmv');
+    $productPeriodDays = max(1, (int) (\Carbon\Carbon::parse($dateFrom ?? now()->toDateString())->diffInDays(\Carbon\Carbon::parse($dateTo ?? now()->toDateString())) + 1));
+    $productDayDivisor = max(1, (int) $productPeriodDays);
+    $productStockRisk = function ($stock, $orders, $isGms = false) use ($productDayDivisor) {
+        if ($isGms) {
+            return ['label' => 'Agregat Campaign', 'class' => 'secondary', 'icon' => 'bi-collection'];
+        }
+        $stock = (int) $stock;
+        $velocity = (int) $orders / $productDayDivisor;
+        if ($stock <= 0 && $orders > 0) {
+            return ['label' => 'Stok Habis', 'class' => 'danger', 'icon' => 'bi-box-seam'];
+        }
+        if ($velocity <= 0) {
+            return $stock > 0
+                ? ['label' => 'Tidak Ada Penjualan', 'class' => 'secondary', 'icon' => 'bi-pause-circle']
+                : ['label' => 'Stok Kosong', 'class' => 'danger', 'icon' => 'bi-box'];
+        }
+        $daysCoverage = $stock / $velocity;
+        if ($daysCoverage < 7) {
+            return ['label' => 'Stok Kritis', 'class' => 'danger', 'icon' => 'bi-exclamation-triangle'];
+        }
+        if ($daysCoverage < 14) {
+            return ['label' => 'Stok Menipis', 'class' => 'warning', 'icon' => 'bi-hourglass-split'];
+        }
+        return ['label' => 'Stok Aman', 'class' => 'success', 'icon' => 'bi-check-circle'];
+    };
     $productRows = $productSourceRows->map(function ($row) {
         $isGms = !empty($row->has_gms) || !empty($row->is_gms);
         $isProblematic = (float) ($row->unit_cogs ?? 0) <= 0;
@@ -81,6 +106,15 @@
                 ? ['gms']
                 : array_values(array_unique(array_merge(['category', 'roas'], $isProblematic ? ['unmapped'] : []))),
         ];
+    })->values()->map(function ($entry) use ($productStockRisk, $productDayDivisor) {
+        $row = $entry['row'];
+        $orders = (int) ($row->orders ?? 0);
+        $stock = (int) ($row->stock_total ?? 0);
+        $entry['aov'] = $orders > 0 ? (float) ($row->gmv ?? 0) / $orders : 0;
+        $entry['velocity'] = $orders / $productDayDivisor;
+        $entry['stock_days'] = $entry['velocity'] > 0 ? $stock / $entry['velocity'] : null;
+        $entry['stock_risk'] = $productStockRisk($stock, $orders, !empty($entry['is_gms']));
+        return $entry;
     })->values();
     $productRegularRows = $productRows->filter(fn ($row) => !$row['is_gms']);
     $productCategoryProductRows = $productRegularRows->groupBy('category');
@@ -98,6 +132,7 @@
             'stock' => $group->sum(fn ($entry) => (int) ($entry['row']->stock_total ?? 0)),
             'spend' => $spend,
             'orders' => $orders,
+            'aov' => $orders > 0 ? $gmv / $orders : 0,
             'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
             'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
             'gmv' => $gmv,
@@ -105,6 +140,7 @@
             'profit' => $profit,
             'profit_unknown' => $group->count() - $knownProfit->count(),
             'poas' => $spend > 0 ? $profit / ($spend * 1.11) : 0,
+            'stock_risk' => $productStockRisk($group->sum(fn ($entry) => (int) ($entry['row']->stock_total ?? 0)), $orders),
         ];
     })->sortByDesc('spend')->values();
     $productSegmentRows = [
@@ -123,6 +159,9 @@
             'spend' => $spend,
             'orders' => $rows->sum(fn ($entry) => (int) ($entry['row']->orders ?? 0)),
             'gmv' => $gmv,
+            'aov' => $rows->sum(fn ($entry) => (int) ($entry['row']->orders ?? 0)) > 0
+                ? $gmv / $rows->sum(fn ($entry) => (int) ($entry['row']->orders ?? 0))
+                : 0,
             'roas' => $spend > 0 ? $gmv / $spend : 0,
             'profit' => $knownProfit->sum(fn ($entry) => (float) ($entry['row']->profit_after_ads ?? 0)),
             'profit_unknown' => $rows->count() - $knownProfit->count(),
@@ -134,17 +173,49 @@
         'gms' => $productSegmentRows['gms']->count(),
         'unmapped' => $productSegmentRows['unmapped']->count(),
     ];
+    $criticalStockProducts = $productRows->filter(fn ($entry) => in_array($entry['stock_risk']['label'], ['Stok Habis', 'Stok Kritis'], true))->count();
     $productInitialKpi = $productSegmentKpis['category'];
 
-    $scatterDataJson = json_encode($productSourceRows->map(function($r) {
-        return [
-            'x' => $r->spend,
-            'y' => $r->profit_after_ads,
-            'name' => $r->item_name,
-            'reco' => $r->classification,
-            'r' => max(4, min(15, $r->orders * 2)) // Bubble size based on orders
-        ];
-    })->values());
+    $productChartSegmentRows = [
+        'category' => $productCategoryRows->map(fn ($row) => [
+            'name' => $row['category'],
+            'spend' => $row['spend'],
+            'profit' => $row['profit'],
+            'profit_available' => $row['profit_unknown'] === 0,
+            'orders' => $row['orders'],
+            'gmv' => $row['gmv'],
+            'aov' => $row['aov'],
+            'roas' => $row['spend'] > 0 ? $row['gmv'] / $row['spend'] : 0,
+            'stock' => $row['stock'],
+            'velocity' => $row['orders'] / $productDayDivisor,
+            'classification' => 'Kategori',
+            'stock_risk' => $row['stock_risk'],
+        ])->values(),
+        'roas' => $productSegmentRows['roas'],
+        'gms' => $productSegmentRows['gms'],
+        'unmapped' => $productSegmentRows['unmapped'],
+    ];
+    $productChartData = collect($productChartSegmentRows)->map(function ($rows) use ($productDayDivisor) {
+        return collect($rows)->map(function ($entry) use ($productDayDivisor) {
+            $isAggregate = is_array($entry) && !isset($entry['row']);
+            $row = $isAggregate ? null : $entry['row'];
+            return [
+                'name' => $isAggregate ? $entry['name'] : ($row->item_name ?: 'Produk tanpa nama'),
+                'x' => (float) ($isAggregate ? $entry['spend'] : ($row->spend ?? 0)),
+                'y' => $isAggregate ? (float) $entry['profit'] : (float) ($row->profit_after_ads ?? 0),
+                'profit_available' => $isAggregate ? (bool) $entry['profit_available'] : $row->profit_after_ads !== null,
+                'orders' => (int) ($isAggregate ? $entry['orders'] : ($row->orders ?? 0)),
+                'gmv' => (float) ($isAggregate ? $entry['gmv'] : ($row->gmv ?? 0)),
+                'aov' => (float) ($isAggregate ? $entry['aov'] : (($row->orders ?? 0) > 0 ? $row->gmv / $row->orders : 0)),
+                'roas' => (float) ($isAggregate ? $entry['roas'] : (($row->spend ?? 0) > 0 ? $row->gmv / $row->spend : 0)),
+                'stock' => (int) ($isAggregate ? $entry['stock'] : ($row->stock_total ?? 0)),
+                'velocity' => (float) ($isAggregate ? $entry['velocity'] : (($row->orders ?? 0) / $productDayDivisor)),
+                'reco' => $isAggregate ? $entry['classification'] : ($row->classification ?? 'Review'),
+                'stock_risk' => $isAggregate ? $entry['stock_risk'] : ($entry['stock_risk'] ?? ['label' => 'Review', 'class' => 'secondary']),
+                'r' => max(4, min(15, ((int) ($isAggregate ? $entry['orders'] : ($row->orders ?? 0))) * 2)),
+            ];
+        })->values();
+    })->all();
 @endphp
 
 <div class="dash-sec"><i class="bi bi-robot"></i> Insight Produk</div>
@@ -165,9 +236,9 @@
     </div>
     <div class="col-6 col-md-3">
         <div class="dpanel p-3 h-100">
-            <div class="text-muted small fw-bold text-uppercase mb-1">Gross Profit (Iklan)</div>
-            <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalGrossProfit, 0, ',', '.') }}</div>
-            <div class="small text-muted mt-1">Terhitung dari {{ $knownProfitItems->count() }} produk ber-HPP</div>
+            <div class="text-muted small fw-bold text-uppercase mb-1">AOV Produk</div>
+            <div class="fs-4 fw-bolder text-dark">Rp {{ number_format($totalOrders > 0 ? $totalGmv / $totalOrders : 0, 0, ',', '.') }}</div>
+            <div class="small text-muted mt-1">{{ number_format($totalOrders, 0, ',', '.') }} orders · GMV / order</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
@@ -176,7 +247,7 @@
             <div class="fs-4 fw-bolder {{ $unknownProfitItems > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">
                 Rp {{ number_format($totalProfit, 0, ',', '.') }}
             </div>
-            <div class="small text-muted mt-1">POAS: {{ number_format($knownAdSpend > 0 ? $totalProfit / ($knownAdSpend * 1.11) : 0, 2) }}x · {{ $unknownProfitItems }} belum ada HPP</div>
+            <div class="small text-muted mt-1">POAS: {{ number_format($knownAdSpend > 0 ? $totalProfit / ($knownAdSpend * 1.11) : 0, 2) }}x · {{ $unknownProfitItems }} belum ada HPP · {{ $criticalStockProducts }} stok kritis</div>
         </div>
     </div>
 </div>
@@ -186,12 +257,25 @@
     <div class="col-12 col-xl-12">
         <div class="dpanel p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Scatter Produk: Spend vs Est. Profit</h6>
-                <span class="badge bg-light text-dark border">Hero Product = Profitabilitas Tinggi & Budget Cukup</span>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Product Matrix: Biaya Iklan vs Net Profit Terhitung</h6>
+                <span id="productScatterHint" class="badge bg-light text-dark border">Subtab: Per Kategori</span>
             </div>
             <div style="height: 300px; position: relative;">
                 <canvas id="productScatterChart"></canvas>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="dpanel p-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-boxes text-primary me-2"></i>Stock Risk vs Sales Velocity</h6>
+                <span class="badge bg-light text-dark border" style="font-size:.6rem;">Periode {{ $productPeriodDays }} hari</span>
+            </div>
+            <div class="small text-muted mb-2" style="font-size:.65rem;">X = orders per hari · Y = stok tersedia · bubble lebih besar = GMV lebih besar.</div>
+            <div style="height:280px; position:relative;"><canvas id="productStockChart"></canvas></div>
         </div>
     </div>
 </div>
@@ -227,7 +311,7 @@
             <div class="dpanel ads-kpi">
                 <div class="ads-kpi-label"><i class="bi bi-graph-up-arrow"></i> GMV</div>
                 <div class="ads-kpi-value" data-product-kpi-value="gmv">Rp {{ number_format($productInitialKpi['gmv'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub">ROAS <span data-product-kpi-value="roas">{{ number_format($productInitialKpi['roas'], 2, ',', '.') }}x</span></div>
+                <div class="ads-kpi-sub">ROAS <span data-product-kpi-value="roas">{{ number_format($productInitialKpi['roas'], 2, ',', '.') }}x</span> · AOV <span data-product-kpi-value="aov">Rp {{ number_format($productInitialKpi['aov'], 0, ',', '.') }}</span></div>
             </div>
             <div class="dpanel ads-kpi kpi-profit">
                 <div class="ads-kpi-label"><i class="bi bi-cash-stack"></i> Net Profit</div>
@@ -247,14 +331,14 @@
             <thead class="table-light sticky-top" style="z-index: 2;">
                 <tr>
                     <th>Produk / SKU</th>
-                    <th>Klasifikasi</th>
+                    <th>Sinyal</th>
                     <th class="text-end">Stok</th>
-                    <th class="text-end">Spend</th>
-                    <th class="text-end">Pesanan</th>
+                    <th class="text-end">Orders</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Click-Through Rate">CTR</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Conversion Rate">CVR</th>
+                    <th class="text-end">Biaya Iklan</th>
+                    <th class="text-end">AOV</th>
                     <th class="text-end">GMV</th>
-                    <th class="text-end">Gross Profit</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Net Profit = Gross Profit - Spend">Net Profit</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Profit on Ad Spend">POAS</th>
                 </tr>
@@ -263,14 +347,14 @@
                 @foreach($productCategoryRows as $categoryRow)
                     <tr class="product-category-row" data-product-views="category" onclick="productToggleCategory(this)">
                         <td><div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right product-caret text-muted" style="font-size:.7rem;"></i><div><div class="fw-bold">{{ $categoryRow['category'] }}</div><div class="text-muted small">{{ number_format($categoryRow['products'], 0, ',', '.') }} produk</div></div></div></td>
-                        <td><span class="badge bg-light text-dark border">Ringkasan</span></td>
+                        <td><span class="badge bg-light text-dark border">Ringkasan</span><br><span class="badge bg-{{ $categoryRow['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $categoryRow['stock_risk']['label'] }}</span></td>
                         <td class="text-end">{{ number_format($categoryRow['stock'], 0, ',', '.') }}</td>
-                        <td class="text-end fw-bold text-danger">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
                         <td class="text-end fw-bold">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($categoryRow['ctr'], 2) }}%</td>
                         <td class="text-end">{{ number_format($categoryRow['cvr'], 2) }}%</td>
+                        <td class="text-end fw-bold text-danger">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</td>
+                        <td class="text-end">Rp {{ number_format($categoryRow['aov'], 0, ',', '.') }}</td>
                         <td class="text-end text-success fw-bold">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</td>
-                        <td class="text-end text-muted">Rp {{ number_format($categoryRow['gross_profit'], 0, ',', '.') }}</td>
                         <td class="text-end fw-bold {{ $categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger' }}">{{ $categoryRow['profit_unknown'] > 0 ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($categoryRow['poas'], 2) }}x</td>
                     </tr>
@@ -279,17 +363,18 @@
                             <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar produk dalam kategori {{ $categoryRow['category'] }}</div>
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover align-middle mb-0" style="font-size:.72rem;">
-                                    <thead><tr><th>Produk / SKU</th><th>Klasifikasi</th><th class="text-end">Stok</th><th class="text-end">Spend</th><th class="text-end">Orders</th><th class="text-end">GMV</th><th class="text-end">Net Profit</th><th class="text-end">POAS</th></tr></thead>
+                                    <thead><tr><th>Produk / SKU</th><th>Sinyal</th><th class="text-end">Stok</th><th class="text-end">Orders</th><th class="text-end">AOV</th><th class="text-end">GMV</th><th class="text-end">Gross Profit</th><th class="text-end">Net Profit</th><th class="text-end">POAS</th></tr></thead>
                                     <tbody>
                                         @foreach($productCategoryProductRows->get($categoryRow['category'], collect()) as $productEntry)
                                             @php $detailProduct = $productEntry['row']; @endphp
                                             <tr>
                                                 <td><div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $detailProduct->item_name }}">{{ $detailProduct->item_name }}</div><div class="text-muted" style="font-size:.62rem;">{{ $detailProduct->item_sku }}</div></td>
-                                                <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span></td>
+                                                <td><span class="badge bg-{{ $detailProduct->class_color }}">{{ $detailProduct->classification }}</span><br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.56rem;">{{ $productEntry['stock_risk']['label'] }}</span></td>
                                                 <td class="text-end">{{ number_format($detailProduct->stock_total ?? 0, 0, ',', '.') }}</td>
-                                                <td class="text-end">Rp {{ number_format($detailProduct->spend, 0, ',', '.') }}</td>
                                                 <td class="text-end">{{ number_format($detailProduct->orders, 0, ',', '.') }}</td>
+                                                <td class="text-end">Rp {{ number_format(($detailProduct->orders ?? 0) > 0 ? $detailProduct->gmv / $detailProduct->orders : 0, 0, ',', '.') }}</td>
                                                 <td class="text-end text-success">Rp {{ number_format($detailProduct->gmv, 0, ',', '.') }}</td>
+                                                <td class="text-end">{{ $detailProduct->gross_profit === null ? 'N/A' : 'Rp ' . number_format($detailProduct->gross_profit, 0, ',', '.') }}</td>
                                                 <td class="text-end">{{ $detailProduct->profit_after_ads === null ? 'N/A' : 'Rp ' . number_format($detailProduct->profit_after_ads, 0, ',', '.') }}</td>
                                                 <td class="text-end">{{ $detailProduct->poas === null ? 'N/A' : number_format($detailProduct->poas, 2) . 'x' }}</td>
                                             </tr>
@@ -329,6 +414,7 @@
                             <span class="badge bg-{{ $row->class_color }}">
                                 {{ $row->classification }}
                             </span>
+                            <br><span class="badge bg-{{ $productEntry['stock_risk']['class'] }}" style="font-size:.58rem;">{{ $productEntry['stock_risk']['label'] }}</span>
                         </td>
                         <td class="text-end">
                             @if(($row->stock_total ?? 0) < 5)
@@ -337,12 +423,12 @@
                                 {{ $row->stock_total ?? 0 }}
                             @endif
                         </td>
-                        <td class="text-end fw-bold text-danger">Rp {{ number_format($row->spend, 0, ',', '.') }}</td>
                         <td class="text-end fw-bold">{{ number_format($row->orders, 0, ',', '.') }}</td>
                         <td class="text-end">{{ number_format($row->ctr, 2) }}%</td>
                         <td class="text-end">{{ number_format($row->cvr, 2) }}%</td>
+                        <td class="text-end fw-bold text-danger">Rp {{ number_format($row->spend, 0, ',', '.') }}</td>
+                        <td class="text-end">Rp {{ number_format(($row->orders ?? 0) > 0 ? $row->gmv / $row->orders : 0, 0, ',', '.') }}</td>
                         <td class="text-end text-success fw-bold">Rp {{ number_format($row->gmv, 0, ',', '.') }}</td>
-                        <td class="text-end text-muted">{{ $row->gross_profit === null ? 'N/A' : 'Rp ' . number_format($row->gross_profit, 0, ',', '.') }}</td>
                         <td class="text-end fw-bold {{ $row->profit_after_ads === null ? 'text-muted' : ($row->profit_after_ads >= 0 ? 'text-success' : 'text-danger') }}">
                             {{ $row->profit_after_ads === null ? 'N/A' : 'Rp ' . number_format($row->profit_after_ads, 0, ',', '.') }}
                         </td>
@@ -364,6 +450,9 @@
 
 <script>
 const productKpiData = {!! json_encode($productSegmentKpis) !!};
+const productChartData = {!! json_encode($productChartData) !!};
+let productMatrixChart = null;
+let productStockChart = null;
 
 function productToggleCategory(row) {
     row.classList.toggle('open');
@@ -393,8 +482,10 @@ function productUpdateKpis(view) {
     setValue('orders', productFormatNumber(kpi.orders, 0));
     setValue('gmv', 'Rp ' + productFormatNumber(kpi.gmv, 0));
     setValue('roas', productFormatNumber(kpi.roas, 2) + 'x');
+    setValue('aov', 'Rp ' + productFormatNumber(kpi.aov, 0));
     setValue('profit', 'Rp ' + productFormatNumber(kpi.profit, 0));
     setValue('profit_unknown', productFormatNumber(kpi.profit_unknown, 0));
+    productRenderCharts(view);
 }
 
 window.__productPerformanceView = function(view) {
@@ -445,12 +536,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.__productPerformanceView(validViews.includes(savedView) ? savedView : 'category');
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    const pScatterData = {!! $scatterDataJson !!};
-
-    const pctx = document.getElementById('productScatterChart');
-    if (!pctx) return;
-
+function productRenderCharts(view) {
+    if (typeof Chart === 'undefined') return;
+    const rows = productChartData[view] || productChartData.category || [];
+    const money = value => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
     const classColorMap = {
         'Hero Product': 'rgba(25, 135, 84, 0.7)',
         'Profit Driver': 'rgba(13, 110, 253, 0.7)',
@@ -458,58 +547,121 @@ document.addEventListener('DOMContentLoaded', function() {
         'Traffic Driver (No Conv)': 'rgba(255, 193, 7, 0.7)',
         'Loss Maker': 'rgba(220, 53, 69, 0.7)',
         'Stock Risk': 'rgba(220, 53, 69, 0.9)',
+        'Kategori': 'rgba(71, 85, 105, 0.7)',
         'Review': 'rgba(108, 117, 125, 0.7)',
-        'Low Performer': 'rgba(173, 181, 189, 0.7)'
+        'Low Performer': 'rgba(173, 181, 189, 0.7)',
     };
+    const colorFor = label => classColorMap[label] || classColorMap.Review;
 
-    const pDatasets = Object.keys(classColorMap).map(cls => {
-        return {
-            label: cls,
-            data: pScatterData.filter(d => d.reco === cls),
-            backgroundColor: classColorMap[cls],
-            borderColor: classColorMap[cls].replace('0.7', '1').replace('0.9', '1'),
-            borderWidth: 1
-        };
-    }).filter(ds => ds.data.length > 0);
-
-    new Chart(pctx, {
-        type: 'bubble',
-        data: {
-            datasets: pDatasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const data = context.raw;
-                            return [
-                                data.name,
-                                'Spend: Rp ' + data.x.toLocaleString('id-ID'),
-                                'Net Profit: Rp ' + data.y.toLocaleString('id-ID')
-                            ];
-                        }
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'bottom'
-                }
+    const matrixCanvas = document.getElementById('productScatterChart');
+    if (matrixCanvas) {
+        if (productMatrixChart) productMatrixChart.destroy();
+        const matrixRows = rows.map(row => ({ ...row, y: row.profit_available ? row.y : 0 }));
+        productMatrixChart = new Chart(matrixCanvas, {
+            type: 'bubble',
+            data: {
+                datasets: [...new Set(matrixRows.map(row => row.reco))].map(function(label) {
+                    const color = colorFor(label);
+                    return {
+                        label: label,
+                        data: matrixRows.filter(row => row.reco === label),
+                        backgroundColor: color,
+                        borderColor: color.replace('0.7', '1').replace('0.9', '1'),
+                        borderWidth: 1,
+                    };
+                }),
             },
-            scales: {
-                x: {
-                    title: { display: true, text: 'Ad Spend (Rp)' },
-                    ticks: { callback: function(value) { return 'Rp ' + (value/1000).toLocaleString('id-ID') + 'k'; } }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const row = context.raw;
+                                return [
+                                    row.name,
+                                    'Biaya iklan: ' + money(row.x) + ' · Orders: ' + productFormatNumber(row.orders, 0),
+                                    'Net profit: ' + (row.profit_available ? money(row.y) : 'N/A · HPP belum tersedia'),
+                                    'GMV: ' + money(row.gmv) + ' · AOV: ' + money(row.aov),
+                                    'ROAS: ' + Number(row.roas || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x',
+                                ];
+                            },
+                        },
+                    },
                 },
-                y: {
-                    title: { display: true, text: 'Est. Net Profit (Rp)' },
-                    ticks: { callback: function(value) { return 'Rp ' + (value/1000).toLocaleString('id-ID') + 'k'; } },
-                    grid: { color: function(context) { return context.tick.value === 0 ? '#ff0000' : 'rgba(0,0,0,0.1)'; } }
-                }
-            }
-        }
-    });
-});
+                scales: {
+                    x: { title: { display: true, text: 'Biaya Iklan (Rp)' }, ticks: { callback: value => 'Rp ' + (value / 1000).toLocaleString('id-ID') + 'k' } },
+                    y: { title: { display: true, text: 'Net Profit Terhitung (Rp)' }, ticks: { callback: value => 'Rp ' + (value / 1000).toLocaleString('id-ID') + 'k' }, grid: { color: context => context.tick.value === 0 ? '#ff0000' : 'rgba(0,0,0,0.1)' } },
+                },
+            },
+        });
+    }
+
+    const stockCanvas = document.getElementById('productStockChart');
+    if (stockCanvas) {
+        if (productStockChart) productStockChart.destroy();
+        const stockColors = {
+            'Stok Aman': 'rgba(16, 185, 129, .72)',
+            'Stok Menipis': 'rgba(245, 158, 11, .72)',
+            'Stok Kritis': 'rgba(239, 68, 68, .78)',
+            'Stok Habis': 'rgba(185, 28, 28, .85)',
+            'Tidak Ada Penjualan': 'rgba(100, 116, 139, .72)',
+            'Stok Kosong': 'rgba(71, 85, 105, .72)',
+            'Agregat Campaign': 'rgba(139, 92, 246, .72)',
+        };
+        const stockLabels = [...new Set(rows.map(row => row.stock_risk?.label || 'Review'))];
+        productStockChart = new Chart(stockCanvas, {
+            type: 'bubble',
+            data: {
+                datasets: stockLabels.map(function(label) {
+                    const color = stockColors[label] || 'rgba(108, 117, 125, .72)';
+                    return {
+                        label: label,
+                        data: rows.filter(row => (row.stock_risk?.label || 'Review') === label).map(row => ({
+                            x: row.velocity,
+                            y: row.stock,
+                            r: Math.max(4, Math.min(16, 4 + Math.log10(Number(row.gmv || 0) + 1) * 2)),
+                            name: row.name,
+                            orders: row.orders,
+                            gmv: row.gmv,
+                            stock_days: row.stock_risk?.label === 'Agregat Campaign' ? null : (row.velocity > 0 ? row.stock / row.velocity : null),
+                        })),
+                        backgroundColor: color,
+                        borderColor: color.replace('.72', '1').replace('.78', '1').replace('.85', '1'),
+                        borderWidth: 1,
+                    };
+                }),
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const row = context.raw;
+                                return [
+                                    row.name,
+                                    'Orders/hari: ' + Number(row.x || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 }),
+                                    'Stok: ' + productFormatNumber(row.y, 0) + ' · GMV: ' + money(row.gmv),
+                                    row.stock_days === null ? 'Coverage: N/A' : 'Coverage: ' + Number(row.stock_days).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' hari',
+                                ];
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: { beginAtZero: true, title: { display: true, text: 'Orders per Hari' } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Stok Tersedia' } },
+                },
+            },
+        });
+    }
+
+    const hint = document.getElementById('productScatterHint');
+    if (hint) hint.textContent = 'Subtab: ' + ({ category: 'Per Kategori', roas: 'GMV Max ROAS', gms: 'GMV Max Auto', unmapped: 'Produk Bermasalah' }[view] || 'Per Kategori');
+}
 </script>

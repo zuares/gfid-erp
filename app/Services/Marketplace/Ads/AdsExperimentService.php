@@ -623,6 +623,7 @@ class AdsExperimentService
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'days_with_data' => $daysWithData,
+            'availability' => $daysWithData > 0 ? 'available' : 'pending',
             'source_table' => $table,
             'metrics' => array_merge($baseMetrics, $calculatedMetrics),
             'data_quality' => array_values(array_unique($quality)),
@@ -666,6 +667,7 @@ class AdsExperimentService
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'days_with_data' => 0,
+            'availability' => 'pending',
             'source_table' => null,
             'metrics' => [
                 'impressions' => 0,
