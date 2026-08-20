@@ -166,22 +166,18 @@
     $gmsUnknownCount = $gmsProfitRows->count() - $gmsKnownRows->count();
     $gmsRoas = $gmsTotalSpend > 0 ? $gmsTotalGmv / $gmsTotalSpend : 0;
     $gmsMarginPct = $gmsTotalGmv > 0 ? ($gmsTotalProfit / $gmsTotalGmv) * 100 : 0;
-    $previousSellerCenterSpend = isset($kpi['previous'])
-        ? (float) ($kpi['previous']->spend ?? 0)
-        : 0;
     $gmsPreviousGmv = $gmsProfitRows->sum(fn ($r) => (float) ($r->camp->prev_gmv ?? 0));
     $gmsPreviousSpend = $gmsProfitRows->sum(fn ($r) => (float) ($r->camp->prev_spend ?? 0));
-    $regularPreviousCampaignSpend = max(0, $previousSellerCenterSpend - $gmsPreviousSpend);
     $gmsPreviousKnownRows = $gmsProfitRows->filter(fn ($r) => $r->camp->prev_profit_after_ads !== null);
     $gmsPreviousProfit = $gmsPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_profit_after_ads ?? 0));
     $gmsPreviousCogs = $gmsPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_total_cogs ?? 0));
     $gmsPreviousValue = $gmsPreviousSpend > 0 ? $gmsPreviousGmv / $gmsPreviousSpend : 0;
     $roasKnownRows = $displayRows->filter(fn ($r) => $r->profit !== null);
     $roasTotalGmv = $displayRows->sum(fn ($r) => (float) $r->camp->gmv);
-    // Kampanye regular adalah total Seller Center dikurangi GMV Max Auto.
-    // Keduanya masih dalam basis spend sebelum PPN; PPN hanya diterapkan
-    // ketika biaya ditampilkan dan profit dihitung.
-    $roasTotalSpend = $regularCampaignSpend;
+    // KPI kampanye regular harus mengambil spend langsung dari baris GMV Max
+    // ROAS. Seller Center - GMV Max Auto hanya dipakai sebagai rekonsiliasi,
+    // bukan sebagai sumber KPI kampanye.
+    $roasTotalSpend = $displayRows->sum(fn ($r) => (float) $r->camp->spend);
     $roasTotalOrders = $displayRows->sum(fn ($r) => (int) $r->camp->orders);
     $roasTotalProfit = $roasKnownRows->sum('profit');
     $roasUnknownCount = $displayRows->count() - $roasKnownRows->count();
@@ -191,7 +187,7 @@
     $roasMarginPct = $roasKnownGmv > 0 ? ($roasTotalProfit / $roasKnownGmv) * 100 : 0;
     $roasPreviousKnownRows = $displayRows->filter(fn ($r) => $r->camp->prev_profit_after_ads !== null);
     $roasPreviousGmv = $displayRows->sum(fn ($r) => (float) ($r->camp->prev_gmv ?? 0));
-    $roasPreviousSpend = $regularPreviousCampaignSpend;
+    $roasPreviousSpend = $displayRows->sum(fn ($r) => (float) ($r->camp->prev_spend ?? 0));
     $roasPreviousProfit = $roasPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_profit_after_ads ?? 0));
     $roasPreviousCogs = $roasPreviousKnownRows->sum(fn ($r) => (float) ($r->camp->prev_total_cogs ?? 0));
     $roasPreviousValue = $roasPreviousSpend > 0 ? $roasPreviousGmv / $roasPreviousSpend : 0;
