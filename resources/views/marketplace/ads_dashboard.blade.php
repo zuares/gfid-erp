@@ -2268,6 +2268,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="p-3">
                     <div id="hourlySummary" class="daily-trend-stats mb-3"></div>
+                    <div id="hourlyDataNotice" class="mb-2 p-2" style="display:none; border-left:4px solid var(--dsh-border); background:var(--dsh-bg); border-radius:4px; font-size:.72rem; color:var(--dsh-muted);"></div>
                     <div style="position: relative; height: 250px;">
                         <canvas id="hourlyChart"></canvas>
                     </div>
@@ -3831,6 +3832,13 @@ document.addEventListener("DOMContentLoaded", function() {
     let hsEl = document.getElementById('hourlySummary');
     if(hsEl) {
         hsEl.innerHTML = `<span style="color:#dc2626">Rp ${formatShortIDR(totalHourlySpend)} Biaya</span> &bull; <span style="color:#10b981">Rp ${formatShortIDR(totalHourlyGmv)} GMV</span> &bull; <span style="color:#3b82f6">${totalHourlyOrders.toLocaleString('id-ID')} Orders</span> &bull; <span style="color:#eab308">${totalHourlyRoas}x ROAS</span>`;
+    }
+    const hourlyDataNotice = document.getElementById('hourlyDataNotice');
+    if (hourlyDataNotice && rawHourly.length === 0) {
+        const selectedFrom = fromEl && fromEl.value ? formatIndoDate(fromEl.value) : 'tanggal terpilih';
+        const selectedTo = toEl && toEl.value ? formatIndoDate(toEl.value) : selectedFrom;
+        hourlyDataNotice.style.display = 'block';
+        hourlyDataNotice.innerHTML = `<i class="bi bi-info-circle me-1"></i> Belum ada data per jam untuk periode ${selectedFrom}${selectedFrom !== selectedTo ? ' – ' + selectedTo : ''}. Grafik tetap menampilkan 24 jam sebagai baseline.`;
     }
 
     const hourlyMetricRows = hourlyData.map(d => {
