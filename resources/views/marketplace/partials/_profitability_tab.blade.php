@@ -284,12 +284,14 @@ window.__profitChartData = {
         <div class="profit-recon-label" style="margin-top:.15rem;">+PPN {{ $fmt($totalSellerCenterSpend * 1.11) }}</div>
     </div>
     <div class="profit-recon-card">
-        <div class="profit-recon-label"><i class="bi bi-megaphone"></i> Kampanye Regular</div>
+        <div class="profit-recon-label"><i class="bi bi-megaphone"></i> GMV Max ROAS</div>
         <div class="profit-recon-value">{{ $fmt($regularCampaignSpend) }}</div>
+        <div class="profit-recon-label" style="margin-top:.15rem;">sebelum PPN · sumber KPI</div>
     </div>
     <div class="profit-recon-card">
-        <div class="profit-recon-label"><i class="bi bi-stars"></i> GMV Max Auto <span style="font-size:.58rem;">sebelum PPN</span></div>
+        <div class="profit-recon-label"><i class="bi bi-stars"></i> GMV Max Auto</div>
         <div class="profit-recon-value" style="color:#b45309;">{{ $fmt($gmvAutoSpend) }}</div>
+        <div class="profit-recon-label" style="margin-top:.15rem;">sebelum PPN · sumber GMS</div>
     </div>
     <div class="profit-recon-card">
         <div class="profit-recon-label"><i class="bi bi-check-circle"></i> Status BEP</div>
@@ -336,9 +338,9 @@ window.__profitChartData = {
             </div>
 
             <div class="dpanel ads-kpi kpi-spend">
-                <div class="ads-kpi-label" title="Total biaya iklan termasuk PPN"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
+                <div class="ads-kpi-label" title="Total biaya iklan Seller Center setelah PPN"><i class="bi bi-wallet2"></i> Biaya Iklan</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">&minus;{{ $fmt($totalTopup) }}</div>
-                <div class="ads-kpi-sub">SC net {{ $fmt($sellerCenterSpend) }}</div>
+                <div class="ads-kpi-sub">Seller Center sebelum PPN {{ $fmt($sellerCenterSpend) }}</div>
                 @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $totalTopup, $previousTopup, true, 'currency'), 'label' => $comparisonLabel])
             </div>
 
@@ -1283,9 +1285,9 @@ window.__profitView = function (mode) {
                 @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $roasTotalGmv, $roasPreviousGmv, false, 'currency'), 'label' => $comparisonLabel])
             </div>
             <div class="dpanel ads-kpi kpi-spend">
-                <div class="ads-kpi-label" title="Belanja iklan termasuk PPN"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
+                <div class="ads-kpi-label" title="Belanja iklan GMV Max ROAS setelah PPN"><i class="bi bi-wallet2"></i> Belanja Iklan GMV Max ROAS</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">−{{ $fmt($roasTotalSpend * 1.11) }}</div>
-                <div class="ads-kpi-sub">Net {{ $fmt($roasTotalSpend) }} · +PPN</div>
+                <div class="ads-kpi-sub">Sebelum PPN {{ $fmt($roasTotalSpend) }} · +PPN</div>
                 @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) ($roasTotalSpend * 1.11), (float) ($roasPreviousSpend * 1.11), true, 'currency'), 'label' => $comparisonLabel])
             </div>
             <div class="dpanel ads-kpi kpi-cogs">
@@ -1485,9 +1487,9 @@ window.__profitView = function (mode) {
                     @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) $gmsTotalGmv, (float) $gmsPreviousGmv, false, 'currency'), 'label' => $comparisonLabel])
                 </div>
                 <div class="dpanel ads-kpi kpi-spend">
-                    <div class="ads-kpi-label" title="Belanja iklan termasuk PPN"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
+                    <div class="ads-kpi-label" title="Belanja iklan GMV Max Auto setelah PPN"><i class="bi bi-wallet2"></i> Belanja Iklan GMV Max Auto</div>
                     <div class="ads-kpi-value">−{{ $fmt($gmsTotalSpend * 1.11) }}</div>
-                    <div class="ads-kpi-sub">Net {{ $fmt($gmsTotalSpend) }} · +PPN</div>
+                    <div class="ads-kpi-sub">Sebelum PPN {{ $fmt($gmsTotalSpend) }} · +PPN</div>
                     @include('marketplace.partials._profit_kpi_compare', ['cmp' => $profitCompare((float) ($gmsTotalSpend * 1.11), (float) ($gmsPreviousSpend * 1.11), true, 'currency'), 'label' => $comparisonLabel])
                 </div>
                 <div class="dpanel ads-kpi kpi-cogs">
