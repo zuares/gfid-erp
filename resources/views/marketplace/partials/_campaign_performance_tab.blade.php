@@ -374,6 +374,77 @@
     }
     $perfSegmentKpis['category'] = $categoryKpi;
     $perfInitialKpi = $perfSegmentKpis['category'];
+    $perfVisibleProfit = $perfRows->sum(fn ($row) => (float) ($row['profit'] ?? 0));
+    $perfVisiblePreviousProfit = $perfRows->sum(fn ($row) => (float) ($row['prev_profit'] ?? 0));
+    $perfProfitAdjustment = $overallCurrentKpi !== null
+        ? round($totalProfit - $perfVisibleProfit, 2)
+        : 0.0;
+    $perfPreviousProfitAdjustment = $overallPreviousKpi !== null
+        ? round($overallPreviousProfit - $perfVisiblePreviousProfit, 2)
+        : 0.0;
+    $perfSpendAdjustment = $overallCurrentKpi !== null
+        ? max(0, round($totalSpend - $perfRows->sum('spend'), 2))
+        : 0.0;
+    if (abs($perfProfitAdjustment) >= 0.01) {
+        $reconciliationCategory = 'Penyesuaian Seller Center';
+        $reconciliationCampaign = [
+            'id' => 'seller-center-adjustment',
+            'store_id' => null,
+            'campaign_id' => 'seller-center-adjustment',
+            'name' => 'Penyesuaian Seller Center',
+            'item_name' => 'Biaya/profit belum teralokasi ke campaign',
+            'type' => null,
+            'bep_roas' => null,
+            'configured_roas' => null,
+            'campaign_budget' => 0,
+            'roas' => 0,
+            'actual_vs_target_pct' => null,
+            'prev_roas' => 0,
+            'orders' => 0,
+            'prev_orders' => 0,
+            'spend' => $perfSpendAdjustment,
+            'prev_spend' => 0,
+            'aov' => 0,
+            'prev_aov' => 0,
+            'gmv' => 0,
+            'prev_gmv' => 0,
+            'profit' => $perfProfitAdjustment,
+            'profit_available' => true,
+            'prev_profit' => $perfPreviousProfitAdjustment,
+        ];
+        $perfCategoryRows = collect([[
+            'category' => $reconciliationCategory,
+            'key' => 'perf-cat-seller-center-adjustment',
+            'campaign_count' => 1,
+            'spend' => $perfSpendAdjustment,
+            'gmv' => 0,
+            'orders' => 0,
+            'aov' => 0,
+            'clicks' => 0,
+            'impressions' => 0,
+            'roas' => 0,
+            'target_roas' => null,
+            'bep_roas' => null,
+            'configured_roas' => null,
+            'campaign_budget' => 0,
+            'actual_vs_target_pct' => null,
+            'profit' => $perfProfitAdjustment,
+            'profit_available' => true,
+            'margin' => null,
+            'cvr' => 0,
+            'prev_spend' => 0,
+            'prev_gmv' => 0,
+            'prev_orders' => 0,
+            'prev_aov' => 0,
+            'prev_roas' => 0,
+            'prev_profit' => $perfPreviousProfitAdjustment,
+            'prev_profit_available' => true,
+            'reco' => ['label' => 'Rekonsiliasi', 'color' => 'warning'],
+            'empty_variant_count' => 0,
+        ]])->concat($perfCategoryRows)->values();
+        $perfCategoryCampaignRows = $perfCategoryCampaignRows->put($reconciliationCategory, collect([$reconciliationCampaign]));
+        $perfSegmentCounts['category']++;
+    }
 
     $scatterDataJson = json_encode($perfRows->map(function($r) {
         return [
@@ -591,10 +662,10 @@
                 <div class="perf-kpi-compare" data-perf-kpi-compare="roas" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($perfInitialKpi['prev_roas'], 2, ',', '.') }}x {!! $fmtDelta($perfInitialKpi['roas'], $perfInitialKpi['prev_roas'], true) !!}</div>
             </div>
             <div class="dpanel ads-kpi kpi-profit">
-                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Net Profit setelah HPP dan biaya iklan setelah PPN 11%."><i class="bi bi-cash-coin" aria-hidden="true"></i> Net Profit</div>
-                <div class="ads-kpi-value" data-perf-kpi-value="profit">Rp {{ number_format($perfInitialKpi['profit'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub">Profit/order: <span data-perf-kpi-value="profit_per_order">Rp {{ number_format($perfInitialKpi['profit_per_order'], 0, ',', '.') }}</span> <span class="perf-kpi-compare" data-perf-kpi-compare="profit_per_order" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit_per_order'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit_per_order'], $perfInitialKpi['prev_profit_per_order'], true) !!}</span></div>
-                <div class="perf-kpi-compare" data-perf-kpi-compare="profit" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($perfInitialKpi['prev_profit'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['profit'], $perfInitialKpi['prev_profit'], true) !!}</div>
+                <div class="ads-kpi-label" data-bs-toggle="tooltip" title="Net Profit keseluruhan setelah HPP dan biaya iklan setelah PPN 11%."><i class="bi bi-cash-coin" aria-hidden="true"></i> Net Profit Keseluruhan</div>
+                <div class="ads-kpi-value {{ $profitUnknownCount > 0 ? 'text-warning' : ($totalProfit >= 0 ? 'text-success' : 'text-danger') }}">Rp {{ number_format($totalProfit, 0, ',', '.') }}</div>
+                <div class="ads-kpi-sub">Profit/order: Rp {{ number_format($totalOrders > 0 ? $totalProfit / $totalOrders : 0, 0, ',', '.') }} <span class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($overallPreviousOrders > 0 ? $overallPreviousProfit / $overallPreviousOrders : 0, 0, ',', '.') }} {!! $fmtDelta($totalOrders > 0 ? $totalProfit / $totalOrders : 0, $overallPreviousOrders > 0 ? $overallPreviousProfit / $overallPreviousOrders : 0, true) !!}</span></div>
+                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($overallPreviousProfit, 0, ',', '.') }} {!! $fmtDelta($totalProfit, $overallPreviousProfit, true) !!}</div>
             </div>
         </div>
     </div>
@@ -616,7 +687,7 @@
                 </tr>
             </thead>
             <tbody>
-                <tr class="perf-overall-row" data-perf-views="category">
+                <tr class="perf-overall-row" data-perf-views="category roas gms unmapped">
                     <td>
                         <div class="fw-bold">Keseluruhan Campaign</div>
                         <div class="text-muted" style="font-size:.68rem;">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }} campaign</div>
@@ -1420,7 +1491,7 @@ function perfUpdateKpis(segment) {
 }
 
 function perfApplySegment(segment) {
-    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row, .perf-overall-row'));
+    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row, .perf-overall-row, .perf-reconciliation-row'));
     const categoryDetails = Array.from(document.querySelectorAll('.perf-category-detail'));
     const emptyState = document.querySelector('.perf-segment-empty');
     const noDataState = document.querySelector('.perf-no-data');
@@ -1446,6 +1517,8 @@ function perfApplySegment(segment) {
         // metrik campaign tidak ikut muncul di tampilan utama kategori.
         const isCategoryView = segment === 'category';
         const isVisible = row.classList.contains('perf-overall-row')
+            ? true
+            : row.classList.contains('perf-reconciliation-row')
             ? isCategoryView
             : isCategoryView
             ? row.classList.contains('perf-category-row')
