@@ -4560,7 +4560,26 @@ document.addEventListener("DOMContentLoaded", function() {
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: {size: 10} } },
-                    tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tooltipText, borderColor: tooltipBorder, borderWidth: 1 }
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipText,
+                        bodyColor: tooltipText,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        callbacks: {
+                            afterBody: function(tooltipItems) {
+                                const point = tooltipItems[0];
+                                const day = dailyData[point.dataIndex] || {};
+                                const orders = parseInt(day.orders || 0);
+                                const gmv = parseFloat(day.gmv || 0);
+                                const aov = orders > 0 ? gmv / orders : 0;
+                                return [
+                                    'Orders: ' + orders.toLocaleString('id-ID'),
+                                    'AOV: ' + formatFullIDR(aov),
+                                ];
+                            },
+                        },
+                    }
                 },
                 scales: {
                     x: { grid: { display: false }, ticks: { maxRotation: 45, font: {size: 9} } },
