@@ -3249,55 +3249,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
         <!-- TAB CONTROL PANEL -->
         <div class="tab-pane" id="tab-control">
-            @php
-                $controlRowsData = collect($campaigns);
-                $controlSpend = (float) $controlRowsData->sum(fn ($campaign) => (float) ($campaign->spend ?? 0)) * 1.11;
-                $controlGmv = (float) $controlRowsData->sum(fn ($campaign) => (float) ($campaign->gmv ?? 0));
-                $controlOrders = (int) $controlRowsData->sum(fn ($campaign) => (int) ($campaign->orders ?? 0));
-                $controlRoas = $controlSpend > 0 ? $controlGmv / $controlSpend : 0;
-                $controlProfit = $controlRowsData->sum(fn ($campaign) => (float) ($campaign->profit_after_ads ?? 0));
-            @endphp
+            <style>
+                .ads-control-list { display:flex; flex-direction:column; gap:.5rem; }
+                .ads-control-row { display:grid; grid-template-columns:minmax(230px,1.5fr) minmax(90px,.45fr) minmax(150px,.75fr) minmax(165px,.8fr) minmax(150px,.7fr); align-items:center; gap:.65rem; padding:.65rem .75rem; border:1px solid var(--dsh-border); border-radius:12px; background:var(--card-bg); }
+                .ads-control-row:hover { border-color:rgba(37,99,235,.35); box-shadow:0 4px 12px rgba(15,23,42,.05); }
+                .ads-control-label { display:block; font-size:.58rem; color:var(--dsh-muted); margin-bottom:.2rem; }
+                .ads-control-input { max-width:125px; min-height:30px; padding:.25rem .45rem; border-radius:8px; font-size:.72rem; font-weight:700; color:var(--text); background:var(--card-bg); border:1px solid var(--dsh-border); }
+                .ads-control-input:focus { border-color:var(--dsh-accent); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+                .ads-control-icon { width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
+                .ads-control-actions { display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
+                @media (max-width: 900px) {
+                    .ads-control-row { grid-template-columns:minmax(210px,1fr) repeat(2,minmax(130px,.7fr)) minmax(140px,.7fr); }
+                    .ads-control-actions { grid-column:1 / -1; padding-top:.25rem; border-top:1px solid var(--dsh-border); }
+                }
+                @media (max-width: 620px) {
+                    .ads-control-row { grid-template-columns:1fr 1fr; }
+                    .ads-control-name { grid-column:1 / -1; }
+                    .ads-control-actions { grid-column:1 / -1; }
+                }
+            </style>
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title">
-                            <i class="bi bi-toggles text-primary"></i> Control Panel Campaign
-                            <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" title="Atur target ROAS, modal harian, status, dan jadwal campaign dari panel ini."></i>
+                            <i class="bi bi-toggles text-primary"></i> Kontrol Campaign
                         </div>
-                        <div class="ads-tab-panel-note">Performa mengikuti periode aktif: {{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }} – {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}</div>
+                        <div class="ads-tab-panel-note">Atur ROAS, modal, status, atau jadwal dari satu baris.</div>
                     </div>
                     <span class="badge rounded-pill text-bg-light" style="font-size:.65rem;" title="Jumlah campaign yang tersedia untuk dikontrol">{{ $campaigns->count() }} campaign</span>
                 </div>
                 <div class="p-3">
-                    <div class="row g-2 mb-3">
-                        <div class="col-6 col-md-3">
-                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="Total biaya iklan periode aktif, termasuk PPN 11%.">
-                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-wallet2 me-1"></i>Biaya iklan</div>
-                                <div style="font-size:.84rem;font-weight:850;">Rp {{ number_format($controlSpend, 0, ',', '.') }}</div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="Total GMV campaign pada periode aktif.">
-                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-receipt me-1"></i>GMV</div>
-                                <div style="font-size:.84rem;font-weight:850;">Rp {{ number_format($controlGmv, 0, ',', '.') }}</div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="ROAS aktual = GMV dibagi biaya iklan termasuk PPN.">
-                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-bullseye me-1"></i>ROAS</div>
-                                <div style="font-size:.84rem;font-weight:850;">{{ number_format($controlRoas, 2, ',', '.') }}x</div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <div class="dpanel p-2 h-100" data-bs-toggle="tooltip" title="Orders dan net profit campaign pada periode aktif.">
-                                <div style="font-size:.62rem;color:var(--dsh-muted);"><i class="bi bi-cart-check me-1"></i>Orders · Profit</div>
-                                <div style="font-size:.84rem;font-weight:850;">{{ number_format($controlOrders, 0, ',', '.') }} · Rp {{ number_format($controlProfit, 0, ',', '.') }}</div>
-                            </div>
-                        </div>
-                    </div>
                     @if($storeId === 'all')
-                        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.72rem; border-radius:10px;">
-                            <i class="bi bi-info-circle me-1"></i> Aksi tetap dikirim ke toko pada baris campaign. Pastikan campaign dan tokonya benar sebelum menyimpan.
+                        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.68rem; border-radius:10px;">
+                            <i class="bi bi-info-circle me-1"></i> Pastikan toko pada baris campaign sudah benar sebelum menyimpan.
                         </div>
                     @endif
                     @if($campaignSchedules->isNotEmpty())
@@ -3342,101 +3326,102 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                     @endif
-                    <div class="table-responsive">
-                        <table class="dpanel-table dpanel-table-sm align-middle" style="min-width:1510px;">
-                            <thead>
-                                <tr>
-                                    <th>Campaign</th>
-                                    <th>Toko</th>
-                                    <th>Jenis</th>
-                                    <th>Status</th>
-                                    <th style="min-width:240px;" title="Metrik campaign berdasarkan periode aktif">Performa periode</th>
-                                    <th style="min-width:145px;">Target ROAS</th>
-                                    <th style="min-width:170px;">Modal Harian</th>
-                                    <th style="min-width:480px;">Aksi &amp; Jadwal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($campaigns as $controlCampaign)
-                                    @php
-                                        $controlId = (string) ($controlCampaign->channel_campaign_id ?? '');
-                                        $controlIsGms = str_starts_with($controlId, 'GMS-') || ($controlCampaign->ad_type ?? null) === 'auto';
-                                        $controlStatus = strtolower((string) ($controlCampaign->campaign_status ?? 'ongoing'));
-                                        $controlType = $controlIsGms ? 'GMV Max' : 'Regular';
-                                        $controlCampaignSpend = (float) ($controlCampaign->spend ?? 0) * 1.11;
-                                        $controlCampaignGmv = (float) ($controlCampaign->gmv ?? 0);
-                                        $controlCampaignOrders = (int) ($controlCampaign->orders ?? 0);
-                                        $controlCampaignRoas = $controlCampaignSpend > 0 ? $controlCampaignGmv / $controlCampaignSpend : 0;
-                                        $controlCampaignProfit = $controlCampaign->profit_after_ads;
-                                    @endphp
-                                    <tr data-control-row
-                                        data-store-id="{{ $controlCampaign->store_id }}"
-                                        data-campaign-id="{{ $controlId }}"
-                                        data-kind="{{ $controlIsGms ? 'gms' : 'cpc' }}"
-                                        data-status="{{ $controlStatus }}">
-                                        <td>
-                                            <div style="font-weight:800; font-size:.76rem;">{{ $controlCampaign->campaign_name ?: 'Campaign ' . $controlId }}</div>
-                                            <div style="font-size:.62rem;color:var(--dsh-muted);">ID {{ $controlId ?: '—' }}</div>
-                                        </td>
-                                        <td style="font-size:.7rem;">{{ $controlCampaign->store?->name ?? 'Toko #' . $controlCampaign->store_id }}</td>
-                                        <td><span class="badge rounded-pill" style="font-size:.6rem;background:{{ $controlIsGms ? '#ecfdf5' : '#eff6ff' }};color:{{ $controlIsGms ? '#047857' : '#1d4ed8' }};">{{ $controlType }}</span></td>
-                                        <td>
-                                            <span data-control-status class="badge rounded-pill" style="font-size:.6rem;background:{{ $controlStatus === 'ongoing' ? '#dcfce7' : ($controlStatus === 'paused' ? '#fef3c7' : '#f1f5f9') }};color:{{ $controlStatus === 'ongoing' ? '#166534' : ($controlStatus === 'paused' ? '#92400e' : '#64748b') }};">
-                                                {{ match($controlStatus) { 'ongoing' => 'Aktif', 'paused' => 'Jeda', 'closed', 'ended' => 'Selesai', default => ucfirst($controlStatus ?: '—') } }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="d-flex gap-2 flex-wrap" style="font-size:.64rem;line-height:1.25;">
-                                                <span title="Biaya iklan termasuk PPN 11%">Iklan <b>Rp {{ number_format($controlCampaignSpend, 0, ',', '.') }}</b></span>
-                                                <span title="GMV periode aktif">GMV <b>Rp {{ number_format($controlCampaignGmv, 0, ',', '.') }}</b></span>
-                                                <span title="ROAS aktual periode aktif">ROAS <b>{{ number_format($controlCampaignRoas, 2, ',', '.') }}x</b></span>
-                                                <span title="Jumlah pesanan periode aktif">Order <b>{{ number_format($controlCampaignOrders, 0, ',', '.') }}</b></span>
-                                                <span title="Net profit setelah biaya iklan termasuk PPN">Profit <b class="{{ $controlCampaignProfit !== null && $controlCampaignProfit < 0 ? 'text-danger' : 'text-success' }}">Rp {{ number_format((float) ($controlCampaignProfit ?? 0), 0, ',', '.') }}</b></span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="text" data-control-roas class="form-control" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" style="font-size:.7rem; min-width:85px;" title="Target ROAS: isi 0 untuk Auto">
-                                                <button type="button" class="btn btn-outline-primary" data-control-action="roas" data-bs-toggle="tooltip" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="input-group input-group-sm">
-                                                <input type="text" data-control-budget class="form-control" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" style="font-size:.7rem; min-width:105px;" title="Modal harian: isi 0 atau kosong untuk Unlimited">
-                                                <button type="button" class="btn btn-outline-primary" data-control-action="budget" data-bs-toggle="tooltip" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="d-flex gap-1 flex-wrap">
-                                                @if($controlStatus === 'ongoing')
-                                                    <button type="button" class="btn btn-sm btn-outline-warning" data-control-action="pause" data-bs-toggle="tooltip" title="Jeda campaign sekarang"><i class="bi bi-pause-fill"></i> Jeda</button>
-                                                @elseif($controlStatus === 'paused')
-                                                    <button type="button" class="btn btn-sm btn-outline-success" data-control-action="resume" data-bs-toggle="tooltip" title="Lanjutkan campaign sekarang"><i class="bi bi-play-fill"></i> Lanjut</button>
-                                                @endif
-                                                @if(!in_array($controlStatus, ['closed', 'ended'], true))
-                                                    <button type="button" class="btn btn-sm btn-outline-danger" data-control-action="stop" data-bs-toggle="tooltip" title="Hentikan campaign hari ini"><i class="bi bi-stop-fill"></i> Hentikan</button>
-                                                @endif
-                                                @if(!in_array($controlStatus, ['closed', 'ended'], true))
-                                                    <select data-control-schedule-action class="form-select form-select-sm" style="width:92px;font-size:.64rem;" title="Pilih aksi yang dijadwalkan">
-                                                        <option value="pause">Jeda</option>
-                                                        <option value="resume">Lanjut</option>
-                                                        <option value="budget">Modal</option>
-                                                    </select>
-                                                    <input type="text" data-control-schedule-budget class="form-control form-control-sm" inputmode="numeric" placeholder="0 = Unlimited" style="display:none;width:125px;font-size:.64rem;">
-                                                    <input type="datetime-local" data-control-schedule-at min="{{ now()->format('Y-m-d\TH:i') }}" class="form-control form-control-sm" style="width:165px;font-size:.64rem;" title="Pilih waktu eksekusi">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary" data-control-action="schedule" data-bs-toggle="tooltip" title="Simpan jadwal"><i class="bi bi-calendar-plus"></i></button>
-                                                @endif
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="8" class="text-center py-4" style="font-size:.75rem;color:var(--dsh-muted);">Belum ada campaign yang bisa dikontrol.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                    <div class="ads-control-list">
+                        <div class="ads-control-row d-none d-md-grid" style="background:transparent;border:0;box-shadow:none;padding:.1rem .75rem;">
+                            <span class="ads-control-label mb-0">Campaign</span>
+                            <span class="ads-control-label mb-0">Status</span>
+                            <span class="ads-control-label mb-0">Target ROAS</span>
+                            <span class="ads-control-label mb-0">Modal harian</span>
+                            <span class="ads-control-label mb-0">Aksi</span>
+                        </div>
+                        @forelse($campaigns as $controlCampaign)
+                            @php
+                                $controlId = (string) ($controlCampaign->channel_campaign_id ?? '');
+                                $controlIsGms = str_starts_with($controlId, 'GMS-') || ($controlCampaign->ad_type ?? null) === 'auto';
+                                $controlStatus = strtolower((string) ($controlCampaign->campaign_status ?? 'ongoing'));
+                                $controlType = $controlIsGms ? 'GMV Max' : 'Regular';
+                            @endphp
+                            <div class="ads-control-row" data-control-row
+                                data-store-id="{{ $controlCampaign->store_id }}"
+                                data-campaign-id="{{ $controlId }}"
+                                data-kind="{{ $controlIsGms ? 'gms' : 'cpc' }}"
+                                data-status="{{ $controlStatus }}">
+                                <div class="ads-control-name">
+                                    <div style="font-weight:800;font-size:.76rem;line-height:1.2;">{{ $controlCampaign->campaign_name ?: 'Campaign ' . $controlId }}</div>
+                                    <div style="font-size:.6rem;color:var(--dsh-muted);margin-top:.2rem;">{{ $controlCampaign->store?->name ?? 'Toko #' . $controlCampaign->store_id }} · {{ $controlType }} · ID {{ $controlId ?: '—' }}</div>
+                                </div>
+                                <div>
+                                    <span data-control-status class="badge rounded-pill" style="font-size:.6rem;background:{{ $controlStatus === 'ongoing' ? '#dcfce7' : ($controlStatus === 'paused' ? '#fef3c7' : '#f1f5f9') }};color:{{ $controlStatus === 'ongoing' ? '#166534' : ($controlStatus === 'paused' ? '#92400e' : '#64748b') }};">
+                                        {{ match($controlStatus) { 'ongoing' => 'Aktif', 'paused' => 'Jeda', 'closed', 'ended' => 'Selesai', default => ucfirst($controlStatus ?: '—') } }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <label class="ads-control-label d-md-none">Target ROAS</label>
+                                    <div class="input-group input-group-sm" style="max-width:150px;">
+                                        <input type="text" data-control-roas class="ads-control-input" inputmode="decimal" placeholder="Auto" value="{{ $controlCampaign->target_roas !== null ? number_format((float) $controlCampaign->target_roas, 2, ',', '') : '' }}" title="Isi 0 untuk Auto">
+                                        <button type="button" class="btn btn-outline-primary ads-control-icon" data-control-action="roas" title="Simpan target ROAS"><i class="bi bi-check2"></i></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="ads-control-label d-md-none">Modal harian</label>
+                                    <div class="input-group input-group-sm" style="max-width:175px;">
+                                        <input type="text" data-control-budget class="ads-control-input" inputmode="numeric" placeholder="Unlimited" value="{{ ($controlCampaign->campaign_budget ?? 0) > 0 ? number_format((float) $controlCampaign->campaign_budget, 0, ',', '.') : '' }}" title="Kosong atau 0 untuk Unlimited">
+                                        <button type="button" class="btn btn-outline-primary ads-control-icon" data-control-action="budget" title="Simpan modal harian"><i class="bi bi-check2"></i></button>
+                                    </div>
+                                </div>
+                                <div class="ads-control-actions">
+                                    @if($controlStatus === 'ongoing')
+                                        <button type="button" class="btn btn-sm btn-outline-warning ads-control-icon" data-control-action="pause" title="Jeda sekarang"><i class="bi bi-pause-fill"></i></button>
+                                    @elseif($controlStatus === 'paused')
+                                        <button type="button" class="btn btn-sm btn-outline-success ads-control-icon" data-control-action="resume" title="Lanjutkan sekarang"><i class="bi bi-play-fill"></i></button>
+                                    @endif
+                                    @if(!in_array($controlStatus, ['closed', 'ended'], true))
+                                        <button type="button" class="btn btn-sm btn-outline-danger ads-control-icon" data-control-action="stop" title="Hentikan hari ini"><i class="bi bi-stop-fill"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary ads-control-icon" data-control-schedule-open title="Buat jadwal"><i class="bi bi-calendar-plus"></i></button>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <div class="text-center py-4" style="font-size:.75rem;color:var(--dsh-muted);">Belum ada campaign yang bisa dikontrol.</div>
+                        @endforelse
                     </div>
                     <div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.65rem;">
-                        <i class="bi bi-shield-check me-1"></i> Perubahan hanya diproses setelah API Shopee berhasil. Hentikan iklan memakai tanggal akhir hari ini melalui endpoint edit campaign.
+                        <i class="bi bi-shield-check me-1"></i> Perubahan diproses setelah API Shopee berhasil.
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="modalCampaignSchedule" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content" style="border-radius:16px;background:var(--card-bg);border:1px solid var(--card-border);">
+                        <div class="modal-header border-0 pb-1">
+                            <div>
+                                <h6 class="modal-title fw-bold mb-1">Jadwalkan aksi</h6>
+                                <div id="campaignScheduleName" style="font-size:.66rem;color:var(--dsh-muted);"></div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body pt-2">
+                            <div class="mb-2">
+                                <label class="ads-control-label">Aksi</label>
+                                <select id="campaignScheduleAction" class="form-select form-select-sm" style="border-radius:8px;">
+                                    <option value="pause">Jeda campaign</option>
+                                    <option value="resume">Lanjutkan campaign</option>
+                                    <option value="budget">Ubah modal harian</option>
+                                </select>
+                            </div>
+                            <div class="mb-2" id="campaignScheduleBudgetWrap" style="display:none;">
+                                <label class="ads-control-label">Modal harian</label>
+                                <input id="campaignScheduleBudget" type="text" class="form-control form-control-sm" inputmode="numeric" placeholder="0 = Unlimited" style="border-radius:8px;">
+                            </div>
+                            <div class="mb-3">
+                                <label class="ads-control-label">Waktu eksekusi</label>
+                                <input id="campaignScheduleAt" type="datetime-local" min="{{ now()->format('Y-m-d\TH:i') }}" class="form-control form-control-sm" style="border-radius:8px;">
+                            </div>
+                            <button type="button" id="campaignScheduleSubmit" class="btn btn-primary btn-sm w-100" style="border-radius:9px;font-weight:750;">
+                                <i class="bi bi-calendar-check me-1"></i> Simpan jadwal
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4161,16 +4146,81 @@ document.addEventListener('DOMContentLoaded', function () {
         row.querySelectorAll('[data-control-action]').forEach(button => {
             button.addEventListener('click', () => runControlAction(button, button.dataset.controlAction));
         });
+    });
 
-        const scheduleAction = row.querySelector('[data-control-schedule-action]');
-        const scheduleBudget = row.querySelector('[data-control-schedule-budget]');
-        const syncScheduleFields = () => {
-            if (!scheduleAction || !scheduleBudget) return;
-            scheduleBudget.style.display = scheduleAction.value === 'budget' ? '' : 'none';
-            if (scheduleAction.value !== 'budget') scheduleBudget.value = '';
+    const scheduleModalEl = document.getElementById('modalCampaignSchedule');
+    const scheduleActionEl = document.getElementById('campaignScheduleAction');
+    const scheduleBudgetWrap = document.getElementById('campaignScheduleBudgetWrap');
+    const scheduleBudgetEl = document.getElementById('campaignScheduleBudget');
+    const scheduleAtEl = document.getElementById('campaignScheduleAt');
+    const scheduleNameEl = document.getElementById('campaignScheduleName');
+    const scheduleSubmitEl = document.getElementById('campaignScheduleSubmit');
+    let scheduleRow = null;
+
+    const syncScheduleModalFields = () => {
+        if (!scheduleActionEl || !scheduleBudgetWrap || !scheduleBudgetEl) return;
+        const isBudget = scheduleActionEl.value === 'budget';
+        scheduleBudgetWrap.style.display = isBudget ? '' : 'none';
+        if (!isBudget) scheduleBudgetEl.value = '';
+    };
+    scheduleActionEl?.addEventListener('change', syncScheduleModalFields);
+
+    document.querySelectorAll('[data-control-schedule-open]').forEach(button => {
+        button.addEventListener('click', () => {
+            scheduleRow = button.closest('[data-control-row]');
+            if (!scheduleRow || !scheduleModalEl) return;
+            const campaignName = scheduleRow.querySelector('.ads-control-name > div')?.textContent?.trim() || 'Campaign';
+            if (scheduleNameEl) scheduleNameEl.textContent = campaignName;
+            if (scheduleActionEl) scheduleActionEl.value = 'pause';
+            if (scheduleBudgetEl) scheduleBudgetEl.value = '';
+            if (scheduleAtEl) scheduleAtEl.value = '';
+            syncScheduleModalFields();
+            window.bootstrap?.Modal.getOrCreateInstance(scheduleModalEl).show();
+        });
+    });
+
+    scheduleSubmitEl?.addEventListener('click', async () => {
+        if (!scheduleRow || scheduleSubmitEl.disabled) return;
+        const scheduleAction = scheduleActionEl?.value || '';
+        const scheduledAt = scheduleAtEl?.value || '';
+        if (!scheduledAt) return controlFeedback('Waktu belum dipilih', 'Pilih tanggal dan jam eksekusi.', 'warning');
+
+        const payload = {
+            store_id: scheduleRow.dataset.storeId,
+            campaign_id: scheduleRow.dataset.campaignId,
+            action: scheduleAction,
+            scheduled_at: scheduledAt,
         };
-        scheduleAction?.addEventListener('change', syncScheduleFields);
-        syncScheduleFields();
+        if (scheduleAction === 'budget') {
+            const budget = parseControlNumber(scheduleBudgetEl?.value, 'budget');
+            if (budget === null) return controlFeedback('Modal belum valid', 'Isi angka modal, gunakan 0 untuk Unlimited.', 'warning');
+            payload.daily_budget = budget;
+        }
+
+        const originalHtml = scheduleSubmitEl.innerHTML;
+        scheduleSubmitEl.disabled = true;
+        scheduleSubmitEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+        try {
+            const response = await fetch(window.AdsDashboardRoutes.campaignSchedule, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Jadwal gagal dibuat.');
+            window.bootstrap?.Modal.getOrCreateInstance(scheduleModalEl).hide();
+            await controlFeedback('Jadwal tersimpan', data.message || 'Aksi campaign berhasil dijadwalkan.');
+            window.location.reload();
+        } catch (error) {
+            await controlFeedback('Gagal menyimpan jadwal', error.message || 'Terjadi kesalahan koneksi.', 'error');
+            scheduleSubmitEl.disabled = false;
+            scheduleSubmitEl.innerHTML = originalHtml;
+        }
     });
 
     document.querySelectorAll('[data-schedule-cancel]').forEach(button => {
