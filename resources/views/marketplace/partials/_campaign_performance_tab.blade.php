@@ -197,7 +197,11 @@
             'reco' => $reco,
             'recoColor' => $recoColor,
             'variant_empty' => (bool) ($camp->variant_empty ?? false),
-            'item_name' => $camp->internalItem ? $camp->internalItem->name : 'N/A',
+            // Gunakan label produk marketplace untuk campaign GMV Max Auto
+            // yang belum memiliki mapping item internal. Ini membuat daftar
+            // campaign tetap informatif tanpa mengubah grain/perhitungannya.
+            'item_name' => $camp->marketplace_item_name
+                ?: ($camp->internalItem ? $camp->internalItem->name : 'N/A'),
             'unit_cogs' => (float) ($camp->unit_cogs ?? 0),
         ]);
     }
@@ -407,8 +411,6 @@
     .perf-cell .perf-sub { font-size: .62rem; font-weight: 500; color: var(--dsh-muted, #6b7280); margin-top: 1px; white-space: nowrap; }
     .perf-kpi-compare { font-size: .61rem; color: var(--dsh-muted, #6b7280); margin-top: .15rem; white-space: nowrap; }
     .perf-previous { color: var(--dsh-muted, #6b7280); font-size: .59rem; white-space: nowrap; }
-    .perf-overall-row { background: rgba(37, 99, 235, .055); border-top: 2px solid var(--dsh-border, #e2e8f0); }
-    .perf-overall-row td { font-weight: 700; }
     /* Baris bisa di-klik untuk expand detail. */
     .perf-table th { font-size: .66rem; text-transform: uppercase; letter-spacing: .02em; color: var(--dsh-muted, #6b7280); }
     .perf-row { cursor: pointer; }
@@ -616,32 +618,6 @@
                 </tr>
             </thead>
             <tbody>
-                <tr class="perf-overall-row" data-perf-views="category roas gms unmapped">
-                    <td>
-                        <div class="fw-bold">Keseluruhan Campaign</div>
-                        <div class="text-muted" style="font-size:.68rem;">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }} campaign</div>
-                    </td>
-                    <td class="text-center"><span class="badge bg-primary">Total</span></td>
-                    <td class="text-end">—</td>
-                    <td class="text-end">—</td>
-                    <td class="text-end">—</td>
-                    <td class="text-end perf-cell">
-                        <div class="perf-main"><span class="perf-val">{{ number_format($totalSpend > 0 ? $totalGmv / $totalSpend : 0, 2) }}x</span></div>
-                        <div class="perf-previous">↔ {{ number_format($overallPreviousSpend > 0 ? $overallPreviousGmv / $overallPreviousSpend : 0, 2) }}x</div>
-                    </td>
-                    <td class="text-end perf-cell">
-                        <div class="perf-main"><span class="perf-val">{{ number_format($totalOrders, 0, ',', '.') }}</span></div>
-                        <div class="perf-previous">↔ {{ number_format($overallPreviousOrders, 0, ',', '.') }}</div>
-                    </td>
-                    <td class="text-end">Rp {{ number_format($totalSpend, 0, ',', '.') }}</td>
-                    <td class="text-end">Rp {{ number_format($totalOrders > 0 ? $totalGmv / $totalOrders : 0, 0, ',', '.') }}</td>
-                    <td class="text-end text-success">Rp {{ number_format($totalGmv, 0, ',', '.') }}</td>
-                    <td class="text-end perf-cell">
-                        <div class="perf-main"><span class="perf-val {{ $totalProfit >= 0 ? 'text-success' : 'text-danger' }}">Rp {{ number_format($totalProfit, 0, ',', '.') }}</span></div>
-                        <div class="perf-sub">Net Profit keseluruhan</div>
-                        <div class="perf-previous">↔ Rp {{ number_format($overallPreviousProfit, 0, ',', '.') }}</div>
-                    </td>
-                </tr>
                 @foreach($perfCategoryRows as $categoryRow)
                     <tr class="perf-category-row" data-perf-views="category" onclick="perfToggleCategory(this)">
                         <td>
@@ -1420,7 +1396,7 @@ function perfUpdateKpis(segment) {
 }
 
 function perfApplySegment(segment) {
-    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row, .perf-overall-row'));
+    const rows = Array.from(document.querySelectorAll('.perf-row, .perf-category-row'));
     const categoryDetails = Array.from(document.querySelectorAll('.perf-category-detail'));
     const emptyState = document.querySelector('.perf-segment-empty');
     const noDataState = document.querySelector('.perf-no-data');
@@ -1445,9 +1421,7 @@ function perfApplySegment(segment) {
         // detail tetap tersedia melalui accordion kategori, agar detail CPC dan
         // metrik campaign tidak ikut muncul di tampilan utama kategori.
         const isCategoryView = segment === 'category';
-        const isVisible = row.classList.contains('perf-overall-row')
-            ? true
-            : isCategoryView
+        const isVisible = isCategoryView
             ? row.classList.contains('perf-category-row')
             : row.classList.contains('perf-row')
                 && (row.dataset.perfViews || '').split(/\s+/).includes(segment);
