@@ -273,7 +273,7 @@ class AdsDashboardService
                 'roas',
             ])
             ->with([
-                'internalItem:id,hpp,base_unit_cost,item_category_id',
+                'internalItem:id,name,hpp,base_unit_cost,item_category_id',
                 'internalItem.category:id,name',
                 'store:id,name,channel_id',
                 'store.channel:id,code',

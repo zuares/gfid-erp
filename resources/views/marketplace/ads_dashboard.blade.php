@@ -18,6 +18,17 @@
     $campaigns = $campaigns ?? collect();
     $adsSetting = $adsSetting ?? (object)[];
     $metrics = $metrics ?? [];
+    $heatmapInternalItems = collect($campaigns)->filter(function ($campaign) {
+        return !empty($campaign->internal_item_id) && $campaign->internalItem;
+    })->map(function ($campaign) {
+        return [
+            'store_id' => (int) $campaign->store_id,
+            'campaign_name' => $campaign->campaign_name ?: ($campaign->channel_campaign_id ?? 'Campaign'),
+            'internal_item_id' => (int) $campaign->internal_item_id,
+            'internal_item_name' => $campaign->internalItem->name ?: ('Item #' . $campaign->internal_item_id),
+            'category' => $campaign->item_category ?? $campaign->internalItem->category?->name,
+        ];
+    })->unique(fn ($item) => $item['store_id'] . '|' . $item['internal_item_id'] . '|' . $item['campaign_name'])->values();
 
     $analysisCurrentPeriod = collect($historicalData)->get(0, []);
     $analysisPreviousPeriod = collect($historicalData)->get(1, []);
@@ -2255,6 +2266,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="position: relative; height: 320px;">
                             <canvas id="historicalChart"></canvas>
                         </div>
+                        <div id="historicalSummaryTable" class="table-responsive mt-3"></div>
                     </div>
                 </div>
             </div>
@@ -2276,8 +2288,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div style="color: var(--dsh-muted); font-size: .75rem;">Menganalisis jam terbaik...</div>
                     </div>
                     <div>
-                        <div style="font-size:.72rem; font-weight:700; color:var(--dsh-muted); margin-bottom:.35rem;">Peringkat waktu</div>
+                        <div style="font-size:.72rem; font-weight:700; color:var(--dsh-muted); margin-bottom:.35rem;">Semua jam · peringkat berdasarkan CVR</div>
                         <div id="hourlyBreakdown" class="table-responsive"></div>
+                        <div id="hourlyItemDetail" class="mt-3 p-2" style="display:none; border:1px solid var(--dsh-border); border-radius:8px; background:var(--dsh-bg);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div id="hourlyItemDetailTitle" style="font-size:.7rem; font-weight:800; color:var(--text);"></div>
+                                <button type="button" id="hourlyItemDetailClose" class="btn btn-sm" style="font-size:.65rem; padding:.15rem .4rem; color:var(--dsh-muted);">Tutup</button>
+                            </div>
+                            <div id="hourlyItemDetailContent"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3749,6 +3768,7 @@ window.AdsDashboardRoutes = {
 document.addEventListener("DOMContentLoaded", function() {
     const rawDaily = @json($dailyChartData ?? []);
     const rawHourly = @json($heatmapData ?? []);
+    const hourlyInternalItems = @json($heatmapInternalItems ?? []);
     const rawHistorical = @json($historicalData ?? []);
     
     // Pad Daily Data to show full range
@@ -3863,6 +3883,37 @@ document.addEventListener("DOMContentLoaded", function() {
             grossProfit: gmv - spend,
         };
     });
+    const hourlyItemDetailEl = document.getElementById('hourlyItemDetail');
+    const hourlyItemDetailTitleEl = document.getElementById('hourlyItemDetailTitle');
+    const hourlyItemDetailContentEl = document.getElementById('hourlyItemDetailContent');
+    const hourlyItemDetailCloseEl = document.getElementById('hourlyItemDetailClose');
+    const escapeHourlyHtml = value => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    const showHourlyItemDetail = (hour) => {
+        if (!hourlyItemDetailEl || !hourlyItemDetailTitleEl || !hourlyItemDetailContentEl) return;
+        const selectedStore = document.querySelector('select[name="store_id"]')?.value || 'all';
+        const items = hourlyInternalItems.filter(item => selectedStore === 'all' || String(item.store_id) === String(selectedStore));
+        hourlyItemDetailTitleEl.innerHTML = `<i class="bi bi-box-seam text-primary me-1"></i> Item internal terkait · ${String(hour).padStart(2, '0')}:00`;
+        hourlyItemDetailContentEl.innerHTML = items.length
+            ? `<div style="font-size:.62rem; color:var(--dsh-muted); margin-bottom:.4rem;">Mapping item pada campaign aktif di periode terpilih.</div>
+                <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0" style="font-size:.66rem;">
+                    <thead><tr><th>Item internal</th><th>Campaign</th><th>Kategori</th></tr></thead>
+                    <tbody>${items.map(item => `<tr>
+                        <td><div class="fw-semibold">${escapeHourlyHtml(item.internal_item_name)}</div><div style="font-size:.6rem;color:var(--dsh-muted);">ID ${escapeHourlyHtml(item.internal_item_id)}</div></td>
+                        <td>${escapeHourlyHtml(item.campaign_name)}</td>
+                        <td>${escapeHourlyHtml(item.category || '—')}</td>
+                    </tr>`).join('')}</tbody>
+                </table></div>`
+            : '<div style="font-size:.68rem; color:var(--dsh-muted);">Belum ada item internal yang ter-mapping pada campaign periode ini.</div>';
+        hourlyItemDetailEl.style.display = 'block';
+    };
+    hourlyItemDetailCloseEl?.addEventListener('click', () => {
+        if (hourlyItemDetailEl) hourlyItemDetailEl.style.display = 'none';
+    });
     const hourlyBreakdownEl = document.getElementById('hourlyBreakdown');
     if (hourlyBreakdownEl) {
         let hourlySortKey = 'cvr';
@@ -3873,12 +3924,17 @@ document.addEventListener("DOMContentLoaded", function() {
             return `<th class="${className}" data-hourly-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
         };
         const renderHourlyBreakdown = () => {
-            const eligibleRows = hourlyMetricRows
-                .filter(row => row.spend > 0 || row.gmv > 0 || row.impressions > 0 || row.clicks > 0 || row.orders > 0)
-                ;
+            const eligibleRows = hourlyMetricRows;
             const tableWorstHour = eligibleRows
                 .filter(row => row.spend > 1000 && row.clicks >= 5)
                 .sort((a, b) => (a.cvr - b.cvr) || (a.orders - b.orders) || (b.clicks - a.clicks) || (a.roas - b.roas))[0];
+            const activeMetricRows = eligibleRows.filter(row => row.impressions > 0 || row.clicks > 0 || row.orders > 0 || row.spend > 0 || row.gmv > 0);
+            const bestCtrHour = activeMetricRows
+                .filter(row => row.impressions > 0)
+                .sort((a, b) => (b.ctr - a.ctr) || (b.clicks - a.clicks) || (b.orders - a.orders))[0];
+            const bestGrossProfitHour = activeMetricRows
+                .filter(row => row.spend > 0 || row.gmv > 0)
+                .sort((a, b) => (b.grossProfit - a.grossProfit) || (b.gmv - a.gmv))[0];
             const breakdownRows = [...eligibleRows]
                 .sort((a, b) => {
                     const aValue = a[hourlySortKey];
@@ -3887,38 +3943,48 @@ document.addEventListener("DOMContentLoaded", function() {
                         ? aValue.localeCompare(bValue)
                         : aValue - bValue;
                     return comparison * (hourlySortDirection === 'asc' ? 1 : -1);
-                })
-                .slice(0, 8);
-            if (tableWorstHour && !breakdownRows.some(row => row.hour === tableWorstHour.hour)) {
-                breakdownRows.push(tableWorstHour);
-            }
+                });
 
             hourlyBreakdownEl.innerHTML = breakdownRows.length
                 ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
                     <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('ctr', 'CTR', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('grossProfit', 'Gross Profit', 'text-end')}${sortableHeader('roas', 'ROAS', 'text-end')}</tr></thead>
                     <tbody>${breakdownRows.map((row, index) => {
                         const isWorst = tableWorstHour && row.hour === tableWorstHour.hour;
-                        const rowStyle = isWorst
+                        const isLoss = row.grossProfit < 0;
+                        const isBestCtr = bestCtrHour && row.hour === bestCtrHour.hour;
+                        const isBestGrossProfit = bestGrossProfitHour && row.hour === bestGrossProfitHour.hour;
+                        const rowStyle = isLoss
                             ? ' style="background:rgba(220, 38, 38, 0.07);"'
                             : (index === 0 ? ' style="background:rgba(245, 158, 11, 0.08);"' : '');
-                        const rowIcon = isWorst
-                            ? '<i class="bi bi-exclamation-triangle-fill text-danger me-1" title="CVR terendah"></i>'
-                            : (index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="Peringkat teratas"></i>' : '');
-                        return `<tr${rowStyle}>
+                        const rowIcon = (isWorst ? '<i class="bi bi-exclamation-triangle-fill text-danger me-1" title="CVR terendah"></i>' : '')
+                            + (isBestCtr ? '<i class="bi bi-bullseye text-primary me-1" title="CTR tertinggi"></i>' : '')
+                            + (isBestGrossProfit ? '<i class="bi bi-cash-coin text-success me-1" title="Gross Profit tertinggi"></i>' : '')
+                            + (!isWorst && !isBestCtr && !isBestGrossProfit && index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="Peringkat teratas"></i>' : '');
+                        const ctrCellStyle = isBestCtr ? ' style="background:rgba(59, 130, 246, 0.12);"' : '';
+                        const grossProfitCellStyle = isBestGrossProfit ? ' style="background:rgba(22, 163, 74, 0.12);"' : '';
+                        return `<tr${rowStyle} data-hour="${row.hour}" class="hourly-detail-row" role="button" tabindex="0" title="Klik untuk melihat item internal">
                         <td class="fw-bold">${rowIcon}${row.label}</td>
                         <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
                         <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
-                        <td class="text-end">${row.ctr.toFixed(2)}%</td>
+                        <td class="text-end"${ctrCellStyle}>${row.ctr.toFixed(2)}%</td>
                         <td class="text-end fw-bold">${row.cvr.toFixed(2)}%</td>
                         <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
                         <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                         <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
-                        <td class="text-end fw-bold ${row.grossProfit >= 0 ? 'text-success' : 'text-danger'}">${row.grossProfit < 0 ? '−' : ''}Rp ${formatShortIDR(Math.abs(row.grossProfit))}</td>
+                        <td class="text-end fw-bold ${isLoss ? 'text-danger' : 'text-success'}"${grossProfitCellStyle} title="${isLoss ? 'Gross Profit negatif' : 'Gross Profit positif'}">${row.grossProfit < 0 ? '−' : ''}Rp ${formatShortIDR(Math.abs(row.grossProfit))}</td>
                         <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
                     </tr>`;
                     }).join('')}</tbody>
                 </table>`
                 : '<div style="font-size:.72rem; color:var(--dsh-muted); padding:.6rem 0;">Belum ada aktivitas per jam pada periode ini.</div>';
+
+            if (breakdownRows.length) {
+                hourlyBreakdownEl.innerHTML += `<div style="font-size:.64rem; color:var(--dsh-muted); margin-top:.45rem;">
+                    <span class="text-primary"><i class="bi bi-bullseye"></i> CTR tertinggi</span>
+                    <span class="ms-2 text-success"><i class="bi bi-cash-coin"></i> Gross Profit tertinggi</span>
+                    <span class="ms-2 text-danger"><i class="bi bi-exclamation-triangle-fill"></i> CVR terendah</span>
+                </div>`;
+            }
 
             hourlyBreakdownEl.querySelectorAll('[data-hourly-sort]').forEach(header => {
                 const sortByHeader = () => {
@@ -3936,6 +4002,16 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         sortByHeader();
+                    }
+                });
+            });
+            hourlyBreakdownEl.querySelectorAll('.hourly-detail-row').forEach(row => {
+                const openDetail = () => showHourlyItemDetail(parseInt(row.dataset.hour, 10));
+                row.addEventListener('click', openDetail);
+                row.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openDetail();
                     }
                 });
             });
@@ -4262,6 +4338,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
+                onClick: function(event, elements) {
+                    const point = elements && elements[0];
+                    const row = point ? hourlyMetricRows[point.index] : null;
+                    if (row) showHourlyItemDetail(row.hour);
+                },
                 plugins: { 
                     legend: { 
                         display: true, 
@@ -4856,6 +4937,81 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                     return 0;
                 };
+
+                const historicalSummaryTable = document.getElementById('historicalSummaryTable');
+                if (historicalSummaryTable) {
+                    const aggregateHistoricalPeriod = (period) => {
+                        const rows = period?.data || [];
+                        const spend = rows.reduce((sum, d) => sum + (parseFloat(d.spend || 0) * ADS_COST_MULTIPLIER), 0);
+                        const gmv = rows.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
+                        const impressions = rows.reduce((sum, d) => sum + parseInt(d.impressions || 0), 0);
+                        const clicks = rows.reduce((sum, d) => sum + parseInt(d.clicks || 0), 0);
+                        const orders = rows.reduce((sum, d) => sum + parseInt(d.orders || 0), 0);
+                        const profit = rows.reduce((sum, d) => sum + getMetricValue(d, 'profit'), 0);
+
+                        return {
+                            roas: spend > 0 ? gmv / spend : 0,
+                            gmv,
+                            spend,
+                            impressions,
+                            clicks,
+                            ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                            cvr: clicks > 0 ? (orders / clicks) * 100 : 0,
+                            orders,
+                            profit,
+                        };
+                    };
+                    const currentSummary = aggregateHistoricalPeriod(rawHistorical[0]);
+                    const previousSummary = aggregateHistoricalPeriod(rawHistorical[1]);
+                    const summaryRows = [
+                        ['roas', 'ROAS', 'ratio'],
+                        ['gmv', 'GMV', 'money'],
+                        ['spend', 'Biaya iklan', 'money'],
+                        ['impressions', 'Impresi', 'count'],
+                        ['clicks', 'Klik', 'count'],
+                        ['ctr', 'CTR', 'percent'],
+                        ['cvr', 'CVR', 'percent'],
+                        ['orders', 'Orders', 'count'],
+                        ['profit', 'Profit', 'money'],
+                    ];
+                    const formatSummaryValue = (value, type) => {
+                        if (type === 'money') {
+                            const negative = value < 0;
+                            return (negative ? '−' : '') + 'Rp ' + formatShortIDR(Math.abs(value));
+                        }
+                        if (type === 'ratio') return value.toFixed(2) + 'x';
+                        if (type === 'percent') return value.toFixed(2) + '%';
+                        return Math.round(value).toLocaleString('id-ID');
+                    };
+                    const formatSummaryChange = (current, previous) => {
+                        if (previous === 0) return current > 0 ? 'Baru' : '—';
+                        const change = ((current - previous) / Math.abs(previous)) * 100;
+                        return (change >= 0 ? '↑ ' : '↓ ') + Math.abs(change).toFixed(1) + '%';
+                    };
+                    const summaryChangeClass = (current, previous) => {
+                        if (previous === 0 || current === previous) return 'text-muted';
+                        return current > previous ? 'text-success' : 'text-danger';
+                    };
+
+                    historicalSummaryTable.innerHTML = `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.7rem;">
+                        <thead><tr>
+                            <th>Metrik</th>
+                            <th class="text-end">Aktif</th>
+                            <th class="text-end">Pembanding</th>
+                            <th class="text-end">Perubahan</th>
+                        </tr></thead>
+                        <tbody>${summaryRows.map(([key, label, type]) => {
+                            const current = currentSummary[key] || 0;
+                            const previous = previousSummary[key] || 0;
+                            return `<tr>
+                                <td class="fw-semibold">${label}</td>
+                                <td class="text-end fw-semibold">${formatSummaryValue(current, type)}</td>
+                                <td class="text-end text-muted">${formatSummaryValue(previous, type)}</td>
+                                <td class="text-end fw-semibold ${summaryChangeClass(current, previous)}">${formatSummaryChange(current, previous)}</td>
+                            </tr>`;
+                        }).join('')}</tbody>
+                    </table>`;
+                }
 
                 const renderHistChart = (metric) => {
                     let datasets = rawHistorical.map((period, idx) => {
