@@ -3313,7 +3313,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <td>{{ $schedule->store?->name ?? 'Toko #' . $schedule->store_id }}</td>
                                                 <td>
                                                     @if($schedule->action === 'budget')
-                                                        @php($scheduledBudget = (float) data_get($schedule->meta, 'daily_budget', 0))
+                                                        @php
+                                                            $scheduledBudget = (float) data_get($schedule->meta, 'daily_budget', 0);
+                                                        @endphp
                                                         Modal {{ $scheduledBudget > 0 ? number_format($scheduledBudget, 0, ',', '.') : 'Unlimited' }}
                                                     @else
                                                         {{ $schedule->action === 'pause' ? 'Jeda' : 'Lanjut' }}
