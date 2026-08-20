@@ -2418,6 +2418,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div style="height: 280px;">
                                 <canvas id="dailyChart"></canvas>
                             </div>
+                            <div id="dailyDataTable" class="table-responsive mt-3"></div>
                         </div>
 
                         <div class="dpanel p-3">
@@ -3935,6 +3936,81 @@ document.addEventListener("DOMContentLoaded", function() {
             <span class="daily-trend-stat"><span class="daily-trend-stat-label">ROAS</span><span class="daily-trend-stat-value" style="color:#b45309">${totalDailyRoas}x</span></span>`;
     }
 
+    const dailyDataTableEl = document.getElementById('dailyDataTable');
+    if (dailyDataTableEl) {
+        let dailySortKey = 'date';
+        let dailySortDirection = 'desc';
+        const dailyRows = dailyData.map(day => {
+            const spend = parseFloat(day.spend || 0) * ADS_COST_MULTIPLIER;
+            const gmv = parseFloat(day.gmv || 0);
+            const impressions = parseInt(day.impressions || 0);
+            const clicks = parseInt(day.clicks || 0);
+            const orders = parseInt(day.orders || 0);
+            return {
+                date: day.date || '',
+                spend,
+                gmv,
+                impressions,
+                clicks,
+                orders,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                aov: orders > 0 ? gmv / orders : 0,
+                roas: spend > 0 ? gmv / spend : 0,
+            };
+        });
+        const dailyHeader = (key, label, className = '') => {
+            const active = dailySortKey === key;
+            const indicator = active ? (dailySortDirection === 'asc' ? '↑' : '↓') : '↕';
+            const priority = ['roas', 'ctr'].includes(key);
+            return `<th class="${className}" data-daily-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;${priority ? 'background:rgba(245,158,11,.07);' : ''}">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
+        };
+        const renderDailyDataTable = () => {
+            const rows = [...dailyRows].sort((a, b) => {
+                const aValue = a[dailySortKey];
+                const bValue = b[dailySortKey];
+                const comparison = typeof aValue === 'string' ? aValue.localeCompare(bValue) : aValue - bValue;
+                return comparison * (dailySortDirection === 'asc' ? 1 : -1);
+            });
+            dailyDataTableEl.innerHTML = rows.length
+                ? `<div style="font-size:.68rem; color:var(--dsh-muted); font-weight:700; margin-bottom:.35rem;">Data per tanggal</div>
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size:.67rem;">
+                        <thead><tr>${dailyHeader('date', 'Tanggal')}${dailyHeader('roas', 'ROAS', 'text-end')}${dailyHeader('impressions', 'Impresi', 'text-end')}${dailyHeader('clicks', 'Klik', 'text-end')}${dailyHeader('ctr', 'CTR', 'text-end')}${dailyHeader('orders', 'Orders', 'text-end')}${dailyHeader('spend', 'Biaya', 'text-end')}${dailyHeader('gmv', 'GMV', 'text-end')}${dailyHeader('aov', 'AOV', 'text-end')}</tr></thead>
+                        <tbody>${rows.map(row => `<tr>
+                            <td class="fw-semibold">${formatIndoDate(row.date)}</td>
+                            <td class="text-end fw-bold" style="background:rgba(245,158,11,.05);">${row.roas.toFixed(2)}x</td>
+                            <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
+                            <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
+                            <td class="text-end" style="background:rgba(59,130,246,.05);">${row.ctr.toFixed(2)}%</td>
+                            <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
+                            <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
+                            <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
+                            <td class="text-end">Rp ${formatShortIDR(row.aov)}</td>
+                        </tr>`).join('')}</tbody>
+                    </table>`
+                : '<div style="font-size:.72rem;color:var(--dsh-muted);">Belum ada data harian.</div>';
+            dailyDataTableEl.querySelectorAll('[data-daily-sort]').forEach(header => {
+                const sortByHeader = () => {
+                    const nextKey = header.dataset.dailySort;
+                    if (dailySortKey === nextKey) {
+                        dailySortDirection = dailySortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        dailySortKey = nextKey;
+                        dailySortDirection = nextKey === 'date' ? 'desc' : 'desc';
+                    }
+                    renderDailyDataTable();
+                };
+                header.addEventListener('click', sortByHeader);
+                header.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        sortByHeader();
+                    }
+                });
+            });
+        };
+        renderDailyDataTable();
+    }
+
     let totalHourlySpend = hourlyData.reduce((sum, d) => sum + (parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER), 0);
     let totalHourlyGmv = hourlyData.reduce((sum, d) => sum + parseFloat(d.gmv || 0), 0);
     let totalHourlyImpressions = hourlyData.reduce((sum, d) => sum + parseInt(d.impressions || 0), 0);
@@ -4010,10 +4086,20 @@ document.addEventListener("DOMContentLoaded", function() {
     if (hourlyBreakdownEl) {
         let hourlySortKey = 'cvr';
         let hourlySortDirection = 'desc';
+        const hourlyPriorityMeta = {
+            roas: { icon: 'bi-lightning-charge-fill', color: '#b45309', background: 'rgba(245, 158, 11, 0.10)', title: 'Efisiensi iklan' },
+            ctr: { icon: 'bi-bullseye', color: '#1d4ed8', background: 'rgba(59, 130, 246, 0.10)', title: 'Daya tarik iklan' },
+            cvr: { icon: 'bi-funnel-fill', color: '#7e22ce', background: 'rgba(139, 92, 246, 0.10)', title: 'Konversi' },
+            grossProfit: { icon: 'bi-cash-coin', color: '#15803d', background: 'rgba(22, 163, 74, 0.10)', title: 'Profitabilitas' },
+        };
         const sortableHeader = (key, label, className = '') => {
             const active = hourlySortKey === key;
             const indicator = active ? (hourlySortDirection === 'asc' ? '↑' : '↓') : '↕';
-            return `<th class="${className}" data-hourly-sort="${key}" role="button" tabindex="0" title="Klik untuk mengurutkan" style="cursor:pointer;user-select:none;">${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
+            const priority = hourlyPriorityMeta[key];
+            const priorityIcon = priority ? `<i class="bi ${priority.icon} me-1"></i>` : '';
+            const priorityStyle = priority ? `background:${priority.background};color:${priority.color};` : '';
+            const title = priority ? `${priority.title} · klik untuk mengurutkan` : 'Klik untuk mengurutkan';
+            return `<th class="${className}" data-hourly-sort="${key}" role="button" tabindex="0" title="${title}" style="cursor:pointer;user-select:none;${priorityStyle}">${priorityIcon}${label} <span style="font-size:.62rem;opacity:${active ? '1' : '.45'};">${indicator}</span></th>`;
         };
         const renderHourlyBreakdown = () => {
             const eligibleRows = hourlyMetricRows;
@@ -4052,15 +4138,19 @@ document.addEventListener("DOMContentLoaded", function() {
                             + (isBestCtr ? '<i class="bi bi-bullseye text-primary me-1" title="CTR tertinggi"></i>' : '')
                             + (isBestGrossProfit ? '<i class="bi bi-cash-coin text-success me-1" title="Gross Profit tertinggi"></i>' : '')
                             + (!isWorst && !isBestCtr && !isBestGrossProfit && index === 0 ? '<i class="bi bi-trophy-fill text-warning me-1" title="Peringkat teratas"></i>' : '');
-                        const ctrCellStyle = isBestCtr ? ' style="background:rgba(59, 130, 246, 0.12);"' : '';
-                        const grossProfitCellStyle = isBestGrossProfit ? ' style="background:rgba(22, 163, 74, 0.12);"' : '';
+                        const roasCellStyle = ' style="background:rgba(245, 158, 11, 0.05);"';
+                        const ctrCellStyle = isBestCtr ? ' style="background:rgba(59, 130, 246, 0.16);"' : ' style="background:rgba(59, 130, 246, 0.04);"';
+                        const cvrCellStyle = ' style="background:rgba(139, 92, 246, 0.05);"';
+                        const grossProfitCellStyle = isBestGrossProfit
+                            ? ' style="background:rgba(22, 163, 74, 0.16);"'
+                            : (isLoss ? ' style="background:rgba(220, 38, 38, 0.14);"' : ' style="background:rgba(22, 163, 74, 0.04);"');
                         return `<tr${rowStyle} data-hour="${row.hour}" class="hourly-detail-row" role="button" tabindex="0" title="Klik untuk melihat item internal">
                         <td class="fw-bold">${rowIcon}${row.label}</td>
-                        <td class="text-end fw-bold">${row.roas.toFixed(2)}x</td>
+                        <td class="text-end fw-bold"${roasCellStyle}>${row.roas.toFixed(2)}x</td>
                         <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
                         <td class="text-end">${row.clicks.toLocaleString('id-ID')}</td>
                         <td class="text-end"${ctrCellStyle}>${row.ctr.toFixed(2)}%</td>
-                        <td class="text-end fw-bold">${row.cvr.toFixed(2)}%</td>
+                        <td class="text-end fw-bold"${cvrCellStyle}>${row.cvr.toFixed(2)}%</td>
                         <td class="text-end">${row.orders.toLocaleString('id-ID')}</td>
                         <td class="text-end text-danger">Rp ${formatShortIDR(row.spend)}</td>
                         <td class="text-end text-success">Rp ${formatShortIDR(row.gmv)}</td>
@@ -4073,7 +4163,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
             if (breakdownRows.length) {
                 hourlyBreakdownEl.innerHTML += `<div style="font-size:.64rem; color:var(--dsh-muted); margin-top:.45rem;">
-                    <span class="text-primary"><i class="bi bi-bullseye"></i> CTR tertinggi</span>
+                    <span style="color:#64748b;"><i class="bi bi-info-circle"></i> Prioritas: ROAS · CTR · CVR · Gross Profit</span>
+                    <span class="ms-2 text-primary"><i class="bi bi-bullseye"></i> CTR tertinggi</span>
                     <span class="ms-2 text-success"><i class="bi bi-cash-coin"></i> Gross Profit tertinggi</span>
                     <span class="ms-2 text-danger"><i class="bi bi-exclamation-triangle-fill"></i> CVR terendah</span>
                 </div>`;
