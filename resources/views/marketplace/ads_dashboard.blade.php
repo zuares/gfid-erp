@@ -4165,19 +4165,6 @@ document.addEventListener("DOMContentLoaded", function() {
                     },
                     {
                         type: 'line',
-                        label: 'Impresi (Jangkauan)',
-                        data: hourlyData.map(d => parseInt(d.impressions || 0)),
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.08)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.35,
-                        pointRadius: 2,
-                        pointHoverRadius: 4,
-                        yAxisID: 'y2'
-                    },
-                    {
-                        type: 'line',
                         label: 'ROAS',
                         data: hourlyData.map(d => {
                             let sp = parseFloat(d.expense || 0) * ADS_COST_MULTIPLIER;
