@@ -1386,6 +1386,10 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     border-color: #64748b !important;
     box-shadow: none !important;
 }
+.shp-topbar {
+    position: relative !important;
+    top: auto !important;
+}
 .shp-pill-accent {
     color: #1d4ed8 !important;
     background: #eff6ff !important;
