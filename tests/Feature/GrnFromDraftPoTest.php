@@ -115,6 +115,37 @@ class GrnFromDraftPoTest extends TestCase
         ];
     }
 
+    public function test_purchase_and_grn_forms_use_mixed_purchase_flow_without_type_choice(): void
+    {
+        $poResponse = $this->get(route('purchasing.purchase_orders.create'));
+
+        $poResponse->assertOk()
+            ->assertSee('Pembelian', false)
+            ->assertSee('Campuran', false)
+            ->assertDontSee('Jenis PO', false)
+            ->assertDontSee('po-type-pill', false);
+
+        $grnResponse = $this->get(route('purchasing.purchase_receipts.create'));
+
+        $grnResponse->assertOk()
+            ->assertSee('name="warehouse_id"', false)
+            ->assertSee('Pilih sesuai lokasi fisik', false)
+            ->assertDontSee('name="order_type"', false);
+    }
+
+    public function test_purchase_order_defaults_legacy_type_when_type_is_omitted(): void
+    {
+        $po = $this->poService->create([
+            'date' => now()->toDateString(),
+            'supplier_id' => $this->supplier->id,
+            'lines' => [
+                ['item_id' => $this->item->id, 'qty' => 1, 'unit_price' => 1000],
+            ],
+        ]);
+
+        $this->assertSame('material', $po->order_type);
+    }
+
     // 1. PO draft tanpa GRN masih bisa diedit + tidak terkunci.
     public function test_draft_po_without_grn_is_not_locked_and_editable(): void
     {

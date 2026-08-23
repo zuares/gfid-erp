@@ -292,11 +292,6 @@
     $selectedSupplierId = old('supplier_id',
         $hasOrder ? $order->supplier_id : $selectedSupplierId ?? request('supplier_id'));
 
-    $selectedOrderType = old('order_type',
-        $hasOrder ? $order->order_type ?? 'material' : ($selectedOrderType ?? request('order_type') ?: null));
-    $selectedOrderType = in_array($selectedOrderType, ['material','finished_good'], true)
-        ? $selectedOrderType : null;
-
     $detailLines = $hasOrder ? $order->lines : $lines ?? collect();
 
     if (!$hasOrder && !$selectedSupplierId && $detailLines->isNotEmpty()) {
@@ -306,20 +301,13 @@
 
     $selectedSupplier = isset($suppliers) ? $suppliers->firstWhere('id', $selectedSupplierId) : null;
 
-    $defaultWhCode = 'RM';
-    if ($hasOrder && ($order->order_type ?? null) === 'finished_good') $defaultWhCode = 'WH-RTS';
-    if (!$hasOrder && $selectedOrderType === 'finished_good')           $defaultWhCode = 'WH-RTS';
-
-    $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?? $warehouses->firstWhere('code', 'RM');
+    $defaultWhCode = $defaultWhCode ?? 'RM';
+    $defaultWarehouse = $defaultWarehouse
+        ?? $warehouses->firstWhere('code', $defaultWhCode)
+        ?? $warehouses->firstWhere('code', 'RM');
     if (!$defaultWarehouse) { $defaultWhCode = 'RM'; $defaultWarehouse = $warehouses->first(); }
 
-    $selectedWarehouseId = old('warehouse_id', $defaultWarehouse?->id ?? '');
-
-    if (!$hasOrder && !$selectedOrderType)
-        $selectedOrderType = $defaultWhCode === 'WH-RTS' ? 'finished_good' : 'material';
-
-    $typeLabel  = $selectedOrderType === 'finished_good' ? 'Barang Jadi' : 'Bahan Baku';
-    $typeTagCss = $selectedOrderType === 'material' ? 'tag-material' : 'tag-fg';
+    $selectedWarehouseId = old('warehouse_id', $selectedWarehouseId ?? $defaultWarehouse?->id ?? '');
 
     // filter baris yang belum fully received — .values() wajib agar key sequential (0,1,2,…)
     // supaya name="selected[{{ $idx }}]" cocok dengan index po_line_id[]/item_id[] di controller
@@ -350,10 +338,10 @@
         @if ($hasOrder)
             <span class="shp-meta-code">Penerimaan untuk {{ $order->code }}</span>
             <span class="shp-meta-store">{{ $order->supplier?->name ?? '-' }}</span>
-            <span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
+            <span class="tag tag-material">PO campuran</span>
         @else
             <span class="shp-meta-code">Pilih item dari PO (draft atau approved)</span>
-            <span class="tag {{ $typeTagCss }}">{{ $typeLabel }}</span>
+            <span class="tag tag-material">PO campuran</span>
             @unless ($hasOrder)
                 <span class="shp-badge">1 GRN = 1 PO</span>
             @endunless
@@ -432,7 +420,6 @@
         
         <input type="hidden" id="purchase_order_id" name="purchase_order_id"
                value="{{ $hasOrder ? $order->id : '' }}">
-        <input type="hidden" name="order_type"  value="{{ $selectedOrderType }}">
         <input type="hidden" id="grn_supplier_id" name="supplier_id"
                value="{{ $hasOrder ? $order->supplier_id : ($selectedSupplierId ?? '') }}">
 
@@ -451,10 +438,18 @@
 
                     <div class="col-12 col-sm-4">
                         <div class="field-lbl">Gudang Tujuan</div>
-                        <input type="hidden" name="warehouse_id" value="{{ $selectedWarehouseId }}">
-                        <div class="form-control form-control-sm bg-light-subtle text-muted" style="cursor:default;">
-                            <span class="mono fw-semibold">{{ $defaultWhCode }}</span>
-                            &mdash; {{ $defaultWarehouse?->name ?? '-' }}
+                        <select name="warehouse_id" id="warehouse_id"
+                                class="form-select form-select-sm @error('warehouse_id') is-invalid @enderror" required>
+                            <option value="">— Pilih gudang —</option>
+                            @foreach ($warehouses as $warehouse)
+                                <option value="{{ $warehouse->id }}" @selected((string) $selectedWarehouseId === (string) $warehouse->id)>
+                                    {{ $warehouse->code }} — {{ $warehouse->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('warehouse_id')<div class="invalid-feedback small">{{ $message }}</div>@enderror
+                        <div class="text-muted mt-1" style="font-size:.7rem;">
+                            Pilih sesuai lokasi fisik. Jika beda gudang, buat GRN terpisah.
                         </div>
                     </div>
 

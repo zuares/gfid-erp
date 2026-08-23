@@ -956,7 +956,9 @@ class PurchaseOrderController extends Controller
                     ->where('type', 'supplier')
                     ->where('active', 1)),
             ],
-            'order_type' => ['required', 'in:material,finished_good,packing,asset,service,jasa,lainnya'],
+            // Legacy field: tidak lagi diisi user, tetapi tetap diterima agar
+            // PO lama dan integrasi existing tetap kompatibel.
+            'order_type' => ['nullable', 'in:material,finished_good,packing,asset,service,jasa,lainnya'],
 
             'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
 

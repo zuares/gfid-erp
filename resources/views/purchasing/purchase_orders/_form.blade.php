@@ -12,14 +12,8 @@
     $allowedOrderTypes = ['material', 'finished_good', 'packing', 'asset', 'service', 'jasa', 'lainnya'];
     $orderType = in_array($orderTypeRaw, $allowedOrderTypes, true) ? $orderTypeRaw : 'material';
 
-    $orderTypeOptions = [
-        'material' => 'Pembelian Campuran',
-        'packing'  => 'Packaging',
-        'service'  => 'Operasional',
-        'finished_good' => 'Barang Jadi',
-    ];
-    // Jenis PO adalah klasifikasi header untuk laporan/default GRN.
-    // Item boleh dicampur dan accounting tetap mengikuti master per baris.
+    // Field legacy untuk kompatibilitas laporan dan PO lama. Tidak ditampilkan
+    // sebagai pilihan user; PO baru memakai default material/campuran.
     $itemSuggestType = null;
     $itemSuggestExtra = [];
 
@@ -149,40 +143,9 @@
             margin-bottom: .85rem;
         }
 
-        /* Focal card — Jenis PO + Supplier */
+        /* Focal card — Pembelian + Supplier */
         .po-focal {
             border: 1px solid var(--line);
-        }
-
-        /* Jenis PO pill buttons */
-        .po-type-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .3rem;
-            padding: .38rem .85rem;
-            border-radius: 999px;
-            border: 1.5px solid var(--line);
-            background: transparent;
-            color: var(--body);
-            font-size: .82rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all .15s;
-            white-space: nowrap;
-        }
-        .po-type-pill:hover {
-            border-color: var(--primary, #2563eb);
-            color: var(--primary, #2563eb);
-            background: color-mix(in srgb, var(--primary, #2563eb) 6%, transparent);
-        }
-        .po-type-pill--active {
-            border-color: var(--primary, #2563eb);
-            background: var(--primary, #2563eb);
-            color: #fff;
-        }
-        .po-type-pill--active:hover {
-            background: var(--primary, #2563eb);
-            color: #fff;
         }
 
         /* Supplier select lebih menonjol */
@@ -190,12 +153,6 @@
             font-size: .95rem;
             padding: .55rem .85rem;
         }
-        .po-type-scroll {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .5rem;
-        }
-
         .po-card .card-body {
             padding: .9rem 1rem;
         }
@@ -512,7 +469,7 @@
             .po-focal .card-body {
                 padding: .7rem !important;
             }
-            /* Jenis PO + Tanggal: pills kiri, tanggal compact di kanan, sama baris */
+            /* Pembelian + Tanggal: ringkas di satu baris */
             .po-focal-top {
                 display: flex !important;
                 align-items: center;
@@ -524,15 +481,6 @@
                 flex: 1;
                 min-width: 0;
                 overflow: hidden;
-            }
-            .po-type-scroll {
-                flex-wrap: nowrap !important;
-                gap: .35rem !important;
-                overflow-x: auto;
-                margin-inline: 0 !important;
-                padding-bottom: .1rem;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
             }
             .po-date-wrap {
                 flex: 0 0 auto;
@@ -548,22 +496,6 @@
                 padding: .3rem .4rem;
                 min-height: 34px;
                 text-align: center;
-            }
-            .po-type-scroll {
-                flex-wrap: nowrap !important;
-                gap: .35rem !important;
-                overflow-x: auto;
-                margin-inline: 0;
-                padding-bottom: .1rem;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
-            }
-            .po-type-scroll::-webkit-scrollbar { display: none; }
-            .po-type-pill {
-                flex: 0 0 auto;
-                min-height: 34px;
-                padding: .28rem .6rem;
-                font-size: .76rem;
             }
             .po-supplier-select {
                 min-height: 42px;
@@ -754,29 +686,20 @@
     </style>
 @endpush
 
-{{-- FOCAL: JENIS PO + SUPPLIER + TANGGAL --}}
+{{-- FOCAL: PEMBELIAN + SUPPLIER + TANGGAL --}}
 <div class="shp-table-card mb-3" data-order-type="{{ $orderType }}">
     <div class="shp-table-head">
         <div class="shp-table-title">Informasi PO</div>
     </div>
     <div style="padding:1.1rem 1.25rem .9rem;">
 
-        {{-- Row atas: Jenis PO (kiri) + Tanggal (kanan) --}}
+        {{-- Row atas: status pembelian (kiri) + Tanggal (kanan) --}}
         <div class="po-focal-top d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
             <div style="min-width:0;flex:1;">
-                <div class="po-label mb-2">Jenis PO <span class="text-muted fw-normal">(klasifikasi, item boleh dicampur)</span></div>
-                <div class="po-type-scroll" id="po-type-pills">
-                    @foreach ($orderTypeOptions as $k => $label)
-                        @php
-                            $icons = ['material'=>'🧵','packing'=>'📦','service'=>'🔧','finished_good'=>'👕'];
-                            $active = $orderType === $k;
-                        @endphp
-                        <button type="button"
-                            class="po-type-pill {{ $active ? 'po-type-pill--active' : '' }}"
-                            data-type="{{ $k }}">
-                            {{ $icons[$k] ?? '' }} {{ $label }}
-                        </button>
-                    @endforeach
+                <div class="po-label mb-2">Pembelian</div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge rounded-pill text-bg-primary">Campuran</span>
+                    <span class="text-muted small">Bahan baku, support/ATK, packaging, dan barang jadi</span>
                 </div>
             </div>
             <div class="po-date-wrap" style="min-width:140px;">
@@ -801,7 +724,6 @@
             <option value="">— Pilih Supplier —</option>
             @foreach ($suppliers as $sup)
                 <option value="{{ $sup->id }}"
-                    data-po-types="{{ implode(',', (array) ($sup->po_types ?? [])) }}"
                     @selected((string) $selectedSupplierId === (string) $sup->id)>
                     {{ $sup->code }} — {{ $sup->name }}
                 </option>
@@ -1115,26 +1037,10 @@
             const liveLines = document.getElementById('po-live-lines');
             const liveQty = document.getElementById('po-live-qty');
 
-            const orderTypeSelect = document.getElementById('po-order-type-hidden');
-            const currentOrderType = @json($orderType);
-            const isEdit = @json((bool) $order?->id);
             const canSeeMoney = @json($canSeeMoney);
 
             const shippingDisplay = document.querySelector('.shipping-display');
             const shippingRaw = document.querySelector('.shipping-raw');
-            const supplierSelect = document.querySelector('select[name="supplier_id"]');
-
-            function filterSuppliersByOrderType(type) {
-                if (!supplierSelect) return;
-
-                const options = Array.from(supplierSelect.querySelectorAll('option[value]'));
-                options.forEach(opt => {
-                    // Satu supplier boleh menerima bahan baku, support/ATK,
-                    // packaging, maupun barang jadi dalam PO yang sama.
-                    opt.hidden = false;
-                    opt.disabled = false;
-                });
-            }
 
             // =========================
             // Helpers
@@ -1733,54 +1639,6 @@
                     shippingDisplay.value = fmtIntId(n);
                     shippingRaw.value = String(Math.round(n || 0));
                 }
-            }
-
-            // order type change => reload
-            // Pill buttons — Jenis PO
-            const hiddenOrderType = document.getElementById('po-order-type-hidden');
-            function switchOrderType(nextType) {
-                if (nextType === 'service') {
-                    window.location.href = @json(route('accounting.cash-expenses.index', ['open_modal' => 1]));
-                    return;
-                }
-
-                filterSuppliersByOrderType(nextType);
-                if (nextType === currentOrderType) return;
-
-                if (isEdit) {
-                    const ids = Array.from(document.querySelectorAll('.js-item-suggest-id'));
-                    const hasFilled = ids.some(el => (el.value || '').toString().trim() !== '');
-                    if (hasFilled) {
-                        const ok = confirm(
-                            'Mengubah Jenis PO akan memuat ulang daftar item. Pastikan item yang sudah dipilih sesuai jenis baru. Lanjut?'
-                        );
-                        if (!ok) return;
-                    }
-                }
-
-                const url = new URL(window.location.href);
-                url.searchParams.set('order_type', nextType);
-                window.location.href = url.toString();
-            }
-
-            document.querySelectorAll('.po-type-pill').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const nextType = this.dataset.type;
-                    if (hiddenOrderType) hiddenOrderType.value = nextType;
-                    document.querySelectorAll('.po-type-pill').forEach(b => b.classList.remove('po-type-pill--active'));
-                    this.classList.add('po-type-pill--active');
-                    switchOrderType(nextType);
-                });
-            });
-
-            // init supplier filter based on current type
-            filterSuppliersByOrderType(currentOrderType);
-
-            // legacy select fallback (hidden but kept for compatibility)
-            if (orderTypeSelect) {
-                orderTypeSelect.addEventListener('change', function() {
-                    switchOrderType(this.value || 'material');
-                });
             }
 
             // init item suggest

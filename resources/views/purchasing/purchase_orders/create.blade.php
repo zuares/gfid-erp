@@ -40,7 +40,7 @@
 </style>
 @endpush
 
-{{-- ── STEP 1: Pilih Jenis PO + Supplier (muncul jika belum ada params) ── --}}
+{{-- ── STEP 1: Pilih Supplier (muncul jika flow step diaktifkan) ── --}}
 @php
     $stepDone = true; // skip step pilih jenis PO, langsung ke form
 @endphp
@@ -60,41 +60,16 @@
                         <input type="hidden" name="from_pr" value="{{ (int) request('from_pr') }}">
                     @endif
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size:.8rem;">Jenis PO</label>
-                        <div class="d-flex gap-2 flex-wrap">
-                            @foreach ([
-                                'material'      => ['label' => 'Pembelian Campuran', 'icon' => '<i class="bi bi-box-seam"></i>'],
-                                'packing'       => ['label' => 'Packaging',      'icon' => '<i class="bi bi-archive"></i>'],
-                                'service'       => ['label' => 'Operasional',    'icon' => '<i class="bi bi-tools"></i>'],
-                                'finished_good' => ['label' => 'Barang Jadi',    'icon' => '<i class="bi bi-bag-check"></i>'],
-                            ] as $val => $opt)
-                            <label class="type-card flex-fill text-center p-3 border cursor-pointer"
-                                style="cursor:pointer; border-radius:12px; transition:.15s; min-width:100px;"
-                                data-val="{{ $val }}">
-                                <input type="radio" name="order_type" value="{{ $val }}"
-                                    class="d-none type-radio" {{ $val === 'material' ? 'checked' : '' }}>
-                                <div style="font-size:1.6rem; margin-bottom:.35rem; color:#64748b;" class="type-icon">{!! $opt['icon'] !!}</div>
-                                <div class="fw-bold" style="font-size:.85rem;">{{ $opt['label'] }}</div>
-                            </label>
-                            @endforeach
-                        </div>
-                    </div>
-
                     <div class="mb-4">
                         <label class="form-label fw-bold" style="font-size:.8rem;">Supplier</label>
                         <select name="supplier_id" id="step1-supplier" class="form-select" required>
                             <option value="">— Pilih supplier —</option>
                             @foreach ($suppliers as $sup)
-                                <option value="{{ $sup->id }}"
-                                    data-po-types="{{ implode(',', $sup->po_types ?? []) }}">
+                                <option value="{{ $sup->id }}">
                                     {{ $sup->code ? $sup->code . ' — ' : '' }}{{ $sup->name }}
                                 </option>
                             @endforeach
                         </select>
-                        <div id="no-supplier-msg" class="text-muted mt-1 d-none" style="font-size:.78rem;">
-                            Tidak ada supplier terdaftar untuk jenis PO ini.
-                        </div>
                     </div>
 
                     <div class="d-flex gap-2">
@@ -108,41 +83,6 @@
     </div>
     </div>
 </div>
-
-<style>
-.type-card { border-color: rgba(148,163,184,.3) !important; transition: all .15s; }
-.type-card:hover { border-color: #475569 !important; background: rgba(148,163,184,.04); }
-.type-card.selected { border-color: #334155 !important; background: rgba(15,23,42,.04); color:#334155; }
-.type-card.selected .type-icon { color: #334155 !important; }
-</style>
-
-<script>
-const supSelect = document.getElementById('step1-supplier');
-const noSupMsg  = document.getElementById('no-supplier-msg');
-const allOpts   = Array.from(supSelect.querySelectorAll('option[value]')); // exclude placeholder
-
-function filterSuppliers(type) {
-    allOpts.forEach(opt => {
-        opt.hidden = false;
-        opt.disabled = false;
-    });
-    noSupMsg.classList.add('d-none');
-}
-
-document.querySelectorAll('.type-card').forEach(card => {
-    card.addEventListener('click', () => {
-        document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        const radio = card.querySelector('.type-radio');
-        radio.checked = true;
-        filterSuppliers(radio.value);
-    });
-    if (card.querySelector('.type-radio').checked) {
-        card.classList.add('selected');
-        filterSuppliers(card.querySelector('.type-radio').value);
-    }
-});
-</script>
 
 @else
     {{-- ── STEP 2: Form PO Utama ── --}}

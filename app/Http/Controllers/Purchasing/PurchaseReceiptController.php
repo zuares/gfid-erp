@@ -119,17 +119,18 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
-     * Form create GRN dari semua PO approved (optional filter supplier + order_type).
+     * Form create GRN dari semua PO yang masih dapat diterima (filter supplier opsional).
      */
     public function create(Request $request)
     {
         $suppliers = Supplier::orderBy('name')->get();
-        $warehouses = Warehouse::orderBy('name')->get();
+        $warehouses = Warehouse::query()->where('active', 1)->orderBy('name')->get();
 
         $order = null;
 
         $selectedSupplierId = $request->input('supplier_id');
-        $selectedOrderType = $this->normalizeOrderType($request->input('order_type')); // null/material/finished_good
+        // PO tidak lagi dibatasi jenis. Semua PO yang masih dapat diterima
+        // ditampilkan agar satu supplier bisa diproses lintas kategori item.
 
         $lines = PurchaseOrderLine::query()
             ->with(['item', 'expenseAccount', 'purchaseOrder.supplier'])
@@ -137,7 +138,7 @@ class PurchaseReceiptController extends Controller
             ->withSum(['receiptLines as qty_received_posted' => function ($q) {
                 $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
             }], 'qty_received')
-            ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId, $selectedOrderType) {
+            ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId) {
                 // Flow baru: GRN boleh dari PO draft ATAU approved (closed juga valid).
                 // Cancelled dikecualikan.
                 $q->whereIn('status', ['draft', 'approved'])
@@ -147,9 +148,6 @@ class PurchaseReceiptController extends Controller
                     $q->where('supplier_id', (int) $selectedSupplierId);
                 }
 
-                if (!empty($selectedOrderType)) {
-                    $q->where('order_type', $selectedOrderType);
-                }
             })
             ->orderByDesc(
                 PurchaseOrder::query()
@@ -169,9 +167,8 @@ class PurchaseReceiptController extends Controller
             $line->partially_received = !$line->fully_received && $qtyReceived > 0;
         });
 
-        // ✅ Default warehouse (controller side)
-        // finished_good -> WH-RTS ; material/packing -> RM
-        $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
+        // Default hanya sebagai usulan; user memilih warehouse di form GRN.
+        $defaultWhCode = 'RM';
         $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
 
         $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
@@ -182,7 +179,6 @@ class PurchaseReceiptController extends Controller
             'order' => $order,
             'lines' => $lines,
             'selectedSupplierId' => $selectedSupplierId,
-            'selectedOrderType' => $selectedOrderType,
             'defaultWhCode' => $defaultWarehouse?->code,
             'defaultWarehouse' => $defaultWarehouse,
             'selectedWarehouseId' => $selectedWarehouseId,
@@ -213,7 +209,7 @@ class PurchaseReceiptController extends Controller
         ]);
 
         $suppliers = Supplier::orderBy('name')->get();
-        $warehouses = Warehouse::orderBy('name')->get();
+        $warehouses = Warehouse::query()->where('active', 1)->orderBy('name')->get();
 
         $lines = $purchase_order->lines;
         $lines->each(function (PurchaseOrderLine $line) {
@@ -225,9 +221,11 @@ class PurchaseReceiptController extends Controller
         });
 
         $selectedSupplierId = $purchase_order->supplier_id;
-        $selectedOrderType = $this->normalizeOrderType($purchase_order->order_type) ?: 'material';
+        // Legacy order_type hanya dipakai untuk memberi usulan awal gudang
+        // pada PO lama; user tetap dapat menggantinya di form GRN.
+        $legacyOrderType = $this->normalizeOrderType($purchase_order->order_type) ?: 'material';
 
-        $defaultWhCode = ($selectedOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
+        $defaultWhCode = ($legacyOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
         $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
 
         $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
@@ -238,7 +236,6 @@ class PurchaseReceiptController extends Controller
             'order' => $purchase_order,
             'lines' => $lines,
             'selectedSupplierId' => $selectedSupplierId,
-            'selectedOrderType' => $selectedOrderType,
             'defaultWhCode' => $defaultWarehouse?->code,
             'defaultWarehouse' => $defaultWarehouse,
             'selectedWarehouseId' => $selectedWarehouseId,
