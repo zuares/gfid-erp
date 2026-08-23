@@ -13,7 +13,8 @@
     $isOwner = $role === 'owner' || $isDev;  // developer = akses owner (semua menu)
     $isOperating = $role === 'operating';
     $isAdmin = $role === 'admin' && !$isDev; // developer TIDAK masuk branch admin agar masuk branch owner
-    $canOpenAiAgent = $isOwner || $isAdmin || $isOperating;
+    // AI dan komunikasi hanya ditampilkan untuk owner/operating.
+    $canOpenAiAgent = $isOwner || $isOperating;
 
     // ✅ capability flags
     $canViewRts = $isOwner || $isAdmin || $isOperating;
@@ -192,7 +193,7 @@
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
-    $hasMarketplacePayoutsIndex = $router->has('accounting.marketplace-payouts.index');
+    $hasMarketplacePayoutsIndex = !$isAdmin && $router->has('accounting.marketplace-payouts.index');
     $hasApReportIndex           = $router->has('accounting.ap-report.index');
     $hasTrialBalanceIndex       = $router->has('accounting.trial-balance.index');
     $hasProfitLossIndex         = $router->has('accounting.profit-loss.index');
@@ -230,7 +231,9 @@
     }
 
     if (!$canModule('master')) {
-        $hasMasterItemsIndex = $hasMasterItemCategoriesIndex = $hasMasterCustomersIndex = false;
+        // Admin hanya mendapat akses CRUD Master Item, bukan seluruh Master Data.
+        $hasMasterItemsIndex = $isAdmin || $isOwner;
+        $hasMasterItemCategoriesIndex = $hasMasterCustomersIndex = false;
         $hasMasterSuppliersIndex = $hasMasterItemBomsIndex = $hasMasterEmployeesIndex = false;
     }
 
@@ -262,6 +265,14 @@
         $hasImportMarketplaceIncomeCommit = $hasImportMarketplaceIncomeCancel = false;
         $hasImportMarketplaceIncomeShow = $hasImportMarketplaceIncomeOrderShow = false;
         $hasImportMarketplaceIncomeApply = false;
+    }
+
+    // Impor disembunyikan dari navigasi admin untuk sementara.
+    if ($isAdmin) {
+        $hasImportMarketplaceIndex = $hasImportMarketplaceCreate = $hasImportMarketplaceExport = false;
+        $hasImportMarketplaceDraft = false;
+        $hasImportMarketplaceIncomeIndex = $hasImportMarketplaceIncomeCreate = false;
+        $hasImportMarketplaceIncomeDraft = false;
     }
 
     if (!$canModule('production')) {
@@ -744,7 +755,7 @@
                     </x-sidebar.simple-link>
                 </li>
             @endif
-            @if (($isOwner || $isAdmin) && ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index')))
+            @if ($isOwner && ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index')))
                 <x-sidebar.label text="Komunikasi" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openCommunication ? 'is-open' : '' }}" type="button"
@@ -863,99 +874,144 @@
                 ADMIN / OPERATING (simple, non-collapsible)
             ========================================================= --}}
 
-            <x-sidebar.label :text="$isAdmin ? 'Persediaan' : 'Operasional'" />
-            <li class="simple-group">
-                @if ($hasInvIntelligence)
-                    <x-sidebar.simple-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
-                        :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
-                        Ringkasan Stok
-                    </x-sidebar.simple-link>
-                @endif
-                
-                @if ($hasWhIntelligence)
-                    <x-sidebar.simple-link href="{{ route('inventory.warehouse_intelligence') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('inventory.warehouse_intelligence') || request()->routeIs('inventory.warehouse_intelligence.*')">
-                        Stok Gudang
-                    </x-sidebar.simple-link>
-                @endif
+            @if ($canShow(
+                $hasInvIntelligence,
+                $hasWhIntelligence,
+                $hasInvStocksItems,
+                $hasInvStockCard,
+                $hasInvBarcodes,
+                $hasInvOpnamesIndex,
+                $hasInvTransfersIndex,
+                $hasInvTransfersCreate,
+                (!$isAdmin && $hasInvWipAdjIndex)
+            ))
+                <x-sidebar.label :text="$isAdmin ? 'Persediaan' : 'Operasional'" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openPersediaan ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navPersediaanAdmin"
+                        aria-expanded="{{ $openPersediaan ? 'true' : 'false' }}" aria-controls="navPersediaanAdmin">
+                        <span class="icon"><i class="bi bi-box-seam"></i></span>
+                        <span>Persediaan</span>
+                        <span class="chevron">▸</span>
+                    </button>
 
-                @if ($hasInvStocksItems)
-                    <x-sidebar.simple-link href="{{ route('inventory.stocks.items') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('inventory.stocks.items')">
-                        Stok Barang
-                    </x-sidebar.simple-link>
-                @endif
+                    <div class="collapse {{ $openPersediaan ? 'show' : '' }}" id="navPersediaanAdmin">
+                        @if ($hasInvIntelligence || $hasWhIntelligence)
+                            @php $subhead('Ringkasan'); @endphp
+                            @if ($hasInvIntelligence)
+                                <x-sidebar.sub-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
+                                    :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
+                                    Ringkasan Stok
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasWhIntelligence)
+                                <x-sidebar.sub-link href="{{ route('inventory.warehouse_intelligence') }}" icon="bi bi-box-seam"
+                                    :active="request()->routeIs('inventory.warehouse_intelligence') || request()->routeIs('inventory.warehouse_intelligence.*')">
+                                    Stok Gudang
+                                </x-sidebar.sub-link>
+                            @endif
+                        @endif
 
-                @if ($hasInvStockCard)
-                    <x-sidebar.simple-link href="{{ route('inventory.stock_card.index') }}" icon="bi bi-list-ul"
-                        :active="request()->routeIs('inventory.stock_card.*')">
-                        Kartu Stok
-                    </x-sidebar.simple-link>
-                @endif
+                        @if ($hasInvStocksItems || $hasInvStockCard || $hasInvBarcodes)
+                            @php $subhead('Stok'); @endphp
+                            @if ($hasInvStocksItems)
+                                <x-sidebar.sub-link href="{{ route('inventory.stocks.items') }}" icon="bi bi-box-seam"
+                                    :active="request()->routeIs('inventory.stocks.items')">
+                                    Stok Barang
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasInvStockCard)
+                                <x-sidebar.sub-link href="{{ route('inventory.stock_card.index') }}" icon="bi bi-list-ul"
+                                    :active="request()->routeIs('inventory.stock_card.*')">
+                                    Kartu Stok
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasInvBarcodes)
+                                <x-sidebar.sub-link href="{{ route('inventory.barcodes.create') }}" icon="bi bi-upc-scan"
+                                    :active="request()->routeIs('inventory.barcodes.*')">
+                                    Cetak Barcode
+                                </x-sidebar.sub-link>
+                            @endif
+                        @endif
 
-                @if ($hasInvBarcodes)
-                    <x-sidebar.simple-link href="{{ route('inventory.barcodes.create') }}" icon="bi bi-upc-scan"
-                        :active="request()->routeIs('inventory.barcodes.*')">
-                        Cetak Barcode
-                    </x-sidebar.simple-link>
-                @endif
-
-                @if ($hasInvOpnamesIndex)
-                    <x-sidebar.simple-link href="{{ route('inventory.stock_opnames.index') }}" icon="bi bi-bar-chart"
-                        :active="request()->routeIs('inventory.stock_opnames.*')">
-                        Stok Opname
-                    </x-sidebar.simple-link>
-                @endif
-
-                @if ($isAdmin && $hasInvTransfersIndex)
-                    <x-sidebar.simple-link href="{{ route('inventory.transfers.index') }}" icon="bi bi-arrow-repeat"
-                        :active="request()->routeIs('inventory.transfers.index')">
-                        Daftar Transfer
-                    </x-sidebar.simple-link>
-                @endif
-
-                @if ($isAdmin && $hasInvTransfersCreate)
-                    <x-sidebar.simple-link href="{{ route('inventory.transfers.create') }}" icon="bi bi-plus-circle"
-                        :active="request()->routeIs('inventory.transfers.create')">
-                        Buat Transfer
-                    </x-sidebar.simple-link>
-                @endif
-
-                @if (!$isAdmin && $hasInvWipAdjIndex)
-                    <x-sidebar.simple-link href="{{ route('inventory.wip_adjustments.index') }}" icon="bi bi-receipt"
-                        :active="request()->routeIs('inventory.wip_adjustments.*')">
-                        Koreksi WIP
-                    </x-sidebar.simple-link>
-                @endif
-            </li>
+                        @if ($hasInvOpnamesIndex || ($isAdmin && ($hasInvTransfersIndex || $hasInvTransfersCreate)) || (!$isAdmin && $hasInvWipAdjIndex))
+                            @php $subhead($isAdmin ? 'Operasional' : 'Koreksi'); @endphp
+                            @if ($hasInvOpnamesIndex)
+                                <x-sidebar.sub-link href="{{ route('inventory.stock_opnames.index') }}" icon="bi bi-bar-chart"
+                                    :active="request()->routeIs('inventory.stock_opnames.*')">
+                                    Stok Opname
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($isAdmin && $hasInvTransfersIndex)
+                                <x-sidebar.sub-link href="{{ route('inventory.transfers.index') }}" icon="bi bi-arrow-repeat"
+                                    :active="request()->routeIs('inventory.transfers.index')">
+                                    Daftar Transfer
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($isAdmin && $hasInvTransfersCreate)
+                                <x-sidebar.sub-link href="{{ route('inventory.transfers.create') }}" icon="bi bi-plus-circle"
+                                    :active="request()->routeIs('inventory.transfers.create')">
+                                    Buat Transfer
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if (!$isAdmin && $hasInvWipAdjIndex)
+                                <x-sidebar.sub-link href="{{ route('inventory.wip_adjustments.index') }}" icon="bi bi-receipt"
+                                    :active="request()->routeIs('inventory.wip_adjustments.*')">
+                                    Koreksi WIP
+                                </x-sidebar.sub-link>
+                            @endif
+                        @endif
+                    </div>
+                </li>
+            @endif
 
             {{-- Permintaan Stok (RTS) --}}
             @if ($canViewRts && ($hasRtsStockReqIndex || (!$isAdmin && $hasRtsDirectReceiveIndex)))
                 <x-sidebar.label text="Permintaan Stok" />
-                <li class="simple-group">
-                    @if ($hasRtsStockReqIndex)
-                        <x-sidebar.simple-link href="{{ route('rts.stock-requests.index') }}" icon="bi bi-cart3"
-                            :active="request()->routeIs('rts.stock-requests.*')"
-                            :dot-only="$canManageRts && $hasRtsNeedReceive"
-                            badge-tone="warn"
-                            :badge-title="$rtsBadgeTitle">
-                            Permintaan Stok (RTS)
-                        </x-sidebar.simple-link>
-                    @endif
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openStockRequests ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navStockRequestsAdmin"
+                        aria-expanded="{{ $openStockRequests ? 'true' : 'false' }}" aria-controls="navStockRequestsAdmin">
+                        <span class="icon"><i class="bi bi-cart3"></i></span>
+                        <span>Permintaan Stok</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openStockRequests ? 'show' : '' }}" id="navStockRequestsAdmin">
+                        <div class="sidebar-subhead">Permintaan</div>
+                        @if ($hasRtsStockReqIndex)
+                            <x-sidebar.sub-link href="{{ route('rts.stock-requests.index') }}" icon="bi bi-cart3"
+                                :active="request()->routeIs('rts.stock-requests.*')"
+                                :dot-only="$canManageRts && $hasRtsNeedReceive"
+                                badge-tone="warn"
+                                :badge-title="$rtsBadgeTitle">
+                                Permintaan Stok (RTS)
+                            </x-sidebar.sub-link>
+                        @endif
 
-                    @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
-                        <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
-                            :active="request()->routeIs('rts.direct-receives.*')">
-                            RTS Dadakan
-                        </x-sidebar.simple-link>
-                    @endif
+                        @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
+                            <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
+                                :active="request()->routeIs('rts.direct-receives.*')">
+                                RTS Dadakan
+                            </x-sidebar.sub-link>
+                        @endif
+                    </div>
                 </li>
             @endif
 
             {{-- Toko Online --}}
             @if ($canShow($hasMarketplaceIndex, $hasMarketplaceSalesReport, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
                 <x-sidebar.label text="Toko Online" />
-                <li class="simple-group">
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdmin"
+                        aria-expanded="{{ $openMarketplaceTools ? 'true' : 'false' }}" aria-controls="navMarketplaceAdmin">
+                        <span class="icon"><i class="bi bi-cart3"></i></span>
+                        <span>Toko Online</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceAdmin">
+                        <div class="sidebar-subhead">Operasional</div>
+                        <div class="simple-group">
                     @if ($hasMarketplaceIndex)
                         <x-sidebar.simple-link href="{{ route('marketplace.orders') }}" icon="bi bi-cart3"
                             :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
@@ -1024,6 +1080,8 @@
                             Rekonsiliasi Barang
                         </x-sidebar.simple-link>
                     @endif
+                        </div>
+                    </div>
                 </li>
             @endif
 
@@ -1111,7 +1169,17 @@
             {{-- Sales (admin only) --}}
             @if ($isAdmin && $canShow($hasSalesShipmentsIndex, $hasSalesShipmentReturnsIndex))
                 <x-sidebar.label text="Penjualan" />
-                <li class="simple-group">
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openSales ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navSalesAdmin"
+                        aria-expanded="{{ $openSales ? 'true' : 'false' }}" aria-controls="navSalesAdmin">
+                        <span class="icon"><i class="bi bi-truck"></i></span>
+                        <span>Penjualan</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openSales ? 'show' : '' }}" id="navSalesAdmin">
+                        <div class="sidebar-subhead">Pengiriman</div>
+                        <div class="simple-group">
                     @if ($hasSalesShipmentsIndex)
                         <x-sidebar.simple-link href="{{ route('sales.shipments.index') }}" icon="bi bi-truck"
                             :active="request()->routeIs('sales.shipments.*')">
@@ -1125,6 +1193,8 @@
                             Retur Pengiriman
                         </x-sidebar.simple-link>
                     @endif
+                        </div>
+                    </div>
                 </li>
             @endif
 
@@ -1137,7 +1207,17 @@
             @endphp
             @if ($adminHasSewReturns || $adminHasRtsDirectReceive || $adminHasRejectReturns || $adminHasQc)
                 <x-sidebar.label text="Produksi" />
-                <li class="simple-group">
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openProduction ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navProductionAdmin"
+                        aria-expanded="{{ $openProduction ? 'true' : 'false' }}" aria-controls="navProductionAdmin">
+                        <span class="icon"><i class="bi bi-gear-wide-connected"></i></span>
+                        <span>Produksi</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openProduction ? 'show' : '' }}" id="navProductionAdmin">
+                        <div class="sidebar-subhead">Operasional</div>
+                        <div class="simple-group">
                     @if ($adminHasSewReturns)
                         <x-sidebar.simple-link href="{{ route('production.sewing.returns.create') }}" icon="bi bi-inbox"
                             :active="request()->routeIs('production.sewing.returns.*')">
@@ -1166,6 +1246,8 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                        </div>
+                    </div>
                 </li>
             @endif
 
@@ -1173,7 +1255,17 @@
             {{-- Pembelian (admin only) --}}
             @if ($isAdmin && $canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate))
                 <x-sidebar.label text="Pengadaan" />
-                <li class="simple-group">
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openPembelian ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navPurchasingAdmin"
+                        aria-expanded="{{ $openPembelian ? 'true' : 'false' }}" aria-controls="navPurchasingAdmin">
+                        <span class="icon"><i class="bi bi-cart-check"></i></span>
+                        <span>Pengadaan</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openPembelian ? 'show' : '' }}" id="navPurchasingAdmin">
+                        <div class="sidebar-subhead">PO & Penerimaan</div>
+                        <div class="simple-group">
                     @if ($hasPoIndex)
                         <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
                             :active="request()->routeIs('purchasing.purchase_orders.index')">
@@ -1198,6 +1290,19 @@
                             Buat Penerimaan
                         </x-sidebar.simple-link>
                     @endif
+                        </div>
+                    </div>
+                </li>
+            @endif
+
+            {{-- Master Item (admin dapat mengelola item tanpa membuka seluruh Master Data) --}}
+            @if ($isAdmin && $hasMasterItemsIndex)
+                <x-sidebar.label text="Data Master" />
+                <li class="simple-group">
+                    <x-sidebar.simple-link href="{{ route('master.items.index') }}" icon="bi bi-box-seam"
+                        :active="request()->routeIs('master.items.*')">
+                        Master Item
+                    </x-sidebar.simple-link>
                 </li>
             @endif
 
@@ -1215,7 +1320,17 @@
                 $hasProdReportsIndex
             ))
                 <x-sidebar.label text="Produksi" />
-                <li class="simple-group">
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openProduction ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navProductionOperating"
+                        aria-expanded="{{ $openProduction ? 'true' : 'false' }}" aria-controls="navProductionOperating">
+                        <span class="icon"><i class="bi bi-gear-wide-connected"></i></span>
+                        <span>Produksi</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openProduction ? 'show' : '' }}" id="navProductionOperating">
+                        <div class="sidebar-subhead">Operasional</div>
+                        <div class="simple-group">
                     @if ($hasProdDashboard)
                         <x-sidebar.simple-link href="{{ route('production.dashboard') }}" icon="bi bi-bar-chart"
                             :active="request()->routeIs('production.dashboard')">
@@ -1321,6 +1436,8 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                        </div>
+                    </div>
                 </li>
             @endif
 
@@ -1335,7 +1452,17 @@
                 $hasOpeningBalancesBatchIndex
             ))
                 <x-sidebar.label text="Keuangan" />
-                <li class="simple-group">
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navAccountingAdmin"
+                        aria-expanded="{{ $openAccounting ? 'true' : 'false' }}" aria-controls="navAccountingAdmin">
+                        <span class="icon"><i class="bi bi-calculator"></i></span>
+                        <span>Keuangan</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openAccounting ? 'show' : '' }}" id="navAccountingAdmin">
+                        <div class="sidebar-subhead">Akuntansi</div>
+                        <div class="simple-group">
                     @if ($hasCashBasisReportIndex)
                         <x-sidebar.simple-link href="{{ route('accounting.cash-basis-report.index') }}" icon="bi bi-bar-chart"
                             :active="request()->routeIs('accounting.cash-basis-report.*')">
@@ -1391,6 +1518,8 @@
                             Batch Saldo Awal
                         </x-sidebar.simple-link>
                     @endif
+                        </div>
+                    </div>
                 </li>
             @endif
 

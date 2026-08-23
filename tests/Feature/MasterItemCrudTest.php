@@ -116,6 +116,46 @@ class MasterItemCrudTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_sidebar_shows_master_item_and_hides_restricted_menus(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ITEM-ADMIN-SIDEBAR',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('master.items.index'));
+
+        $response->assertOk()
+            ->assertSee('Master Item')
+            ->assertSee(route('master.items.index'), false)
+            ->assertSee('data-bs-target="#navPersediaanAdmin"', false)
+            ->assertSee('data-bs-target="#navPersediaanAdminMobile"', false)
+            ->assertDontSee('AI Studio')
+            ->assertDontSee('Connect OpenAI')
+            ->assertDontSee('AI Agent')
+            ->assertDontSee('Komunikasi')
+            ->assertDontSee('WhatsApp')
+            ->assertDontSee('Penerimaan Marketplace')
+            ->assertDontSee('Impor')
+            ->assertDontSee('Import Toko Online Income');
+    }
+
+    public function test_operating_sidebar_groups_inventory_and_production(): void
+    {
+        $operating = User::factory()->create([
+            'role' => 'operating',
+            'employee_code' => 'ITEM-OPERATING-SIDEBAR',
+        ]);
+
+        $this->actingAs($operating)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('data-bs-target="#navPersediaanAdmin"', false)
+            ->assertSee('data-bs-target="#navPersediaanAdminMobile"', false)
+            ->assertSee('data-bs-target="#navProductionOperating"', false)
+            ->assertSee('data-bs-target="#navProductionOperatingMobile"', false);
+    }
+
     public function test_quick_supplier_fields_do_not_override_item_fields(): void
     {
         $response = $this->actingAs($this->owner)->get(route('master.items.create'));
