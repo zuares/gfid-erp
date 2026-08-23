@@ -173,6 +173,7 @@
     let cameraLoading = false;
     let submitting = false;
     let cameraLibraryPromise = null;
+    let orderAudioContext = null;
 
     function showToast(message, error = false) {
         if (!toast) return;
@@ -180,6 +181,63 @@
         toast.className = 'sif-toast show' + (error ? ' error' : '');
         clearTimeout(showToast.timer);
         showToast.timer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function getOrderAudioContext() {
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            orderAudioContext = orderAudioContext || new Ctx();
+            return orderAudioContext;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function unlockOrderAudio() {
+        const context = getOrderAudioContext();
+        if (context?.state === 'suspended') context.resume().catch(() => {});
+    }
+
+    function orderBeep(freq, duration = .1, volume = .3, delay = 0, type = 'sine') {
+        try {
+            const context = getOrderAudioContext();
+            if (!context) return;
+            unlockOrderAudio();
+            const start = context.currentTime + delay;
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.type = type;
+            oscillator.frequency.value = freq;
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            gain.gain.setValueAtTime(volume, start);
+            gain.gain.exponentialRampToValueAtTime(.001, start + duration);
+            oscillator.start(start);
+            oscillator.stop(start + duration);
+        } catch (error) {}
+    }
+
+    function playOrderSound(eventKey, fallback) {
+        if (window.GFID && typeof window.GFID.playScanSound === 'function') {
+            window.GFID.playScanSound(eventKey, fallback);
+            return;
+        }
+        fallback();
+    }
+
+    function orderSuccessSound() {
+        playOrderSound('order_ready', () => {
+            orderBeep(880, .09, .36, 0, 'sine');
+            orderBeep(1175, .1, .36, .1, 'sine');
+        });
+    }
+
+    function orderErrorSound() {
+        playOrderSound('error_general', () => {
+            orderBeep(220, .13, .42, 0, 'sawtooth');
+            orderBeep(150, .16, .42, .14, 'sawtooth');
+        });
     }
 
     function renderOrders() {
@@ -240,6 +298,7 @@
     async function openCamera() {
         if (!cameraBtn || !cameraPanel || cameraLoading || camera) return;
 
+        unlockOrderAudio();
         cameraPanel.hidden = false;
         cameraLoading = true;
         cameraBtn.disabled = true;
@@ -267,6 +326,7 @@
             setCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke dalam kotak.');
         } catch (error) {
             await stopCamera();
+            orderErrorSound();
             setCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
             showToast('Kamera tidak dapat dibuka. Pastikan izin kamera aktif dan gunakan HTTPS.', true);
         } finally {
@@ -291,8 +351,10 @@
             if (!orders.includes(orderNo)) orders.push(orderNo);
             renderOrders();
             input.value = '';
+            orderSuccessSound();
             showToast(data.message || 'Order berhasil dicatat.');
         } catch (error) {
+            orderErrorSound();
             showToast(error.message || 'Gagal mencatat order.', true);
         } finally {
             input.disabled = false;
@@ -305,6 +367,7 @@
     input?.addEventListener('keydown', async function (event) {
         if (event.key !== 'Enter') return;
         event.preventDefault();
+        unlockOrderAudio();
         const orderNo = input.value.trim().toUpperCase();
         if (!orderNo) return;
         await submitOrder(orderNo);
@@ -315,8 +378,10 @@
     window.addEventListener('pagehide', stopCamera);
 
     confirmBtn?.addEventListener('click', function (event) {
+        unlockOrderAudio();
         if (this.getAttribute('aria-disabled') === 'true') {
             event.preventDefault();
+            orderErrorSound();
             showToast('Scan minimal satu nomor order terlebih dahulu.', true);
         }
     });
