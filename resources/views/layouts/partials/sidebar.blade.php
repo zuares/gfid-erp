@@ -988,6 +988,13 @@
                             </x-sidebar.sub-link>
                         @endif
 
+                        @if ($isAdmin && $hasRtsDirectReceiveIndex)
+                            <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
+                                :active="request()->routeIs('rts.direct-receives.*')">
+                                Setor Jahit Dadakan
+                            </x-sidebar.sub-link>
+                        @endif
+
                         @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
                             <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
                                 :active="request()->routeIs('rts.direct-receives.*')">
@@ -1201,11 +1208,10 @@
             {{-- Produksi (admin only) — Setor Jahit + Dadakan + Reject Jahit + QC Jahit --}}
             @php
                 $adminHasSewReturns  = $isAdmin && $router->has('production.sewing.returns.create');
-                $adminHasRtsDirectReceive = $isAdmin && $hasRtsDirectReceiveIndex;
                 $adminHasRejectReturns = $isAdmin && $hasProdSewRejectReturnsIndex;
                 $adminHasQc          = $isAdmin && $hasProdQcIndex;
             @endphp
-            @if ($adminHasSewReturns || $adminHasRtsDirectReceive || $adminHasRejectReturns || $adminHasQc)
+            @if ($adminHasSewReturns || $adminHasRejectReturns || $adminHasQc)
                 <x-sidebar.label text="Produksi" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openProduction ? 'is-open' : '' }}" type="button"
@@ -1222,13 +1228,6 @@
                         <x-sidebar.simple-link href="{{ route('production.sewing.returns.create') }}" icon="bi bi-inbox"
                             :active="request()->routeIs('production.sewing.returns.*')">
                             Setor Jahit
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($adminHasRtsDirectReceive)
-                        <x-sidebar.simple-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
-                            :active="request()->routeIs('rts.direct-receives.*')">
-                            Setor Jahit Dadakan
                         </x-sidebar.simple-link>
                     @endif
 

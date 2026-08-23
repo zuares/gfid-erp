@@ -946,6 +946,13 @@
                                     </a>
                                 @endif
 
+                                @if ($isAdmin && $hasRtsDirectReceiveIndex)
+                                    <a href="{{ route('rts.direct-receives.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
+                                        <span class="icon">⚡</span><span>Setor Jahit Dadakan</span>
+                                    </a>
+                                @endif
+
                                 @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
                                     <a href="{{ route('rts.direct-receives.index') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
@@ -1032,7 +1039,7 @@
                     @endif
 
                     {{-- Produksi (admin) --}}
-                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasRtsDirectReceiveIndex || $hasProdSewRejectReturnsIndex || $hasProdQcIndex))
+                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasProdSewRejectReturnsIndex || $hasProdQcIndex))
                         <div class="mobile-sidebar-section-label">Produksi</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodOpen ? 'is-open' : '' }}"
@@ -1048,13 +1055,6 @@
                                     <a href="{{ route('production.sewing.returns.create') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing.returns.*') ? 'active' : '' }}">
                                         <span class="icon">📥</span><span>Setor Jahit</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasRtsDirectReceiveIndex)
-                                    <a href="{{ route('rts.direct-receives.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
-                                        <span class="icon">⚡</span><span>Setor Jahit Dadakan</span>
                                     </a>
                                 @endif
 
