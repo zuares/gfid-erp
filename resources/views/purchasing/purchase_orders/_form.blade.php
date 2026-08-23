@@ -60,6 +60,12 @@
         $linesData = [];
     }
 
+    // Nilai awal agar halaman Edit PO langsung menampilkan total tersimpan
+    // sebelum kalkulasi JavaScript selesai diinisialisasi.
+    $initialSubtotal = (float) ($order?->subtotal ?? 0);
+    $initialShipping = (float) ($order?->shipping_cost ?? 0);
+    $initialGrandTotal = (float) ($order?->grand_total ?? 0);
+
     $receivedByLineId = $order && $order->exists ? app(\App\Services\Purchasing\PurchaseOrderService::class)->receivedQtyByLineId($order) : [];
 @endphp
 
@@ -1532,15 +1538,15 @@
                 <div class="po-meta-totals">
                     <div class="po-total-line">
                         <div class="po-total-key">Subtotal Items</div>
-                        <div class="po-total-val subtle" id="po-subtotal-meta">0</div>
+                        <div class="po-total-val subtle" id="po-subtotal-meta">{{ number_format($initialSubtotal, 0, ',', '.') }}</div>
                     </div>
                     <div class="po-total-line">
                         <div class="po-total-key">Ongkir</div>
-                        <div class="po-total-val subtle" id="po-shipping-meta">0</div>
+                        <div class="po-total-val subtle" id="po-shipping-meta">{{ number_format($initialShipping, 0, ',', '.') }}</div>
                     </div>
                     <div class="po-total-line">
                         <div class="po-total-key">Grand Total</div>
-                        <div class="po-total-val" id="po-grand-meta">0</div>
+                        <div class="po-total-val" id="po-grand-meta">{{ number_format($initialGrandTotal, 0, ',', '.') }}</div>
                     </div>
                 </div>
             @endif
