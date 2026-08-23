@@ -583,7 +583,10 @@ class PurchaseOrderService
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
-            if ($itemId <= 0 || $qty <= 0.0001) {
+            // Draft boleh menyimpan item yang sudah dipilih meski qty belum
+            // diisi. Baris tersebut tetap tampil di detail PO dan bisa
+            // dilengkapi dari halaman edit sebelum di-approve/diterima.
+            if ($itemId <= 0) {
                 continue;
             }
 
