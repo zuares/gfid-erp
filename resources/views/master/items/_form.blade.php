@@ -77,6 +77,8 @@
     .item-supply-preset-option strong { display:block; color:#0f172a; font-size:.72rem; }
     .item-supply-preset-option small { display:block; margin-top:2px; color:#94a3b8; font-size:.63rem; line-height:1.25; }
     .item-supplier-picker { padding:11px; border:1px solid #e2e8f0; border-radius:15px; background:#f8fafc; }
+    .item-supplier-add-panel { margin-top:9px; padding:10px; border:1px dashed #93c5fd; border-radius:11px; background:#eff6ff; }
+    .item-supplier-add-panel[hidden] { display:none; }
     .item-supplier-search { margin-bottom:8px; }
     .item-supplier-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; max-height:220px; overflow:auto; padding-right:3px; }
     .item-supplier-option { display:flex; align-items:flex-start; gap:8px; padding:8px 9px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; cursor:pointer; }
@@ -107,6 +109,7 @@
     body[data-theme="dark"] .item-crud-header { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-crud-title { color:#f8fafc; }
     body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-supplier-picker, body[data-theme="dark"] .item-supplier-option, body[data-theme="dark"] .item-status-switch { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-supplier-add-panel { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-supply-preset-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-supplier-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-section-title { color:#f8fafc; }
@@ -253,7 +256,33 @@
                         <label class="form-label mb-0">Supplier item</label>
                         <div class="form-text">Pilih satu atau beberapa supplier yang biasa menyediakan item ini.</div>
                     </div>
-                    <span class="badge text-bg-light" data-supplier-count>0 dipilih</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge text-bg-light" data-supplier-count>0 dipilih</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-open-quick-supplier><i class="bi bi-plus-lg me-1"></i>Tambah supplier</button>
+                    </div>
+                </div>
+                <div class="item-supplier-add-panel" data-quick-supplier-panel hidden>
+                    <div data-quick-supplier-form>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label" for="quick-supplier-code">Kode supplier</label>
+                                <input id="quick-supplier-code" name="code" type="text" class="form-control form-control-sm" maxlength="50" placeholder="SUP-001" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="quick-supplier-name">Nama supplier</label>
+                                <input id="quick-supplier-name" name="name" type="text" class="form-control form-control-sm" maxlength="255" placeholder="Nama supplier" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="quick-supplier-phone">Telepon</label>
+                                <input id="quick-supplier-phone" name="phone" type="text" class="form-control form-control-sm" maxlength="50" placeholder="Opsional">
+                            </div>
+                            <div class="col-md-2 d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-primary flex-fill" data-quick-supplier-submit>Simpan</button>
+                                <button type="button" class="btn btn-sm btn-light" data-close-quick-supplier title="Tutup"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                        </div>
+                        <div class="small text-danger mt-2" data-quick-supplier-error hidden></div>
+                    </div>
                 </div>
                 <input type="search" class="form-control item-supplier-search" placeholder="Cari kode atau nama supplier..." data-supplier-search autocomplete="off">
                 <div class="item-supplier-list" data-supplier-list>
@@ -366,10 +395,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const defaultSupply = document.querySelector('[data-default-supply-source]');
     const supplyPresetGroup = document.querySelector('[data-supply-preset-group]');
     const supplierSearch = document.querySelector('[data-supplier-search]');
-    const supplierOptions = Array.from(document.querySelectorAll('[data-supplier-option]'));
+    let supplierOptions = Array.from(document.querySelectorAll('[data-supplier-option]'));
     const supplierCheckboxes = Array.from(document.querySelectorAll('[data-supplier-checkbox]'));
     const primarySupplier = document.querySelector('[data-primary-supplier]');
     const supplierCount = document.querySelector('[data-supplier-count]');
+    const quickSupplierPanel = document.querySelector('[data-quick-supplier-panel]');
+    const quickSupplierForm = document.querySelector('[data-quick-supplier-form]');
+    const quickSupplierSubmit = document.querySelector('[data-quick-supplier-submit]');
+    const quickSupplierError = document.querySelector('[data-quick-supplier-error]');
+    const quickSupplierRoute = @json(route('master.items.quick_suppliers.store'));
     const supplySummary = document.querySelector('[data-supply-summary]');
     const supplySummaryText = document.querySelector('[data-supply-summary-text]');
     const allocation = document.getElementById('default-allocation');
@@ -398,6 +432,90 @@ document.addEventListener('DOMContentLoaded', function () {
                 primarySupplier.value = selected[0] || '';
             }
             primarySupplier.disabled = selected.length === 0;
+        }
+    }
+
+    function appendSupplierOption(supplier) {
+        const supplierList = document.querySelector('[data-supplier-list]');
+        if (!supplierList) return;
+
+        const label = document.createElement('label');
+        label.className = 'item-supplier-option';
+        label.dataset.supplierOption = '';
+        label.dataset.search = `${supplier.code} ${supplier.name}`.toLowerCase();
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input mt-1';
+        checkbox.name = 'supplier_ids[]';
+        checkbox.value = String(supplier.id);
+        checkbox.checked = true;
+        checkbox.dataset.supplierCheckbox = '';
+        checkbox.addEventListener('change', refreshSupplierPicker);
+
+        const text = document.createElement('span');
+        const code = document.createElement('strong');
+        code.textContent = supplier.code;
+        const name = document.createElement('small');
+        name.textContent = supplier.name;
+        text.append(code, name);
+        label.append(checkbox, text);
+        supplierList.appendChild(label);
+
+        supplierOptions.push(label);
+        supplierCheckboxes.push(checkbox);
+
+        if (primarySupplier) {
+            const option = document.createElement('option');
+            option.value = String(supplier.id);
+            option.textContent = `${supplier.code} — ${supplier.name}`;
+            option.dataset.primaryOption = '';
+            option.selected = true;
+            primarySupplier.appendChild(option);
+            primarySupplier.value = String(supplier.id);
+        }
+        refreshSupplierPicker();
+    }
+
+    async function quickCreateSupplier() {
+        if (!quickSupplierForm || !quickSupplierSubmit) return;
+        const fields = Array.from(quickSupplierForm.querySelectorAll('input[name]'));
+        const payload = new FormData();
+        fields.forEach(field => payload.append(field.name, field.value));
+        quickSupplierSubmit.disabled = true;
+        quickSupplierSubmit.textContent = 'Menyimpan...';
+        if (quickSupplierError) {
+            quickSupplierError.hidden = true;
+            quickSupplierError.textContent = '';
+        }
+
+        try {
+            const response = await fetch(quickSupplierRoute, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: payload,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) {
+                const validationMessage = data.errors ? Object.values(data.errors).flat()[0] : null;
+                throw new Error(validationMessage || data.message || 'Supplier gagal ditambahkan.');
+            }
+
+            appendSupplierOption(data.supplier);
+            quickSupplierForm.querySelectorAll('input[name]').forEach(input => { input.value = ''; });
+            if (quickSupplierPanel) quickSupplierPanel.hidden = true;
+        } catch (error) {
+            if (quickSupplierError) {
+                quickSupplierError.textContent = error.message || 'Supplier gagal ditambahkan.';
+                quickSupplierError.hidden = false;
+            }
+        } finally {
+            quickSupplierSubmit.disabled = false;
+            quickSupplierSubmit.textContent = 'Simpan';
         }
     }
 
@@ -477,6 +595,21 @@ document.addEventListener('DOMContentLoaded', function () {
     allocation?.addEventListener('change', refreshAllocation);
     activeInput?.addEventListener('change', refreshStatus);
     supplierCheckboxes.forEach(input => input.addEventListener('change', refreshSupplierPicker));
+    document.querySelector('[data-open-quick-supplier]')?.addEventListener('click', function () {
+        if (!quickSupplierPanel) return;
+        quickSupplierPanel.hidden = false;
+        quickSupplierForm?.querySelector('input[name="code"]')?.focus();
+    });
+    document.querySelector('[data-close-quick-supplier]')?.addEventListener('click', function () {
+        if (quickSupplierPanel) quickSupplierPanel.hidden = true;
+    });
+    quickSupplierSubmit?.addEventListener('click', quickCreateSupplier);
+    quickSupplierForm?.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            quickCreateSupplier();
+        }
+    });
     supplierSearch?.addEventListener('input', function () {
         const query = supplierSearch.value.trim().toLowerCase();
         supplierOptions.forEach(option => {

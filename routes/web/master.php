@@ -24,6 +24,9 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::get('items/meta', [ItemController::class, 'meta'])
             ->name('items.meta');
 
+        Route::post('items/quick-suppliers', [SupplierController::class, 'quickStore'])
+            ->name('items.quick_suppliers.store');
+
         // ✅ suggest items buat mapping (ringan)
         Route::get('items/suggest', [SupplierController::class, 'suggestItems'])
             ->name('items.suggest');

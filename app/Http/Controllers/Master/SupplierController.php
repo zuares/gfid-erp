@@ -50,6 +50,33 @@ class SupplierController extends Controller
         return view('master.suppliers.create');
     }
 
+    public function quickStore(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:50', 'unique:suppliers,code'],
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $supplier = Supplier::create([
+            'code' => strtoupper(trim($data['code'])),
+            'name' => trim($data['name']),
+            'phone' => $data['phone'] ?? null,
+            'type' => 'supplier',
+            'active' => true,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'supplier' => [
+                'id' => (int) $supplier->id,
+                'code' => (string) $supplier->code,
+                'name' => (string) $supplier->name,
+                'phone' => (string) ($supplier->phone ?? ''),
+            ],
+        ], 201);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
