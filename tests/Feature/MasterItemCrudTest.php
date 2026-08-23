@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
+use App\Models\Account;
+use App\Models\ItemCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -84,5 +86,32 @@ class MasterItemCrudTest extends TestCase
 
         $this->assertSame('Item Setelah Edit', $item->fresh()->name);
         $response->assertRedirect(route('master.items.index'));
+    }
+
+    public function test_maintenance_category_forces_expense_account(): void
+    {
+        $category = ItemCategory::where('code', 'MNT')->firstOrFail();
+
+        $response = $this->actingAs($this->owner)->post(route('master.items.store'), [
+            'code' => 'MNT-001',
+            'name' => 'Refill Pisau Mesin Potong',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_category_id' => $category->id,
+            'default_allocation' => 'hpp',
+            'default_expense_account_id' => '',
+            'supplier_ids' => [],
+            'primary_supplier_id' => '',
+            'active' => 1,
+            'barcodes' => [],
+        ]);
+
+        $item = Item::where('code', 'MNT-001')->firstOrFail();
+        $maintenanceAccount = Account::where('code', '6105')->firstOrFail();
+
+        $this->assertSame('expense', $item->default_allocation);
+        $this->assertSame($maintenanceAccount->id, $item->default_expense_account_id);
+        $this->assertFalse((bool) $item->is_stocked);
+        $response->assertRedirect(route('master.items.edit', $item));
     }
 }

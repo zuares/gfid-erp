@@ -589,7 +589,7 @@
           <thead>
             <tr>
               <th style="width:56px">#</th>
-              <th style="min-width:380px">Material</th>
+              <th style="min-width:380px">Komponen (bahan / accessories)</th>
               <th style="width:190px">Kelompok</th>
               <th style="width:160px">Qty (raw)</th>
               <th style="width:110px">UOM</th>
@@ -694,7 +694,7 @@
 
   function initMaterialSelect($select){
     $select.select2({
-      placeholder: 'Cari material...',
+      placeholder: 'Cari bahan / accessories...',
       allowClear: true,
       ajax: {
         url: ajaxUrl,

@@ -198,7 +198,7 @@ class ItemController extends Controller
             $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
 
-            if (isset($data['unit_cost'])) {
+            if ($accountingPolicy['default_allocation'] === 'hpp' && isset($data['unit_cost'])) {
                 $item->update(['hpp' => $data['unit_cost']]);
                 ItemCostSnapshot::create([
                     'item_id' => $item->id,
@@ -279,7 +279,7 @@ class ItemController extends Controller
             $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
 
-            if (isset($data['unit_cost'])) {
+            if ($accountingPolicy['default_allocation'] === 'hpp' && isset($data['unit_cost'])) {
                 $unitCost = $data['unit_cost'];
                 $hppNotes = $data['hpp_notes'] ?? 'HPP diperbarui dari form Master Item';
                 $currentSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
@@ -587,6 +587,8 @@ class ItemController extends Controller
 
         $this->validateCategoryForType($data['type'], $data['item_category_id'] ?? null);
 
+        $data = $this->applyCategoryAccountingDefaults($data);
+
         if (($data['default_allocation'] ?? 'hpp') === 'expense'
             && empty($data['default_expense_account_id'])) {
             throw ValidationException::withMessages([
@@ -604,6 +606,30 @@ class ItemController extends Controller
             throw ValidationException::withMessages([
                 'primary_supplier_id' => 'Supplier utama harus dipilih dari daftar supplier item.',
             ]);
+        }
+
+        return $data;
+    }
+
+    protected function applyCategoryAccountingDefaults(array $data): array
+    {
+        $category = !empty($data['item_category_id'])
+            ? ItemCategory::find($data['item_category_id'])
+            : null;
+
+        if ($category?->kind !== 'operational') {
+            return $data;
+        }
+
+        $data['default_allocation'] = 'expense';
+
+        if (empty($data['default_expense_account_id'])) {
+            $accountCode = $category->code === 'MNT' ? '6105' : '6104';
+            $data['default_expense_account_id'] = Account::query()
+                ->where('code', $accountCode)
+                ->where('type', 'expense')
+                ->where('is_active', true)
+                ->value('id');
         }
 
         return $data;

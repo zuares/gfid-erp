@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
-use App\Models\ItemRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -373,6 +372,7 @@ class ItemBomController extends Controller
 
     private function syncLines(ItemBom $bom, array $lines): void
     {
+        $this->validateBomComponents($lines);
         ItemBomLine::where('item_bom_id', $bom->id)->delete();
 
         foreach ($lines as $l) {
@@ -388,6 +388,32 @@ class ItemBomController extends Controller
 
                 'is_optional' => (bool) ($l['is_optional'] ?? false),
                 'sort_order' => (int) ($l['sort_order'] ?? 0),
+            ]);
+        }
+    }
+
+    private function validateBomComponents(array $lines): void
+    {
+        $ids = collect($lines)
+            ->pluck('material_item_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $eligibleCount = Item::query()
+            ->whereIn('id', $ids)
+            ->where('type', 'material')
+            ->whereDoesntHave('category', fn ($q) => $q->where('kind', 'operational'))
+            ->where(function ($q) {
+                $q->whereNull('default_allocation')
+                    ->orWhere('default_allocation', 'hpp');
+            })
+            ->count();
+
+        if ($eligibleCount !== $ids->count()) {
+            throw ValidationException::withMessages([
+                'lines' => 'Komponen BOM harus berupa Material yang masuk persediaan/HPP. Accessories boleh dipilih, sedangkan ATK dan Maintenance Mesin tidak boleh masuk BOM.',
             ]);
         }
     }
@@ -474,26 +500,18 @@ class ItemBomController extends Controller
         $type = $request->query('type', 'material'); // material / finished_good
         $q = trim((string) $request->query('q', ''));
 
-        $rmId = ItemRole::where('code', ItemRole::RM)->value('id');
-        $supId = ItemRole::where('code', ItemRole::SUP)->value('id');
-        $pkgId = ItemRole::where('code', ItemRole::PKG)->value('id');
-
-        $roleIds = array_values(array_filter([
-            $rmId ? (int) $rmId : null,
-            $supId ? (int) $supId : null,
-            $pkgId ? (int) $pkgId : null,
-        ]));
-
         $items = Item::query()
             ->when($type === 'finished_good', function ($qq) {
                 $qq->where('type', 'finished_good')->canBeMade();
-            }, function ($qq) use ($roleIds) {
-                $qq->where(function ($w) use ($roleIds) {
-                    if (!empty($roleIds)) {
-                        $w->whereIn('item_role_id', $roleIds);
-                    }
-                    $w->orWhereIn('item_role', ['raw_material', 'production_supply', 'shipping_supply']);
-                });
+            }, function ($qq) {
+                // Bahan baku, bahan pendukung, accessories, dan packaging
+                // boleh menjadi komponen selama perlakuannya persediaan/HPP.
+                $qq->where('type', 'material')
+                    ->whereDoesntHave('category', fn ($w) => $w->where('kind', 'operational'))
+                    ->where(function ($w) {
+                        $w->whereNull('default_allocation')
+                            ->orWhere('default_allocation', 'hpp');
+                    });
             })
             ->when($q !== '', function ($qq) use ($q) {
                 $qq->where(function ($w) use ($q) {

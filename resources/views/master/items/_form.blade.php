@@ -38,7 +38,12 @@
             ? \App\Models\Item::SUPPLY_MAKE
             : ($supplyMode === 'outsource' ? \App\Models\Item::SUPPLY_OUTSOURCE : \App\Models\Item::SUPPLY_BUY);
     }
+    $selectedCategory = collect($categories)->firstWhere('id', (int) old('item_category_id', $item?->item_category_id));
+    $categoryKind = $selectedCategory?->kind;
     $defaultAllocation = old('default_allocation', $item?->default_allocation ?? 'hpp');
+    if ($categoryKind === 'operational' && old('default_allocation') === null) {
+        $defaultAllocation = 'expense';
+    }
     $isProductionItem = in_array($itemType, ['finished_good', 'wip'], true);
     $supplyAccordionOpen = $isProductionItem
         || count($selectedSupplierIds) > 0
@@ -388,15 +393,19 @@
                     <input id="last-purchase-price" type="number" min="0" step="0.01" name="last_purchase_price" class="form-control @error('last_purchase_price') is-invalid @enderror" value="{{ old('last_purchase_price', $item?->last_purchase_price) }}" placeholder="0">
                     @error('last_purchase_price')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="unit-cost">HPP sementara (Rp / unit)</label>
-                    <input id="unit-cost" type="number" min="0" step="0.01" name="unit_cost" class="form-control @error('unit_cost') is-invalid @enderror" value="{{ old('unit_cost', $activeSnapshot?->unit_cost) }}" placeholder="0">
-                    @error('unit_cost')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="hpp-notes">Catatan HPP</label>
-                    <input id="hpp-notes" type="text" name="hpp_notes" class="form-control @error('hpp_notes') is-invalid @enderror" value="{{ old('hpp_notes', $activeSnapshot?->notes) }}" maxlength="255" placeholder="Contoh: HPP awal dari faktur">
-                    @error('hpp_notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                <div class="col-md-8" data-hpp-fields @if($defaultAllocation === 'expense') hidden @endif>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="unit-cost">HPP sementara (Rp / unit)</label>
+                            <input id="unit-cost" type="number" min="0" step="0.01" name="unit_cost" class="form-control @error('unit_cost') is-invalid @enderror" value="{{ old('unit_cost', $activeSnapshot?->unit_cost) }}" placeholder="0">
+                            @error('unit_cost')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="hpp-notes">Catatan HPP</label>
+                            <input id="hpp-notes" type="text" name="hpp_notes" class="form-control @error('hpp_notes') is-invalid @enderror" value="{{ old('hpp_notes', $activeSnapshot?->notes) }}" maxlength="255" placeholder="Contoh: HPP awal dari faktur">
+                            @error('hpp_notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
                 </div>
             </div>
             @if($activeSnapshot)
@@ -406,13 +415,14 @@
     </div>
 
     @php
-        $bomHref = $itemBom
+        $bomHref = $itemBom && $canMake
             ? route('master.item_boms.edit', $itemBom)
-            : ($isEdit && $item && in_array($item->type, ['finished_good', 'wip'], true)
+            : ($isEdit && $item && $canMake && in_array($item->type, ['finished_good', 'wip'], true)
                 ? route('master.item_boms.create', ['item_id' => $item->id])
                 : null);
     @endphp
-    @php $bomDisabledText = $isProductionItem ? 'Simpan item dulu' : 'Pilih FG/WIP dulu'; @endphp
+    @php $bomDisabledText = $isEdit ? 'Aktifkan produksi sendiri' : 'Simpan item dulu'; @endphp
+    @if($isProductionItem)
     <div class="item-bom-menu mt-3" data-bom-menu>
         <div class="d-flex align-items-center gap-3">
             <div class="item-bom-menu-icon"><i class="bi bi-diagram-3"></i></div>
@@ -427,6 +437,7 @@
             <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="{{ $bomDisabledText }}">{{ $bomDisabledText }}</button>
         @endif
     </div>
+    @endif
 
     @include('master.items._barcodes_form')
 
@@ -462,11 +473,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const supplySummary = document.querySelector('[data-supply-summary]');
     const supplySummaryText = document.querySelector('[data-supply-summary-text]');
     const allocation = document.getElementById('default-allocation');
+    const hppFields = document.querySelector('[data-hpp-fields]');
+    const bomMenu = document.querySelector('[data-bom-menu]');
     const expenseWrap = document.querySelector('[data-expense-account-wrap]');
     const activeInput = document.getElementById('item-active');
     const activeLabel = document.querySelector('[data-status-label]');
     const help = document.querySelector('[data-item-category-help]');
-    const categoryHelp = { finished_good: 'Pilih kategori produk untuk barang jadi.', wip: 'WIP mengikuti kategori produk jadi.', material: 'Pilih kategori bahan, pendukung, accessories, ATK, atau packaging.' };
+    const categoryHelp = { finished_good: 'Pilih kategori produk untuk barang jadi.', wip: 'WIP mengikuti kategori produk jadi.', material: 'Pilih kategori sesuai fungsi: bahan utama, accessories, pendukung, packing, atau operasional.' };
     const isEditForm = {{ $isEdit ? 'true' : 'false' }};
 
     function modeForType(type) {
@@ -638,16 +651,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!typeSelect || !categorySelect) return;
         const allowed = typeSelect.value === 'finished_good' || typeSelect.value === 'wip' ? ['product'] : ['material','support','accessory','packaging','operational','other'];
         Array.from(categorySelect.options).forEach(option => { if (option.value) option.hidden = !allowed.includes(option.dataset.kind || 'other'); });
-        const selected = categorySelect.selectedOptions[0];
-        if (selected?.value && selected.hidden) categorySelect.value = '';
-        if (help) help.textContent = categoryHelp[typeSelect.value] || '';
-        if (typeSelect.value === 'material' && selected?.dataset.kind === 'operational' && !{{ $isEdit ? 'true' : 'false' }}) {
-            if (allocation) allocation.value = 'expense';
-            const expenseAccountCode = selected?.dataset.code === 'MNT' ? '6105' : '6104';
-            const defaultExpenseAccount = expenseWrap?.querySelector(`option[data-account-code="${expenseAccountCode}"]`);
-            if (defaultExpenseAccount && expenseWrap) expenseWrap.querySelector('select').value = defaultExpenseAccount.value;
+        let selected = categorySelect.selectedOptions[0];
+        if (selected?.value && selected.hidden) {
+            categorySelect.value = '';
+            selected = categorySelect.selectedOptions[0];
         }
+        if (help) help.textContent = categoryHelp[typeSelect.value] || '';
+        applyCategoryPolicy(selected);
         const isSupplyItem = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
+        if (bomMenu) bomMenu.hidden = !isSupplyItem;
         if (supplyWrap) supplyWrap.hidden = !isSupplyItem;
         if (canBuy) canBuy.disabled = !isSupplyItem;
         if (canMake) canMake.disabled = !isSupplyItem;
@@ -675,8 +687,34 @@ document.addEventListener('DOMContentLoaded', function () {
     function refreshAllocation() {
         if (!expenseWrap || !allocation) return;
         expenseWrap.hidden = allocation.value !== 'expense';
+        if (hppFields) {
+            hppFields.hidden = allocation.value === 'expense';
+            hppFields.querySelectorAll('input, textarea').forEach(field => {
+                field.disabled = allocation.value === 'expense';
+            });
+        }
         const account = expenseWrap.querySelector('select');
         if (account) account.required = allocation.value === 'expense';
+    }
+
+    function applyCategoryPolicy(selected) {
+        if (!allocation || !selected) return;
+
+        const isOperational = selected.dataset.kind === 'operational';
+        if (isOperational) {
+            allocation.value = 'expense';
+            allocation.disabled = true;
+
+            const expenseCode = selected.dataset.code === 'MNT' ? '6105' : '6104';
+            const defaultExpenseAccount = expenseWrap?.querySelector(`option[data-account-code="${expenseCode}"]`);
+            if (defaultExpenseAccount && expenseWrap) {
+                expenseWrap.querySelector('select').value = defaultExpenseAccount.value;
+            }
+        } else {
+            allocation.disabled = false;
+        }
+
+        refreshAllocation();
     }
     function refreshStatus() { if (activeLabel && activeInput) activeLabel.textContent = activeInput.checked ? 'Aktif / bisa dipakai' : 'Nonaktif / disembunyikan'; }
     typeSelect?.addEventListener('change', function () {
@@ -697,6 +735,7 @@ document.addEventListener('DOMContentLoaded', function () {
     canBuy?.addEventListener('change', refreshSupply);
     canMake?.addEventListener('change', refreshSupply);
     allocation?.addEventListener('change', refreshAllocation);
+    categorySelect?.addEventListener('change', refreshCategory);
     activeInput?.addEventListener('change', refreshStatus);
     supplierCheckboxes.forEach(input => input.addEventListener('change', refreshSupplierPicker));
     document.querySelector('[data-open-quick-supplier]')?.addEventListener('click', function () {
