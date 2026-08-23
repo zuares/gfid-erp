@@ -85,8 +85,13 @@
     .item-supply-preset-option strong { display:block; color:#0f172a; font-size:.72rem; }
     .item-supply-preset-option small { display:block; margin-top:2px; color:#94a3b8; font-size:.63rem; line-height:1.25; }
     .item-supplier-picker { padding:11px; border:1px solid #e2e8f0; border-radius:15px; background:#f8fafc; }
-    .item-supplier-add-panel { margin-top:9px; padding:10px; border:1px dashed #93c5fd; border-radius:11px; background:#eff6ff; }
+    .item-supplier-add-panel { margin-top:9px; padding:13px; border:1px solid #bfdbfe; border-radius:13px; background:#eff6ff; }
     .item-supplier-add-panel[hidden] { display:none; }
+    .item-quick-supplier-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .item-quick-supplier-field-full { grid-column:1 / -1; }
+    .item-quick-supplier-types { display:flex; flex-wrap:wrap; gap:10px 16px; min-height:39px; align-items:center; padding:7px 10px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
+    .item-quick-supplier-types .form-check { margin:0; }
+    .item-quick-supplier-actions { display:flex; justify-content:flex-end; gap:7px; margin-top:12px; }
     .item-supplier-search { margin-bottom:8px; }
     .item-supplier-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; max-height:220px; overflow:auto; padding-right:3px; }
     .item-supplier-option { display:flex; align-items:flex-start; gap:8px; padding:8px 9px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; cursor:pointer; }
@@ -128,7 +133,7 @@
     body[data-theme="dark"] .item-form { color:#e5e7eb; }
     body[data-theme="dark"] .item-crud-header { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-crud-title { color:#f8fafc; }
-    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-supplier-picker, body[data-theme="dark"] .item-supplier-option, body[data-theme="dark"] .item-status-switch, body[data-theme="dark"] .item-accordion { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-supplier-picker, body[data-theme="dark"] .item-supplier-option, body[data-theme="dark"] .item-status-switch, body[data-theme="dark"] .item-accordion, body[data-theme="dark"] .item-quick-supplier-types { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-supplier-add-panel { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-supply-preset-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-supplier-option strong { color:#f8fafc; }
@@ -142,7 +147,7 @@
     body[data-theme="dark"] .item-bom-menu { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-bom-menu-title { color:#e0e7ff; }
     @media(max-width:900px) { .item-supply-preset { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @media(max-width:700px) { .item-form-section { padding:14px; } .item-supplier-list, .item-supply-preset { grid-template-columns:1fr; } .item-accordion summary { align-items:flex-start; } .item-accordion-meta { white-space:nowrap; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
+    @media(max-width:700px) { .item-form-section { padding:14px; } .item-supplier-list, .item-supply-preset, .item-quick-supplier-grid { grid-template-columns:1fr; } .item-accordion summary { align-items:flex-start; } .item-accordion-meta { white-space:nowrap; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
 </style>
 @endpush
 
@@ -287,23 +292,49 @@
                         </div>
                         <div class="item-supplier-add-panel" data-quick-supplier-panel hidden>
                             <div data-quick-supplier-form>
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-md-3">
-                                        <label class="form-label" for="quick-supplier-code">Kode supplier</label>
-                                        <input id="quick-supplier-code" name="code" type="text" class="form-control form-control-sm" maxlength="50" placeholder="SUP-001" required>
+                                <div class="item-quick-supplier-grid">
+                                    <div>
+                                        <label class="form-label" for="quick-supplier-code">Kode supplier <span class="item-required">*</span></label>
+                                        <input id="quick-supplier-code" name="code" type="text" class="form-control" maxlength="50" placeholder="SUP001" required autocomplete="off">
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label" for="quick-supplier-name">Nama supplier</label>
-                                        <input id="quick-supplier-name" name="name" type="text" class="form-control form-control-sm" maxlength="255" placeholder="Nama supplier" required>
+                                    <div>
+                                        <label class="form-label" for="quick-supplier-name">Nama supplier <span class="item-required">*</span></label>
+                                        <input id="quick-supplier-name" name="name" type="text" class="form-control" maxlength="255" placeholder="Nama supplier" required autocomplete="off">
                                     </div>
-                                    <div class="col-md-3">
+                                    <div>
                                         <label class="form-label" for="quick-supplier-phone">Telepon</label>
-                                        <input id="quick-supplier-phone" name="phone" type="text" class="form-control form-control-sm" maxlength="50" placeholder="Opsional">
+                                        <input id="quick-supplier-phone" name="phone" type="text" class="form-control" maxlength="50" placeholder="Nomor HP / WhatsApp" autocomplete="off">
                                     </div>
-                                    <div class="col-md-2 d-flex gap-1">
-                                        <button type="button" class="btn btn-sm btn-primary flex-fill" data-quick-supplier-submit>Simpan</button>
-                                        <button type="button" class="btn btn-sm btn-light" data-close-quick-supplier title="Tutup"><i class="bi bi-x-lg"></i></button>
+                                    <div>
+                                        <label class="form-label" for="quick-supplier-email">Email</label>
+                                        <input id="quick-supplier-email" name="email" type="email" class="form-control" maxlength="255" placeholder="Email supplier" autocomplete="off">
                                     </div>
+                                    <div>
+                                        <label class="form-label" for="quick-supplier-active">Status</label>
+                                        <select id="quick-supplier-active" name="active" class="form-select" data-quick-default="1">
+                                            <option value="1" selected>Aktif</option>
+                                            <option value="0">Nonaktif</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Jenis PO</label>
+                                        <div class="item-quick-supplier-types">
+                                            @foreach(['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'] as $poType => $poLabel)
+                                                <label class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="po_types[]" value="{{ $poType }}">
+                                                    <span class="form-check-label">{{ $poLabel }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    <div class="item-quick-supplier-field-full">
+                                        <label class="form-label" for="quick-supplier-address">Alamat</label>
+                                        <textarea id="quick-supplier-address" name="address" rows="2" class="form-control" maxlength="1000" placeholder="Alamat supplier"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-quick-supplier-actions">
+                                    <button type="button" class="btn btn-sm btn-light" data-close-quick-supplier>Batal</button>
+                                    <button type="button" class="btn btn-sm btn-primary" data-quick-supplier-submit><i class="bi bi-check2 me-1"></i>Simpan supplier</button>
                                 </div>
                                 <div class="small text-danger mt-2" data-quick-supplier-error hidden></div>
                             </div>
@@ -311,7 +342,7 @@
                         <input type="search" class="form-control item-supplier-search" placeholder="Cari supplier..." data-supplier-search autocomplete="off">
                         <div class="item-supplier-list" data-supplier-list>
                             @forelse($supplierOptions as $supplier)
-                                <label class="item-supplier-option" data-supplier-option data-search="{{ strtolower($supplier->code . ' ' . $supplier->name) }}">
+                                <label class="item-supplier-option" data-supplier-option data-supplier-code="{{ strtolower($supplier->code) }}" data-search="{{ strtolower($supplier->code . ' ' . $supplier->name) }}">
                                     <input type="checkbox" class="form-check-input mt-1" name="supplier_ids[]" value="{{ $supplier->id }}" data-supplier-checkbox @checked(in_array((int) $supplier->id, $selectedSupplierIds, true))>
                                     <span><strong>{{ $supplier->code }}</strong><small>{{ $supplier->name }}</small></span>
                                 </label>
@@ -466,6 +497,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const label = document.createElement('label');
         label.className = 'item-supplier-option';
         label.dataset.supplierOption = '';
+        label.dataset.supplierCode = String(supplier.code || '').trim().toLowerCase();
         label.dataset.search = `${supplier.code} ${supplier.name}`.toLowerCase();
 
         const checkbox = document.createElement('input');
@@ -501,11 +533,58 @@ document.addEventListener('DOMContentLoaded', function () {
         refreshSupplierPicker();
     }
 
+    function resetQuickSupplierForm() {
+        if (!quickSupplierForm) return;
+        quickSupplierForm.querySelectorAll('input[name], select[name], textarea[name]').forEach(field => {
+            if (field.type === 'checkbox') {
+                field.checked = false;
+            } else if (field.tagName === 'SELECT') {
+                field.value = field.dataset.quickDefault || '';
+            } else {
+                field.value = '';
+            }
+        });
+    }
+
     async function quickCreateSupplier() {
         if (!quickSupplierForm || !quickSupplierSubmit) return;
-        const fields = Array.from(quickSupplierForm.querySelectorAll('input[name]'));
+        if (quickSupplierError) {
+            quickSupplierError.hidden = true;
+            quickSupplierError.textContent = '';
+        }
+        const codeField = quickSupplierForm.querySelector('input[name="code"]');
+        const nameField = quickSupplierForm.querySelector('input[name="name"]');
+        const normalizedCode = String(codeField?.value || '').trim().toLowerCase();
+        const existingOption = supplierOptions.find(option => String(option.dataset.supplierCode || '').trim().toLowerCase() === normalizedCode);
+
+        if (!normalizedCode || !String(nameField?.value || '').trim()) {
+            if (quickSupplierError) {
+                quickSupplierError.textContent = 'Kode dan nama supplier wajib diisi.';
+                quickSupplierError.hidden = false;
+            }
+            return;
+        }
+
+        if (existingOption) {
+            const existingCheckbox = existingOption.querySelector('[data-supplier-checkbox]');
+            if (existingCheckbox) {
+                existingCheckbox.checked = true;
+                existingOption.hidden = false;
+                if (supplierSearch) supplierSearch.value = '';
+                if (primarySupplier) primarySupplier.value = existingCheckbox.value;
+                refreshSupplierPicker();
+            }
+            resetQuickSupplierForm();
+            if (quickSupplierPanel) quickSupplierPanel.hidden = true;
+            return;
+        }
+
+        const fields = Array.from(quickSupplierForm.querySelectorAll('input[name], select[name], textarea[name]'));
         const payload = new FormData();
-        fields.forEach(field => payload.append(field.name, field.value));
+        fields.forEach(field => {
+            if (field.type === 'checkbox' && !field.checked) return;
+            payload.append(field.name, field.value);
+        });
         quickSupplierSubmit.disabled = true;
         quickSupplierSubmit.textContent = 'Menyimpan...';
         if (quickSupplierError) {
@@ -530,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             appendSupplierOption(data.supplier);
-            quickSupplierForm.querySelectorAll('input[name]').forEach(input => { input.value = ''; });
+            resetQuickSupplierForm();
             if (quickSupplierPanel) quickSupplierPanel.hidden = true;
         } catch (error) {
             if (quickSupplierError) {
@@ -539,7 +618,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } finally {
             quickSupplierSubmit.disabled = false;
-            quickSupplierSubmit.textContent = 'Simpan';
+            quickSupplierSubmit.innerHTML = '<i class="bi bi-check2 me-1"></i>Simpan supplier';
         }
     }
 

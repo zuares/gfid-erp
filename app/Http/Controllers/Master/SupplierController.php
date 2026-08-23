@@ -53,21 +53,64 @@ class SupplierController extends Controller
     public function quickStore(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:suppliers,code'],
+            'code' => ['required', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string'],
+            'po_types' => ['nullable', 'array'],
+            'po_types.*' => ['in:material,finished_good,packing'],
+            'active' => ['nullable', 'boolean'],
         ]);
 
+        $code = strtoupper(trim($data['code']));
+        $active = (bool) ($data['active'] ?? true);
+
+        if (!$active) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Supplier harus berstatus aktif agar bisa langsung dipilih pada item.',
+            ], 422);
+        }
+
+        $existing = Supplier::query()
+            ->whereRaw('LOWER(code) = ?', [strtolower($code)])
+            ->first();
+
+        if ($existing) {
+            if ($existing->type !== 'supplier' || !$existing->active) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Kode supplier sudah ada tetapi tidak aktif sebagai supplier pembelian.',
+                ], 422);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'created' => false,
+                'supplier' => [
+                    'id' => (int) $existing->id,
+                    'code' => (string) $existing->code,
+                    'name' => (string) $existing->name,
+                    'phone' => (string) ($existing->phone ?? ''),
+                ],
+            ]);
+        }
+
         $supplier = Supplier::create([
-            'code' => strtoupper(trim($data['code'])),
+            'code' => $code,
             'name' => trim($data['name']),
             'phone' => $data['phone'] ?? null,
+            'email' => $data['email'] ?? null,
+            'address' => $data['address'] ?? null,
+            'po_types' => !empty($data['po_types']) ? $data['po_types'] : null,
             'type' => 'supplier',
-            'active' => true,
+            'active' => $active,
         ]);
 
         return response()->json([
             'ok' => true,
+            'created' => true,
             'supplier' => [
                 'id' => (int) $supplier->id,
                 'code' => (string) $supplier->code,
