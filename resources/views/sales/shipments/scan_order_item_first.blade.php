@@ -47,7 +47,6 @@
     .sif-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 58px; border: 1px solid #2563eb; border-radius: 9px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
     .sif-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
     .sif-camera-btn:disabled { opacity: .65; cursor: wait; }
-    .sif-camera-label { margin-left: .2rem; }
     .sif-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
     .sif-camera-panel[hidden] { display: none !important; }
     .sif-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
@@ -69,7 +68,6 @@
         .sif-card-head, .sif-body { padding: .7rem; }
         .sif-input { min-height: 62px; font-size: 1.08rem; }
         .sif-camera-btn { width: 46px; min-width: 46px; min-height: 62px; padding-inline: .35rem; }
-        .sif-camera-label { display: none; }
     }
 </style>
 @endpush
@@ -111,7 +109,7 @@
                     <div class="sif-input-row">
                         <input type="text" id="sifScanInput" class="sif-input" placeholder="Scan / ketik nomor order lalu Enter" autocomplete="off" autofocus>
                         <button type="button" id="sifCameraBtn" class="sif-camera-btn" aria-label="Buka kamera untuk scan barcode" title="Scan dengan kamera">
-                            <i class="bi bi-camera-video" aria-hidden="true"></i><span class="sif-camera-label">Kamera</span>
+                            <i class="bi bi-camera-video" aria-hidden="true"></i>
                         </button>
                     </div>
                     <div id="sifCameraPanel" class="sif-camera-panel" hidden>
