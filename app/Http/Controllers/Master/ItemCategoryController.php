@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 
 class ItemCategoryController extends Controller
@@ -105,6 +106,36 @@ class ItemCategoryController extends Controller
         return redirect()
             ->route('master.item_categories.index')
             ->with('success', 'Kategori item berhasil dibuat.');
+    }
+
+    public function quickStore(Request $request): JsonResponse
+    {
+        $request->merge([
+            'code' => strtoupper(trim((string) $request->input('code'))),
+        ]);
+
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:50', Rule::unique('item_categories', 'code')],
+            'name' => ['required', 'string', 'max:190'],
+            'kind' => ['required', 'string', Rule::in(array_keys(ItemCategory::kindLabels()))],
+        ]);
+
+        $category = ItemCategory::create([
+            'code' => strtoupper(trim($data['code'])),
+            'name' => trim($data['name']),
+            'kind' => $data['kind'],
+            'active' => true,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'category' => [
+                'id' => (int) $category->id,
+                'code' => (string) $category->code,
+                'name' => (string) $category->name,
+                'kind' => (string) $category->kind,
+            ],
+        ], 201);
     }
 
     public function update(Request $request, ItemCategory $item_category)

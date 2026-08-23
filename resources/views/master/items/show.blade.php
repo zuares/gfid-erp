@@ -56,6 +56,7 @@
 @endpush
 
 @section('content')
+@php($canManageBom = auth()->user()?->canAccessModule('master') ?? false)
 <div class="item-detail-page">
     <div class="item-detail-hero">
         <div class="item-detail-main">
@@ -68,6 +69,13 @@
         </div>
         <div class="item-detail-actions">
             <a href="{{ route('master.items.create') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item Lagi</a>
+            @if($canManageBom && in_array($item->type, ['finished_good', 'wip'], true) && $item->canMake())
+                @if($itemBom)
+                    <a href="{{ route('master.item_boms.edit', $itemBom) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-diagram-3"></i>Kelola BOM</a>
+                @else
+                    <a href="{{ route('master.item_boms.create', ['item_id' => $item->id]) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-diagram-3"></i>Atur BOM</a>
+                @endif
+            @endif
             <a href="{{ route('master.items.index') }}" class="btn item-detail-soft btn-sm"><i class="bi bi-arrow-left"></i>Kembali</a>
             <a href="{{ route('master.items.hpp_temp.edit', $item) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i>Set HPP</a>
             <a href="{{ route('master.items.edit', $item) }}" class="btn item-detail-primary btn-sm"><i class="bi bi-pencil"></i>Edit Item</a>
@@ -95,6 +103,30 @@
                 <div class="item-detail-note">Metode pasok tidak berlaku untuk item material.</div>
             @endif
         </div>
+
+        @if(in_array($item->type, ['finished_good', 'wip'], true))
+            <div class="item-detail-section">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <h2 class="item-detail-heading mb-0"><i class="bi bi-diagram-3 me-2"></i>Bill of Materials (BOM)</h2>
+                    @if($itemBom)
+                        <span class="item-detail-pill item-detail-make">{{ $itemBom->lines_count }} komponen</span>
+                    @endif
+                </div>
+                @if($itemBom)
+                    <div class="item-detail-note">BOM aktif untuk produksi sendiri dan siap dipakai pada kebutuhan material.</div>
+                    @if($canManageBom)
+                        <a href="{{ route('master.item_boms.edit', $itemBom) }}" class="btn item-detail-primary btn-sm mt-3"><i class="bi bi-pencil"></i>Review BOM</a>
+                    @endif
+                @elseif($item->canMake())
+                    <div class="item-detail-note">Item ini bisa diproduksi sendiri tetapi belum memiliki BOM.</div>
+                    @if($canManageBom)
+                        <a href="{{ route('master.item_boms.create', ['item_id' => $item->id]) }}" class="btn item-detail-primary btn-sm mt-3"><i class="bi bi-plus-lg"></i>Tambah BOM Sekarang</a>
+                    @endif
+                @else
+                    <div class="item-detail-note">Aktifkan metode pasok Produksi sendiri untuk membuat BOM.</div>
+                @endif
+            </div>
+        @endif
 
         <div class="item-detail-section">
             <h2 class="item-detail-heading"><i class="bi bi-info-circle me-2"></i>Informasi item</h2>

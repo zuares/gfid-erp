@@ -118,6 +118,11 @@ class ItemController extends Controller
     public function show(Item $item)
     {
         $item->load(['category', 'barcodes']);
+        $itemBom = ItemBom::query()
+            ->withCount('lines')
+            ->where('item_id', $item->id)
+            ->latest('id')
+            ->first();
 
         // snapshot HPP aktif (kalau ada)
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
@@ -125,6 +130,7 @@ class ItemController extends Controller
         return view('master.items.show', [
             'item' => $item,
             'activeSnapshot' => $activeSnapshot,
+            'itemBom' => $itemBom,
             'typeLabels' => $this->typeLabels(),
         ]);
     }
@@ -556,6 +562,22 @@ class ItemController extends Controller
         $request->merge([
             'code' => $this->normalizeItemCode($request->input('code')),
         ]);
+
+        $normalizedCode = $request->input('code');
+        if ($normalizedCode !== '') {
+            $duplicateCodeQuery = Item::query()
+                ->whereRaw("REPLACE(UPPER(TRIM(code)), ' ', '-') = ?", [$normalizedCode]);
+
+            if ($idToIgnore) {
+                $duplicateCodeQuery->where('id', '<>', $idToIgnore);
+            }
+
+            if ($duplicate = $duplicateCodeQuery->first(['code', 'name'])) {
+                throw ValidationException::withMessages([
+                    'code' => "Kode item sudah digunakan oleh {$duplicate->name} ({$duplicate->code}). Gunakan kode lain.",
+                ]);
+            }
+        }
 
         $data = $request->validate([
             'code' => [

@@ -9,18 +9,17 @@ use App\Http\Controllers\Master\SupplierBankAccountController;
 use App\Http\Controllers\Master\SupplierController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth', 'access:master'])->group(function () {
+Route::middleware(['web', 'auth', 'master.items'])->group(function () {
 
     Route::prefix('master')->name('master.')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | ITEMS
+        | MASTER ITEMS
         |--------------------------------------------------------------------------
-         */
-        // ⚠️ Static routes harus SEBELUM resource agar tidak ditangkap {item} wildcard
-
-        // metadata master item (akun2, kategori, dll)
+        | Admin dapat mengelola item tanpa otomatis membuka seluruh Master Data.
+        | Endpoint quick supplier/category tetap tersedia karena dipakai oleh form item.
+        */
         Route::get('items/meta', [ItemController::class, 'meta'])
             ->name('items.meta');
 
@@ -30,18 +29,30 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::post('items/quick-suppliers', [SupplierController::class, 'quickStore'])
             ->name('items.quick_suppliers.store');
 
-        // ✅ suggest items buat mapping (ringan)
+        Route::post('items/quick-categories', [ItemCategoryController::class, 'quickStore'])
+            ->name('items.quick_categories.store');
+
         Route::get('items/suggest', [SupplierController::class, 'suggestItems'])
             ->name('items.suggest');
 
-        // ✅ Bulk update (kategori / tipe / HPP) untuk beberapa item sekaligus
         Route::post('items/bulk-update', [ItemController::class, 'bulkUpdate'])
             ->name('items.bulk_update');
-            
+
         Route::patch('items/{item}/update-expense-account', [ItemController::class, 'updateExpenseAccount'])
             ->name('items.update_expense_account');
 
         Route::resource('items', ItemController::class);
+
+        Route::get('items/{item}/hpp-temp', [ItemController::class, 'editHppTemp'])
+            ->name('items.hpp_temp.edit');
+        Route::post('items/{item}/hpp-temp', [ItemController::class, 'storeHppTemp'])
+            ->name('items.hpp_temp.store');
+    });
+});
+
+Route::middleware(['web', 'auth', 'access:master'])->group(function () {
+
+    Route::prefix('master')->name('master.')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
@@ -52,12 +63,6 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
             ->only(['index', 'store', 'update', 'destroy'])
             ->parameters(['item-categories' => 'item_category'])
             ->names('item_categories');
-
-        // HPP sementara master item
-        Route::get('items/{item}/hpp-temp', [ItemController::class, 'editHppTemp'])
-            ->name('items.hpp_temp.edit');
-        Route::post('items/{item}/hpp-temp', [ItemController::class, 'storeHppTemp'])
-            ->name('items.hpp_temp.store');
 
         /*
         |--------------------------------------------------------------------------

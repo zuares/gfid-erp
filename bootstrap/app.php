@@ -2,6 +2,7 @@
 
 use App\Console\Commands\SendWeeklyCrmSummary;
 use App\Console\Commands\SeedProductionBoms;
+use App\Http\Middleware\EnsureMasterItemAccess;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\TrackStorefrontVisitor;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->alias([
             'access'           => EnsureModuleAccess::class,
+            'master.items'     => EnsureMasterItemAccess::class,
             'role'             => RoleMiddleware::class,
             'track.storefront' => TrackStorefrontVisitor::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,

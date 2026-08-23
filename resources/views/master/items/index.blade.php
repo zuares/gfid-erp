@@ -14,6 +14,7 @@
         'missing_hpp' => 0,
     ];
     $hasFilters = request()->hasAny(['q', 'type', 'category_kind', 'item_category_id', 'supply_mode']);
+    $canManageMasterData = auth()->user()?->canAccessModule('master') ?? false;
     $supplyModes = [
         'buy' => 'Beli jadi saja',
         'make' => 'Produksi sendiri saja',
@@ -49,7 +50,6 @@
     .item-filter .form-control:focus, .item-filter .form-select:focus { border-color:#94a3b8; box-shadow:0 0 0 .2rem rgba(15,23,42,.07); }
     .item-filter-actions { display:flex; gap:7px; align-items:center; }
     .item-filter-actions .btn { min-height:38px; }
-    .item-filter-hint { padding:0 14px 12px; color:#94a3b8; font-size:.72rem; }
     .item-bulk { display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
     .item-bulk strong { font-size:.8rem; }
     .item-table-wrap { overflow:auto; }
@@ -80,6 +80,22 @@
     .modal-header, .modal-footer { border-color:#eef2f7; }
     .modal-title { font-weight:850; font-size:.95rem; }
     .modal .form-control, .modal .form-select { border-radius:11px; font-size:.82rem; }
+    .item-mobile-list { display:none; }
+    .item-mobile-card { padding:13px; border-bottom:1px solid #eef2f7; }
+    .item-mobile-card:last-child { border-bottom:0; }
+    .item-mobile-card-head, .item-mobile-card-footer { display:flex; align-items:center; justify-content:space-between; gap:9px; }
+    .item-mobile-card-head { align-items:flex-start; }
+    .item-mobile-card-title { min-width:0; }
+    .item-mobile-card-title .item-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .item-mobile-card-meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:12px; }
+    .item-mobile-card-meta > div { min-width:0; }
+    .item-mobile-card-label { color:#94a3b8; font-size:.63rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+    .item-mobile-card-value { margin-top:2px; color:#334155; font-size:.74rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .item-mobile-card-footer { margin-top:12px; }
+    .item-mobile-card-actions { display:flex; flex:1 1 auto; gap:6px; }
+    .item-mobile-card-actions .btn { flex:1 1 0; justify-content:center; }
+    body[data-theme="dark"] .item-mobile-card { border-color:#334155; }
+    body[data-theme="dark"] .item-mobile-card-value { color:#e2e8f0; }
     body[data-theme="dark"] .item-page { color:#e5e7eb; }
     body[data-theme="dark"] .item-hero, body[data-theme="dark"] .item-card, body[data-theme="dark"] .item-kpi { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-eyebrow, body[data-theme="dark"] .item-bulk, body[data-theme="dark"] .item-table thead th { background:#111827; border-color:#334155; }
@@ -89,7 +105,33 @@
     body[data-theme="dark"] .item-table tbody tr:hover { background:#111827; }
     body[data-theme="dark"] .item-filter .form-control, body[data-theme="dark"] .item-filter .form-select, body[data-theme="dark"] .modal-content { background:#0f172a; border-color:#475569; color:#f8fafc; }
     @media (max-width:1100px) { .item-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } .item-filter { grid-template-columns:repeat(3,minmax(0,1fr)); } .item-filter-search { grid-column:1 / -1; } }
-    @media (max-width:700px) { .item-page { padding:10px 8px 24px; } .item-hero { align-items:flex-start; flex-direction:column; padding:15px; } .item-actions, .item-actions .btn { width:100%; } .item-actions .btn { justify-content:center; } .item-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .item-filter { grid-template-columns:1fr; } .item-filter-search { grid-column:auto; } .item-filter-actions, .item-filter-actions .btn { width:100%; } .item-filter-actions .btn { justify-content:center; } }
+    @media (max-width:700px) {
+        .item-page { padding:8px 6px 22px; }
+        .item-hero { align-items:flex-start; flex-direction:column; padding:13px; border-radius:17px; }
+        .item-icon { width:40px; height:40px; flex-basis:40px; border-radius:13px; }
+        .item-title { font-size:1.15rem; }
+        .item-actions, .item-actions .btn { width:100%; }
+        .item-actions { display:grid; grid-template-columns:1fr 1fr; }
+        .item-actions .btn { justify-content:center; }
+        .item-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+        .item-kpi { padding:10px; border-radius:13px; }
+        .item-kpi-value { font-size:1.05rem; }
+        .item-kpi-note { display:none; }
+        .item-filter { grid-template-columns:1fr; padding:11px; }
+        .item-filter-search { grid-column:auto; }
+        .item-filter-actions, .item-filter-actions .btn { width:100%; }
+        .item-filter-actions { display:grid; grid-template-columns:1fr auto; }
+        .item-filter-actions .btn { justify-content:center; }
+        .item-table-wrap { display:none; }
+        .item-mobile-list { display:block; }
+        .item-footer { align-items:flex-start; padding:11px; }
+        .item-footer .pagination { width:100%; overflow:auto; padding-bottom:2px; }
+        .item-footer .pagination .page-link { white-space:nowrap; }
+        .item-bulk { padding:9px 11px; }
+        .item-bulk .item-muted { display:none; }
+        .item-bulk .btn { flex:1 1 auto; }
+        .item-bulk #bulkClear { flex:0 0 auto; }
+    }
 </style>
 @endpush
 
@@ -101,11 +143,12 @@
             <div>
                 <div class="item-eyebrow"><i class="bi bi-database-check"></i> Master Data</div>
                 <h1 class="item-title">Master Item</h1>
-                <div class="item-subtitle">Satu tempat untuk mengatur SKU, klasifikasi, metode pasok, barcode, dan HPP.</div>
             </div>
         </div>
         <div class="item-actions">
-            <a href="{{ route('master.item_categories.index') }}" class="btn item-soft btn-sm"><i class="bi bi-tags"></i>Kategori</a>
+            @if($canManageMasterData)
+                <a href="{{ route('master.item_categories.index') }}" class="btn item-soft btn-sm"><i class="bi bi-tags"></i>Kategori</a>
+            @endif
             <a href="{{ route('master.items.create') }}" class="btn item-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item</a>
         </div>
     </div>
@@ -121,19 +164,19 @@
     @endif
 
     <div class="item-kpis">
-        <div class="item-kpi"><div class="item-kpi-label">Total Item</div><div class="item-kpi-value">{{ $fmt($stats['total']) }}</div><div class="item-kpi-note">sesuai filter</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Aktif</div><div class="item-kpi-value">{{ $fmt($stats['active']) }}</div><div class="item-kpi-note">siap dipakai</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Bisa Dibeli</div><div class="item-kpi-value">{{ $fmt($stats['can_buy']) }}</div><div class="item-kpi-note">termasuk hybrid</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Bisa Dibuat</div><div class="item-kpi-value">{{ $fmt($stats['can_make']) }}</div><div class="item-kpi-note">produksi sendiri</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Hybrid</div><div class="item-kpi-value">{{ $fmt($stats['hybrid']) }}</div><div class="item-kpi-note">dua opsi pasok</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">HPP Kosong</div><div class="item-kpi-value">{{ $fmt($stats['missing_hpp']) }}</div><div class="item-kpi-note">perlu dilengkapi</div></div>
+        <div class="item-kpi"><div class="item-kpi-label">Total Item</div><div class="item-kpi-value">{{ $fmt($stats['total']) }}</div></div>
+        <div class="item-kpi"><div class="item-kpi-label">Aktif</div><div class="item-kpi-value">{{ $fmt($stats['active']) }}</div></div>
+        <div class="item-kpi"><div class="item-kpi-label">Bisa Dibeli</div><div class="item-kpi-value">{{ $fmt($stats['can_buy']) }}</div></div>
+        <div class="item-kpi"><div class="item-kpi-label">Bisa Dibuat</div><div class="item-kpi-value">{{ $fmt($stats['can_make']) }}</div></div>
+        <div class="item-kpi"><div class="item-kpi-label">Hybrid</div><div class="item-kpi-value">{{ $fmt($stats['hybrid']) }}</div></div>
+        <div class="item-kpi"><div class="item-kpi-label">HPP Kosong</div><div class="item-kpi-value">{{ $fmt($stats['missing_hpp']) }}</div></div>
     </div>
 
     <div class="item-card">
         <form method="GET" action="{{ route('master.items.index') }}" class="item-filter">
             <div class="item-filter-search">
                 <label class="item-label" for="item-search">Cari item</label>
-                <input id="item-search" type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Kode, SKU, atau nama item..." autocomplete="off">
+                <input id="item-search" type="search" name="q" value="{{ request('q') }}" class="form-control" autocomplete="off">
             </div>
             <div>
                 <label class="item-label" for="item-type">Tipe</label>
@@ -178,8 +221,6 @@
                 @endif
             </div>
         </form>
-        <div class="item-filter-hint"><i class="bi bi-info-circle me-1"></i>Tekan Enter untuk mencari. Kolom Pasok menjelaskan apakah item hanya dibeli, hanya dibuat, atau bisa keduanya.</div>
-
         <div id="bulkToolbar" class="item-bulk d-none">
             <strong><span id="selectedCount">0</span> item dipilih</strong>
             <span class="item-muted">Aksi massal:</span>
@@ -258,6 +299,53 @@
                     </tbody>
                 </table>
             </div>
+            <div class="item-mobile-list">
+                @foreach($items as $item)
+                    @php
+                        $hpp = (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0);
+                        $barcodeCount = (int) ($item->barcodes_count ?? 0);
+                        $modeClass = $item->isHybrid() ? 'item-status-hybrid' : ($item->canMake() ? 'item-status-make' : ($item->canBuy() ? 'item-status-buy' : 'item-status-undefined'));
+                    @endphp
+                    <article class="item-mobile-card">
+                        <div class="item-mobile-card-head">
+                            <div class="d-flex align-items-start gap-2 min-w-0">
+                                <input type="checkbox" class="form-check-input row-check mt-1" value="{{ $item->id }}" aria-label="Pilih {{ $item->code }}">
+                                <div class="item-mobile-card-title">
+                                    <a class="item-code text-decoration-none" href="{{ route('master.items.show', $item) }}">{{ $item->code }}</a>
+                                    <div class="item-name mt-1">{{ $item->name }}</div>
+                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · {{ $item->unit ?: 'pcs' }}</div>
+                                </div>
+                            </div>
+                            <span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span>
+                        </div>
+                        <div class="item-mobile-card-meta">
+                            <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $typeLabels[$item->type] ?? $item->type }}</div></div>
+                            <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? 'Tanpa kategori' }}</div></div>
+                            <div><div class="item-mobile-card-label">Pasok</div><div class="item-mobile-card-value">@if(in_array($item->type, ['finished_good', 'wip'], true))<span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>@else-@endif</div></div>
+                            <div><div class="item-mobile-card-label">HPP / Barcode</div><div class="item-mobile-card-value">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : 'Belum di-set' }} · {{ $barcodeCount }}</div></div>
+                        </div>
+                        <div class="item-mobile-card-footer">
+                            <div class="item-mobile-card-actions">
+                                <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm"><i class="bi bi-eye"></i>Lihat</a>
+                                <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit</a>
+                            </div>
+                            <div class="dropdown">
+                                <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                    <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form method="POST" action="{{ route('master.items.destroy', $item) }}" onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}?');">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="dropdown-item small text-danger"><i class="bi bi-trash3 me-2"></i>Hapus item</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+                @endforeach
+            </div>
             <div class="item-footer"><div>Menampilkan {{ $items->firstItem() }}–{{ $items->lastItem() }} dari {{ $fmt($items->total()) }} item</div>{{ $items->links() }}</div>
         @else
             <div class="item-empty">
@@ -300,7 +388,7 @@
             @csrf
             <input type="hidden" name="action" value="set_hpp">
             <div class="modal-header"><h5 class="modal-title">Set HPP sementara <span class="text-muted">(<span class="sel-count">0</span> item)</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
-            <div class="modal-body"><div class="alert alert-warning py-2 px-3 small"><i class="bi bi-exclamation-triangle me-1"></i>HPP aktif sebelumnya akan digantikan oleh snapshot baru.</div><label class="item-label" for="bulk-hpp">HPP per unit (Rp)</label><input id="bulk-hpp" type="number" min="0" step="0.01" name="unit_cost" class="form-control" required><label class="item-label mt-3" for="bulk-hpp-notes">Catatan (opsional)</label><input id="bulk-hpp-notes" type="text" name="notes" maxlength="255" class="form-control" placeholder="Contoh: update manual Agustus 2026"><div class="ids-container"></div></div>
+            <div class="modal-body"><label class="item-label" for="bulk-hpp">HPP per unit (Rp)</label><input id="bulk-hpp" type="number" min="0" step="0.01" name="unit_cost" class="form-control" required><label class="item-label mt-3" for="bulk-hpp-notes">Catatan (opsional)</label><input id="bulk-hpp-notes" type="text" name="notes" maxlength="255" class="form-control"><div class="ids-container"></div></div>
             <div class="modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-success btn-sm rounded-pill fw-bold">Terapkan HPP</button></div>
         </form>
     </div>

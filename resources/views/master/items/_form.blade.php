@@ -69,24 +69,26 @@
     .item-section-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .item-section-icon { width:32px; height:32px; flex:0 0 32px; display:flex; align-items:center; justify-content:center; color:#334155; background:#f1f5f9; border-radius:10px; }
     .item-section-title { margin:0; color:#0f172a; font-size:.95rem; font-weight:900; letter-spacing:-.02em; }
-    .item-section-help { margin-top:2px; color:#94a3b8; font-size:.74rem; }
     .item-form .form-label { margin-bottom:5px; color:#475569; font-size:.7rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
     .item-form .form-control, .item-form .form-select { min-height:39px; border-color:#e2e8f0; border-radius:11px; color:#0f172a; font-size:.82rem; font-weight:600; box-shadow:none; }
     .item-form textarea.form-control { min-height:auto; }
     .item-form .form-control:focus, .item-form .form-select:focus { border-color:#94a3b8; box-shadow:0 0 0 .2rem rgba(15,23,42,.07); }
-    .item-form .form-text { color:#94a3b8; font-size:.7rem; }
     .item-form .invalid-feedback { font-size:.7rem; }
     .item-code-field { position:relative; }
-    .item-code-hint { margin-top:5px; color:#94a3b8; font-size:.68rem; }
+    .item-category-picker { display:flex; align-items:center; gap:6px; }
+    .item-category-picker .form-select { min-width:0; flex:1 1 auto; }
+    .item-category-add { width:39px; min-width:39px; height:39px; padding:0; border-radius:11px; }
     .item-code-suggest { position:absolute; z-index:30; top:calc(100% + 5px); left:0; min-width:320px; max-width:min(440px, 80vw); padding:7px; border:1px solid #cbd5e1; border-radius:13px; background:#fff; box-shadow:0 14px 32px rgba(15,23,42,.14); }
     .item-code-suggest[hidden] { display:none; }
     .item-code-suggest-head { padding:5px 7px 7px; color:#64748b; font-size:.68rem; font-weight:800; }
     .item-code-suggest-head.is-duplicate { color:#b91c1c; }
-    .item-code-suggest-row { display:flex; align-items:flex-start; gap:8px; padding:7px; border-radius:9px; }
+    .item-code-suggest-row { display:flex; width:100%; align-items:flex-start; gap:8px; padding:7px; border:0; border-radius:9px; background:transparent; text-align:left; cursor:pointer; }
     .item-code-suggest-row + .item-code-suggest-row { margin-top:2px; }
     .item-code-suggest-row:hover { background:#f8fafc; }
     .item-code-suggest-code { color:#0f172a; font-size:.73rem; font-weight:900; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
     .item-code-suggest-name { min-width:0; color:#64748b; font-size:.7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .item-code-duplicate-feedback { display:none; margin-top:5px; color:#b91c1c; font-size:.68rem; font-weight:700; }
+    .item-code-duplicate-feedback.is-visible { display:block; }
     .item-required { color:#dc2626; }
     .item-supply-box { padding:13px; border:1px solid #e2e8f0; border-radius:15px; background:#f8fafc; }
     .item-supply-options { display:grid; gap:8px; }
@@ -163,13 +165,48 @@
     body[data-theme="dark"] .item-bom-menu { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-bom-menu-title { color:#e0e7ff; }
     @media(max-width:900px) { .item-supply-preset { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @media(max-width:700px) { .item-form-section { padding:14px; } .item-supplier-list, .item-supply-preset, .item-quick-supplier-grid { grid-template-columns:1fr; } .item-accordion summary { align-items:flex-start; } .item-accordion-meta { white-space:nowrap; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
+    @media(max-width:700px) {
+        .item-crud-page { padding:8px 6px 22px; }
+        .item-crud-header { align-items:flex-start; flex-direction:column; padding:13px; border-radius:17px; }
+        .item-crud-header > div:last-child { width:100%; display:flex; gap:6px; }
+        .item-crud-header > div:last-child .btn { flex:1 1 0; justify-content:center; }
+        .item-crud-title { font-size:1.15rem; }
+        .item-form-section { padding:13px; }
+        .item-supplier-list, .item-supply-preset, .item-quick-supplier-grid { grid-template-columns:1fr; }
+        .item-accordion summary { align-items:flex-start; }
+        .item-accordion-meta { white-space:nowrap; }
+        .item-form-footer { align-items:stretch; flex-direction:column-reverse; }
+        .item-form-footer > * { width:100%; }
+        .item-form-footer .btn { width:100%; justify-content:center; }
+        .item-bom-menu { align-items:stretch; flex-direction:column; padding:12px; }
+        .item-bom-menu .btn { width:100%; justify-content:center; }
+    }
+    @media(max-width:440px) {
+        .item-crud-header > div:last-child { flex-direction:column; }
+        .item-section-title { font-size:.88rem; }
+        .item-accordion-meta { font-size:.64rem; }
+    }
 </style>
 @endpush
 
 <div class="item-form">
     @if($errors->any())
-        <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.8rem;"><i class="bi bi-exclamation-circle me-1"></i>{{ $errors->first() }}</div>
+        @push('scripts')
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!window.Swal) return;
+            const messages = @json($errors->all());
+            window.Swal.fire({
+                icon: 'error',
+                title: 'Data belum bisa disimpan',
+                html: `<div class="text-start small">${messages.map(message => `<div class="mb-1">• ${String(message).replace(/[&<>]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[character]))}</div>`).join('')}</div>`,
+                confirmButtonText: 'Periksa data',
+                confirmButtonColor: '#334155',
+                width: 'min(92vw, 460px)',
+            });
+        });
+        </script>
+        @endpush
     @endif
 
     <div class="item-form-card">
@@ -185,17 +222,17 @@
                         <input id="item-code" type="text" name="code" class="form-control @error('code') is-invalid @enderror" value="{{ old('code', $item?->code) }}" maxlength="50" autocomplete="off" spellcheck="false" required>
                         <div class="item-code-suggest" data-code-suggest hidden></div>
                     </div>
-                    <div class="item-code-hint">Gunakan huruf kapital dan tanda - agar kode konsisten.</div>
+                    <div class="item-code-duplicate-feedback" data-code-duplicate-feedback></div>
                     @error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-2 col-md-4">
                     <label class="form-label" for="item-sku">SKU</label>
-                    <input id="item-sku" type="text" name="sku" class="form-control @error('sku') is-invalid @enderror" value="{{ old('sku', $item?->sku) }}" placeholder="Kosong = mengikuti kode" autocomplete="off">
+                    <input id="item-sku" type="text" name="sku" class="form-control @error('sku') is-invalid @enderror" value="{{ old('sku', $item?->sku) }}" autocomplete="off">
                     @error('sku')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-5 col-md-8">
                     <label class="form-label" for="item-name">Nama item <span class="item-required">*</span></label>
-                    <input id="item-name" type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $item?->name) }}" placeholder="Contoh: Kemeja Flannel Pria" required>
+                    <input id="item-name" type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $item?->name) }}" required>
                     @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-3 col-md-4">
@@ -223,12 +260,15 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label" for="item-category">Kategori</label>
-                    <select id="item-category" name="item_category_id" data-item-category class="form-select @error('item_category_id') is-invalid @enderror">
-                        <option value="">Tanpa kategori</option>
-                        @foreach($categories as $category)
-                            <option value="{{ $category->id }}" data-code="{{ $category->code }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
-                        @endforeach
-                    </select>
+                    <div class="item-category-picker">
+                        <select id="item-category" name="item_category_id" data-item-category class="form-select @error('item_category_id') is-invalid @enderror">
+                            <option value="">Tanpa kategori</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" data-code="{{ $category->code }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-outline-primary item-category-add" data-open-category-modal title="Tambah kategori" aria-label="Tambah kategori"><i class="bi bi-plus-lg"></i></button>
+                    </div>
                     @error('item_category_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -264,14 +304,14 @@
                                     <label class="form-label mb-2">Metode pasok</label>
                                     <div class="item-supply-preset" data-supply-preset-group>
                                         @foreach([
-                                            'buy' => ['Beli jadi', 'Supplier'],
-                                            'make' => ['Produksi sendiri', 'BOM'],
-                                            'hybrid' => ['Hybrid', 'Beli / produksi'],
-                                            'outsource' => ['Makloon', 'Pihak ketiga'],
-                                        ] as $mode => [$label, $helpText])
+                                            'buy' => 'Beli jadi',
+                                            'make' => 'Produksi sendiri',
+                                            'hybrid' => 'Hybrid',
+                                            'outsource' => 'Makloon',
+                                        ] as $mode => $label)
                                             <label class="item-supply-preset-option">
                                                 <input type="radio" name="supply_mode_preset" value="{{ $mode }}" class="form-check-input mt-1" data-supply-preset @checked($supplyMode === $mode)>
-                                                <span><strong>{{ $label }}</strong><small>{{ $helpText }}</small></span>
+                                                <span><strong>{{ $label }}</strong></span>
                                             </label>
                                         @endforeach
                                     </div>
@@ -396,6 +436,40 @@
             </details>
         </div>
 
+        <div class="modal fade" id="quickItemCategoryModal" tabindex="-1" aria-labelledby="quickItemCategoryTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="quickItemCategoryTitle">Tambah kategori</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="quick-category-code">Kode kategori</label>
+                            <input id="quick-category-code" type="text" class="form-control" maxlength="50" placeholder="ACC-NEW" autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="quick-category-name">Nama kategori</label>
+                            <input id="quick-category-name" type="text" class="form-control" maxlength="190" placeholder="Accessories baru" autocomplete="off">
+                        </div>
+                        <div>
+                            <label class="form-label" for="quick-category-kind">Kelompok</label>
+                            <select id="quick-category-kind" class="form-select">
+                                @foreach(\App\Models\ItemCategory::kindLabels() as $kind => $label)
+                                    <option value="{{ $kind }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="small text-danger mt-2" data-quick-category-error hidden></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" class="btn btn-primary" data-quick-category-submit><i class="bi bi-check2 me-1"></i>Simpan kategori</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="item-form-section">
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-cash-coin"></i></div>
@@ -416,7 +490,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="hpp-notes">Catatan HPP</label>
-                            <input id="hpp-notes" type="text" name="hpp_notes" class="form-control @error('hpp_notes') is-invalid @enderror" value="{{ old('hpp_notes', $activeSnapshot?->notes) }}" maxlength="255" placeholder="Contoh: HPP awal dari faktur">
+                    <input id="hpp-notes" type="text" name="hpp_notes" class="form-control @error('hpp_notes') is-invalid @enderror" value="{{ old('hpp_notes', $activeSnapshot?->notes) }}" maxlength="255">
                             @error('hpp_notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
@@ -429,13 +503,18 @@
     </div>
 
     @php
-        $bomHref = $itemBom && $canMake
+        $canManageBom = auth()->user()?->canAccessModule('master') ?? false;
+        $bomHref = $canManageBom && $itemBom && $canMake
             ? route('master.item_boms.edit', $itemBom)
-            : ($isEdit && $item && $canMake && in_array($item->type, ['finished_good', 'wip'], true)
+            : ($canManageBom && $isEdit && $item && $canMake && in_array($item->type, ['finished_good', 'wip'], true)
                 ? route('master.item_boms.create', ['item_id' => $item->id])
                 : null);
     @endphp
-    @php $bomDisabledText = $isEdit ? 'Aktifkan produksi sendiri' : 'Simpan item dulu'; @endphp
+    @php
+        $bomDisabledText = !$canManageBom
+            ? 'Akses BOM dibatasi'
+            : ($isEdit ? 'Aktifkan produksi sendiri' : 'Simpan item dulu');
+    @endphp
     @if($isProductionItem)
     <div class="item-bom-menu mt-3" data-bom-menu>
         <div class="d-flex align-items-center gap-3">
@@ -456,7 +535,6 @@
     @include('master.items._barcodes_form')
 
     <div class="item-form-footer">
-        <div class="item-section-help"><span class="item-required">*</span> wajib diisi</div>
         <div class="d-flex gap-2">
             <a href="{{ route('master.items.index') }}" class="btn btn-item-outline px-4"><i class="bi bi-arrow-left"></i>Batal</a>
             <button type="submit" class="btn btn-item-primary px-4"><i class="bi bi-check2"></i>{{ $isEdit ? 'Simpan Perubahan' : 'Simpan Item' }}</button>
@@ -469,6 +547,13 @@
 document.addEventListener('DOMContentLoaded', function () {
     const typeSelect = document.querySelector('[data-item-type]');
     const categorySelect = document.querySelector('[data-item-category]');
+    const quickCategoryModal = document.getElementById('quickItemCategoryModal');
+    const quickCategoryCode = document.getElementById('quick-category-code');
+    const quickCategoryName = document.getElementById('quick-category-name');
+    const quickCategoryKind = document.getElementById('quick-category-kind');
+    const quickCategorySubmit = document.querySelector('[data-quick-category-submit]');
+    const quickCategoryError = document.querySelector('[data-quick-category-error]');
+    const quickCategoryRoute = @json(route('master.items.quick_categories.store'));
     const supplyWrap = document.querySelector('[data-supply-policy-wrap]');
     const canBuy = document.querySelector('[data-supply-can-buy]');
     const canMake = document.querySelector('[data-supply-can-make]');
@@ -490,7 +575,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const hppFields = document.querySelector('[data-hpp-fields]');
     const bomMenu = document.querySelector('[data-bom-menu]');
     const codeInput = document.getElementById('item-code');
+    const skuInput = document.getElementById('item-sku');
     const codeSuggest = document.querySelector('[data-code-suggest]');
+    const codeDuplicateFeedback = document.querySelector('[data-code-duplicate-feedback]');
+    const itemForm = document.querySelector('form[data-item-form]');
     const codeSuggestRoute = @json(route('master.items.code_suggestions'));
     const currentItemId = @json($item?->id);
     const expenseWrap = document.querySelector('[data-expense-account-wrap]');
@@ -499,9 +587,98 @@ document.addEventListener('DOMContentLoaded', function () {
     const isEditForm = {{ $isEdit ? 'true' : 'false' }};
     let codeSuggestTimer = null;
     let codeSuggestRequest = null;
+    let duplicateCodeItem = null;
+    let lastCheckedCode = '';
+    let allowSubmitOnce = false;
+    let skuAutoSync = Boolean(skuInput && (
+        !String(skuInput.value || '').trim()
+        || normalizeItemCode(skuInput.value) === normalizeItemCode(codeInput?.value)
+    ));
+    let lastAutoSku = skuAutoSync ? String(skuInput?.value || '').trim() : '';
 
     function normalizeItemCode(value) {
         return String(value || '').trim().toUpperCase().replace(/\s+/g, '-');
+    }
+
+    function syncSkuFromCode() {
+        if (!codeInput || !skuInput || !skuAutoSync) return;
+        const normalizedCode = normalizeItemCode(codeInput.value);
+        if (!normalizedCode) return;
+        skuInput.value = normalizedCode;
+        lastAutoSku = normalizedCode;
+    }
+
+    function allowedQuickCategoryKinds() {
+        return typeSelect?.value === 'finished_good' || typeSelect?.value === 'wip'
+            ? ['product']
+            : ['material', 'support', 'accessory', 'packaging', 'operational', 'other'];
+    }
+
+    function refreshQuickCategoryKinds() {
+        if (!quickCategoryKind) return;
+        const allowed = allowedQuickCategoryKinds();
+        Array.from(quickCategoryKind.options).forEach(option => {
+            option.hidden = !allowed.includes(option.value);
+            option.disabled = !allowed.includes(option.value);
+        });
+        if (!allowed.includes(quickCategoryKind.value)) quickCategoryKind.value = allowed[0] || '';
+    }
+
+    function showQuickCategoryError(message = '') {
+        if (!quickCategoryError) return;
+        quickCategoryError.textContent = message;
+        quickCategoryError.hidden = !message;
+    }
+
+    async function quickCreateCategory() {
+        if (!quickCategorySubmit || !categorySelect) return;
+        const code = String(quickCategoryCode?.value || '').trim().toUpperCase();
+        const name = String(quickCategoryName?.value || '').trim();
+        const kind = quickCategoryKind?.value || '';
+        const allowed = allowedQuickCategoryKinds();
+
+        showQuickCategoryError('');
+        if (!code || !name || !allowed.includes(kind)) {
+            showQuickCategoryError('Kode, nama, dan kelompok kategori wajib diisi sesuai tipe item.');
+            return;
+        }
+
+        quickCategorySubmit.disabled = true;
+        quickCategorySubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+
+        try {
+            const response = await fetch(quickCategoryRoute, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ code, name, kind }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) {
+                const validationMessage = data.errors ? Object.values(data.errors).flat()[0] : null;
+                throw new Error(validationMessage || data.message || 'Kategori gagal ditambahkan.');
+            }
+
+            const option = document.createElement('option');
+            option.value = String(data.category.id);
+            option.dataset.code = data.category.code;
+            option.dataset.kind = data.category.kind;
+            option.textContent = `${data.category.code} — ${data.category.name}`;
+            categorySelect.appendChild(option);
+            categorySelect.value = String(data.category.id);
+            refreshCategory();
+            if (window.GFID?.toast) window.GFID.toast('Kategori berhasil ditambahkan.');
+            window.bootstrap?.Modal?.getOrCreateInstance(quickCategoryModal).hide();
+        } catch (error) {
+            showQuickCategoryError(error.message || 'Kategori gagal ditambahkan.');
+        } finally {
+            quickCategorySubmit.disabled = false;
+            quickCategorySubmit.innerHTML = '<i class="bi bi-check2 me-1"></i>Simpan kategori';
+        }
     }
 
     function hideCodeSuggestions() {
@@ -510,16 +687,46 @@ document.addEventListener('DOMContentLoaded', function () {
         codeSuggest.replaceChildren();
     }
 
+    function setDuplicateCode(item) {
+        duplicateCodeItem = item || null;
+        codeInput?.classList.toggle('is-invalid', Boolean(duplicateCodeItem));
+        if (!codeDuplicateFeedback) return;
+        codeDuplicateFeedback.textContent = duplicateCodeItem
+            ? `Kode sudah digunakan oleh ${duplicateCodeItem.name} (${duplicateCodeItem.code}). Gunakan kode lain.`
+            : '';
+        codeDuplicateFeedback.classList.toggle('is-visible', Boolean(duplicateCodeItem));
+    }
+
+    function showDuplicateAlert(item = duplicateCodeItem) {
+        if (!item) return;
+        const message = `Kode ${item.code} sudah digunakan oleh ${item.name}. Silakan gunakan kode item yang berbeda.`;
+        if (window.GFID?.errorAlert) {
+            window.GFID.errorAlert(message, { title: 'Kode item sudah ada' });
+            return;
+        }
+        if (window.Swal) {
+            window.Swal.fire({
+                icon: 'warning',
+                title: 'Kode item sudah ada',
+                text: message,
+                confirmButtonText: 'Gunakan kode lain',
+                confirmButtonColor: '#334155',
+            });
+        }
+    }
+
     function showCodeSuggestions(items) {
         if (!codeSuggest) return;
         codeSuggest.replaceChildren();
         if (!items.length) {
+            setDuplicateCode(null);
             hideCodeSuggestions();
             return;
         }
 
         const normalizedCode = normalizeItemCode(codeInput?.value);
         const duplicate = items.find(item => normalizeItemCode(item.code) === normalizedCode);
+        setDuplicateCode(duplicate);
         const head = document.createElement('div');
         head.className = `item-code-suggest-head${duplicate ? ' is-duplicate' : ''}`;
         head.textContent = duplicate
@@ -528,8 +735,10 @@ document.addEventListener('DOMContentLoaded', function () {
         codeSuggest.appendChild(head);
 
         items.forEach(item => {
-            const row = document.createElement('div');
+            const row = document.createElement('button');
+            row.type = 'button';
             row.className = 'item-code-suggest-row';
+            row.title = `Pilih kode ${item.code}`;
             const code = document.createElement('span');
             code.className = 'item-code-suggest-code';
             code.textContent = item.code;
@@ -537,6 +746,14 @@ document.addEventListener('DOMContentLoaded', function () {
             name.className = 'item-code-suggest-name';
             name.textContent = item.name;
             row.append(code, name);
+            row.addEventListener('click', function () {
+                codeInput.value = normalizeItemCode(item.code);
+                lastCheckedCode = codeInput.value;
+                setDuplicateCode(item);
+                hideCodeSuggestions();
+                codeInput.focus();
+                showDuplicateAlert(item);
+            });
             codeSuggest.appendChild(row);
         });
 
@@ -548,6 +765,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const normalized = normalizeItemCode(codeInput.value);
         if (codeInput.value !== normalized) codeInput.value = normalized;
         if (!normalized) {
+            lastCheckedCode = '';
+            setDuplicateCode(null);
             hideCodeSuggestions();
             return;
         }
@@ -564,6 +783,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             if (!response.ok) throw new Error('Gagal memeriksa kode item.');
             const data = await response.json();
+            lastCheckedCode = normalized;
             showCodeSuggestions(Array.isArray(data.items) ? data.items : []);
         } catch (error) {
             if (error.name !== 'AbortError') hideCodeSuggestions();
@@ -571,17 +791,58 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     codeInput?.addEventListener('input', function () {
+        syncSkuFromCode();
+        lastCheckedCode = '';
+        setDuplicateCode(null);
         window.clearTimeout(codeSuggestTimer);
         codeSuggestTimer = window.setTimeout(checkItemCode, 240);
     });
     codeInput?.addEventListener('focus', function () {
+        syncSkuFromCode();
         if (normalizeItemCode(codeInput.value)) checkItemCode();
+    });
+    skuInput?.addEventListener('input', function () {
+        if (String(skuInput.value || '').trim() !== lastAutoSku) skuAutoSync = false;
     });
     codeInput?.addEventListener('blur', function () {
         window.setTimeout(hideCodeSuggestions, 180);
     });
     document.addEventListener('click', function (event) {
         if (!event.target.closest('.item-code-field')) hideCodeSuggestions();
+    });
+
+    itemForm?.addEventListener('submit', async function (event) {
+        if (allowSubmitOnce) {
+            allowSubmitOnce = false;
+            return;
+        }
+
+        const normalized = normalizeItemCode(codeInput?.value);
+        if (codeInput && codeInput.value !== normalized) codeInput.value = normalized;
+
+        if (duplicateCodeItem && lastCheckedCode === normalized) {
+            event.preventDefault();
+            showDuplicateAlert();
+            codeInput?.focus();
+            return;
+        }
+
+        if (normalized && lastCheckedCode !== normalized) {
+            event.preventDefault();
+            await checkItemCode();
+            if (duplicateCodeItem) {
+                showDuplicateAlert();
+                codeInput?.focus();
+                return;
+            }
+
+            allowSubmitOnce = true;
+            if (typeof itemForm.requestSubmit === 'function') {
+                itemForm.requestSubmit();
+            } else {
+                itemForm.submit();
+            }
+        }
     });
 
     function modeForType(type) {
@@ -820,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function refreshStatus() { if (activeLabel && activeInput) activeLabel.textContent = activeInput.checked ? 'Aktif / bisa dipakai' : 'Nonaktif / disembunyikan'; }
     typeSelect?.addEventListener('change', function () {
         refreshCategory();
+        refreshQuickCategoryKinds();
         if (!isEditForm || supplyPresetGroup?.dataset.userEdited !== '1') {
             const mode = modeForType(typeSelect.value);
             const preset = supplyPresetGroup?.querySelector(`[data-supply-preset][value="${mode}"]`);
@@ -839,6 +1101,22 @@ document.addEventListener('DOMContentLoaded', function () {
     categorySelect?.addEventListener('change', refreshCategory);
     activeInput?.addEventListener('change', refreshStatus);
     supplierCheckboxes.forEach(input => input.addEventListener('change', refreshSupplierPicker));
+    document.querySelector('[data-open-category-modal]')?.addEventListener('click', function () {
+        refreshQuickCategoryKinds();
+        showQuickCategoryError('');
+        if (quickCategoryCode) quickCategoryCode.value = '';
+        if (quickCategoryName) quickCategoryName.value = '';
+        if (quickCategoryModal && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(quickCategoryModal).show();
+        }
+    });
+    quickCategorySubmit?.addEventListener('click', quickCreateCategory);
+    quickCategoryName?.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            quickCreateCategory();
+        }
+    });
     document.querySelector('[data-open-quick-supplier]')?.addEventListener('click', function () {
         if (!quickSupplierPanel) return;
         quickSupplierPanel.hidden = false;
@@ -861,10 +1139,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
     refreshCategory();
+    refreshQuickCategoryKinds();
     refreshSupply();
     refreshAllocation();
     refreshStatus();
     refreshSupplierPicker();
+    syncSkuFromCode();
 });
 </script>
 @endpush

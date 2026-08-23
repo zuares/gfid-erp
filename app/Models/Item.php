@@ -14,6 +14,7 @@ class Item extends Model
 
     protected $fillable = [
         'code',
+        'sku',
         'name',
         'unit',
         'type', // material / finished_good
