@@ -1100,6 +1100,167 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         font-size: .9rem;
     }
 }
+
+/* ══════════════════════════════════════════════════
+   WORKFLOW NAV + STICKY NEXT ACTION
+══════════════════════════════════════════════════ */
+.rk-flow {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    flex-wrap: wrap;
+    margin: .55rem 0 .45rem;
+    padding: .42rem .55rem;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 8px;
+    background: var(--card, #fff);
+}
+.rk-flow-step {
+    display: inline-flex;
+    align-items: center;
+    gap: .32rem;
+    min-height: 28px;
+    padding: .18rem .55rem;
+    border: 1px solid rgba(148,163,184,.25);
+    border-radius: 7px;
+    color: #64748b;
+    font-size: .72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.rk-flow-step.done { color: #334155; background: rgba(148,163,184,.08); }
+.rk-flow-step.active { color: #fff; background: #334155; border-color: #334155; }
+.rk-flow-sep { color: #cbd5e1; font-size: .72rem; }
+.shp-topbar .rk-topbar-primary { display: inline-flex; align-items: center; gap: .35rem; }
+.shp-topbar .rk-topbar-primary:not(:disabled) { opacity: 1; pointer-events: auto; }
+@media (max-width: 768px) {
+    .rk-flow { display: none; }
+    .shp-topbar .rk-topbar-utility { display: none; }
+}
+
+/* Visual hierarchy: action states are intentionally color-coded. */
+.shp-topbar .rk-topbar-primary {
+    color: #fff !important;
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    font-weight: 850;
+    box-shadow: 0 3px 10px rgba(37,99,235,.28) !important;
+}
+.shp-topbar .rk-topbar-primary:hover:not(:disabled) {
+    color: #fff !important;
+    background: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+}
+.shp-topbar .rk-topbar-primary:disabled {
+    color: #64748b !important;
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+}
+.shp-topbar .shp-pill-accent {
+    color: #1d4ed8 !important;
+    background: #eff6ff !important;
+    border-color: #93c5fd !important;
+}
+.shp-scan-input:focus,
+.rk-searchbox:focus-within {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.16) !important;
+}
+.rk-tab.active { color: #2563eb !important; border-bottom-color: #2563eb !important; }
+.rk-act-btn.fulfill {
+    color: #166534 !important;
+    border-color: #86efac !important;
+    background: #f0fdf4 !important;
+}
+.rk-act-btn.fulfill:hover,
+.rk-act-btn.fulfill.on {
+    color: #fff !important;
+    border-color: #16a34a !important;
+    background: #16a34a !important;
+}
+.rk-act-btn.pending {
+    color: #92400e !important;
+    border-color: #fcd34d !important;
+    background: #fffbeb !important;
+}
+.rk-act-btn.pending:hover,
+.rk-act-btn.pending.on {
+    color: #fff !important;
+    border-color: #d97706 !important;
+    background: #d97706 !important;
+}
+.rk-act-btn.skip {
+    color: #64748b !important;
+    border-color: #cbd5e1 !important;
+    background: #f8fafc !important;
+}
+.rk-act-btn.skip:hover,
+.rk-act-btn.skip.on {
+    color: #fff !important;
+    border-color: #64748b !important;
+    background: #64748b !important;
+}
+.rk-item-first-hidden { display: none !important; }
+.rk-item-first-panel {
+    margin-bottom: .75rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(37,99,235,.18);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(239,246,255,.95), #fff);
+}
+.rk-item-first-title { color: #1e40af; font-weight: 900; font-size: .9rem; }
+.rk-item-first-sub { margin-top: .2rem; color: #64748b; font-size: .78rem; }
+.rk-item-first-map {
+    display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
+    margin-top: .75rem; padding: .5rem .65rem; border-radius: 8px;
+    background: rgba(255,255,255,.8); border: 1px solid rgba(37,99,235,.12);
+    color: #475569; font-size: .76rem; font-weight: 700;
+}
+.rk-item-first-list { display: grid; gap: .35rem; margin-top: .65rem; }
+.rk-item-first-row { display: flex; align-items: center; gap: .5rem; padding: .45rem .55rem; border-radius: 7px; background: #fff; }
+.rk-item-first-code { color: #0f172a; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-weight: 900; }
+.rk-item-first-name { color: #64748b; font-size: .74rem; flex: 1; }
+.rk-item-first-qty { color: #1d4ed8; font-weight: 900; }
+
+/* Semua tombol aksi utama memakai teks putih agar tetap focal dan terbaca. */
+.shp-topbar .rk-topbar-primary,
+.shp-topbar .rk-topbar-primary:disabled {
+    color: #fff !important;
+}
+.shp-topbar .btn-return-scan {
+    color: #fff !important;
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+}
+.shp-topbar .btn-return-scan:hover {
+    color: #fff !important;
+    background: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+}
+.rk-act-btn.fulfill,
+.rk-act-btn.fulfill:hover,
+.rk-act-btn.fulfill.on {
+    color: #fff !important;
+    background: #16a34a !important;
+    border-color: #16a34a !important;
+}
+.rk-act-btn.pending,
+.rk-act-btn.pending:hover,
+.rk-act-btn.pending.on {
+    color: #fff !important;
+    background: #d97706 !important;
+    border-color: #d97706 !important;
+}
+.rk-act-btn.skip,
+.rk-act-btn.skip:hover,
+.rk-act-btn.skip.on,
+.rk-sub-btn-pick,
+.rk-sub-btn-pick:hover {
+    color: #fff !important;
+    background: #64748b !important;
+    border-color: #64748b !important;
+}
 </style>
 @endpush
 
@@ -1107,16 +1268,19 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 @php
     $totalLines = $shipment->lines->count();
     $totalQty   = $shipment->lines->sum('qty_scanned');
+    $isItemFirst = ($shipment->scan_mode ?? 'item_first') === 'item_first';
 @endphp
 
 <div class="shp-topbar">
     <a href="{{ route('sales.shipments.edit', $shipment) }}" class="btn-shp-outline btn-return-scan btn-sm" style="text-decoration:none;font-size:0.75rem;padding:0.25rem 0.6rem;">
         <span aria-hidden="true">&larr;</span>
-        <span>Scan Barang</span>
+        <span>Scan Item</span>
     </a>
-    <a href="/marketplace/orders" class="btn-shp-outline btn-sm" style="text-decoration:none; background:#f8fafc; border-color:#e2e8f0; color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
-        📦 List Order
-    </a>
+    @if (!$isItemFirst)
+        <a href="/marketplace/orders" class="btn-shp-outline btn-sm rk-topbar-utility" style="text-decoration:none; background:#f8fafc; border-color:#e2e8f0; color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
+            📦 List Order
+        </a>
+    @endif
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
     <span class="shp-topbar-spacer"></span>
@@ -1124,21 +1288,55 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     <span class="shp-pill">Batch <b>{{ $totalLines }}</b> SKU</span>
     <span class="shp-pill shp-pill-accent">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     <span class="shp-pill" id="topPillOrders" style="display:none">Pesanan <b id="topOrderCount">0</b></span>
+    <button type="button" id="topConfirmBtn" class="btn-shp-submit rk-topbar-primary" disabled>
+        <i class="bi bi-arrow-right-short" aria-hidden="true"></i>
+        Konfirmasi Pesanan
+    </button>
 </div>
 
 <div class="rk-wrap">
 
+    <nav class="rk-flow {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" aria-label="Alur shipment">
+        <span class="rk-flow-step done"><span>1</span> Scan Item</span>
+        <span class="rk-flow-sep" aria-hidden="true">→</span>
+        <span class="rk-flow-step active"><span>2</span> Rekonsiliasi</span>
+        <span class="rk-flow-sep" aria-hidden="true">→</span>
+        <span class="rk-flow-step"><span>3</span> Konfirmasi &amp; Submit</span>
+    </nav>
+
+    @if ($isItemFirst)
+        <div class="rk-item-first-panel">
+            <div class="rk-item-first-title">Mapping Order &amp; Item Otomatis</div>
+            <div class="rk-item-first-sub">Mode Scan Item aktif. Tidak perlu scan order lagi; item yang sudah discan dipakai sebagai detail shipment.</div>
+            <div class="rk-item-first-map">
+                <span>Order:</span>
+                <strong>{{ $shipment->orderScans->count() === 1 ? $shipment->orderScans->first()->order_no : 'Item shipment' }}</strong>
+                <span style="margin-left:auto;color:#2563eb">{{ $totalLines }} SKU · {{ number_format($totalQty, 0, ',', '.') }} qty</span>
+            </div>
+            <div class="rk-item-first-list">
+                @forelse ($batchPool as $item)
+                    <div class="rk-item-first-row">
+                        <span class="rk-item-first-code">{{ $item['item_code'] }}</span>
+                        <span class="rk-item-first-name">{{ $item['item_name'] }}</span>
+                        <span class="rk-item-first-qty">×{{ number_format($item['qty'], 0, ',', '.') }}</span>
+                    </div>
+                @empty
+                    <div class="rk-batch-empty">Belum ada item yang discan.</div>
+                @endforelse
+            </div>
+        </div>
+    @endif
 
 
     {{-- TABS --}}
-    <div class="rk-tabs" role="tablist">
+    <div class="rk-tabs {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" role="tablist">
         <button type="button" class="rk-tab active" data-tab="pesanan">Pesanan <span class="rk-tab-count" id="rkOrderCount">0</span></button>
         <button type="button" class="rk-tab" data-tab="sisa">Belum Alokasi <span class="rk-tab-count" id="rkSisaCount">0</span></button>
         <button type="button" class="rk-tab" data-tab="batch">Isi Batch <span class="rk-tab-count">{{ $batchPool->count() }}</span></button>
     </div>
 
     {{-- TAB: PESANAN --}}
-    <div class="rk-tabpane active" id="rk-tab-pesanan" role="tabpanel">
+    <div class="rk-tabpane active {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" id="rk-tab-pesanan" role="tabpanel">
         {{-- HERO SCAN CARD --}}
         <div class="shp-scan-card" style="padding: 1rem 1.25rem 0.8rem; margin-bottom: 0.75rem; border-radius: 12px; border-width: 1px;">
             <div class="shp-scan-header" style="margin-bottom: 0.35rem;">
@@ -1149,7 +1347,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             <input type="text" id="orderInput" class="shp-scan-input"
                    placeholder="Scan / ketik no pesanan lalu Enter"
                    style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
-                   autocomplete="off" spellcheck="false" autofocus>
+                   autocomplete="off" spellcheck="false" @if (!$isItemFirst) autofocus @endif>
 
         </div>
 
@@ -1174,20 +1372,15 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             <div class="rk-empty-sub">Bisa dari barcode scanner atau ketik manual lalu tekan Enter</div>
         </div>
 
-        <div class="mt-4 mb-2 text-end">
-            <button id="topConfirmBtn" class="btn-shp-submit" disabled style="font-size: 0.95rem; padding: 0.6rem 2rem; border-radius: 8px;">
-                Konfirmasi Pesanan
-            </button>
-        </div>
     </div>
 
     {{-- TAB: SISA STOK --}}
-    <div class="rk-tabpane" id="rk-tab-sisa" role="tabpanel">
+    <div class="rk-tabpane {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" id="rk-tab-sisa" role="tabpanel">
         <div id="sisaCard" style="display:none"></div>
     </div>
 
     {{-- TAB: ISI BATCH --}}
-    <div class="rk-tabpane" id="rk-tab-batch" role="tabpanel">
+    <div class="rk-tabpane {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" id="rk-tab-batch" role="tabpanel">
         <div class="rk-order-card">
             <div class="rk-batch-head">
                 <div>
@@ -1343,6 +1536,7 @@ const UPDATE_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_u
 const LINK_SCAN_URL = {!! json_encode(parse_url(route('sales.shipments.rekon_link_scan', [$shipment, '__NO__']), PHP_URL_PATH)) !!};
 const SERVER_ORDER_SCANS = @json($savedOrderScans ?? []);
 const SHIPMENT_TYPE = @json($shipment->shipment_type ?? 'marketplace');
+const ITEM_FIRST = @json(($shipment->scan_mode ?? 'item_first') === 'item_first');
 const IS_OWNER = @json(auth()->user()?->hasRole('owner') ?? false);
 
 // Batch pool dari server — sumber kebenaran qty total per item
@@ -2177,6 +2371,15 @@ window.promptLinkScan = async function(idx) {
 };
 
 function updateConfirmBtn() {
+    if (ITEM_FIRST) {
+        const hasScannedItems = BATCH_POOL.some(item => Number(item.qty || 0) > 0);
+        if (topConfirmBtn) {
+            topConfirmBtn.disabled = !hasScannedItems;
+            topConfirmBtn.classList.toggle('active', hasScannedItems);
+        }
+        return;
+    }
+
     const validOrders = orders.filter(o => o.found || SHIPMENT_TYPE === 'manual');
     const allDecided  = validOrders.length > 0 && validOrders.every(o => o.decision);
     if (topConfirmBtn) {
@@ -2466,7 +2669,7 @@ window.resetRekon = function () {
     });
 };
 
-topConfirmBtn.addEventListener('click', function () {
+topConfirmBtn?.addEventListener('click', function () {
     if (this.disabled) return;
     unlockAudio();
     sndNav();
@@ -2498,7 +2701,7 @@ topConfirmBtn.addEventListener('click', function () {
 window.addEventListener('load', async function () {
     loadState();
     renderAll();
-    focusInput();
+    if (!ITEM_FIRST) focusInput();
 });
 
 })();

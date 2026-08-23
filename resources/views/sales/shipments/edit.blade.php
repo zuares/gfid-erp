@@ -1291,6 +1291,95 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     padding: 0;
     border-radius: 2px;
 }
+
+/* ══════════════════════════════════════════════════
+   WORKFLOW NAV + QUICK ACTIONS
+══════════════════════════════════════════════════ */
+.shp-flow {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    flex-wrap: wrap;
+    margin: .55rem 0 .45rem;
+    padding: .42rem .55rem;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 8px;
+    background: var(--card, #fff);
+}
+.shp-flow-step {
+    display: inline-flex;
+    align-items: center;
+    gap: .32rem;
+    min-height: 28px;
+    padding: .18rem .55rem;
+    border: 1px solid rgba(148,163,184,.25);
+    border-radius: 7px;
+    color: #64748b;
+    font-size: .72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.shp-flow-step.active { color: #fff; background: #334155; border-color: #334155; }
+.shp-flow-step.done { color: #334155; background: rgba(148,163,184,.08); }
+.shp-flow-sep { color: #cbd5e1; font-size: .72rem; }
+.shp-topbar .shp-topbar-primary { display: inline-flex; align-items: center; gap: .35rem; }
+.shp-topbar .shp-topbar-primary.is-disabled { opacity: .5; pointer-events: none; }
+@media (max-width: 768px) {
+    .shp-flow { display: none; }
+    .shp-topbar .shp-topbar-primary {
+        display: inline-flex;
+        width: 100%;
+        order: 5;
+        justify-content: center;
+        min-height: 38px;
+    }
+    .shp-topbar .shp-topbar-utility { display: none; }
+}
+
+/* Visual hierarchy: make the next action and scan focus unmistakable. */
+.shp-topbar .shp-topbar-primary {
+    color: #fff !important;
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    font-weight: 850;
+    box-shadow: 0 3px 10px rgba(37,99,235,.28) !important;
+}
+.shp-topbar a.shp-topbar-primary,
+.shp-topbar a.shp-topbar-primary span,
+.shp-topbar a.shp-topbar-primary i,
+.shp-topbar a.shp-topbar-primary:hover,
+.shp-topbar a.shp-topbar-primary:hover span,
+.shp-topbar a.shp-topbar-primary:hover i {
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+}
+.shp-topbar .shp-topbar-primary:hover {
+    color: #fff !important;
+    background: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+}
+.shp-topbar .shp-topbar-primary.is-disabled {
+    color: #fff !important;
+    background: #64748b !important;
+    border-color: #64748b !important;
+    box-shadow: none !important;
+}
+.shp-pill-accent {
+    color: #1d4ed8 !important;
+    background: #eff6ff !important;
+    border-color: #93c5fd !important;
+}
+.shp-scan-label,
+.shp-table-title { color: #334155; font-weight: 850; }
+.shp-scan-input:focus {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.18) !important;
+}
+.shp-item-searchbox:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+.item-code { color: #0f172a; }
 </style>
 @endpush
 
@@ -1298,6 +1387,13 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 @php
     $totalQty          = $shipment->lines->sum('qty_scanned');
     $totalLines        = $shipment->lines->count();
+    $isItemFirst       = ($shipment->scan_mode ?? 'item_first') === 'item_first';
+    $isOrderFirst      = !$isItemFirst;
+    $nextScanUrl       = route('sales.shipments.scan_order', $shipment);
+    $nextCanProceed    = $isOrderFirst || $totalLines > 0;
+    $nextScanLabel     = $isOrderFirst
+        ? 'Lanjut Scan No Order Dulu'
+        : ($totalLines > 0 ? 'Lanjut Scan No Order' : 'Scan Barang Dulu');
     $lastScannedLineId = $shipment->lines()->latest('updated_at')->value('id');
     // Utamakan hasil hitung live dari controller (persist saat reload, hilang saat resolved);
     // fallback ke flash session bila tidak tersedia.
@@ -1334,17 +1430,29 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         Qty <b id="summaryTotalQty">{{ number_format($totalQty, 0, ',', '.') }}</b>
     </span>
 
-    <a href="/marketplace/orders" class="btn btn-shp-outline btn-sm" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
+    <a href="/marketplace/orders" class="btn btn-shp-outline btn-sm shp-topbar-utility" style="background:#f8fafc;border-color:#e2e8f0;color:#475569;font-size:0.75rem;padding:0.25rem 0.6rem;">
         📦 List Order
     </a>
 
-    <button type="button" class="btn btn-shp-submit btn-sm" onclick="printPickingList()" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
+    <button type="button" class="btn btn-shp-submit btn-sm shp-topbar-utility" onclick="printPickingList()" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
         Cetak Picking
     </button>
 
-    <a href="{{ route('sales.shipments.scan_order', $shipment) }}"
-       class="btn btn-shp-outline btn-sm" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
-        Scan Pesanan
+    @if (!$isItemFirst)
+        <a href="{{ route('sales.shipments.scan_order', $shipment) }}"
+           class="btn btn-shp-outline btn-sm" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
+            Scan Pesanan
+        </a>
+    @endif
+
+    <a href="{{ $nextCanProceed ? $nextScanUrl : '#' }}"
+       id="rekonBtn"
+       data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
+       data-next-url="{{ $nextScanUrl }}"
+       class="btn btn-shp-submit btn-sm shp-topbar-primary {{ $nextCanProceed ? '' : 'is-disabled' }}"
+       aria-disabled="{{ $nextCanProceed ? 'false' : 'true' }}">
+        <i class="bi bi-arrow-right-short" aria-hidden="true"></i>
+        <span>{{ $nextScanLabel }}</span>
     </a>
 
 
@@ -1584,17 +1692,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         </div>
     </div>
 
-    <div class="mt-4 mb-2 text-end">
-        <a href="{{ $totalLines > 0 ? route('sales.shipments.rekon', $shipment) : '#' }}"
-           id="rekonBtn"
-           data-is-manual="0"
-           data-rekon-url="{{ route('sales.shipments.rekon', $shipment) }}"
-           class="btn btn-rekon {{ $totalLines > 0 ? '' : 'is-disabled' }}"
-           aria-disabled="{{ $totalLines > 0 ? 'false' : 'true' }}"
-           style="font-size: 0.95rem; padding: 0.6rem 2rem; border-radius: 8px;">
-            {{ $totalLines > 0 ? 'Lanjut Rekonsiliasi' : 'Scan Barang Dulu' }}
-        </a>
-    </div>
 </div>
 
 {{-- ═══════════════════════ IMPORT PREVIEW MODAL ═══════════════════════ --}}
@@ -1706,6 +1803,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const itemFilterEmpty   = document.getElementById('itemFilterEmpty');
     const btnJumpLast       = document.getElementById('btnJumpLast');
     const rekonBtn          = document.getElementById('rekonBtn');
+    const isItemFirst       = @json($isItemFirst);
     const toastEl           = document.getElementById('scanToast');
     const summaryLines      = document.getElementById('summaryTotalLines');
     const summaryQty        = document.getElementById('summaryTotalQty');
@@ -2055,19 +2153,30 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     }
 
     function syncRekonButton(totalLines) {
-        if (!rekonBtn) return;
         const count = parseInt(totalLines ?? summaryLines?.textContent ?? '0', 10) || 0;
-        if (count > 0) {
-            const url = rekonBtn.dataset.rekonUrl || rekonBtn.href;
+        if (!rekonBtn) return;
+        const label = rekonBtn.querySelector('span') || rekonBtn;
+        if (isItemFirst) {
+            const url = rekonBtn.dataset.nextUrl || rekonBtn.dataset.rekonUrl || rekonBtn.href;
+            if (count > 0) {
+                rekonBtn.href = url;
+                label.textContent = 'Lanjut Scan No Order';
+                rekonBtn.classList.remove('is-disabled');
+                rekonBtn.setAttribute('aria-disabled', 'false');
+            } else {
+                rekonBtn.href = '#';
+                label.textContent = 'Scan Barang Dulu';
+                rekonBtn.classList.add('is-disabled');
+                rekonBtn.setAttribute('aria-disabled', 'true');
+            }
+            return;
+        }
+        if (!isItemFirst) {
+            const url = rekonBtn.dataset.nextUrl || rekonBtn.dataset.rekonUrl || rekonBtn.href;
             rekonBtn.href = url;
-            rekonBtn.textContent = 'Lanjut Rekonsiliasi';
+            label.textContent = 'Lanjut Scan No Order Dulu';
             rekonBtn.classList.remove('is-disabled');
             rekonBtn.setAttribute('aria-disabled', 'false');
-        } else {
-            rekonBtn.href = '#';
-            rekonBtn.textContent = 'Scan Barang Dulu';
-            rekonBtn.classList.add('is-disabled');
-            rekonBtn.setAttribute('aria-disabled', 'true');
         }
     }
 
@@ -2433,13 +2542,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             const code = scanInput.value.trim();
             if (!code) { beepErr(); showScanError('Kode kosong.'); focusScan(); return; }
 
-            /* ── Barcode navigasi: scan NEXT → pindah ke Rekon atau Submit ── */
+            /* ── Barcode navigasi: scan NEXT → lanjut ke langkah berikutnya ── */
             if (code.toUpperCase() === 'NEXT') {
                 scanInput.value = '';
                 if (rekonBtn && !rekonBtn.classList.contains('is-disabled')) {
                     beepNav();
-                    if (rekonBtn.dataset.rekonUrl) {
-                        window.location.href = rekonBtn.dataset.rekonUrl;
+                    const nextUrl = rekonBtn.dataset.nextUrl || rekonBtn.dataset.rekonUrl;
+                    if (nextUrl) {
+                        window.location.href = nextUrl;
                     }
                 }
                 return;
@@ -2449,7 +2559,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             if (lookup && lookup.type === 'order') {
                 scanInput.value = '';
                 beepErr();
-                const msg = 'Yang discan adalah nomor pesanan/resi, bukan item. Gunakan Scan Pesanan.';
+                const msg = 'Yang discan adalah nomor pesanan/resi, bukan kode item. Gunakan Scan Item.';
                 showScanError(msg);
                 showToast('err', msg);
                 focusScan();

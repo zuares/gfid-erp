@@ -964,7 +964,7 @@ class ShipmentController extends Controller
                 ->with('message', 'Shipment bukan draft, tidak bisa di-edit / discan lagi.');
         }
 
-        $shipment->load(['store', 'lines.item.category', 'creator', 'invoice']);
+        $shipment->load(['store', 'lines.item.category']);
 
         // Hitung kekurangan stok secara live agar panel tetap muncul saat reload
         // dan otomatis hilang begitu stok/qty sudah beres.
@@ -976,20 +976,32 @@ class ShipmentController extends Controller
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
 
-        $today = now()->toDateString();
-        $kpi = [
-            'created' => Shipment::whereDate('created_at', $today)->count(),
-            'qty'     => (int) ShipmentLine::whereHas('shipment', fn ($q) => $q->whereDate('created_at', $today))->sum('qty_scanned'),
-            'draft'   => Shipment::whereDate('created_at', $today)->where('status', 'draft')->count(),
-            'posted'  => Shipment::whereDate('created_at', $today)->where('status', 'posted')->count(),
-        ];
-
-        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'kpi', 'stockInsufficient'));
+        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'stockInsufficient'));
     }
 
 
     public function editOrderFirst(Shipment $shipment)
     {
+        if ($shipment->status !== 'draft') {
+            return redirect()
+                ->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Shipment bukan draft, tidak bisa scan nomor order lagi.');
+        }
+
+        if (($shipment->scan_mode ?? 'item_first') === 'item_first') {
+            $shipment->load(['lines.item', 'orderScans.lines.item']);
+
+            if ($shipment->lines->isEmpty()) {
+                return redirect()
+                    ->route('sales.shipments.edit', $shipment)
+                    ->with('status', 'error')
+                    ->with('message', 'Scan item terlebih dahulu sebelum scan nomor order.');
+            }
+
+            return view('sales.shipments.scan_order_item_first', compact('shipment'));
+        }
+
         $shipment->load([
             'store',
             'lines.item',
@@ -1046,6 +1058,14 @@ class ShipmentController extends Controller
                 'status' => 'error',
                 'message' => 'Shipment sudah tidak berstatus draft.',
             ], 409);
+        }
+
+        if (($shipment->scan_mode ?? 'item_first') === 'item_first'
+            && !$shipment->lines()->exists()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Scan item terlebih dahulu sebelum scan nomor order.',
+            ], 422);
         }
 
         $data = $request->validate([
@@ -1368,7 +1388,9 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', $message)->withInput();
         }
 
-        $fulfillmentId = null;
+        $autoOrderScan = $this->autoMapItemFirstLines($shipment);
+        $autoOrderScanId = $autoOrderScan?->id;
+        $fulfillmentId = $autoOrderScan?->fulfillment_id;
         $scanInfo = null;
         $recordOnlyOrder = false;
 
@@ -1433,7 +1455,7 @@ class ShipmentController extends Controller
             }
         }
 
-        $result = DB::transaction(function () use ($shipment, $item, $qty, $orderNo, $fulfillmentId) {
+        $result = DB::transaction(function () use ($shipment, $item, $qty, $orderNo, $fulfillmentId, $autoOrderScanId) {
             $warehouse = $this->whRts();
             if ($warehouse) {
                 app(\App\Services\Inventory\InventoryService::class)->reserveStock(
@@ -1444,8 +1466,8 @@ class ShipmentController extends Controller
                 );
             }
 
-            $orderScanId = null;
-            if ($orderNo !== '') {
+            $orderScanId = $autoOrderScanId;
+            if (!$orderScanId && $orderNo !== '') {
                 $orderScan = ShipmentOrderScan::query()
                     ->where('shipment_id', $shipment->id)
                     ->where('order_no', $orderNo)
@@ -2374,6 +2396,67 @@ class ShipmentController extends Controller
         $this->journalService->postShipmentCogsFromMutations($shipment);
     }
 
+    /**
+     * Untuk mode scan barang dulu, tautkan item ungrouped hanya ketika
+     * target order-nya memang tidak ambigu: invoice shipment atau satu
+     * order scan yang sudah tersimpan.
+     */
+    protected function autoMapItemFirstLines(Shipment $shipment): ?ShipmentOrderScan
+    {
+        if (($shipment->scan_mode ?? 'item_first') !== 'item_first') {
+            return null;
+        }
+
+        $shipment->loadMissing(['orderScans', 'invoice']);
+        $orderScan = null;
+
+        if ($shipment->sales_invoice_id && $shipment->invoice) {
+            $invoice = $shipment->invoice;
+            $orderNo = trim((string) ($invoice->channel_order_no ?: $invoice->code ?: ('INV-' . $invoice->id)));
+
+            if ($orderNo !== '') {
+                $payload = [
+                    'mode' => 'record_only',
+                    'label' => 'Tertaut otomatis dari invoice',
+                    'linked_source' => 'sales_invoice',
+                    'sales_invoice_id' => $invoice->id,
+                    'order' => [
+                        'order_no' => $orderNo,
+                        'invoice_id' => $invoice->id,
+                        'invoice_code' => $invoice->code,
+                        'source' => 'sales_invoice',
+                        'status' => 'pending',
+                    ],
+                ];
+
+                $orderScan = ShipmentOrderScan::firstOrNew([
+                    'shipment_id' => $shipment->id,
+                    'order_no' => $orderNo,
+                ]);
+                $orderScan->fill([
+                    'fulfillment_id' => $orderScan->fulfillment_id,
+                    'status' => $orderScan->status ?: 'pending',
+                    'source' => 'sales_invoice',
+                    'raw_payload' => array_merge((array) $orderScan->raw_payload, $payload),
+                ]);
+                $orderScan->save();
+            }
+        } elseif ($shipment->orderScans->count() === 1) {
+            $orderScan = $shipment->orderScans->first();
+        }
+
+        if (!$orderScan) {
+            return null;
+        }
+
+        ShipmentLine::query()
+            ->where('shipment_id', $shipment->id)
+            ->whereNull('shipment_order_scan_id')
+            ->update(['shipment_order_scan_id' => $orderScan->id]);
+
+        return $orderScan;
+    }
+
     /* ═══════════════════════════════════════════════════════════════════
      |  OPSI C — REKONSILIASI PESANAN
      |  Alur: scan batch bebas → input no pesanan → auto-match → confirm
@@ -2389,6 +2472,7 @@ class ShipmentController extends Controller
                 ->with('message', 'Hanya shipment draft yang bisa direkonsiliasi.');
         }
 
+        $this->autoMapItemFirstLines($shipment);
         $shipment->load(['store', 'warehouse', 'lines.item', 'orderScans.lines.item']);
 
         $warehouse = $this->whRts();
@@ -2445,34 +2529,16 @@ class ShipmentController extends Controller
                 ->with('message', 'Hanya shipment draft yang bisa dikonfirmasi.');
         }
 
-        $shipment->load(['store', 'warehouse', 'lines.item', 'orderScans.lines.item']);
+        $this->autoMapItemFirstLines($shipment);
+        $shipment->load(['lines.item', 'orderScans.lines.item']);
 
         $warehouse = $this->whRts();
         $stockInsufficient = $warehouse
             ? $this->checkStockSufficiency($shipment, $warehouse)
             : [];
 
-        $batchPool = $shipment->lines->mapWithKeys(fn ($l) => [
-            $l->item_id => [
-                'item_id'   => $l->item_id,
-                'item_code' => $l->item?->code ?? '-',
-                'item_name' => $l->item?->name ?? '-',
-                'qty'       => (int) $l->qty_scanned,
-            ],
-        ]);
-
-        $savedOrderScans = $shipment->orderScans
-            ->sortBy('id')
-            ->map(fn ($scan) => [
-                'no' => $scan->order_no,
-                'decision' => $scan->status ?: 'pending',
-            ])
-            ->values();
-
         return view('sales.shipments.confirm_orders', compact(
             'shipment',
-            'batchPool',
-            'savedOrderScans',
             'stockInsufficient'
         ));
     }

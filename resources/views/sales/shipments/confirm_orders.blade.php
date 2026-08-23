@@ -5,7 +5,7 @@
 
 @push('head')
 <style>
-.sd-wrap{max-width:1040px;margin-inline:auto;padding:.7rem .75rem 5rem}
+.sd-wrap{max-width:1040px;margin-inline:auto;padding:.7rem .75rem 1.5rem}
 .sd-topbar{position:sticky;top:0;z-index:250;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.55rem .75rem;background:var(--card,#fff);border-bottom:1px solid rgba(148,163,184,.18)}
 .sd-code{font-weight:900;font-size:1rem;color:#111827}
 .sd-spacer{flex:1}
@@ -15,16 +15,7 @@
 .sd-primary{background:#334155!important;border-color:#334155!important;color:#fff!important}
 .sd-danger{color:#991b1b;border-color:rgba(153,27,27,.25);background:transparent}
 .sd-status{font-weight:850;color:#334155;background:rgba(148,163,184,.08)}
-.sd-flow{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:.6rem 0;padding:.45rem .55rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;background:var(--card,#fff)}
-.sd-step{border:1px solid rgba(148,163,184,.25);border-radius:7px;padding:.18rem .5rem;font-size:.72rem;font-weight:800;color:#64748b}
-.sd-step.done{background:rgba(148,163,184,.08);color:#334155}
-.sd-step.active{background:#334155;border-color:#334155;color:#fff}
-.sd-sep{color:#cbd5e1;font-size:.72rem}
-.sd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
 .sd-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
-.sd-kpi{padding:.65rem .75rem}
-.sd-label{font-size:.72rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
-.sd-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.18rem;font-weight:900;color:#111827;margin-top:.12rem}
 .sd-muted{color:#64748b;font-size:.8rem}
 .sd-head{display:flex;align-items:center;gap:.55rem;justify-content:space-between;padding:.7rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}
 .sd-title{font-weight:900;color:#334155}
@@ -47,25 +38,51 @@
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
-.sd-warning{margin-bottom:.65rem;padding:.65rem .75rem;border:1px solid rgba(245,158,11,.28);border-radius:8px;color:#92400e;background:rgba(245,158,11,.08);font-size:.8rem;font-weight:650}
-.sd-match-panel{margin-bottom:.65rem;border:1px solid rgba(148,163,184,.22);border-radius:8px;background:var(--card,#fff);padding:.65rem .75rem}.sd-match-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem}.sd-match-title{font-size:.82rem;font-weight:900;color:#334155}.sd-match-note{margin-top:.18rem;color:#64748b;font-size:.72rem}.sd-toggle{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;min-width:68px;min-height:32px;border:1px solid rgba(148,163,184,.35);border-radius:999px;padding:.22rem .5rem;background:#f8fafc;color:#64748b;font-size:.68rem;font-weight:900;cursor:pointer;transition:.15s ease}.sd-toggle-dot{width:10px;height:10px;border-radius:999px;background:#94a3b8}.sd-toggle.is-on{border-color:#334155;background:#334155;color:#fff}.sd-toggle.is-on .sd-toggle-dot{background:#fff}
 .sd-stock-warning{margin-bottom:.65rem;border:1px solid rgba(220,38,38,.24);border-radius:8px;background:rgba(254,242,242,.72);overflow:hidden}
 .sd-stock-head{padding:.65rem .75rem;border-bottom:1px solid rgba(220,38,38,.16);color:#991b1b;font-size:.8rem;font-weight:900}
 .sd-stock-table-wrap{overflow:auto}.sd-stock-table{width:100%;border-collapse:collapse}.sd-stock-table th,.sd-stock-table td{padding:.5rem .65rem;border-bottom:1px solid rgba(220,38,38,.12);font-size:.78rem}.sd-stock-table th{text-align:left;color:#991b1b;font-size:.68rem;text-transform:uppercase;letter-spacing:.02em;background:rgba(254,226,226,.45)}.sd-stock-table td{color:#475569}.sd-stock-table tr:last-child td{border-bottom:0}.sd-stock-table .sd-stock-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}.sd-stock-table .sd-stock-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sd-stock-table .sd-stock-short{color:#dc2626;font-weight:900}
-.sd-tabs{display:flex;gap:.25rem;margin-bottom:.65rem;border-bottom:1px solid rgba(148,163,184,.18);flex-wrap:wrap}
-.sd-tab{appearance:none;display:inline-flex;align-items:center;gap:.4rem;border:none;background:transparent;color:#64748b;font-weight:800;font-size:.82rem;padding:.55rem .8rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.sd-tab.active{color:#111827;border-bottom-color:#334155}
-.sd-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;border-radius:999px;background:rgba(148,163,184,.16);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.7rem;font-weight:900}
-.sd-tab.active .sd-tab-count{background:#334155;color:#fff}
-.sd-tabpane{display:none}.sd-tabpane.active{display:block}
-.sd-table-wrap{overflow:auto;border:1px solid rgba(148,163,184,.16);border-radius:8px}
-.sd-table{width:100%;border-collapse:collapse}.sd-table th,.sd-table td{padding:.55rem .65rem;border-bottom:1px solid rgba(148,163,184,.12);vertical-align:middle}.sd-table th{text-align:left;font-size:.72rem;color:#64748b;font-weight:900;text-transform:uppercase;background:rgba(148,163,184,.04)}.sd-table td{font-size:.86rem;color:#334155}
-.sd-table td.sd-r{text-align:right}.sd-code-cell{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}.sd-name{color:#64748b;font-size:.8rem;margin-top:.08rem}.sd-total td{font-weight:900;color:#111827;background:rgba(148,163,184,.04)}
-.sd-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.sd-meta-box{border:1px solid rgba(148,163,184,.16);border-radius:8px;padding:.55rem .65rem}
-.sd-actions{display:flex;justify-content:space-between;align-items:center;gap:.55rem;flex-wrap:wrap;margin-top:.15rem}.sd-actions-group{display:flex;gap:.45rem;flex-wrap:wrap}
 @media(max-width:860px){
-  .sd-wrap{padding:.5rem .5rem 6rem}.sd-topbar{padding:.5rem}.sd-code{flex:1;min-width:150px;font-size:1.02rem}.sd-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}.sd-kpi{padding:.58rem .62rem}.sd-value{font-size:1.08rem}.sd-head{padding:.65rem .7rem}.sd-body{padding:.65rem .7rem}.sd-order{grid-template-columns:1fr;align-items:flex-start;gap:.4rem}.sd-actions,.sd-actions-group{width:100%}.sd-actions-group .sd-btn,.sd-actions form{width:100%}.sd-actions form .sd-btn{width:100%}.sd-meta{grid-template-columns:1fr}.sd-table-wrap{border:none;border-radius:0;overflow:visible}.sd-table,.sd-table tbody,.sd-table tr,.sd-table td{display:block;width:100%}.sd-table thead{display:none}.sd-table tr{border:1px solid rgba(148,163,184,.16);border-radius:8px;margin-bottom:.45rem;padding:.55rem .6rem;background:var(--card,#fff)}.sd-table td{border:0;padding:0}.sd-table td.sd-r{text-align:left;margin-top:.35rem}.sd-name{display:none}.sd-total{display:none!important}
+  .sd-wrap{padding:.5rem .5rem 1.5rem}.sd-topbar{padding:.5rem}.sd-code{flex:1;min-width:150px;font-size:1.02rem}.sd-head{padding:.65rem .7rem}.sd-body{padding:.65rem .7rem}.sd-order{grid-template-columns:1fr;align-items:flex-start;gap:.4rem}
 }
+.sd-topbar .sd-topbar-nav { white-space:nowrap; }
+.sd-inline-form { display:contents; }
+.sd-topbar .sd-topbar-primary { white-space:nowrap; }
+@media(max-width:860px){
+  .sd-topbar .sd-topbar-nav { min-height:34px; padding-inline:.5rem; }
+  .sd-topbar .sd-topbar-primary { width:100%; order:5; }
+}
+
+/* Visual hierarchy: the submit action must be the clearest control. */
+.sd-topbar .sd-topbar-primary {
+  color:#fff!important;
+  background:#2563eb!important;
+  border-color:#2563eb!important;
+  font-weight:900;
+  box-shadow:0 3px 10px rgba(37,99,235,.28);
+}
+.sd-topbar .sd-topbar-primary:hover:not(:disabled) {
+  color:#fff!important;
+  background:#1d4ed8!important;
+  border-color:#1d4ed8!important;
+}
+.sd-topbar .sd-topbar-primary:disabled {
+  color:#64748b!important;
+  background:#e2e8f0!important;
+  border-color:#cbd5e1!important;
+  box-shadow:none;
+}
+.sd-topbar .sd-status {
+  color:#9a3412!important;
+  background:#fff7ed!important;
+  border-color:#fdba74!important;
+}
+.sd-topbar .sd-pill:not(.sd-status) b { color:#1d4ed8; }
+.sd-order-search input:focus {
+  border-color:#2563eb;
+  box-shadow:0 0 0 .16rem rgba(37,99,235,.14);
+}
+.sd-title { color:#0f172a; font-size:.9rem; }
+.sd-order-no { color:#0f172a; }
 </style>
 @endpush
 
@@ -80,48 +97,51 @@
     $totalQty = (int) $lines->sum('qty_scanned');
     $totalLines = (int) $lines->count();
     $pendingOrders = $orderScans->where('status', 'pending')->count();
+    $isItemFirst = ($shipment->scan_mode ?? 'item_first') === 'item_first';
 @endphp
 
 <div class="sd-topbar">
-    <a href="{{ route('sales.shipments.index') }}" class="sd-btn">Kembali</a>
+    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn sd-topbar-nav">
+        <i class="bi bi-box-seam" aria-hidden="true"></i> Scan Item
+    </a>
+    @if (!$isItemFirst)
+        <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-topbar-nav">
+            <i class="bi bi-upc-scan" aria-hidden="true"></i> Scan Order
+        </a>
+    @endif
+    <a href="{{ route('sales.shipments.index') }}" class="sd-btn sd-topbar-nav">
+        <i class="bi bi-list-ul" aria-hidden="true"></i> Daftar Shipment
+    </a>
     <span class="sd-code">{{ $shipment->code }}</span>
     <span class="sd-pill sd-status">{{ $statusLabel }}</span>
     <span class="sd-spacer"></span>
     <span class="sd-pill">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
-    <span class="sd-pill">Pesanan <b>{{ number_format($orderScans->count(), 0, ',', '.') }}</b></span>
+    @if ($isItemFirst)
+        <span class="sd-pill">Mapping <b>Otomatis</b></span>
+    @else
+        <span class="sd-pill">Pesanan <b>{{ number_format($orderScans->count(), 0, ',', '.') }}</b></span>
+    @endif
+    @if($statusKey === 'draft')
+        <form id="shipmentSubmitForm" class="sd-inline-form" action="{{ route('sales.shipments.submit', $shipment) }}" method="POST"
+              data-gf-confirm
+              data-gf-confirm-title="Submit shipment?"
+              data-gf-confirm-summary='@json(["orders" => $orderScans->count(), "items" => $totalLines, "qty" => $totalQty])'
+              data-gf-confirm-text="{{ $isItemFirst ? 'Mapping item otomatis · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty : 'Order discan: ' . $orderScans->count() . ' · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty }}. Stok akan dikurangi dari WH-RTS."
+              data-gf-confirm-ok="Submit"
+              data-gf-confirm-cancel="Batal">
+            @csrf
+            <button type="submit" class="sd-btn sd-primary sd-topbar-primary"
+                    title="{{ !empty($stockInsufficient) ? 'Stok WH-RTS belum cukup' : 'Submit shipment' }}"
+                    @disabled($lines->count() === 0 || !empty($stockInsufficient))>
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> Submit Shipment
+            </button>
+        </form>
+    @else
+        <a href="{{ route('sales.shipments.show', $shipment) }}" class="sd-btn sd-primary sd-topbar-primary">Lihat Detail</a>
+    @endif
 </div>
 
 <div class="sd-wrap">
-    <div class="sd-flow">
-        <span class="sd-step done">Scan Barang</span><span class="sd-sep">-&gt;</span>
-        <span class="sd-step done">Scan Pesanan</span><span class="sd-sep">-&gt;</span>
-        <span class="sd-step active">Konfirmasi Pesanan</span><span class="sd-sep">-&gt;</span>
-        <span class="sd-step">Simpan &amp; Kurangi Stok</span>
-    </div>
-
-    <div class="sd-grid">
-        <div class="sd-card sd-kpi"><div class="sd-label">Qty Batch</div><div class="sd-value">{{ number_format($totalQty, 0, ',', '.') }}</div></div>
-        <div class="sd-card sd-kpi"><div class="sd-label">SKU</div><div class="sd-value">{{ number_format($totalLines, 0, ',', '.') }}</div></div>
-        <div class="sd-card sd-kpi"><div class="sd-label">Pesanan</div><div class="sd-value">{{ number_format($orderScans->count(), 0, ',', '.') }}</div></div>
-        <div class="sd-card sd-kpi"><div class="sd-label">Status</div><div class="sd-value" style="font-size:1rem">{{ $statusLabel }}</div></div>
-    </div>
-
-    <div class="sd-warning">
-        Order di halaman ini masih berupa pencatatan. Stok WH-RTS akan dikurangi saat shipment disubmit.
-    </div>
-
-    <div class="sd-match-panel">
-        <div class="sd-match-row">
-            <div>
-                <div class="sd-match-title">Matching Marketplace / Fulfillment</div>
-                <div class="sd-match-note" id="matchingNote">OFF · Order disimpan sebagai pencatatan saja.</div>
-            </div>
-            <button type="button" class="sd-toggle" id="matchingToggle" aria-pressed="false">
-                <span class="sd-toggle-dot"></span><span id="matchingToggleLabel">OFF</span>
-            </button>
-        </div>
-        <input type="hidden" name="matching_enabled" id="matchingEnabledInput" value="0" form="shipmentSubmitForm">
-    </div>
 
     @if(!empty($stockInsufficient))
         <div class="sd-stock-warning" role="alert">
@@ -153,23 +173,37 @@
         </div>
     @endif
 
-    <div class="sd-tabs" role="tablist">
-        <button type="button" class="sd-tab active" data-tab="pesanan">Order <span class="sd-tab-count">{{ number_format($orderScans->count(), 0, ',', '.') }}</span></button>
-        <button type="button" class="sd-tab" data-tab="item">Item Batch <span class="sd-tab-count">{{ number_format($totalLines, 0, ',', '.') }}</span></button>
-        <button type="button" class="sd-tab" data-tab="info">Info Shipment</button>
-    </div>
-
-    <div class="sd-tabpane active" id="sd-tab-pesanan" role="tabpanel">
-        <div class="sd-card">
+    <div class="sd-card">
             <div class="sd-head">
-                <div><div class="sd-title">Order Tercatat</div><div class="sd-muted">Review grouping order/no resi dan item sebelum stok dikurangi.</div></div>
-                <span class="sd-pill">{{ number_format($pendingOrders, 0, ',', '.') }} tunda</span>
+                <div><div class="sd-title">{{ $isItemFirst ? 'Mapping Order & Item' : 'Order Tercatat' }}</div><div class="sd-muted">{{ $isItemFirst ? 'Item dipetakan otomatis dari shipment sebelum stok dikurangi.' : 'Review grouping order/no resi dan item sebelum stok dikurangi.' }}</div></div>
+                <span class="sd-pill">{{ $isItemFirst ? 'Otomatis' : number_format($pendingOrders, 0, ',', '.') . ' tunda' }}</span>
             </div>
             <div class="sd-order-search">
                 <input type="search" id="orderSearchInput" placeholder="Cari nomor order atau no resi..." autocomplete="off">
             </div>
             <div class="sd-body">
-                @if($orderScans->isEmpty())
+                @if($orderScans->isEmpty() && $isItemFirst)
+                    <div class="sd-order sd-order-group">
+                        <div class="sd-order-lead">
+                            <span class="sd-order-num">✓</span>
+                            <div>
+                                <div class="sd-order-no">ITEM SHIPMENT</div>
+                                <div class="sd-muted">Belum ada order spesifik; item dipakai sebagai mapping otomatis.</div>
+                            </div>
+                            <span class="sd-order-qty">x{{ number_format($totalQty, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="sd-order-items">
+                            @forelse($ungroupedLines as $line)
+                                <div class="sd-order-item">
+                                    <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div></div>
+                                    <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
+                                </div>
+                            @empty
+                                <div class="sd-muted" style="padding:.45rem 0">Belum ada item yang discan.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                @elseif($orderScans->isEmpty())
                     <div class="sd-empty">Belum ada nomor pesanan yang dikonfirmasi.</div>
                 @else
                     <div class="sd-list">
@@ -217,67 +251,11 @@
                     <div class="sd-empty" id="orderSearchEmpty" hidden>Tidak ada order/no resi yang cocok.</div>
                 @endif
             </div>
-        </div>
-    </div>
-
-    <div class="sd-tabpane" id="sd-tab-item" role="tabpanel">
-        <div class="sd-card"><div class="sd-head"><div><div class="sd-title">Item Batch</div><div class="sd-muted">Semua item yang akan diproses pada shipment ini.</div></div><span class="sd-pill">{{ number_format($totalLines, 0, ',', '.') }} SKU</span></div><div class="sd-body">
-            @if($lines->isEmpty())
-                <div class="sd-empty">Belum ada item.</div>
-            @else
-                <div class="sd-table-wrap"><table class="sd-table"><thead><tr><th>Item</th><th class="sd-r">Qty</th></tr></thead><tbody>
-                    @foreach($lines as $line)
-                        <tr><td><div class="sd-code-cell">{{ $line->item?->code ?? '-' }}</div><div class="sd-name">{{ $line->item?->name ?? '-' }}</div></td><td class="sd-r"><span class="sd-badge">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }} pcs</span></td></tr>
-                    @endforeach
-                    <tr class="sd-total"><td class="sd-r">Total</td><td class="sd-r">{{ number_format($totalQty, 0, ',', '.') }}</td></tr>
-                </tbody></table></div>
-            @endif
-        </div></div>
-    </div>
-
-    <div class="sd-tabpane" id="sd-tab-info" role="tabpanel">
-        <div class="sd-card"><div class="sd-head"><div class="sd-title">Info Shipment</div></div><div class="sd-body"><div class="sd-meta">
-            <div class="sd-meta-box"><div class="sd-label">Store</div><div class="sd-value" style="font-size:.95rem">{{ $shipment->store?->code ?? '-' }}</div><div class="sd-muted">{{ $shipment->store?->name ?? 'Belum dihubungkan' }}</div></div>
-            <div class="sd-meta-box"><div class="sd-label">Tanggal</div><div class="sd-value" style="font-size:.95rem">{{ $shipment->date ? $shipment->date->format('d M Y') : '-' }}</div><div class="sd-muted">Shipment manual</div></div>
-            <div class="sd-meta-box"><div class="sd-label">Warehouse</div><div class="sd-value" style="font-size:.95rem">{{ $shipment->warehouse?->code ?? 'WH-RTS' }}</div><div class="sd-muted">Stok dikurangi saat submit</div></div>
-        </div></div></div>
-    </div>
-
-    <div class="sd-actions">
-        <div class="sd-actions-group"><a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn">Kembali Scan</a><a href="{{ route('sales.shipments.index') }}" class="sd-btn">Daftar Shipment</a></div>
-        <div class="sd-actions-group">
-            @if($statusKey === 'draft')
-                <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="sd-btn sd-danger">Batalkan Shipment</a>
-                <form id="shipmentSubmitForm" action="{{ route('sales.shipments.submit', $shipment) }}" method="POST"
-                      data-gf-confirm
-                      data-gf-confirm-title="Submit shipment?"
-                      data-gf-confirm-summary='@json(["orders" => $orderScans->count(), "items" => $totalLines, "qty" => $totalQty])'
-                      data-gf-confirm-text="Order discan: {{ $orderScans->count() }} · Item/SKU: {{ $totalLines }} · Total qty: {{ $totalQty }}. Stok akan dikurangi dari WH-RTS."
-                      data-gf-confirm-ok="Submit"
-                      data-gf-confirm-cancel="Batal">
-                    @csrf
-                    <button type="submit" class="sd-btn sd-primary" title="{{ !empty($stockInsufficient) ? 'Stok WH-RTS belum cukup' : 'Submit shipment' }}" @disabled($lines->count() === 0 || !empty($stockInsufficient))>Submit Shipment</button>
-                </form>
-            @else
-                <a href="{{ route('sales.shipments.show', $shipment) }}" class="sd-btn sd-primary">Lihat Detail</a>
-            @endif
-        </div>
     </div>
 </div>
 
 <script>
 (function(){
-    var tabs = document.querySelectorAll('.sd-tab');
-    var panes = document.querySelectorAll('.sd-tabpane');
-    function activate(name){
-        tabs.forEach(function(tab){ tab.classList.toggle('active', tab.dataset.tab === name); });
-        panes.forEach(function(pane){ pane.classList.toggle('active', pane.id === 'sd-tab-' + name); });
-        try { history.replaceState(null, '', '#' + name); } catch(e) {}
-    }
-    tabs.forEach(function(tab){ tab.addEventListener('click', function(){ activate(tab.dataset.tab); }); });
-    var hash = (location.hash || '').replace('#', '');
-    if (['pesanan','item','info'].indexOf(hash) !== -1) activate(hash);
-
     var orderSearchInput = document.getElementById('orderSearchInput');
     var orderSearchEmpty = document.getElementById('orderSearchEmpty');
     var orderCards = document.querySelectorAll('[data-order-card]');
@@ -295,20 +273,6 @@
         if (orderSearchEmpty) orderSearchEmpty.hidden = visibleCount > 0;
     });
 
-    var matchingToggle = document.getElementById('matchingToggle');
-    var matchingToggleLabel = document.getElementById('matchingToggleLabel');
-    var matchingEnabledInput = document.getElementById('matchingEnabledInput');
-    var matchingNote = document.getElementById('matchingNote');
-    matchingToggle?.addEventListener('click', function(){
-        var enabled = matchingToggle.getAttribute('aria-pressed') !== 'true';
-        matchingToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        matchingToggle.classList.toggle('is-on', enabled);
-        if (matchingToggleLabel) matchingToggleLabel.textContent = enabled ? 'ON' : 'OFF';
-        if (matchingEnabledInput) matchingEnabledInput.value = enabled ? '1' : '0';
-        if (matchingNote) matchingNote.textContent = enabled
-            ? 'ON · Mode matching dipilih untuk integrasi marketplace.'
-            : 'OFF · Order disimpan sebagai pencatatan saja.';
-    });
 })();
 </script>
 @endsection
