@@ -804,7 +804,8 @@
                 padding-top: 0 !important;
                 text-align: right;
             }
-            .po-total-line:not(:last-child) { display: none !important; }
+            .po-total-line:not(:last-child) { display: flex !important; }
+            .po-total-line:nth-child(2) { display: none !important; }
             .po-total-line:last-child { border-top: 0; padding: 0; flex-direction: column; align-items: flex-end; }
             .po-total-key { font-size: .6rem; color: var(--muted); }
             .po-total-val { font-size: .95rem; font-weight: 900; }
@@ -996,6 +997,10 @@
             }
 
             .po-total-line:not(:last-child) {
+                display: flex !important;
+            }
+
+            .po-total-line:nth-child(2) {
                 display: none !important;
             }
 
@@ -1552,8 +1557,8 @@
             const btnAddBottom = document.getElementById('btn-add-line-bottom');
             const btnResetEmpty = document.getElementById('btn-reset-empty-lines');
 
-            const subtotalCell = document.getElementById('po-subtotal-cell');
             const subtotalMeta = document.getElementById('po-subtotal-meta');
+            const subtotalCell = document.getElementById('po-subtotal-cell') || subtotalMeta;
             const shippingMeta = document.getElementById('po-shipping-meta');
             const grandMeta = document.getElementById('po-grand-meta');
             const liveLines = document.getElementById('po-live-lines');
