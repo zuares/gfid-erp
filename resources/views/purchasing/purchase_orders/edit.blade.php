@@ -57,12 +57,12 @@
         <div class="shp-wrap pt-2">
             @include('purchasing.purchase_orders._form')
             
-            <div class="d-flex justify-content-end gap-2 mt-4 mb-2">
-                <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}" class="btn-shp-outline text-decoration-none">
-                    Batal
+            <div class="po-editor-actions mt-4 mb-2">
+                <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}" class="btn-shp-outline po-cancel-btn text-decoration-none">
+                    <i class="bi bi-arrow-left me-1"></i>Batal
                 </a>
-                <button type="submit" class="btn-shp-submit">
-                    Simpan PO
+                <button type="submit" class="btn-shp-submit po-submit-btn">
+                    <i class="bi bi-check2 me-1"></i>Simpan PO
                 </button>
             </div>
         </div>

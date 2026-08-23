@@ -143,9 +143,36 @@
             margin-bottom: .85rem;
         }
 
-        /* Focal card — Pembelian + Supplier */
+        /* Focal card — Supplier + Tanggal Dokumen */
         .po-focal {
             border: 1px solid var(--line);
+        }
+
+        .po-focal-fields {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .po-date-wrap {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .po-date-wrap input {
+            width: 100%;
+        }
+
+        .po-editor-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: .55rem;
+            align-items: center;
+        }
+
+        .po-editor-actions .btn {
+            min-height: 40px;
         }
 
         /* Supplier select lebih menonjol */
@@ -153,6 +180,17 @@
             font-size: .95rem;
             padding: .55rem .85rem;
         }
+
+        .po-td-item .js-item-suggest-input,
+        .po-td-qty .po-field,
+        .po-td-price .po-field {
+            min-height: 38px;
+            padding: .375rem .75rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
         .po-card .card-body {
             padding: .9rem 1rem;
         }
@@ -238,6 +276,209 @@
         .po-lines-table th {
             position: relative;
             overflow: visible;
+        }
+
+        /* Metadata akun tetap ringkas; input angka selalu mulai dari garis yang sama. */
+        .po-lines-table tbody td {
+            vertical-align: top;
+        }
+
+        .po-td-qty,
+        .po-td-price,
+        .po-td-total,
+        .po-td-action {
+            vertical-align: top !important;
+        }
+
+        .line-accounting-badge {
+            display: inline-flex !important;
+            align-items: center;
+            gap: .25rem;
+            min-height: 16px;
+            margin-top: .2rem !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            color: #94a3b8 !important;
+            box-shadow: none !important;
+            font-size: .62rem !important;
+            font-weight: 600 !important;
+            line-height: 1.1;
+        }
+
+        .line-accounting-badge i,
+        .line-accounting-badge span {
+            color: inherit !important;
+            -webkit-text-fill-color: currentColor !important;
+        }
+
+        .line-accounting-badge i {
+            font-size: .62rem;
+        }
+
+        .line-expacc-text {
+            margin-top: .2rem !important;
+            max-width: 100%;
+            color: #94a3b8 !important;
+            font-size: .62rem !important;
+            font-weight: 500;
+            line-height: 1.15;
+        }
+
+        .line-expacc-text > span {
+            display: flex;
+            align-items: center;
+            gap: .2rem;
+            min-width: 0;
+            white-space: nowrap;
+        }
+
+        .line-expacc-text .expacc-label-text {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #64748b !important;
+            font-weight: 600 !important;
+        }
+
+        .line-expacc-text > span,
+        .line-expacc-text .btn-edit-expacc {
+            color: #94a3b8 !important;
+        }
+
+        .line-expacc-text .btn-edit-expacc {
+            opacity: .75;
+        }
+
+        .line-expacc-hint {
+            display: flex;
+            align-items: center;
+            gap: .2rem;
+            margin-bottom: .25rem !important;
+            color: #a16207 !important;
+            font-size: .62rem !important;
+            font-weight: 600 !important;
+            line-height: 1.1;
+        }
+
+        .line-expacc-wrapper {
+            margin-top: .35rem !important;
+        }
+
+        .line-expacc-wrapper > div:first-child {
+            display: flex;
+            align-items: center;
+            gap: .2rem;
+            margin-bottom: .25rem !important;
+            line-height: 1.1;
+        }
+
+        .line-expacc-raw {
+            min-height: 32px;
+        }
+
+        .po-lines-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: .75rem 1rem;
+            border-top: 1px solid var(--line);
+            background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+        }
+
+        .po-lines-head {
+            display: flex;
+            align-items: flex-start !important;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .po-lines-head > div:first-child {
+            min-width: 0;
+        }
+
+        .po-lines-head-actions {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            flex-shrink: 0;
+        }
+
+        .po-lines-head-actions .btn {
+            min-height: 36px;
+        }
+
+        .po-add-label-short {
+            display: none;
+        }
+
+        .po-add-line-btn {
+            background: #2563eb !important;
+            border-color: #2563eb !important;
+            border-radius: 8px !important;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff;
+        }
+
+        .po-add-line-btn,
+        .po-add-line-btn i,
+        .po-add-line-btn span {
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+        }
+
+        .po-add-line-btn:hover,
+        .po-add-line-btn:focus-visible {
+            background: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff;
+        }
+
+        .po-submit-btn {
+            background: #2563eb !important;
+            border-color: #2563eb !important;
+            border-radius: 8px !important;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff;
+        }
+
+        .po-submit-btn,
+        .po-submit-btn i,
+        .po-submit-btn span {
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+        }
+
+        .po-submit-btn:hover,
+        .po-submit-btn:focus-visible {
+            background: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
+            color: #fff !important;
+            -webkit-text-fill-color: #fff;
+        }
+
+        .po-cancel-btn {
+            border-radius: 8px !important;
+        }
+
+        .po-reset-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .35rem;
+            min-height: 36px;
+            white-space: nowrap;
+        }
+
+        .po-lines-summary {
+            color: var(--muted);
+            font-size: .8rem;
+            font-weight: 700;
+            white-space: nowrap;
         }
 
         .item-suggest-wrap {
@@ -469,48 +710,29 @@
             .po-focal .card-body {
                 padding: .7rem !important;
             }
-            /* Pembelian + Tanggal: ringkas di satu baris */
-            .po-focal-top {
-                display: flex !important;
-                align-items: center;
-                gap: .5rem;
-                margin-bottom: .5rem !important;
-                flex-wrap: nowrap;
+            .po-focal-fields {
+                grid-template-columns: 1fr;
+                gap: .75rem;
             }
-            .po-focal-top > div:first-child {
-                flex: 1;
-                min-width: 0;
-                overflow: hidden;
-            }
-            .po-date-wrap {
-                flex: 0 0 auto;
-                min-width: 0 !important;
-                width: 108px;
-                margin-top: 0 !important;
-            }
-            .po-date-wrap .po-label { display: none; }
             .po-date-wrap input {
                 min-width: 0 !important;
                 width: 100%;
                 font-size: .8rem !important;
                 padding: .3rem .4rem;
                 min-height: 34px;
-                text-align: center;
             }
             .po-supplier-select {
                 min-height: 42px;
                 font-size: 16px !important;
             }
-            /* Detail Barang: input lebih kecil */
-            .js-item-suggest-input {
-                min-height: 36px;
-                font-size: 13px !important;
-            }
+            /* Detail Barang: semua input memakai rhythm yang sama */
+            .po-td-item .js-item-suggest-input,
             .po-td-qty .po-field,
             .po-td-price .po-field {
                 min-height: 36px;
                 font-size: 13px !important;
                 padding: .28rem .4rem;
+                border-radius: 10px;
             }
             .po-field { font-size: 14px !important; }
             .po-label {
@@ -538,8 +760,8 @@
                 padding-inline: .5rem;
                 font-size: .78rem;
             }
-            #btn-reset-empty-lines { display: none; }
-            #btn-add-line { display: none; }
+            #btn-reset-empty-lines { display: inline-flex; }
+            #btn-add-line { display: inline-flex; }
             .po-toolbar-summary { display: none; }
             /* + Barang bawah: posisi di bawah harga (kolom 2), bukan full-width */
             .d-block.d-lg-none.text-center.py-2 {
@@ -612,14 +834,14 @@
             .po-lines-table tbody {
                 display: block;
             }
-            /* ── 2-row card per baris ── */
+            /* ── Input utama satu baris: kode | qty | harga | hapus ── */
             .po-lines-table tbody tr {
                 display: grid;
-                grid-template-columns: 1fr 1fr auto;
-                grid-template-rows: auto auto;
+                grid-template-columns: minmax(0, 1.45fr) minmax(54px, .7fr) minmax(72px, 1fr) 32px;
+                grid-template-rows: auto;
                 align-items: start;
                 column-gap: .4rem;
-                row-gap: .3rem;
+                row-gap: 0;
                 width: 100%;
                 box-sizing: border-box;
                 margin: 0 0 .5rem;
@@ -640,13 +862,14 @@
                 padding: 0;
             }
             .po-col-no    { display: none !important; }
-            .po-td-item   { grid-column: 1 / span 2; grid-row: 1; min-width: 0; }
-            .po-td-action { grid-column: 3; grid-row: 1; position: static !important; display: flex !important; align-items: center; justify-content: flex-end; padding: 0 !important; }
+            .po-td-item   { grid-column: 1; grid-row: 1; min-width: 0; }
+            .po-td-action { grid-column: 4; grid-row: 1; position: static !important; display: flex !important; align-items: center; justify-content: flex-end; padding: 0 !important; }
             .po-td-action .btn { min-height: 32px; min-width: 32px; padding: .1rem .4rem; border-radius: 999px !important; font-weight: 800; font-size: .82rem; }
-            .po-td-qty    { grid-column: 1; grid-row: 2; display: block !important; width: auto !important; margin: 0 !important; }
-            .po-td-price  { grid-column: 2; grid-row: 2; display: block !important; width: auto !important; margin: 0 !important; }
+            .po-td-qty    { grid-column: 2; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
+            .po-td-price  { grid-column: 3; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
             .po-td-total  { display: none !important; }
-            .po-lines-no-money .po-td-qty { grid-column: 1 / span 2; }
+            .po-lines-no-money .po-td-qty { grid-column: 2; }
+            .po-lines-no-money .po-td-action { grid-column: 3; }
             .po-lines-table tbody td[data-label]::before { display: none !important; }
             .po-num-display { text-align: left; font-weight: 800; }
 
@@ -683,30 +906,346 @@
                 width: 5%
             }
         }
+
+        @media (max-width: 767.98px) {
+            .po-lines-head {
+                flex-wrap: wrap;
+                gap: .55rem;
+                align-items: center !important;
+                padding: .6rem .7rem .5rem !important;
+            }
+
+            .po-lines-head-actions {
+                margin-left: auto;
+            }
+
+            .po-lines-summary {
+                display: flex;
+                align-items: center;
+                font-size: .74rem;
+            }
+
+            .po-lines-head-actions #btn-reset-empty-lines {
+                min-height: 38px;
+                white-space: nowrap;
+            }
+
+            .po-reset-btn {
+                min-height: 34px;
+                padding: .3rem .55rem;
+                border-radius: 8px !important;
+                font-size: .7rem;
+            }
+
+            .po-lines-footer {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: .45rem;
+                padding: .55rem .65rem;
+            }
+
+            .po-lines-footer #btn-add-line {
+                width: auto;
+                min-height: 36px;
+                padding: .4rem .75rem;
+                border-radius: 8px !important;
+                font-size: .78rem;
+            }
+
+            .po-add-label-full {
+                display: none;
+            }
+
+            .po-add-label-short {
+                display: inline;
+            }
+
+            .po-meta-card {
+                display: block !important;
+            }
+
+            .po-meta-inputs {
+                display: grid !important;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: .55rem;
+                margin-bottom: .7rem !important;
+            }
+
+            .po-meta-inputs > div:first-child {
+                display: none !important;
+            }
+
+            .po-meta-inputs > div:nth-child(2),
+            .po-meta-inputs .po-meta-ongkir {
+                min-width: 0;
+                width: auto;
+            }
+
+            .po-meta-card .po-label {
+                display: block !important;
+                font-size: .62rem;
+                margin-bottom: .2rem;
+            }
+
+            .po-meta-totals {
+                border-top: 1px solid var(--line) !important;
+                padding-top: .55rem !important;
+                text-align: right;
+            }
+
+            .po-total-line:not(:last-child) {
+                display: none !important;
+            }
+
+            .po-total-line:last-child {
+                display: flex !important;
+                flex-direction: row;
+                align-items: baseline;
+                justify-content: space-between;
+                border-top: 0;
+                padding: 0;
+            }
+
+            .po-total-key {
+                font-size: .62rem;
+            }
+
+            .po-total-val {
+                font-size: 1rem;
+            }
+
+            .po-editor-actions {
+                position: sticky;
+                bottom: 0;
+                z-index: 1000;
+                margin-inline: -.5rem;
+                padding: .65rem .75rem;
+                display: grid;
+                grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr);
+                gap: .5rem;
+                background: color-mix(in srgb, var(--card) 94%, transparent);
+                border-top: 1px solid var(--line);
+                box-shadow: 0 -8px 20px rgba(15, 23, 42, .08);
+                backdrop-filter: blur(12px);
+            }
+
+            .po-editor-actions .btn {
+                width: 100%;
+                min-height: 42px;
+                margin: 0 !important;
+                padding-inline: .7rem;
+                font-size: .82rem;
+                border-radius: 8px !important;
+            }
+
+            .po-editor-actions .po-cancel-btn { order: 1; }
+            .po-editor-actions .po-submit-btn { order: 2; }
+
+            .shp-wrap {
+                padding-inline: .5rem;
+                padding-bottom: 8rem;
+            }
+
+            .shp-table-card {
+                margin-top: .5rem;
+                border-radius: 12px;
+                box-shadow: 0 2px 10px rgba(15, 23, 42, .05);
+            }
+
+            .shp-table-head {
+                padding: .7rem .75rem .6rem;
+            }
+
+            .po-lines-head > div:first-child > .text-muted,
+            .po-focal-fields > div:first-child > .text-muted {
+                display: none !important;
+            }
+
+            .po-focal-fields {
+                gap: .6rem;
+            }
+
+            .po-focal-fields > div[style] {
+                min-width: 0 !important;
+            }
+
+            .po-supplier-select,
+            .po-date-wrap input {
+                min-height: 42px !important;
+                font-size: 14px !important;
+            }
+
+            .po-lines-table tbody tr {
+                margin-bottom: .45rem;
+                padding: .6rem !important;
+                box-shadow: 0 2px 8px rgba(15, 23, 42, .05);
+            }
+
+            .po-td-item .js-item-suggest-input,
+            .po-td-qty .po-field,
+            .po-td-price .po-field {
+                min-height: 40px !important;
+                font-size: 14px !important;
+                padding: .35rem .5rem;
+                border-radius: 10px;
+            }
+
+            .line-accounting-badge {
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: .6rem !important;
+            }
+
+            .line-expacc-text,
+            .line-expacc-text > span {
+                font-size: .64rem !important;
+            }
+
+            .line-expacc-wrapper > div:first-child {
+                font-size: .64rem !important;
+            }
+
+            .line-expacc-raw {
+                min-height: 40px !important;
+                font-size: 14px !important;
+            }
+
+            .po-lines-footer .po-add-line-btn {
+                flex: 0 0 auto;
+                min-height: 36px;
+                padding-inline: .65rem;
+            }
+
+            .po-lines-summary {
+                justify-content: center;
+                margin-left: auto;
+                font-size: .7rem;
+            }
+
+            .po-lines-summary .po-total-live {
+                font-size: .82rem !important;
+            }
+
+            .po-meta-inputs select,
+            .po-meta-inputs input {
+                min-height: 40px;
+                font-size: 14px !important;
+            }
+
+            .po-editor-actions {
+                padding-bottom: calc(.65rem + env(safe-area-inset-bottom));
+            }
+
+            /* Mobile: kode, qty, dan harga tetap satu baris dengan konteks yang jelas. */
+            .po-lines-table tbody td[data-label]::before {
+                display: block !important;
+                margin-bottom: .18rem;
+                color: var(--muted);
+                font-size: .56rem;
+                font-weight: 800;
+                letter-spacing: .07em;
+                line-height: 1;
+                text-transform: uppercase;
+            }
+
+            .po-td-item::before { content: "Kode Barang" !important; }
+            .po-td-qty::before { content: "Qty" !important; }
+            .po-td-price::before { content: "Harga" !important; }
+
+            .po-td-item,
+            .po-td-qty,
+            .po-td-price {
+                min-width: 0 !important;
+            }
+
+            .po-td-item .item-suggest-wrap,
+            .po-td-item .js-item-suggest-input,
+            .po-td-qty .po-field,
+            .po-td-price .po-field {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .po-td-item .js-item-suggest-input,
+            .po-td-qty .po-field,
+            .po-td-price .po-field {
+                min-height: 40px !important;
+                padding: .35rem .5rem;
+                border-radius: 10px;
+            }
+
+            .po-meta-card {
+                padding: .65rem;
+            }
+
+            .po-meta-inputs {
+                gap: .45rem;
+                margin-bottom: .55rem !important;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .po-lines-table tbody tr {
+                grid-template-columns: minmax(0, 1.2fr) minmax(48px, .65fr) minmax(64px, .9fr) 30px;
+                column-gap: .28rem;
+                padding: .45rem;
+            }
+
+            .po-td-item .js-item-suggest-input,
+            .po-td-qty .po-field,
+            .po-td-price .po-field {
+                font-size: 13px !important;
+            }
+
+            .po-td-action .btn {
+                min-width: 30px;
+                width: 30px;
+            }
+        }
     </style>
 @endpush
 
-{{-- FOCAL: PEMBELIAN + SUPPLIER + TANGGAL --}}
+{{-- FOCAL: SUPPLIER + TANGGAL DOKUMEN --}}
 <div class="shp-table-card mb-3" data-order-type="{{ $orderType }}">
     <div class="shp-table-head">
         <div class="shp-table-title">Informasi PO</div>
     </div>
     <div style="padding:1.1rem 1.25rem .9rem;">
 
-        {{-- Row atas: status pembelian (kiri) + Tanggal (kanan) --}}
-        <div class="po-focal-top d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
-            <div style="min-width:0;flex:1;">
-                <div class="po-label mb-2">Pembelian</div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="badge rounded-pill text-bg-primary">Campuran</span>
-                    <span class="text-muted small">Bahan baku, support/ATK, packaging, dan barang jadi</span>
-                </div>
+        <div class="po-focal-fields">
+            <div>
+                <label for="po-supplier" class="po-label mb-1">Supplier</label>
+                <select name="supplier_id" id="po-supplier"
+                    class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
+                    required>
+                    <option value="">— Pilih Supplier —</option>
+                    @foreach ($suppliers as $sup)
+                        <option value="{{ $sup->id }}"
+                            @selected((string) $selectedSupplierId === (string) $sup->id)>
+                            {{ $sup->code }} — {{ $sup->name }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('supplier_id')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+                @if (auth()->user()?->role === 'owner')
+                    <div class="text-muted mt-1" style="font-size: .75rem;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        List supplier diambil dari <a href="{{ route('master.suppliers.index') }}" target="_blank" class="text-decoration-none fw-bold">Master Supplier</a>.
+                    </div>
+                @endif
             </div>
-            <div class="po-date-wrap" style="min-width:140px;">
-                <div class="po-label mb-1">Tanggal</div>
-                <input type="text" name="date" value="{{ $orderDate }}"
+
+            <div class="po-date-wrap">
+                <label for="po-document-date" class="po-label mb-1">Tanggal Dokumen</label>
+                <input type="text" id="po-document-date" name="date" value="{{ $orderDate }}"
                     class="form-control po-field gf-date-input @error('date') is-invalid @enderror"
-                    data-gf-date autocomplete="off" style="min-width:140px;">
+                    data-gf-date autocomplete="off">
                 @error('date')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -715,37 +1254,23 @@
 
         {{-- hidden input order_type --}}
         <input type="hidden" name="order_type" id="po-order-type-hidden" value="{{ $orderType }}">
-
-        {{-- Supplier --}}
-        <div class="po-label mb-1">Supplier</div>
-        <select name="supplier_id" id="po-supplier"
-            class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
-            required>
-            <option value="">— Pilih Supplier —</option>
-            @foreach ($suppliers as $sup)
-                <option value="{{ $sup->id }}"
-                    @selected((string) $selectedSupplierId === (string) $sup->id)>
-                    {{ $sup->code }} — {{ $sup->name }}
-                </option>
-            @endforeach
-        </select>
-        @error('supplier_id')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        @if (auth()->user()?->role === 'owner')
-            <div class="text-muted mt-1" style="font-size: .75rem;">
-                <i class="bi bi-info-circle me-1"></i>
-                List supplier dan pengaturannya diambil dari menu <a href="{{ route('master.suppliers.index') }}" target="_blank" class="text-decoration-none fw-bold">Master Supplier</a>.
-            </div>
-        @endif
     </div>
 </div>
 
 {{-- LINES --}}
 <div class="shp-table-card mb-3">
-    <div class="shp-table-head d-flex justify-content-between align-items-center">
-        <div class="shp-table-title">Detail Barang</div>
-        <span class="text-muted" style="font-size: .75rem;">Isi qty barang yang ingin dibeli.</span>
+    <div class="shp-table-head po-lines-head">
+        <div>
+            <div class="shp-table-title">Detail Barang</div>
+            <span class="text-muted" style="font-size: .75rem;">Isi item, qty, dan harga yang ingin dibeli.</span>
+        </div>
+        <div class="po-lines-head-actions">
+            <button type="button" id="btn-reset-empty-lines" class="btn-shp-outline po-reset-btn"
+                title="Hapus baris item yang masih kosong">
+                <i class="bi bi-eraser"></i>
+                <span>Reset Kosong</span>
+            </button>
+        </div>
     </div>
 
     <div class="table-responsive po-table-wrapper">
@@ -793,7 +1318,7 @@
                         $selectedAcc = collect($expenseAccounts)->firstWhere('id', $expAcc);
                         $allocationLabel = $alloc === 'expense'
                             ? 'Biaya' . ($selectedAcc ? ' · ' . $selectedAcc->code : '')
-                            : 'Persediaan / HPP';
+                            : 'HPP';
                     @endphp
 
                     <tr class="po-row">
@@ -802,7 +1327,7 @@
                         <td class="po-td-item" data-label="Item">
                             <x-item-suggest :items="$items" idName="lines[{{ $i }}][item_id]"
                                 :idValue="$lineItemId" :displayValue="$itemDisplay" :type="$itemSuggestType" :extraParams="$itemSuggestExtra" variant="mini"
-                                displayMode="code-name"
+                                displayMode="code-name" mobileDisplayMode="code"
                                 :minChars="1" />
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
@@ -833,7 +1358,7 @@
                                 </span>
                             </div>
                             <div class="line-expacc-wrapper mt-2" style="{{ ($alloc === 'expense' && !$expAcc) ? '' : 'display:none;' }}">
-                                <div style="font-size: 0.68rem; color: #d97706; font-weight: 700; margin-bottom: 2px;">
+                                <div class="line-expacc-hint">
                                     <i class="bi bi-exclamation-circle"></i> Item Biaya - Pilih Akun
                                 </div>
                                 <select name="lines[{{ $i }}][expense_account_id]" class="form-select form-select-sm line-expacc-raw" style="border-color: #fcd34d;">
@@ -882,12 +1407,12 @@
                         <td class="text-center align-middle line-index po-col-no">1</td>
 
                         <td class="po-td-item" data-label="Item">
-                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name"
+                            <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name" mobileDisplayMode="code"
                                 :showName="false" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
                                 placeholder="Masukan kode barang" />
                             <div class="line-accounting-badge mt-1" data-line-accounting-badge
                                  style="display:inline-flex;align-items:center;gap:.25rem;padding:.12rem .42rem;border-radius:999px;font-size:.64rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">
-                                <i class="bi bi-box-seam"></i><span data-line-accounting-text>Persediaan / HPP</span>
+                                <i class="bi bi-box-seam"></i><span data-line-accounting-text>HPP</span>
                             </div>
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">
                             <div class="line-expacc-text mt-1" style="display:none;">
@@ -896,7 +1421,7 @@
                                 </span>
                             </div>
                             <div class="line-expacc-wrapper mt-2" style="display:none;">
-                                <div style="font-size: 0.68rem; color: #d97706; font-weight: 700; margin-bottom: 2px;">
+                                <div class="line-expacc-hint">
                                     <i class="bi bi-exclamation-circle"></i> Item Biaya - Pilih Akun
                                 </div>
                                 <select name="lines[0][expense_account_id]" class="form-select form-select-sm line-expacc-raw" style="border-color: #fcd34d;">
@@ -938,19 +1463,16 @@
         </table>
     </div>
 
-    <div class="p-3 border-top d-flex justify-content-between align-items-center" style="background: rgba(148, 163, 184, .02); flex-wrap: wrap; gap: 1rem;">
-        <div class="text-muted" style="font-size: .88rem; font-weight: 600;">
+    <div class="po-lines-footer">
+        <button type="button" id="btn-add-line" class="btn-shp-submit po-add-line-btn" title="Tambah barang baru">
+            <i class="bi bi-plus-lg me-1"></i>
+            <span class="po-add-label-full">Tambah Barang</span>
+            <span class="po-add-label-short">Tambah</span>
+        </button>
+        <div class="po-lines-summary">
             <span class="mono po-total-live" id="po-live-lines" style="color:var(--primary); font-size:1.05rem;">0</span> item
             <span class="mx-2">·</span>
             <span class="mono po-total-live" id="po-live-qty" style="color:var(--primary); font-size:1.05rem;">0</span> qty
-        </div>
-        <div>
-            <button type="button" id="btn-reset-empty-lines" class="btn-shp-outline me-2">
-                Reset Kosong
-            </button>
-            <button type="button" id="btn-add-line" class="btn-shp-submit">
-                <i class="bi bi-plus-lg me-1"></i> Tambah Barang
-            </button>
         </div>
     </div>
 
@@ -1039,6 +1561,7 @@
 
             const canSeeMoney = @json($canSeeMoney);
 
+            const supplierSelect = document.querySelector('#po-supplier');
             const shippingDisplay = document.querySelector('.shipping-display');
             const shippingRaw = document.querySelector('.shipping-raw');
 
@@ -1263,7 +1786,7 @@
                         : '';
                     accountingText.textContent = alloc === 'expense'
                         ? `Biaya${accountCode ? ' · ' + accountCode : ''}`
-                        : 'Persediaan / HPP';
+                        : 'HPP';
                     accountingBadge.style.background = alloc === 'expense' ? '#fff7ed' : '#eff6ff';
                     accountingBadge.style.color = alloc === 'expense' ? '#c2410c' : '#1d4ed8';
                     accountingBadge.style.borderColor = alloc === 'expense' ? '#fed7aa' : '#bfdbfe';
@@ -1323,7 +1846,7 @@
                 const newBadge = newRow.querySelector('[data-line-accounting-badge]');
                 const newBadgeText = newRow.querySelector('[data-line-accounting-text]');
                 if (newBadge && newBadgeText) {
-                    newBadgeText.textContent = 'Persediaan / HPP';
+                    newBadgeText.textContent = 'HPP';
                     newBadge.style.background = '#eff6ff';
                     newBadge.style.color = '#1d4ed8';
                     newBadge.style.borderColor = '#bfdbfe';
@@ -1349,20 +1872,31 @@
 
             btnAddTop?.addEventListener('click', addNewRow);
             btnAddBottom?.addEventListener('click', addNewRow);
-            btnResetEmpty?.addEventListener('click', function () {
+            btnResetEmpty?.addEventListener('click', function (event) {
+                event.preventDefault();
                 const rows = Array.from(tableBody.querySelectorAll('tr'));
-                const removable = rows.filter((tr) => {
-                    const qty = parseFloat(tr.querySelector('.line-qty-raw')?.value || '0') || 0;
-                    const itemId = (tr.querySelector('.js-item-suggest-id')?.value || '').toString().trim();
-                    return rows.length > 1 && qty <= 0.0001 && itemId === '';
-                });
-
-                removable.forEach((tr) => tr.remove());
-
-                if (!tableBody.querySelector('tr')) {
-                    addNewRow();
+                if (rows.length <= 1) {
+                    recalcAll();
                     return;
                 }
+
+                const isEmptyRow = (tr) => {
+                    const itemId = (tr.querySelector('.js-item-suggest-id')?.value || '').toString().trim();
+                    const itemText = (tr.querySelector('.js-item-suggest-input')?.value || '').toString().trim();
+                    const qty = parseNumber(tr.querySelector('.line-qty-display')?.value || '');
+                    const price = parseNumber(tr.querySelector('.line-price-display')?.value || '');
+
+                    return itemId === '' && itemText === '' && qty <= 0.0001 && price <= 0.0001;
+                });
+
+                let removable = rows.filter(isEmptyRow);
+
+                // Jangan hapus seluruh tabel: selalu sisakan satu baris kosong.
+                if (removable.length === rows.length) {
+                    removable = removable.slice(0, -1);
+                }
+
+                removable.forEach((tr) => tr.remove());
 
                 renumberLines();
                 recalcAll();
@@ -1387,7 +1921,7 @@
                     const rowBadge = row.querySelector('[data-line-accounting-badge]');
                     const rowBadgeText = row.querySelector('[data-line-accounting-text]');
                     if (rowBadge && rowBadgeText) {
-                        rowBadgeText.textContent = 'Persediaan / HPP';
+                        rowBadgeText.textContent = 'HPP';
                         rowBadge.style.background = '#eff6ff';
                         rowBadge.style.color = '#1d4ed8';
                         rowBadge.style.borderColor = '#bfdbfe';

@@ -36,6 +36,7 @@
 
     // input display mode
     'displayMode' => 'code-name', // code-name | code | name
+    'mobileDisplayMode' => null, // optional mobile-only override
 
     // dropdown toggles (desktop)
     'showName' => true,
@@ -81,6 +82,7 @@
 <div class="item-suggest-wrap" data-type="{{ $type }}" data-item-category-id="{{ $itemCategoryId }}"
     data-min-chars="{{ (int) $minChars }}" data-max-results="{{ (int) $maxResults }}"
     data-autofocus="{{ $autofocus ? '1' : '0' }}" data-display-mode="{{ $displayMode }}"
+    data-mobile-display-mode="{{ $mobileDisplayMode ?? '' }}"
     data-show-name="{{ $showName ? '1' : '0' }}" data-show-category="{{ $showCategory ? '1' : '0' }}"
     data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}"
     data-skip-submit="{{ $skipSubmitValidation ? '1' : '0' }}">
@@ -236,6 +238,7 @@
                 const maxResults = parseInt(wrap.dataset.maxResults || "4", 10);
 
                 const displayMode = wrap.dataset.displayMode || 'code-name';
+                const mobileDisplayMode = wrap.dataset.mobileDisplayMode || displayMode;
                 const showName = wrap.dataset.showName === "1";
                 const showCategory = wrap.dataset.showCategory === "1";
 
@@ -261,6 +264,10 @@
                 }
 
                 if (input.value && displayMode === 'code') input.value = (input.value || '').toUpperCase();
+                if (isMobileViewport() && mobileDisplayMode === 'code' && hiddenId?.value) {
+                    const selectedInitial = initialItems.find(item => String(item.id) === String(hiddenId.value));
+                    if (selectedInitial?.code) input.value = selectedInitial.code.toUpperCase();
+                }
 
                 let timer = null;
                 let lastItems = [];
@@ -327,6 +334,7 @@
                     activeIndex = -1;
 
                     const mobile = isMobileViewport();
+                    const renderMode = mobile ? mobileDisplayMode : displayMode;
 
                     items.forEach((item) => {
                         const btn = document.createElement("button");
@@ -334,10 +342,10 @@
                         btn.className = "item-suggest-option list-group-item list-group-item-action";
 
                         let html;
-                        if (displayMode === 'name') {
+                        if (renderMode === 'name') {
                             html = `<div class='item-suggest-option-code'>${item.name || ''}</div>`;
                             html += `<div class='item-suggest-option-name'>${(item.code || '').toUpperCase()}</div>`;
-                        } else if (displayMode === 'code-name') {
+                        } else if (renderMode === 'code-name') {
                             html = `<div class='item-suggest-option-code'>${item.name || ''}</div>`;
                             const sub = [];
                             if (item.code) sub.push((item.code || '').toUpperCase());
@@ -367,11 +375,12 @@
 
                 function setSelection(item) {
                     const mobile = isMobileViewport();
+                    const selectionMode = mobile ? mobileDisplayMode : displayMode;
                     let text;
 
-                    if (displayMode === 'name') {
+                    if (selectionMode === 'name') {
                         text = item.name || item.code || '';
-                    } else if (displayMode === 'code-name') {
+                    } else if (selectionMode === 'code-name') {
                         text = item.name || item.code || '';
                         if (!mobile && item.code && item.name) text += " — " + (item.code || '').toUpperCase();
                     } else {
