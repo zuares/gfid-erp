@@ -2014,9 +2014,29 @@
                 if (el.classList.contains('line-qty-display')) selectAllLater(el);
             }, true);
 
-            // userEdited price flag
+            // Keep the raw values in sync while typing so mobile submit
+            // cannot send a stale qty (usually 0) to the server.
             tableBody.addEventListener('input', function(e) {
-                if (e.target.classList.contains('line-price-display')) e.target.dataset.userEdited = '1';
+                const tr = e.target.closest('tr');
+                if (!tr) return;
+
+                if (e.target.classList.contains('line-qty-display')) {
+                    syncRowRaw(tr);
+                    recalcAll();
+                }
+
+                if (e.target.classList.contains('line-price-display')) {
+                    e.target.dataset.userEdited = '1';
+                    syncRowRaw(tr);
+                    recalcAll();
+                }
+            });
+
+            // Final safety net for direct clicks/taps on the submit button.
+            const poForm = tableBody.closest('form');
+            poForm?.addEventListener('submit', function() {
+                tableBody.querySelectorAll('tr').forEach(syncRowRaw);
+                recalcAll();
             });
 
             // blur format
