@@ -598,9 +598,9 @@
                                         'cancelled' => 'Dibatalkan',
                                         default => ucfirst($uiStatus),
                                     };
-                                    // Fallback untuk shipment lama yang dibuat sebelum scan_mode disimpan.
-                                    $isOrderFirst = ($shipment->scan_mode ?? 'item_first') === 'order_first'
-                                        || (($shipment->scan_mode ?? null) === 'item_first' && (int) ($shipment->order_scans_count ?? 0) > 0);
+                                    // Mode scan adalah pilihan awal shipment. Jumlah order yang
+                                    // sudah tercatat tidak boleh mengubah label mode menjadi order_first.
+                                    $isOrderFirst = ($shipment->scan_mode ?? 'item_first') === 'order_first';
                                     $modeLabel = $isOrderFirst ? 'Order dulu' : 'Item dulu';
                                     $stockBlocked = !empty($shipment->stock_insufficient_calc);
                                     $actionRoute = $uiStatus === 'draft'
