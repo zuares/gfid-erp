@@ -147,23 +147,104 @@
     body[data-theme="dark"] .divider{ background: rgba(51, 65, 85, 0.85); }
     .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
 
+    /* Minimal list hierarchy */
+    .ship-topbar{
+        position:sticky;
+        top:0;
+        z-index:100;
+        padding:.7rem .85rem;
+        margin-bottom:.75rem;
+        border-radius:0 0 10px 10px;
+        box-shadow:0 4px 16px rgba(15,23,42,.04);
+    }
+    .ship-heading{ min-width:250px; }
+    .ship-eyebrow{
+        margin-bottom:.15rem;
+        color:#94a3b8;
+        font-size:.62rem;
+        font-weight:800;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+    }
+    .ship-topbar .title{ font-size:1.12rem; font-weight:850; color:#0f172a; }
+    .ship-topbar .sub{ margin-top:.12rem; }
+    .ship-topbar .kpis{ margin-top:.5rem; }
+    .ship-topbar .kpi{ background:#f8fafc; }
+    .ship-topbar .kpi .val{ color:#0f172a; font-weight:850; }
+    .ship-topbar .kpi.kpi-draft .val{ color:#475569; }
+    .ship-topbar .kpi.kpi-submitted .val{ color:#1d4ed8; }
+    .ship-topbar .kpi.kpi-posted .val{ color:#15803d; }
+    .header-actions .btn-ship-primary{ min-height:36px; padding-inline:1rem; font-weight:800; }
+    .filter-bar{ align-items:flex-start; padding:.7rem; }
+    .filter-heading{ padding-top:.35rem; color:#0f172a; }
+    .filter-heading i{ margin-right:.25rem; color:#2563eb; }
+    .filter-input-wrap{ position:relative; min-width:0; }
+    .filter-input-wrap i{ position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
+    .filter-input-wrap .filter-input{ padding-left:2rem; }
+    .filter-advanced-label{ display:none; }
+    .list-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.7rem .8rem; border-bottom:1px solid var(--shp-border); }
+    .list-toolbar-title{ color:#0f172a; font-size:.86rem; font-weight:850; }
+    .list-toolbar-sub{ margin-left:.35rem; color:#94a3b8; font-size:.72rem; }
+    .list-count{ display:inline-flex; align-items:center; min-height:28px; padding:.15rem .55rem; border:1px solid rgba(37,99,235,.18); border-radius:999px; background:#eff6ff; color:#1d4ed8; font-size:.7rem; font-weight:800; white-space:nowrap; }
+    .code-link{ display:inline-block; color:#1d4ed8!important; font-size:.8rem; font-weight:850; }
+    .code-link:hover{ color:#1e40af!important; }
+    .shipment-date{ margin-top:.18rem; color:#64748b; font-size:.7rem; }
+    .shipment-store{ margin-top:.18rem; color:#475569; font-size:.72rem; }
+    .mode-badge{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.2rem .5rem; font-size:.68rem; font-weight:800; white-space:nowrap; }
+    .mode-badge::before{ content:''; width:6px; height:6px; border-radius:999px; background:currentColor; }
+    .mode-item{ color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; }
+    .mode-order{ color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; }
+    .package-summary{ display:grid; gap:.12rem; }
+    .package-main{ color:#0f172a; font-size:.78rem; font-weight:850; }
+    .package-sub{ color:#64748b; font-size:.7rem; }
+    .row-draft{ background:rgba(239,246,255,.22); }
+    .row-draft:hover{ background:rgba(239,246,255,.58)!important; }
+    .ship-row-action .btn-ship-primary{ color:#fff!important; background:#2563eb!important; border-color:#2563eb!important; }
+    .ship-row-action .btn-ship-primary:hover{ background:#1d4ed8!important; border-color:#1d4ed8!important; }
+    .action-label{ margin-left:.22rem; }
+    .empty-icon{ display:grid; place-items:center; width:42px; height:42px; margin:0 auto .65rem; border-radius:12px; background:#eff6ff; color:#2563eb; font-size:1.1rem; }
+    .empty-title{ color:#0f172a; font-size:.9rem; font-weight:850; }
+    .empty-sub{ margin-top:.25rem; font-size:.78rem; }
+    .list-footer{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.65rem .8rem .8rem; border-top:1px solid var(--shp-border); }
+    .list-footer .pagination{ margin:0; }
+    body[data-theme="dark"] .ship-topbar .title,
+    body[data-theme="dark"] .filter-heading,
+    body[data-theme="dark"] .list-toolbar-title,
+    body[data-theme="dark"] .package-main,
+    body[data-theme="dark"] .empty-title{ color:#f1f5f9; }
+    body[data-theme="dark"] .ship-topbar .kpi{ background:#0f172a; }
+    body[data-theme="dark"] .ship-topbar .kpi .val{ color:#e2e8f0; }
+    body[data-theme="dark"] .shipment-store,
+    body[data-theme="dark"] .shipment-date,
+    body[data-theme="dark"] .package-sub{ color:#94a3b8; }
+    body[data-theme="dark"] .row-draft{ background:rgba(30,64,175,.12); }
+
     @media (max-width: 768px) {
         .page-wrap{ padding:.5rem .5rem 4rem; }
         .ship-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
-        .title{ font-size:1.05rem; }
-        .sub{ display:none; }
+        .ship-heading{ min-width:0; width:100%; }
+        .ship-topbar .sub{ display:block; }
+        .ship-topbar .kpis{ margin-top:.45rem; }
+        .ship-topbar .kpi{ flex:1; justify-content:space-between; }
         .header-actions{ width:100%; justify-content:flex-start; }
         .header-actions .btn{ flex:1; }
         .filter-bar{ display:block; padding:.65rem; }
         .filter-heading{ margin-bottom:.5rem; }
         .shipment-filter-form{ display:grid; grid-template-columns:1fr 1fr; width:100%; }
-        .shipment-filter-form .filter-input{ grid-column:1 / -1; width:100%; }
+        .shipment-filter-form .filter-input-wrap{ grid-column:1 / -1; width:100%; }
+        .shipment-filter-form .filter-input{ width:100%; }
         .shipment-filter-form .filter-date{ width:100%; }
         .shipment-filter-form .filter-label{ display:none; }
         .shipment-filter-form .btn{ width:100%; }
         .filter-select{ width:100%; min-height:40px; }
         .shipment-filter-form .btn{ min-height:40px; }
         .kpis{ display:none; }
+        .ship-topbar .kpis{ display:flex; }
+        .list-toolbar{ align-items:flex-start; }
+        .list-toolbar-sub{ display:block; margin:.15rem 0 0; }
+        .list-footer{ display:block; }
+        .list-footer .pagination{ margin-top:.6rem; }
+        .action-label{ display:inline; }
         .table-responsive{ max-height:62vh; overflow:auto; }
         .table-list thead{ display:none; }
         .table-list,
@@ -401,15 +482,16 @@
     @endif
 
     <div class="ship-topbar">
-        <div>
-            <div class="title">Shipment</div>
-            <div class="sub">Dokumen barang keluar WH-RTS.</div>
+        <div class="ship-heading">
+            <div class="ship-eyebrow">Operasional gudang</div>
+            <div class="title">Daftar Shipment</div>
+            <div class="sub">Pilih shipment untuk melanjutkan scan atau melihat detail.</div>
 
             <div class="kpis">
-                <span class="kpi"><span class="lbl">Total</span><span class="val">{{ number_format($kpi['total'], 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Draft</span><span class="val">{{ number_format($kpi['draft'], 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Submitted</span><span class="val">{{ number_format($kpi['submitted'], 0, ',', '.') }}</span></span>
-                <span class="kpi"><span class="lbl">Posted</span><span class="val">{{ number_format($kpi['posted'], 0, ',', '.') }}</span></span>
+                <span class="kpi"><span class="lbl">Semua</span><span class="val">{{ number_format($kpi['total'], 0, ',', '.') }}</span></span>
+                <span class="kpi kpi-draft"><span class="lbl">Draft</span><span class="val">{{ number_format($kpi['draft'], 0, ',', '.') }}</span></span>
+                <span class="kpi kpi-submitted"><span class="lbl">Diproses</span><span class="val">{{ number_format($kpi['submitted'], 0, ',', '.') }}</span></span>
+                <span class="kpi kpi-posted"><span class="lbl">Selesai</span><span class="val">{{ number_format($kpi['posted'], 0, ',', '.') }}</span></span>
             </div>
         </div>
 
@@ -425,17 +507,20 @@
             @endif
 
             <a href="{{ route('sales.shipments.create') }}" class="btn btn-sm btn-ship-primary btn-pill">
-                Shipment Baru
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Shipment Baru
             </a>
         </div>
     </div>
 
     <div class="filter-bar">
-        <div class="filter-heading">Filter daftar<small>Cari dan saring shipment</small></div>
+        <div class="filter-heading"><i class="bi bi-search" aria-hidden="true"></i> Cari Shipment<small>Gunakan kode, order, atau resi</small></div>
         <form method="GET" class="shipment-filter-form">
             <input type="hidden" name="sort" value="{{ $sort }}">
             <input type="hidden" name="direction" value="{{ $direction }}">
-            <input type="search" name="q" value="{{ $search }}" class="form-control form-control-sm filter-input" placeholder="Cari kode shipment / order / resi..." autocomplete="off">
+            <div class="filter-input-wrap">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="search" name="q" value="{{ $search }}" class="form-control form-control-sm filter-input" placeholder="Kode shipment / order / resi" autocomplete="off" aria-label="Cari kode shipment, order, atau resi">
+            </div>
             <select name="status" class="form-select form-select-sm filter-select" aria-label="Filter status">
                 <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Semua status</option>
                 <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Draft</option>
@@ -450,7 +535,7 @@
             </select>
             <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm filter-date" aria-label="Dari tanggal" title="Dari tanggal">
             <input type="date" name="date_to" value="{{ $dateTo }}" class="form-control form-control-sm filter-date" aria-label="Sampai tanggal" title="Sampai tanggal">
-            <button type="submit" class="btn btn-sm btn-ship-outline btn-pill">Filter</button>
+            <button type="submit" class="btn btn-sm btn-ship-primary btn-pill">Terapkan</button>
             @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo)
                 <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill">Reset</a>
             @endif
@@ -461,21 +546,31 @@
         <div class="card-body p-0">
             @if ($shipments->count() === 0)
                 <div class="empty">
-                    Belum ada shipment.
-                    <div class="mt-1">Klik <b>Shipment Baru</b> untuk mulai scan.</div>
+                    <div class="empty-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div>
+                    <div class="empty-title">Belum ada shipment yang cocok</div>
+                    <div class="empty-sub">Coba ubah filter atau klik <b>Shipment Baru</b> untuk mulai.</div>
+                    @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo)
+                        <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill mt-3">Hapus Filter</a>
+                    @endif
                 </div>
             @else
+                <div class="list-toolbar">
+                    <div>
+                        <span class="list-toolbar-title">Shipment terbaru</span>
+                        <span class="list-toolbar-sub">Klik kode atau aksi untuk membuka shipment.</span>
+                    </div>
+                    <span class="list-count">{{ number_format($shipments->total(), 0, ',', '.') }} data</span>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle table-list">
                         <thead>
                             <tr>
                                 <th style="width: 46px;">#</th>
-                                <th style="width: 135px;"><a class="table-sort {{ $sort === 'date' ? 'active' : '' }}" href="{{ $sortUrl('date') }}">Tanggal &amp; Jam <span class="table-sort-icon">{{ $sortIcon('date') }}</span></a></th>
-                                <th style="width: 210px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Shipment <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
-                                <th class="text-end" style="width: 100px;"><a class="table-sort {{ $sort === 'order_scans_count' ? 'active' : '' }}" href="{{ $sortUrl('order_scans_count') }}">Pesanan <span class="table-sort-icon">{{ $sortIcon('order_scans_count') }}</span></a></th>
-                                <th class="text-end" style="width: 90px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Item/SKU <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
+                                <th style="min-width: 220px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Shipment <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
+                                <th style="width: 125px;">Mode Scan</th>
+                                <th style="width: 145px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Isi Paket <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
                                 <th style="width: 130px;"><a class="table-sort {{ $sort === 'status' ? 'active' : '' }}" href="{{ $sortUrl('status') }}">Status <span class="table-sort-icon">{{ $sortIcon('status') }}</span></a></th>
-                                <th style="width: 90px;"></th>
+                                <th style="width: 125px;">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -496,25 +591,27 @@
                                         default => 'st-submitted',
                                     };
 
-                                    $statusLabel = ucfirst($uiStatus);
+                                    $statusLabel = match ($uiStatus) {
+                                        'draft' => 'Draft',
+                                        'submitted' => 'Diproses',
+                                        'posted' => 'Selesai',
+                                        'cancelled' => 'Dibatalkan',
+                                        default => ucfirst($uiStatus),
+                                    };
                                     // Fallback untuk shipment lama yang dibuat sebelum scan_mode disimpan.
                                     $isOrderFirst = ($shipment->scan_mode ?? 'item_first') === 'order_first'
                                         || (($shipment->scan_mode ?? null) === 'item_first' && (int) ($shipment->order_scans_count ?? 0) > 0);
+                                    $modeLabel = $isOrderFirst ? 'Order dulu' : 'Item dulu';
                                     $stockBlocked = !empty($shipment->stock_insufficient_calc);
                                     $actionRoute = $uiStatus === 'draft'
                                         ? route($isOrderFirst ? 'sales.shipments.confirm_orders' : 'sales.shipments.edit', $shipment)
                                         : route('sales.shipments.show', $shipment);
-                                    $actionLabel = $uiStatus === 'draft' ? 'Lanjutkan' : 'Detail';
+                                    $actionLabel = $uiStatus === 'draft' ? 'Lanjut scan' : 'Lihat detail';
                                 @endphp
 
-                                <tr>
+                                <tr class="{{ $uiStatus === 'draft' ? 'row-draft' : '' }}">
                                     <td class="text-muted small mobile-hide">
                                         {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
-                                    </td>
-
-                                    <td class="small mobile-hide">
-                                        <div>{{ $fmtDate($shipment->date, 'd M Y') }}</div>
-                                        <div class="muted" style="font-size:.64rem;">{{ $fmtDate($shipment->created_at, 'H:i') }} WIB</div>
                                     </td>
 
                                     <td>
@@ -524,25 +621,35 @@
                                                     {{ $shipment->code }}
                                                 </a>
 
+                                                <div class="shipment-date">
+                                                    {{ $fmtDate($shipment->date, 'd M Y') }} · {{ $fmtDate($shipment->created_at, 'H:i') }} WIB
+                                                </div>
+                                                @if($shipment->store)
+                                                    <div class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</div>
+                                                @endif
+
                                                 <div class="ship-row-meta d-md-none">
-                                                    <span>{{ $fmtDate($shipment->date, 'd M Y') }}</span>
-                                                    <span>{{ $fmtDate($shipment->created_at, 'H:i') }}</span>
-                                                    <span>Order {{ number_format($orderCount, 0, ',', '.') }}</span>
-                                                    <span>Item {{ number_format($itemCount, 0, ',', '.') }}</span>
+                                                    <span>{{ $modeLabel }}</span>
+                                                    <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
+                                                    <span>{{ number_format($itemCount, 0, ',', '.') }} SKU</span>
+                                                    <span>{{ number_format($qty, 0, ',', '.') }} qty</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
 
-                                    <td class="text-end mobile-hide">
-                                        <span class="fw-semibold">{{ number_format($orderCount, 0, ',', '.') }}</span>
-                                    </td>
-
-                                    <td class="text-end mobile-hide">
-                                        <span class="fw-semibold">{{ number_format($itemCount, 0, ',', '.') }}</span>
+                                    <td class="mobile-hide">
+                                        <span class="mode-badge {{ $isOrderFirst ? 'mode-order' : 'mode-item' }}">{{ $modeLabel }}</span>
                                     </td>
 
                                     <td class="mobile-hide">
+                                        <div class="package-summary">
+                                            <span class="package-main">{{ number_format($itemCount, 0, ',', '.') }} SKU · {{ number_format($qty, 0, ',', '.') }} qty</span>
+                                            <span class="package-sub">{{ number_format($orderCount, 0, ',', '.') }} order tercatat</span>
+                                        </div>
+                                    </td>
+
+                                    <td>
                                         <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
                                     </td>
 
@@ -562,7 +669,7 @@
                                                     'qty' => $l->qty_scanned
                                                 ])->toJson();
                                             @endphp
-                                            <div class="d-flex justify-content-end gap-1">
+                                            <div class="d-flex justify-content-end gap-1 flex-wrap">
                                                 <button type="button" class="btn btn-sm btn-ship-outline btn-pill"
                                                     data-code="{{ $shipment->code }}"
                                                     data-date="{{ $fmtDate($shipment->date, 'd M Y') }}"
@@ -570,8 +677,8 @@
                                                     data-phone="{{ $recv['phone'] }}"
                                                     data-alamat="{{ $recv['alamat'] }}"
                                                     data-items="{{ $linesJson }}"
-                                                    onclick="openPreview(this)" title="Preview Label">
-                                                    <i class="bi bi-printer"></i>
+                                                    onclick="openPreview(this)" title="Preview label">
+                                                    <i class="bi bi-printer" aria-hidden="true"></i><span class="action-label">Preview</span>
                                                 </button>
                                                 
                                                 @if($uiStatus === 'draft')
@@ -584,20 +691,21 @@
                                                           data-gf-confirm-cancel="Batal">
                                                         @csrf
                                                         <button type="submit" class="btn btn-sm btn-ship-primary btn-pill" title="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim/Post' }}" @disabled($stockBlocked)>
-                                                            <i class="bi bi-send"></i>
+                                                            <i class="bi bi-send" aria-hidden="true"></i><span class="action-label">Kirim</span>
                                                         </button>
                                                     </form>
                                                     
                                                     <form action="{{ route('sales.shipments.manual.destroy', $shipment) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus paket manual ini?');">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill" style="border-color:#fecaca;" title="Hapus">
-                                                            <i class="bi bi-trash"></i>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill" style="border-color:#fecaca;" title="Hapus shipment">
+                                                            <i class="bi bi-trash" aria-hidden="true"></i><span class="action-label">Hapus</span>
                                                         </button>
                                                     </form>
                                                 @endif
                                             </div>
                                         @else
-                                            <a href="{{ $actionRoute }}" class="btn btn-sm btn-ship-outline btn-pill w-100">
+                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill w-100">
+                                                <i class="bi {{ $uiStatus === 'draft' ? 'bi-play-fill' : 'bi-arrow-right' }}" aria-hidden="true"></i>
                                                 {{ $actionLabel }}
                                             </a>
                                         @endif
@@ -610,7 +718,8 @@
 
                 <div class="divider"></div>
 
-                <div class="p-3">
+                <div class="list-footer">
+                    <span class="muted">Menampilkan {{ $shipments->firstItem() }}–{{ $shipments->lastItem() }} dari {{ $shipments->total() }}</span>
                     {{ $shipments->links() }}
                 </div>
             @endif
