@@ -295,11 +295,11 @@
                                 <div class="item-quick-supplier-grid">
                                     <div>
                                         <label class="form-label" for="quick-supplier-code">Kode supplier <span class="item-required">*</span></label>
-                                        <input id="quick-supplier-code" name="code" type="text" class="form-control" maxlength="50" placeholder="SUP001" required autocomplete="off">
+                                        <input id="quick-supplier-code" name="code" type="text" class="form-control" maxlength="50" placeholder="SUP001" autocomplete="off">
                                     </div>
                                     <div>
                                         <label class="form-label" for="quick-supplier-name">Nama supplier <span class="item-required">*</span></label>
-                                        <input id="quick-supplier-name" name="name" type="text" class="form-control" maxlength="255" placeholder="Nama supplier" required autocomplete="off">
+                                        <input id="quick-supplier-name" name="name" type="text" class="form-control" maxlength="255" placeholder="Nama supplier" autocomplete="off">
                                     </div>
                                     <div>
                                         <label class="form-label" for="quick-supplier-phone">Telepon</label>
