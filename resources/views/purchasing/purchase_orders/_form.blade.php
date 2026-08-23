@@ -873,6 +873,10 @@
                             "lines.$i.expense_account_id",
                             $line['expense_account_id'] ?? ($line['item']['default_expense_account_id'] ?? ''),
                         );
+                        $selectedAcc = collect($expenseAccounts)->firstWhere('id', $expAcc);
+                        $allocationLabel = $alloc === 'expense'
+                            ? 'Biaya' . ($selectedAcc ? ' · ' . $selectedAcc->code : '')
+                            : 'Persediaan / HPP';
                     @endphp
 
                     <tr class="po-row">
@@ -886,6 +890,12 @@
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
+
+                            <div class="line-accounting-badge mt-1" data-line-accounting-badge
+                                 style="display:inline-flex;align-items:center;gap:.25rem;padding:.12rem .42rem;border-radius:999px;font-size:.64rem;font-weight:700;background:{{ $alloc === 'expense' ? '#fff7ed' : '#eff6ff' }};color:{{ $alloc === 'expense' ? '#c2410c' : '#1d4ed8' }};border:1px solid {{ $alloc === 'expense' ? '#fed7aa' : '#bfdbfe' }};">
+                                <i class="bi {{ $alloc === 'expense' ? 'bi-receipt' : 'bi-box-seam' }}"></i>
+                                <span data-line-accounting-text>{{ $allocationLabel }}</span>
+                            </div>
 
                             <input type="hidden" name="lines[{{ $i }}][allocation]" class="line-alloc-raw" value="{{ $alloc }}">
                             <div class="line-expacc-text mt-1" style="{{ $expAcc ? '' : 'display:none;' }}">
@@ -958,6 +968,10 @@
                             <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name"
                                 :showName="false" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
                                 placeholder="Masukan kode barang" />
+                            <div class="line-accounting-badge mt-1" data-line-accounting-badge
+                                 style="display:inline-flex;align-items:center;gap:.25rem;padding:.12rem .42rem;border-radius:999px;font-size:.64rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">
+                                <i class="bi bi-box-seam"></i><span data-line-accounting-text>Persediaan / HPP</span>
+                            </div>
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">
                             <div class="line-expacc-text mt-1" style="display:none;">
                                 <span class="text-muted" style="font-size: .68rem;">Biaya: <span class="expacc-label-text fw-semibold"></span>
@@ -1336,6 +1350,8 @@
 
                 const allocRaw = tr.querySelector('.line-alloc-raw');
                 const expAccRaw = tr.querySelector('.line-expacc-raw');
+                const accountingBadge = tr.querySelector('[data-line-accounting-badge]');
+                const accountingText = tr.querySelector('[data-line-accounting-text]');
                 if (!allocRaw || !expAccRaw) return;
 
                 // kalau nanti kamu bikin UI override manual, flag ini bisa dipakai.
@@ -1348,29 +1364,43 @@
                 const alloc = (meta.default_allocation === 'expense') ? 'expense' : 'hpp';
                 allocRaw.value = alloc;
 
-                    const wrapper = tr.querySelector('.line-expacc-wrapper');
-                    const textWrap = tr.querySelector('.line-expacc-text');
-                    const textLabel = tr.querySelector('.expacc-label-text');
-                    
-                    if (force || !expAccRaw.value) {
-                        expAccRaw.value = meta.default_expense_account_id ? String(meta.default_expense_account_id) : '';
+                if (accountingBadge && accountingText) {
+                    const accountCode = meta.default_expense_account_id
+                        ? (expAccRaw.querySelector(`option[value="${meta.default_expense_account_id}"]`)?.dataset.text?.split(' - ')[0] || '')
+                        : '';
+                    accountingText.textContent = alloc === 'expense'
+                        ? `Biaya${accountCode ? ' · ' + accountCode : ''}`
+                        : 'Persediaan / HPP';
+                    accountingBadge.style.background = alloc === 'expense' ? '#fff7ed' : '#eff6ff';
+                    accountingBadge.style.color = alloc === 'expense' ? '#c2410c' : '#1d4ed8';
+                    accountingBadge.style.borderColor = alloc === 'expense' ? '#fed7aa' : '#bfdbfe';
+                    const icon = accountingBadge.querySelector('i');
+                    if (icon) icon.className = `bi ${alloc === 'expense' ? 'bi-receipt' : 'bi-box-seam'}`;
+                }
+
+                const wrapper = tr.querySelector('.line-expacc-wrapper');
+                const textWrap = tr.querySelector('.line-expacc-text');
+                const textLabel = tr.querySelector('.expacc-label-text');
+
+                if (force || !expAccRaw.value) {
+                    expAccRaw.value = meta.default_expense_account_id ? String(meta.default_expense_account_id) : '';
+                }
+
+                if (meta.default_expense_account_id && meta.default_expense_account_id != '') {
+                    if (wrapper) wrapper.style.display = 'none';
+                    if (textWrap) textWrap.style.display = '';
+                    if (textLabel) {
+                        const opt = expAccRaw.querySelector(`option[value="${meta.default_expense_account_id}"]`);
+                        textLabel.textContent = opt ? opt.dataset.text : 'Terpilih';
                     }
-                    
-                    if (meta.default_expense_account_id && meta.default_expense_account_id != '') {
-                        if(wrapper) wrapper.style.display = 'none';
-                        if(textWrap) textWrap.style.display = '';
-                        if(textLabel) {
-                            const opt = expAccRaw.querySelector(`option[value="${meta.default_expense_account_id}"]`);
-                            textLabel.textContent = opt ? opt.dataset.text : 'Terpilih';
-                        }
+                } else {
+                    if (alloc === 'expense') {
+                        if (wrapper) wrapper.style.display = '';
                     } else {
-                        if (alloc === 'expense') {
-                            if(wrapper) wrapper.style.display = '';
-                        } else {
-                            if(wrapper) wrapper.style.display = 'none';
-                        }
-                        if(textWrap) textWrap.style.display = 'none';
+                        if (wrapper) wrapper.style.display = 'none';
                     }
+                    if (textWrap) textWrap.style.display = 'none';
+                }
 
                 recalcAll();
             }
@@ -1397,6 +1427,16 @@
                     inp.value = 'hpp';
                     inp.dataset.userEdited = '0';
                 });
+                const newBadge = newRow.querySelector('[data-line-accounting-badge]');
+                const newBadgeText = newRow.querySelector('[data-line-accounting-text]');
+                if (newBadge && newBadgeText) {
+                    newBadgeText.textContent = 'Persediaan / HPP';
+                    newBadge.style.background = '#eff6ff';
+                    newBadge.style.color = '#1d4ed8';
+                    newBadge.style.borderColor = '#bfdbfe';
+                    const icon = newBadge.querySelector('i');
+                    if (icon) icon.className = 'bi bi-box-seam';
+                }
                 newRow.querySelectorAll('.line-expacc-wrapper, .line-expacc-text').forEach(wrap => {
                     wrap.style.display = 'none';
                 });
@@ -1451,6 +1491,16 @@
 
                     // ✅ reset mapping
                     row.querySelectorAll('.line-alloc-raw').forEach(inp => inp.value = 'hpp');
+                    const rowBadge = row.querySelector('[data-line-accounting-badge]');
+                    const rowBadgeText = row.querySelector('[data-line-accounting-text]');
+                    if (rowBadge && rowBadgeText) {
+                        rowBadgeText.textContent = 'Persediaan / HPP';
+                        rowBadge.style.background = '#eff6ff';
+                        rowBadge.style.color = '#1d4ed8';
+                        rowBadge.style.borderColor = '#bfdbfe';
+                        const icon = rowBadge.querySelector('i');
+                        if (icon) icon.className = 'bi bi-box-seam';
+                    }
                     row.querySelectorAll('.line-expacc-wrapper, .line-expacc-text').forEach(wrap => {
                         wrap.style.display = 'none';
                     });

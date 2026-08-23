@@ -56,6 +56,7 @@ class ItemCategory extends Model
             'support' => 'Bahan Pendukung',
             'accessory' => 'Accessories',
             'packaging' => 'Packaging & Shipping',
+            'operational' => 'ATK & Operasional',
             'other' => 'Lainnya',
         ];
     }

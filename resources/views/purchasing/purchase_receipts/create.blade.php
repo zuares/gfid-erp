@@ -530,6 +530,8 @@
                         $qtyRemaining    = (float)($line->qty_remaining ?? $qtyPo);
                         $qtyReceivedSoFar= (float)($line->qty_received_posted ?? 0);
                         $pctDone         = $qtyPo > 0 ? round(($qtyReceivedSoFar / $qtyPo) * 100) : 0;
+                        $lineAllocation  = ($line->allocation ?? ($line->item?->default_allocation ?? 'hpp')) === 'expense' ? 'expense' : 'hpp';
+                        $lineExpenseAcc  = $line->expenseAccount ?? null;
 
                         $poId   = $po?->id;
                         $poCode = $po?->code;
@@ -582,6 +584,13 @@
                                 @endif
                                 @if ($isPartial)
                                     &nbsp;<span class="tag tag-partial">Sebagian diterima</span>
+                                @endif
+                            </div>
+                            <div class="mt-1">
+                                @if ($lineAllocation === 'expense')
+                                    <span class="tag" style="font-size:.65rem;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;">Biaya{{ $lineExpenseAcc ? ' · '.$lineExpenseAcc->code : '' }}</span>
+                                @else
+                                    <span class="tag" style="font-size:.65rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">Persediaan / HPP</span>
                                 @endif
                             </div>
                             @if ($isPartial)

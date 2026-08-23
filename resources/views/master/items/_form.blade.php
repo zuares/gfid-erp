@@ -7,14 +7,32 @@
     ];
     $isEdit = filled($item?->id);
     $itemBom = $itemBom ?? null;
+    $itemType = old('type', $item?->type ?? 'material');
     $legacySource = old('production_source', $item?->production_source ?? \App\Models\Item::PRODUCTION_BUY);
     $canBuy = old('can_buy', $item?->can_buy ?? ($legacySource === \App\Models\Item::PRODUCTION_BUY ? 1 : 0));
     $canMake = old('can_make', $item?->can_make ?? ($legacySource === \App\Models\Item::PRODUCTION_IN_HOUSE ? 1 : 0));
+    $hasOldSupplyChoice = old('supply_mode_preset') !== null || old('can_buy') !== null || old('can_make') !== null;
+    $supplyMode = old('supply_mode_preset', $canBuy && $canMake ? 'hybrid' : ($canMake ? 'make' : ($canBuy ? 'buy' : 'outsource')));
+    if (!$isEdit && !$hasOldSupplyChoice) {
+        $supplyMode = match ($itemType) {
+            'finished_good' => 'hybrid',
+            'wip' => 'make',
+            default => 'outsource',
+        };
+        $canBuy = $supplyMode === 'buy' || $supplyMode === 'hybrid' ? 1 : 0;
+        $canMake = $supplyMode === 'make' || $supplyMode === 'hybrid' ? 1 : 0;
+    }
     $defaultSupplySource = old('default_supply_source', $item?->default_supply_source ?? match ($legacySource) {
         \App\Models\Item::PRODUCTION_IN_HOUSE => \App\Models\Item::SUPPLY_MAKE,
         \App\Models\Item::PRODUCTION_OUTSOURCE => \App\Models\Item::SUPPLY_OUTSOURCE,
         default => \App\Models\Item::SUPPLY_BUY,
     });
+    if (!$isEdit && !$hasOldSupplyChoice) {
+        $defaultSupplySource = in_array($supplyMode, ['make', 'hybrid'], true)
+            ? \App\Models\Item::SUPPLY_MAKE
+            : ($supplyMode === 'outsource' ? \App\Models\Item::SUPPLY_OUTSOURCE : \App\Models\Item::SUPPLY_BUY);
+    }
+    $defaultAllocation = old('default_allocation', $item?->default_allocation ?? 'hpp');
 @endphp
 
 @push('head')
@@ -46,11 +64,18 @@
     .item-supply-option:hover { border-color:#94a3b8; }
     .item-supply-option strong { display:block; font-size:.78rem; }
     .item-supply-option span { display:block; color:#94a3b8; font-size:.69rem; margin-top:1px; }
+    .item-supply-preset { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+    .item-supply-preset-option { position:relative; display:flex; align-items:flex-start; gap:7px; min-height:58px; padding:9px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; cursor:pointer; }
+    .item-supply-preset-option:hover { border-color:#94a3b8; }
+    .item-supply-preset-option:has(input:checked) { border-color:#6366f1; background:#eef2ff; box-shadow:0 0 0 2px rgba(99,102,241,.1); }
+    .item-supply-preset-option strong { display:block; color:#0f172a; font-size:.72rem; }
+    .item-supply-preset-option small { display:block; margin-top:2px; color:#94a3b8; font-size:.63rem; line-height:1.25; }
     .item-supply-summary { display:flex; align-items:center; gap:7px; margin-top:11px; color:#64748b; font-size:.72rem; }
     .item-supply-summary .dot { width:8px; height:8px; border-radius:50%; background:#94a3b8; }
     .item-supply-summary.is-hybrid .dot { background:#7c3aed; }
     .item-supply-summary.is-make .dot { background:#059669; }
     .item-supply-summary.is-buy .dot { background:#2563eb; }
+    .item-supply-summary.is-outsource .dot { background:#d97706; }
     .item-supply-summary.is-invalid .dot { background:#d97706; }
     .item-status-switch { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:39px; padding:9px 11px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
     .item-status-switch strong { font-size:.78rem; }
@@ -67,7 +92,8 @@
     body[data-theme="dark"] .item-form { color:#e5e7eb; }
     body[data-theme="dark"] .item-crud-header { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-crud-title { color:#f8fafc; }
-    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-status-switch { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-status-switch { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-supply-preset-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-section-title { color:#f8fafc; }
     body[data-theme="dark"] .item-section-icon { color:#cbd5e1; background:#1e293b; }
     body[data-theme="dark"] .item-form .form-label { color:#cbd5e1; }
@@ -116,7 +142,7 @@
         <div class="item-form-section">
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-diagram-3"></i></div>
-                <div><h2 class="item-section-title">Klasifikasi & metode pasok</h2><div class="item-section-help">Tipe menentukan alur item. Untuk barang jadi, aktifkan satu atau dua cara mendapatkan barang.</div></div>
+                <div><h2 class="item-section-title">Klasifikasi & perlakuan pembelian</h2><div class="item-section-help">Bahan baku masuk persediaan. ATK dan operasional biasanya langsung dibebankan ke akun biaya.</div></div>
             </div>
             <div class="row g-3">
                 <div class="col-lg-7">
@@ -142,11 +168,12 @@
                             @error('item_category_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-7">
-                            <label class="form-label" for="default-allocation">Sifat pembelian</label>
+                            <label class="form-label" for="default-allocation">Perlakuan saat dibeli</label>
                             <select id="default-allocation" name="default_allocation" class="form-select @error('default_allocation') is-invalid @enderror">
-                                <option value="hpp" @selected(old('default_allocation', $item?->default_allocation ?? 'hpp') === 'hpp')>Masuk stok / aset</option>
-                                <option value="expense" @selected(old('default_allocation', $item?->default_allocation) === 'expense')>Langsung biaya / expense</option>
+                                <option value="hpp" @selected($defaultAllocation === 'hpp')>Masuk persediaan / HPP</option>
+                                <option value="expense" @selected($defaultAllocation === 'expense')>Langsung biaya / expense</option>
                             </select>
+                            <div class="form-text">Bahan baku pilih persediaan. ATK pilih langsung biaya agar tidak masuk stok bahan baku.</div>
                             @error('default_allocation')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-5" data-expense-account-wrap>
@@ -154,7 +181,7 @@
                             <select id="expense-account" name="default_expense_account_id" class="form-select @error('default_expense_account_id') is-invalid @enderror">
                                 <option value="">Pilih akun</option>
                                 @foreach($expenseAccounts ?? [] as $account)
-                                    <option value="{{ $account->id }}" @selected(old('default_expense_account_id', $item?->default_expense_account_id) == $account->id)>{{ $account->code }} — {{ $account->name }}</option>
+                                    <option value="{{ $account->id }}" data-account-code="{{ $account->code }}" @selected(old('default_expense_account_id', $item?->default_expense_account_id) == $account->id)>{{ $account->code }} — {{ $account->name }}</option>
                                 @endforeach
                             </select>
                             @error('default_expense_account_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -165,14 +192,28 @@
                 <div class="col-lg-5" data-supply-policy-wrap>
                     <div class="item-supply-box h-100">
                         <label class="form-label mb-2">Metode pasok</label>
+                        <div class="item-supply-preset" data-supply-preset-group>
+                            @foreach([
+                                'buy' => ['Beli jadi', 'Tersedia dari supplier'],
+                                'make' => ['Produksi sendiri', 'Pakai BOM dan alur produksi'],
+                                'hybrid' => ['Hybrid', 'Bisa beli atau produksi'],
+                                'outsource' => ['Makloon', 'Diproduksi pihak ketiga'],
+                            ] as $mode => [$label, $helpText])
+                                <label class="item-supply-preset-option">
+                                    <input type="radio" name="supply_mode_preset" value="{{ $mode }}" class="form-check-input mt-1" data-supply-preset @checked($supplyMode === $mode)>
+                                    <span><strong>{{ $label }}</strong><small>{{ $helpText }}</small></span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <div class="form-text mt-2">Pilihan ini mengisi kemampuan beli/produksi dan prioritas default otomatis.</div>
                         <div class="item-supply-options">
                             <input type="hidden" name="can_buy" value="0">
-                            <label class="item-supply-option" for="can-buy">
+                            <label class="item-supply-option d-none" for="can-buy">
                                 <input id="can-buy" type="checkbox" class="form-check-input mt-0" name="can_buy" value="1" data-supply-can-buy @checked((int) $canBuy === 1)>
                                 <span><strong>Bisa dibeli jadi</strong><span>Digunakan saat barang jadi tersedia dari supplier.</span></span>
                             </label>
                             <input type="hidden" name="can_make" value="0">
-                            <label class="item-supply-option" for="can-make">
+                            <label class="item-supply-option d-none" for="can-make">
                                 <input id="can-make" type="checkbox" class="form-check-input mt-0" name="can_make" value="1" data-supply-can-make @checked((int) $canMake === 1)>
                                 <span><strong>Bisa diproduksi sendiri</strong><span>Digunakan saat item memiliki BOM dan alur produksi.</span></span>
                             </label>
@@ -274,6 +315,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const canBuy = document.querySelector('[data-supply-can-buy]');
     const canMake = document.querySelector('[data-supply-can-make]');
     const defaultSupply = document.querySelector('[data-default-supply-source]');
+    const supplyPresetGroup = document.querySelector('[data-supply-preset-group]');
     const supplySummary = document.querySelector('[data-supply-summary]');
     const supplySummaryText = document.querySelector('[data-supply-summary-text]');
     const allocation = document.getElementById('default-allocation');
@@ -281,15 +323,37 @@ document.addEventListener('DOMContentLoaded', function () {
     const activeInput = document.getElementById('item-active');
     const activeLabel = document.querySelector('[data-status-label]');
     const help = document.querySelector('[data-item-category-help]');
-    const categoryHelp = { finished_good: 'Pilih kategori produk untuk barang jadi.', wip: 'WIP mengikuti kategori produk jadi.', material: 'Pilih kategori bahan, pendukung, accessories, atau packaging.' };
+    const categoryHelp = { finished_good: 'Pilih kategori produk untuk barang jadi.', wip: 'WIP mengikuti kategori produk jadi.', material: 'Pilih kategori bahan, pendukung, accessories, ATK, atau packaging.' };
+    const isEditForm = {{ $isEdit ? 'true' : 'false' }};
+
+    function modeForType(type) {
+        return type === 'finished_good' ? 'hybrid' : (type === 'wip' ? 'make' : 'outsource');
+    }
+
+    function applySupplyPreset(mode) {
+        if (!canBuy || !canMake) return;
+        canBuy.checked = mode === 'buy' || mode === 'hybrid';
+        canMake.checked = mode === 'make' || mode === 'hybrid';
+        if (defaultSupply) {
+            defaultSupply.value = mode === 'make' || mode === 'hybrid'
+                ? 'make'
+                : (mode === 'outsource' ? 'outsource' : 'buy');
+        }
+        refreshSupply();
+    }
 
     function refreshCategory() {
         if (!typeSelect || !categorySelect) return;
-        const allowed = typeSelect.value === 'finished_good' || typeSelect.value === 'wip' ? ['product'] : ['material','support','accessory','packaging','other'];
+        const allowed = typeSelect.value === 'finished_good' || typeSelect.value === 'wip' ? ['product'] : ['material','support','accessory','packaging','operational','other'];
         Array.from(categorySelect.options).forEach(option => { if (option.value) option.hidden = !allowed.includes(option.dataset.kind || 'other'); });
         const selected = categorySelect.selectedOptions[0];
         if (selected?.value && selected.hidden) categorySelect.value = '';
         if (help) help.textContent = categoryHelp[typeSelect.value] || '';
+        if (typeSelect.value === 'material' && selected?.dataset.kind === 'operational' && !{{ $isEdit ? 'true' : 'false' }}) {
+            if (allocation) allocation.value = 'expense';
+            const atkAccount = expenseWrap?.querySelector('option[data-account-code="6104"]');
+            if (atkAccount && expenseWrap) expenseWrap.querySelector('select').value = atkAccount.value;
+        }
         const isSupplyItem = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
         if (supplyWrap) supplyWrap.hidden = !isSupplyItem;
         if (canBuy) canBuy.disabled = !isSupplyItem;
@@ -310,18 +374,41 @@ document.addEventListener('DOMContentLoaded', function () {
         if (canBuyNow && canMakeNow) { text = 'Hybrid: bisa beli jadi atau produksi sendiri'; cls = 'is-hybrid'; }
         else if (canMakeNow) { text = 'Produksi sendiri'; cls = 'is-make'; }
         else if (canBuyNow) { text = 'Beli jadi'; cls = 'is-buy'; }
+        else if (defaultSupply?.value === 'outsource') { text = 'Makloon / outsource'; cls = 'is-outsource'; }
         if (supplySummary) supplySummary.className = 'item-supply-summary ' + cls;
         if (supplySummaryText) supplySummaryText.textContent = text;
     }
 
-    function refreshAllocation() { if (expenseWrap && allocation) expenseWrap.hidden = allocation.value !== 'expense'; }
+    function refreshAllocation() {
+        if (!expenseWrap || !allocation) return;
+        expenseWrap.hidden = allocation.value !== 'expense';
+        const account = expenseWrap.querySelector('select');
+        if (account) account.required = allocation.value === 'expense';
+    }
     function refreshStatus() { if (activeLabel && activeInput) activeLabel.textContent = activeInput.checked ? 'Aktif / bisa dipakai' : 'Nonaktif / disembunyikan'; }
-    typeSelect?.addEventListener('change', refreshCategory);
+    typeSelect?.addEventListener('change', function () {
+        refreshCategory();
+        if (!isEditForm || supplyPresetGroup?.dataset.userEdited !== '1') {
+            const mode = modeForType(typeSelect.value);
+            const preset = supplyPresetGroup?.querySelector(`[data-supply-preset][value="${mode}"]`);
+            if (preset) preset.checked = true;
+            applySupplyPreset(mode);
+        }
+    });
+    supplyPresetGroup?.addEventListener('change', function (event) {
+        const preset = event.target.closest('[data-supply-preset]');
+        if (!preset) return;
+        supplyPresetGroup.dataset.userEdited = '1';
+        applySupplyPreset(preset.value);
+    });
     canBuy?.addEventListener('change', refreshSupply);
     canMake?.addEventListener('change', refreshSupply);
     allocation?.addEventListener('change', refreshAllocation);
     activeInput?.addEventListener('change', refreshStatus);
-    refreshCategory(); refreshAllocation(); refreshStatus();
+    refreshCategory();
+    refreshSupply();
+    refreshAllocation();
+    refreshStatus();
 });
 </script>
 @endpush

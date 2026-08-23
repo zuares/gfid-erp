@@ -8,6 +8,7 @@ use App\Models\ItemBom;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
+use App\Models\Account;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -164,6 +165,7 @@ class ItemController extends Controller
                 $data['type'] ?? 'material',
                 $data['item_category_id'] ?? null,
             );
+            $accountingPolicy = $this->accountingPolicyFor($data, $classification);
             $supplyPolicy = $this->supplyPolicyFor($data['type'] ?? 'material', $data);
 
             $item = Item::create([
@@ -175,8 +177,8 @@ class ItemController extends Controller
                 'item_category_id' => $data['item_category_id'] ?? null,
                 'item_role_id' => $classification['item_role_id'],
                 'item_role' => $classification['item_role'],
-                'is_stocked' => $classification['is_stocked'],
-                'hpp_behavior' => $classification['hpp_behavior'],
+                'is_stocked' => $accountingPolicy['is_stocked'],
+                'hpp_behavior' => $accountingPolicy['hpp_behavior'],
                 'production_source' => $this->legacyProductionSourceFor(
                     $data['type'] ?? 'material',
                     $supplyPolicy['default_supply_source'],
@@ -185,8 +187,8 @@ class ItemController extends Controller
                 'can_make' => $supplyPolicy['can_make'],
                 'default_supply_source' => $supplyPolicy['default_supply_source'],
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
-                'default_allocation' => $data['default_allocation'] ?? 'hpp',
-                'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
+                'default_allocation' => $accountingPolicy['default_allocation'],
+                'default_expense_account_id' => $accountingPolicy['default_expense_account_id'],
                 'last_purchase_price' => $data['last_purchase_price'] ?? 0,
             ]);
 
@@ -225,7 +227,7 @@ class ItemController extends Controller
         $item->load('barcodes');
 
         $categories = $this->categoryOptions();
-        $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
+        $expenseAccounts = Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
         $itemBom = ItemBom::query()->where('item_id', $item->id)->first();
         $typeLabels = $this->typeLabels();
@@ -242,6 +244,7 @@ class ItemController extends Controller
                 $data['type'],
                 $data['item_category_id'] ?? null,
             );
+            $accountingPolicy = $this->accountingPolicyFor($data, $classification);
             $supplyPolicy = $this->supplyPolicyFor($data['type'], $data, $item);
 
             $item->update([
@@ -253,8 +256,8 @@ class ItemController extends Controller
                 'item_category_id' => $data['item_category_id'] ?? null,
                 'item_role_id' => $classification['item_role_id'],
                 'item_role' => $classification['item_role'],
-                'is_stocked' => $classification['is_stocked'],
-                'hpp_behavior' => $classification['hpp_behavior'],
+                'is_stocked' => $accountingPolicy['is_stocked'],
+                'hpp_behavior' => $accountingPolicy['hpp_behavior'],
                 'production_source' => $this->legacyProductionSourceFor(
                     $data['type'],
                     $supplyPolicy['default_supply_source'],
@@ -263,8 +266,8 @@ class ItemController extends Controller
                 'can_make' => $supplyPolicy['can_make'],
                 'default_supply_source' => $supplyPolicy['default_supply_source'],
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
-                'default_allocation' => $data['default_allocation'] ?? 'hpp',
-                'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
+                'default_allocation' => $accountingPolicy['default_allocation'],
+                'default_expense_account_id' => $accountingPolicy['default_expense_account_id'],
                 'last_purchase_price' => array_key_exists('last_purchase_price', $data) ? $data['last_purchase_price'] : $item->last_purchase_price,
             ]);
 
@@ -540,7 +543,13 @@ class ItemController extends Controller
             'active' => ['nullable'],
             
             'default_allocation' => ['nullable', 'string', Rule::in(['hpp', 'expense'])],
-            'default_expense_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'default_expense_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(fn ($q) => $q
+                    ->where('type', 'expense')
+                    ->where('is_active', true)),
+            ],
 
             'last_purchase_price' => ['nullable', 'numeric', 'min:0'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
@@ -557,6 +566,13 @@ class ItemController extends Controller
 
         $this->validateCategoryForType($data['type'], $data['item_category_id'] ?? null);
 
+        if (($data['default_allocation'] ?? 'hpp') === 'expense'
+            && empty($data['default_expense_account_id'])) {
+            throw ValidationException::withMessages([
+                'default_expense_account_id' => 'Pilih akun biaya untuk item yang dibeli sebagai expense.',
+            ]);
+        }
+
         return $data;
     }
 
@@ -571,7 +587,7 @@ class ItemController extends Controller
 
         if (!in_array($kind, $allowed, true)) {
             throw ValidationException::withMessages([
-                'item_category_id' => 'Kategori tidak sesuai dengan tipe item. Finished Good wajib kategori produk; Material wajib kategori bahan/pendukung/accessories/packaging.',
+                'item_category_id' => 'Kategori tidak sesuai dengan tipe item. Finished Good wajib kategori produk; Material wajib kategori bahan/pendukung/accessories/ATK/operasional/packaging.',
             ]);
         }
     }
@@ -580,8 +596,8 @@ class ItemController extends Controller
     {
         return match ($type) {
             'finished_good', 'wip' => ['product'],
-            'material' => ['material', 'support', 'accessory', 'packaging', 'other'],
-            default => ['product', 'material', 'support', 'accessory', 'packaging', 'other'],
+            'material' => ['material', 'support', 'accessory', 'packaging', 'operational', 'other'],
+            default => ['product', 'material', 'support', 'accessory', 'packaging', 'operational', 'other'],
         };
     }
 
@@ -621,6 +637,32 @@ class ItemController extends Controller
                 'hpp_behavior' => 'hpp',
             ],
         };
+    }
+
+    protected function accountingPolicyFor(array $data, array $classification): array
+    {
+        $allocation = ($data['default_allocation'] ?? 'hpp') === 'expense'
+            ? 'expense'
+            : 'hpp';
+
+        $expenseAccountId = $allocation === 'expense'
+            ? (int) ($data['default_expense_account_id'] ?? 0)
+            : null;
+
+        if ($allocation === 'expense' && $expenseAccountId <= 0) {
+            throw ValidationException::withMessages([
+                'default_expense_account_id' => 'Akun biaya wajib dipilih untuk alokasi expense.',
+            ]);
+        }
+
+        return [
+            'default_allocation' => $allocation,
+            'default_expense_account_id' => $expenseAccountId ?: null,
+            // Item yang langsung dibebankan tidak boleh ikut dianggap stok
+            // bahan produksi walaupun role legacy-nya masih RM/SUP.
+            'is_stocked' => $allocation === 'expense' ? false : $classification['is_stocked'],
+            'hpp_behavior' => $allocation === 'expense' ? 'non_hpp' : $classification['hpp_behavior'],
+        ];
     }
 
     protected function productionSourceFor(string $type, ?string $productionSource): ?string
@@ -798,7 +840,12 @@ class ItemController extends Controller
     public function updateExpenseAccount(Request $request, Item $item)
     {
         $request->validate([
-            'expense_account_id' => 'required|exists:accounts,id',
+            'expense_account_id' => [
+                'required',
+                Rule::exists('accounts', 'id')->where(fn ($q) => $q
+                    ->where('type', 'expense')
+                    ->where('is_active', true)),
+            ],
         ]);
 
         $item->default_expense_account_id = $request->expense_account_id;

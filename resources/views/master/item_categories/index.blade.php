@@ -23,6 +23,7 @@
         'support' => 'amber',
         'accessory' => 'slate',
         'packaging' => 'green',
+        'operational' => 'amber',
         'other' => 'muted',
     ];
 @endphp

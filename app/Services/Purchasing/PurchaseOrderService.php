@@ -187,6 +187,10 @@ class PurchaseOrderService
                         'lines' => 'Ada item Expense tapi akun biaya belum ter-set. Set default_expense_account_id pada master item / pilih akun biaya di baris PO.',
                     ]);
                 }
+
+                foreach ($order->lines->where('allocation', 'expense') as $line) {
+                    $this->assertExpenseAccount((int) $line->expense_account_id);
+                }
             }
 
             // ✅ APPROVE ORDER
@@ -453,6 +457,10 @@ class PurchaseOrderService
                     } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
                         $keep->expense_account_id = (int) $item->default_expense_account_id;
                     }
+
+                    if (!empty($keep->expense_account_id)) {
+                        $this->assertExpenseAccount((int) $keep->expense_account_id);
+                    }
                 }
 
                 $keep->save();
@@ -476,6 +484,10 @@ class PurchaseOrderService
                         $expenseAccountId = (int) $fromLine;
                     } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
                         $expenseAccountId = (int) $item->default_expense_account_id;
+                    }
+
+                    if ($expenseAccountId) {
+                        $this->assertExpenseAccount($expenseAccountId);
                     }
                 }
 
@@ -632,6 +644,10 @@ class PurchaseOrderService
                         $expenseAccountId = null;
                     }
                 }
+
+                if ($expenseAccountId) {
+                    $this->assertExpenseAccount($expenseAccountId);
+                }
             }
 
             $lineTotal = max(0, ($qty * $unitPrice) - $discount);
@@ -713,6 +729,21 @@ class PurchaseOrderService
         }
 
         return (int) $acc->id;
+    }
+
+    protected function assertExpenseAccount(int $accountId): void
+    {
+        $valid = Account::query()
+            ->whereKey($accountId)
+            ->where('type', 'expense')
+            ->where('is_active', true)
+            ->exists();
+
+        if (!$valid) {
+            throw ValidationException::withMessages([
+                'lines' => "Akun biaya #{$accountId} tidak aktif atau bukan akun expense.",
+            ]);
+        }
     }
 
     protected function normalizeOrderType(?string $value): string

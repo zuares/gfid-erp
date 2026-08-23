@@ -72,6 +72,11 @@ class GrnFromDraftPoTest extends TestCase
             );
         }
 
+        Account::updateOrCreate(
+            ['code' => '6104'],
+            ['name' => 'Biaya ATK', 'type' => 'expense', 'is_active' => 1]
+        );
+
         $this->poService = app(PurchaseOrderService::class);
         $this->grnService = app(GoodsReceiptService::class);
 
@@ -305,6 +310,78 @@ class GrnFromDraftPoTest extends TestCase
 
         // received_status PO harus fully_received meski PO draft
         $this->assertSame('fully_received', $po->fresh()->received_status);
+    }
+
+    public function test_mixed_raw_material_and_atk_po_splits_stock_and_expense(): void
+    {
+        $expenseAccount = Account::where('code', '6104')->firstOrFail();
+        $atk = Item::create([
+            'code' => 'GRNATK1',
+            'name' => 'Kertas ATK',
+            'unit' => 'pack',
+            'type' => 'material',
+            'item_role' => 'raw_material',
+            'default_allocation' => 'expense',
+            'default_expense_account_id' => $expenseAccount->id,
+            'is_stocked' => false,
+            'hpp_behavior' => 'non_hpp',
+            'active' => 1,
+        ]);
+
+        $po = $this->poService->create([
+            'date' => now()->toDateString(),
+            'supplier_id' => $this->supplier->id,
+            'order_type' => 'material',
+            'lines' => [
+                ['item_id' => $this->item->id, 'qty' => 10, 'unit_price' => 1000],
+                ['item_id' => $atk->id, 'qty' => 2, 'unit_price' => 2000],
+            ],
+        ]);
+
+        $poLines = $po->lines()->orderBy('id')->get();
+        $this->assertSame('hpp', $poLines[0]->allocation);
+        $this->assertSame('expense', $poLines[1]->allocation);
+        $this->assertSame($expenseAccount->id, (int) $poLines[1]->expense_account_id);
+
+        $grn = $this->grnService->create([
+            'date' => now()->toDateString(),
+            'supplier_id' => $this->supplier->id,
+            'warehouse_id' => $this->warehouse->id,
+            'purchase_order_id' => $po->id,
+            'created_by' => $this->admin->id,
+            'lines' => $poLines->map(fn ($line) => [
+                'purchase_order_line_id' => $line->id,
+                'item_id' => $line->item_id,
+                'qty_received' => $line->qty,
+                'qty_reject' => 0,
+                'unit_price' => 999999,
+            ])->all(),
+        ]);
+
+        $receiptLines = $grn->lines()->orderBy('id')->get();
+        $this->assertSame('hpp', $receiptLines[0]->allocation);
+        $this->assertSame('expense', $receiptLines[1]->allocation);
+        $this->assertSame($expenseAccount->id, (int) $receiptLines[1]->expense_account_id);
+
+        $this->grnService->post($grn);
+
+        $this->assertEqualsWithDelta(
+            10,
+            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+                ->where('item_id', $this->item->id)->value('qty'),
+            0.001
+        );
+        $this->assertEqualsWithDelta(
+            0,
+            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+                ->where('item_id', $atk->id)->value('qty'),
+            0.001
+        );
+
+        $invJournal = Journal::where('source_type', 'grn_inv')->where('source_id', $grn->id)->whereNull('voided_at')->firstOrFail();
+        $expJournal = Journal::where('source_type', 'grn_exp')->where('source_id', $grn->id)->whereNull('voided_at')->firstOrFail();
+        $this->assertEqualsWithDelta(10000, (float) $invJournal->lines()->where('account_id', Account::where('code', '1201')->value('id'))->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(4000, (float) $expJournal->lines()->where('account_id', $expenseAccount->id)->sum('debit'), 0.01);
     }
 
     // 20. Unpost GRN membalik stok dan void jurnal.

@@ -17,6 +17,8 @@ class PurchaseReceiptLine extends Model
         'unit',
         'unit_price',
         'line_total',
+        'allocation',
+        'expense_account_id',
         'notes',
     ];
 
@@ -41,6 +43,11 @@ class PurchaseReceiptLine extends Model
     public function purchaseOrderLine()
     {
         return $this->belongsTo(PurchaseOrderLine::class, 'purchase_order_line_id');
+    }
+
+    public function expenseAccount()
+    {
+        return $this->belongsTo(Account::class, 'expense_account_id');
     }
 
     public function returnLineOrigin()

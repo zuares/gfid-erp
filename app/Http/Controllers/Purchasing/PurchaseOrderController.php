@@ -146,7 +146,10 @@ class PurchaseOrderController extends Controller
         $suppliers = Supplier::query()->orderBy('name')->get(['id', 'name', 'po_types']);
 
         $itemQuery = Item::query()
-            ->select(['id', 'code', 'name', 'item_category_id', 'type', 'active'])
+            ->select([
+                'id', 'code', 'name', 'item_category_id', 'type', 'active',
+                'default_allocation', 'default_expense_account_id',
+            ])
             ->where('active', 1)
             ->with(['category:id,code,name'])
             ->orderByRaw("

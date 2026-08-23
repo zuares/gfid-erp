@@ -165,11 +165,12 @@ class GoodsReceiptService
         $poLines = collect();
         $alreadyByLine = [];
         if (!empty($poLineIds)) {
-            $poLines = PurchaseOrderLine::query()
-                ->whereIn('id', $poLineIds)
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
+                $poLines = PurchaseOrderLine::query()
+                    ->whereIn('id', $poLineIds)
+                    ->with('item:id,default_allocation,default_expense_account_id')
+                    ->lockForUpdate()
+                    ->get(['id', 'purchase_order_id', 'item_id', 'qty', 'unit_price', 'allocation', 'expense_account_id'])
+                    ->keyBy('id');
 
             // qty terpakai per PO line dari GRN lain (draft + posted) — cegah over-receipt.
             $alreadyByLine = DB::table('purchase_receipt_lines as prl')
@@ -231,6 +232,12 @@ class GoodsReceiptService
 
                 // ✅ HARGA SERVER-SIDE: selalu ambil dari PO line, abaikan request.
                 $row['unit_price'] = (float) $poLine->unit_price;
+                $row['allocation'] = in_array($poLine->allocation, ['hpp', 'expense'], true)
+                    ? $poLine->allocation
+                    : (($poLine->item?->default_allocation ?? 'hpp') === 'expense' ? 'expense' : 'hpp');
+                $row['expense_account_id'] = $row['allocation'] === 'expense'
+                    ? ($poLine->expense_account_id ?: $poLine->item?->default_expense_account_id)
+                    : null;
             } else {
                 // Baris tanpa PO line: hanya boleh bila GRN memang tidak berbasis PO,
                 // atau baris ad-hoc pada GRN ber-PO (diizinkan, harga apa adanya dari controller).
@@ -352,7 +359,8 @@ class GoodsReceiptService
                 $isHpp = $this->isLineEligibleForStock(
                     $line->purchase_order_line_id,
                     (int) $line->item_id,
-                    $maps['eligibility']
+                    $maps['eligibility'],
+                    (int) $line->id,
                 );
 
                 if (!$isHpp) {
@@ -619,12 +627,9 @@ class GoodsReceiptService
                     }
 
                     if ($accId <= 0) {
-                        if ($purchaseExpenseFallbackId <= 0) {
-                            throw ValidationException::withMessages([
-                                'grn' => "Expense line ada tapi tidak ada akun biaya. Set expense_account_id di PO line, atau buat COA {$purchaseExpenseFallbackCode} sebagai fallback.",
-                            ]);
-                        }
-                        $accId = (int) $purchaseExpenseFallbackId;
+                        throw ValidationException::withMessages([
+                            'grn' => 'Expense line belum memiliki akun biaya. Lengkapi akun biaya pada Master Item atau baris PO sebelum posting GRN.',
+                        ]);
                     }
 
                     $expLines[] = ['account_id' => $accId, 'debit' => round($amt, 2), 'credit' => 0];
@@ -783,6 +788,8 @@ class GoodsReceiptService
         $grn->lines()->delete();
 
         $subtotal = 0.0;
+        $hasAllocation = Schema::hasColumn('purchase_receipt_lines', 'allocation');
+        $hasExpenseAccount = Schema::hasColumn('purchase_receipt_lines', 'expense_account_id');
 
         foreach ($linesData as $row) {
             $itemId = $row['item_id'] ?? null;
@@ -805,7 +812,21 @@ class GoodsReceiptService
 
             $lineTotal = round(max(0, $qtyReceived) * $unitPrice, 2);
 
-            PurchaseReceiptLine::create([
+            $item = Item::query()
+                ->select(['id', 'default_allocation', 'default_expense_account_id'])
+                ->find($itemId);
+            $allocation = (($row['allocation'] ?? $item?->default_allocation ?? 'hpp') === 'expense')
+                ? 'expense'
+                : 'hpp';
+            $expenseAccountId = $allocation === 'expense'
+                ? (int) ($row['expense_account_id'] ?? $item?->default_expense_account_id ?? 0)
+                : null;
+
+            if ($allocation === 'expense' && $expenseAccountId > 0) {
+                $this->assertExpenseAccount($expenseAccountId);
+            }
+
+            $linePayload = [
                 'purchase_receipt_id' => $grn->id,
                 'purchase_order_line_id' => $poLineId,
                 'item_id' => $itemId,
@@ -816,7 +837,17 @@ class GoodsReceiptService
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
                 'notes' => $notes,
-            ]);
+            ];
+            if ($hasAllocation) {
+                $linePayload['allocation'] = $allocation;
+            }
+            if ($hasExpenseAccount) {
+                $linePayload['expense_account_id'] = $allocation === 'expense'
+                    ? ($expenseAccountId ?: null)
+                    : null;
+            }
+
+            PurchaseReceiptLine::create($linePayload);
 
             $subtotal += $lineTotal;
         }
@@ -986,6 +1017,7 @@ class GoodsReceiptService
 
         $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
         $expenseAccByPoLineId = collect();
+        $expenseAccByReceiptLineId = collect();
 
         if ($hasLineExpenseAcc) {
             $poLineIds = $grn->lines
@@ -1003,9 +1035,15 @@ class GoodsReceiptService
             }
         }
 
+        if (Schema::hasColumn('purchase_receipt_lines', 'expense_account_id')) {
+            $expenseAccByReceiptLineId = $grn->lines
+                ->pluck('expense_account_id', 'id');
+        }
+
         return [
             'eligibility' => $eligibility,
             'expenseAccByPoLineId' => $expenseAccByPoLineId,
+            'expenseAccByReceiptLineId' => $expenseAccByReceiptLineId,
         ];
     }
 
@@ -1013,6 +1051,7 @@ class GoodsReceiptService
     {
         $elig = $maps['eligibility'] ?? ['poAllocByLineId' => collect(), 'itemAllocById' => collect()];
         $expenseAccByPoLineId = $maps['expenseAccByPoLineId'] ?? collect();
+        $expenseAccByReceiptLineId = $maps['expenseAccByReceiptLineId'] ?? collect();
 
         $hppTotal = 0.0;
         $hppByItemRole = []; // item_role → total hpp amount
@@ -1028,7 +1067,7 @@ class GoodsReceiptService
             if ($grn->is_replacement) {
                 $isHpp = true;
             } else {
-                $isHpp = $this->isLineEligibleForStock($line->purchase_order_line_id, (int) $line->item_id, $elig);
+                $isHpp = $this->isLineEligibleForStock($line->purchase_order_line_id, (int) $line->item_id, $elig, (int) $line->id);
             }
 
             if ($isHpp) {
@@ -1044,6 +1083,14 @@ class GoodsReceiptService
 
             if ($poLineId > 0) {
                 $accId = (int) ($expenseAccByPoLineId[$poLineId] ?? 0);
+            }
+
+            if ($accId <= 0 && $line->id) {
+                $accId = (int) ($expenseAccByReceiptLineId[(int) $line->id] ?? 0);
+            }
+
+            if ($accId <= 0) {
+                $accId = (int) ($line->item?->default_expense_account_id ?? 0);
             }
 
             $expenseByAcc[$accId] = round((float) ($expenseByAcc[$accId] ?? 0) + $amt, 2);
@@ -1145,6 +1192,11 @@ class GoodsReceiptService
 
         $poAllocByLineId = collect();
         $itemAllocById = collect();
+        $receiptAllocByLineId = collect();
+
+        if (Schema::hasColumn('purchase_receipt_lines', 'allocation')) {
+            $receiptAllocByLineId = $grn->lines->pluck('allocation', 'id');
+        }
 
         if ($hasPoLineAlloc) {
             $poLineIds = $grn->lines
@@ -1181,17 +1233,42 @@ class GoodsReceiptService
         return [
             'poAllocByLineId' => $poAllocByLineId,
             'itemAllocById' => $itemAllocById,
+            'receiptAllocByLineId' => $receiptAllocByLineId,
         ];
     }
 
-    protected function isLineEligibleForStock($purchaseOrderLineId, int $itemId, array $maps): bool
+    protected function isLineEligibleForStock($purchaseOrderLineId, int $itemId, array $maps, ?int $receiptLineId = null): bool
     {
         $poAllocByLineId = $maps['poAllocByLineId'] ?? collect();
         $itemAllocById = $maps['itemAllocById'] ?? collect();
+        $receiptAllocByLineId = $maps['receiptAllocByLineId'] ?? collect();
+
+        if ($receiptLineId && $receiptAllocByLineId->has($receiptLineId)) {
+            $receiptAllocation = (string) ($receiptAllocByLineId[$receiptLineId] ?? '');
+
+            if (in_array($receiptAllocation, ['hpp', 'expense'], true)) {
+                return $receiptAllocation !== 'expense';
+            }
+        }
 
         $poLineId = ($purchaseOrderLineId === null || $purchaseOrderLineId === '') ? null : (int) $purchaseOrderLineId;
 
         return $this->isEligibleFromMaps($poLineId, $itemId, $poAllocByLineId, $itemAllocById);
+    }
+
+    protected function assertExpenseAccount(int $accountId): void
+    {
+        $valid = Account::query()
+            ->whereKey($accountId)
+            ->where('type', 'expense')
+            ->where('is_active', true)
+            ->exists();
+
+        if (!$valid) {
+            throw ValidationException::withMessages([
+                'grn' => "Akun biaya #{$accountId} tidak aktif atau bukan akun expense.",
+            ]);
+        }
     }
 
     protected function isEligibleFromMaps(?int $poLineId, int $itemId, $poAllocByLineId, $itemAllocById): bool

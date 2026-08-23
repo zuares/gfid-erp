@@ -132,7 +132,7 @@ class PurchaseReceiptController extends Controller
         $selectedOrderType = $this->normalizeOrderType($request->input('order_type')); // null/material/finished_good
 
         $lines = PurchaseOrderLine::query()
-            ->with(['item', 'purchaseOrder.supplier'])
+            ->with(['item', 'expenseAccount', 'purchaseOrder.supplier'])
             ->withCount('draftReceiptLines')
             ->withSum(['receiptLines as qty_received_posted' => function ($q) {
                 $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
@@ -204,7 +204,7 @@ class PurchaseReceiptController extends Controller
         $purchase_order->load([
             'supplier',
             'lines' => function ($q) {
-                $q->with('item')
+                $q->with(['item', 'expenseAccount'])
                   ->withCount('draftReceiptLines')
                   ->withSum(['receiptLines as qty_received_posted' => function ($q) {
                       $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
@@ -392,7 +392,7 @@ class PurchaseReceiptController extends Controller
                 ->with('error', 'Replacement GRN tidak dapat diedit secara manual. Jika salah, batalkan/hapus GRN ini dan ulangi proses terima pengganti dari dokumen Retur.');
         }
 
-        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'lines.purchaseOrderLine', 'order']);
+        $purchase_receipt->load(['supplier', 'warehouse', 'lines.item', 'lines.expenseAccount', 'lines.purchaseOrderLine', 'order']);
 
         $suppliers = Supplier::orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
@@ -532,6 +532,8 @@ class PurchaseReceiptController extends Controller
         $unitPrices = $request->input('unit_price', []);
         $units = $request->input('unit', []);
         $lineNotes = $request->input('line_notes', []);
+        $allocations = $request->input('allocation', []);
+        $expenseAccountIds = $request->input('expense_account_id', []);
         $selected = $request->input('selected', []);
 
         if (!is_array($itemIds) || count($itemIds) === 0) {
@@ -649,6 +651,8 @@ class PurchaseReceiptController extends Controller
                 'unit_price' => $unitPrice,
                 'unit' => $units[$i] ?? null,
                 'notes' => $lineNotes[$i] ?? null,
+                'allocation' => $allocations[$i] ?? null,
+                'expense_account_id' => $expenseAccountIds[$i] ?? null,
             ];
         }
 

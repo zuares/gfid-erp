@@ -237,6 +237,28 @@ class Item extends Model
         return $this->hasMany(ItemCostSnapshot::class);
     }
 
+    public function defaultExpenseAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'default_expense_account_id');
+    }
+
+    public function usesExpenseAllocation(): bool
+    {
+        return ($this->default_allocation ?? 'hpp') === 'expense';
+    }
+
+    public function usesInventoryAllocation(): bool
+    {
+        return !$this->usesExpenseAllocation();
+    }
+
+    public function getAllocationLabelAttribute(): string
+    {
+        return $this->usesExpenseAllocation()
+            ? 'Langsung biaya'
+            : 'Masuk persediaan / HPP';
+    }
+
     public function activeCostSnapshot()
     {
         return $this->hasOne(ItemCostSnapshot::class, 'item_id')

@@ -368,6 +368,8 @@
 
                       <td>
                         <input type="hidden" name="po_line_id[]" value="{{ old('po_line_id.' . $i, '') }}">
+                        <input type="hidden" name="allocation[]" value="{{ old('allocation.' . $i, 'hpp') }}">
+                        <input type="hidden" name="expense_account_id[]" value="{{ old('expense_account_id.' . $i, '') }}">
                         <x-item-suggest
                           idName="item_id[]"
                           :items="$items"
@@ -380,6 +382,13 @@
                           :showCategory="true"
                           :skipSubmitValidation="true"
                         />
+                        @php
+                          $oldAllocation = old('allocation.' . $i, 'hpp') === 'expense' ? 'expense' : 'hpp';
+                          $oldExpenseAccount = old('expense_account_id.' . $i, '');
+                        @endphp
+                        <span class="badge rounded-pill mt-1 {{ $oldAllocation === 'expense' ? 'text-bg-warning' : 'text-bg-primary' }}">
+                          {{ $oldAllocation === 'expense' ? 'Biaya' . ($oldExpenseAccount ? ' · akun terpilih' : '') : 'Persediaan / HPP' }}
+                        </span>
                       </td>
 
                       <td>
@@ -423,6 +432,12 @@
 
                       <td>
                         <input type="hidden" name="po_line_id[]" value="{{ $line->purchase_order_line_id ?? '' }}">
+                        @php
+                          $lineAllocation = ($line->allocation ?? ($line->item?->default_allocation ?? 'hpp')) === 'expense' ? 'expense' : 'hpp';
+                          $lineExpenseAccount = $line->expense_account_id ?? '';
+                        @endphp
+                        <input type="hidden" name="allocation[]" value="{{ $lineAllocation }}">
+                        <input type="hidden" name="expense_account_id[]" value="{{ $lineExpenseAccount }}">
                         <x-item-suggest
                           idName="item_id[]"
                           :items="$items"
@@ -435,6 +450,9 @@
                           :showCategory="true"
                           :skipSubmitValidation="true"
                         />
+                        <span class="badge rounded-pill mt-1 {{ $lineAllocation === 'expense' ? 'text-bg-warning' : 'text-bg-primary' }}">
+                          {{ $lineAllocation === 'expense' ? 'Biaya' . ($line->expenseAccount?->code ? ' · ' . $line->expenseAccount->code : '') : 'Persediaan / HPP' }}
+                        </span>
                       </td>
 
                       <td>
@@ -636,6 +654,8 @@
         inp.value = '0';
       } else if (name === 'unit[]' || name === 'line_notes[]'){
         inp.value = '';
+      } else if (name === 'po_line_id[]' || name === 'allocation[]' || name === 'expense_account_id[]') {
+        inp.value = name === 'allocation[]' ? 'hpp' : '';
       } else {
         // item-suggest input visible & hidden
         if (inp.classList.contains('js-item-suggest-input')) inp.value = '';
@@ -643,6 +663,13 @@
         if (inp.classList.contains('js-item-suggest-category')) inp.value = '';
       }
     });
+
+    const badge = clone.querySelector('.badge');
+    if (badge) {
+      badge.classList.remove('text-bg-warning');
+      badge.classList.add('text-bg-primary');
+      badge.textContent = 'Persediaan / HPP';
+    }
 
     // remove "inited" marker so it will re-init
     const wrap = clone.querySelector('.item-suggest-wrap');
