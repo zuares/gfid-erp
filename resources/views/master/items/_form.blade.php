@@ -7,6 +7,12 @@
     ];
     $isEdit = filled($item?->id);
     $itemBom = $itemBom ?? null;
+    $supplierOptions = $suppliers ?? collect();
+    $selectedSupplierIds = old('supplier_ids', $item?->suppliers?->pluck('id')->all() ?? []);
+    $selectedSupplierIds = array_values(array_unique(array_map('intval', is_array($selectedSupplierIds) ? $selectedSupplierIds : [$selectedSupplierIds])));
+    $storedPrimarySupplierId = $item?->suppliers?->first(fn ($supplier) => (bool) $supplier->pivot?->is_primary)?->id
+        ?? ($selectedSupplierIds[0] ?? null);
+    $selectedPrimarySupplierId = (int) old('primary_supplier_id', $storedPrimarySupplierId ?? 0);
     $itemType = old('type', $item?->type ?? 'material');
     $legacySource = old('production_source', $item?->production_source ?? \App\Models\Item::PRODUCTION_BUY);
     $canBuy = old('can_buy', $item?->can_buy ?? ($legacySource === \App\Models\Item::PRODUCTION_BUY ? 1 : 0));
@@ -70,6 +76,14 @@
     .item-supply-preset-option:has(input:checked) { border-color:#6366f1; background:#eef2ff; box-shadow:0 0 0 2px rgba(99,102,241,.1); }
     .item-supply-preset-option strong { display:block; color:#0f172a; font-size:.72rem; }
     .item-supply-preset-option small { display:block; margin-top:2px; color:#94a3b8; font-size:.63rem; line-height:1.25; }
+    .item-supplier-picker { padding:11px; border:1px solid #e2e8f0; border-radius:15px; background:#f8fafc; }
+    .item-supplier-search { margin-bottom:8px; }
+    .item-supplier-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; max-height:220px; overflow:auto; padding-right:3px; }
+    .item-supplier-option { display:flex; align-items:flex-start; gap:8px; padding:8px 9px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; cursor:pointer; }
+    .item-supplier-option:hover { border-color:#94a3b8; }
+    .item-supplier-option:has(input:checked) { border-color:#0ea5e9; background:#f0f9ff; }
+    .item-supplier-option strong { display:block; color:#0f172a; font-size:.72rem; }
+    .item-supplier-option small { display:block; margin-top:1px; color:#94a3b8; font-size:.64rem; }
     .item-supply-summary { display:flex; align-items:center; gap:7px; margin-top:11px; color:#64748b; font-size:.72rem; }
     .item-supply-summary .dot { width:8px; height:8px; border-radius:50%; background:#94a3b8; }
     .item-supply-summary.is-hybrid .dot { background:#7c3aed; }
@@ -92,15 +106,16 @@
     body[data-theme="dark"] .item-form { color:#e5e7eb; }
     body[data-theme="dark"] .item-crud-header { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-crud-title { color:#f8fafc; }
-    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-status-switch { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-supplier-picker, body[data-theme="dark"] .item-supplier-option, body[data-theme="dark"] .item-status-switch { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-supply-preset-option strong { color:#f8fafc; }
+    body[data-theme="dark"] .item-supplier-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-section-title { color:#f8fafc; }
     body[data-theme="dark"] .item-section-icon { color:#cbd5e1; background:#1e293b; }
     body[data-theme="dark"] .item-form .form-label { color:#cbd5e1; }
     body[data-theme="dark"] .item-form .form-control, body[data-theme="dark"] .item-form .form-select { color:#f8fafc; background:#0f172a; border-color:#475569; }
     body[data-theme="dark"] .item-bom-menu { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-bom-menu-title { color:#e0e7ff; }
-    @media(max-width:700px) { .item-form-section { padding:14px; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
+    @media(max-width:700px) { .item-form-section { padding:14px; } .item-supplier-list, .item-supply-preset { grid-template-columns:1fr; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
 </style>
 @endpush
 
@@ -232,6 +247,40 @@
                     </div>
                 </div>
             </div>
+            <div class="mt-3 item-supplier-picker" data-supplier-picker>
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <label class="form-label mb-0">Supplier item</label>
+                        <div class="form-text">Pilih satu atau beberapa supplier yang biasa menyediakan item ini.</div>
+                    </div>
+                    <span class="badge text-bg-light" data-supplier-count>0 dipilih</span>
+                </div>
+                <input type="search" class="form-control item-supplier-search" placeholder="Cari kode atau nama supplier..." data-supplier-search autocomplete="off">
+                <div class="item-supplier-list" data-supplier-list>
+                    @forelse($supplierOptions as $supplier)
+                        <label class="item-supplier-option" data-supplier-option data-search="{{ strtolower($supplier->code . ' ' . $supplier->name) }}">
+                            <input type="checkbox" class="form-check-input mt-1" name="supplier_ids[]" value="{{ $supplier->id }}" data-supplier-checkbox @checked(in_array((int) $supplier->id, $selectedSupplierIds, true))>
+                            <span><strong>{{ $supplier->code }}</strong><small>{{ $supplier->name }}</small></span>
+                        </label>
+                    @empty
+                        <div class="form-text">Belum ada supplier aktif bertipe supplier.</div>
+                    @endforelse
+                </div>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-md-5">
+                        <label class="form-label" for="primary-supplier">Supplier utama</label>
+                        <select id="primary-supplier" name="primary_supplier_id" class="form-select" data-primary-supplier>
+                            <option value="">Otomatis gunakan pilihan pertama</option>
+                            @foreach($supplierOptions as $supplier)
+                                <option value="{{ $supplier->id }}" data-primary-option @selected($selectedPrimarySupplierId === (int) $supplier->id)>{{ $supplier->code }} — {{ $supplier->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-7"><div class="form-text">Supplier utama dipakai sebagai rekomendasi awal saat membuat permintaan/pembelian.</div></div>
+                </div>
+                @error('supplier_ids')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
+                @error('primary_supplier_id')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
+            </div>
             <div class="mt-3" data-status-wrap>
                 <label class="form-label" for="item-active">Status item</label>
                 <div class="item-status-switch">
@@ -316,6 +365,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const canMake = document.querySelector('[data-supply-can-make]');
     const defaultSupply = document.querySelector('[data-default-supply-source]');
     const supplyPresetGroup = document.querySelector('[data-supply-preset-group]');
+    const supplierSearch = document.querySelector('[data-supplier-search]');
+    const supplierOptions = Array.from(document.querySelectorAll('[data-supplier-option]'));
+    const supplierCheckboxes = Array.from(document.querySelectorAll('[data-supplier-checkbox]'));
+    const primarySupplier = document.querySelector('[data-primary-supplier]');
+    const supplierCount = document.querySelector('[data-supplier-count]');
     const supplySummary = document.querySelector('[data-supply-summary]');
     const supplySummaryText = document.querySelector('[data-supply-summary-text]');
     const allocation = document.getElementById('default-allocation');
@@ -328,6 +382,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function modeForType(type) {
         return type === 'finished_good' ? 'hybrid' : (type === 'wip' ? 'make' : 'outsource');
+    }
+
+    function refreshSupplierPicker() {
+        const selected = supplierCheckboxes.filter(input => input.checked).map(input => String(input.value));
+        if (supplierCount) supplierCount.textContent = `${selected.length} dipilih`;
+        if (primarySupplier) {
+            Array.from(primarySupplier.options).forEach(option => {
+                if (!option.dataset.primaryOption) return;
+                const visible = selected.includes(String(option.value));
+                option.hidden = !visible;
+                option.disabled = !visible;
+            });
+            if (primarySupplier.value && !selected.includes(String(primarySupplier.value))) {
+                primarySupplier.value = selected[0] || '';
+            }
+            primarySupplier.disabled = selected.length === 0;
+        }
     }
 
     function applySupplyPreset(mode) {
@@ -405,10 +476,18 @@ document.addEventListener('DOMContentLoaded', function () {
     canMake?.addEventListener('change', refreshSupply);
     allocation?.addEventListener('change', refreshAllocation);
     activeInput?.addEventListener('change', refreshStatus);
+    supplierCheckboxes.forEach(input => input.addEventListener('change', refreshSupplierPicker));
+    supplierSearch?.addEventListener('input', function () {
+        const query = supplierSearch.value.trim().toLowerCase();
+        supplierOptions.forEach(option => {
+            option.hidden = query !== '' && !String(option.dataset.search || '').includes(query);
+        });
+    });
     refreshCategory();
     refreshSupply();
     refreshAllocation();
     refreshStatus();
+    refreshSupplierPicker();
 });
 </script>
 @endpush

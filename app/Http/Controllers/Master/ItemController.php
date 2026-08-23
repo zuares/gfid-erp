@@ -9,6 +9,8 @@ use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
 use App\Models\Account;
+use App\Models\Supplier;
+use App\Models\SupplierItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -73,10 +75,11 @@ class ItemController extends Controller
         $item = null;
 
         $categories = $this->categoryOptions();
+        $suppliers = $this->supplierOptions();
         $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = null;
         $typeLabels = $this->typeLabels();
-        return view('master.items.create', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot', 'typeLabels'));
+        return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'typeLabels'));
     }
 
     public function show(Item $item)
@@ -192,6 +195,7 @@ class ItemController extends Controller
                 'last_purchase_price' => $data['last_purchase_price'] ?? 0,
             ]);
 
+            $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
 
             if (isset($data['unit_cost'])) {
@@ -224,15 +228,16 @@ class ItemController extends Controller
 
     public function edit(Item $item)
     {
-        $item->load('barcodes');
+        $item->load(['barcodes', 'suppliers']);
 
         $categories = $this->categoryOptions();
+        $suppliers = $this->supplierOptions();
         $expenseAccounts = Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
         $itemBom = ItemBom::query()->where('item_id', $item->id)->first();
         $typeLabels = $this->typeLabels();
         
-        return view('master.items.edit', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'typeLabels'));
+        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'typeLabels'));
     }
 
     public function update(Request $request, Item $item)
@@ -271,6 +276,7 @@ class ItemController extends Controller
                 'last_purchase_price' => array_key_exists('last_purchase_price', $data) ? $data['last_purchase_price'] : $item->last_purchase_price,
             ]);
 
+            $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
 
             if (isset($data['unit_cost'])) {
@@ -540,6 +546,21 @@ class ItemController extends Controller
             'can_make' => ['nullable', 'boolean'],
             'default_supply_source' => ['nullable', 'string', Rule::in(array_keys(Item::supplySourceLabels()))],
 
+            'supplier_ids' => ['nullable', 'array'],
+            'supplier_ids.*' => [
+                'integer',
+                Rule::exists('suppliers', 'id')->where(fn ($q) => $q
+                    ->where('type', 'supplier')
+                    ->where('active', true)),
+            ],
+            'primary_supplier_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('suppliers', 'id')->where(fn ($q) => $q
+                    ->where('type', 'supplier')
+                    ->where('active', true)),
+            ],
+
             'active' => ['nullable'],
             
             'default_allocation' => ['nullable', 'string', Rule::in(['hpp', 'expense'])],
@@ -570,6 +591,18 @@ class ItemController extends Controller
             && empty($data['default_expense_account_id'])) {
             throw ValidationException::withMessages([
                 'default_expense_account_id' => 'Pilih akun biaya untuk item yang dibeli sebagai expense.',
+            ]);
+        }
+
+        $supplierIds = collect($data['supplier_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        if (!empty($data['primary_supplier_id'])
+            && !$supplierIds->contains((int) $data['primary_supplier_id'])) {
+            throw ValidationException::withMessages([
+                'primary_supplier_id' => 'Supplier utama harus dipilih dari daftar supplier item.',
             ]);
         }
 
@@ -800,6 +833,49 @@ class ItemController extends Controller
             END")
             ->orderBy('name')
             ->get();
+    }
+
+    protected function supplierOptions()
+    {
+        return Supplier::query()
+            ->where('type', 'supplier')
+            ->where('active', true)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
+    }
+
+    protected function syncSuppliers(Item $item, array $supplierIds, $primarySupplierId = null): void
+    {
+        $ids = collect($supplierIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        SupplierItem::query()
+            ->where('item_id', $item->id)
+            ->when($ids->isNotEmpty(), fn ($query) => $query->whereNotIn('supplier_id', $ids->all()))
+            ->delete();
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $primaryId = (int) $primarySupplierId;
+        if (!$ids->contains($primaryId)) {
+            $primaryId = (int) $ids->first();
+        }
+
+        foreach ($ids as $supplierId) {
+            $mapping = SupplierItem::query()->firstOrNew([
+                'supplier_id' => (int) $supplierId,
+                'item_id' => $item->id,
+            ]);
+
+            $mapping->is_primary = (int) $supplierId === $primaryId;
+            $mapping->active = true;
+            $mapping->save();
+        }
     }
 
     /**
