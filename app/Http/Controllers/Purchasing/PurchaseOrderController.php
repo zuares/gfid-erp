@@ -542,7 +542,10 @@ class PurchaseOrderController extends Controller
             ->where('type', 'supplier')
             ->where(function ($q) use ($purchase_order) {
                 $q->where('active', 1)
-                    ->orWhereKey($purchase_order->supplier_id);
+                    // Tetap tampilkan supplier PO walau status master-nya
+                    // sudah nonaktif. Builder project ini tidak mendukung
+                    // helper Eloquent `orWhereKey()`.
+                    ->orWhere('id', $purchase_order->supplier_id);
             })
             ->orderBy('name')
             ->get();
@@ -896,31 +899,33 @@ class PurchaseOrderController extends Controller
         $supplierId = (int) $request->query('supplier_id');
         $itemId = (int) $request->query('item_id');
 
-        if ($supplierId <= 0 || $itemId <= 0) {
+        if ($itemId <= 0) {
             return response()->json(['last_price' => null]);
         }
 
-        // 1) supplier_prices — diupdate setiap PO approve/save, paling akurat
-        if (Schema::hasTable('supplier_prices')) {
-            $last = DB::table('supplier_prices')
-                ->where('supplier_id', $supplierId)
-                ->where('item_id', $itemId)
-                ->value('last_price');
+        if ($supplierId > 0) {
+            // 1) supplier_prices — diupdate setiap PO approve/save, paling akurat
+            if (Schema::hasTable('supplier_prices')) {
+                $last = DB::table('supplier_prices')
+                    ->where('supplier_id', $supplierId)
+                    ->where('item_id', $itemId)
+                    ->value('last_price');
 
-            if ($last !== null && (float) $last > 0) {
-                return response()->json(['last_price' => (float) $last]);
+                if ($last !== null && (float) $last > 0) {
+                    return response()->json(['last_price' => (float) $last]);
+                }
             }
-        }
 
-        // 2) supplier_items — harga master yang diset manual
-        if (Schema::hasTable('supplier_items')) {
-            $last = DB::table('supplier_items')
-                ->where('supplier_id', $supplierId)
-                ->where('item_id', $itemId)
-                ->value('last_price');
+            // 2) supplier_items — harga master yang diset manual
+            if (Schema::hasTable('supplier_items')) {
+                $last = DB::table('supplier_items')
+                    ->where('supplier_id', $supplierId)
+                    ->where('item_id', $itemId)
+                    ->value('last_price');
 
-            if ($last !== null && (float) $last > 0) {
-                return response()->json(['last_price' => (float) $last]);
+                if ($last !== null && (float) $last > 0) {
+                    return response()->json(['last_price' => (float) $last]);
+                }
             }
         }
 
