@@ -52,7 +52,7 @@
         <div class="card shp-table-card" style="border-radius:12px; overflow:hidden;">
             <div class="card-body p-4">
                 <h5 class="fw-black mb-1" style="color: #334155;">Purchase Order Baru</h5>
-                <p class="text-muted mb-4" style="font-size:.85rem;">Pilih jenis PO dan supplier terlebih dahulu.</p>
+                <p class="text-muted mb-4" style="font-size:.85rem;">Pilih supplier. Item bahan baku, support/ATK, packaging, dan barang jadi dapat digabung dalam satu PO.</p>
 
                 <form id="step1-form" method="GET" action="{{ route('purchasing.purchase_orders.create') }}">
                     {{-- PR-D: carry from_pr through step 1 --}}
@@ -64,7 +64,7 @@
                         <label class="form-label fw-bold" style="font-size:.8rem;">Jenis PO</label>
                         <div class="d-flex gap-2 flex-wrap">
                             @foreach ([
-                                'material'      => ['label' => 'Bahan Produksi', 'icon' => '<i class="bi bi-box-seam"></i>'],
+                                'material'      => ['label' => 'Pembelian Campuran', 'icon' => '<i class="bi bi-box-seam"></i>'],
                                 'packing'       => ['label' => 'Packaging',      'icon' => '<i class="bi bi-archive"></i>'],
                                 'service'       => ['label' => 'Operasional',    'icon' => '<i class="bi bi-tools"></i>'],
                                 'finished_good' => ['label' => 'Barang Jadi',    'icon' => '<i class="bi bi-bag-check"></i>'],
@@ -88,7 +88,7 @@
                             @foreach ($suppliers as $sup)
                                 <option value="{{ $sup->id }}"
                                     data-po-types="{{ implode(',', $sup->po_types ?? []) }}">
-                                    {{ $sup->name }}
+                                    {{ $sup->code ? $sup->code . ' — ' : '' }}{{ $sup->name }}
                                 </option>
                             @endforeach
                         </select>
@@ -122,16 +122,11 @@ const noSupMsg  = document.getElementById('no-supplier-msg');
 const allOpts   = Array.from(supSelect.querySelectorAll('option[value]')); // exclude placeholder
 
 function filterSuppliers(type) {
-    let anyVisible = false;
     allOpts.forEach(opt => {
-        const types = opt.dataset.poTypes; // "material,finished_good" or "" (all)
-        const show  = !types || types === '' || types.split(',').includes(type);
-        opt.hidden = !show;
-        if (show) anyVisible = true;
+        opt.hidden = false;
+        opt.disabled = false;
     });
-    // reset selection if hidden
-    if (supSelect.selectedOptions[0]?.hidden) supSelect.value = '';
-    noSupMsg.classList.toggle('d-none', anyVisible);
+    noSupMsg.classList.add('d-none');
 }
 
 document.querySelectorAll('.type-card').forEach(card => {

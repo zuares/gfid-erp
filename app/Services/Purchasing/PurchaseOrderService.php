@@ -340,8 +340,6 @@ class PurchaseOrderService
      */
     protected function syncLinesLocked(PurchaseOrder $order, array $linesData): float
     {
-        $orderType = $this->normalizeOrderType($order->getAttribute('order_type') ?: 'material');
-
         $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
         $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
         $hasItemDefaultAlloc = Schema::hasColumn('items', 'default_allocation');
@@ -427,13 +425,6 @@ class PurchaseOrderService
             if (!$item) {
                 continue;
             }
-            $expectedType = $orderType === 'packing' ? 'material' : $orderType;
-            if (empty($referencedByItem[$itemId]) && (string) $item->type !== (string) $expectedType) {
-                throw ValidationException::withMessages([
-                    "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
-                ]);
-            }
-
             $lineTotal = round(max(0, ($qty * $unitPrice) - $discount), 2);
 
             // Alokasi/expense account: pertahankan yang lama untuk referenced, hitung untuk baru.
@@ -556,8 +547,6 @@ class PurchaseOrderService
         $order->lines()->delete();
 
         $subtotal = 0.0;
-        $orderType = $this->normalizeOrderType($order->getAttribute('order_type') ?: 'material');
-
         // feature flags
         $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
         $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
@@ -602,14 +591,6 @@ class PurchaseOrderService
             $item = $itemsById->get($itemId);
             if (!$item) {
                 continue;
-            }
-
-            // Guard item type must match order type
-            $expectedType = $orderType === 'packing' ? 'material' : $orderType;
-            if ((string) $item->type !== (string) $expectedType) {
-                throw ValidationException::withMessages([
-                    "lines.$i.item_id" => "Item tidak sesuai jenis PO. PO: {$orderType}, Item: {$item->type}.",
-                ]);
             }
 
             // Allocation (hpp/expense) - auto dari master item, line override kalau ada

@@ -327,6 +327,28 @@ class GrnFromDraftPoTest extends TestCase
             'hpp_behavior' => 'non_hpp',
             'active' => 1,
         ]);
+        $packaging = Item::create([
+            'code' => 'GRNPACK1',
+            'name' => 'Karton Packaging',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_role' => 'shipping_supply',
+            'default_allocation' => 'hpp',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'active' => 1,
+        ]);
+        $finishedGood = Item::create([
+            'code' => 'GRNFG1',
+            'name' => 'Kaos Jadi',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_role' => 'finished_good',
+            'default_allocation' => 'hpp',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'active' => 1,
+        ]);
 
         $po = $this->poService->create([
             'date' => now()->toDateString(),
@@ -335,6 +357,8 @@ class GrnFromDraftPoTest extends TestCase
             'lines' => [
                 ['item_id' => $this->item->id, 'qty' => 10, 'unit_price' => 1000],
                 ['item_id' => $atk->id, 'qty' => 2, 'unit_price' => 2000],
+                ['item_id' => $packaging->id, 'qty' => 3, 'unit_price' => 1000],
+                ['item_id' => $finishedGood->id, 'qty' => 1, 'unit_price' => 5000],
             ],
         ]);
 
@@ -342,6 +366,8 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertSame('hpp', $poLines[0]->allocation);
         $this->assertSame('expense', $poLines[1]->allocation);
         $this->assertSame($expenseAccount->id, (int) $poLines[1]->expense_account_id);
+        $this->assertSame('hpp', $poLines[2]->allocation);
+        $this->assertSame('hpp', $poLines[3]->allocation);
 
         $grn = $this->grnService->create([
             'date' => now()->toDateString(),
@@ -377,10 +403,24 @@ class GrnFromDraftPoTest extends TestCase
                 ->where('item_id', $atk->id)->value('qty'),
             0.001
         );
+        $this->assertEqualsWithDelta(
+            3,
+            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+                ->where('item_id', $packaging->id)->value('qty'),
+            0.001
+        );
+        $this->assertEqualsWithDelta(
+            1,
+            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+                ->where('item_id', $finishedGood->id)->value('qty'),
+            0.001
+        );
 
         $invJournal = Journal::where('source_type', 'grn_inv')->where('source_id', $grn->id)->whereNull('voided_at')->firstOrFail();
         $expJournal = Journal::where('source_type', 'grn_exp')->where('source_id', $grn->id)->whereNull('voided_at')->firstOrFail();
         $this->assertEqualsWithDelta(10000, (float) $invJournal->lines()->where('account_id', Account::where('code', '1201')->value('id'))->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(3000, (float) $invJournal->lines()->where('account_id', Account::where('code', '1205')->value('id'))->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(5000, (float) $invJournal->lines()->where('account_id', Account::where('code', '1203')->value('id'))->sum('debit'), 0.01);
         $this->assertEqualsWithDelta(4000, (float) $expJournal->lines()->where('account_id', $expenseAccount->id)->sum('debit'), 0.01);
     }
 
@@ -411,7 +451,7 @@ class GrnFromDraftPoTest extends TestCase
     public function test_price_visibility_helper(): void
     {
         $this->assertTrue($this->owner->canSeePurchasePrices());   // owner
-        $this->assertFalse($this->admin->canSeePurchasePrices());  // admin gudang
+        $this->assertTrue($this->admin->canSeePurchasePrices());   // admin purchasing
         $this->assertFalse((new User(['role' => 'operating']))->canSeePurchasePrices());
         // branch accounting (belum jadi role valid di DB) — uji logika saja:
         $this->assertTrue((new User(['role' => 'accounting']))->canSeePurchasePrices());

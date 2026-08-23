@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller
@@ -143,7 +144,11 @@ class PurchaseOrderController extends Controller
         $order->payment_method_id = $paymentMethods->firstWhere('mode', 'transfer')?->id
             ?? $paymentMethods->first()?->id;
 
-        $suppliers = Supplier::query()->orderBy('name')->get(['id', 'name', 'po_types']);
+        $suppliers = Supplier::query()
+            ->where('type', 'supplier')
+            ->where('active', 1)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'po_types']);
 
         $itemQuery = Item::query()
             ->select([
@@ -160,7 +165,6 @@ class PurchaseOrderController extends Controller
             ")
             ->orderBy('name')
             ->limit(300);
-        $this->applyPoItemFilter($itemQuery, $orderType);
         $items = $itemQuery->get();
 
         $cashAccounts = Account::query()
@@ -534,7 +538,14 @@ class PurchaseOrderController extends Controller
 
         $purchase_order->load(['lines.item', 'paymentMethod']);
 
-        $suppliers = Supplier::orderBy('name')->get();
+        $suppliers = Supplier::query()
+            ->where('type', 'supplier')
+            ->where(function ($q) use ($purchase_order) {
+                $q->where('active', 1)
+                    ->orWhereKey($purchase_order->supplier_id);
+            })
+            ->orderBy('name')
+            ->get();
 
         $paymentMethods = PaymentMethod::query()
             ->where('is_active', 1)
@@ -563,7 +574,6 @@ class PurchaseOrderController extends Controller
             ")
             ->orderBy('name')
             ->limit(300);
-        $this->applyPoItemFilter($itemsBaseQuery, $orderType);
         $itemsBase = $itemsBaseQuery->get();
 
         $lineItemIds = $purchase_order->lines
@@ -939,7 +949,13 @@ class PurchaseOrderController extends Controller
     {
         $rules = [
             'date' => ['required', 'date'],
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'supplier_id' => [
+                'required',
+                'integer',
+                Rule::exists('suppliers', 'id')->where(fn ($q) => $q
+                    ->where('type', 'supplier')
+                    ->where('active', 1)),
+            ],
             'order_type' => ['required', 'in:material,finished_good,packing,asset,service,jasa,lainnya'],
 
             'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
@@ -976,26 +992,9 @@ class PurchaseOrderController extends Controller
         }
         unset($line);
 
-        // Picker sudah memfilter item, tetapi payload tetap harus dijaga di
-        // server agar item beli-only/make-only tidak tertukar lewat request.
-        if ($data['order_type'] === 'finished_good') {
-            $itemErrors = [];
-            foreach ($data['lines'] as $index => $line) {
-                $itemId = (int) ($line['item_id'] ?? 0);
-                if (!$itemId) {
-                    continue;
-                }
-
-                $item = Item::find($itemId);
-                if (!$item || $item->type !== 'finished_good' || !$item->canBuy()) {
-                    $itemErrors["lines.{$index}.item_id"] = 'Item ini bukan barang jadi yang dapat dibeli.';
-                }
-            }
-
-            if ($itemErrors) {
-                throw ValidationException::withMessages($itemErrors);
-            }
-        }
+        // PO boleh berisi campuran bahan baku, support/ATK, packaging,
+        // service, dan barang jadi. Accounting tetap ditentukan per baris
+        // melalui default_allocation + akun biaya master item.
 
         if (!$this->canSeeMoney($request)) {
             $this->stripMoneyFromNonOwnerPayload($data, $existingOrder);
@@ -1148,21 +1147,9 @@ class PurchaseOrderController extends Controller
 
     protected function applyPoItemFilter($query, string $orderType): void
     {
-        if ($orderType === 'packing') {
-            $query->where('type', 'material')
-                ->whereHas('category', fn($q) => $q->where('code', 'PACK'));
-            return;
-        }
-
-        if ($orderType === 'material') {
-            $query->where('type', 'material')
-                ->whereDoesntHave('category', fn($q) => $q->where('code', 'PACK'));
-            return;
-        }
-
-        if ($orderType === 'finished_good') {
-            $query->where('type', 'finished_good')->canBeBought();
-        }
+        // Retained for backwards compatibility with extensions that call this
+        // helper. PO item selection is intentionally unfiltered by type or
+        // category; only the active-item scope is applied by the caller.
     }
 
     protected function canSeeMoney(?Request $request = null): bool

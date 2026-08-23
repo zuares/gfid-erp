@@ -13,20 +13,15 @@
     $orderType = in_array($orderTypeRaw, $allowedOrderTypes, true) ? $orderTypeRaw : 'material';
 
     $orderTypeOptions = [
-        'material' => 'Bahan Produksi',
+        'material' => 'Pembelian Campuran',
         'packing'  => 'Packaging',
         'service'  => 'Operasional',
         'finished_good' => 'Barang Jadi',
     ];
-    $itemSuggestType = in_array($orderType, ['material', 'packing'], true)
-        ? 'material'
-        : ($orderType === 'finished_good' ? 'finished_good' : null);
-    $itemSuggestExtra = match ($orderType) {
-        'packing' => ['category_codes' => 'PACK'],
-        'material' => ['exclude_category_codes' => 'PACK'],
-        'finished_good' => ['can_buy' => 1],
-        default => [],
-    };
+    // Jenis PO adalah klasifikasi header untuk laporan/default GRN.
+    // Item boleh dicampur dan accounting tetap mengikuti master per baris.
+    $itemSuggestType = null;
+    $itemSuggestExtra = [];
 
     // === DATE ===
     $dateRaw = old('date') ?? ($order?->date ?? now()->toDateString());
@@ -769,7 +764,7 @@
         {{-- Row atas: Jenis PO (kiri) + Tanggal (kanan) --}}
         <div class="po-focal-top d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
             <div style="min-width:0;flex:1;">
-                <div class="po-label mb-2">Jenis PO</div>
+                <div class="po-label mb-2">Jenis PO <span class="text-muted fw-normal">(klasifikasi, item boleh dicampur)</span></div>
                 <div class="po-type-scroll" id="po-type-pills">
                     @foreach ($orderTypeOptions as $k => $label)
                         @php
@@ -1133,20 +1128,12 @@
                 if (!supplierSelect) return;
 
                 const options = Array.from(supplierSelect.querySelectorAll('option[value]'));
-                let selectedVisible = false;
-
                 options.forEach(opt => {
-                    const types = (opt.dataset.poTypes || '').split(',').map(s => s.trim()).filter(Boolean);
-                    const visible = types.length === 0 || types.includes(type);
-                    opt.hidden = !visible;
-                    opt.disabled = !visible;
-                    if (visible && opt.selected) selectedVisible = true;
+                    // Satu supplier boleh menerima bahan baku, support/ATK,
+                    // packaging, maupun barang jadi dalam PO yang sama.
+                    opt.hidden = false;
+                    opt.disabled = false;
                 });
-
-                if (!selectedVisible) {
-                    const firstVisible = options.find(opt => !opt.disabled);
-                    if (firstVisible) supplierSelect.value = firstVisible.value;
-                }
             }
 
             // =========================
