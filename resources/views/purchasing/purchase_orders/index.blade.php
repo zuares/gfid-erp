@@ -39,6 +39,67 @@
     };
 @endphp
 
+@push('head')
+<style>
+    .po-date-row {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: .45rem;
+        color: var(--shp-text, #334155);
+        font-weight: 650;
+        line-height: 1.35;
+    }
+
+    .po-date-row .po-date-time {
+        color: #94a3b8;
+        font-size: .68rem;
+        font-weight: 500;
+    }
+
+    .po-mobile-statuses {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        margin-top: .5rem;
+    }
+
+    .po-mobile-status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: .18rem .5rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        border-radius: 999px;
+        color: #64748b;
+        background: rgba(148, 163, 184, .08);
+        font-size: .68rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .po-mobile-status.is-approved,
+    .po-mobile-status.is-received {
+        color: #15803d;
+        background: rgba(22, 163, 74, .08);
+        border-color: rgba(22, 163, 74, .2);
+    }
+
+    .po-mobile-status.is-cancelled {
+        color: #b91c1c;
+        background: rgba(239, 68, 68, .08);
+        border-color: rgba(239, 68, 68, .2);
+    }
+
+    .po-mobile-status.is-partial {
+        color: #a16207;
+        background: rgba(234, 179, 8, .1);
+        border-color: rgba(234, 179, 8, .25);
+    }
+</style>
+@endpush
+
 @section('content')
 <x-index-layout title="Purchase Orders" subtitle="Daftar pemesanan barang.">
     @if (isset($summary))
@@ -111,7 +172,7 @@
 
     @if (isset($summary) && !empty($summary->last_date))
         <x-slot name="summary">
-            PO terakhir dibuat: <strong class="mono">{{ id_date($summary->last_date) }}</strong>
+            PO terakhir dibuat: <strong>{{ id_day($summary->last_date) }}</strong>
         </x-slot>
     @endif
 
@@ -126,7 +187,7 @@
             <th style="width: 46px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">#</th>
             <th style="width: 230px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                 <a href="{{ $sortUrl('date') }}" class="th-sort {{ $sortCol === 'date' ? 'active' : '' }}">
-                    Dokumen & Tanggal {{ $sortIcon('date') }}
+                    Dokumen & Hari/Tanggal {{ $sortIcon('date') }}
                 </a>
             </th>
             <th style="position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
@@ -199,10 +260,10 @@
                             {{ $order->code }}
                         </a>
                         
-                        <div class="small mono mt-1 d-flex align-items-center gap-2" style="color:var(--shp-text); font-weight: 500; line-height: 1.3;">
-                            <span>{{ id_date($order->date) }}</span>
+                        <div class="small mono mt-1 po-date-row">
+                            <span class="po-date">{{ id_day($order->date) }}</span>
                             @if($order->updated_at)
-                                <span style="font-size: .65rem; font-weight: 400; opacity: .65;">{{ $order->updated_at->format('H:i') }}</span>
+                                <span class="po-date-time">· diperbarui {{ id_time($order->updated_at) }}</span>
                             @endif
                         </div>
 
@@ -217,22 +278,17 @@
                             {{ implode(' · ', $subParts) }}
                         </div>
                     </div>
-                    <div class="d-flex align-items-center justify-content-end d-md-none gap-2" style="font-size: 1.05rem;">
-                        <!-- PO Status -->
-                        <i class="bi {{ $uiStatus === 'approved' ? 'bi-check-square-fill text-primary' : ($uiStatus === 'cancelled' ? 'bi-x-square-fill text-danger' : 'bi-file-earmark-text-fill text-muted') }}" title="{{ $statusLabel }}"></i>
-                        
-                        <!-- RCV Status -->
-                        @if ($rcv === 'fully_received')
-                            <i class="bi bi-box-seam-fill text-success" title="Masuk Gudang"></i>
-                        @elseif ($rcv === 'partial')
-                            <i class="bi bi-box-seam" style="color: #eab308;" title="Masuk Sebagian"></i>
-                        @else
-                            <i class="bi bi-box" style="color: #cbd5e1;" title="Belum Masuk"></i>
-                        @endif
-
-                        <!-- Payment Status -->
+                    <div class="po-mobile-statuses d-md-none" aria-label="Ringkasan status PO">
+                        <span class="po-mobile-status {{ $uiStatus === 'approved' ? 'is-approved' : ($uiStatus === 'cancelled' ? 'is-cancelled' : '') }}">
+                            {{ $statusLabel }}
+                        </span>
+                        <span class="po-mobile-status {{ $rcv === 'fully_received' ? 'is-received' : ($rcv === 'partial' ? 'is-partial' : '') }}">
+                            {{ $rcvLabel }}
+                        </span>
                         @if ($canSeeMoney)
-                            <i class="bi {{ $ps === 'paid' ? 'bi-check-circle-fill pay-icon paid' : ($ps === 'partial' ? 'bi-pie-chart-fill pay-icon partial' : 'bi-circle pay-icon unpaid') }}" title="{{ $payLabel }}"></i>
+                            <span class="po-mobile-status {{ $ps === 'paid' ? 'is-approved' : ($ps === 'partial' ? 'is-partial' : '') }}">
+                                {{ $payLabel }}
+                            </span>
                         @endif
                     </div>
                 </div>
@@ -240,9 +296,6 @@
 
             <td>
                 <div class="supplier-name">{{ optional($order->supplier)->name ?? '—' }}</div>
-                <div class="ship-row-meta d-md-none">
-                    <span class="mono">{{ id_date($order->date) }}</span>
-                </div>
             </td>
 
             @if($canSeeMoney)
