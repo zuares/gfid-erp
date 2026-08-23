@@ -8,7 +8,6 @@
 @endpush
 
 @section('content')
-<div class="page-wrap">
     @if(isset($isDummy) && $isDummy)
     <div style="background-color: #fff3cd; color: #856404; padding: 10px 15px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
         <div>
@@ -62,9 +61,8 @@
             <div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>
         </div>
     </div> <!-- end .card-main -->
-</div> <!-- end .page-wrap -->
-
-@include('marketplace.partials.orders-modals')
+    @include('marketplace.partials.orders-modals')
+@endsection
 
 @push('scripts')
 <script>

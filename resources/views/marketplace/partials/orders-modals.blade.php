@@ -27,7 +27,6 @@
     </div>
 </div>
 <!-- END MODAL -->
-@endsection
 
 {{-- Review Modal (Sedang Proses) --}}
 <div class="ord-review-modal-bg" id="ordReviewBg" onclick="closeReviewModal(event)">
@@ -286,4 +285,3 @@
         </div>
     </div>
 </div>
-

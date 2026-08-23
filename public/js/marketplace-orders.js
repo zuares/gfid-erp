@@ -83,6 +83,18 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return '/api/marketplace/local-orders-paginated' + (lp.toString() ? ('?' + lp.toString()) : '');
     }
 
+    // Endpoint ini memakai paginator Laravel (res.data adalah array), tetapi
+    // beberapa refresh lama masih mengembalikan array langsung. Normalisasi di
+    // satu tempat supaya render tidak pernah menerima object paginator mentah.
+    function applyOrdersResponse(res) {
+        const payload = Array.isArray(res) ? { data: res } : (res || {});
+        orders = Array.isArray(payload.data) ? payload.data : [];
+        currentPage = Number(payload.current_page) || 1;
+        lastPage = Number(payload.last_page) || 1;
+        totalOrders = Number(payload.total) || orders.length;
+        return orders;
+    }
+
     // Status order yang dianggap "aktif" (perlu proses / sedang packing)
     const ACTIVE_ORDER_STATUSES = ['READY_TO_SHIP', 'MATCHED', 'PROCESSED'];
 
@@ -875,10 +887,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         // Kirim rentang tanggal aktif ke backend supaya order lama hasil backfill
         // ikut terambil (backend tidak lagi terpaku 200 order terbaru saja).
         const res = await api(localOrdersUrl()).catch(() => ({data: []}));
-        orders = res.data || [];
-        currentPage = res.current_page || 1;
-        lastPage = res.last_page || 1;
-        totalOrders = res.total || 0;
+        applyOrdersResponse(res);
 
         if (activeStore && !isNaN(activeStore)) {
             const storeIdNum = parseInt(activeStore, 10);
@@ -3146,7 +3155,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             
             try {
                 const newOrders = await api(localOrdersUrl());
-                orders = newOrders;
+                applyOrdersResponse(newOrders);
                 fulfillmentStatusMap.clear();
                 orders.forEach(o => {
                     if (o.fulfillment_status) {
@@ -3331,7 +3340,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             setTimeout(async () => {
                 try {
                     const newOrders = await api(localOrdersUrl());
-                    orders = newOrders;
+                    applyOrdersResponse(newOrders);
                     fulfillmentStatusMap.clear();
                     orders.forEach(o => {
                         if (o.fulfillment_status) {
@@ -3558,7 +3567,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         silentRefreshBusy = true;
         try {
             const newOrders = await api(localOrdersUrl());
-            orders = newOrders;
+            applyOrdersResponse(newOrders);
             fulfillmentStatusMap.clear();
             orders.forEach(o => {
                 if (o.fulfillment_status) {
