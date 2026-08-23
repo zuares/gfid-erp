@@ -67,6 +67,7 @@
             </div>
         </div>
         <div class="item-detail-actions">
+            <a href="{{ route('master.items.create') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item Lagi</a>
             <a href="{{ route('master.items.index') }}" class="btn item-detail-soft btn-sm"><i class="bi bi-arrow-left"></i>Kembali</a>
             <a href="{{ route('master.items.hpp_temp.edit', $item) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i>Set HPP</a>
             <a href="{{ route('master.items.edit', $item) }}" class="btn item-detail-primary btn-sm"><i class="bi bi-pencil"></i>Edit Item</a>

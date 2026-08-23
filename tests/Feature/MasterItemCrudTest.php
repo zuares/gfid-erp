@@ -28,7 +28,7 @@ class MasterItemCrudTest extends TestCase
     public function test_create_item_can_be_submitted_without_opening_quick_supplier_panel(): void
     {
         $response = $this->actingAs($this->owner)->post(route('master.items.store'), [
-            'code' => 'CRUD-NEW-001',
+            'code' => 'crud new 001',
             'name' => 'Item CRUD Baru',
             'unit' => 'pcs',
             'type' => 'material',
@@ -43,7 +43,12 @@ class MasterItemCrudTest extends TestCase
         $item = Item::where('code', 'CRUD-NEW-001')->first();
 
         $this->assertNotNull($item);
-        $response->assertRedirect(route('master.items.edit', $item));
+        $response->assertRedirect(route('master.items.show', $item));
+
+        $this->actingAs($this->owner)
+            ->get(route('master.items.show', $item))
+            ->assertOk()
+            ->assertSee('Tambah Item Lagi');
     }
 
     public function test_quick_supplier_fields_do_not_override_item_fields(): void
@@ -85,7 +90,7 @@ class MasterItemCrudTest extends TestCase
         ]);
 
         $this->assertSame('Item Setelah Edit', $item->fresh()->name);
-        $response->assertRedirect(route('master.items.index'));
+        $response->assertRedirect(route('master.items.show', $item));
     }
 
     public function test_maintenance_category_forces_expense_account(): void
@@ -112,6 +117,30 @@ class MasterItemCrudTest extends TestCase
         $this->assertSame('expense', $item->default_allocation);
         $this->assertSame($maintenanceAccount->id, $item->default_expense_account_id);
         $this->assertFalse((bool) $item->is_stocked);
-        $response->assertRedirect(route('master.items.edit', $item));
+        $response->assertRedirect(route('master.items.show', $item));
+    }
+
+    public function test_item_code_suggestions_show_existing_codes(): void
+    {
+        $item = Item::create([
+            'code' => 'ACC-ZIP-001',
+            'name' => 'Resleting Hitam',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_role' => 'production_supply',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'default_allocation' => 'hpp',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->getJson(route('master.items.code_suggestions', ['q' => 'acc zip']))
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $item->id,
+                'code' => 'ACC-ZIP-001',
+                'name' => 'Resleting Hitam',
+            ]);
     }
 }

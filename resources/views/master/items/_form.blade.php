@@ -76,6 +76,17 @@
     .item-form .form-control:focus, .item-form .form-select:focus { border-color:#94a3b8; box-shadow:0 0 0 .2rem rgba(15,23,42,.07); }
     .item-form .form-text { color:#94a3b8; font-size:.7rem; }
     .item-form .invalid-feedback { font-size:.7rem; }
+    .item-code-field { position:relative; }
+    .item-code-hint { margin-top:5px; color:#94a3b8; font-size:.68rem; }
+    .item-code-suggest { position:absolute; z-index:30; top:calc(100% + 5px); left:0; min-width:320px; max-width:min(440px, 80vw); padding:7px; border:1px solid #cbd5e1; border-radius:13px; background:#fff; box-shadow:0 14px 32px rgba(15,23,42,.14); }
+    .item-code-suggest[hidden] { display:none; }
+    .item-code-suggest-head { padding:5px 7px 7px; color:#64748b; font-size:.68rem; font-weight:800; }
+    .item-code-suggest-head.is-duplicate { color:#b91c1c; }
+    .item-code-suggest-row { display:flex; align-items:flex-start; gap:8px; padding:7px; border-radius:9px; }
+    .item-code-suggest-row + .item-code-suggest-row { margin-top:2px; }
+    .item-code-suggest-row:hover { background:#f8fafc; }
+    .item-code-suggest-code { color:#0f172a; font-size:.73rem; font-weight:900; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
+    .item-code-suggest-name { min-width:0; color:#64748b; font-size:.7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .item-required { color:#dc2626; }
     .item-supply-box { padding:13px; border:1px solid #e2e8f0; border-radius:15px; background:#f8fafc; }
     .item-supply-options { display:grid; gap:8px; }
@@ -170,7 +181,11 @@
             <div class="row g-2">
                 <div class="col-lg-2 col-md-4">
                     <label class="form-label" for="item-code">Kode item <span class="item-required">*</span></label>
-                    <input id="item-code" type="text" name="code" class="form-control @error('code') is-invalid @enderror" value="{{ old('code', $item?->code) }}" autocomplete="off" required>
+                    <div class="item-code-field">
+                        <input id="item-code" type="text" name="code" class="form-control @error('code') is-invalid @enderror" value="{{ old('code', $item?->code) }}" maxlength="50" autocomplete="off" spellcheck="false" required>
+                        <div class="item-code-suggest" data-code-suggest hidden></div>
+                    </div>
+                    <div class="item-code-hint">Gunakan huruf kapital dan tanda - agar kode konsisten.</div>
                     @error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-2 col-md-4">
@@ -214,7 +229,6 @@
                             <option value="{{ $category->id }}" data-code="{{ $category->code }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
                         @endforeach
                     </select>
-                    <div class="form-text" data-item-category-help></div>
                     @error('item_category_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -475,12 +489,100 @@ document.addEventListener('DOMContentLoaded', function () {
     const allocation = document.getElementById('default-allocation');
     const hppFields = document.querySelector('[data-hpp-fields]');
     const bomMenu = document.querySelector('[data-bom-menu]');
+    const codeInput = document.getElementById('item-code');
+    const codeSuggest = document.querySelector('[data-code-suggest]');
+    const codeSuggestRoute = @json(route('master.items.code_suggestions'));
+    const currentItemId = @json($item?->id);
     const expenseWrap = document.querySelector('[data-expense-account-wrap]');
     const activeInput = document.getElementById('item-active');
     const activeLabel = document.querySelector('[data-status-label]');
-    const help = document.querySelector('[data-item-category-help]');
-    const categoryHelp = { finished_good: 'Pilih kategori produk untuk barang jadi.', wip: 'WIP mengikuti kategori produk jadi.', material: 'Pilih kategori sesuai fungsi: bahan utama, accessories, pendukung, packing, atau operasional.' };
     const isEditForm = {{ $isEdit ? 'true' : 'false' }};
+    let codeSuggestTimer = null;
+    let codeSuggestRequest = null;
+
+    function normalizeItemCode(value) {
+        return String(value || '').trim().toUpperCase().replace(/\s+/g, '-');
+    }
+
+    function hideCodeSuggestions() {
+        if (!codeSuggest) return;
+        codeSuggest.hidden = true;
+        codeSuggest.replaceChildren();
+    }
+
+    function showCodeSuggestions(items) {
+        if (!codeSuggest) return;
+        codeSuggest.replaceChildren();
+        if (!items.length) {
+            hideCodeSuggestions();
+            return;
+        }
+
+        const normalizedCode = normalizeItemCode(codeInput?.value);
+        const duplicate = items.find(item => normalizeItemCode(item.code) === normalizedCode);
+        const head = document.createElement('div');
+        head.className = `item-code-suggest-head${duplicate ? ' is-duplicate' : ''}`;
+        head.textContent = duplicate
+            ? `Kode sudah digunakan oleh “${duplicate.name}”. Gunakan kode lain.`
+            : 'Kode yang mirip sudah terdaftar:';
+        codeSuggest.appendChild(head);
+
+        items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'item-code-suggest-row';
+            const code = document.createElement('span');
+            code.className = 'item-code-suggest-code';
+            code.textContent = item.code;
+            const name = document.createElement('span');
+            name.className = 'item-code-suggest-name';
+            name.textContent = item.name;
+            row.append(code, name);
+            codeSuggest.appendChild(row);
+        });
+
+        codeSuggest.hidden = false;
+    }
+
+    async function checkItemCode() {
+        if (!codeInput || !codeSuggest) return;
+        const normalized = normalizeItemCode(codeInput.value);
+        if (codeInput.value !== normalized) codeInput.value = normalized;
+        if (!normalized) {
+            hideCodeSuggestions();
+            return;
+        }
+
+        if (codeSuggestRequest) codeSuggestRequest.abort();
+        codeSuggestRequest = new AbortController();
+        const params = new URLSearchParams({ q: normalized });
+        if (currentItemId) params.set('exclude_id', currentItemId);
+
+        try {
+            const response = await fetch(`${codeSuggestRoute}?${params.toString()}`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: codeSuggestRequest.signal,
+            });
+            if (!response.ok) throw new Error('Gagal memeriksa kode item.');
+            const data = await response.json();
+            showCodeSuggestions(Array.isArray(data.items) ? data.items : []);
+        } catch (error) {
+            if (error.name !== 'AbortError') hideCodeSuggestions();
+        }
+    }
+
+    codeInput?.addEventListener('input', function () {
+        window.clearTimeout(codeSuggestTimer);
+        codeSuggestTimer = window.setTimeout(checkItemCode, 240);
+    });
+    codeInput?.addEventListener('focus', function () {
+        if (normalizeItemCode(codeInput.value)) checkItemCode();
+    });
+    codeInput?.addEventListener('blur', function () {
+        window.setTimeout(hideCodeSuggestions, 180);
+    });
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.item-code-field')) hideCodeSuggestions();
+    });
 
     function modeForType(type) {
         return type === 'finished_good' ? 'hybrid' : (type === 'wip' ? 'make' : 'outsource');
@@ -656,7 +758,6 @@ document.addEventListener('DOMContentLoaded', function () {
             categorySelect.value = '';
             selected = categorySelect.selectedOptions[0];
         }
-        if (help) help.textContent = categoryHelp[typeSelect.value] || '';
         applyCategoryPolicy(selected);
         const isSupplyItem = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
         if (bomMenu) bomMenu.hidden = !isSupplyItem;

@@ -24,6 +24,9 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::get('items/meta', [ItemController::class, 'meta'])
             ->name('items.meta');
 
+        Route::get('items/code-suggestions', [ItemController::class, 'codeSuggestions'])
+            ->name('items.code_suggestions');
+
         Route::post('items/quick-suppliers', [SupplierController::class, 'quickStore'])
             ->name('items.quick_suppliers.store');
 

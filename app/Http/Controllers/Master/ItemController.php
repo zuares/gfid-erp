@@ -12,6 +12,7 @@ use App\Models\Account;
 use App\Models\Supplier;
 use App\Models\SupplierItem;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +81,38 @@ class ItemController extends Controller
         $activeSnapshot = null;
         $typeLabels = $this->typeLabels();
         return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'typeLabels'));
+    }
+
+    public function codeSuggestions(Request $request): JsonResponse
+    {
+        $query = $this->normalizeItemCode($request->query('q'));
+        $excludeId = (int) $request->query('exclude_id', 0);
+
+        if ($query === '') {
+            return response()->json(['items' => []]);
+        }
+
+        $items = Item::query()
+            ->select(['id', 'code', 'name', 'type', 'unit'])
+            ->when($excludeId > 0, fn ($q) => $q->where('id', '<>', $excludeId))
+            ->where(function ($q) use ($query) {
+                $q->whereRaw('UPPER(code) LIKE ?', [$query . '%'])
+                    ->orWhereRaw('UPPER(name) LIKE ?', ['%' . $query . '%']);
+            })
+            ->orderByRaw('CASE WHEN UPPER(code) = ? THEN 0 WHEN UPPER(code) LIKE ? THEN 1 ELSE 2 END', [$query, $query . '%'])
+            ->orderBy('code')
+            ->limit(8)
+            ->get();
+
+        return response()->json([
+            'items' => $items->map(fn (Item $item) => [
+                'id' => (int) $item->id,
+                'code' => (string) $item->code,
+                'name' => (string) $item->name,
+                'type' => (string) ($item->type ?? 'material'),
+                'unit' => (string) ($item->unit ?? 'pcs'),
+            ])->values(),
+        ]);
     }
 
     public function show(Item $item)
@@ -222,7 +255,7 @@ class ItemController extends Controller
         });
 
         return redirect()
-            ->route('master.items.edit', $item)
+            ->route('master.items.show', $item)
             ->with('success', 'Item baru berhasil dibuat beserta barcode-nya.');
     }
 
@@ -311,7 +344,7 @@ class ItemController extends Controller
         });
 
         return redirect()
-            ->route('master.items.index')
+            ->route('master.items.show', $item)
             ->with('success', 'Item & barcode berhasil diperbarui.');
     }
 
@@ -520,6 +553,10 @@ class ItemController extends Controller
     {
         $idToIgnore = $item?->id;
 
+        $request->merge([
+            'code' => $this->normalizeItemCode($request->input('code')),
+        ]);
+
         $data = $request->validate([
             'code' => [
                 'required',
@@ -609,6 +646,11 @@ class ItemController extends Controller
         }
 
         return $data;
+    }
+
+    protected function normalizeItemCode(?string $code): string
+    {
+        return strtoupper(trim((string) preg_replace('/\s+/', '-', (string) $code)));
     }
 
     protected function applyCategoryAccountingDefaults(array $data): array
