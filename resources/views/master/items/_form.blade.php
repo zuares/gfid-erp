@@ -39,6 +39,14 @@
             : ($supplyMode === 'outsource' ? \App\Models\Item::SUPPLY_OUTSOURCE : \App\Models\Item::SUPPLY_BUY);
     }
     $defaultAllocation = old('default_allocation', $item?->default_allocation ?? 'hpp');
+    $isProductionItem = in_array($itemType, ['finished_good', 'wip'], true);
+    $supplyAccordionOpen = $isProductionItem
+        || count($selectedSupplierIds) > 0
+        || $errors->has('supplier_ids')
+        || $errors->has('primary_supplier_id')
+        || $errors->has('can_buy')
+        || $errors->has('can_make')
+        || $errors->has('default_supply_source');
 @endphp
 
 @push('head')
@@ -53,7 +61,7 @@
     .item-form-card { border:1px solid #e2e8f0; border-radius:20px; background:#fff; box-shadow:0 12px 32px rgba(15,23,42,.05); overflow:hidden; }
     .item-form-section { padding:17px; }
     .item-form-section + .item-form-section { border-top:1px solid #eef2f7; }
-    .item-section-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
+    .item-section-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .item-section-icon { width:32px; height:32px; flex:0 0 32px; display:flex; align-items:center; justify-content:center; color:#334155; background:#f1f5f9; border-radius:10px; }
     .item-section-title { margin:0; color:#0f172a; font-size:.95rem; font-weight:900; letter-spacing:-.02em; }
     .item-section-help { margin-top:2px; color:#94a3b8; font-size:.74rem; }
@@ -70,7 +78,7 @@
     .item-supply-option:hover { border-color:#94a3b8; }
     .item-supply-option strong { display:block; font-size:.78rem; }
     .item-supply-option span { display:block; color:#94a3b8; font-size:.69rem; margin-top:1px; }
-    .item-supply-preset { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+    .item-supply-preset { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
     .item-supply-preset-option { position:relative; display:flex; align-items:flex-start; gap:7px; min-height:58px; padding:9px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; cursor:pointer; }
     .item-supply-preset-option:hover { border-color:#94a3b8; }
     .item-supply-preset-option:has(input:checked) { border-color:#6366f1; background:#eef2ff; box-shadow:0 0 0 2px rgba(99,102,241,.1); }
@@ -93,6 +101,18 @@
     .item-supply-summary.is-buy .dot { background:#2563eb; }
     .item-supply-summary.is-outsource .dot { background:#d97706; }
     .item-supply-summary.is-invalid .dot { background:#d97706; }
+    .item-accordion { border:1px solid #e2e8f0; border-radius:15px; background:#f8fafc; overflow:hidden; }
+    .item-accordion + .item-accordion { margin-top:10px; }
+    .item-accordion summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 13px; cursor:pointer; list-style:none; }
+    .item-accordion summary::-webkit-details-marker { display:none; }
+    .item-accordion summary:hover { background:#f1f5f9; }
+    .item-accordion[open] summary { border-bottom:1px solid #e2e8f0; }
+    .item-accordion-title { display:flex; align-items:center; gap:9px; color:#334155; font-size:.78rem; font-weight:900; }
+    .item-accordion-title i { color:#6366f1; font-size:1rem; }
+    .item-accordion-meta { display:flex; align-items:center; gap:7px; color:#64748b; font-size:.7rem; }
+    .item-accordion-meta .bi-chevron-down { transition:transform .18s ease; }
+    .item-accordion[open] .item-accordion-meta .bi-chevron-down { transform:rotate(180deg); }
+    .item-accordion-body { padding:13px; }
     .item-status-switch { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:39px; padding:9px 11px; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
     .item-status-switch strong { font-size:.78rem; }
     .item-form-footer { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:15px; }
@@ -108,17 +128,21 @@
     body[data-theme="dark"] .item-form { color:#e5e7eb; }
     body[data-theme="dark"] .item-crud-header { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-crud-title { color:#f8fafc; }
-    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-supplier-picker, body[data-theme="dark"] .item-supplier-option, body[data-theme="dark"] .item-status-switch { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-form-card, body[data-theme="dark"] .item-supply-box, body[data-theme="dark"] .item-supply-option, body[data-theme="dark"] .item-supply-preset-option, body[data-theme="dark"] .item-supplier-picker, body[data-theme="dark"] .item-supplier-option, body[data-theme="dark"] .item-status-switch, body[data-theme="dark"] .item-accordion { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-supplier-add-panel { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-supply-preset-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-supplier-option strong { color:#f8fafc; }
     body[data-theme="dark"] .item-section-title { color:#f8fafc; }
     body[data-theme="dark"] .item-section-icon { color:#cbd5e1; background:#1e293b; }
+    body[data-theme="dark"] .item-accordion summary:hover { background:#1e293b; }
+    body[data-theme="dark"] .item-accordion[open] summary { border-color:#334155; }
+    body[data-theme="dark"] .item-accordion-title { color:#e2e8f0; }
     body[data-theme="dark"] .item-form .form-label { color:#cbd5e1; }
     body[data-theme="dark"] .item-form .form-control, body[data-theme="dark"] .item-form .form-select { color:#f8fafc; background:#0f172a; border-color:#475569; }
     body[data-theme="dark"] .item-bom-menu { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-bom-menu-title { color:#e0e7ff; }
-    @media(max-width:700px) { .item-form-section { padding:14px; } .item-supplier-list, .item-supply-preset { grid-template-columns:1fr; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
+    @media(max-width:900px) { .item-supply-preset { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:700px) { .item-form-section { padding:14px; } .item-supplier-list, .item-supply-preset { grid-template-columns:1fr; } .item-accordion summary { align-items:flex-start; } .item-accordion-meta { white-space:nowrap; } .item-form-footer { align-items:stretch; flex-direction:column-reverse; } .item-form-footer > * { width:100%; } .item-form-footer .btn { width:100%; justify-content:center; } }
 </style>
 @endpush
 
@@ -131,25 +155,25 @@
         <div class="item-form-section">
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-box"></i></div>
-                <div><h2 class="item-section-title">Identitas item</h2><div class="item-section-help">Gunakan kode yang konsisten agar mudah dicari di pembelian, produksi, dan inventory.</div></div>
+                <h2 class="item-section-title">Identitas item</h2>
             </div>
-            <div class="row g-3">
-                <div class="col-md-3">
+            <div class="row g-2">
+                <div class="col-lg-2 col-md-4">
                     <label class="form-label" for="item-code">Kode item <span class="item-required">*</span></label>
                     <input id="item-code" type="text" name="code" class="form-control @error('code') is-invalid @enderror" value="{{ old('code', $item?->code) }}" autocomplete="off" required>
                     @error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-2 col-md-4">
                     <label class="form-label" for="item-sku">SKU</label>
                     <input id="item-sku" type="text" name="sku" class="form-control @error('sku') is-invalid @enderror" value="{{ old('sku', $item?->sku) }}" placeholder="Kosong = mengikuti kode" autocomplete="off">
                     @error('sku')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-4">
+                <div class="col-lg-5 col-md-8">
                     <label class="form-label" for="item-name">Nama item <span class="item-required">*</span></label>
                     <input id="item-name" type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $item?->name) }}" placeholder="Contoh: Kemeja Flannel Pria" required>
                     @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-2">
+                <div class="col-lg-3 col-md-4">
                     <label class="form-label" for="item-unit">Satuan <span class="item-required">*</span></label>
                     <input id="item-unit" type="text" name="unit" class="form-control @error('unit') is-invalid @enderror" value="{{ old('unit', $item?->unit ?? 'pcs') }}" required>
                     @error('unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -160,176 +184,177 @@
         <div class="item-form-section">
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-diagram-3"></i></div>
-                <div><h2 class="item-section-title">Klasifikasi & perlakuan pembelian</h2><div class="item-section-help">Bahan baku masuk persediaan. ATK dan operasional biasanya langsung dibebankan ke akun biaya.</div></div>
+                <h2 class="item-section-title">Klasifikasi & akuntansi</h2>
             </div>
-            <div class="row g-3">
-                <div class="col-lg-7">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label" for="item-type">Tipe item <span class="item-required">*</span></label>
-                            <select id="item-type" name="type" data-item-type class="form-select @error('type') is-invalid @enderror" required>
-                                @foreach($typeLabels as $key => $label)
-                                    <option value="{{ $key }}" @selected(old('type', $item?->type ?? 'material') === $key)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('type')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="item-category">Kategori</label>
-                            <select id="item-category" name="item_category_id" data-item-category class="form-select @error('item_category_id') is-invalid @enderror">
-                                <option value="">Tanpa kategori</option>
-                                @foreach($categories as $category)
-                                    <option value="{{ $category->id }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
-                                @endforeach
-                            </select>
-                            <div class="form-text" data-item-category-help></div>
-                            @error('item_category_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-md-7">
-                            <label class="form-label" for="default-allocation">Perlakuan saat dibeli</label>
-                            <select id="default-allocation" name="default_allocation" class="form-select @error('default_allocation') is-invalid @enderror">
-                                <option value="hpp" @selected($defaultAllocation === 'hpp')>Masuk persediaan / HPP</option>
-                                <option value="expense" @selected($defaultAllocation === 'expense')>Langsung biaya / expense</option>
-                            </select>
-                            <div class="form-text">Bahan baku pilih persediaan. ATK pilih langsung biaya agar tidak masuk stok bahan baku.</div>
-                            @error('default_allocation')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div class="col-md-5" data-expense-account-wrap>
-                            <label class="form-label" for="expense-account">Akun biaya</label>
-                            <select id="expense-account" name="default_expense_account_id" class="form-select @error('default_expense_account_id') is-invalid @enderror">
-                                <option value="">Pilih akun</option>
-                                @foreach($expenseAccounts ?? [] as $account)
-                                    <option value="{{ $account->id }}" data-account-code="{{ $account->code }}" @selected(old('default_expense_account_id', $item?->default_expense_account_id) == $account->id)>{{ $account->code }} — {{ $account->name }}</option>
-                                @endforeach
-                            </select>
-                            @error('default_expense_account_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
+            <div class="row g-2 align-items-end">
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label" for="item-type">Tipe item <span class="item-required">*</span></label>
+                    <select id="item-type" name="type" data-item-type class="form-select @error('type') is-invalid @enderror" required>
+                        @foreach($typeLabels as $key => $label)
+                            <option value="{{ $key }}" @selected(old('type', $item?->type ?? 'material') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('type')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label" for="item-category">Kategori</label>
+                    <select id="item-category" name="item_category_id" data-item-category class="form-select @error('item_category_id') is-invalid @enderror">
+                        <option value="">Tanpa kategori</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="form-text" data-item-category-help></div>
+                    @error('item_category_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label" for="default-allocation">Perlakuan pembelian</label>
+                    <select id="default-allocation" name="default_allocation" class="form-select @error('default_allocation') is-invalid @enderror">
+                        <option value="hpp" @selected($defaultAllocation === 'hpp')>Persediaan / HPP</option>
+                        <option value="expense" @selected($defaultAllocation === 'expense')>Biaya langsung</option>
+                    </select>
+                    @error('default_allocation')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-lg-3 col-md-6" data-expense-account-wrap>
+                    <label class="form-label" for="expense-account">Akun biaya</label>
+                    <select id="expense-account" name="default_expense_account_id" class="form-select @error('default_expense_account_id') is-invalid @enderror">
+                        <option value="">Pilih akun</option>
+                        @foreach($expenseAccounts ?? [] as $account)
+                            <option value="{{ $account->id }}" data-account-code="{{ $account->code }}" @selected(old('default_expense_account_id', $item?->default_expense_account_id) == $account->id)>{{ $account->code }} — {{ $account->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('default_expense_account_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            </div>
 
-                <div class="col-lg-5" data-supply-policy-wrap>
-                    <div class="item-supply-box h-100">
-                        <label class="form-label mb-2">Metode pasok</label>
-                        <div class="item-supply-preset" data-supply-preset-group>
-                            @foreach([
-                                'buy' => ['Beli jadi', 'Tersedia dari supplier'],
-                                'make' => ['Produksi sendiri', 'Pakai BOM dan alur produksi'],
-                                'hybrid' => ['Hybrid', 'Bisa beli atau produksi'],
-                                'outsource' => ['Makloon', 'Diproduksi pihak ketiga'],
-                            ] as $mode => [$label, $helpText])
-                                <label class="item-supply-preset-option">
-                                    <input type="radio" name="supply_mode_preset" value="{{ $mode }}" class="form-check-input mt-1" data-supply-preset @checked($supplyMode === $mode)>
-                                    <span><strong>{{ $label }}</strong><small>{{ $helpText }}</small></span>
+            <details class="item-accordion mt-3" data-supply-accordion @if($supplyAccordionOpen) open @endif>
+                <summary>
+                    <span class="item-accordion-title"><i class="bi bi-truck"></i>Pasokan & supplier</span>
+                    <span class="item-accordion-meta"><span class="badge rounded-pill text-bg-light" data-supplier-count>0 dipilih</span><i class="bi bi-chevron-down"></i></span>
+                </summary>
+                <div class="item-accordion-body">
+                    <div data-supply-policy-wrap>
+                        <div class="item-supply-box">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-lg-8">
+                                    <label class="form-label mb-2">Metode pasok</label>
+                                    <div class="item-supply-preset" data-supply-preset-group>
+                                        @foreach([
+                                            'buy' => ['Beli jadi', 'Supplier'],
+                                            'make' => ['Produksi sendiri', 'BOM'],
+                                            'hybrid' => ['Hybrid', 'Beli / produksi'],
+                                            'outsource' => ['Makloon', 'Pihak ketiga'],
+                                        ] as $mode => [$label, $helpText])
+                                            <label class="item-supply-preset-option">
+                                                <input type="radio" name="supply_mode_preset" value="{{ $mode }}" class="form-check-input mt-1" data-supply-preset @checked($supplyMode === $mode)>
+                                                <span><strong>{{ $label }}</strong><small>{{ $helpText }}</small></span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                                <div class="col-lg-4">
+                                    <label class="form-label" for="default-supply-source">Prioritas default</label>
+                                    <select id="default-supply-source" name="default_supply_source" data-default-supply-source class="form-select @error('default_supply_source') is-invalid @enderror">
+                                        @foreach(\App\Models\Item::supplySourceLabels() as $key => $label)
+                                            <option value="{{ $key }}" @selected($defaultSupplySource === $key)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="item-supply-summary" data-supply-summary><span class="dot"></span><span data-supply-summary-text>Belum ditentukan</span></div>
+                                </div>
+                            </div>
+                            <div class="item-supply-options">
+                                <input type="hidden" name="can_buy" value="0">
+                                <label class="item-supply-option d-none" for="can-buy">
+                                    <input id="can-buy" type="checkbox" class="form-check-input mt-0" name="can_buy" value="1" data-supply-can-buy @checked((int) $canBuy === 1)>
+                                    <span><strong>Bisa dibeli jadi</strong></span>
                                 </label>
-                            @endforeach
+                                <input type="hidden" name="can_make" value="0">
+                                <label class="item-supply-option d-none" for="can-make">
+                                    <input id="can-make" type="checkbox" class="form-check-input mt-0" name="can_make" value="1" data-supply-can-make @checked((int) $canMake === 1)>
+                                    <span><strong>Bisa diproduksi sendiri</strong></span>
+                                </label>
+                            </div>
+                            @error('can_buy')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                            @error('can_make')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                            @error('default_supply_source')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
-                        <div class="form-text mt-2">Pilihan ini mengisi kemampuan beli/produksi dan prioritas default otomatis.</div>
-                        <div class="item-supply-options">
-                            <input type="hidden" name="can_buy" value="0">
-                            <label class="item-supply-option d-none" for="can-buy">
-                                <input id="can-buy" type="checkbox" class="form-check-input mt-0" name="can_buy" value="1" data-supply-can-buy @checked((int) $canBuy === 1)>
-                                <span><strong>Bisa dibeli jadi</strong><span>Digunakan saat barang jadi tersedia dari supplier.</span></span>
-                            </label>
-                            <input type="hidden" name="can_make" value="0">
-                            <label class="item-supply-option d-none" for="can-make">
-                                <input id="can-make" type="checkbox" class="form-check-input mt-0" name="can_make" value="1" data-supply-can-make @checked((int) $canMake === 1)>
-                                <span><strong>Bisa diproduksi sendiri</strong><span>Digunakan saat item memiliki BOM dan alur produksi.</span></span>
-                            </label>
+                    </div>
+
+                    <div class="mt-3 item-supplier-picker" data-supplier-picker>
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <label class="form-label mb-0">Supplier item</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-open-quick-supplier><i class="bi bi-plus-lg me-1"></i>Tambah supplier</button>
                         </div>
-                        <label class="form-label mt-3" for="default-supply-source">Prioritas default</label>
-                        <select id="default-supply-source" name="default_supply_source" data-default-supply-source class="form-select @error('default_supply_source') is-invalid @enderror">
-                            @foreach(\App\Models\Item::supplySourceLabels() as $key => $label)
-                                <option value="{{ $key }}" @selected($defaultSupplySource === $key)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        <div class="item-supply-summary" data-supply-summary><span class="dot"></span><span data-supply-summary-text>Belum ditentukan</span></div>
-                        <div class="form-text mt-2">Jika dua pilihan aktif, item akan tampil sebagai Hybrid. Prioritas ini menjadi pilihan awal saat membuat rencana.</div>
-                        @error('can_buy')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                        @error('can_make')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                        @error('default_supply_source')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                    </div>
-                </div>
-            </div>
-            <div class="mt-3 item-supplier-picker" data-supplier-picker>
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                    <div>
-                        <label class="form-label mb-0">Supplier item</label>
-                        <div class="form-text">Pilih satu atau beberapa supplier yang biasa menyediakan item ini.</div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge text-bg-light" data-supplier-count>0 dipilih</span>
-                        <button type="button" class="btn btn-sm btn-outline-primary" data-open-quick-supplier><i class="bi bi-plus-lg me-1"></i>Tambah supplier</button>
-                    </div>
-                </div>
-                <div class="item-supplier-add-panel" data-quick-supplier-panel hidden>
-                    <div data-quick-supplier-form>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-3">
-                                <label class="form-label" for="quick-supplier-code">Kode supplier</label>
-                                <input id="quick-supplier-code" name="code" type="text" class="form-control form-control-sm" maxlength="50" placeholder="SUP-001" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="quick-supplier-name">Nama supplier</label>
-                                <input id="quick-supplier-name" name="name" type="text" class="form-control form-control-sm" maxlength="255" placeholder="Nama supplier" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label" for="quick-supplier-phone">Telepon</label>
-                                <input id="quick-supplier-phone" name="phone" type="text" class="form-control form-control-sm" maxlength="50" placeholder="Opsional">
-                            </div>
-                            <div class="col-md-2 d-flex gap-1">
-                                <button type="button" class="btn btn-sm btn-primary flex-fill" data-quick-supplier-submit>Simpan</button>
-                                <button type="button" class="btn btn-sm btn-light" data-close-quick-supplier title="Tutup"><i class="bi bi-x-lg"></i></button>
+                        <div class="item-supplier-add-panel" data-quick-supplier-panel hidden>
+                            <div data-quick-supplier-form>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="quick-supplier-code">Kode supplier</label>
+                                        <input id="quick-supplier-code" name="code" type="text" class="form-control form-control-sm" maxlength="50" placeholder="SUP-001" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="quick-supplier-name">Nama supplier</label>
+                                        <input id="quick-supplier-name" name="name" type="text" class="form-control form-control-sm" maxlength="255" placeholder="Nama supplier" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="quick-supplier-phone">Telepon</label>
+                                        <input id="quick-supplier-phone" name="phone" type="text" class="form-control form-control-sm" maxlength="50" placeholder="Opsional">
+                                    </div>
+                                    <div class="col-md-2 d-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-primary flex-fill" data-quick-supplier-submit>Simpan</button>
+                                        <button type="button" class="btn btn-sm btn-light" data-close-quick-supplier title="Tutup"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                                <div class="small text-danger mt-2" data-quick-supplier-error hidden></div>
                             </div>
                         </div>
-                        <div class="small text-danger mt-2" data-quick-supplier-error hidden></div>
+                        <input type="search" class="form-control item-supplier-search" placeholder="Cari supplier..." data-supplier-search autocomplete="off">
+                        <div class="item-supplier-list" data-supplier-list>
+                            @forelse($supplierOptions as $supplier)
+                                <label class="item-supplier-option" data-supplier-option data-search="{{ strtolower($supplier->code . ' ' . $supplier->name) }}">
+                                    <input type="checkbox" class="form-check-input mt-1" name="supplier_ids[]" value="{{ $supplier->id }}" data-supplier-checkbox @checked(in_array((int) $supplier->id, $selectedSupplierIds, true))>
+                                    <span><strong>{{ $supplier->code }}</strong><small>{{ $supplier->name }}</small></span>
+                                </label>
+                            @empty
+                                <div class="form-text">Belum ada supplier aktif.</div>
+                            @endforelse
+                        </div>
+                        <div class="row g-2 align-items-end mt-1">
+                            <div class="col-lg-6">
+                                <label class="form-label" for="primary-supplier">Supplier utama</label>
+                                <select id="primary-supplier" name="primary_supplier_id" class="form-select" data-primary-supplier>
+                                    <option value="">Otomatis gunakan pilihan pertama</option>
+                                    @foreach($supplierOptions as $supplier)
+                                        <option value="{{ $supplier->id }}" data-primary-option @selected($selectedPrimarySupplierId === (int) $supplier->id)>{{ $supplier->code }} — {{ $supplier->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        @error('supplier_ids')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
+                        @error('primary_supplier_id')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="mt-3" data-status-wrap>
+                        <label class="form-label" for="item-active">Status item</label>
+                        <div class="item-status-switch">
+                            <strong data-status-label>{{ old('active', $item?->active ?? 1) ? 'Aktif / bisa dipakai' : 'Nonaktif / disembunyikan' }}</strong>
+                            <input type="hidden" name="active" value="0">
+                            <div class="form-check form-switch mb-0"><input id="item-active" type="checkbox" name="active" value="1" class="form-check-input" @checked(old('active', $item?->active ?? 1) == 1)></div>
+                        </div>
                     </div>
                 </div>
-                <input type="search" class="form-control item-supplier-search" placeholder="Cari kode atau nama supplier..." data-supplier-search autocomplete="off">
-                <div class="item-supplier-list" data-supplier-list>
-                    @forelse($supplierOptions as $supplier)
-                        <label class="item-supplier-option" data-supplier-option data-search="{{ strtolower($supplier->code . ' ' . $supplier->name) }}">
-                            <input type="checkbox" class="form-check-input mt-1" name="supplier_ids[]" value="{{ $supplier->id }}" data-supplier-checkbox @checked(in_array((int) $supplier->id, $selectedSupplierIds, true))>
-                            <span><strong>{{ $supplier->code }}</strong><small>{{ $supplier->name }}</small></span>
-                        </label>
-                    @empty
-                        <div class="form-text">Belum ada supplier aktif bertipe supplier.</div>
-                    @endforelse
-                </div>
-                <div class="row g-2 align-items-end mt-1">
-                    <div class="col-md-5">
-                        <label class="form-label" for="primary-supplier">Supplier utama</label>
-                        <select id="primary-supplier" name="primary_supplier_id" class="form-select" data-primary-supplier>
-                            <option value="">Otomatis gunakan pilihan pertama</option>
-                            @foreach($supplierOptions as $supplier)
-                                <option value="{{ $supplier->id }}" data-primary-option @selected($selectedPrimarySupplierId === (int) $supplier->id)>{{ $supplier->code }} — {{ $supplier->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-7"><div class="form-text">Supplier utama dipakai sebagai rekomendasi awal saat membuat permintaan/pembelian.</div></div>
-                </div>
-                @error('supplier_ids')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
-                @error('primary_supplier_id')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
-            </div>
-            <div class="mt-3" data-status-wrap>
-                <label class="form-label" for="item-active">Status item</label>
-                <div class="item-status-switch">
-                    <span><strong data-status-label>{{ old('active', $item?->active ?? 1) ? 'Aktif / bisa dipakai' : 'Nonaktif / disembunyikan' }}</strong><span class="d-block item-section-help">Item nonaktif tidak dipakai untuk transaksi baru.</span></span>
-                    <input type="hidden" name="active" value="0">
-                    <div class="form-check form-switch mb-0"><input id="item-active" type="checkbox" name="active" value="1" class="form-check-input" @checked(old('active', $item?->active ?? 1) == 1)></div>
-                </div>
-            </div>
+            </details>
         </div>
 
         <div class="item-form-section">
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-cash-coin"></i></div>
-                <div><h2 class="item-section-title">Harga & biaya dasar</h2><div class="item-section-help">HPP sementara dapat diperbarui lagi dari menu Set HPP.</div></div>
+                <h2 class="item-section-title">Harga & biaya dasar</h2>
             </div>
-            <div class="row g-3">
+            <div class="row g-2">
                 <div class="col-md-4">
                     <label class="form-label" for="last-purchase-price">Harga beli terakhir (Rp)</label>
                     <input id="last-purchase-price" type="number" min="0" step="0.01" name="last_purchase_price" class="form-control @error('last_purchase_price') is-invalid @enderror" value="{{ old('last_purchase_price', $item?->last_purchase_price) }}" placeholder="0">
-                    <div class="form-text">Biasanya ter-update dari penerimaan PO.</div>
                     @error('last_purchase_price')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-4">
@@ -350,7 +375,6 @@
     </div>
 
     @php
-        $isProductionItem = in_array(old('type', $item?->type ?? 'material'), ['finished_good', 'wip'], true);
         $bomHref = $itemBom
             ? route('master.item_boms.edit', $itemBom)
             : ($isEdit && $item && in_array($item->type, ['finished_good', 'wip'], true)
