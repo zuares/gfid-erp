@@ -206,7 +206,7 @@
                     <select id="item-category" name="item_category_id" data-item-category class="form-select @error('item_category_id') is-invalid @enderror">
                         <option value="">Tanpa kategori</option>
                         @foreach($categories as $category)
-                            <option value="{{ $category->id }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
+                            <option value="{{ $category->id }}" data-code="{{ $category->code }}" data-kind="{{ $category->kind }}" @selected(old('item_category_id', $item?->item_category_id) == $category->id)>{{ $category->code }} — {{ $category->name }}</option>
                         @endforeach
                     </select>
                     <div class="form-text" data-item-category-help></div>
@@ -643,8 +643,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (help) help.textContent = categoryHelp[typeSelect.value] || '';
         if (typeSelect.value === 'material' && selected?.dataset.kind === 'operational' && !{{ $isEdit ? 'true' : 'false' }}) {
             if (allocation) allocation.value = 'expense';
-            const atkAccount = expenseWrap?.querySelector('option[data-account-code="6104"]');
-            if (atkAccount && expenseWrap) expenseWrap.querySelector('select').value = atkAccount.value;
+            const expenseAccountCode = selected?.dataset.code === 'MNT' ? '6105' : '6104';
+            const defaultExpenseAccount = expenseWrap?.querySelector(`option[data-account-code="${expenseAccountCode}"]`);
+            if (defaultExpenseAccount && expenseWrap) expenseWrap.querySelector('select').value = defaultExpenseAccount.value;
         }
         const isSupplyItem = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
         if (supplyWrap) supplyWrap.hidden = !isSupplyItem;

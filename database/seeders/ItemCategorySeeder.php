@@ -79,6 +79,18 @@ class ItemCategorySeeder extends Seeder
                 'active' => 1,
                 'kind' => 'support',
             ]);
+            DB::table('item_categories')->updateOrInsert(['code' => 'ATK'], [
+                'code' => 'ATK',
+                'name' => 'ATK & Operasional',
+                'active' => 1,
+                'kind' => 'operational',
+            ]);
+            DB::table('item_categories')->updateOrInsert(['code' => 'MNT'], [
+                'code' => 'MNT',
+                'name' => 'Maintenance Mesin',
+                'active' => 1,
+                'kind' => 'operational',
+            ]);
             DB::table('item_categories')->updateOrInsert(['code' => 'PACK'], [
                 'code' => 'PACK',
                 'name' => 'Packaging & Shipping',

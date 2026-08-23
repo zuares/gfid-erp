@@ -161,6 +161,13 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '6105'], [
+                'code' => '6105',
+                'name' => 'Biaya Pemeliharaan Mesin',
+                'type' => 'expense',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
             DB::table('accounts')->updateOrInsert(['code' => '6110'], [
                 'code' => '6110',
                 'name' => 'Biaya Packing',
