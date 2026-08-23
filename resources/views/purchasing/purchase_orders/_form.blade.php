@@ -1167,6 +1167,22 @@
             .po-td-qty::before { content: "Qty" !important; }
             .po-td-price::before { content: "Harga" !important; }
 
+            .po-td-action {
+                align-self: start;
+                align-items: flex-start !important;
+                padding-top: .74rem !important;
+            }
+
+            .po-td-action .btn-remove-line {
+                width: 36px;
+                height: 36px;
+                min-width: 36px;
+                min-height: 36px;
+                padding: 0 !important;
+                border-radius: 8px !important;
+                font-size: 1rem;
+            }
+
             .po-td-item,
             .po-td-qty,
             .po-td-price {
@@ -1213,8 +1229,10 @@
             }
 
             .po-td-action .btn {
-                min-width: 30px;
-                width: 30px;
+                min-width: 34px;
+                width: 34px;
+                height: 34px;
+                min-height: 34px;
             }
         }
     </style>
@@ -1339,6 +1357,7 @@
                             <x-item-suggest :items="$items" idName="lines[{{ $i }}][item_id]"
                                 :idValue="$lineItemId" :displayValue="$itemDisplay" :type="$itemSuggestType" :extraParams="$itemSuggestExtra" variant="mini"
                                 displayMode="code-name" mobileDisplayMode="code"
+                                placeholder="Masukan kode barang" mobilePlaceholder="Kode barang"
                                 :minChars="1" />
                             @error("lines.$i.item_id")
                                 <div class="text-danger small">{{ $message }}</div>
@@ -1420,7 +1439,7 @@
                         <td class="po-td-item" data-label="Item">
                             <x-item-suggest idName="lines[0][item_id]" :items="$items" displayMode="code-name" mobileDisplayMode="code"
                                 :showName="false" :showCategory="false" :type="$itemSuggestType" :extraParams="$itemSuggestExtra"
-                                placeholder="Masukan kode barang" />
+                                placeholder="Masukan kode barang" mobilePlaceholder="Kode barang" />
                             <div class="line-accounting-badge mt-1" data-line-accounting-badge
                                  style="display:inline-flex;align-items:center;gap:.25rem;padding:.12rem .42rem;border-radius:999px;font-size:.64rem;font-weight:700;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">
                                 <i class="bi bi-box-seam"></i><span data-line-accounting-text>HPP</span>
@@ -1708,8 +1727,11 @@
             // =========================
             async function fetchLastPrice(supplierId, itemId) {
                 if (!canSeeMoney) return null;
-                const url =
-                    `{{ route('purchasing.supplier_price') }}?supplier_id=${encodeURIComponent(supplierId)}&item_id=${encodeURIComponent(itemId)}`;
+                const params = new URLSearchParams({
+                    item_id: String(itemId)
+                });
+                if (supplierId) params.set('supplier_id', String(supplierId));
+                const url = `{{ route('purchasing.supplier_price') }}?${params.toString()}`;
                 const res = await fetch(url, {
                     headers: {
                         'Accept': 'application/json'
@@ -1727,16 +1749,16 @@
             async function applyLastPriceToRow(tr, {
                 force = false
             } = {}) {
-                const supplierId = supplierSelect?.value;
+                const supplierId = supplierSelect?.value || '';
                 const itemId = tr.querySelector('.js-item-suggest-id')?.value;
-                if (!supplierId || !itemId) return;
+                if (!itemId) return;
 
                 const priceDisp = tr.querySelector('.line-price-display');
                 const priceRaw = tr.querySelector('.line-price-raw');
                 if (!priceDisp || !priceRaw) return;
 
                 const userEdited = priceDisp.dataset.userEdited === '1';
-                if (!force && userEdited) return;
+                if (userEdited) return;
                 if (!force && priceRaw.value && Number(priceRaw.value) > 0) return;
 
                 const last = await fetchLastPrice(supplierId, itemId);
@@ -1898,7 +1920,7 @@
                     const price = parseNumber(tr.querySelector('.line-price-display')?.value || '');
 
                     return itemId === '' && itemText === '' && qty <= 0.0001 && price <= 0.0001;
-                });
+                };
 
                 let removable = rows.filter(isEmptyRow);
 
@@ -2173,7 +2195,7 @@
             // supplier change -> refresh last price on rows not edited
             supplierSelect?.addEventListener('change', function() {
                 tableBody.querySelectorAll('tr').forEach(tr => applyLastPriceToRow(tr, {
-                    force: false
+                    force: true
                 }));
             });
 
