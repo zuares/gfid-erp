@@ -295,23 +295,23 @@
                                 <div class="item-quick-supplier-grid">
                                     <div>
                                         <label class="form-label" for="quick-supplier-code">Kode supplier <span class="item-required">*</span></label>
-                                        <input id="quick-supplier-code" name="code" type="text" class="form-control" maxlength="50" placeholder="SUP001" autocomplete="off">
+                                        <input id="quick-supplier-code" data-quick-field="code" type="text" class="form-control" maxlength="50" placeholder="SUP001" autocomplete="off">
                                     </div>
                                     <div>
                                         <label class="form-label" for="quick-supplier-name">Nama supplier <span class="item-required">*</span></label>
-                                        <input id="quick-supplier-name" name="name" type="text" class="form-control" maxlength="255" placeholder="Nama supplier" autocomplete="off">
+                                        <input id="quick-supplier-name" data-quick-field="name" type="text" class="form-control" maxlength="255" placeholder="Nama supplier" autocomplete="off">
                                     </div>
                                     <div>
                                         <label class="form-label" for="quick-supplier-phone">Telepon</label>
-                                        <input id="quick-supplier-phone" name="phone" type="text" class="form-control" maxlength="50" placeholder="Nomor HP / WhatsApp" autocomplete="off">
+                                        <input id="quick-supplier-phone" data-quick-field="phone" type="text" class="form-control" maxlength="50" placeholder="Nomor HP / WhatsApp" autocomplete="off">
                                     </div>
                                     <div>
                                         <label class="form-label" for="quick-supplier-email">Email</label>
-                                        <input id="quick-supplier-email" name="email" type="email" class="form-control" maxlength="255" placeholder="Email supplier" autocomplete="off">
+                                        <input id="quick-supplier-email" data-quick-field="email" type="email" class="form-control" maxlength="255" placeholder="Email supplier" autocomplete="off">
                                     </div>
                                     <div>
                                         <label class="form-label" for="quick-supplier-active">Status</label>
-                                        <select id="quick-supplier-active" name="active" class="form-select" data-quick-default="1">
+                                        <select id="quick-supplier-active" data-quick-field="active" class="form-select" data-quick-default="1">
                                             <option value="1" selected>Aktif</option>
                                             <option value="0">Nonaktif</option>
                                         </select>
@@ -321,7 +321,7 @@
                                         <div class="item-quick-supplier-types">
                                             @foreach(['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'] as $poType => $poLabel)
                                                 <label class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="po_types[]" value="{{ $poType }}">
+                                                    <input class="form-check-input" type="checkbox" data-quick-field="po_types[]" value="{{ $poType }}">
                                                     <span class="form-check-label">{{ $poLabel }}</span>
                                                 </label>
                                             @endforeach
@@ -329,7 +329,7 @@
                                     </div>
                                     <div class="item-quick-supplier-field-full">
                                         <label class="form-label" for="quick-supplier-address">Alamat</label>
-                                        <textarea id="quick-supplier-address" name="address" rows="2" class="form-control" maxlength="1000" placeholder="Alamat supplier"></textarea>
+                                        <textarea id="quick-supplier-address" data-quick-field="address" rows="2" class="form-control" maxlength="1000" placeholder="Alamat supplier"></textarea>
                                     </div>
                                 </div>
                                 <div class="item-quick-supplier-actions">
@@ -535,7 +535,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function resetQuickSupplierForm() {
         if (!quickSupplierForm) return;
-        quickSupplierForm.querySelectorAll('input[name], select[name], textarea[name]').forEach(field => {
+        quickSupplierForm.querySelectorAll('[data-quick-field]').forEach(field => {
             if (field.type === 'checkbox') {
                 field.checked = false;
             } else if (field.tagName === 'SELECT') {
@@ -552,8 +552,8 @@ document.addEventListener('DOMContentLoaded', function () {
             quickSupplierError.hidden = true;
             quickSupplierError.textContent = '';
         }
-        const codeField = quickSupplierForm.querySelector('input[name="code"]');
-        const nameField = quickSupplierForm.querySelector('input[name="name"]');
+        const codeField = quickSupplierForm.querySelector('[data-quick-field="code"]');
+        const nameField = quickSupplierForm.querySelector('[data-quick-field="name"]');
         const normalizedCode = String(codeField?.value || '').trim().toLowerCase();
         const existingOption = supplierOptions.find(option => String(option.dataset.supplierCode || '').trim().toLowerCase() === normalizedCode);
 
@@ -579,11 +579,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const fields = Array.from(quickSupplierForm.querySelectorAll('input[name], select[name], textarea[name]'));
+        const fields = Array.from(quickSupplierForm.querySelectorAll('[data-quick-field]'));
         const payload = new FormData();
         fields.forEach(field => {
             if (field.type === 'checkbox' && !field.checked) return;
-            payload.append(field.name, field.value);
+            payload.append(field.dataset.quickField, field.value);
         });
         quickSupplierSubmit.disabled = true;
         quickSupplierSubmit.textContent = 'Menyimpan...';
@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('[data-open-quick-supplier]')?.addEventListener('click', function () {
         if (!quickSupplierPanel) return;
         quickSupplierPanel.hidden = false;
-        quickSupplierForm?.querySelector('input[name="code"]')?.focus();
+        quickSupplierForm?.querySelector('[data-quick-field="code"]')?.focus();
     });
     document.querySelector('[data-close-quick-supplier]')?.addEventListener('click', function () {
         if (quickSupplierPanel) quickSupplierPanel.hidden = true;

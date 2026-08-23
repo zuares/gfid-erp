@@ -44,6 +44,17 @@ class MasterItemCrudTest extends TestCase
         $response->assertRedirect(route('master.items.edit', $item));
     }
 
+    public function test_quick_supplier_fields_do_not_override_item_fields(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('master.items.create'));
+
+        $response->assertOk()
+            ->assertSee('id="quick-supplier-code" data-quick-field="code"', false)
+            ->assertSee('id="quick-supplier-name" data-quick-field="name"', false)
+            ->assertDontSee('id="quick-supplier-code" name="code"', false)
+            ->assertDontSee('id="quick-supplier-name" name="name"', false);
+    }
+
     public function test_edit_item_can_be_submitted_without_opening_quick_supplier_panel(): void
     {
         $item = Item::create([
