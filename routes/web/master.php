@@ -32,6 +32,15 @@ Route::middleware(['web', 'auth', 'master.items'])->group(function () {
         Route::post('items/quick-categories', [ItemCategoryController::class, 'quickStore'])
             ->name('items.quick_categories.store');
 
+        Route::post('items/quick-type-options', [ItemController::class, 'quickStoreTypeOption'])
+            ->name('items.quick_type_options.store');
+
+        Route::post('items/quick-purchase-treatments', [ItemController::class, 'quickStorePurchaseTreatment'])
+            ->name('items.quick_purchase_treatments.store');
+
+        Route::post('items/quick-expense-accounts', [ItemController::class, 'quickStoreExpenseAccount'])
+            ->name('items.quick_expense_accounts.store');
+
         Route::get('items/suggest', [SupplierController::class, 'suggestItems'])
             ->name('items.suggest');
 

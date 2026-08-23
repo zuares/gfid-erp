@@ -6,6 +6,7 @@
     $typeLabels = $typeLabels ?? ['material' => 'Material / Bahan', 'wip' => 'Setengah Jadi (WIP)', 'finished_good' => 'Barang Jadi (FG)'];
     $hpp = (float) ($activeSnapshot?->unit_cost ?? $item->effective_unit_cost ?? 0);
     $modeClass = $item->isHybrid() ? 'item-detail-hybrid' : ($item->canMake() ? 'item-detail-make' : ($item->canBuy() ? 'item-detail-buy' : 'item-detail-undefined'));
+    $typeLabel = $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type);
 @endphp
 
 @push('head')
@@ -86,7 +87,7 @@
 
     <div class="item-detail-grid">
         <div class="item-detail-stat"><div class="item-detail-stat-label">Status</div><div class="item-detail-stat-value"><span class="item-detail-pill {{ $item->active ? 'item-detail-make' : 'item-detail-undefined' }}">{{ $item->active ? 'Aktif / Bisa dipakai' : 'Nonaktif' }}</span></div><div class="item-detail-stat-note">{{ $item->active ? 'Tersedia untuk transaksi baru' : 'Sembunyikan dari transaksi baru' }}</div></div>
-        <div class="item-detail-stat"><div class="item-detail-stat-label">Tipe & kategori</div><div class="item-detail-stat-value">{{ $typeLabels[$item->type] ?? $item->type }}</div><div class="item-detail-stat-note">{{ $item->category?->name ?? 'Tanpa kategori' }}</div></div>
+        <div class="item-detail-stat"><div class="item-detail-stat-label">Tipe & kategori</div><div class="item-detail-stat-value">{{ $typeLabel }}</div><div class="item-detail-stat-note">{{ $item->category?->name ?? 'Tanpa kategori' }}</div></div>
         <div class="item-detail-stat"><div class="item-detail-stat-label">HPP aktif</div><div class="item-detail-stat-value">{{ $hpp > 0 ? 'Rp '.number_format($hpp, 0, ',', '.') : 'Belum di-set' }}</div><div class="item-detail-stat-note">{{ $activeSnapshot?->snapshot_date?->format('d/m/Y') ?? 'Belum ada snapshot' }}</div></div>
     </div>
 
@@ -136,7 +137,7 @@
                 <div><div class="item-detail-label">Satuan</div><div class="item-detail-value">{{ $item->unit ?: '-' }}</div></div>
                 <div><div class="item-detail-label">Kategori</div><div class="item-detail-value">{{ $item->category?->code ?? '-' }}{{ $item->category ? ' · '.$item->category->name : '' }}</div></div>
                 <div><div class="item-detail-label">Harga beli terakhir</div><div class="item-detail-value">{{ (float) $item->last_purchase_price > 0 ? 'Rp '.number_format((float) $item->last_purchase_price, 0, ',', '.') : 'Belum ada' }}</div></div>
-                <div><div class="item-detail-label">Sifat pembelian</div><div class="item-detail-value">{{ $item->default_allocation === 'expense' ? 'Langsung biaya' : 'Masuk stok / aset' }}</div></div>
+                <div><div class="item-detail-label">Perlakuan pembelian</div><div class="item-detail-value">{{ $item->purchaseTreatment?->name ?? ($item->default_allocation === 'expense' ? 'Langsung biaya' : 'Masuk stok / aset') }}</div></div>
             </div>
         </div>
 

@@ -18,6 +18,7 @@ class Item extends Model
         'name',
         'unit',
         'type', // material / finished_good
+        'item_type_option_id',
         'item_category_id', // sementara masih dipakai (keluarga produk / legacy)
         'product_category_id', // kalau kamu sudah tambah kolom ini (opsional)
         'item_role', // legacy string (raw_material/production_supply/...)
@@ -36,6 +37,7 @@ class Item extends Model
         'rts_max_display',
         'affects_hpp',
         'default_allocation', // hpp / expense
+        'purchase_treatment_id',
         'default_expense_account_id',
 
         'is_stocked',
@@ -168,6 +170,16 @@ class Item extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ItemCategory::class, 'item_category_id');
+    }
+
+    public function itemTypeOption(): BelongsTo
+    {
+        return $this->belongsTo(ItemTypeOption::class);
+    }
+
+    public function purchaseTreatment(): BelongsTo
+    {
+        return $this->belongsTo(ItemPurchaseTreatment::class);
     }
 
     public function boms(): HasMany

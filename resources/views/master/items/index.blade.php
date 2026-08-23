@@ -259,7 +259,7 @@
                                     <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · {{ $item->unit ?: 'pcs' }}</div>
                                 </td>
                                 <td>
-                                    <span class="item-type">{{ $typeLabels[$item->type] ?? $item->type }}</span>
+                                    <span class="item-type">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</span>
                                     <div class="item-meta">{{ $item->category?->code ?? 'Tanpa kategori' }}{{ $item->category ? ' · '.$item->category->name : '' }}</div>
                                 </td>
                                 <td>
@@ -319,7 +319,7 @@
                             <span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span>
                         </div>
                         <div class="item-mobile-card-meta">
-                            <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $typeLabels[$item->type] ?? $item->type }}</div></div>
+                            <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</div></div>
                             <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? 'Tanpa kategori' }}</div></div>
                             <div><div class="item-mobile-card-label">Pasok</div><div class="item-mobile-card-value">@if(in_array($item->type, ['finished_good', 'wip'], true))<span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>@else-@endif</div></div>
                             <div><div class="item-mobile-card-label">HPP / Barcode</div><div class="item-mobile-card-value">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : 'Belum di-set' }} · {{ $barcodeCount }}</div></div>

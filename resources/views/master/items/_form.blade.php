@@ -7,6 +7,8 @@
     ];
     $isEdit = filled($item?->id);
     $itemBom = $itemBom ?? null;
+    $itemTypeOptions = $itemTypeOptions ?? collect();
+    $purchaseTreatmentOptions = $purchaseTreatmentOptions ?? collect();
     $supplierOptions = $suppliers ?? collect();
     $selectedSupplierIds = old('supplier_ids', $item?->suppliers?->pluck('id')->all() ?? []);
     $selectedSupplierIds = array_values(array_unique(array_map('intval', is_array($selectedSupplierIds) ? $selectedSupplierIds : [$selectedSupplierIds])));
@@ -14,6 +16,13 @@
         ?? ($selectedSupplierIds[0] ?? null);
     $selectedPrimarySupplierId = (int) old('primary_supplier_id', $storedPrimarySupplierId ?? 0);
     $itemType = old('type', $item?->type ?? 'material');
+    $selectedTypeOptionId = (int) old(
+        'item_type_option_id',
+        $item?->item_type_option_id
+            ?? $itemTypeOptions->firstWhere('base_type', $itemType)?->id
+            ?? $itemTypeOptions->firstWhere('code', $itemType)?->id
+            ?? 0
+    );
     $legacySource = old('production_source', $item?->production_source ?? \App\Models\Item::PRODUCTION_BUY);
     $canBuy = old('can_buy', $item?->can_buy ?? ($legacySource === \App\Models\Item::PRODUCTION_BUY ? 1 : 0));
     $canMake = old('can_make', $item?->can_make ?? ($legacySource === \App\Models\Item::PRODUCTION_IN_HOUSE ? 1 : 0));
@@ -41,6 +50,12 @@
     $selectedCategory = collect($categories)->firstWhere('id', (int) old('item_category_id', $item?->item_category_id));
     $categoryKind = $selectedCategory?->kind;
     $defaultAllocation = old('default_allocation', $item?->default_allocation ?? 'hpp');
+    $selectedTreatmentId = (int) old(
+        'purchase_treatment_id',
+        $item?->purchase_treatment_id
+            ?? $purchaseTreatmentOptions->firstWhere('allocation', $defaultAllocation)?->id
+            ?? 0
+    );
     if ($categoryKind === 'operational' && old('default_allocation') === null) {
         $defaultAllocation = 'expense';
     }
@@ -77,7 +92,10 @@
     .item-code-field { position:relative; }
     .item-category-picker { display:flex; align-items:center; gap:6px; }
     .item-category-picker .form-select { min-width:0; flex:1 1 auto; }
+    .item-option-picker { display:flex; align-items:center; gap:6px; }
+    .item-option-picker .form-select { min-width:0; flex:1 1 auto; }
     .item-category-add { width:39px; min-width:39px; height:39px; padding:0; border-radius:11px; }
+    .item-option-add { width:39px; min-width:39px; height:39px; padding:0; border-radius:11px; }
     .item-code-suggest { position:absolute; z-index:30; top:calc(100% + 5px); left:0; min-width:320px; max-width:min(440px, 80vw); padding:7px; border:1px solid #cbd5e1; border-radius:13px; background:#fff; box-shadow:0 14px 32px rgba(15,23,42,.14); }
     .item-code-suggest[hidden] { display:none; }
     .item-code-suggest-head { padding:5px 7px 7px; color:#64748b; font-size:.68rem; font-weight:800; }
@@ -251,11 +269,16 @@
             <div class="row g-2 align-items-end">
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label" for="item-type">Tipe item <span class="item-required">*</span></label>
-                    <select id="item-type" name="type" data-item-type class="form-select @error('type') is-invalid @enderror" required>
-                        @foreach($typeLabels as $key => $label)
-                            <option value="{{ $key }}" @selected(old('type', $item?->type ?? 'material') === $key)>{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    <div class="item-option-picker">
+                        <select id="item-type-option" name="item_type_option_id" data-item-type-option class="form-select @error('item_type_option_id') is-invalid @enderror" required>
+                            @foreach($itemTypeOptions as $option)
+                                <option value="{{ $option->id }}" data-base-type="{{ $option->base_type }}" @selected($selectedTypeOptionId === (int) $option->id)>{{ $option->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-outline-primary item-option-add" data-open-type-modal title="Tambah tipe item" aria-label="Tambah tipe item"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <input id="item-type" type="hidden" name="type" data-item-type value="{{ old('type', $itemType) }}">
+                    @error('item_type_option_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                     @error('type')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-3 col-md-6">
@@ -273,20 +296,29 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label" for="default-allocation">Perlakuan pembelian</label>
-                    <select id="default-allocation" name="default_allocation" class="form-select @error('default_allocation') is-invalid @enderror">
-                        <option value="hpp" @selected($defaultAllocation === 'hpp')>Persediaan / HPP</option>
-                        <option value="expense" @selected($defaultAllocation === 'expense')>Biaya langsung</option>
-                    </select>
+                    <div class="item-option-picker">
+                        <select id="purchase-treatment" name="purchase_treatment_id" data-purchase-treatment class="form-select @error('purchase_treatment_id') is-invalid @enderror">
+                            @foreach($purchaseTreatmentOptions as $option)
+                                <option value="{{ $option->id }}" data-allocation="{{ $option->allocation }}" data-default-account="{{ $option->default_expense_account_id ?? '' }}" @selected($selectedTreatmentId === (int) $option->id)>{{ $option->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-outline-primary item-option-add" data-open-treatment-modal title="Tambah perlakuan pembelian" aria-label="Tambah perlakuan pembelian"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <input id="default-allocation" type="hidden" name="default_allocation" data-default-allocation value="{{ $defaultAllocation }}">
+                    @error('purchase_treatment_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                     @error('default_allocation')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-lg-3 col-md-6" data-expense-account-wrap>
                     <label class="form-label" for="expense-account">Akun biaya</label>
-                    <select id="expense-account" name="default_expense_account_id" class="form-select @error('default_expense_account_id') is-invalid @enderror">
-                        <option value="">Pilih akun</option>
-                        @foreach($expenseAccounts ?? [] as $account)
-                            <option value="{{ $account->id }}" data-account-code="{{ $account->code }}" @selected(old('default_expense_account_id', $item?->default_expense_account_id) == $account->id)>{{ $account->code }} — {{ $account->name }}</option>
-                        @endforeach
-                    </select>
+                    <div class="item-option-picker">
+                        <select id="expense-account" name="default_expense_account_id" class="form-select @error('default_expense_account_id') is-invalid @enderror">
+                            <option value="">Pilih akun</option>
+                            @foreach($expenseAccounts ?? [] as $account)
+                                <option value="{{ $account->id }}" data-account-code="{{ $account->code }}" @selected(old('default_expense_account_id', $item?->default_expense_account_id) == $account->id)>{{ $account->code }} — {{ $account->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-outline-primary item-option-add" data-open-account-modal title="Tambah akun biaya" aria-label="Tambah akun biaya"><i class="bi bi-plus-lg"></i></button>
+                    </div>
                     @error('default_expense_account_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
@@ -470,6 +502,51 @@
             </div>
         </div>
 
+        <div class="modal fade" id="quickItemTypeModal" tabindex="-1" aria-labelledby="quickItemTypeTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header"><h5 class="modal-title" id="quickItemTypeTitle">Tambah tipe item</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3"><label class="form-label" for="quick-type-code">Kode tipe</label><input id="quick-type-code" type="text" class="form-control" maxlength="50" autocomplete="off"></div>
+                        <div class="mb-3"><label class="form-label" for="quick-type-name">Nama tipe</label><input id="quick-type-name" type="text" class="form-control" maxlength="100" autocomplete="off"></div>
+                        <div><label class="form-label" for="quick-type-base">Basis perilaku</label><select id="quick-type-base" class="form-select">@foreach($typeLabels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></div>
+                        <div class="small text-danger mt-2" data-quick-type-error hidden></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" data-quick-type-submit><i class="bi bi-check2 me-1"></i>Simpan tipe</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="quickPurchaseTreatmentModal" tabindex="-1" aria-labelledby="quickPurchaseTreatmentTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header"><h5 class="modal-title" id="quickPurchaseTreatmentTitle">Tambah perlakuan pembelian</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3"><label class="form-label" for="quick-treatment-code">Kode perlakuan</label><input id="quick-treatment-code" type="text" class="form-control" maxlength="50" autocomplete="off"></div>
+                        <div class="mb-3"><label class="form-label" for="quick-treatment-name">Nama perlakuan</label><input id="quick-treatment-name" type="text" class="form-control" maxlength="120" autocomplete="off"></div>
+                        <div class="mb-3"><label class="form-label" for="quick-treatment-allocation">Alokasi akuntansi</label><select id="quick-treatment-allocation" class="form-select"><option value="hpp">Persediaan / HPP</option><option value="expense">Biaya langsung</option></select></div>
+                        <div data-quick-treatment-account-wrap><label class="form-label" for="quick-treatment-account">Akun biaya default</label><select id="quick-treatment-account" class="form-select"><option value="">Pilih akun</option>@foreach($expenseAccounts ?? [] as $account)<option value="{{ $account->id }}">{{ $account->code }} — {{ $account->name }}</option>@endforeach</select></div>
+                        <div class="small text-danger mt-2" data-quick-treatment-error hidden></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" data-quick-treatment-submit><i class="bi bi-check2 me-1"></i>Simpan perlakuan</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="quickExpenseAccountModal" tabindex="-1" aria-labelledby="quickExpenseAccountTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header"><h5 class="modal-title" id="quickExpenseAccountTitle">Tambah akun biaya</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+                    <div class="modal-body">
+                        <div class="mb-3"><label class="form-label" for="quick-account-code">Kode akun</label><input id="quick-account-code" type="text" class="form-control" maxlength="20" autocomplete="off"></div>
+                        <div><label class="form-label" for="quick-account-name">Nama akun</label><input id="quick-account-name" type="text" class="form-control" maxlength="190" autocomplete="off"></div>
+                        <div class="small text-danger mt-2" data-quick-account-error hidden></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" data-quick-account-submit><i class="bi bi-check2 me-1"></i>Simpan akun</button></div>
+                </div>
+            </div>
+        </div>
+
         <div class="item-form-section">
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-cash-coin"></i></div>
@@ -545,7 +622,8 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const typeSelect = document.querySelector('[data-item-type]');
+    const typeSelect = document.querySelector('[data-item-type-option]');
+    const typeValue = document.querySelector('[data-item-type]');
     const categorySelect = document.querySelector('[data-item-category]');
     const quickCategoryModal = document.getElementById('quickItemCategoryModal');
     const quickCategoryCode = document.getElementById('quick-category-code');
@@ -554,6 +632,29 @@ document.addEventListener('DOMContentLoaded', function () {
     const quickCategorySubmit = document.querySelector('[data-quick-category-submit]');
     const quickCategoryError = document.querySelector('[data-quick-category-error]');
     const quickCategoryRoute = @json(route('master.items.quick_categories.store'));
+    const quickTypeModal = document.getElementById('quickItemTypeModal');
+    const quickTypeCode = document.getElementById('quick-type-code');
+    const quickTypeName = document.getElementById('quick-type-name');
+    const quickTypeBase = document.getElementById('quick-type-base');
+    const quickTypeSubmit = document.querySelector('[data-quick-type-submit]');
+    const quickTypeError = document.querySelector('[data-quick-type-error]');
+    const quickTypeRoute = @json(route('master.items.quick_type_options.store'));
+    const treatmentSelect = document.querySelector('[data-purchase-treatment]');
+    const quickTreatmentModal = document.getElementById('quickPurchaseTreatmentModal');
+    const quickTreatmentCode = document.getElementById('quick-treatment-code');
+    const quickTreatmentName = document.getElementById('quick-treatment-name');
+    const quickTreatmentAllocation = document.getElementById('quick-treatment-allocation');
+    const quickTreatmentAccount = document.getElementById('quick-treatment-account');
+    const quickTreatmentAccountWrap = document.querySelector('[data-quick-treatment-account-wrap]');
+    const quickTreatmentSubmit = document.querySelector('[data-quick-treatment-submit]');
+    const quickTreatmentError = document.querySelector('[data-quick-treatment-error]');
+    const quickTreatmentRoute = @json(route('master.items.quick_purchase_treatments.store'));
+    const quickAccountModal = document.getElementById('quickExpenseAccountModal');
+    const quickAccountCode = document.getElementById('quick-account-code');
+    const quickAccountName = document.getElementById('quick-account-name');
+    const quickAccountSubmit = document.querySelector('[data-quick-account-submit]');
+    const quickAccountError = document.querySelector('[data-quick-account-error]');
+    const quickAccountRoute = @json(route('master.items.quick_expense_accounts.store'));
     const supplyWrap = document.querySelector('[data-supply-policy-wrap]');
     const canBuy = document.querySelector('[data-supply-can-buy]');
     const canMake = document.querySelector('[data-supply-can-make]');
@@ -600,6 +701,21 @@ document.addEventListener('DOMContentLoaded', function () {
         return String(value || '').trim().toUpperCase().replace(/\s+/g, '-');
     }
 
+    function selectedBaseType() {
+        return typeSelect?.selectedOptions?.[0]?.dataset.baseType || typeValue?.value || 'material';
+    }
+
+    function syncBaseType() {
+        if (typeValue) typeValue.value = selectedBaseType();
+        return selectedBaseType();
+    }
+
+    function syncTreatmentAllocation() {
+        const option = treatmentSelect?.selectedOptions?.[0];
+        if (allocation) allocation.value = option?.dataset.allocation || 'hpp';
+        return allocation?.value || 'hpp';
+    }
+
     function syncSkuFromCode() {
         if (!codeInput || !skuInput || !skuAutoSync) return;
         const normalizedCode = normalizeItemCode(codeInput.value);
@@ -609,7 +725,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function allowedQuickCategoryKinds() {
-        return typeSelect?.value === 'finished_good' || typeSelect?.value === 'wip'
+        const type = selectedBaseType();
+        return type === 'finished_good' || type === 'wip'
             ? ['product']
             : ['material', 'support', 'accessory', 'packaging', 'operational', 'other'];
     }
@@ -679,6 +796,125 @@ document.addEventListener('DOMContentLoaded', function () {
             quickCategorySubmit.disabled = false;
             quickCategorySubmit.innerHTML = '<i class="bi bi-check2 me-1"></i>Simpan kategori';
         }
+    }
+
+    function showOptionError(node, message = '') {
+        if (!node) return;
+        node.textContent = message;
+        node.hidden = !message;
+    }
+
+    function hideQuickModal(modal) {
+        if (modal && window.bootstrap?.Modal) window.bootstrap.Modal.getOrCreateInstance(modal).hide();
+    }
+
+    async function postQuickOption(route, payload, submit, errorNode) {
+        submit.disabled = true;
+        submit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+        showOptionError(errorNode, '');
+        try {
+            const response = await fetch(route, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) {
+                const validationMessage = data.errors ? Object.values(data.errors).flat()[0] : null;
+                throw new Error(validationMessage || data.message || 'Data gagal ditambahkan.');
+            }
+            return data;
+        } catch (error) {
+            showOptionError(errorNode, error.message || 'Data gagal ditambahkan.');
+            return null;
+        } finally {
+            submit.disabled = false;
+        }
+    }
+
+    async function quickCreateTypeOption() {
+        const code = String(quickTypeCode?.value || '').trim().toLowerCase();
+        const name = String(quickTypeName?.value || '').trim();
+        const baseType = quickTypeBase?.value || 'material';
+        if (!code || !name) {
+            showOptionError(quickTypeError, 'Kode dan nama tipe wajib diisi.');
+            return;
+        }
+        const data = await postQuickOption(quickTypeRoute, { code, name, base_type: baseType }, quickTypeSubmit, quickTypeError);
+        if (!data) return;
+        const option = document.createElement('option');
+        option.value = String(data.option.id);
+        option.dataset.baseType = data.option.base_type;
+        option.textContent = data.option.name;
+        typeSelect?.appendChild(option);
+        if (typeSelect) typeSelect.value = option.value;
+        syncBaseType();
+        refreshCategory();
+        refreshQuickCategoryKinds();
+        hideQuickModal(quickTypeModal);
+        if (window.GFID?.toast) window.GFID.toast('Tipe item berhasil ditambahkan.');
+    }
+
+    function refreshQuickTreatmentAccount() {
+        if (quickTreatmentAccountWrap) quickTreatmentAccountWrap.hidden = quickTreatmentAllocation?.value !== 'expense';
+    }
+
+    async function quickCreateTreatment() {
+        const code = String(quickTreatmentCode?.value || '').trim().toLowerCase();
+        const name = String(quickTreatmentName?.value || '').trim();
+        const allocationValue = quickTreatmentAllocation?.value || 'hpp';
+        const accountId = quickTreatmentAccount?.value || '';
+        if (!code || !name || (allocationValue === 'expense' && !accountId)) {
+            showOptionError(quickTreatmentError, allocationValue === 'expense' ? 'Kode, nama, dan akun biaya wajib diisi.' : 'Kode dan nama perlakuan wajib diisi.');
+            return;
+        }
+        const data = await postQuickOption(quickTreatmentRoute, {
+            code,
+            name,
+            allocation: allocationValue,
+            default_expense_account_id: accountId || null,
+        }, quickTreatmentSubmit, quickTreatmentError);
+        if (!data) return;
+        const option = document.createElement('option');
+        option.value = String(data.option.id);
+        option.dataset.allocation = data.option.allocation;
+        option.dataset.defaultAccount = data.option.default_expense_account_id || '';
+        option.textContent = data.option.name;
+        treatmentSelect?.appendChild(option);
+        if (treatmentSelect) treatmentSelect.value = option.value;
+        syncTreatmentAllocation();
+        refreshAllocation();
+        hideQuickModal(quickTreatmentModal);
+        if (window.GFID?.toast) window.GFID.toast('Perlakuan pembelian berhasil ditambahkan.');
+    }
+
+    async function quickCreateExpenseAccount() {
+        const code = String(quickAccountCode?.value || '').trim();
+        const name = String(quickAccountName?.value || '').trim();
+        if (!code || !name) {
+            showOptionError(quickAccountError, 'Kode dan nama akun wajib diisi.');
+            return;
+        }
+        const data = await postQuickOption(quickAccountRoute, { code, name }, quickAccountSubmit, quickAccountError);
+        if (!data) return;
+        const appendAccount = select => {
+            if (!select) return;
+            const option = document.createElement('option');
+            option.value = String(data.account.id);
+            option.textContent = data.account.code + ' — ' + data.account.name;
+            option.dataset.accountCode = data.account.code;
+            select.appendChild(option);
+            select.value = option.value;
+        };
+        appendAccount(document.getElementById('expense-account'));
+        appendAccount(quickTreatmentAccount);
+        hideQuickModal(quickAccountModal);
+        if (window.GFID?.toast) window.GFID.toast('Akun biaya berhasil ditambahkan.');
     }
 
     function hideCodeSuggestions() {
@@ -1012,7 +1248,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function refreshCategory() {
         if (!typeSelect || !categorySelect) return;
-        const allowed = typeSelect.value === 'finished_good' || typeSelect.value === 'wip' ? ['product'] : ['material','support','accessory','packaging','operational','other'];
+        const type = selectedBaseType();
+        const allowed = type === 'finished_good' || type === 'wip' ? ['product'] : ['material','support','accessory','packaging','operational','other'];
         Array.from(categorySelect.options).forEach(option => { if (option.value) option.hidden = !allowed.includes(option.dataset.kind || 'other'); });
         let selected = categorySelect.selectedOptions[0];
         if (selected?.value && selected.hidden) {
@@ -1020,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', function () {
             selected = categorySelect.selectedOptions[0];
         }
         applyCategoryPolicy(selected);
-        const isSupplyItem = typeSelect.value === 'finished_good' || typeSelect.value === 'wip';
+        const isSupplyItem = type === 'finished_good' || type === 'wip';
         if (bomMenu) bomMenu.hidden = !isSupplyItem;
         if (supplyWrap) supplyWrap.hidden = !isSupplyItem;
         if (canBuy) canBuy.disabled = !isSupplyItem;
@@ -1060,12 +1297,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function applyCategoryPolicy(selected) {
-        if (!allocation || !selected) return;
+        if (!allocation) return;
+        if (!selected) {
+            if (treatmentSelect) treatmentSelect.disabled = false;
+            refreshAllocation();
+            return;
+        }
 
         const isOperational = selected.dataset.kind === 'operational';
         if (isOperational) {
-            allocation.value = 'expense';
-            allocation.disabled = true;
+            const expenseTreatment = Array.from(treatmentSelect?.options || []).find(option => option.dataset.allocation === 'expense');
+            if (expenseTreatment) treatmentSelect.value = expenseTreatment.value;
+            syncTreatmentAllocation();
+            if (treatmentSelect) treatmentSelect.disabled = true;
 
             const expenseCode = selected.dataset.code === 'MNT' ? '6105' : '6104';
             const defaultExpenseAccount = expenseWrap?.querySelector(`option[data-account-code="${expenseCode}"]`);
@@ -1073,17 +1317,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 expenseWrap.querySelector('select').value = defaultExpenseAccount.value;
             }
         } else {
-            allocation.disabled = false;
+            if (treatmentSelect) treatmentSelect.disabled = false;
         }
 
         refreshAllocation();
     }
     function refreshStatus() { if (activeLabel && activeInput) activeLabel.textContent = activeInput.checked ? 'Aktif / bisa dipakai' : 'Nonaktif / disembunyikan'; }
     typeSelect?.addEventListener('change', function () {
+        syncBaseType();
         refreshCategory();
         refreshQuickCategoryKinds();
         if (!isEditForm || supplyPresetGroup?.dataset.userEdited !== '1') {
-            const mode = modeForType(typeSelect.value);
+            const mode = modeForType(selectedBaseType());
             const preset = supplyPresetGroup?.querySelector(`[data-supply-preset][value="${mode}"]`);
             if (preset) preset.checked = true;
             applySupplyPreset(mode);
@@ -1097,7 +1342,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     canBuy?.addEventListener('change', refreshSupply);
     canMake?.addEventListener('change', refreshSupply);
-    allocation?.addEventListener('change', refreshAllocation);
+    treatmentSelect?.addEventListener('change', function () {
+        syncTreatmentAllocation();
+        refreshAllocation();
+    });
     categorySelect?.addEventListener('change', refreshCategory);
     activeInput?.addEventListener('change', refreshStatus);
     supplierCheckboxes.forEach(input => input.addEventListener('change', refreshSupplierPicker));
@@ -1117,6 +1365,31 @@ document.addEventListener('DOMContentLoaded', function () {
             quickCreateCategory();
         }
     });
+    document.querySelector('[data-open-type-modal]')?.addEventListener('click', function () {
+        showOptionError(quickTypeError, '');
+        if (quickTypeCode) quickTypeCode.value = '';
+        if (quickTypeName) quickTypeName.value = '';
+        if (quickTypeModal && window.bootstrap?.Modal) window.bootstrap.Modal.getOrCreateInstance(quickTypeModal).show();
+    });
+    quickTypeSubmit?.addEventListener('click', quickCreateTypeOption);
+    document.querySelector('[data-open-treatment-modal]')?.addEventListener('click', function () {
+        showOptionError(quickTreatmentError, '');
+        if (quickTreatmentCode) quickTreatmentCode.value = '';
+        if (quickTreatmentName) quickTreatmentName.value = '';
+        if (quickTreatmentAllocation) quickTreatmentAllocation.value = 'expense';
+        if (quickTreatmentAccount) quickTreatmentAccount.value = '';
+        refreshQuickTreatmentAccount();
+        if (quickTreatmentModal && window.bootstrap?.Modal) window.bootstrap.Modal.getOrCreateInstance(quickTreatmentModal).show();
+    });
+    quickTreatmentAllocation?.addEventListener('change', refreshQuickTreatmentAccount);
+    quickTreatmentSubmit?.addEventListener('click', quickCreateTreatment);
+    document.querySelector('[data-open-account-modal]')?.addEventListener('click', function () {
+        showOptionError(quickAccountError, '');
+        if (quickAccountCode) quickAccountCode.value = '';
+        if (quickAccountName) quickAccountName.value = '';
+        if (quickAccountModal && window.bootstrap?.Modal) window.bootstrap.Modal.getOrCreateInstance(quickAccountModal).show();
+    });
+    quickAccountSubmit?.addEventListener('click', quickCreateExpenseAccount);
     document.querySelector('[data-open-quick-supplier]')?.addEventListener('click', function () {
         if (!quickSupplierPanel) return;
         quickSupplierPanel.hidden = false;
@@ -1138,6 +1411,9 @@ document.addEventListener('DOMContentLoaded', function () {
             option.hidden = query !== '' && !String(option.dataset.search || '').includes(query);
         });
     });
+    syncBaseType();
+    syncTreatmentAllocation();
+    refreshQuickTreatmentAccount();
     refreshCategory();
     refreshQuickCategoryKinds();
     refreshSupply();

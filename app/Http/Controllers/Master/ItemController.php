@@ -8,6 +8,8 @@ use App\Models\ItemBom;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
+use App\Models\ItemTypeOption;
+use App\Models\ItemPurchaseTreatment;
 use App\Models\Account;
 use App\Models\Supplier;
 use App\Models\SupplierItem;
@@ -26,6 +28,7 @@ class ItemController extends Controller
         $filteredQuery = $this->itemQueryFor($request);
         $query = (clone $filteredQuery)
             ->with('category')
+            ->with(['itemTypeOption', 'purchaseTreatment'])
             ->withCount('barcodes')
             ->with(['costSnapshots' => function ($q) {
                 $q->active()
@@ -80,7 +83,9 @@ class ItemController extends Controller
         $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = null;
         $typeLabels = $this->typeLabels();
-        return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'typeLabels'));
+        $itemTypeOptions = $this->itemTypeOptions();
+        $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
+        return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
     public function codeSuggestions(Request $request): JsonResponse
@@ -115,9 +120,109 @@ class ItemController extends Controller
         ]);
     }
 
+    public function quickStoreTypeOption(Request $request): JsonResponse
+    {
+        $request->merge([
+            'code' => strtolower(trim((string) $request->input('code'))),
+        ]);
+
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9][a-z0-9_-]*$/', Rule::unique('item_type_options', 'code')],
+            'name' => ['required', 'string', 'max:100'],
+            'base_type' => ['required', 'string', Rule::in(array_keys($this->typeLabels()))],
+        ]);
+
+        $option = ItemTypeOption::create([
+            'code' => $data['code'],
+            'name' => trim($data['name']),
+            'base_type' => $data['base_type'],
+            'active' => true,
+            'is_system' => false,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'option' => [
+                'id' => (int) $option->id,
+                'code' => (string) $option->code,
+                'name' => (string) $option->name,
+                'base_type' => (string) $option->base_type,
+            ],
+        ], 201);
+    }
+
+    public function quickStorePurchaseTreatment(Request $request): JsonResponse
+    {
+        $request->merge([
+            'code' => strtolower(trim((string) $request->input('code'))),
+        ]);
+
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9][a-z0-9_-]*$/', Rule::unique('item_purchase_treatments', 'code')],
+            'name' => ['required', 'string', 'max:120'],
+            'allocation' => ['required', 'string', Rule::in(['hpp', 'expense'])],
+            'default_expense_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(fn ($q) => $q->where('type', 'expense')->where('is_active', true)),
+            ],
+        ]);
+
+        if ($data['allocation'] === 'expense' && empty($data['default_expense_account_id'])) {
+            throw ValidationException::withMessages([
+                'default_expense_account_id' => 'Pilih akun biaya untuk perlakuan expense.',
+            ]);
+        }
+
+        $option = ItemPurchaseTreatment::create([
+            'code' => $data['code'],
+            'name' => trim($data['name']),
+            'allocation' => $data['allocation'],
+            'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
+            'active' => true,
+            'is_system' => false,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'option' => [
+                'id' => (int) $option->id,
+                'code' => (string) $option->code,
+                'name' => (string) $option->name,
+                'allocation' => (string) $option->allocation,
+                'default_expense_account_id' => $option->default_expense_account_id,
+            ],
+        ], 201);
+    }
+
+    public function quickStoreExpenseAccount(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:20', Rule::unique('accounts', 'code')],
+            'name' => ['required', 'string', 'max:190'],
+        ]);
+
+        $account = Account::create([
+            'code' => trim($data['code']),
+            'name' => trim($data['name']),
+            'type' => 'expense',
+            'is_cash' => false,
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'account' => [
+                'id' => (int) $account->id,
+                'code' => (string) $account->code,
+                'name' => (string) $account->name,
+            ],
+        ], 201);
+    }
+
     public function show(Item $item)
     {
-        $item->load(['category', 'barcodes']);
+        $item->load(['category', 'barcodes', 'itemTypeOption', 'purchaseTreatment']);
         $itemBom = ItemBom::query()
             ->withCount('lines')
             ->where('item_id', $item->id)
@@ -216,6 +321,7 @@ class ItemController extends Controller
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
                 'type' => $data['type'] ?? 'material',
+                'item_type_option_id' => $data['item_type_option_id'] ?? null,
                 'item_category_id' => $data['item_category_id'] ?? null,
                 'item_role_id' => $classification['item_role_id'],
                 'item_role' => $classification['item_role'],
@@ -230,6 +336,7 @@ class ItemController extends Controller
                 'default_supply_source' => $supplyPolicy['default_supply_source'],
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
                 'default_allocation' => $accountingPolicy['default_allocation'],
+                'purchase_treatment_id' => $data['purchase_treatment_id'] ?? null,
                 'default_expense_account_id' => $accountingPolicy['default_expense_account_id'],
                 'last_purchase_price' => $data['last_purchase_price'] ?? 0,
             ]);
@@ -267,7 +374,7 @@ class ItemController extends Controller
 
     public function edit(Item $item)
     {
-        $item->load(['barcodes', 'suppliers']);
+        $item->load(['barcodes', 'suppliers', 'itemTypeOption', 'purchaseTreatment']);
 
         $categories = $this->categoryOptions();
         $suppliers = $this->supplierOptions();
@@ -275,8 +382,10 @@ class ItemController extends Controller
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
         $itemBom = ItemBom::query()->where('item_id', $item->id)->first();
         $typeLabels = $this->typeLabels();
+        $itemTypeOptions = $this->itemTypeOptions();
+        $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
         
-        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'typeLabels'));
+        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
     public function update(Request $request, Item $item)
@@ -297,6 +406,7 @@ class ItemController extends Controller
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
                 'type' => $data['type'] ?? 'material',
+                'item_type_option_id' => $data['item_type_option_id'] ?? null,
                 'item_category_id' => $data['item_category_id'] ?? null,
                 'item_role_id' => $classification['item_role_id'],
                 'item_role' => $classification['item_role'],
@@ -311,6 +421,7 @@ class ItemController extends Controller
                 'default_supply_source' => $supplyPolicy['default_supply_source'],
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
                 'default_allocation' => $accountingPolicy['default_allocation'],
+                'purchase_treatment_id' => $data['purchase_treatment_id'] ?? null,
                 'default_expense_account_id' => $accountingPolicy['default_expense_account_id'],
                 'last_purchase_price' => array_key_exists('last_purchase_price', $data) ? $data['last_purchase_price'] : $item->last_purchase_price,
             ]);
@@ -598,6 +709,11 @@ class ItemController extends Controller
                 // sesuaikan kalau kamu punya type lain
                 Rule::in(['material', 'finished_good', 'wip']),
             ],
+            'item_type_option_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('item_type_options', 'id')->where(fn ($q) => $q->where('active', true)),
+            ],
 
             'item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
             'production_source' => ['nullable', 'string', Rule::in(array_keys(Item::productionSourceLabels()))],
@@ -623,6 +739,11 @@ class ItemController extends Controller
             'active' => ['nullable'],
             
             'default_allocation' => ['nullable', 'string', Rule::in(['hpp', 'expense'])],
+            'purchase_treatment_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('item_purchase_treatments', 'id')->where(fn ($q) => $q->where('active', true)),
+            ],
             'default_expense_account_id' => [
                 'nullable',
                 'integer',
@@ -643,6 +764,8 @@ class ItemController extends Controller
             'barcodes.*.notes' => ['nullable', 'string', 'max:190'],
             'barcodes.*.is_active' => ['nullable'],
         ]);
+
+        $data = $this->normalizeMasterOptions($data);
 
         $this->validateCategoryForType($data['type'], $data['item_category_id'] ?? null);
 
@@ -687,6 +810,17 @@ class ItemController extends Controller
 
         $data['default_allocation'] = 'expense';
 
+        $selectedTreatment = !empty($data['purchase_treatment_id'])
+            ? ItemPurchaseTreatment::find($data['purchase_treatment_id'])
+            : null;
+        if (!$selectedTreatment || $selectedTreatment->allocation !== 'expense') {
+            $data['purchase_treatment_id'] = ItemPurchaseTreatment::query()
+                ->where('allocation', 'expense')
+                ->where('is_system', true)
+                ->where('active', true)
+                ->value('id');
+        }
+
         if (empty($data['default_expense_account_id'])) {
             $accountCode = $category->code === 'MNT' ? '6105' : '6104';
             $data['default_expense_account_id'] = Account::query()
@@ -694,6 +828,34 @@ class ItemController extends Controller
                 ->where('type', 'expense')
                 ->where('is_active', true)
                 ->value('id');
+        }
+
+        return $data;
+    }
+
+    protected function normalizeMasterOptions(array $data): array
+    {
+        $typeOption = !empty($data['item_type_option_id'])
+            ? ItemTypeOption::query()->where('active', true)->find($data['item_type_option_id'])
+            : ItemTypeOption::query()->where('code', $data['type'] ?? 'material')->where('active', true)->first();
+
+        if ($typeOption) {
+            $data['item_type_option_id'] = $typeOption->id;
+            $data['type'] = $typeOption->base_type;
+        }
+
+        $treatment = !empty($data['purchase_treatment_id'])
+            ? ItemPurchaseTreatment::query()->with('expenseAccount')->where('active', true)->find($data['purchase_treatment_id'])
+            : ItemPurchaseTreatment::query()->where('allocation', $data['default_allocation'] ?? 'hpp')->where('active', true)->orderByDesc('is_system')->first();
+
+        if ($treatment) {
+            $data['purchase_treatment_id'] = $treatment->id;
+            $data['default_allocation'] = $treatment->allocation;
+            if ($treatment->allocation === 'expense'
+                && empty($data['default_expense_account_id'])
+                && $treatment->default_expense_account_id) {
+                $data['default_expense_account_id'] = $treatment->default_expense_account_id;
+            }
         }
 
         return $data;
@@ -869,6 +1031,25 @@ class ItemController extends Controller
             'wip' => 'Setengah Jadi (WIP)',
             'finished_good' => 'Barang Jadi (FG)',
         ];
+    }
+
+    protected function itemTypeOptions()
+    {
+        return ItemTypeOption::query()
+            ->where('active', true)
+            ->orderByDesc('is_system')
+            ->orderBy('name')
+            ->get();
+    }
+
+    protected function purchaseTreatmentOptions()
+    {
+        return ItemPurchaseTreatment::query()
+            ->with('expenseAccount')
+            ->where('active', true)
+            ->orderByDesc('is_system')
+            ->orderBy('name')
+            ->get();
     }
 
     protected function itemQueryFor(Request $request)

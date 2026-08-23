@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Item;
 use App\Models\Account;
 use App\Models\ItemCategory;
+use App\Models\ItemPurchaseTreatment;
+use App\Models\ItemTypeOption;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -146,6 +148,57 @@ class MasterItemCrudTest extends TestCase
         ]);
     }
 
+    public function test_type_purchase_treatment_and_expense_account_can_be_created_inline(): void
+    {
+        $typeResponse = $this->actingAs($this->owner)->postJson(route('master.items.quick_type_options.store'), [
+            'code' => 'service-material',
+            'name' => 'Bahan Jasa',
+            'base_type' => 'material',
+        ]);
+        $typeResponse->assertCreated()->assertJsonPath('option.name', 'Bahan Jasa');
+        $typeId = $typeResponse->json('option.id');
+
+        $accountResponse = $this->actingAs($this->owner)->postJson(route('master.items.quick_expense_accounts.store'), [
+            'code' => '6999',
+            'name' => 'Biaya Bahan Jasa',
+        ]);
+        $accountResponse->assertCreated()->assertJsonPath('account.name', 'Biaya Bahan Jasa');
+        $accountId = $accountResponse->json('account.id');
+
+        $treatmentResponse = $this->actingAs($this->owner)->postJson(route('master.items.quick_purchase_treatments.store'), [
+            'code' => 'service-expense',
+            'name' => 'Biaya Bahan Jasa',
+            'allocation' => 'expense',
+            'default_expense_account_id' => $accountId,
+        ]);
+        $treatmentResponse->assertCreated()->assertJsonPath('option.name', 'Biaya Bahan Jasa');
+        $treatmentId = $treatmentResponse->json('option.id');
+
+        $response = $this->actingAs($this->owner)->post(route('master.items.store'), [
+            'code' => 'custom-option-001',
+            'name' => 'Item Dengan Master Custom',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_type_option_id' => $typeId,
+            'item_category_id' => '',
+            'default_allocation' => 'hpp',
+            'purchase_treatment_id' => $treatmentId,
+            'default_expense_account_id' => $accountId,
+            'supplier_ids' => [],
+            'primary_supplier_id' => '',
+            'active' => 1,
+            'barcodes' => [],
+        ]);
+
+        $item = Item::where('code', 'CUSTOM-OPTION-001')->firstOrFail();
+        $this->assertSame((int) $typeId, (int) $item->item_type_option_id);
+        $this->assertSame('material', $item->type);
+        $this->assertSame((int) $treatmentId, (int) $item->purchase_treatment_id);
+        $this->assertSame('expense', $item->default_allocation);
+        $this->assertSame((int) $accountId, (int) $item->default_expense_account_id);
+        $response->assertRedirect(route('master.items.show', $item));
+    }
+
     public function test_finished_good_detail_has_bom_setup_action(): void
     {
         $item = Item::create([
@@ -201,6 +254,57 @@ class MasterItemCrudTest extends TestCase
         $this->assertSame('Item Setelah Edit', $item->fresh()->name);
         $this->assertSame('CUSTOM-EDIT-SKU', $item->fresh()->sku);
         $response->assertRedirect(route('master.items.show', $item));
+    }
+
+    public function test_edit_form_is_populated_with_custom_type_and_purchase_treatment(): void
+    {
+        $account = Account::create([
+            'code' => '6998',
+            'name' => 'Biaya Custom Edit',
+            'type' => 'expense',
+            'is_cash' => false,
+            'is_active' => true,
+        ]);
+        $typeOption = ItemTypeOption::create([
+            'code' => 'edit-material',
+            'name' => 'Material Edit Custom',
+            'base_type' => 'material',
+            'active' => true,
+            'is_system' => false,
+        ]);
+        $treatment = ItemPurchaseTreatment::create([
+            'code' => 'edit-expense',
+            'name' => 'Expense Edit Custom',
+            'allocation' => 'expense',
+            'default_expense_account_id' => $account->id,
+            'active' => true,
+            'is_system' => false,
+        ]);
+        $item = Item::create([
+            'code' => 'EDIT-CUSTOM-001',
+            'name' => 'Item Edit Custom',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_type_option_id' => $typeOption->id,
+            'purchase_treatment_id' => $treatment->id,
+            'default_allocation' => 'expense',
+            'default_expense_account_id' => $account->id,
+            'item_role' => 'raw_material',
+            'is_stocked' => false,
+            'hpp_behavior' => 'expense',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.items.edit', $item))
+            ->assertOk()
+            ->assertSee('value="'.$typeOption->id.'" data-base-type="material" selected', false)
+            ->assertSee('value="'.$treatment->id.'" data-allocation="expense"', false)
+            ->assertSee('Material Edit Custom')
+            ->assertSee('Expense Edit Custom')
+            ->assertSee('Tambah tipe item')
+            ->assertSee('Tambah perlakuan pembelian')
+            ->assertSee('Tambah akun biaya');
     }
 
     public function test_maintenance_category_forces_expense_account(): void
