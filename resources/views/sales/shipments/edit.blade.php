@@ -1217,6 +1217,28 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
    ITEM SUGGEST DROPDOWN (autocomplete)
 ══════════════════════════════════════════════════ */
 #scanForm { position: relative; }
+.shp-scan-input-row { display: flex; align-items: stretch; gap: .45rem; }
+.shp-scan-input-row .shp-scan-input { min-width: 0; flex: 1; }
+.shp-camera-btn { flex: 0 0 auto; width: 48px; min-height: 52px; border: 1px solid #2563eb; border-radius: 8px; color: #fff; background: #2563eb; font-size: 1rem; cursor: pointer; }
+.shp-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.shp-camera-btn:disabled { opacity: .65; cursor: wait; }
+.shp-camera-panel { margin-top: .5rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 8px; background: #fff; }
+.shp-camera-panel[hidden] { display: none !important; }
+.shp-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .45rem .6rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
+.shp-camera-title { font-size: .72rem; font-weight: 850; }
+.shp-camera-close { border: 0; border-radius: 5px; padding: .2rem .42rem; color: #64748b; background: transparent; font-size: .68rem; font-weight: 800; cursor: pointer; }
+.shp-camera-close:hover { color: #0f172a; background: #e2e8f0; }
+.shp-camera-reader { min-height: 190px; background: #0f172a; }
+.shp-camera-reader video { display: block; width: 100% !important; max-height: 330px; object-fit: cover; }
+.shp-camera-status { padding: .42rem .6rem; color: #64748b; background: #fff; font-size: .67rem; line-height: 1.4; }
+.shp-camera-status.error { color: #b91c1c; background: #fef2f2; }
+body[data-theme="dark"] .shp-camera-panel { border-color: rgba(51,65,85,.8); background: #0f172a; }
+body[data-theme="dark"] .shp-camera-head { color: #e2e8f0; background: #1e293b; border-bottom-color: rgba(51,65,85,.8); }
+body[data-theme="dark"] .shp-camera-close { color: #cbd5e1; }
+body[data-theme="dark"] .shp-camera-status { color: #cbd5e1; background: #0f172a; }
+@media (max-width: 640px) {
+    .shp-camera-btn { width: 48px; min-height: 58px; }
+}
 .shp-suggest {
     display: none;
     position: absolute;
@@ -1480,13 +1502,27 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         <form id="scanForm" method="POST"
               action="{{ parse_url(route('sales.shipments.scan_item', $shipment), PHP_URL_PATH) }}">
             @csrf
-            <input type="text" name="scan_code"
-                   class="form-control shp-scan-input" id="scanInput"
-                   placeholder="Scan / ketik kode barang lalu tekan Enter"
-                   style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
-                   autocomplete="off" spellcheck="false"
-                   role="combobox" aria-autocomplete="list"
-                   aria-expanded="false" aria-controls="scanSuggest" required>
+            <div class="shp-scan-input-row">
+                <input type="text" name="scan_code"
+                       class="form-control shp-scan-input" id="scanInput"
+                       placeholder="Scan / ketik kode barang lalu tekan Enter"
+                       style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
+                       autocomplete="off" spellcheck="false"
+                       role="combobox" aria-autocomplete="list"
+                       aria-expanded="false" aria-controls="scanSuggest" required>
+                <button type="button" id="scanCameraBtn" class="shp-camera-btn"
+                        aria-label="Buka kamera untuk scan barcode item" title="Scan dengan kamera">
+                    <i class="bi bi-camera-video" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div id="scanCameraPanel" class="shp-camera-panel" hidden>
+                <div class="shp-camera-head">
+                    <span class="shp-camera-title"><i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode item ke kamera</span>
+                    <button type="button" id="scanCameraClose" class="shp-camera-close">Tutup</button>
+                </div>
+                <div id="scanCameraReader" class="shp-camera-reader"></div>
+                <div id="scanCameraStatus" class="shp-camera-status">Meminta izin kamera...</div>
+            </div>
 
             {{-- autocomplete suggestions --}}
             <div class="shp-suggest" id="scanSuggest" role="listbox"></div>
@@ -1794,6 +1830,11 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     /* ── DOM refs ── */
     const scanInput         = document.getElementById('scanInput');
     const scanForm          = document.getElementById('scanForm');
+    const scanCameraBtn     = document.getElementById('scanCameraBtn');
+    const scanCameraPanel   = document.getElementById('scanCameraPanel');
+    const scanCameraClose   = document.getElementById('scanCameraClose');
+    const scanCameraReader  = document.getElementById('scanCameraReader');
+    const scanCameraStatus  = document.getElementById('scanCameraStatus');
     const scanLookupUrl     = @json(route('sales.shipments.scan_lookup', $shipment));
     const linesWrapper      = document.getElementById('linesWrapper');
     const linesTbody        = document.getElementById('linesTbody');
@@ -1823,6 +1864,10 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     let lastScannedLineId = @json($lastScannedLineId);
     let sessionScanCount  = 0;
     let itemFilterQuery   = '';
+    let itemCamera        = null;
+    let itemCameraLoading = false;
+    let itemCameraLibrary = null;
+    let itemCameraDecoding = false;
     const pickingLines = new Map(@json($pickingLinesPayload));
 
     const FMT = new Intl.NumberFormat('id-ID');
@@ -2043,6 +2088,90 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         }).then(res => res.ok ? res.json() : null).catch(() => null);
     }
+
+    /* ── camera barcode scanner ── */
+    function setItemCameraStatus(message, error = false) {
+        if (!scanCameraStatus) return;
+        scanCameraStatus.textContent = message;
+        scanCameraStatus.classList.toggle('error', error);
+    }
+
+    function loadItemCameraLibrary() {
+        if (window.Html5Qrcode) return Promise.resolve();
+        if (itemCameraLibrary) return itemCameraLibrary;
+
+        itemCameraLibrary = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+            script.async = true;
+            script.onload = () => window.Html5Qrcode ? resolve() : reject(new Error('Library kamera tidak tersedia.'));
+            script.onerror = () => reject(new Error('Library kamera gagal dimuat.'));
+            document.head.appendChild(script);
+        });
+
+        return itemCameraLibrary;
+    }
+
+    async function stopItemCamera() {
+        if (!itemCamera) return;
+        const activeCamera = itemCamera;
+        itemCamera = null;
+        try { await activeCamera.stop(); } catch (error) {}
+        try { activeCamera.clear(); } catch (error) {}
+    }
+
+    async function closeItemCamera() {
+        await stopItemCamera();
+        if (scanCameraPanel) scanCameraPanel.hidden = true;
+        if (scanCameraReader) scanCameraReader.innerHTML = '';
+        scheduleFocusScan({ force: true });
+    }
+
+    async function openItemCamera() {
+        if (!scanCameraBtn || !scanCameraPanel || itemCameraLoading || itemCamera) return;
+
+        scanCameraPanel.hidden = false;
+        itemCameraLoading = true;
+        itemCameraDecoding = false;
+        scanCameraBtn.disabled = true;
+        setItemCameraStatus('Memuat kamera dan meminta izin akses...');
+
+        try {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error('Browser ini tidak mendukung akses kamera. Gunakan Chrome atau Safari versi terbaru.');
+            }
+
+            await loadItemCameraLibrary();
+            itemCamera = new window.Html5Qrcode('scanCameraReader');
+            await itemCamera.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: { width: 280, height: 150 }, aspectRatio: 1.777778 },
+                async (decodedText) => {
+                    if (itemCameraDecoding) return;
+                    const code = String(decodedText || '').trim().toUpperCase();
+                    if (!code) return;
+                    itemCameraDecoding = true;
+                    await closeItemCamera();
+                    scanInput.value = code;
+                    if (typeof scanForm.requestSubmit === 'function') scanForm.requestSubmit();
+                    else scanForm.dispatchEvent(new Event('submit', { cancelable: true }));
+                },
+                () => {}
+            );
+            setItemCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke dalam kotak.');
+        } catch (error) {
+            await stopItemCamera();
+            setItemCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
+            showToast('err', 'Kamera tidak dapat dibuka. Pastikan izin kamera aktif dan gunakan HTTPS.');
+        } finally {
+            itemCameraLoading = false;
+            scanCameraBtn.disabled = false;
+        }
+    }
+
+    scanCameraBtn?.addEventListener('click', openItemCamera);
+    scanCameraClose?.addEventListener('click', closeItemCamera);
+    window.addEventListener('pagehide', stopItemCamera);
 
     /* ── session counter ── */
     function bumpScanCount() {
