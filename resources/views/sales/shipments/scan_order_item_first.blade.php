@@ -42,18 +42,23 @@
     .sif-order-no { flex: 1; min-width: 0; overflow: hidden; color: #0f172a; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .86rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
     .sif-order-status { color: #166534; font-size: .7rem; font-weight: 800; }
     .sif-empty { padding: 1rem; color: #64748b; text-align: center; font-size: .78rem; }
-    .sif-camera-btn { margin-top: .6rem; width: 100%; min-height: 42px; border: 1px solid #2563eb; border-radius: 8px; color: #1d4ed8; background: #fff; font-size: .78rem; font-weight: 900; cursor: pointer; }
-    .sif-camera-btn:hover { color: #fff; background: #2563eb; }
-    .sif-camera-panel { margin-top: .7rem; overflow: hidden; border: 1px solid rgba(37,99,235,.3); border-radius: 9px; background: #0f172a; }
+    .sif-input-row { display: flex; align-items: stretch; gap: .45rem; }
+    .sif-input-row .sif-input { min-width: 0; flex: 1; }
+    .sif-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 58px; border: 1px solid #2563eb; border-radius: 9px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
+    .sif-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    .sif-camera-btn:disabled { opacity: .65; cursor: wait; }
+    .sif-camera-label { margin-left: .2rem; }
+    .sif-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
     .sif-camera-panel[hidden] { display: none !important; }
-    .sif-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .6rem .7rem; color: #fff; }
-    .sif-camera-title { font-size: .78rem; font-weight: 900; }
-    .sif-camera-close { border: 0; border-radius: 6px; padding: .25rem .5rem; color: #e2e8f0; background: rgba(255,255,255,.12); font-size: .7rem; font-weight: 800; cursor: pointer; }
-    .sif-camera-reader { min-height: 230px; background: #020617; }
+    .sif-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
+    .sif-camera-title { font-size: .74rem; font-weight: 900; }
+    .sif-camera-close { border: 0; border-radius: 6px; padding: .22rem .45rem; color: #64748b; background: transparent; font-size: .7rem; font-weight: 800; cursor: pointer; }
+    .sif-camera-close:hover { color: #0f172a; background: #e2e8f0; }
+    .sif-camera-reader { min-height: 200px; background: #0f172a; }
     .sif-camera-reader video { display: block; width: 100% !important; max-height: 360px; object-fit: cover; }
     .sif-camera-reader img { max-width: 100%; }
-    .sif-camera-status { padding: .55rem .7rem; color: #cbd5e1; font-size: .7rem; line-height: 1.4; }
-    .sif-camera-status.error { color: #fecaca; background: rgba(127,29,29,.45); }
+    .sif-camera-status { padding: .45rem .65rem; color: #64748b; background: #fff; font-size: .68rem; line-height: 1.4; }
+    .sif-camera-status.error { color: #b91c1c; background: #fef2f2; }
     .sif-toast { position: fixed; left: 50%; bottom: 1.2rem; z-index: 9999; display: none; transform: translateX(-50%); max-width: min(92vw, 520px); padding: .65rem .9rem; border-radius: 999px; color: #fff; background: #0f172a; font-size: .8rem; font-weight: 800; }
     .sif-toast.show { display: block; }
     .sif-toast.error { background: #991b1b; }
@@ -63,6 +68,8 @@
         .sif-topbar .sif-btn-primary { width: 100%; order: 5; }
         .sif-card-head, .sif-body { padding: .7rem; }
         .sif-input { min-height: 62px; font-size: 1.08rem; }
+        .sif-camera-btn { width: 46px; min-width: 46px; min-height: 62px; padding-inline: .35rem; }
+        .sif-camera-label { display: none; }
     }
 </style>
 @endpush
@@ -101,10 +108,12 @@
             <div class="sif-body">
                 <div class="sif-scan-box">
                     <label class="sif-label" for="sifScanInput">Nomor Order</label>
-                    <input type="text" id="sifScanInput" class="sif-input" placeholder="Scan / ketik nomor order lalu Enter" autocomplete="off" autofocus>
-                    <button type="button" id="sifCameraBtn" class="sif-camera-btn">
-                        <i class="bi bi-camera-video" aria-hidden="true"></i> Scan dengan Kamera
-                    </button>
+                    <div class="sif-input-row">
+                        <input type="text" id="sifScanInput" class="sif-input" placeholder="Scan / ketik nomor order lalu Enter" autocomplete="off" autofocus>
+                        <button type="button" id="sifCameraBtn" class="sif-camera-btn" aria-label="Buka kamera untuk scan barcode" title="Scan dengan kamera">
+                            <i class="bi bi-camera-video" aria-hidden="true"></i><span class="sif-camera-label">Kamera</span>
+                        </button>
+                    </div>
                     <div id="sifCameraPanel" class="sif-camera-panel" hidden>
                         <div class="sif-camera-head">
                             <span class="sif-camera-title"><i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode ke kamera</span>
