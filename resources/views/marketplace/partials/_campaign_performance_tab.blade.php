@@ -468,6 +468,46 @@
     .perf-chip { display: flex; align-items: baseline; gap: .35rem; background: var(--card-bg, #fff); border: 1px solid var(--dsh-border, rgba(0,0,0,.08)); border-radius: 8px; padding: .3rem .55rem; font-size: .68rem; }
     .perf-chip > span { color: var(--dsh-muted, #6b7280); }
     .perf-chip > b { font-weight: 700; }
+    /* Scrollbar horizontal tetap terlihat saat tabel performa panjang. */
+    .perf-table-scroll-shell { position: relative; }
+    .perf-table-scroll-shell > .table-responsive { overflow-x: auto; }
+    .perf-sticky-scrollbar {
+        position: sticky;
+        bottom: .35rem;
+        z-index: 8;
+        display: block;
+        height: 14px;
+        margin: 0 .75rem .35rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        background: #ffffff !important;
+        opacity: 1 !important;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        box-shadow: 0 -2px 10px rgba(15, 23, 42, .16);
+        scrollbar-color: #64748b #e2e8f0;
+        scrollbar-width: auto;
+    }
+    .perf-sticky-scrollbar > div { height: 1px; }
+    .perf-sticky-scrollbar::-webkit-scrollbar { height: 12px; }
+    .perf-sticky-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 999px; }
+    .perf-sticky-scrollbar::-webkit-scrollbar-thumb { background: #64748b; border: 2px solid #e2e8f0; border-radius: 999px; }
+    body[data-theme="dark"] .perf-sticky-scrollbar { background: #0f172a !important; border-color: #475569; box-shadow: 0 -2px 10px rgba(0, 0, 0, .4); scrollbar-color: #94a3b8 #1e293b; }
+    body[data-theme="dark"] .perf-sticky-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+    body[data-theme="dark"] .perf-sticky-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-color: #1e293b; }
+    .perf-hourly-panel { margin-top: .65rem; padding: .65rem .7rem .7rem; background: var(--card-bg, #fff); border: 1px solid var(--dsh-border, rgba(0,0,0,.08)); border-radius: 10px; }
+    .perf-hourly-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.55rem; }
+    .perf-hourly-title { font-size:.68rem; font-weight:800; color:var(--text); }
+    .perf-hourly-subtitle { font-size:.58rem; color:var(--dsh-muted, #6b7280); }
+    .perf-hourly-state { min-height: 22px; display:flex; align-items:center; gap:.35rem; font-size:.63rem; color:var(--dsh-muted, #6b7280); }
+    .perf-hourly-heatmap { display:grid; grid-template-columns:repeat(12, minmax(34px, 1fr)); gap:.28rem; }
+    .perf-hour-cell { min-width:0; padding:.28rem .18rem; border:1px solid rgba(148,163,184,.18); border-radius:6px; text-align:center; color:#0f172a; transition:transform .12s, box-shadow .12s; }
+    .perf-hour-cell:hover { transform:translateY(-1px); box-shadow:0 3px 8px rgba(15,23,42,.15); }
+    .perf-hour-cell strong { display:block; font-size:.58rem; line-height:1.1; }
+    .perf-hour-cell span { display:block; margin-top:.12rem; font-size:.5rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .perf-hour-legend { display:flex; align-items:center; gap:.35rem; margin-top:.45rem; font-size:.55rem; color:var(--dsh-muted, #6b7280); }
+    .perf-hour-legend i { width:11px; height:11px; display:inline-block; border-radius:3px; }
+    @media (max-width: 575.98px) { .perf-hourly-heatmap { grid-template-columns:repeat(6, minmax(34px, 1fr)); } }
     .perf-edit-target { font-size:.58rem; padding:.12rem .35rem; border-radius:6px; line-height:1; }
     .perf-inline-config { display: inline-flex; justify-content: flex-end; max-width: 100%; }
     .perf-inline-config-display { display: inline-flex; align-items: center; gap: .22rem; cursor: pointer; white-space: nowrap; border-radius: 5px; padding: .12rem .2rem; }
@@ -701,7 +741,8 @@
             </div>
         </div>
     </div>
-    <div class="table-responsive">
+    <div class="perf-table-scroll-shell" data-perf-sticky-shell>
+    <div class="table-responsive" data-perf-table-scroll>
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
             <thead class="table-light sticky-top" style="z-index: 2;">
                 <tr>
@@ -864,7 +905,7 @@
                     @php
                         $meetsTarget = $row['target_roas'] !== null && $row['roas'] >= $row['target_roas'];
                     @endphp
-                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" onclick="perfToggle(this)">
+                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
                         {{-- Campaign / Item --}}
                         <td>
                             <div class="d-flex align-items-start gap-1">
@@ -999,6 +1040,18 @@
                                 <div class="perf-chip"><span>POAS</span><b>{{ $row['poas'] === null ? '—' : number_format($row['poas'], 2) . 'x' }}</b></div>
                                 <div class="perf-chip"><span>Biaya riil (PPN 11%)</span><b>Rp {{ number_format($row['spend_ppn'], 0, ',', '.') }}</b>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
                             </div>
+                            <div class="perf-hourly-panel" data-perf-hourly-panel data-store-id="{{ e((string) $row['store_id']) }}" data-campaign-id="{{ e((string) $row['campaign_id']) }}" data-campaign-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}">
+                                <div class="perf-hourly-header">
+                                    <div>
+                                        <div class="perf-hourly-title"><i class="bi bi-grid-3x3-gap text-primary me-1"></i>Heatmap performa per jam</div>
+                                        <div class="perf-hourly-subtitle">Klik untuk melihat konsentrasi traffic campaign</div>
+                                    </div>
+                                    <span class="badge bg-light text-dark border" data-perf-hourly-date>—</span>
+                                </div>
+                                <div class="perf-hourly-state" data-perf-hourly-state><span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span> Memuat data per jam…</div>
+                                <div class="perf-hourly-heatmap" data-perf-hourly-heatmap style="display:none;"></div>
+                                <div class="perf-hour-legend" data-perf-hourly-legend style="display:none;"><i style="background:#dbeafe;"></i> traffic rendah <i style="background:#2563eb;margin-left:.25rem;"></i> traffic tinggi <span>· isi cell: klik / order</span></div>
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -1011,6 +1064,8 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+    <div class="perf-sticky-scrollbar" data-perf-sticky-scrollbar aria-label="Geser tabel performa secara horizontal"><div></div></div>
     </div>
 </div>
 
@@ -1506,9 +1561,191 @@ function perfToggle(row) {
     row.classList.toggle('open');
     const d = row.nextElementSibling;
     if (d && d.classList.contains('perf-detail')) {
-        d.style.display = (d.style.display === 'none' || !d.style.display) ? 'table-row' : 'none';
+        const isOpen = row.classList.contains('open');
+        d.style.display = isOpen ? 'table-row' : 'none';
+        if (isOpen) perfLoadHourly(d.querySelector('[data-perf-hourly-panel]'));
     }
 }
+
+function perfInitStickyScrollbar() {
+    document.querySelectorAll('[data-perf-sticky-shell]').forEach(shell => {
+        if (shell.dataset.perfScrollbarReady === '1') return;
+        const tableScroll = shell.querySelector('[data-perf-table-scroll]');
+        const stickyScroll = shell.querySelector('[data-perf-sticky-scrollbar]');
+        const spacer = stickyScroll?.firstElementChild;
+        if (!tableScroll || !stickyScroll || !spacer) return;
+        shell.dataset.perfScrollbarReady = '1';
+        let syncing = false;
+        const syncWidth = () => {
+            spacer.style.width = `${tableScroll.scrollWidth}px`;
+            stickyScroll.style.display = tableScroll.scrollWidth > tableScroll.clientWidth + 2 ? 'block' : 'none';
+            if (!syncing) stickyScroll.scrollLeft = tableScroll.scrollLeft;
+        };
+        tableScroll.addEventListener('scroll', () => {
+            if (syncing) return;
+            syncing = true;
+            stickyScroll.scrollLeft = tableScroll.scrollLeft;
+            syncing = false;
+        }, { passive: true });
+        stickyScroll.addEventListener('scroll', () => {
+            if (syncing) return;
+            syncing = true;
+            tableScroll.scrollLeft = stickyScroll.scrollLeft;
+            syncing = false;
+        }, { passive: true });
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(syncWidth).observe(tableScroll);
+        } else {
+            window.addEventListener('resize', syncWidth);
+        }
+        syncWidth();
+    });
+}
+
+function perfHourlyDate() {
+    const params = new URLSearchParams(window.location.search);
+    const isoDate = params.get('date_to') || new Date().toISOString().slice(0, 10);
+    const parts = isoDate.split('-');
+    return {
+        iso: isoDate,
+        api: parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : isoDate,
+        label: parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : isoDate,
+    };
+}
+
+function perfHourlyNumber(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'string') {
+        value = value.trim().replace(/\s/g, '');
+        if (value.includes(',') && value.includes('.')) value = value.replace(/\./g, '').replace(',', '.');
+        else if (value.includes(',')) value = value.replace(',', '.');
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+function perfHourlyField(item, names) {
+    for (const name of names) {
+        if (item && Object.prototype.hasOwnProperty.call(item, name)) return item[name];
+    }
+    return 0;
+}
+
+function perfHourlyHour(item) {
+    const hourKeys = ['performance_hour', 'hour', 'hour_of_day', 'hourly', 'time_hour'];
+    const hourKey = hourKeys.find(key => item && Object.prototype.hasOwnProperty.call(item, key));
+    const value = hourKey ? item[hourKey] : null;
+    if (value !== null && value !== undefined && value !== '') {
+        const hour = Number(value);
+        if (Number.isFinite(hour)) return Math.max(0, Math.min(23, Math.floor(hour)));
+    }
+    const timestamp = perfHourlyField(item, ['report_time', 'timestamp', 'time']);
+    if (timestamp) {
+        const date = new Date(Number(timestamp) > 10000000000 ? Number(timestamp) : Number(timestamp) * 1000);
+        if (!Number.isNaN(date.getTime())) return date.getHours();
+    }
+    return null;
+}
+
+function perfHourlyRows(payload) {
+    const rows = [];
+    const visit = (value, depth = 0) => {
+        if (depth > 5 || value === null || value === undefined) return;
+        if (Array.isArray(value)) {
+            value.forEach(item => visit(item, depth + 1));
+            return;
+        }
+        if (typeof value !== 'object') return;
+        const hour = perfHourlyHour(value);
+        const hasMetric = ['impressions', 'impression', 'clicks', 'click', 'orders', 'order', 'broad_order', 'gmv', 'broad_gmv', 'expense', 'spend', 'cost'].some(key => Object.prototype.hasOwnProperty.call(value, key));
+        if (hour !== null && hasMetric) rows.push({
+            hour,
+            impressions: perfHourlyNumber(perfHourlyField(value, ['impressions', 'impression', 'views', 'view', 'broad_impression'])),
+            clicks: perfHourlyNumber(perfHourlyField(value, ['clicks', 'click'])),
+            orders: perfHourlyNumber(perfHourlyField(value, ['orders', 'order', 'broad_order'])),
+            gmv: perfHourlyNumber(perfHourlyField(value, ['gmv', 'broad_gmv', 'revenue'])),
+            spend: perfHourlyNumber(perfHourlyField(value, ['expense', 'spend', 'cost', 'ads_spend'])),
+        });
+        Object.values(value).forEach(child => visit(child, depth + 1));
+    };
+    visit(payload);
+    const byHour = new Map();
+    rows.forEach(row => {
+        const current = byHour.get(row.hour) || { hour: row.hour, impressions: 0, clicks: 0, orders: 0, gmv: 0, spend: 0 };
+        current.impressions += row.impressions;
+        current.clicks += row.clicks;
+        current.orders += row.orders;
+        current.gmv += row.gmv;
+        current.spend += row.spend;
+        byHour.set(row.hour, current);
+    });
+    return Array.from({ length: 24 }, (_, hour) => byHour.get(hour) || { hour, impressions: 0, clicks: 0, orders: 0, gmv: 0, spend: 0 });
+}
+
+function perfFormatHourlyNumber(value) {
+    return Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+}
+
+function perfRenderHourly(panel, payload) {
+    const heatmap = panel.querySelector('[data-perf-hourly-heatmap]');
+    const state = panel.querySelector('[data-perf-hourly-state]');
+    const legend = panel.querySelector('[data-perf-hourly-legend]');
+    if (!heatmap || !state) return;
+    const rows = perfHourlyRows(payload);
+    const maxTraffic = Math.max(1, ...rows.map(row => row.clicks || row.impressions || 0));
+    const hasTraffic = rows.some(row => row.impressions > 0 || row.clicks > 0 || row.orders > 0 || row.gmv > 0 || row.spend > 0);
+    heatmap.innerHTML = rows.map(row => {
+        const traffic = row.clicks || row.impressions || 0;
+        const intensity = traffic > 0 ? Math.max(.12, traffic / maxTraffic) : .04;
+        const color = traffic > 0 ? `rgba(37, 99, 235, ${intensity})` : 'rgba(148, 163, 184, .08)';
+        const textColor = intensity > .58 ? '#fff' : '#0f172a';
+        const roas = row.spend > 0 ? row.gmv / row.spend : 0;
+        return `<div class="perf-hour-cell" style="background:${color};color:${textColor}" title="${String(row.hour).padStart(2, '0')}:00 · Impresi ${perfFormatHourlyNumber(row.impressions)} · Klik ${perfFormatHourlyNumber(row.clicks)} · Order ${perfFormatHourlyNumber(row.orders)} · ROAS ${roas.toFixed(2)}x"><strong>${String(row.hour).padStart(2, '0')}:00</strong><span>${perfFormatHourlyNumber(row.clicks)} klik</span><span>${perfFormatHourlyNumber(row.orders)} order</span></div>`;
+    }).join('');
+    heatmap.style.display = 'grid';
+    if (legend) legend.style.display = 'flex';
+    state.innerHTML = hasTraffic
+        ? '<i class="bi bi-check-circle-fill text-success"></i> Traffic campaign tersedia untuk tanggal terpilih.'
+        : '<i class="bi bi-info-circle"></i> Belum ada traffic per jam pada tanggal terpilih.';
+}
+
+function perfLoadHourly(panel) {
+    if (!panel || panel.dataset.hourlyLoaded === '1' || panel.dataset.hourlyLoading === '1') return;
+    const route = window.AdsDashboardRoutes?.campaignHourly;
+    const date = perfHourlyDate();
+    const storeId = panel.dataset.storeId;
+    const campaignId = panel.dataset.campaignId;
+    const state = panel.querySelector('[data-perf-hourly-state]');
+    const dateBadge = panel.querySelector('[data-perf-hourly-date]');
+    if (dateBadge) dateBadge.textContent = date.label;
+    if (!route || !storeId || !campaignId) {
+        if (state) state.innerHTML = '<i class="bi bi-exclamation-circle text-warning"></i> Data campaign per jam belum tersedia.';
+        return;
+    }
+    const cacheKey = `${storeId}:${campaignId}:${date.iso}`;
+    window.__perfHourlyCache = window.__perfHourlyCache || {};
+    if (window.__perfHourlyCache[cacheKey]) {
+        perfRenderHourly(panel, window.__perfHourlyCache[cacheKey]);
+        panel.dataset.hourlyLoaded = '1';
+        return;
+    }
+    panel.dataset.hourlyLoading = '1';
+    const query = new URLSearchParams({ store_id: storeId, campaign_id: campaignId, date: date.api });
+    fetch(`${route}?${query.toString()}`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => response.json().then(data => ({ response, data })))
+        .then(({ response, data }) => {
+            if (!response.ok || data.status === 'error' || data.error) throw new Error(data.message || data.error || 'Data hourly gagal dimuat.');
+            window.__perfHourlyCache[cacheKey] = data.data ?? data.response ?? data;
+            perfRenderHourly(panel, window.__perfHourlyCache[cacheKey]);
+            panel.dataset.hourlyLoaded = '1';
+        })
+        .catch(error => {
+            if (state) state.innerHTML = `<i class="bi bi-exclamation-triangle text-warning"></i> ${String(error.message || 'Data hourly gagal dimuat.')}`;
+        })
+        .finally(() => { panel.dataset.hourlyLoading = '0'; });
+}
+
+perfInitStickyScrollbar();
 
 function perfToggleCategory(row) {
     row.classList.toggle('open');
