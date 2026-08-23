@@ -42,6 +42,18 @@
     .sif-order-no { flex: 1; min-width: 0; overflow: hidden; color: #0f172a; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .86rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
     .sif-order-status { color: #166534; font-size: .7rem; font-weight: 800; }
     .sif-empty { padding: 1rem; color: #64748b; text-align: center; font-size: .78rem; }
+    .sif-camera-btn { margin-top: .6rem; width: 100%; min-height: 42px; border: 1px solid #2563eb; border-radius: 8px; color: #1d4ed8; background: #fff; font-size: .78rem; font-weight: 900; cursor: pointer; }
+    .sif-camera-btn:hover { color: #fff; background: #2563eb; }
+    .sif-camera-panel { margin-top: .7rem; overflow: hidden; border: 1px solid rgba(37,99,235,.3); border-radius: 9px; background: #0f172a; }
+    .sif-camera-panel[hidden] { display: none !important; }
+    .sif-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .6rem .7rem; color: #fff; }
+    .sif-camera-title { font-size: .78rem; font-weight: 900; }
+    .sif-camera-close { border: 0; border-radius: 6px; padding: .25rem .5rem; color: #e2e8f0; background: rgba(255,255,255,.12); font-size: .7rem; font-weight: 800; cursor: pointer; }
+    .sif-camera-reader { min-height: 230px; background: #020617; }
+    .sif-camera-reader video { display: block; width: 100% !important; max-height: 360px; object-fit: cover; }
+    .sif-camera-reader img { max-width: 100%; }
+    .sif-camera-status { padding: .55rem .7rem; color: #cbd5e1; font-size: .7rem; line-height: 1.4; }
+    .sif-camera-status.error { color: #fecaca; background: rgba(127,29,29,.45); }
     .sif-toast { position: fixed; left: 50%; bottom: 1.2rem; z-index: 9999; display: none; transform: translateX(-50%); max-width: min(92vw, 520px); padding: .65rem .9rem; border-radius: 999px; color: #fff; background: #0f172a; font-size: .8rem; font-weight: 800; }
     .sif-toast.show { display: block; }
     .sif-toast.error { background: #991b1b; }
@@ -90,6 +102,17 @@
                 <div class="sif-scan-box">
                     <label class="sif-label" for="sifScanInput">Nomor Order</label>
                     <input type="text" id="sifScanInput" class="sif-input" placeholder="Scan / ketik nomor order lalu Enter" autocomplete="off" autofocus>
+                    <button type="button" id="sifCameraBtn" class="sif-camera-btn">
+                        <i class="bi bi-camera-video" aria-hidden="true"></i> Scan dengan Kamera
+                    </button>
+                    <div id="sifCameraPanel" class="sif-camera-panel" hidden>
+                        <div class="sif-camera-head">
+                            <span class="sif-camera-title"><i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode ke kamera</span>
+                            <button type="button" id="sifCameraClose" class="sif-camera-close">Tutup</button>
+                        </div>
+                        <div id="sifCameraReader" class="sif-camera-reader"></div>
+                        <div id="sifCameraStatus" class="sif-camera-status">Meminta izin kamera...</div>
+                    </div>
                     <div class="sif-hint">Satu order cukup untuk mapping otomatis item yang sudah discan.</div>
                 </div>
             </div>
@@ -128,9 +151,18 @@
     const count = document.getElementById('sifOrderCount');
     const confirmBtn = document.getElementById('sifConfirmBtn');
     const toast = document.getElementById('sifToast');
+    const cameraBtn = document.getElementById('sifCameraBtn');
+    const cameraPanel = document.getElementById('sifCameraPanel');
+    const cameraClose = document.getElementById('sifCameraClose');
+    const cameraReader = document.getElementById('sifCameraReader');
+    const cameraStatus = document.getElementById('sifCameraStatus');
     const recordUrl = @json(route('sales.shipments.scan_order_store', $shipment));
     const csrf = @json(csrf_token());
     let orders = @json($orders->map(fn ($order) => $order->order_no)->values());
+    let camera = null;
+    let cameraLoading = false;
+    let submitting = false;
+    let cameraLibraryPromise = null;
 
     function showToast(message, error = false) {
         if (!toast) return;
@@ -158,13 +190,85 @@
         }
     }
 
-    input?.addEventListener('input', () => { input.value = input.value.toUpperCase(); });
-    input?.addEventListener('keydown', async function (event) {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        const orderNo = input.value.trim().toUpperCase();
-        if (!orderNo) return;
+    function setCameraStatus(message, error = false) {
+        if (!cameraStatus) return;
+        cameraStatus.textContent = message;
+        cameraStatus.classList.toggle('error', error);
+    }
 
+    function loadCameraLibrary() {
+        if (window.Html5Qrcode) return Promise.resolve();
+        if (cameraLibraryPromise) return cameraLibraryPromise;
+
+        cameraLibraryPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+            script.async = true;
+            script.onload = () => window.Html5Qrcode ? resolve() : reject(new Error('Library kamera tidak tersedia.'));
+            script.onerror = () => reject(new Error('Library kamera gagal dimuat.'));
+            document.head.appendChild(script);
+        });
+
+        return cameraLibraryPromise;
+    }
+
+    async function stopCamera() {
+        if (!camera) return;
+        const activeCamera = camera;
+        camera = null;
+        try { await activeCamera.stop(); } catch (error) {}
+        try { activeCamera.clear(); } catch (error) {}
+    }
+
+    async function closeCamera() {
+        await stopCamera();
+        if (cameraPanel) cameraPanel.hidden = true;
+        if (cameraReader) cameraReader.innerHTML = '';
+        if (input) input.focus();
+    }
+
+    async function openCamera() {
+        if (!cameraBtn || !cameraPanel || cameraLoading || camera) return;
+
+        cameraPanel.hidden = false;
+        cameraLoading = true;
+        cameraBtn.disabled = true;
+        setCameraStatus('Memuat kamera dan meminta izin akses...');
+
+        try {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error('Browser ini tidak mendukung akses kamera. Gunakan Chrome atau Safari versi terbaru.');
+            }
+
+            await loadCameraLibrary();
+            camera = new window.Html5Qrcode('sifCameraReader');
+            await camera.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: { width: 280, height: 150 }, aspectRatio: 1.777778 },
+                async (decodedText) => {
+                    if (submitting) return;
+                    const orderNo = String(decodedText || '').trim().toUpperCase();
+                    if (!orderNo) return;
+                    await closeCamera();
+                    await submitOrder(orderNo);
+                },
+                () => {}
+            );
+            setCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke dalam kotak.');
+        } catch (error) {
+            await stopCamera();
+            setCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
+            showToast('Kamera tidak dapat dibuka. Pastikan izin kamera aktif dan gunakan HTTPS.', true);
+        } finally {
+            cameraLoading = false;
+            cameraBtn.disabled = false;
+        }
+    }
+
+    async function submitOrder(orderNo) {
+        if (!orderNo || submitting) return;
+
+        submitting = true;
         input.disabled = true;
         try {
             const response = await fetch(recordUrl, {
@@ -182,9 +286,23 @@
             showToast(error.message || 'Gagal mencatat order.', true);
         } finally {
             input.disabled = false;
+            submitting = false;
             input.focus();
         }
+    }
+
+    input?.addEventListener('input', () => { input.value = input.value.toUpperCase(); });
+    input?.addEventListener('keydown', async function (event) {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        const orderNo = input.value.trim().toUpperCase();
+        if (!orderNo) return;
+        await submitOrder(orderNo);
     });
+
+    cameraBtn?.addEventListener('click', openCamera);
+    cameraClose?.addEventListener('click', closeCamera);
+    window.addEventListener('pagehide', stopCamera);
 
     confirmBtn?.addEventListener('click', function (event) {
         if (this.getAttribute('aria-disabled') === 'true') {
