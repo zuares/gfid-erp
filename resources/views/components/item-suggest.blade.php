@@ -17,6 +17,7 @@
     'categoryValue' => '',
 
     'placeholder' => 'Kode / nama barang',
+    'mobilePlaceholder' => null,
 
     // filter API
     'type' => null,
@@ -83,6 +84,7 @@
     data-min-chars="{{ (int) $minChars }}" data-max-results="{{ (int) $maxResults }}"
     data-autofocus="{{ $autofocus ? '1' : '0' }}" data-display-mode="{{ $displayMode }}"
     data-mobile-display-mode="{{ $mobileDisplayMode ?? '' }}"
+    data-mobile-placeholder="{{ $mobilePlaceholder ?? '' }}"
     data-show-name="{{ $showName ? '1' : '0' }}" data-show-category="{{ $showCategory ? '1' : '0' }}"
     data-extra-params='@json($extraParams)' data-required="{{ $required ? '1' : '0' }}"
     data-skip-submit="{{ $skipSubmitValidation ? '1' : '0' }}">
@@ -239,6 +241,8 @@
 
                 const displayMode = wrap.dataset.displayMode || 'code-name';
                 const mobileDisplayMode = wrap.dataset.mobileDisplayMode || displayMode;
+                const desktopPlaceholder = input.getAttribute('placeholder') || '';
+                const mobilePlaceholder = wrap.dataset.mobilePlaceholder || '';
                 const showName = wrap.dataset.showName === "1";
                 const showCategory = wrap.dataset.showCategory === "1";
 
@@ -247,6 +251,13 @@
 
                 const type = wrap.dataset.type || null;
                 const itemCategoryId = wrap.dataset.itemCategoryId || null;
+
+                function syncResponsivePlaceholder() {
+                    if (!mobilePlaceholder) return;
+                    input.placeholder = isMobileViewport() ? mobilePlaceholder : desktopPlaceholder;
+                }
+
+                syncResponsivePlaceholder();
 
                 function currentExtraParams() {
                     try {
@@ -561,6 +572,7 @@
                 });
 
                 window.addEventListener('resize', () => {
+                    syncResponsivePlaceholder();
                     if (isDropdownVisible()) positionDropdown(input, dropdown, maxResults);
                 });
 

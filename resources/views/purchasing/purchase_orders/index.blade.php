@@ -30,6 +30,14 @@
         'paid' => 'Paid',
     ];
 
+    $hasPoFilters = request()->filled('q')
+        || request()->filled('supplier_id')
+        || request()->filled('status')
+        || request()->filled('pay_status')
+        || request()->filled('from_date')
+        || request()->filled('to_date')
+        || (request()->filled('period') && request('period') !== 'all');
+
     $payBadge = function ($s) {
         return match ((string) $s) {
             'paid' => 'badge-pay badge-pay-paid',
@@ -97,6 +105,138 @@
         background: rgba(234, 179, 8, .1);
         border-color: rgba(234, 179, 8, .25);
     }
+
+    .po-filter-main {
+        gap: .45rem !important;
+    }
+
+    .po-date-filter {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        margin-bottom: 1rem;
+        padding: .6rem .75rem;
+        background: var(--card, #fff);
+        border: 1px solid rgba(148, 163, 184, .18);
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, .025);
+    }
+
+    body[data-theme="dark"] .po-date-filter {
+        background: rgba(15, 23, 42, .98);
+        border-color: rgba(51, 65, 85, .6);
+    }
+
+    .po-date-filter-label {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        flex: 0 0 auto;
+        color: #64748b;
+        font-size: .7rem;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .po-date-filter-label i {
+        color: #94a3b8;
+        font-size: .85rem;
+    }
+
+    .po-date-filter-controls {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .po-date-filter-controls .date-section {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .po-reset-all-filters {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        margin-left: auto;
+        padding-inline: .7rem;
+        border-radius: 8px !important;
+        background: transparent !important;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+        .po-filter-main {
+            display: grid !important;
+            grid-template-columns: 1fr;
+            gap: .45rem !important;
+        }
+
+        .po-filter-main > input,
+        .po-filter-main > select {
+            width: 100% !important;
+            max-width: none !important;
+            min-height: 40px;
+        }
+
+        .po-date-filter {
+            align-items: stretch;
+            flex-direction: column;
+            gap: .4rem;
+            padding: .6rem;
+        }
+
+        .po-date-filter-label {
+            min-height: 22px;
+            font-size: .68rem;
+            letter-spacing: .04em;
+        }
+
+        .po-date-filter-controls {
+            flex-direction: column;
+            align-items: stretch;
+            gap: .45rem;
+        }
+
+        .po-date-filter-controls .date-section {
+            width: 100% !important;
+            border-radius: 9px;
+        }
+
+        .po-date-filter-controls .ds-presets {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .po-date-filter-controls .ds-preset-btn {
+            min-height: 38px;
+            height: 38px !important;
+            padding-inline: .2rem;
+            font-size: .68rem !important;
+        }
+
+        .po-date-filter-controls .rts-date-picker.flatpickr-input {
+            min-height: 40px;
+            height: 40px !important;
+            font-size: .8rem !important;
+        }
+
+        .po-date-filter-controls .ds-clear {
+            min-height: 36px;
+            height: 36px;
+        }
+
+        .po-reset-all-filters {
+            width: 100%;
+            margin-left: 0;
+            min-height: 40px;
+        }
+    }
 </style>
 @endpush
 
@@ -124,7 +264,7 @@
     <x-slot name="filters">
         <form id="po-filter-form" method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
             <div class="filter-bar mb-3">
-                <div class="d-flex flex-wrap gap-2 align-items-center">
+                <div class="po-filter-main d-flex flex-wrap align-items-center">
                     <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm search-input" style="max-width:200px;" placeholder="Cari PO..." autocomplete="off">
 
                     <select name="supplier_id" class="form-select form-select-sm po-filter-auto" style="max-width:160px;">
@@ -150,22 +290,28 @@
                 </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="background: rgba(148,163,184,.08); border: 1px dashed rgba(148,163,184,.35); padding: .75rem .85rem; border-radius: 10px;">
-                <div style="font-size: .8rem; font-weight: 600; color: #64748b; margin-right: .5rem;">Filter Tanggal:</div>
-                <x-date-range-picker 
-                    :date-from="request('from_date')" 
-                    :date-to="request('to_date')" 
-                    :period="request('period', 'all')" 
-                    form-id="po-filter-form"
-                    name-from="from_date"
-                    name-to="to_date"
-                />
+            <div class="po-date-filter">
+                <div class="po-date-filter-label">
+                    <i class="bi bi-calendar3"></i>
+                    <span>Tanggal PO</span>
+                </div>
 
-                @if (request()->filled('q') || request()->filled('supplier_id') || request()->filled('status') || request()->filled('pay_status') || request()->filled('from_date') || request()->filled('to_date'))
-                    <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-sm btn-ship-outline btn-pill ms-auto" style="height: 32px; display: flex; align-items: center; background: #fff;">
-                        <i class="bi bi-x me-1"></i>Reset Semua Filter
-                    </a>
-                @endif
+                <div class="po-date-filter-controls">
+                    <x-date-range-picker
+                        :date-from="request('from_date')"
+                        :date-to="request('to_date')"
+                        :period="request('period', 'all')"
+                        form-id="po-filter-form"
+                        name-from="from_date"
+                        name-to="to_date"
+                    />
+
+                    @if ($hasPoFilters)
+                        <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-sm btn-ship-outline po-reset-all-filters">
+                            <i class="bi bi-x-lg me-1"></i>Reset Filter
+                        </a>
+                    @endif
+                </div>
             </div>
         </form>
     </x-slot>
