@@ -147,6 +147,11 @@
 
         // guard: payment hanya boleh kalau hutang real sudah ada
         $hasAp = $grnPostedTotal > 0.0001;
+        $poGrandTotal = (float) ($order->grand_total ?? 0);
+        $dpRemaining = max(0, round($poGrandTotal - $dpTotal, 2));
+        $canPaySettlement = $canPay && $hasAp && $apOutstanding > 0.01;
+        $canPayDp = $canPay && $poGrandTotal > 0.01 && $dpRemaining > 0.01;
+        $canOpenPayment = $canPaySettlement || $canPayDp;
 
         // apply DP guard
         $canApplyDp = $canPay && $hasAp && $dpAvailable > 0.01 && $apOutstanding > 0.01;
@@ -205,12 +210,12 @@
         @endif
     @endif
     
-    @if ($canSeeMoney && $canPay && $hasAp)
-        @if ($apOutstanding > 0.01)
-             <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="Bayar PO"><i class="bi bi-cash-coin d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Bayar PO</span></button>
-        @else
-             <button type="button" class="po-btn po-success" disabled style="opacity: 0.6; cursor: not-allowed;" title="PO Sudah Lunas"><i class="bi bi-check-circle d-inline-block d-md-none"></i> <span class="d-none d-md-inline">Sudah Lunas</span></button>
-        @endif
+    @if ($canSeeMoney && $canOpenPayment)
+        @php $paymentButtonLabel = $canPaySettlement ? 'Bayar PO' : 'Bayar DP'; @endphp
+        <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="{{ $paymentButtonLabel }}">
+            <i class="bi bi-cash-coin d-inline-block d-md-none"></i>
+            <span class="d-none d-md-inline">{{ $paymentButtonLabel }}</span>
+        </button>
     @endif
     
     {{-- Terima (buat GRN) --}}
@@ -611,13 +616,19 @@
             <div class="modal-content gf-modal">
                 <div class="modal-header">
                     <div>
-                        <h6 class="modal-title fw-semibold mb-0">Bayar PO</h6>
+                        <h6 class="modal-title fw-semibold mb-0">{{ $canPaySettlement ? 'Bayar PO' : 'Bayar DP' }}</h6>
                         <div class="d-flex gap-1 flex-wrap mt-2">
-                            <span class="modal-kpi">GRN <strong class="mono">{{ rupiah($grnPostedTotal) }}</strong></span>
-                            @if ($returnPostedTotal > 0.0001)
-                                <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
+                            @if ($hasAp)
+                                <span class="modal-kpi">GRN <strong class="mono">{{ rupiah($grnPostedTotal) }}</strong></span>
+                                @if ($returnPostedTotal > 0.0001)
+                                    <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
+                                @endif
+                                <span class="modal-kpi">Sisa <strong class="mono">{{ rupiah($apOutstanding) }}</strong></span>
+                            @else
+                                <span class="modal-kpi">Total PO <strong class="mono">{{ rupiah($poGrandTotal) }}</strong></span>
+                                <span class="modal-kpi">DP tercatat <strong class="mono">{{ rupiah($dpTotal) }}</strong></span>
+                                <span class="modal-kpi">Sisa DP <strong class="mono">{{ rupiah($dpRemaining) }}</strong></span>
                             @endif
-                            <span class="modal-kpi">Sisa <strong class="mono">{{ rupiah($apOutstanding) }}</strong></span>
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -629,6 +640,14 @@
 
                     <div class="modal-body">
                         <div class="row g-2">
+                            @if (!$hasAp)
+                                <div class="col-12">
+                                    <div class="alert alert-info py-2 px-3 mb-1 small">
+                                        PO masih draft dan belum ada GRN. Pembayaran ini akan dicatat sebagai DP; pelunasan tersedia setelah GRN POSTED.
+                                    </div>
+                                </div>
+                            @endif
+
                             <div class="col-6 col-md-3">
                                 <label class="form-label small fw-semibold">Tanggal</label>
                                 <input type="text" name="date" class="form-control form-control-sm gf-date-input"
@@ -638,9 +657,12 @@
 
                             <div class="col-6 col-md-3">
                                 <label class="form-label small fw-semibold">Jenis</label>
+                                @php $defaultPaymentType = $hasAp ? old('type', 'payment') : 'dp'; @endphp
                                 <select name="type" class="form-select form-select-sm" required id="typeSelectModal">
-                                    <option value="payment" @selected(old('type', 'payment') === 'payment')>Pelunasan</option>
-                                    <option value="dp" @selected(old('type') === 'dp')>DP (Uang Muka)</option>
+                                    @if ($hasAp)
+                                        <option value="payment" @selected($defaultPaymentType === 'payment')>Pelunasan</option>
+                                    @endif
+                                    <option value="dp" @selected($defaultPaymentType === 'dp')>DP (Uang Muka)</option>
                                 </select>
                             </div>
 
@@ -873,12 +895,6 @@
                 // =========================================================
                 const pm = document.getElementById('pmSelectModal');
                 const btnSave = document.getElementById('btnSavePayment');
-                const grnPostedTotal = {{ (float) $grnPostedTotal }};
-
-                if (grnPostedTotal <= 0.0001 && btnSave) {
-                    btnSave.disabled = true;
-                }
-
                 const cashWrap = document.getElementById('cashWrap');
                 const bankWrap = document.getElementById('bankWrap');
                 const creditWrap = document.getElementById('creditWrap');
@@ -894,6 +910,7 @@
                 const btnFill = document.getElementById('btnFillRemaining');
 
                 const remaining = {{ (float) $apOutstanding }};
+                const dpRemaining = {{ (float) $dpRemaining }};
                 const typeSelect = document.getElementById('typeSelectModal');
 
                 function fmtId(n) {
@@ -1021,7 +1038,8 @@
 
                 btnFill?.addEventListener('click', function() {
                     if (!amountInput) return;
-                    amountInput.value = fmtId(remaining);
+                    const maxAmount = (typeSelect?.value || 'payment') === 'dp' ? dpRemaining : remaining;
+                    amountInput.value = fmtId(maxAmount);
                     amountInput.focus();
                     amountInput.select?.();
                 });

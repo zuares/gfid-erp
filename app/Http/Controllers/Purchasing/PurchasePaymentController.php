@@ -100,6 +100,7 @@ class PurchasePaymentController extends Controller
      * - TRANSFER: wajib akun 1111-1114
      * - CREDIT: cash_account_id harus null
      * - PAYMENT: hanya boleh kalau ada GRN posted dan tidak boleh melebihi outstanding
+     * - DP: boleh dicatat sebelum GRN posted, maksimal sebesar nilai PO
      */
     public function store(Request $request, PurchaseOrder $purchase_order)
     {
@@ -108,12 +109,6 @@ class PurchasePaymentController extends Controller
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts()
             ->where('status', 'posted')
             ->sum('grand_total');
-
-        if ($grnPostedTotal <= 0.0001) {
-            throw ValidationException::withMessages([
-                'amount' => 'Belum ada GRN POSTED. Pembayaran/DP hanya boleh setelah barang diterima (GRN posted).',
-            ]);
-        }
 
         if (($purchase_order->status ?? '') === 'cancelled') {
             return back()->with('error', 'PO cancelled tidak bisa menerima pembayaran.');
@@ -135,6 +130,12 @@ class PurchasePaymentController extends Controller
         if ($amount <= 0) {
             throw ValidationException::withMessages([
                 'amount' => 'Nominal pembayaran harus > 0.',
+            ]);
+        }
+
+        if (($data['type'] ?? '') === 'payment' && $grnPostedTotal <= 0.0001) {
+            throw ValidationException::withMessages([
+                'amount' => 'Pelunasan hanya bisa dilakukan setelah GRN POSTED.',
             ]);
         }
 
