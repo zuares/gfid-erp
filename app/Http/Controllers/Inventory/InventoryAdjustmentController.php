@@ -1137,6 +1137,9 @@ class InventoryAdjustmentController extends Controller
             'active' => true,
             'is_stocked' => true,
             'production_source' => $type === 'finished_good' ? Item::PRODUCTION_IN_HOUSE : Item::PRODUCTION_BUY,
+            'can_buy' => false,
+            'can_make' => $type === 'finished_good',
+            'default_supply_source' => $type === 'finished_good' ? Item::SUPPLY_MAKE : null,
         ]);
 
         return response()->json([

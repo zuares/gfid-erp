@@ -71,6 +71,7 @@ class RtsDirectReceiveController extends Controller
         $items = Item::query()
             ->select('id', 'code', 'name')
             ->where('type', 'finished_good')
+            ->canBeMade()
             ->orderBy('code')
             ->get();
 

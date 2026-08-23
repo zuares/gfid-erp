@@ -973,6 +973,27 @@ class PurchaseOrderController extends Controller
         }
         unset($line);
 
+        // Picker sudah memfilter item, tetapi payload tetap harus dijaga di
+        // server agar item beli-only/make-only tidak tertukar lewat request.
+        if ($data['order_type'] === 'finished_good') {
+            $itemErrors = [];
+            foreach ($data['lines'] as $index => $line) {
+                $itemId = (int) ($line['item_id'] ?? 0);
+                if (!$itemId) {
+                    continue;
+                }
+
+                $item = Item::find($itemId);
+                if (!$item || $item->type !== 'finished_good' || !$item->canBuy()) {
+                    $itemErrors["lines.{$index}.item_id"] = 'Item ini bukan barang jadi yang dapat dibeli.';
+                }
+            }
+
+            if ($itemErrors) {
+                throw ValidationException::withMessages($itemErrors);
+            }
+        }
+
         if (!$this->canSeeMoney($request)) {
             $this->stripMoneyFromNonOwnerPayload($data, $existingOrder);
         }
@@ -1137,7 +1158,7 @@ class PurchaseOrderController extends Controller
         }
 
         if ($orderType === 'finished_good') {
-            $query->where('type', 'finished_good');
+            $query->where('type', 'finished_good')->canBeBought();
         }
     }
 

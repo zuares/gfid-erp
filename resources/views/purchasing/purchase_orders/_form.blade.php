@@ -24,6 +24,7 @@
     $itemSuggestExtra = match ($orderType) {
         'packing' => ['category_codes' => 'PACK'],
         'material' => ['exclude_category_codes' => 'PACK'],
+        'finished_good' => ['can_buy' => 1],
         default => [],
     };
 

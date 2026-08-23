@@ -3,14 +3,15 @@
 @section('title', 'Tambah Item')
 
 @section('content')
-<div class="page-wrap">
-    <div class="item-topbar">
+<div class="item-crud-page">
+    <div class="item-crud-header">
         <div>
-            <div class="title">Tambah Item</div>
-            <div class="sub">Lengkapi data master item baru.</div>
+            <div class="item-crud-eyebrow"><i class="bi bi-database me-1"></i>Master Data / Item Baru</div>
+            <h1 class="item-crud-title">Tambah Item</h1>
+            <div class="item-crud-subtitle">Buat satu master item yang siap dipakai di pembelian, inventory, atau produksi.</div>
         </div>
-        <div class="controls">
-            <a href="{{ route('master.items.index') }}" class="btn btn-sm btn-item-outline btn-pill">Kembali</a>
+        <div>
+            <a href="{{ route('master.items.index') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Kembali</a>
         </div>
     </div>
     

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemBom;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
@@ -18,7 +19,8 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Item::query()
+        $filteredQuery = $this->itemQueryFor($request);
+        $query = (clone $filteredQuery)
             ->with('category')
             ->withCount('barcodes')
             ->with(['costSnapshots' => function ($q) {
@@ -26,26 +28,8 @@ class ItemController extends Controller
                     ->orderByDesc('snapshot_date')
                     ->orderByDesc('id')
                     ->limit(1);
-            }]);
-
-        if ($search = $request->input('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%');
-            });
-        }
-
-        if ($type = $request->input('type')) {
-            $query->where('type', $type);
-        }
-
-        if ($categoryId = $request->input('item_category_id')) {
-            $query->where('item_category_id', $categoryId);
-        }
-
-        if ($categoryKind = $request->input('category_kind')) {
-            $query->whereHas('category', fn($q) => $q->where('kind', $categoryKind));
-        }
+            }])
+            ->withCount(['boms as active_boms_count' => fn ($q) => $q->where('active', true)]);
 
         $items = $query
             ->orderBy('code')
@@ -54,8 +38,33 @@ class ItemController extends Controller
 
         $categories = $this->categoryOptions();
         $categoryKinds = ItemCategory::kindLabels();
+        $typeLabels = $this->typeLabels();
+        $itemStats = [
+            'total' => (clone $filteredQuery)->count(),
+            'active' => (clone $filteredQuery)->where('active', true)->count(),
+            'can_buy' => (clone $filteredQuery)->where('can_buy', true)->count(),
+            'can_make' => (clone $filteredQuery)->where('can_make', true)->count(),
+            'hybrid' => (clone $filteredQuery)->where('can_buy', true)->where('can_make', true)->count(),
+            'missing_hpp' => (clone $filteredQuery)->where(function ($q) {
+                $q->where(function ($q) {
+                    $q->whereNull('hpp')->orWhere('hpp', '<=', 0);
+                })->where(function ($q) {
+                    $q->whereNull('base_unit_cost')->orWhere('base_unit_cost', '<=', 0);
+                });
+            })->whereDoesntHave('costSnapshots', function ($q) {
+                $q->where('is_active', true)->where('unit_cost', '>', 0);
+            })->count(),
+        ];
+        $supplyItems = Item::query()->whereIn('type', ['finished_good', 'wip']);
+        $supplySummary = [
+            'total' => (clone $supplyItems)->count(),
+            'hybrid' => (clone $supplyItems)->where('can_buy', true)->where('can_make', true)->count(),
+            'make_only' => (clone $supplyItems)->where('can_buy', false)->where('can_make', true)->count(),
+            'buy_only' => (clone $supplyItems)->where('can_buy', true)->where('can_make', false)->count(),
+            'review' => (clone $supplyItems)->where('can_buy', false)->where('can_make', false)->count(),
+        ];
 
-        return view('master.items.index', compact('items', 'categories', 'categoryKinds'));
+        return view('master.items.index', compact('items', 'categories', 'categoryKinds', 'typeLabels', 'itemStats', 'supplySummary'));
     }
 
     public function create()
@@ -65,12 +74,13 @@ class ItemController extends Controller
         $categories = $this->categoryOptions();
         $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = null;
-        return view('master.items.create', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot'));
+        $typeLabels = $this->typeLabels();
+        return view('master.items.create', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot', 'typeLabels'));
     }
 
     public function show(Item $item)
     {
-        $item->load('barcodes');
+        $item->load(['category', 'barcodes']);
 
         // snapshot HPP aktif (kalau ada)
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
@@ -78,6 +88,7 @@ class ItemController extends Controller
         return view('master.items.show', [
             'item' => $item,
             'activeSnapshot' => $activeSnapshot,
+            'typeLabels' => $this->typeLabels(),
         ]);
     }
 
@@ -153,10 +164,7 @@ class ItemController extends Controller
                 $data['type'] ?? 'material',
                 $data['item_category_id'] ?? null,
             );
-            $productionSource = $this->productionSourceFor(
-                $data['type'] ?? 'material',
-                $data['production_source'] ?? null,
-            );
+            $supplyPolicy = $this->supplyPolicyFor($data['type'] ?? 'material', $data);
 
             $item = Item::create([
                 'code' => $data['code'],
@@ -169,7 +177,13 @@ class ItemController extends Controller
                 'item_role' => $classification['item_role'],
                 'is_stocked' => $classification['is_stocked'],
                 'hpp_behavior' => $classification['hpp_behavior'],
-                'production_source' => $productionSource,
+                'production_source' => $this->legacyProductionSourceFor(
+                    $data['type'] ?? 'material',
+                    $supplyPolicy['default_supply_source'],
+                ),
+                'can_buy' => $supplyPolicy['can_buy'],
+                'can_make' => $supplyPolicy['can_make'],
+                'default_supply_source' => $supplyPolicy['default_supply_source'],
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
                 'default_allocation' => $data['default_allocation'] ?? 'hpp',
                 'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
@@ -213,8 +227,10 @@ class ItemController extends Controller
         $categories = $this->categoryOptions();
         $expenseAccounts = \App\Models\Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+        $itemBom = ItemBom::query()->where('item_id', $item->id)->first();
+        $typeLabels = $this->typeLabels();
         
-        return view('master.items.edit', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot'));
+        return view('master.items.edit', compact('item', 'categories', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'typeLabels'));
     }
 
     public function update(Request $request, Item $item)
@@ -226,10 +242,7 @@ class ItemController extends Controller
                 $data['type'],
                 $data['item_category_id'] ?? null,
             );
-            $productionSource = $this->productionSourceFor(
-                $data['type'],
-                $data['production_source'] ?? null,
-            );
+            $supplyPolicy = $this->supplyPolicyFor($data['type'], $data, $item);
 
             $item->update([
                 'code' => $data['code'],
@@ -242,7 +255,13 @@ class ItemController extends Controller
                 'item_role' => $classification['item_role'],
                 'is_stocked' => $classification['is_stocked'],
                 'hpp_behavior' => $classification['hpp_behavior'],
-                'production_source' => $productionSource,
+                'production_source' => $this->legacyProductionSourceFor(
+                    $data['type'],
+                    $supplyPolicy['default_supply_source'],
+                ),
+                'can_buy' => $supplyPolicy['can_buy'],
+                'can_make' => $supplyPolicy['can_make'],
+                'default_supply_source' => $supplyPolicy['default_supply_source'],
                 'active' => isset($data['active']) ? (bool) $data['active'] : true,
                 'default_allocation' => $data['default_allocation'] ?? 'hpp',
                 'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
@@ -298,7 +317,7 @@ class ItemController extends Controller
 
     /**
      * Bulk update beberapa item sekaligus.
-     * Aksi yang didukung: set_category, set_type, set_hpp.
+     * Aksi yang didukung: set_category, set_type, set_hpp, set_supply_policy.
      *
      * Catatan biaya: set_hpp memakai mekanisme snapshot 'master_temp' yang
      * sama dengan storeHppTemp() — menonaktifkan snapshot aktif lalu membuat
@@ -307,7 +326,7 @@ class ItemController extends Controller
     public function bulkUpdate(Request $request)
     {
         $data = $request->validate([
-            'action' => ['required', 'string', Rule::in(['set_category', 'set_type', 'set_hpp'])],
+            'action' => ['required', 'string', Rule::in(['set_category', 'set_type', 'set_hpp', 'set_supply_policy'])],
             'item_ids' => ['required', 'array', 'min:1'],
             'item_ids.*' => ['integer', 'exists:items,id'],
 
@@ -316,6 +335,9 @@ class ItemController extends Controller
             'type' => ['nullable', 'string', Rule::in(['material', 'finished_good', 'wip'])],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:255'],
+            'can_buy' => ['nullable', 'boolean'],
+            'can_make' => ['nullable', 'boolean'],
+            'default_supply_source' => ['nullable', 'string', Rule::in(array_keys(Item::supplySourceLabels()))],
         ]);
 
         $ids = array_values(array_unique($data['item_ids']));
@@ -348,10 +370,29 @@ class ItemController extends Controller
                 if (empty($data['type'])) {
                     abort(422, 'Tipe wajib dipilih untuk aksi ubah tipe.');
                 }
-                foreach (Item::whereIn('id', $ids)->get(['id', 'item_category_id', 'production_source']) as $item) {
+                foreach (Item::whereIn('id', $ids)->get([
+                    'id',
+                    'type',
+                    'item_category_id',
+                    'production_source',
+                    'can_buy',
+                    'can_make',
+                    'default_supply_source',
+                ]) as $item) {
                     $this->validateCategoryForType($data['type'], $item->item_category_id);
                     $classification = $this->classificationFor($data['type'], $item->item_category_id);
-                    $productionSource = $this->productionSourceFor($data['type'], $item->production_source ?? null);
+                    $isSupplyItem = in_array($item->type, ['finished_good', 'wip'], true);
+                    $supplyPolicy = $this->supplyPolicyFor(
+                        $data['type'],
+                        [
+                            'can_buy' => $isSupplyItem ? (bool) $item->can_buy : true,
+                            'can_make' => $isSupplyItem ? (bool) $item->can_make : false,
+                            'default_supply_source' => $isSupplyItem
+                                ? $item->default_supply_source
+                                : Item::SUPPLY_BUY,
+                        ],
+                        $item,
+                    );
 
                     Item::whereKey($item->id)->update([
                         'type' => $data['type'],
@@ -359,7 +400,13 @@ class ItemController extends Controller
                         'item_role' => $classification['item_role'],
                         'is_stocked' => $classification['is_stocked'],
                         'hpp_behavior' => $classification['hpp_behavior'],
-                        'production_source' => $productionSource,
+                        'production_source' => $this->legacyProductionSourceFor(
+                            $data['type'],
+                            $supplyPolicy['default_supply_source'],
+                        ),
+                        'can_buy' => $supplyPolicy['can_buy'],
+                        'can_make' => $supplyPolicy['can_make'],
+                        'default_supply_source' => $supplyPolicy['default_supply_source'],
                     ]);
                     $count++;
                 }
@@ -408,12 +455,48 @@ class ItemController extends Controller
                 }
                 return;
             }
+
+            if ($action === 'set_supply_policy') {
+                $canBuy = (bool) ($data['can_buy'] ?? false);
+                $canMake = (bool) ($data['can_make'] ?? false);
+                $defaultSource = $data['default_supply_source'] ?? null;
+
+                foreach (Item::whereIn('id', $ids)->get(['id', 'type', 'production_source']) as $item) {
+                    if (!in_array($item->type, ['finished_good', 'wip'], true)) {
+                        continue;
+                    }
+
+                    $supplyPolicy = $this->supplyPolicyFor($item->type, [
+                        'can_buy' => $canBuy,
+                        'can_make' => $canMake,
+                        'default_supply_source' => $defaultSource,
+                    ], $item);
+
+                    Item::whereKey($item->id)->update([
+                        'production_source' => $this->legacyProductionSourceFor(
+                            $item->type,
+                            $supplyPolicy['default_supply_source'],
+                        ),
+                        'can_buy' => $supplyPolicy['can_buy'],
+                        'can_make' => $supplyPolicy['can_make'],
+                        'default_supply_source' => $supplyPolicy['default_supply_source'],
+                    ]);
+                    $count++;
+                }
+
+                if ($count === 0) {
+                    abort(422, 'Pilih item Finished Good atau WIP untuk mengubah metode pasok.');
+                }
+
+                return;
+            }
         });
 
         $labels = [
             'set_category' => 'kategori',
             'set_type' => 'tipe',
             'set_hpp' => 'HPP',
+            'set_supply_policy' => 'metode pasok',
         ];
 
         return redirect()
@@ -450,6 +533,9 @@ class ItemController extends Controller
 
             'item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
             'production_source' => ['nullable', 'string', Rule::in(array_keys(Item::productionSourceLabels()))],
+            'can_buy' => ['nullable', 'boolean'],
+            'can_make' => ['nullable', 'boolean'],
+            'default_supply_source' => ['nullable', 'string', Rule::in(array_keys(Item::supplySourceLabels()))],
 
             'active' => ['nullable'],
             
@@ -548,6 +634,115 @@ class ItemController extends Controller
         }
 
         return Item::PRODUCTION_BUY;
+    }
+
+    /**
+     * Normalisasi kebijakan pasok item untuk FG/WIP.
+     * production_source tetap diisi sebagai compatibility layer untuk service lama.
+     */
+    protected function supplyPolicyFor(string $type, array $data, ?Item $item = null): array
+    {
+        if (!in_array($type, ['finished_good', 'wip'], true)) {
+            return [
+                'can_buy' => false,
+                'can_make' => false,
+                'default_supply_source' => null,
+            ];
+        }
+
+        $legacySource = $item?->production_source
+            ?? ($data['production_source'] ?? Item::PRODUCTION_BUY);
+
+        $canBuy = array_key_exists('can_buy', $data)
+            ? (bool) $data['can_buy']
+            : $legacySource === Item::PRODUCTION_BUY;
+        $canMake = array_key_exists('can_make', $data)
+            ? (bool) $data['can_make']
+            : $legacySource === Item::PRODUCTION_IN_HOUSE;
+
+        $defaultSource = $data['default_supply_source'] ?? null;
+        if (!array_key_exists($defaultSource, Item::supplySourceLabels())) {
+            $defaultSource = match ($legacySource) {
+                Item::PRODUCTION_IN_HOUSE => Item::SUPPLY_MAKE,
+                Item::PRODUCTION_OUTSOURCE => Item::SUPPLY_OUTSOURCE,
+                default => Item::SUPPLY_BUY,
+            };
+        }
+
+        if ($defaultSource === Item::SUPPLY_MAKE && !$canMake) {
+            $defaultSource = $canBuy ? Item::SUPPLY_BUY : null;
+        } elseif ($defaultSource === Item::SUPPLY_BUY && !$canBuy) {
+            $defaultSource = $canMake ? Item::SUPPLY_MAKE : null;
+        } elseif (!$canBuy && !$canMake && $defaultSource !== Item::SUPPLY_OUTSOURCE) {
+            $defaultSource = null;
+        }
+
+        return [
+            'can_buy' => $canBuy,
+            'can_make' => $canMake,
+            'default_supply_source' => $defaultSource,
+        ];
+    }
+
+    protected function legacyProductionSourceFor(string $type, ?string $defaultSource): ?string
+    {
+        if (!in_array($type, ['finished_good', 'wip'], true)) {
+            return null;
+        }
+
+        return match ($defaultSource) {
+            Item::SUPPLY_MAKE => Item::PRODUCTION_IN_HOUSE,
+            Item::SUPPLY_OUTSOURCE => Item::PRODUCTION_OUTSOURCE,
+            default => Item::PRODUCTION_BUY,
+        };
+    }
+
+    protected function typeLabels(): array
+    {
+        return [
+            'material' => 'Material / Bahan',
+            'wip' => 'Setengah Jadi (WIP)',
+            'finished_good' => 'Barang Jadi (FG)',
+        ];
+    }
+
+    protected function itemQueryFor(Request $request)
+    {
+        $query = Item::query();
+
+        if ($search = trim((string) $request->input('q'))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', '%' . $search . '%')
+                    ->orWhere('sku', 'like', '%' . $search . '%')
+                    ->orWhere('name', 'like', '%' . $search . '%');
+            });
+        }
+
+        if ($type = $request->input('type')) {
+            $query->where('type', $type);
+        }
+
+        if ($categoryId = $request->input('item_category_id')) {
+            $query->where('item_category_id', $categoryId);
+        }
+
+        if ($categoryKind = $request->input('category_kind')) {
+            $query->whereHas('category', fn($q) => $q->where('kind', $categoryKind));
+        }
+
+        $supplyMode = $request->input('supply_mode');
+        if (in_array($supplyMode, ['buy', 'make', 'hybrid', 'undefined', 'buy_only', 'make_only', 'review'], true)) {
+            $query->whereIn('type', ['finished_good', 'wip']);
+
+            match ($supplyMode) {
+                'buy', 'buy_only' => $query->where('can_buy', true)->where('can_make', false),
+                'make', 'make_only' => $query->where('can_buy', false)->where('can_make', true),
+                'hybrid' => $query->where('can_buy', true)->where('can_make', true),
+                'undefined', 'review' => $query->where('can_buy', false)->where('can_make', false),
+            };
+        }
+
+        return $query;
     }
 
     protected function categoryOptions()

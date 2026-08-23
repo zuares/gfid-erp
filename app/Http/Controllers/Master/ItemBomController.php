@@ -100,13 +100,22 @@ class ItemBomController extends Controller
         return view('master.item_boms.index', compact('boms', 'q', 'bomUsageBadges'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $rows = old('lines') ?: [$this->defaultRow(10)];
+        $prefilledItem = null;
+
+        if ($request->filled('item_id')) {
+            $prefilledItem = Item::query()
+                ->whereKey((int) $request->input('item_id'))
+                ->whereIn('type', ['finished_good', 'wip'])
+                ->first(['id', 'code', 'name', 'type']);
+        }
 
         return view('master.item_boms.form', [
             'bom' => null,
             'rows' => $rows,
+            'prefilledItem' => $prefilledItem,
         ]);
     }
 
@@ -197,6 +206,12 @@ class ItemBomController extends Controller
         return DB::transaction(function () use ($data) {
             $item = Item::whereKey($data['item_id'])->firstOrFail();
 
+            if (!in_array($item->type, ['finished_good', 'wip'], true) || !$item->canMake()) {
+                throw ValidationException::withMessages([
+                    'item_id' => 'Item ini belum disiapkan untuk produksi sendiri. Aktifkan kemampuan produksi pada Master Item terlebih dahulu.',
+                ]);
+            }
+
             $bom = ItemBom::updateOrCreate(
                 ['item_id' => $item->id],
                 [
@@ -218,6 +233,13 @@ class ItemBomController extends Controller
         $data = $this->validatePayload($request, isUpdate: true);
 
         return DB::transaction(function () use ($bom, $data) {
+            $item = $bom->item;
+            if (!$item || !in_array($item->type, ['finished_good', 'wip'], true) || !$item->canMake()) {
+                throw ValidationException::withMessages([
+                    'item_id' => 'Item BOM ini tidak lagi disiapkan untuk produksi sendiri. Periksa Metode Pasok pada Master Item.',
+                ]);
+            }
+
             $bom->update([
                 'name' => $data['name'] ?: $bom->name,
                 'active' => (bool) $data['active'],
@@ -464,7 +486,7 @@ class ItemBomController extends Controller
 
         $items = Item::query()
             ->when($type === 'finished_good', function ($qq) {
-                $qq->where('type', 'finished_good');
+                $qq->where('type', 'finished_good')->canBeMade();
             }, function ($qq) use ($roleIds) {
                 $qq->where(function ($w) use ($roleIds) {
                     if (!empty($roleIds)) {
@@ -580,8 +602,11 @@ class ItemBomController extends Controller
 
         DB::transaction(function () use ($rowsBySku, $mode, &$created, &$updated, &$skipped) {
             foreach ($rowsBySku as $skuCode => $lines) {
-                $sku = Item::where('code', $skuCode)->where('type', 'finished_good')->first();
-                if (!$sku) {$skipped[] = "SKU not found: {$skuCode}";continue;}
+                $sku = Item::where('code', $skuCode)
+                    ->where('type', 'finished_good')
+                    ->canBeMade()
+                    ->first();
+                if (!$sku) {$skipped[] = "SKU not found / tidak bisa diproduksi: {$skuCode}";continue;}
 
                 $bom = ItemBom::firstOrCreate(
                     ['item_id' => $sku->id],

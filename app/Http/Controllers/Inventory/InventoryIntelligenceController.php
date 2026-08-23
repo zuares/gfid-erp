@@ -137,7 +137,7 @@ class InventoryIntelligenceController extends Controller
 
         $fileName = ($isProcurement ? 'saran-pengadaan-fob-' : 'saran-produksi-') . now()->format('Ymd-His') . '.csv';
 
-        return response()->streamDownload(function () use ($rows, $isProcurement) {
+        return response()->streamDownload(function () use ($rows, $isProcurement, $filters) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM
             fputcsv($out, [

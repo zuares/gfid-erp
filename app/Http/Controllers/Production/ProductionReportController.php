@@ -41,7 +41,7 @@ class ProductionReportController extends Controller
             'recap' => $recap,
             'totals' => $totals,
             'statuses' => $this->flow->statuses(),
-            'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
+            'itemOptions' => Item::where('type', 'finished_good')->canBeMade()->orderBy('code')->get(),
             'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
             'operatorOptions' => Employee::whereIn('role', ['sewing', 'operating'])->orderBy('code')->get(),
         ]);

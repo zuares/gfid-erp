@@ -39,7 +39,7 @@ class ProductionPriorityService
         $items = Item::with('category')
             ->whereIn('id', $ids)
             ->where('type', 'finished_good')
-            ->where('production_source', Item::PRODUCTION_IN_HOUSE)
+            ->canBeMade()
             ->get()
             ->keyBy('id');
 
@@ -51,7 +51,7 @@ class ProductionPriorityService
         $rows = $items->map(function ($item) use ($snapshot, $deadlines, $aging, $maxAds, $today) {
             $id = $item->id;
             $snap = $snapshot->get($id);
-            $isMadeInHouse = $item->production_source === Item::PRODUCTION_IN_HOUSE;
+            $isMadeInHouse = $item->canMake();
 
             $ready = (float) ($snap->ready_stock ?? 0);
             $siapJahit = (float) ($snap->siap_jahit ?? 0);
@@ -107,6 +107,11 @@ class ProductionPriorityService
                 'is_made_in_house' => $isMadeInHouse,
                 'production_source' => $item->production_source_label,
                 'production_source_key' => $isMadeInHouse ? 'own' : 'external',
+                'can_buy' => $item->canBuy(),
+                'can_make' => $item->canMake(),
+                'is_hybrid' => $item->isHybrid(),
+                'supply_mode' => $item->supply_mode_label,
+                'default_supply_source' => $item->effectiveSupplySource(),
                 'ready' => $ready,
                 'barang_jadi' => $barangJadi,
                 'siap_jahit' => $siapJahit,

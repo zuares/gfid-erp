@@ -153,6 +153,7 @@ class RtsStockRequestController extends Controller
         $finishedGoodsItems = Item::query()
             ->select('id', 'code', 'name')
             ->where('type', 'finished_good')
+            ->canBeMade()
             ->orderBy('code')
             ->get();
 

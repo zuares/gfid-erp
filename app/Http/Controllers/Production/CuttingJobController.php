@@ -340,6 +340,7 @@ class CuttingJobController extends Controller
         $items = Item::query()
             ->select('id', 'code', 'item_category_id')
             ->where('type', 'finished_good')
+            ->canBeMade()
             ->with(['category:id,code,name'])
             ->orderBy('code')
             ->get();
@@ -527,6 +528,7 @@ class CuttingJobController extends Controller
         $items = Item::query()
             ->select('id', 'code', 'name', 'item_category_id')
             ->where('type', 'finished_good')
+            ->canBeMade()
             ->with(['category:id,code,name'])
             ->orderBy('code')
             ->get();
@@ -994,6 +996,8 @@ class CuttingJobController extends Controller
                 ->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item, LOT & qty pcs > 0.']);
         }
 
+        $this->validateFinishedItemsCanBeMade($validBundles);
+
         // =========================
         // 4) HEADER lot_id
         // =========================
@@ -1263,6 +1267,8 @@ class CuttingJobController extends Controller
             return back()->withErrors(['bundles' => 'Minimal 1 baris bundle harus diisi dengan item, LOT & qty pcs > 0.'])->withInput();
         }
 
+        $this->validateFinishedItemsCanBeMade($validBundles);
+
         // isi header lot_id kalau kosong
         if (empty($validated['lot_id'])) {
             $validated['lot_id'] = (int) ($validBundles[0]['lot_id'] ?? $selectedLotIds[0]);
@@ -1391,6 +1397,7 @@ class CuttingJobController extends Controller
 
             $item = Item::query()
                 ->where('type', 'finished_good')
+                ->canBeMade()
                 ->whereRaw('UPPER(code) = ?', [$code])
                 ->first();
 
@@ -1405,6 +1412,51 @@ class CuttingJobController extends Controller
         }
 
         $request->merge(['bundles' => $bundles]);
+    }
+
+    private function validateFinishedItemsCanBeMade(array $bundles): void
+    {
+        $itemIds = collect($bundles)
+            ->pluck('finished_item_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $allowedIds = Item::query()
+            ->whereIn('id', $itemIds)
+            ->where('type', 'finished_good')
+            ->canBeMade()
+            ->pluck('id');
+
+        if ($allowedIds->count() !== $itemIds->count()) {
+            $blockedCodes = Item::query()
+                ->whereIn('id', $itemIds->diff($allowedIds))
+                ->pluck('code')
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'bundles' => 'Item berikut hanya bisa dibeli jadi dan tidak dapat masuk proses cutting: ' . ($blockedCodes ?: 'item tidak valid') . '.',
+            ]);
+        }
+
+        $activeBomItemIds = DB::table('item_boms')
+            ->whereIn('item_id', $allowedIds->all())
+            ->where('active', true)
+            ->pluck('item_id')
+            ->map(fn ($id) => (int) $id);
+
+        $missingBomIds = $itemIds->diff($activeBomItemIds);
+        if ($missingBomIds->isNotEmpty()) {
+            $missingBomCodes = Item::whereIn('id', $missingBomIds)
+                ->orderBy('code')
+                ->pluck('code')
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'bundles' => 'Item belum memiliki BOM aktif: ' . ($missingBomCodes ?: 'item tidak valid') . '. Buat atau aktifkan BOM terlebih dahulu.',
+            ]);
+        }
     }
 
     private function onlyMainRawMaterialLots($lotStocks)

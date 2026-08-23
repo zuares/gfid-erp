@@ -427,6 +427,7 @@
 @section('content')
 @php
   $isEdit = (bool) $bom;
+  $prefilledItem = $prefilledItem ?? null;
   $action = $isEdit ? route('master.item_boms.update', $bom) : route('master.item_boms.store');
 
   // controller sebaiknya kirim $rows (sudah kamu punya)
@@ -482,6 +483,10 @@
         <div class="lbl">SKU (Finished Goods)</div>
         @if($isEdit)
           <input class="inp mono" value="{{ $bom->item->code }} — {{ $bom->item->name }}" disabled>
+        @elseif($prefilledItem)
+          <input type="hidden" name="item_id" value="{{ $prefilledItem->id }}">
+          <input class="inp mono" value="{{ $prefilledItem->code }} — {{ $prefilledItem->name }}" disabled>
+          <div class="small" style="margin-top:6px">SKU dipilih dari Master Item.</div>
         @else
           <select id="sku_id" name="item_id" style="width:100%"></select>
           <div class="small" style="margin-top:6px">Ketik kode: <span class="mono">C5BLK</span> / <span class="mono">J3MST</span> / dll</div>

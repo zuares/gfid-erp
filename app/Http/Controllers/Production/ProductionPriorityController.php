@@ -33,7 +33,7 @@ class ProductionPriorityController extends Controller
         return view('production.priority.index', [
             'filters' => $filters,
             'rows' => $rows,
-            'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
+            'itemOptions' => Item::where('type', 'finished_good')->canBeMade()->orderBy('code')->get(),
             'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
         ]);
     }

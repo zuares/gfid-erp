@@ -1,118 +1,120 @@
 @extends('layouts.app')
 
-@section('title', 'Master Item • ' . $item->code)
+@section('title', 'Detail Item · ' . $item->code)
+
+@php
+    $typeLabels = $typeLabels ?? ['material' => 'Material / Bahan', 'wip' => 'Setengah Jadi (WIP)', 'finished_good' => 'Barang Jadi (FG)'];
+    $hpp = (float) ($activeSnapshot?->unit_cost ?? $item->effective_unit_cost ?? 0);
+    $modeClass = $item->isHybrid() ? 'item-detail-hybrid' : ($item->canMake() ? 'item-detail-make' : ($item->canBuy() ? 'item-detail-buy' : 'item-detail-undefined'));
+@endphp
 
 @push('head')
-    <style>
-        .item-show-wrap {
-            max-width: 900px;
-            margin-inline: auto;
-            padding: 1rem .9rem 3rem;
-        }
-
-        body[data-theme="light"] .item-show-wrap {
-            background:
-                radial-gradient(circle at top left,
-                    rgba(59, 130, 246, 0.08) 0,
-                    rgba(148, 163, 184, 0.08) 30%,
-                    #f9fafb 70%);
-        }
-
-        .item-card {
-            background: var(--card);
-            border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            box-shadow:
-                0 8px 20px rgba(15, 23, 42, 0.08),
-                0 0 0 1px rgba(15, 23, 42, 0.02);
-        }
-    </style>
+<style>
+    .item-detail-page { max-width:1040px; margin:0 auto; padding:16px 12px 34px; color:#0f172a; }
+    .item-detail-hero, .item-detail-card { border:1px solid #e2e8f0; border-radius:22px; background:#fff; box-shadow:0 14px 36px rgba(15,23,42,.06); }
+    .item-detail-hero { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px; margin-bottom:14px; }
+    .item-detail-main { display:flex; align-items:center; gap:12px; min-width:0; }
+    .item-detail-icon { width:48px; height:48px; flex:0 0 48px; display:flex; align-items:center; justify-content:center; border-radius:16px; background:linear-gradient(135deg,#0f172a,#475569); color:#fff; font-size:1.25rem; }
+    .item-detail-code { color:#64748b; font-size:.7rem; font-weight:850; text-transform:uppercase; letter-spacing:.05em; }
+    .item-detail-title { margin:3px 0 0; color:#0f172a; font-size:1.35rem; font-weight:900; letter-spacing:-.04em; }
+    .item-detail-subtitle { margin-top:3px; color:#64748b; font-size:.8rem; }
+    .item-detail-actions { display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end; }
+    .item-detail-actions .btn, .item-detail-card .btn { border-radius:999px; font-weight:800; display:inline-flex; align-items:center; gap:6px; }
+    .item-detail-primary { color:#fff!important; background:linear-gradient(135deg,#0f172a,#334155)!important; border-color:transparent!important; }
+    .item-detail-soft { color:#334155!important; background:#fff!important; border:1px solid #cbd5e1!important; }
+    .item-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .item-detail-stat { padding:14px; border:1px solid #e2e8f0; border-radius:17px; background:linear-gradient(180deg,#fff,#f8fafc); }
+    .item-detail-stat-label { color:#64748b; font-size:.67rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+    .item-detail-stat-value { margin-top:5px; color:#0f172a; font-size:1.05rem; font-weight:900; }
+    .item-detail-stat-note { margin-top:2px; color:#94a3b8; font-size:.72rem; }
+    .item-detail-section { padding:17px; }
+    .item-detail-section + .item-detail-section { border-top:1px solid #eef2f7; }
+    .item-detail-heading { margin:0 0 13px; color:#0f172a; font-size:.95rem; font-weight:900; }
+    .item-detail-info { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 18px; }
+    .item-detail-label { color:#64748b; font-size:.68rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+    .item-detail-value { margin-top:3px; color:#0f172a; font-size:.83rem; font-weight:700; }
+    .item-detail-note { color:#94a3b8; font-size:.72rem; }
+    .item-detail-pill { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:5px 9px; font-size:.7rem; font-weight:850; }
+    .item-detail-buy { color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; }
+    .item-detail-make { color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; }
+    .item-detail-hybrid { color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; }
+    .item-detail-undefined { color:#92400e; background:#fffbeb; border:1px solid #fde68a; }
+    .item-detail-table { margin:0; font-size:.8rem; }
+    .item-detail-table th { padding:9px 10px; color:#64748b; background:#f8fafc; border-color:#e2e8f0; font-size:.67rem; text-transform:uppercase; letter-spacing:.04em; }
+    .item-detail-table td { padding:10px; border-color:#eef2f7; vertical-align:middle; }
+    .item-detail-empty { padding:18px; color:#94a3b8; text-align:center; font-size:.78rem; }
+    body[data-theme="dark"] .item-detail-page { color:#e5e7eb; }
+    body[data-theme="dark"] .item-detail-hero, body[data-theme="dark"] .item-detail-card, body[data-theme="dark"] .item-detail-stat { background:#0f172a; border-color:#334155; }
+    body[data-theme="dark"] .item-detail-title, body[data-theme="dark"] .item-detail-value, body[data-theme="dark"] .item-detail-stat-value, body[data-theme="dark"] .item-detail-heading { color:#f8fafc; }
+    body[data-theme="dark"] .item-detail-subtitle, body[data-theme="dark"] .item-detail-label, body[data-theme="dark"] .item-detail-stat-label { color:#94a3b8; }
+    body[data-theme="dark"] .item-detail-table th { background:#111827; border-color:#334155; }
+    body[data-theme="dark"] .item-detail-table td { border-color:#334155; }
+    body[data-theme="dark"] .item-detail-soft { background:#0f172a!important; color:#cbd5e1!important; border-color:#475569!important; }
+    @media(max-width:700px) { .item-detail-hero { align-items:flex-start; flex-direction:column; } .item-detail-actions, .item-detail-actions .btn { width:100%; } .item-detail-actions .btn { justify-content:center; } .item-detail-grid, .item-detail-info { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:440px) { .item-detail-grid, .item-detail-info { grid-template-columns:1fr; } }
+</style>
 @endpush
 
 @section('content')
-    <div class="item-show-wrap">
-        <div class="mb-3 flex items-center justify-between gap-2">
+<div class="item-detail-page">
+    <div class="item-detail-hero">
+        <div class="item-detail-main">
+            <div class="item-detail-icon"><i class="bi bi-box-seam"></i></div>
             <div>
-                <h1 class="text-lg font-semibold tracking-tight">
-                    Master Item — {{ $item->code }}
-                </h1>
-                <p class="text-sm text-slate-500 dark:text-slate-400">
-                    {{ $item->name }}
-                </p>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <a href="{{ route('master.items.edit', $item->id) }}"
-                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700">
-                    Edit Item
-                </a>
-
-                <a href="{{ route('master.items.hpp_temp.edit', $item->id) }}"
-                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm bg-emerald-600 text-white hover:bg-emerald-700">
-                    Set HPP Sementara
-                </a>
+                <div class="item-detail-code">Master Item · {{ $item->code }}</div>
+                <h1 class="item-detail-title">{{ $item->name }}</h1>
+                <div class="item-detail-subtitle">{{ $item->sku ?: 'SKU mengikuti kode' }} · {{ $item->unit ?: 'pcs' }}</div>
             </div>
         </div>
-
-        <div class="item-card p-4 sm:p-5 space-y-4">
-            {{-- Info dasar item --}}
-            <div class="grid sm:grid-cols-2 gap-3 text-sm">
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Kode</p>
-                    <p class="font-medium">{{ $item->code }}</p>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Nama</p>
-                    <p class="font-medium">{{ $item->name }}</p>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Kategori</p>
-                    <p class="font-medium">{{ $item->category->name ?? '-' }}</p>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Satuan</p>
-                    <p class="font-medium">{{ $item->uom ?? '-' }}</p>
-                </div>
-            </div>
-
-            <hr class="border-dashed border-slate-200 dark:border-slate-700">
-
-            {{-- HPP Aktif --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase mb-1">HPP Aktif (Sementara)</p>
-                    <p class="text-xl font-semibold">
-                        Rp {{ number_format($item->active_unit_cost, 0) }}
-                    </p>
-                    @if (optional($item->costSnapshots()->active()->latest('snapshot_date')->latest('id')->first())->reference_type)
-                        <p class="text-xs text-slate-500 mt-1">
-                            Sumber:
-                            {{ $item->costSnapshots()->active()->latest('snapshot_date')->latest('id')->first()->reference_type }}
-                        </p>
-                    @else
-                        <p class="text-xs text-slate-400 mt-1">
-                            Belum ada HPP aktif — klik "Set HPP Sementara".
-                        </p>
-                    @endif
-                </div>
-
-                <div class="inline-flex items-center gap-2">
-                    <span
-                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
-                    @if ($item->active_unit_cost > 0) bg-emerald-50 text-emerald-700 border border-emerald-200
-                    @else
-                        bg-amber-50 text-amber-700 border border-amber-200 @endif
-                    ">
-                        @if ($item->active_unit_cost > 0)
-                            HPP aktif tersedia
-                        @else
-                            HPP belum di-set
-                        @endif
-                    </span>
-                </div>
-            </div>
-
-            {{-- (Opsional) bisa tambah section lain di bawah sini --}}
+        <div class="item-detail-actions">
+            <a href="{{ route('master.items.index') }}" class="btn item-detail-soft btn-sm"><i class="bi bi-arrow-left"></i>Kembali</a>
+            <a href="{{ route('master.items.hpp_temp.edit', $item) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i>Set HPP</a>
+            <a href="{{ route('master.items.edit', $item) }}" class="btn item-detail-primary btn-sm"><i class="bi bi-pencil"></i>Edit Item</a>
         </div>
     </div>
+
+    @if(session('success'))<div class="alert alert-success py-2 px-3 mb-3" style="font-size:.8rem;">{{ session('success') }}</div>@endif
+
+    <div class="item-detail-grid">
+        <div class="item-detail-stat"><div class="item-detail-stat-label">Status</div><div class="item-detail-stat-value"><span class="item-detail-pill {{ $item->active ? 'item-detail-make' : 'item-detail-undefined' }}">{{ $item->active ? 'Aktif / Bisa dipakai' : 'Nonaktif' }}</span></div><div class="item-detail-stat-note">{{ $item->active ? 'Tersedia untuk transaksi baru' : 'Sembunyikan dari transaksi baru' }}</div></div>
+        <div class="item-detail-stat"><div class="item-detail-stat-label">Tipe & kategori</div><div class="item-detail-stat-value">{{ $typeLabels[$item->type] ?? $item->type }}</div><div class="item-detail-stat-note">{{ $item->category?->name ?? 'Tanpa kategori' }}</div></div>
+        <div class="item-detail-stat"><div class="item-detail-stat-label">HPP aktif</div><div class="item-detail-stat-value">{{ $hpp > 0 ? 'Rp '.number_format($hpp, 0, ',', '.') : 'Belum di-set' }}</div><div class="item-detail-stat-note">{{ $activeSnapshot?->snapshot_date?->format('d/m/Y') ?? 'Belum ada snapshot' }}</div></div>
+    </div>
+
+    <div class="item-detail-card">
+        <div class="item-detail-section">
+            <h2 class="item-detail-heading"><i class="bi bi-diagram-3 me-2"></i>Ringkasan metode pasok</h2>
+            @if(in_array($item->type, ['finished_good', 'wip'], true))
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="item-detail-pill {{ $modeClass }}">{{ $item->supply_mode_label }}</span>
+                    <span class="item-detail-note">Prioritas default: <strong>{{ $item->default_supply_source_label }}</strong></span>
+                </div>
+                <div class="item-detail-note mt-2">Item ini dapat digunakan dalam alur pembelian jadi, produksi sendiri, atau keduanya sesuai pilihan di Master Item.</div>
+            @else
+                <div class="item-detail-note">Metode pasok tidak berlaku untuk item material.</div>
+            @endif
+        </div>
+
+        <div class="item-detail-section">
+            <h2 class="item-detail-heading"><i class="bi bi-info-circle me-2"></i>Informasi item</h2>
+            <div class="item-detail-info">
+                <div><div class="item-detail-label">Kode</div><div class="item-detail-value">{{ $item->code }}</div></div>
+                <div><div class="item-detail-label">SKU</div><div class="item-detail-value">{{ $item->sku ?: 'Mengikuti kode' }}</div></div>
+                <div><div class="item-detail-label">Satuan</div><div class="item-detail-value">{{ $item->unit ?: '-' }}</div></div>
+                <div><div class="item-detail-label">Kategori</div><div class="item-detail-value">{{ $item->category?->code ?? '-' }}{{ $item->category ? ' · '.$item->category->name : '' }}</div></div>
+                <div><div class="item-detail-label">Harga beli terakhir</div><div class="item-detail-value">{{ (float) $item->last_purchase_price > 0 ? 'Rp '.number_format((float) $item->last_purchase_price, 0, ',', '.') : 'Belum ada' }}</div></div>
+                <div><div class="item-detail-label">Sifat pembelian</div><div class="item-detail-value">{{ $item->default_allocation === 'expense' ? 'Langsung biaya' : 'Masuk stok / aset' }}</div></div>
+            </div>
+        </div>
+
+        <div class="item-detail-section">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3"><h2 class="item-detail-heading mb-0"><i class="bi bi-upc-scan me-2"></i>Barcode</h2><span class="item-detail-note">{{ $item->barcodes->count() }} barcode</span></div>
+            @if($item->barcodes->count())
+                <div class="table-responsive"><table class="table item-detail-table"><thead><tr><th>Barcode</th><th>Tipe</th><th>Catatan</th><th>Status</th></tr></thead><tbody>@foreach($item->barcodes as $barcode)<tr><td class="fw-bold">{{ $barcode->barcode }}</td><td>{{ \Illuminate\Support\Str::headline($barcode->type ?? 'main') }}</td><td class="text-muted">{{ $barcode->notes ?: '-' }}</td><td>{{ $barcode->is_active ? 'Aktif' : 'Nonaktif' }}</td></tr>@endforeach</tbody></table></div>
+            @else
+                <div class="item-detail-empty">Belum ada barcode untuk item ini.</div>
+            @endif
+        </div>
+    </div>
+</div>
 @endsection

@@ -68,7 +68,7 @@ class ProductionDashboardController extends Controller
                 'initialPartial' => $this->partialFor($initialTab),
                 'periodLabel' => $this->periodLabel($filters),
                 'operatorOptions' => Employee::whereIn('role', ['sewing', 'operating'])->orderBy('code')->get(),
-                'itemOptions' => Item::where('type', 'finished_good')->orderBy('code')->get(),
+                'itemOptions' => Item::where('type', 'finished_good')->canBeMade()->orderBy('code')->get(),
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
                 'tabCounts' => $this->tabCounts($filters),
             ],

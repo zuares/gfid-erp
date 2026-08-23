@@ -11,14 +11,23 @@
         ->values();
 
     $topSuggestionsOwn = $rows
-        ->where('suggested_qty', '>', 0)
-        ->where('production_source_key', 'own')
+        ->filter(fn($r) => (bool) ($r->can_make ?? false) && ($r->production_suggested_qty ?? 0) > 0)
+        ->map(function ($r) {
+            $r = clone $r;
+            $r->suggested_qty = (float) ($r->production_suggested_qty ?? 0);
+            return $r;
+        })
         ->sortByDesc('suggested_qty')
         ->values();
 
     $topSuggestionsExt = $rows
-        ->where('suggested_qty', '>', 0)
-        ->where('production_source_key', 'external')
+        ->filter(fn($r) => ((bool) ($r->can_buy ?? false) || ($r->default_supply_source ?? null) === \App\Models\Item::SUPPLY_OUTSOURCE)
+            && ($r->procurement_suggested_qty ?? 0) > 0)
+        ->map(function ($r) {
+            $r = clone $r;
+            $r->suggested_qty = (float) ($r->procurement_suggested_qty ?? 0);
+            return $r;
+        })
         ->sortByDesc('suggested_qty')
         ->values();
 
@@ -37,8 +46,8 @@
     $pctStockout = round(($summary['stockout'] / $skuTotal) * 100);
     $pctSehat = round(($summary['sehat'] / $skuTotal) * 100);
     $pctNoDemand = round((($summary['sku_no_demand'] ?? 0) / $skuTotal) * 100);
-    $ownSuggested = (float) $rows->where('suggested_qty', '>', 0)->where('production_source_key', 'own')->sum('suggested_qty');
-    $extSuggested = (float) $rows->where('suggested_qty', '>', 0)->where('production_source_key', 'external')->sum('suggested_qty');
+    $ownSuggested = (float) $rows->sum('production_suggested_qty');
+    $extSuggested = (float) $rows->sum('procurement_suggested_qty');
 @endphp
 
 <div class="kpi-grid mb-4">

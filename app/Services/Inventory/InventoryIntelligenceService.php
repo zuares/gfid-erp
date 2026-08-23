@@ -16,8 +16,9 @@ use Illuminate\Support\Facades\DB;
  * lalu menurunkan metrik forecast realtime:
  *   - forecast_30   = ADS × 30
  *   - forecast_60   = ADS × 60 (khusus saran pengadaan FOB)
- *   - suggested_qty = saran produksi sesuai horizon untuk in-house, atau
- *                     saran pengadaan 60 hari untuk FOB
+ *   - suggested_qty = saran sesuai default_supply_source
+ *   - production_suggested_qty / procurement_suggested_qty tetap tersedia
+ *     untuk item Hybrid agar user bisa memilih jalurnya
  *   - status        = sehat / menipis / kritis / stockout / no_demand
  *
  * Read-only. Tidak membuat tabel/kolom. Sumber kebenaran sama dgn modul Produksi.
@@ -79,13 +80,18 @@ class InventoryIntelligenceService
             $forecast60 = round($ads * self::PROCUREMENT_HORIZON, 1);
             $productionForecast = round($ads * $productionHorizon, 1);
             $procurementForecast = round($ads * $procurementHorizon, 1);
-            $productionSuggested = $ads > 0
+            $productionSuggested = $item->canMake() && $ads > 0
                 ? max(0.0, round($productionForecast - $availableStock, 0))
                 : 0.0;
-            $procurementSuggested = $ads > 0
+            $procurementSuggested = ($item->canBuy() || $item->effectiveSupplySource() === Item::SUPPLY_OUTSOURCE) && $ads > 0
                 ? max(0.0, round($procurementForecast - $availableStock, 0))
                 : 0.0;
-            $suggested = $item->is_made_in_house ? $productionSuggested : $procurementSuggested;
+            $defaultSupplySource = $item->effectiveSupplySource();
+            $useProduction = $defaultSupplySource === Item::SUPPLY_MAKE && $item->canMake();
+            $useProcurement = !$useProduction && ($item->canBuy() || $defaultSupplySource === Item::SUPPLY_OUTSOURCE);
+            $suggested = $useProduction
+                ? $productionSuggested
+                : ($useProcurement ? $procurementSuggested : 0.0);
             $unitCost = $this->unitCost($item);
             $suggestedValue = round($suggested * $unitCost, 0);
             $availableValue = round($availableStock * $unitCost, 0);
@@ -101,7 +107,13 @@ class InventoryIntelligenceService
                 'category' => $item->category?->name ?? '-',
                 'production_source' => $item->production_source,
                 'production_source_label' => $item->production_source_label,
-                'production_source_key' => $item->is_made_in_house ? 'own' : 'external',
+                'production_source_key' => $useProduction ? 'own' : ($useProcurement ? 'external' : 'unknown'),
+                'can_buy' => $item->canBuy(),
+                'can_make' => $item->canMake(),
+                'is_hybrid' => $item->isHybrid(),
+                'supply_mode' => $item->supply_mode_label,
+                'default_supply_source' => $defaultSupplySource,
+                'default_supply_source_label' => $item->default_supply_source_label,
                 'rts_min_display' => $item->rts_min_display,
                 'rts_max_display' => $item->rts_max_display,
                 'ready' => $readyRts,
@@ -152,9 +164,10 @@ class InventoryIntelligenceService
     public function productionDraft(array $filters, array $itemIds = []): Collection
     {
         return $this->rows($filters)
-            ->where('production_source_key', 'own')
+            ->filter(fn ($r) => (bool) ($r->can_make ?? false))
             ->when(!empty($itemIds), fn ($rows) => $rows->whereIn('item_id', $itemIds))
-            ->filter(fn ($r) => $r->suggested_qty > 0)
+            ->filter(fn ($r) => ($r->production_suggested_qty ?? 0) > 0)
+            ->map(fn ($r) => $this->draftRowFor($r, 'make'))
             ->sortByDesc('suggested_qty')
             ->values();
     }
@@ -163,11 +176,25 @@ class InventoryIntelligenceService
     public function procurementDraft(array $filters, array $itemIds = []): Collection
     {
         return $this->rows($filters)
-            ->where('production_source_key', 'external')
+            ->filter(fn ($r) => (bool) ($r->can_buy ?? false) || ($r->default_supply_source ?? null) === Item::SUPPLY_OUTSOURCE)
             ->when(!empty($itemIds), fn ($rows) => $rows->whereIn('item_id', $itemIds))
-            ->filter(fn ($r) => $r->suggested_qty > 0)
+            ->filter(fn ($r) => ($r->procurement_suggested_qty ?? 0) > 0)
+            ->map(fn ($r) => $this->draftRowFor($r, 'buy'))
             ->sortByDesc('suggested_qty')
             ->values();
+    }
+
+    private function draftRowFor(object $row, string $source): object
+    {
+        $draft = clone $row;
+        $draft->suggested_qty = $source === 'make'
+            ? (float) ($row->production_suggested_qty ?? 0)
+            : (float) ($row->procurement_suggested_qty ?? 0);
+        $draft->suggested_value = round($draft->suggested_qty * (float) ($row->unit_cost ?? 0), 0);
+        $draft->draft_supply_source = $source;
+        $draft->production_source_key = $source === 'make' ? 'own' : 'external';
+
+        return $draft;
     }
 
     private function procurementHorizon(array $filters): int
@@ -194,7 +221,7 @@ class InventoryIntelligenceService
             ? $item->getRelation('activeCostSnapshot')
             : null;
 
-        $candidates = $item->is_made_in_house
+        $candidates = $item->effectiveSupplySource() === Item::SUPPLY_MAKE
             ? [
                 $activeSnapshot?->unit_cost,
                 $item->base_unit_cost,

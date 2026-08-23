@@ -22,6 +22,9 @@ class Item extends Model
         'item_role', // legacy string (raw_material/production_supply/...)
         'item_role_id', // FK ke item_roles
         'production_source', // in_house / outsource / buy
+        'can_buy',
+        'can_make',
+        'default_supply_source',
 
         'last_purchase_price',
         'hpp',
@@ -46,6 +49,9 @@ class Item extends Model
     public const PRODUCTION_IN_HOUSE = 'in_house';
     public const PRODUCTION_OUTSOURCE = 'outsource';
     public const PRODUCTION_BUY = 'buy';
+    public const SUPPLY_MAKE = 'make';
+    public const SUPPLY_BUY = 'buy';
+    public const SUPPLY_OUTSOURCE = 'outsource';
 
     protected $casts = [
         'last_purchase_price' => 'decimal:2',
@@ -56,6 +62,8 @@ class Item extends Model
         'affects_hpp' => 'boolean',
         'is_stocked' => 'boolean',
         'allow_negative' => 'boolean',
+        'can_buy' => 'boolean',
+        'can_make' => 'boolean',
 
         'consumption_cutting' => 'decimal:4',
         'consumption_cutting_basis_qty' => 'decimal:4',
@@ -77,7 +85,78 @@ class Item extends Model
 
     public function getIsMadeInHouseAttribute(): bool
     {
+        return $this->canMake();
+    }
+
+    public static function supplySourceLabels(): array
+    {
+        return [
+            self::SUPPLY_MAKE => 'Produksi sendiri',
+            self::SUPPLY_BUY => 'Beli jadi',
+            self::SUPPLY_OUTSOURCE => 'Makloon / Outsource',
+        ];
+    }
+
+    public function canBuy(): bool
+    {
+        if ((bool) $this->can_buy || (bool) $this->can_make || $this->default_supply_source !== null) {
+            return (bool) $this->can_buy;
+        }
+
+        return $this->production_source === self::PRODUCTION_BUY;
+    }
+
+    public function canMake(): bool
+    {
+        if ((bool) $this->can_buy || (bool) $this->can_make || $this->default_supply_source !== null) {
+            return (bool) $this->can_make;
+        }
+
         return $this->production_source === self::PRODUCTION_IN_HOUSE;
+    }
+
+    public function isHybrid(): bool
+    {
+        return $this->canBuy() && $this->canMake();
+    }
+
+    public function getSupplyModeLabelAttribute(): string
+    {
+        if ($this->isHybrid()) {
+            return 'Hybrid: produksi / beli jadi';
+        }
+
+        if ($this->canMake()) {
+            return 'Produksi sendiri';
+        }
+
+        if ($this->canBuy()) {
+            return 'Beli jadi';
+        }
+
+        return 'Belum ditentukan';
+    }
+
+    public function getDefaultSupplySourceLabelAttribute(): string
+    {
+        return self::supplySourceLabels()[$this->effectiveSupplySource()] ?? 'Belum ditentukan';
+    }
+
+    /**
+     * Sumber default yang dipakai service ketika data lama belum memiliki policy.
+     */
+    public function effectiveSupplySource(): ?string
+    {
+        if (array_key_exists($this->default_supply_source, self::supplySourceLabels())) {
+            return $this->default_supply_source;
+        }
+
+        return match ($this->production_source) {
+            self::PRODUCTION_IN_HOUSE => self::SUPPLY_MAKE,
+            self::PRODUCTION_OUTSOURCE => self::SUPPLY_OUTSOURCE,
+            self::PRODUCTION_BUY => self::SUPPLY_BUY,
+            default => $this->canMake() && !$this->canBuy() ? self::SUPPLY_MAKE : null,
+        };
     }
 
     /* ============================================================
@@ -88,6 +167,11 @@ class Item extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ItemCategory::class, 'item_category_id');
+    }
+
+    public function boms(): HasMany
+    {
+        return $this->hasMany(ItemBom::class);
     }
 
     // Kalau kamu sudah punya product_category_id
@@ -169,6 +253,22 @@ class Item extends Model
     {
         return $query->whereHas('inventoryStocks', function ($q) use ($warehouseId) {
             $q->where('warehouse_id', $warehouseId)->where('qty', '>', 0);
+        });
+    }
+
+    public function scopeCanBeMade($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('can_make', true)
+                ->orWhere('production_source', self::PRODUCTION_IN_HOUSE);
+        });
+    }
+
+    public function scopeCanBeBought($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('can_buy', true)
+                ->orWhereIn('production_source', [self::PRODUCTION_BUY, self::PRODUCTION_OUTSOURCE]);
         });
     }
 

@@ -1002,7 +1002,10 @@ class WarehouseIntelligenceController extends Controller
 
         return $rows
             ->filter(function ($r) {
-                return $this->normalizeProductionSourceGroup($r) === 'in_house';
+                // Hybrid tetap masuk tab PRD karena masih boleh diproduksi,
+                // walaupun prioritas default-nya saat ini bisa beli jadi.
+                return (bool) ($r->can_make ?? false)
+                    || $this->normalizeProductionSourceGroup($r) === 'in_house';
             })
             ->values();
     }
@@ -1243,6 +1246,17 @@ class WarehouseIntelligenceController extends Controller
 
     private function normalizeProductionSourceGroup(object $row): string
     {
+        $defaultSupplySource = strtolower(trim((string) ($row->default_supply_source ?? '')));
+        if ($defaultSupplySource === Item::SUPPLY_MAKE) {
+            return 'in_house';
+        }
+        if ($defaultSupplySource === Item::SUPPLY_BUY) {
+            return 'buy';
+        }
+        if ($defaultSupplySource === Item::SUPPLY_OUTSOURCE) {
+            return 'outsource';
+        }
+
         $source = strtolower(trim((string) ($row->production_source ?? '')));
         $sourceKey = strtolower(trim((string) ($row->production_source_key ?? '')));
 

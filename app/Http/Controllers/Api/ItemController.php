@@ -81,6 +81,15 @@ class ItemController extends Controller
             }
         }
 
+        // Samakan filter picker dengan aturan kemampuan pasok di server.
+        if ($request->boolean('can_make')) {
+            $query->canBeMade();
+        }
+
+        if ($request->boolean('can_buy')) {
+            $query->canBeBought();
+        }
+
         // 🎯 Filter kategori
         if ($categoryId = $request->input('item_category_id')) {
             $query->where('item_category_id', $categoryId);
@@ -155,6 +164,12 @@ class ItemController extends Controller
             'type' => $item->type,
             'item_category_id' => $item->item_category_id,
             'item_category' => optional($item->category)->name,
+            'can_buy' => $item->canBuy(),
+            'can_make' => $item->canMake(),
+            'is_hybrid' => $item->isHybrid(),
+            'supply_mode' => $item->supply_mode_label,
+            'default_supply_source' => $item->effectiveSupplySource(),
+            'default_supply_source_label' => $item->default_supply_source_label,
         ], $extra);
     }
 
@@ -200,6 +215,8 @@ class ItemController extends Controller
                 'type' => $request->input('type'),
                 'item_category_id' => $request->input('item_category_id'),
                 'active' => $request->input('active', 1),
+                'can_make' => $request->boolean('can_make'),
+                'can_buy' => $request->boolean('can_buy'),
                 'lot_id' => $request->input('lot_id'),
             ],
         ]);

@@ -312,7 +312,8 @@
                                         <td><span class="muted">{{ $typeLabels[$item->type] ?? $item->type }}</span></td>
                                         <td>
                                             @if (in_array($item->type, ['finished_good', 'wip'], true))
-                                                <span class="muted">{{ $item->production_source_label }}</span>
+                                                <div class="item-name">{{ $item->supply_mode_label }}</div>
+                                                <div class="muted">Default: {{ $item->default_supply_source_label }}</div>
                                             @else
                                                 <span class="muted">-</span>
                                             @endif

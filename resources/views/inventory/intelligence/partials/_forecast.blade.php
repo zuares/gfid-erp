@@ -1,6 +1,15 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
-    $rows = $rows->where('production_source_key', 'own')->values();
+    $rows = $rows
+        ->filter(fn($r) => (bool) ($r->can_make ?? false))
+        ->map(function ($r) {
+            $r = clone $r;
+            $r->suggested_qty = (float) ($r->production_suggested_qty ?? 0);
+            $r->suggested_value = round($r->suggested_qty * (float) ($r->unit_cost ?? 0), 0);
+            $r->production_source_key = 'own';
+            return $r;
+        })
+        ->values();
     $productionDays = (int) ($filters['production_days'] ?? 30);
     $fmtRp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
     $skuCount = $rows->count();

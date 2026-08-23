@@ -904,7 +904,7 @@
                             {{-- ITEM JADI pakai component item-suggest (idName wajib) --}}
                             <x-item-suggest idName="bundles[__INDEX__][finished_item_id]"
                                 displayName="bundles[__INDEX__][finished_item_display]" placeholder="Cari item jadi"
-                                type="finished_good" displayMode="code" :extraParams="[]" />
+                                type="finished_good" displayMode="code" :extraParams="['can_make' => 1]" />
                             <div class="bundle-item-help">Tap lalu pilih item dari daftar.</div>
                         </td>
                         <td>
