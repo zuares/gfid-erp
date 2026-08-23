@@ -58,13 +58,15 @@
     .sif-camera-reader img { max-width: 100%; }
     .sif-camera-status { padding: .45rem .65rem; color: #64748b; background: #fff; font-size: .68rem; line-height: 1.4; }
     .sif-camera-status.error { color: #b91c1c; background: #fef2f2; }
-    .sif-topbar { position: relative; top: auto; z-index: 1; }
+    .sif-topbar { --sif-topbar-height: 3.7rem; position: sticky; top: 0; z-index: 300; }
+    .sif-shell > .sif-card:first-child { position: sticky; top: var(--sif-topbar-height); z-index: 250; }
     .sif-toast { position: fixed; left: 50%; bottom: 1.2rem; z-index: 9999; display: none; transform: translateX(-50%); max-width: min(92vw, 520px); padding: .65rem .9rem; border-radius: 999px; color: #fff; background: #0f172a; font-size: .8rem; font-weight: 800; }
     .sif-toast.show { display: block; }
     .sif-toast.error { background: #991b1b; }
     @media (max-width: 640px) {
         .sif-page { padding: 0 .45rem 1.5rem; }
         .sif-topbar { margin: 0 -.45rem; padding: .5rem .55rem; }
+        .sif-topbar { --sif-topbar-height: 7.2rem; }
         .sif-topbar .sif-btn-primary { width: 100%; order: 5; }
         .sif-card-head, .sif-body { padding: .7rem; }
         .sif-input { min-height: 62px; font-size: 1.08rem; }

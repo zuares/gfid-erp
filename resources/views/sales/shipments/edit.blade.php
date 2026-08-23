@@ -1387,8 +1387,16 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     box-shadow: none !important;
 }
 .shp-topbar {
-    position: relative !important;
-    top: auto !important;
+    --shp-topbar-height: 3.9rem;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 300;
+}
+.shp-scan-card {
+    position: sticky;
+    top: var(--shp-topbar-height);
+    z-index: 250;
+    background: var(--card, #fff);
 }
 .shp-pill-accent {
     color: #1d4ed8 !important;
@@ -1406,6 +1414,9 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     box-shadow: 0 0 0 3px rgba(37,99,235,.12);
 }
 .item-code { color: #0f172a; }
+@media (max-width: 768px) {
+    .shp-topbar { --shp-topbar-height: 6.6rem; }
+}
 </style>
 @endpush
 
