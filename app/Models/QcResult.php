@@ -23,6 +23,7 @@ class QcResult extends Model
         'qty_reject',
         'reject_reason',
         'operator_id',
+        'qc_by_user_id',
         'status',
         'notes',
     ];
@@ -57,6 +58,11 @@ class QcResult extends Model
     public function operator(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'operator_id');
+    }
+
+    public function qcUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'qc_by_user_id');
     }
 
     /*

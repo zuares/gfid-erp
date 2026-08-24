@@ -57,6 +57,7 @@ class QcService
 
             $qcDate = $payload['qc_date'];
             $operatorId = $payload['operator_id'] ?? null;
+            $qcByUserId = $payload['qc_by_user_id'] ?? null;
             $rows = $payload['results'] ?? [];
 
             /** @var \Illuminate\Support\Collection<int, CuttingJobBundle> $bundleMap */
@@ -117,6 +118,7 @@ class QcService
                         'qty_ok' => $qtyOk,
                         'qty_reject' => $qtyReject,
                         'operator_id' => $operatorId,
+                        'qc_by_user_id' => $qcByUserId,
                         'status' => $status,
                         'notes' => $row['notes'] ?? null,
                         'reject_reason' => $row['reject_reason'] ?? null,
@@ -160,6 +162,7 @@ class QcService
 
             $qcDate = $payload['qc_date'];
             $operatorId = $payload['operator_id'] ?? null;
+            $qcByUserId = $payload['qc_by_user_id'] ?? null;
             $rows = $payload['results'] ?? [];
 
             // ===========================
@@ -272,6 +275,7 @@ class QcService
                     qtyReject: $qtyReject,
                     status: $status,
                     operatorId: $operatorId,
+                    qcByUserId: $qcByUserId,
                     notes: $notes,
                     rejectReason: $rejectReason,
                     cuttingJobId: $bundle->cutting_job_id,
@@ -496,6 +500,7 @@ class QcService
 
             $qcDate = $payload['qc_date'];
             $operatorId = $payload['operator_id'] ?? null;
+            $qcByUserId = $payload['qc_by_user_id'] ?? null;
             $rows = $payload['results'] ?? [];
 
             /** @var \Illuminate\Support\Collection<int, CuttingJobBundle> $bundleMap */
@@ -573,6 +578,7 @@ class QcService
                     qtyReject: $qtyReject,
                     status: $status,
                     operatorId: $operatorId,
+                    qcByUserId: $qcByUserId,
                     notes: $notes,
                     rejectReason: $rejectReason,
                     cuttingJobId: $bundle->cutting_job_id,
@@ -722,6 +728,7 @@ class QcService
         float $qtyReject,
         string $status,
         ?int $operatorId = null,
+        ?int $qcByUserId = null,
         ?string $notes = null,
         ?string $rejectReason = null,
         ?int $cuttingJobId = null,
@@ -742,6 +749,7 @@ class QcService
                 'qty_reject' => $qtyReject,
                 'reject_reason' => $rejectReason,
                 'operator_id' => $operatorId,
+                'qc_by_user_id' => $qcByUserId,
                 'status' => $status,
                 'notes' => $notes,
             ],
@@ -886,10 +894,11 @@ class QcService
         float $newOk,
         float $newReject = 0,
         ?int $operatorId = null,
+        ?int $qcByUserId = null,
         ?string $rejectReason = null,
         ?string $notes = null,
     ): void {
-        DB::transaction(function () use ($bundle, $qcDate, $newOk, $newReject, $operatorId, $rejectReason, $notes) {
+        DB::transaction(function () use ($bundle, $qcDate, $newOk, $newReject, $operatorId, $qcByUserId, $rejectReason, $notes) {
 
             // lock bundle + job supaya aman dari race condition
             $bundle = CuttingJobBundle::query()
@@ -1034,6 +1043,7 @@ class QcService
                     'qty_reject' => $newReject,
                     'reject_reason' => $rejectReason,
                     'operator_id' => $operatorId,
+                    'qc_by_user_id' => $qcByUserId,
                     'status' => $status,
                     'notes' => $notes,
                 ],

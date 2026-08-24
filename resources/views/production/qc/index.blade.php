@@ -905,6 +905,7 @@
                                         $isVoided = !empty($ret->voided_at);
                                         $hasQc = \App\Models\QcResult::where('stage', \App\Models\QcResult::STAGE_SEWING)
                                             ->where('sewing_job_id', $ret->id)->exists();
+                                        $qcByUser = $ret->qcResults->first()?->qcUser?->name;
 
                                         $detailHref = Route::has('production.sewing.returns.show')
                                             ? route('production.sewing.returns.show', $ret)
@@ -917,6 +918,9 @@
                                         <td>
                                             <div class="fw-semibold">{{ $ret->operator?->name ?? '-' }}</div>
                                             <div class="text-muted" style="font-size:.72rem;">{{ $ret->code }} · {{ $totalBundles }} bundle</div>
+                                            @if ($qcByUser)
+                                                <div class="text-muted" style="font-size:.72rem;">QC: {{ $qcByUser }}</div>
+                                            @endif
                                         </td>
                                         <td>
                                             <span class="text-muted" style="font-size:.82rem;">{{ $pickupDate?->format('d M Y') ?? '-' }}</span>
@@ -1000,6 +1004,7 @@
                                         $isVoided = !empty($ret->voided_at);
                                         $hasQc = \App\Models\QcResult::where('stage', \App\Models\QcResult::STAGE_SEWING)
                                             ->where('sewing_job_id', $ret->id)->exists();
+                                        $qcByUser = $ret->qcResults->first()?->qcUser?->name;
 
                                         $detailHref = Route::has('production.sewing.returns.show')
                                             ? route('production.sewing.returns.show', $ret)
@@ -1013,6 +1018,9 @@
                                             <div>
                                                 <div class="fw-semibold" style="font-size:.88rem;">{{ $ret->operator?->name ?? '-' }}</div>
                                                 <div class="text-muted" style="font-size:.7rem;">{{ $ret->code }} · {{ $totalBundles }} bundle</div>
+                                                @if ($qcByUser)
+                                                    <div class="text-muted" style="font-size:.7rem;">QC: {{ $qcByUser }}</div>
+                                                @endif
                                             </div>
                                             <div class="d-flex gap-1 align-items-center">
                                                 <span class="badge qc-mobile-status-pill bg-{{ $cfg[1] }}">{{ $cfg[0] }}</span>

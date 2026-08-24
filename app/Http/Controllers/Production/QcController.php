@@ -56,6 +56,7 @@ class QcController extends Controller
                     'lines.pickupLine.pickup',
                     'lines.pickupLine.bundle.finishedItem',
                     'lines.pickupLine.bundle.cuttingJob.lot.item',
+                    'qcResults.qcUser',
                 ])
                 ->orderByDesc('date')
                 ->orderByDesc('id')
@@ -98,6 +99,7 @@ class QcController extends Controller
                         'lines.pickupLine.pickup',
                         'lines.pickupLine.bundle.finishedItem',
                         'lines.pickupLine.bundle.cuttingJob.lot.item',
+                        'qcResults.qcUser',
                     ])
                     ->orderByDesc('date')
                     ->orderByDesc('id')
@@ -185,10 +187,9 @@ class QcController extends Controller
             'results.*.notes' => ['nullable', 'string'],
         ]);
 
-        // fallback operator → kalau hidden kosong, pakai employee dari user login
-        if (empty($validated['operator_id'])) {
-            $validated['operator_id'] = \Illuminate\Support\Facades\Auth::user()->employee?->id;
-        }
+        // Operator QC selalu mengikuti akun yang sedang login.
+        $validated['operator_id'] = Auth::user()->employee?->id;
+        $validated['qc_by_user_id'] = Auth::id();
 
         try {
             // 1️⃣ SIMPAN QC (tanpa mutasi stok)
@@ -258,6 +259,7 @@ class QcController extends Controller
         $payload = [
             'qc_date' => $qcDate,
             'operator_id' => $operatorId,
+            'qc_by_user_id' => Auth::id(),
             'results' => $cuttingJob->bundles->map(fn(CuttingJobBundle $bundle) => [
                 'cutting_job_bundle_id' => $bundle->id,
                 'qty_ok' => (float) $bundle->qty_pcs,
@@ -338,6 +340,7 @@ class QcController extends Controller
         $payload = [
             'qc_date'     => $qcDate,
             'operator_id' => $operatorId,
+            'qc_by_user_id' => Auth::id(),
             'results'     => [[
                 'cutting_job_bundle_id' => $bundle->id,
                 'qty_ok'        => $qtyOk,
@@ -401,11 +404,12 @@ class QcController extends Controller
         $qtyReject = max(0, min($qtyPcs, (float) $request->input('qty_reject', 0)));
         $qtyOk     = max(0, $qtyPcs - $qtyReject);
         $qcDate    = $request->input('qc_date') ?: now()->toDateString();
-        $operatorId = $request->input('operator_id') ?: Auth::user()->employee?->id;
+        $operatorId = Auth::user()->employee?->id;
 
         $payload = [
             'qc_date'     => $qcDate,
             'operator_id' => $operatorId,
+            'qc_by_user_id' => Auth::id(),
             'results'     => [[
                 'cutting_job_bundle_id' => $bundle->id,
                 'qty_ok'        => $qtyOk,
@@ -675,6 +679,7 @@ class QcController extends Controller
                 newOk: (float) $validated['qty_ok'],
                 newReject: (float) ($validated['qty_reject'] ?? 0),
                 operatorId: $operatorId,
+                qcByUserId: Auth::id(),
                 rejectReason: $validated['reject_reason'] ?? null,
                 notes: $validated['notes'] ?? null,
             );
@@ -792,9 +797,9 @@ class QcController extends Controller
             'results.*.notes'            => ['nullable', 'string'],
         ]);
 
-        if (empty($validated['operator_id'])) {
-            $validated['operator_id'] = Auth::user()->employee?->id;
-        }
+        // Operator QC selalu mengikuti akun yang sedang login.
+        $validated['operator_id'] = Auth::user()->employee?->id;
+        $validated['qc_by_user_id'] = Auth::id();
 
         $alreadyMoved = DB::table('inventory_mutations')
             ->where('source_type', 'sewing_qc_out')

@@ -39,6 +39,11 @@ class SewingReturn extends Model
         return $this->belongsTo(Employee::class, 'operator_id');
     }
 
+    public function qcResults()
+    {
+        return $this->hasMany(QcResult::class, 'sewing_job_id');
+    }
+
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');

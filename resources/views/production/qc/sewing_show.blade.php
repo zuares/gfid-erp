@@ -593,11 +593,14 @@
                                    value="{{ old('qc_date', now()->toDateString()) }}" required>
                         </div>
                         <div class="col-7 col-lg-3">
-                            <label class="form-label form-label-sm">Operator QC</label>
+                            <label class="form-label form-label-sm">QC oleh (login)</label>
                             <input type="hidden" name="operator_id" value="{{ $loginOperator?->id }}">
                             <div class="form-control form-control-sm mono" style="background: rgba(148,163,184,.1);">
-                                {{ $loginOperator?->name ?? '(Tidak ditemukan)' }}
+                                {{ auth()->user()?->name ?? '-' }}
                             </div>
+                            @if ($loginOperator)
+                                <div class="text-muted small mt-1">Employee: {{ $loginOperator->name }}</div>
+                            @endif
                         </div>
                         <div class="col-lg-3 d-none d-lg-block">
                             <label class="form-label form-label-sm">Status QC</label>
