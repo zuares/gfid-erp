@@ -303,6 +303,14 @@
         return 'Lainnya';
     }
 
+    async function enableOrderAutoFocus() {
+        const video = cameraReader?.querySelector('video');
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const capabilities = track?.getCapabilities?.();
+        if (!track || !Array.isArray(capabilities?.focusMode) || !capabilities.focusMode.includes('continuous')) return;
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (error) {}
+    }
+
     function renderOrderFilters() {
         const groups = { SPX: 0, JY: 0, Lainnya: 0 };
         orders.forEach(order => { groups[getOrderGroup(order)] += 1; });
@@ -419,10 +427,6 @@
                 .filter(value => Number.isInteger(value));
             const cameraConfig = {
                 fps: 12,
-                qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                    width: Math.max(180, Math.min(Math.floor(viewfinderWidth * .92), 760)),
-                    height: Math.max(110, Math.min(Math.floor(viewfinderHeight * .38), 280)),
-                }),
                 aspectRatio: 1.777778,
                 disableFlip: false,
                 experimentalFeatures: { useBarCodeDetectorIfSupported: true },
@@ -440,7 +444,8 @@
                 },
                 () => {}
             );
-            setCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke kotak hijau.');
+            await enableOrderAutoFocus();
+            setCameraStatus('Deteksi otomatis aktif. Arahkan barcode batang atau QR ke area kamera.');
         } catch (error) {
             await stopCamera();
             orderErrorSound();

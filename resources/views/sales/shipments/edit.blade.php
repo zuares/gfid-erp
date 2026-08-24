@@ -2142,6 +2142,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         try { activeCamera.clear(); } catch (error) {}
     }
 
+    async function enableItemAutoFocus() {
+        const video = scanCameraReader?.querySelector('video');
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const capabilities = track?.getCapabilities?.();
+        if (!track || !Array.isArray(capabilities?.focusMode) || !capabilities.focusMode.includes('continuous')) return;
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (error) {}
+    }
+
     async function closeItemCamera() {
         await stopItemCamera();
         if (scanCameraPanel) scanCameraPanel.hidden = true;
@@ -2176,10 +2184,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 .filter(value => Number.isInteger(value));
             const cameraConfig = {
                 fps: 12,
-                qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                    width: Math.max(180, Math.min(Math.floor(viewfinderWidth * .92), 760)),
-                    height: Math.max(110, Math.min(Math.floor(viewfinderHeight * .38), 280)),
-                }),
                 aspectRatio: 1.777778,
                 disableFlip: false,
                 experimentalFeatures: { useBarCodeDetectorIfSupported: true },
@@ -2200,7 +2204,8 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 },
                 () => {}
             );
-            setItemCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke kotak hijau.');
+            await enableItemAutoFocus();
+            setItemCameraStatus('Deteksi otomatis aktif. Arahkan barcode batang atau QR ke area kamera.');
         } catch (error) {
             await stopItemCamera();
             setItemCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
