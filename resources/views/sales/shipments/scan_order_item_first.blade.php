@@ -58,17 +58,19 @@
     .sif-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 54px; border: 1px solid #2563eb; border-radius: 8px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
     .sif-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
     .sif-camera-btn:disabled { opacity: .65; cursor: wait; }
-    .sif-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
+    body.sif-camera-open { overflow: hidden !important; }
+    .sif-camera-panel { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; margin: 0; overflow: hidden; border: 0; border-radius: 0; background: #020617; color: #fff; }
     .sif-camera-panel[hidden] { display: none !important; }
-    .sif-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
-    .sif-camera-title { font-size: .74rem; font-weight: 900; }
-    .sif-camera-close { border: 0; border-radius: 6px; padding: .22rem .45rem; color: #64748b; background: transparent; font-size: .7rem; font-weight: 800; cursor: pointer; }
-    .sif-camera-close:hover { color: #0f172a; background: #e2e8f0; }
-    .sif-camera-reader { min-height: 200px; background: #0f172a; }
-    .sif-camera-reader video { display: block; width: 100% !important; max-height: 360px; object-fit: cover; }
+    .sif-camera-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: .5rem; min-height: 58px; padding: max(.7rem, env(safe-area-inset-top)) .85rem .7rem; color: #fff; background: rgba(2,6,23,.9); border-bottom: 1px solid rgba(148,163,184,.2); }
+    .sif-camera-title { color: #fff; font-size: .82rem; font-weight: 900; }
+    .sif-camera-close { border: 1px solid rgba(255,255,255,.22); border-radius: 7px; padding: .35rem .6rem; color: #fff; background: rgba(255,255,255,.08); font-size: .72rem; font-weight: 800; cursor: pointer; }
+    .sif-camera-close:hover { color: #fff; background: rgba(255,255,255,.18); }
+    .sif-camera-reader { position: relative; display: flex; flex: 1 1 auto; align-items: center; justify-content: center; min-height: 0; width: 100%; overflow: hidden; background: #000; }
+    .sif-camera-reader video { display: block; width: 100% !important; height: 100% !important; max-height: none; object-fit: cover; }
     .sif-camera-reader img { max-width: 100%; }
-    .sif-camera-status { padding: .45rem .65rem; color: #64748b; background: #fff; font-size: .68rem; line-height: 1.4; }
-    .sif-camera-status.error { color: #b91c1c; background: #fef2f2; }
+    .sif-camera-reader #qr-shaded-region { border: 2px solid #22c55e !important; border-radius: 12px !important; box-shadow: 0 0 0 9999px rgba(2,6,23,.2), 0 0 22px rgba(34,197,94,.55) !important; }
+    .sif-camera-status { display: flex; flex: 0 0 auto; align-items: center; min-height: 52px; padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom)); color: #cbd5e1; background: rgba(2,6,23,.94); font-size: .74rem; line-height: 1.4; }
+    .sif-camera-status.error { color: #fecaca; background: rgba(127,29,29,.94); }
     .sif-topbar { --sif-topbar-height: 3.7rem; position: sticky; top: 0; z-index: 300; }
     .app-main .page-wrap:has(.sif-page) {
         /* Keep the scan section tied to the page scroll, not a clipped wrapper. */
@@ -388,6 +390,7 @@
     async function closeCamera() {
         await stopCamera();
         if (cameraPanel) cameraPanel.hidden = true;
+        document.body.classList.remove('sif-camera-open');
         if (cameraReader) cameraReader.innerHTML = '';
         if (input) input.focus();
     }
@@ -397,6 +400,7 @@
 
         unlockOrderAudio();
         cameraPanel.hidden = false;
+        document.body.classList.add('sif-camera-open');
         cameraLoading = true;
         cameraBtn.disabled = true;
         setCameraStatus('Memuat kamera dan meminta izin akses...');
@@ -408,9 +412,29 @@
 
             await loadCameraLibrary();
             camera = new window.Html5Qrcode('sifCameraReader');
+            const formatNames = [
+                'CODE_128', 'CODE_39', 'CODE_93', 'CODABAR',
+                'EAN_13', 'EAN_8', 'ITF', 'UPC_A', 'UPC_E',
+                'QR_CODE', 'DATA_MATRIX'
+            ];
+            const supportedFormats = window.Html5QrcodeSupportedFormats || {};
+            const formatsToSupport = formatNames
+                .map(name => supportedFormats[name])
+                .filter(value => Number.isInteger(value));
+            const cameraConfig = {
+                fps: 12,
+                qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                    width: Math.max(180, Math.min(Math.floor(viewfinderWidth * .92), 760)),
+                    height: Math.max(110, Math.min(Math.floor(viewfinderHeight * .38), 280)),
+                }),
+                aspectRatio: 1.777778,
+                disableFlip: false,
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            };
+            if (formatsToSupport.length) cameraConfig.formatsToSupport = formatsToSupport;
             await camera.start(
                 { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 280, height: 150 }, aspectRatio: 1.777778 },
+                cameraConfig,
                 async (decodedText) => {
                     if (submitting) return;
                     const orderNo = String(decodedText || '').trim().toUpperCase();
@@ -420,7 +444,7 @@
                 },
                 () => {}
             );
-            setCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke dalam kotak.');
+            setCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke kotak hijau.');
         } catch (error) {
             await stopCamera();
             orderErrorSound();
