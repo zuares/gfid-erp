@@ -1392,11 +1392,17 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     top: 0 !important;
     z-index: 300;
 }
+.app-main .page-wrap:has(.shp-wrap) {
+    /* Keep the sticky scan card tied to the page scroll, not a clipped wrapper. */
+    overflow-x: clip !important;
+}
 .shp-scan-card {
-    position: sticky;
-    top: var(--shp-topbar-height);
+    position: sticky !important;
+    top: var(--shp-topbar-height) !important;
     z-index: 250;
     background: var(--card, #fff);
+    align-self: flex-start;
+    box-shadow: 0 8px 18px rgba(15,23,42,.08) !important;
 }
 .shp-pill-accent {
     color: #1d4ed8 !important;
