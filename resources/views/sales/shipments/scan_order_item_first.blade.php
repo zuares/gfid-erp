@@ -236,9 +236,16 @@
     }
 
     function orderSuccessSound() {
-        playOrderSound('order_ready', () => {
-            orderBeep(880, .09, .36, 0, 'sine');
-            orderBeep(1175, .1, .36, .1, 'sine');
+        playOrderSound('order_success', () => {
+            orderBeep(660, .07, .36, 0, 'sine');
+            orderBeep(880, .1, .36, .08, 'sine');
+        });
+    }
+
+    function orderDuplicateSound() {
+        playOrderSound('order_duplicate', () => {
+            orderBeep(784, .08, .38, 0, 'square');
+            orderBeep(784, .08, .38, .1, 'square');
         });
     }
 
@@ -357,11 +364,17 @@
             });
             const data = await response.json();
             if (!response.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal mencatat order.');
+            const isDuplicate = data.duplicate === true || data.created === false;
             if (!orders.includes(orderNo)) orders.push(orderNo);
             renderOrders();
             input.value = '';
-            orderSuccessSound();
-            showToast(data.message || 'Order berhasil dicatat.');
+            if (isDuplicate) {
+                orderDuplicateSound();
+                showToast(data.message || 'Order sudah tercatat.', true);
+            } else {
+                orderSuccessSound();
+                showToast(data.message || 'Order berhasil dicatat.');
+            }
         } catch (error) {
             orderErrorSound();
             showToast(error.message || 'Gagal mencatat order.', true);

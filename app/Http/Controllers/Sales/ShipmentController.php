@@ -1187,6 +1187,7 @@ class ShipmentController extends Controller
         return response()->json([
             'status' => 'ok',
             'created' => $scan->wasRecentlyCreated,
+            'duplicate' => !$scan->wasRecentlyCreated,
             'message' => $lookupFallbackStatus !== null
                 ? "Order {$orderNo} dicatat sebagai manual/belum tertaut."
                 : ($scan->wasRecentlyCreated
