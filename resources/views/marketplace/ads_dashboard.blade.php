@@ -2331,7 +2331,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <button class="dash-tab-sm" data-val="clicks"><i class="bi bi-cursor"></i> Klik</button>
                             <button class="dash-tab-sm" data-val="ctr"><i class="bi bi-hand-index"></i> CTR</button>
                             <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
-                            <button class="dash-tab-sm" data-val="profit"><i class="bi bi-cash-stack"></i> Profit</button>
+                            <button class="dash-tab-sm" data-val="profit"><i class="bi bi-cash-stack"></i> Profit setelah admin</button>
                         </div>
                     </div>
                     </div>
@@ -5746,13 +5746,18 @@ document.addEventListener("DOMContentLoaded", function() {
                     } else if (metric === 'cvr') {
                         return clicks > 0 ? (orders / clicks) * 100 : 0;
                     } else if (metric === 'profit') {
-                        // Net Profit (Est) per hari — rasio margin global (blended),
-                        // konsisten dgn chart "Trend Harian" di tab Profit.
+                        // Profit per hari memakai omzet bersih setelah admin.
+                        // Backend mengirim net_revenue historis per toko/tanggal;
+                        // fallback hanya dipakai untuk data lama yang belum punya
+                        // field tersebut.
                         const pd = window.__profitChartData || {};
                         const rev = parseFloat(pd.totalRev || 0);
                         const cogsRatio = rev > 0 ? (parseFloat(pd.totalCogs || 0) / rev) : 0;
                         const feeRatio  = rev > 0 ? (parseFloat(pd.feeAmt || 0) / rev) : 0;
-                        return gm - (gm * cogsRatio) - (gm * feeRatio) - (sp * 1.11);
+                        const netRevenue = d.net_revenue !== undefined
+                            ? parseFloat(d.net_revenue || 0)
+                            : gm - (gm * feeRatio);
+                        return netRevenue - (gm * cogsRatio) - (sp * 1.11);
                     }
                     return 0;
                 };
@@ -5797,7 +5802,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         ['ctr', 'CTR', 'percent'],
                         ['cvr', 'CVR', 'percent'],
                         ['orders', 'Orders', 'count'],
-                        ['profit', 'Profit', 'money'],
+                        ['profit', 'Profit setelah admin', 'money'],
                     ];
                     const formatSummaryValue = (value, type) => {
                         if (type === 'money') {

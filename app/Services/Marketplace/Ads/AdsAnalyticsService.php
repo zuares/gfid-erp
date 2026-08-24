@@ -3,7 +3,9 @@
 namespace App\Services\Marketplace\Ads;
 
 use App\Models\MarketplaceAdCampaign;
+use App\Models\MarketplaceAdsSetting;
 use App\Models\MarketplaceAdsHourlyPerformance;
+use App\Models\MarketplaceOrderSettlement;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -146,6 +148,7 @@ class AdsAnalyticsService
         string $compareMode = 'prev_period'
     )
     {
+        $storeIds = array_values(array_filter((array) $storeId, fn ($id) => is_numeric($id)));
         $days = Carbon::parse($dateFrom)->diffInDays(Carbon::parse($dateTo)) + 1;
         $results = [];
         
@@ -163,16 +166,57 @@ class AdsAnalyticsService
                 $end = $endBase->subDays($days * $i)->toDateString();
             }
             
-            $daily = collect($this->aggregateDailyRows($storeId, $start, $end))
+            // Analisa Profit harus memakai omzet bersih per periode, bukan
+            // rasio admin periode aktif yang ditempelkan ke semua periode.
+            // Ambil rasio per toko/tanggal agar mode manual dan settlement
+            // historis tetap konsisten, termasuk saat memilih Semua Toko.
+            $adminRatios = $this->getAdminFeeRatios($storeIds, $start, $end);
+            $storeDaily = collect($storeIds)->mapWithKeys(function ($id) use ($start, $end) {
+                return [(string) $id => collect($this->aggregateDailyRows((int) $id, $start, $end))->keyBy(fn ($row) => (string) $row->date)];
+            });
+
+            $daily = collect($this->aggregateDailyRows($storeIds, $start, $end))
                 ->sortKeys()
-                ->map(fn ($row) => [
-                    'date'        => substr((string) $row->date, 0, 10),
-                    'spend'       => (float) $row->spend,
-                    'gmv'         => (float) $row->gmv,
-                    'impressions' => (int) $row->impressions,
-                    'clicks'      => (int) $row->clicks,
-                    'orders'      => (int) $row->orders,
-                ])
+                ->map(function ($row) use ($storeIds, $storeDaily, $adminRatios) {
+                    $date = substr((string) $row->date, 0, 10);
+                    $netRevenue = 0.0;
+                    $adminFee = 0.0;
+                    $hasStoreBreakdown = false;
+
+                    foreach ($storeIds as $id) {
+                        $storeRow = $storeDaily->get((string) $id)?->get($date);
+                        if (! $storeRow) {
+                            continue;
+                        }
+
+                        $storeGmv = (float) ($storeRow->gmv ?? 0);
+                        if ($storeGmv <= 0) {
+                            continue;
+                        }
+
+                        $ratio = (float) ($adminRatios[(string) $id . '|' . $date] ?? AdsDashboardService::DEFAULT_NET_REVENUE_RATIO);
+                        $netRevenue += $storeGmv * $ratio;
+                        $adminFee += $storeGmv * max(0.0, 1 - $ratio);
+                        $hasStoreBreakdown = true;
+                    }
+
+                    if (! $hasStoreBreakdown) {
+                        $gmv = (float) ($row->gmv ?? 0);
+                        $netRevenue = $gmv * AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+                        $adminFee = $gmv - $netRevenue;
+                    }
+
+                    return [
+                        'date'        => $date,
+                        'spend'       => (float) $row->spend,
+                        'gmv'         => (float) $row->gmv,
+                        'net_revenue' => round($netRevenue, 2),
+                        'admin_fee'   => round($adminFee, 2),
+                        'impressions' => (int) $row->impressions,
+                        'clicks'      => (int) $row->clicks,
+                        'orders'      => (int) $row->orders,
+                    ];
+                })
                 ->values();
                 
             $results[] = [
@@ -184,5 +228,71 @@ class AdsAnalyticsService
         }
         
         return $results;
+    }
+
+    /**
+     * Return net-revenue ratios keyed by store and calendar date.
+     * Manual admin fee is authoritative; auto mode uses settlement data and
+     * falls back to the dashboard default when no settlement is available.
+     *
+     * @return array<string, float>
+     */
+    private function getAdminFeeRatios(array $storeIds, string $dateFrom, string $dateTo): array
+    {
+        if ($storeIds === []) {
+            return [];
+        }
+
+        $ratios = [];
+        $manualRatios = MarketplaceAdsSetting::query()
+            ->whereIn('store_id', $storeIds)
+            ->where('admin_fee_mode', 'manual')
+            ->whereNotNull('admin_fee_pct')
+            ->get(['store_id', 'admin_fee_pct'])
+            ->mapWithKeys(fn ($setting) => [
+                (string) $setting->store_id => max(0.0, 1 - ((float) $setting->admin_fee_pct / 100)),
+            ])
+            ->all();
+
+        foreach ($manualRatios as $storeKey => $ratio) {
+            $ratios[$storeKey . '|*'] = (float) $ratio;
+        }
+
+        $dateExpression = 'DATE(COALESCE(mo.ordered_at, mo.order_date, mos.settlement_time, mos.created_at))';
+        $settlementRows = MarketplaceOrderSettlement::query()
+            ->from('marketplace_order_settlements as mos')
+            ->leftJoin('marketplace_orders as mo', 'mo.id', '=', 'mos.order_id')
+            ->whereIn('mos.store_id', $storeIds)
+            ->whereBetween(DB::raw($dateExpression), [$dateFrom, $dateTo])
+            ->selectRaw("mos.store_id, {$dateExpression} as settlement_date, SUM(mos.final_income) as final_income, SUM(mos.buyer_payment_amount) as buyer_payment")
+            ->groupBy('mos.store_id', DB::raw($dateExpression))
+            ->get();
+
+        foreach ($settlementRows as $row) {
+            $storeKey = (string) $row->store_id;
+            if (array_key_exists($storeKey . '|*', $ratios)) {
+                continue;
+            }
+
+            $buyerPayment = (float) ($row->buyer_payment ?? 0);
+            $finalIncome = (float) ($row->final_income ?? 0);
+            $ratio = $buyerPayment > 0
+                ? min(1.0, max(0.0, $finalIncome / $buyerPayment))
+                : AdsDashboardService::DEFAULT_NET_REVENUE_RATIO;
+            $ratios[$storeKey . '|' . substr((string) $row->settlement_date, 0, 10)] = round($ratio, 4);
+        }
+
+        foreach ($storeIds as $storeId) {
+            $storeKey = (string) $storeId;
+            $fallback = (float) ($ratios[$storeKey . '|*'] ?? AdsDashboardService::DEFAULT_NET_REVENUE_RATIO);
+            $start = Carbon::parse($dateFrom);
+            $end = Carbon::parse($dateTo);
+            for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+                $key = $storeKey . '|' . $date->toDateString();
+                $ratios[$key] ??= $fallback;
+            }
+        }
+
+        return $ratios;
     }
 }

@@ -1310,6 +1310,35 @@ class AdsModuleTest extends TestCase
         $this->assertSame(20000.0, (float) $history[1]['data']->first()['spend']);
     }
 
+    public function test_historical_comparison_includes_net_revenue_after_manual_admin_fee()
+    {
+        $store = $this->createStore('HISTADMIN');
+        \App\Models\MarketplaceAdsSetting::create([
+            'store_id' => $store->id,
+            'admin_fee_mode' => 'manual',
+            'admin_fee_pct' => 20,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'impressions' => 100,
+            'clicks' => 10,
+            'spend' => 10000,
+            'orders' => 1,
+            'gmv' => 100000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $history = app(AdsAnalyticsService::class)
+            ->getHistoricalComparison($store->id, '2026-07-30', '2026-07-30', 1, 'prev_period');
+
+        $day = $history[0]['data']->first();
+        $this->assertSame(80000.0, (float) $day['net_revenue']);
+        $this->assertSame(20000.0, (float) $day['admin_fee']);
+    }
+
     public function test_summary_prefers_seller_center_without_double_counting_gms()
     {
         $store = $this->createStore('SUMMARYSOURCE');
