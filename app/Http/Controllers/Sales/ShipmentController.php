@@ -424,6 +424,16 @@ class ShipmentController extends Controller
         $scanMode = $request->get('scan_mode', 'all');
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
+        $period = $request->get('period', 'all');
+        if (!$dateFrom && !$dateTo && in_array($period, ['today', 'week', 'month'], true)) {
+            $periodStart = match ($period) {
+                'today' => now()->startOfDay(),
+                'week' => now()->startOfWeek(),
+                'month' => now()->startOfMonth(),
+            };
+            $dateFrom = $periodStart->toDateString();
+            $dateTo = now()->toDateString();
+        }
         $sort = $request->get('sort', 'date');
         $direction = strtolower((string) $request->get('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['date', 'code', 'order_scans_count', 'lines_count', 'status'];
@@ -538,6 +548,7 @@ class ShipmentController extends Controller
             'scanMode',
             'dateFrom',
             'dateTo',
+            'period',
             'sort',
             'direction',
             'kpi',

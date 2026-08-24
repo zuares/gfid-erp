@@ -62,16 +62,31 @@
     .kpi .val{ font-weight:650; color:var(--shp-accent); }
 
     .header-actions{ display:flex; gap:.45rem; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-    .filter-bar{ display:flex; align-items:center; gap:.75rem; margin:0 0 .65rem; padding:.6rem .7rem; border:1px solid var(--shp-border); border-radius:8px; background:var(--card,#fff); }
-    .filter-heading{ min-width:105px; color:#334155; font-size:.76rem; font-weight:800; }
-    .filter-heading small{ display:block; margin-top:.08rem; color:#94a3b8; font-size:.66rem; font-weight:600; }
-    .shipment-filter-form{ display:grid; grid-template-columns:minmax(220px,1.5fr) repeat(2,minmax(115px, .8fr)) repeat(2,minmax(115px,.8fr)) auto auto; gap:.4rem; align-items:center; flex:1; }
-    .shipment-filter-form .filter-input{ min-width:0; border-radius:7px; font-size:.78rem; }
-    .shipment-filter-form .filter-date{ width:125px; border-radius:7px; font-size:.78rem; }
+    .filter-bar{ background:var(--card,#fff); border:1px solid var(--shp-border); border-radius:10px; padding:.75rem .85rem; margin-bottom:.65rem; box-shadow:0 2px 8px rgba(15,23,42,.025); }
+    body[data-theme="dark"] .filter-bar{ background:rgba(15,23,42,.98); border-color:rgba(51,65,85,.6); }
+    .shipment-filter-form{ display:block; }
+    .shipment-filter-main{ display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; }
+    .shipment-filter-main .filter-input-wrap{ flex:1 1 220px; min-width:180px; }
+    .shipment-filter-main .filter-input{ width:100%; min-width:0; border-radius:8px; font-size:.8rem; }
+    .shipment-filter-main .filter-select{ min-width:130px; border-radius:8px; font-size:.8rem; }
+    .shipment-date-control{ display:flex; align-items:center; flex:1 1 300px; min-width:250px; }
+    .shipment-date-control .date-section{ width:100%; min-width:0; height:36px!important; border:1px solid rgba(37,99,235,.32)!important; border-radius:9px!important; background:#f8fafc; box-shadow:0 2px 8px rgba(37,99,235,.08); }
+    .shipment-date-control .rts-date-picker.flatpickr-input{ min-width:120px!important; width:100%!important; height:36px!important; color:#334155; font-size:.82rem!important; font-weight:650; }
+    body[data-theme="dark"] .shipment-date-control .date-section{ background:#1e293b; border-color:rgba(96,165,250,.55)!important; box-shadow:0 2px 10px rgba(30,64,175,.18); }
+    body[data-theme="dark"] .shipment-date-control .rts-date-picker.flatpickr-input{ color:#e2e8f0; }
+    @media (min-width:769px){
+        .shipment-filter-main{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(115px,.7fr) minmax(125px,.8fr) minmax(250px,1.2fr) auto auto; align-items:center; flex-wrap:nowrap; }
+        .shipment-filter-main .filter-input-wrap,
+        .shipment-filter-main .filter-input,
+        .shipment-filter-main .filter-select{ width:100%; min-width:0; }
+        .shipment-date-control{ width:100%; min-width:0; flex:initial; }
+        .shipment-date-control .date-section{ width:100%; min-width:0!important; }
+        .shipment-filter-main > .btn{ white-space:nowrap; }
+    }
+    .filter-summary{ font-size:.74rem; color:var(--shp-muted); }
+    .filter-summary strong{ color:var(--shp-accent); }
+    body[data-theme="dark"] .filter-summary strong{ color:#cbd5e1; }
     .shipment-filter-form .btn{ min-height:32px; }
-    .filter-label{ font-size:.8rem; color:#6b7280; }
-    body[data-theme="dark"] .filter-label{ color:#9ca3af; }
-    .filter-select{ border-radius:7px; padding-left:.75rem; padding-right:2rem; font-size:.82rem; }
     .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
     .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; }
     .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
@@ -81,18 +96,18 @@
     .btn-fresh:hover{ background:#fef2f2; color:#991b1b; border-color:#fca5a5; }
 
     .table-list{ margin-bottom:0; }
-    .table-responsive{ max-height:min(64vh, 640px); overflow:auto; }
+    .table-responsive{ max-height:60vh; overflow:auto; }
     .table-list thead th{
         position:sticky;
         top:0;
         z-index:20;
         border-bottom-width:1px;
-        font-size:.68rem;
-        text-transform:none;
-        letter-spacing:0;
+        font-size:.64rem;
+        text-transform:uppercase;
+        letter-spacing:.04em;
         color:#64748b;
         background: var(--card,#fff);
-        padding:.52rem .62rem;
+        padding:.75rem 1rem;
         white-space:nowrap;
     }
     .table-list thead tr{ position:sticky; top:0; z-index:20; }
@@ -109,7 +124,8 @@
     .table-list tbody td{
         vertical-align:middle;
         border-top-color: rgba(148, 163, 184, 0.16);
-        padding:.52rem .62rem;
+        padding:.55rem .85rem;
+        font-size:.78rem;
     }
     body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
@@ -146,6 +162,8 @@
     .divider{ height:1px; background: rgba(148, 163, 184, 0.20); }
     body[data-theme="dark"] .divider{ background: rgba(51, 65, 85, 0.85); }
     .flash-clean{ border-radius:8px; padding:.62rem .75rem; font-size:.84rem; border:1px solid rgba(148,163,184,.25); }
+    .stale-draft-alert{ display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; border-radius:8px; padding:.5rem .7rem; color:#92400e; background:#fffbeb; border:1px solid #fde68a; font-size:.74rem; }
+    .stale-draft-alert a{ color:#78350f; font-weight:800; text-decoration:underline; }
 
     /* Minimal list hierarchy */
     .ship-topbar{
@@ -176,10 +194,10 @@
     .list-toolbar-title{ color:#0f172a; font-size:.86rem; font-weight:850; }
     .list-toolbar-sub{ margin-left:.35rem; color:#94a3b8; font-size:.72rem; }
     .list-count{ display:inline-flex; align-items:center; min-height:28px; padding:.15rem .55rem; border:1px solid rgba(37,99,235,.18); border-radius:999px; background:#eff6ff; color:#1d4ed8; font-size:.7rem; font-weight:800; white-space:nowrap; }
-    .code-link{ display:inline-block; color:#334155!important; font-size:.8rem; font-weight:700; }
-    .code-link:hover{ color:#0f172a!important; }
-    .shipment-inline{ display:flex; align-items:center; gap:.45rem; min-width:0; white-space:nowrap; }
-    .shipment-timestamps{ display:flex; align-items:center; flex-wrap:wrap; gap:.18rem .45rem; margin-top:.18rem; color:#64748b; font-size:.7rem; }
+    .code-link{ display:inline-block; color:#334155!important; font-size:.8rem; font-weight:800; text-decoration:none; background:rgba(148,163,184,.12); padding:.2rem .5rem; border-radius:6px; border:1px solid rgba(148,163,184,.25); white-space:nowrap; }
+    .code-link:hover{ color:#0f172a!important; background:rgba(148,163,184,.22); border-color:rgba(148,163,184,.4); }
+    .shipment-inline{ display:flex; flex-direction:column; align-items:flex-start; gap:.14rem; min-width:0; white-space:normal; }
+    .shipment-timestamps{ display:flex; align-items:center; flex-wrap:wrap; gap:.18rem .45rem; color:#64748b; font-size:.7rem; }
     .shipment-timestamps span + span::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .shipment-store{ color:#475569; font-size:.72rem; }
     .shipment-store::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
@@ -187,8 +205,8 @@
     .mode-badge::before{ content:''; width:6px; height:6px; border-radius:999px; background:currentColor; }
     .mode-item{ color:#475569; background:#f8fafc; border:1px solid #e2e8f0; }
     .mode-order{ color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; }
-    .package-summary{ display:flex; align-items:baseline; gap:.3rem; white-space:nowrap; }
-    .package-main{ color:#0f172a; font-size:.78rem; font-weight:850; }
+    .package-summary{ display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .45rem; white-space:nowrap; }
+    .package-main{ color:#334155; font-size:.78rem; font-weight:750; }
     .package-sub{ color:#64748b; font-size:.7rem; }
     .package-sub::before{ content:'·'; margin-right:.3rem; color:#cbd5e1; }
     .row-draft{ background:rgba(248,250,252,.68); }
@@ -239,14 +257,13 @@
         .header-actions{ width:100%; justify-content:flex-start; }
         .header-actions .btn{ flex:1; }
         .filter-bar{ display:block; padding:.65rem; }
-        .filter-heading{ margin-bottom:.5rem; }
-        .shipment-filter-form{ display:grid; grid-template-columns:1fr 1fr; width:100%; }
-        .shipment-filter-form .filter-input-wrap{ grid-column:1 / -1; width:100%; }
-        .shipment-filter-form .filter-input{ width:100%; }
-        .shipment-filter-form .filter-date{ width:100%; }
-        .shipment-filter-form .filter-label{ display:none; }
-        .shipment-filter-form .btn{ width:100%; }
-        .filter-select{ width:100%; min-height:40px; }
+        .shipment-filter-main{ display:grid; grid-template-columns:1fr; width:100%; }
+        .shipment-filter-main .filter-input-wrap,
+        .shipment-filter-main .filter-input,
+        .shipment-filter-main .filter-select{ width:100%; min-width:0; }
+        .shipment-filter-main .filter-select{ min-height:40px; }
+        .shipment-date-control{ width:100%; min-width:0; flex-basis:100%; }
+        .shipment-filter-form .btn{ width:100%; min-height:40px; }
         .shipment-filter-form .btn{ min-height:40px; }
         .kpis{ display:none; }
         .ship-topbar .kpis{ display:none; }
@@ -487,20 +504,6 @@
         </div>
     @endif
 
-    @if(isset($staleDrafts) && $staleDrafts->count() > 0)
-        <div class="alert alert-warning mb-2" style="border-radius: 8px; font-size: 0.88rem;">
-            <i class="bi bi-clock-history"></i> 
-            <strong>Peringatan Stale Draft:</strong> 
-            Terdapat <b>{{ $staleDrafts->count() }} Shipment</b> (Draft/Submitted) berumur lebih dari 24 jam yang menahan total 
-            <b>{{ number_format($staleDrafts->sum('total_allocated'), 0, ',', '.') }} unit stok</b>. 
-            Mohon segera selesaikan atau hapus draf berikut: 
-            @foreach($staleDrafts->take(5) as $sd)
-                <a href="{{ route('sales.shipments.edit', $sd) }}" class="fw-bold text-dark text-decoration-underline">{{ $sd->code }}</a>{{ !$loop->last ? ',' : '' }}
-            @endforeach
-            @if($staleDrafts->count() > 5) ... @endif
-        </div>
-    @endif
-
     <div class="ship-topbar">
         <div class="ship-heading">
             <div class="title">Daftar Shipment</div>
@@ -531,35 +534,65 @@
         </div>
     </div>
 
-    <div class="filter-bar">
-        <div class="filter-heading"><i class="bi bi-search" aria-hidden="true"></i> Cari Shipment<small>Gunakan kode, order, atau resi</small></div>
-        <form method="GET" class="shipment-filter-form">
-            <input type="hidden" name="sort" value="{{ $sort }}">
-            <input type="hidden" name="direction" value="{{ $direction }}">
-            <div class="filter-input-wrap">
-                <i class="bi bi-search" aria-hidden="true"></i>
-                <input type="search" name="q" value="{{ $search }}" class="form-control form-control-sm filter-input" placeholder="Kode shipment / order / resi" autocomplete="off" aria-label="Cari kode shipment, order, atau resi">
+    @if(isset($staleDrafts) && $staleDrafts->count() > 0)
+        <div class="stale-draft-alert mb-2" role="status">
+            <i class="bi bi-clock-history" aria-hidden="true"></i>
+            <strong>Draft lama:</strong>
+            <span>{{ $staleDrafts->count() }} shipment · {{ number_format($staleDrafts->sum('total_allocated'), 0, ',', '.') }} unit stok</span>
+            <span>·</span>
+            @foreach($staleDrafts->take(5) as $sd)
+                <a href="{{ route('sales.shipments.edit', $sd) }}">{{ $sd->code }}</a>{{ !$loop->last ? ',' : '' }}
+            @endforeach
+            @if($staleDrafts->count() > 5) <span>dan lainnya</span> @endif
+        </div>
+    @endif
+
+    <form id="shipment-filter-form" method="GET" class="shipment-filter-form">
+        <input type="hidden" name="sort" value="{{ $sort }}">
+        <input type="hidden" name="direction" value="{{ $direction }}">
+
+        <div class="filter-bar">
+            <div class="shipment-filter-main">
+                <div class="filter-input-wrap">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" name="q" value="{{ $search }}" class="form-control form-control-sm filter-input" placeholder="Cari shipment, order, atau resi..." autocomplete="off" aria-label="Cari kode shipment, order, atau resi">
+                </div>
+                <select name="status" class="form-select form-select-sm filter-select" aria-label="Filter status">
+                    <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Semua Status</option>
+                    <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Draft</option>
+                    <option value="submitted" {{ $statusFilter === 'submitted' ? 'selected' : '' }}>Submitted</option>
+                    <option value="posted" {{ $statusFilter === 'posted' ? 'selected' : '' }}>Posted</option>
+                    <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                </select>
+                <select name="scan_mode" class="form-select form-select-sm filter-select" aria-label="Filter mode scan">
+                    <option value="all" {{ $scanMode === 'all' ? 'selected' : '' }}>Semua Mode Scan</option>
+                    <option value="order_first" {{ $scanMode === 'order_first' ? 'selected' : '' }}>Scan Order Dulu</option>
+                    <option value="item_first" {{ $scanMode === 'item_first' ? 'selected' : '' }}>Scan Item Dulu</option>
+                </select>
+                <div class="shipment-date-control">
+                    <x-date-range-picker
+                        :date-from="$dateFrom"
+                        :date-to="$dateTo"
+                        :period="$period"
+                        form-id="shipment-filter-form"
+                        name-from="date_from"
+                        name-to="date_to"
+                        :show-presets="false"
+                    />
+                </div>
+                <button type="submit" class="btn btn-sm btn-ship-primary btn-pill">Terapkan</button>
+                @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo || $period !== 'all')
+                    <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill">Reset Filter</a>
+                @endif
             </div>
-            <select name="status" class="form-select form-select-sm filter-select" aria-label="Filter status">
-                <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Semua status</option>
-                <option value="draft" {{ $statusFilter === 'draft' ? 'selected' : '' }}>Draft</option>
-                <option value="submitted" {{ $statusFilter === 'submitted' ? 'selected' : '' }}>Submitted</option>
-                <option value="posted" {{ $statusFilter === 'posted' ? 'selected' : '' }}>Posted</option>
-                <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-            </select>
-            <select name="scan_mode" class="form-select form-select-sm filter-select" aria-label="Filter mode scan">
-                <option value="all" {{ $scanMode === 'all' ? 'selected' : '' }}>Semua mode</option>
-                <option value="order_first" {{ $scanMode === 'order_first' ? 'selected' : '' }}>Scan Order</option>
-                <option value="item_first" {{ $scanMode === 'item_first' ? 'selected' : '' }}>Scan Item</option>
-            </select>
-            <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm filter-date" aria-label="Dari tanggal" title="Dari tanggal">
-            <input type="date" name="date_to" value="{{ $dateTo }}" class="form-control form-control-sm filter-date" aria-label="Sampai tanggal" title="Sampai tanggal">
-            <button type="submit" class="btn btn-sm btn-ship-primary btn-pill">Terapkan</button>
-            @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo)
-                <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill">Reset</a>
-            @endif
-        </form>
-    </div>
+        </div>
+    </form>
+
+    @if($shipments->count() > 0)
+        <div class="filter-summary mb-2 px-1">
+            Shipment terakhir dibuat: <strong>{{ $fmtDate($shipments->first()->created_at, 'd M Y H:i') }} WIB</strong>
+        </div>
+    @endif
 
     <div class="card card-main">
         <div class="card-body p-0">
@@ -568,7 +601,7 @@
                     <div class="empty-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div>
                     <div class="empty-title">Belum ada shipment yang cocok</div>
                     <div class="empty-sub">Coba ubah filter atau klik <b>Shipment Baru</b> untuk mulai.</div>
-                    @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo)
+                    @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo || $period !== 'all')
                         <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill mt-3">Hapus Filter</a>
                     @endif
                 </div>
@@ -578,7 +611,7 @@
                         <thead>
                             <tr>
                                 <th style="width: 46px;">#</th>
-                                <th style="min-width: 220px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Shipment <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
+                                <th style="min-width: 220px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Dokumen &amp; Waktu <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
                                 <th style="width: 125px;">Mode Scan</th>
                                 <th style="width: 145px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Isi Paket <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
                                 <th style="width: 130px;"><a class="table-sort {{ $sort === 'status' ? 'active' : '' }}" href="{{ $sortUrl('status') }}">Status <span class="table-sort-icon">{{ $sortIcon('status') }}</span></a></th>
@@ -649,9 +682,9 @@
 
                                                 <div class="ship-row-meta d-md-none">
                                                     <span>{{ $modeLabel }}</span>
-                                                    <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
-                                                    <span>{{ number_format($itemCount, 0, ',', '.') }} SKU</span>
+                                                    <span>{{ number_format($itemCount, 0, ',', '.') }} item</span>
                                                     <span>{{ number_format($qty, 0, ',', '.') }} qty</span>
+                                                    <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -662,9 +695,10 @@
                                     </td>
 
                                     <td class="mobile-hide">
-                                        <div class="package-summary">
-                                            <span class="package-main">{{ number_format($itemCount, 0, ',', '.') }} SKU · {{ number_format($qty, 0, ',', '.') }} qty</span>
-                                            <span class="package-sub">{{ number_format($orderCount, 0, ',', '.') }} order tercatat</span>
+                                        <div class="package-summary" aria-label="Isi paket">
+                                            <span class="package-main">{{ number_format($itemCount, 0, ',', '.') }} item</span>
+                                            <span class="package-sub">{{ number_format($qty, 0, ',', '.') }} qty</span>
+                                            <span class="package-sub">{{ number_format($orderCount, 0, ',', '.') }} order</span>
                                         </div>
                                     </td>
 
@@ -705,7 +739,7 @@
                                                           data-gf-confirm
                                                           data-gf-confirm-title="Kirim paket manual?"
                                                           data-gf-confirm-summary='@json(["orders" => (int) ($shipment->order_scans_count ?? 0), "items" => $shipment->lines->count(), "qty" => $qty])'
-                                                          data-gf-confirm-text="Order discan: {{ (int) ($shipment->order_scans_count ?? 0) }} · Item/SKU: {{ $shipment->lines->count() }} · Total qty: {{ $qty }}. Stok WH-RTS akan dipotong."
+                                                          data-gf-confirm-text="Order discan: {{ (int) ($shipment->order_scans_count ?? 0) }} · Item: {{ $shipment->lines->count() }} · Total qty: {{ $qty }}. Stok WH-RTS akan dipotong."
                                                           data-gf-confirm-ok="Kirim"
                                                           data-gf-confirm-cancel="Batal">
                                                         @csrf
