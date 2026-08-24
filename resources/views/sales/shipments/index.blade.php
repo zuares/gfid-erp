@@ -211,6 +211,12 @@
     .action-icon{ display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0!important; border-radius:8px!important; }
     .action-icon i{ margin:0!important; font-size:.86rem; }
     .action-icon .action-label{ display:none; }
+    .ship-row-action .action-icon{ transition:transform .12s ease, background .12s ease, border-color .12s ease; }
+    .ship-row-action .action-icon:hover{ transform:translateY(-1px); }
+    .ship-row-action .btn-ship-outline.action-icon{ color:#64748b!important; background:#f8fafc!important; border-color:#dbe2ea!important; }
+    .ship-row-action .btn-ship-outline.action-icon:hover{ color:#334155!important; background:#eef2f7!important; border-color:#cbd5e1!important; }
+    .ship-row-action .btn-outline-danger.action-icon{ color:#b45353!important; background:#fffafa!important; border-color:#f1d0d0!important; }
+    .ship-row-action .btn-outline-danger.action-icon:hover{ color:#991b1b!important; background:#fef2f2!important; border-color:#e8b4b4!important; }
     .ship-row-action .btn-ship-primary{ color:#fff!important; background:#2563eb!important; border-color:#2563eb!important; }
     .ship-row-action .btn-ship-primary:hover{ background:#1d4ed8!important; border-color:#1d4ed8!important; }
     .action-label{ margin-left:.22rem; }
@@ -614,7 +620,7 @@
                                     $statusLabel = match ($uiStatus) {
                                         'draft' => 'Draft',
                                         'submitted' => 'Diproses',
-                                        'posted' => 'Selesai',
+                                        'posted' => 'Posted',
                                         'cancelled' => 'Dibatalkan',
                                         default => ucfirst($uiStatus),
                                     };
@@ -727,7 +733,7 @@
                                             </div>
                                         @else
                                             <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill action-icon" title="{{ $actionLabel }}" aria-label="{{ $actionLabel }} {{ $shipment->code }}">
-                                                <i class="bi {{ $uiStatus === 'draft' ? 'bi-play-fill' : 'bi-arrow-right' }}" aria-hidden="true"></i>
+                                                <i class="bi {{ $uiStatus === 'draft' ? 'bi-upc-scan' : 'bi-eye' }}" aria-hidden="true"></i>
                                             </a>
                                         @endif
                                     </td>
