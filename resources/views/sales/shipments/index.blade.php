@@ -206,6 +206,11 @@
     .ship-row-action{ white-space:nowrap; }
     .ship-row-action .btn{ width:auto!important; white-space:nowrap; }
     .ship-row-action .d-flex{ flex-wrap:nowrap!important; }
+    .shipment-row-clickable{ cursor:pointer; }
+    .shipment-row-clickable:hover{ background:rgba(239,246,255,.72)!important; }
+    .action-icon{ display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0!important; border-radius:8px!important; }
+    .action-icon i{ margin:0!important; font-size:.86rem; }
+    .action-icon .action-label{ display:none; }
     .ship-row-action .btn-ship-primary{ color:#fff!important; background:#2563eb!important; border-color:#2563eb!important; }
     .ship-row-action .btn-ship-primary:hover{ background:#1d4ed8!important; border-color:#1d4ed8!important; }
     .action-label{ margin-left:.22rem; }
@@ -624,7 +629,9 @@
                                     $actionLabel = $uiStatus === 'draft' ? 'Lanjut scan' : 'Lihat detail';
                                 @endphp
 
-                                <tr class="{{ $uiStatus === 'draft' ? 'row-draft' : '' }}">
+                                <tr class="shipment-row-clickable {{ $uiStatus === 'draft' ? 'row-draft' : '' }}"
+                                    data-row-href="{{ $actionRoute }}" tabindex="0" role="link"
+                                    aria-label="{{ $actionLabel }} {{ $shipment->code }}">
                                     <td class="text-muted small mobile-hide">
                                         {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
                                     </td>
@@ -685,15 +692,15 @@
                                                 ])->toJson();
                                             @endphp
                                             <div class="d-flex justify-content-end gap-1 flex-wrap">
-                                                <button type="button" class="btn btn-sm btn-ship-outline btn-pill"
+                                                <button type="button" class="btn btn-sm btn-ship-outline btn-pill action-icon"
                                                     data-code="{{ $shipment->code }}"
                                                     data-date="{{ $fmtDate($shipment->date, 'd M Y') }}"
                                                     data-nama="{{ $recv['nama'] }}"
                                                     data-phone="{{ $recv['phone'] }}"
                                                     data-alamat="{{ $recv['alamat'] }}"
                                                     data-items="{{ $linesJson }}"
-                                                    onclick="openPreview(this)" title="Preview label">
-                                                    <i class="bi bi-printer" aria-hidden="true"></i><span class="action-label">Preview</span>
+                                                    onclick="openPreview(this)" title="Preview label" aria-label="Preview label">
+                                                    <i class="bi bi-printer" aria-hidden="true"></i>
                                                 </button>
                                                 
                                                 @if($uiStatus === 'draft')
@@ -705,23 +712,22 @@
                                                           data-gf-confirm-ok="Kirim"
                                                           data-gf-confirm-cancel="Batal">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill" title="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim/Post' }}" @disabled($stockBlocked)>
-                                                            <i class="bi bi-send" aria-hidden="true"></i><span class="action-label">Kirim</span>
+                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill action-icon" title="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim/Post' }}" aria-label="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim paket' }}" @disabled($stockBlocked)>
+                                                            <i class="bi bi-send" aria-hidden="true"></i>
                                                         </button>
                                                     </form>
                                                     
                                                     <form action="{{ route('sales.shipments.manual.destroy', $shipment) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus paket manual ini?');">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill" style="border-color:#fecaca;" title="Hapus shipment">
-                                                            <i class="bi bi-trash" aria-hidden="true"></i><span class="action-label">Hapus</span>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill action-icon" style="border-color:#fecaca;" title="Hapus shipment" aria-label="Hapus shipment">
+                                                            <i class="bi bi-trash" aria-hidden="true"></i>
                                                         </button>
                                                     </form>
                                                 @endif
                                             </div>
                                         @else
-                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill">
+                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill action-icon" title="{{ $actionLabel }}" aria-label="{{ $actionLabel }} {{ $shipment->code }}">
                                                 <i class="bi {{ $uiStatus === 'draft' ? 'bi-play-fill' : 'bi-arrow-right' }}" aria-hidden="true"></i>
-                                                {{ $actionLabel }}
                                             </a>
                                         @endif
                                     </td>
@@ -906,5 +912,19 @@ function closePreview() {
 function printLabel() {
     window.print();
 }
+
+document.querySelectorAll('tr[data-row-href]').forEach(function (row) {
+    function goToRow(event) {
+        if (event.target.closest('a, button, form, input, select, textarea, label')) return;
+        window.location.href = row.dataset.rowHref;
+    }
+
+    row.addEventListener('click', goToRow);
+    row.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        goToRow(event);
+    });
+});
 </script>
 @endsection
