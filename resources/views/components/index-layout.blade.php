@@ -102,6 +102,7 @@
     .badge-pay { border-radius: 7px; font-size: .7rem; padding: .1rem .55rem; border: 1px solid rgba(148,163,184,.45); background: rgba(148,163,184,.10); color: #64748b; white-space: nowrap; }
     .badge-pay-paid { border-color: rgba(22,163,74,.55); background: rgba(22,163,74,.12); color: #15803d; }
     .badge-pay-partial { border-color: rgba(234,179,8,.55); background: rgba(234,179,8,.12); color: #a16207; }
+    .badge-pay-overpaid { border-color: rgba(124,58,237,.55); background: rgba(124,58,237,.12); color: #6d28d9; }
 
     .badge-rcv { border-radius: 7px; font-size: .65rem; padding: .05rem .45rem; border: 1px solid transparent; white-space: nowrap; display: inline-block; }
     .badge-rcv-none { background: rgba(148,163,184,.08); color: #94a3b8; border-color: rgba(148,163,184,.4); }

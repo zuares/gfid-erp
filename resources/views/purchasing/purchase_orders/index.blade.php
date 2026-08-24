@@ -28,6 +28,7 @@
         'unpaid' => 'Unpaid',
         'partial' => 'Partial',
         'paid' => 'Paid',
+        'overpaid' => 'Piutang',
     ];
 
     $hasPoFilters = request()->filled('q')
@@ -42,6 +43,7 @@
         return match ((string) $s) {
             'paid' => 'badge-pay badge-pay-paid',
             'partial' => 'badge-pay badge-pay-partial',
+            'overpaid' => 'badge-pay badge-pay-overpaid',
             default => 'badge-pay badge-pay-unpaid',
         };
     };
@@ -104,6 +106,12 @@
         color: #a16207;
         background: rgba(234, 179, 8, .1);
         border-color: rgba(234, 179, 8, .25);
+    }
+
+    .po-mobile-status.is-overpaid {
+        color: #6d28d9;
+        background: rgba(124, 58, 237, .1);
+        border-color: rgba(124, 58, 237, .25);
     }
 
     .po-filter-main {
@@ -385,6 +393,7 @@
             $payLabel = match($ps) {
                 'paid' => 'Lunas',
                 'partial' => 'Bayar sebagian',
+                'overpaid' => 'Piutang supplier',
                 default => 'Belum bayar',
             };
 
@@ -432,7 +441,7 @@
                             {{ $rcvLabel }}
                         </span>
                         @if ($canSeeMoney)
-                            <span class="po-mobile-status {{ $ps === 'paid' ? 'is-approved' : ($ps === 'partial' ? 'is-partial' : '') }}">
+                            <span class="po-mobile-status {{ $ps === 'paid' ? 'is-approved' : ($ps === 'partial' ? 'is-partial' : ($ps === 'overpaid' ? 'is-overpaid' : '')) }}">
                                 {{ $payLabel }}
                             </span>
                         @endif

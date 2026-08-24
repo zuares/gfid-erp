@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('purchase_orders', function (Blueprint $table) {
             // status pembayaran di luar status dokumen PO
-            $table->string('payment_status', 20)->default('unpaid')->after('status'); // unpaid|partial|paid
+            $table->string('payment_status', 20)->default('unpaid')->after('status'); // unpaid|partial|paid|overpaid
             $table->decimal('paid_amount', 18, 2)->default(0)->after('payment_status');
 
             // tempo

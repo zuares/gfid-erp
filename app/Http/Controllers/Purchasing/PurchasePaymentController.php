@@ -100,7 +100,7 @@ class PurchasePaymentController extends Controller
      * - TRANSFER: wajib akun 1111-1114
      * - CREDIT: cash_account_id harus null
      * - PAYMENT: hanya boleh kalau ada GRN posted dan tidak boleh melebihi outstanding
-     * - DP: boleh dicatat sebelum GRN posted, maksimal sebesar nilai PO
+     * - DP: boleh dicatat sebelum GRN posted dan boleh melebihi nilai PO
      */
     public function store(Request $request, PurchaseOrder $purchase_order)
     {
@@ -190,16 +190,6 @@ class PurchasePaymentController extends Controller
             if ($amount > $outstanding + 0.01) {
                 throw ValidationException::withMessages([
                     'amount' => 'Nominal melebihi sisa hutang.',
-                ]);
-            }
-        }
-
-        // (Opsional) batas DP supaya tidak kebablasan
-        if (($data['type'] ?? '') === 'dp') {
-            $dpTotal = (float) $purchase_order->activePayments()->where('type', 'dp')->sum('amount');
-            if ($dpTotal + $amount > (float) $purchase_order->grand_total + 0.01) {
-                throw ValidationException::withMessages([
-                    'amount' => 'Total DP melebihi nilai PO.',
                 ]);
             }
         }
@@ -383,21 +373,34 @@ class PurchasePaymentController extends Controller
     }
 
     // ======================================================================
-    // INTERNAL: Payment Status (AP based on GRN posted)
+    // INTERNAL: Payment Status (berdasarkan total pembayaran terhadap nilai PO)
     // ======================================================================
 
     /**
-     * paid_amount & payment_status untuk hutang
-     * hanya menghitung type=payment (pelunasan hutang) + dp_apply
-     * basis hutang: total GRN posted - return posted
+     * DP adalah uang yang sudah dibayarkan ke supplier, sehingga ikut dihitung
+     * untuk status pembayaran PO. dp_apply hanya jurnal pemindahan DP ke AP,
+     * bukan pembayaran baru dan tidak boleh dihitung dua kali.
+     *
+     * Status:
+     * - unpaid: belum ada pembayaran
+     * - partial: pembayaran masih di bawah nilai PO
+     * - paid: pembayaran sama dengan nilai PO
+     * - overpaid: pembayaran melebihi nilai PO (menjadi piutang supplier)
      */
     protected function recalcPaymentStatus(PurchaseOrder $order): void
     {
-        $debt = (float) $this->netDebtByGrn($order);
+        $grand = round((float) $order->grand_total, 2);
         $eps = 0.01;
 
-        // kalau belum ada GRN posted, hutang belum terbentuk
-        if ($debt <= $eps) {
+        $agg = $order->activePayments()
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN type IN ('dp', 'payment') THEN amount ELSE 0 END), 0) as paid
+            ")
+            ->first();
+
+        $paid = round((float) ($agg->paid ?? 0), 2);
+
+        if ($grand <= $eps || $paid <= $eps) {
             $order->paid_amount = 0;
             $order->payment_status = 'unpaid';
             $order->save();
@@ -405,27 +408,25 @@ class PurchasePaymentController extends Controller
             return;
         }
 
-        $agg = $order->activePayments()
-            ->selectRaw("
-                COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) as paid,
-                COALESCE(SUM(CASE WHEN type = 'dp_apply' THEN amount ELSE 0 END), 0) as dp_applied
-            ")
-            ->first();
-
-        $paid = (float) ($agg->paid ?? 0);
-        $dpApplied = (float) ($agg->dp_applied ?? 0);
-
-        $paidForAp = round($paid + $dpApplied, 2);
-        $paidForAp = min($paidForAp, round($debt, 2)); // clamp
-
         $status = 'unpaid';
-        if ($paidForAp > $eps && $paidForAp + $eps < $debt) {
-            $status = 'partial';
-        } elseif ($paidForAp + $eps >= $debt) {
+        if ($paid > $grand + $eps) {
+            $status = 'overpaid';
+        } elseif ($paid + $eps >= $grand) {
             $status = 'paid';
+        } elseif ($paid > $eps) {
+            $status = 'partial';
         }
 
-        $order->paid_amount = $paidForAp;
+        // Pembayaran adalah konfirmasi bahwa PO sudah diproses. Draft tidak
+        // boleh tetap tampil sebagai dokumen aktif setelah ada pembayaran.
+        if ($order->status === 'draft' && in_array($status, ['partial', 'paid', 'overpaid'], true)) {
+            $order->status = 'approved';
+            $order->approved_by = auth()->id();
+            $order->approved_at = now();
+        }
+
+        // Jangan clamp nilai overpaid agar selisih piutang tetap terlihat.
+        $order->paid_amount = $paid;
         $order->payment_status = $status;
         $order->save();
         

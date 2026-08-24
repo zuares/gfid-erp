@@ -26,6 +26,11 @@
 .po-status.approved{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.2)}
 .po-status.closed{color:#0f172a;background:rgba(15,23,42,.08);border-color:rgba(15,23,42,.2)}
 .po-status.cancelled{color:#991b1b;background:rgba(153,27,27,.08);border-color:rgba(153,27,27,.2)}
+.pay-badge{font-weight:850;color:#475569;background:rgba(148,163,184,.08)}
+.pay-badge.pay-paid{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.2)}
+.pay-badge.pay-partial{color:#a16207;background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.25)}
+.pay-badge.pay-overpaid{color:#6d28d9;background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.25)}
+.pay-badge.pay-unpaid{color:#64748b;background:rgba(148,163,184,.08)}
 .po-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
 .po-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
 .po-kpi{padding:.65rem .75rem}
@@ -125,12 +130,28 @@
         $apOutstanding =
             (float) ($apOutstanding ?? max(0, round($apDebt - $paidPaymentTotal - $dpAppliedTotal, 2)));
 
+        // Tampilkan pecahan rupiah jika saldo aktual memang memiliki desimal.
+        // Tanpa ini, sisa Rp0,98 terlihat sebagai Rp1 dan tombol "Sisa"
+        // mengirim nominal yang lebih besar dari hutang sebenarnya.
+        $formatPaymentMoney = static function ($value): string {
+            $value = (float) $value;
+            $decimals = abs($value - round($value)) > 0.0001 ? 2 : 0;
+            return rupiah($value, $decimals);
+        };
+
         // status bayar
         $payStatus = (string) ($order->payment_status ?? 'unpaid');
         $payBadgeClass = match ($payStatus) {
             'paid' => 'pay-badge pay-paid',
             'partial' => 'pay-badge pay-partial',
+            'overpaid' => 'pay-badge pay-overpaid',
             default => 'pay-badge pay-unpaid',
+        };
+        $payStatusLabel = match ($payStatus) {
+            'paid' => 'LUNAS',
+            'partial' => 'SEBAGIAN BAYAR',
+            'overpaid' => 'PIUTANG SUPPLIER',
+            default => 'BELUM BAYAR',
         };
 
         $canPay = $status !== 'cancelled';
@@ -149,8 +170,10 @@
         $hasAp = $grnPostedTotal > 0.0001;
         $poGrandTotal = (float) ($order->grand_total ?? 0);
         $dpRemaining = max(0, round($poGrandTotal - $dpTotal, 2));
+        $supplierReceivable = max(0, round((float) ($order->paid_amount ?? 0) - $poGrandTotal, 2));
         $canPaySettlement = $canPay && $hasAp && $apOutstanding > 0.01;
-        $canPayDp = $canPay && $poGrandTotal > 0.01 && $dpRemaining > 0.01;
+        // DP boleh melebihi nilai PO agar selisihnya tercatat sebagai piutang supplier.
+        $canPayDp = $canPay && $poGrandTotal > 0.01;
         $canOpenPayment = $canPaySettlement || $canPayDp;
 
         // apply DP guard
@@ -189,6 +212,9 @@
     <span class="po-supplier d-none d-md-inline">{{ optional($order->supplier)->name ?? 'Purchase Order' }}</span>
     
     <span class="po-pill po-status {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
+    @if ($canSeeMoney)
+        <span class="po-pill {{ $payBadgeClass }}">{{ $payStatusLabel }}</span>
+    @endif
     
     @if ($order->isLocked())
         <span class="po-pill po-status" style="background:rgba(245,158,11,.1);color:#92400e;border:1px solid rgba(245,158,11,.3);" title="{{ $order->lock_reason }} ({{ optional($order->locked_at)->format('d/m/Y H:i') }})"><i class="bi bi-lock-fill"></i> Locked</span>
@@ -324,8 +350,8 @@
             <div class="po-value">{{ rupiah($grnPostedTotal) }}</div>
         </div>
         <div class="po-card po-kpi">
-            <div class="po-label">Sisa Tagihan</div>
-            <div class="po-value" style="color:#b91c1c;">{{ rupiah($apOutstanding) }}</div>
+            <div class="po-label">{{ $payStatus === 'overpaid' ? 'Piutang Supplier' : 'Sisa Tagihan' }}</div>
+            <div class="po-value" style="color:{{ $payStatus === 'overpaid' ? '#6d28d9' : '#b91c1c' }};">{{ $formatPaymentMoney($payStatus === 'overpaid' ? $supplierReceivable : $apOutstanding) }}</div>
         </div>
         @else
         <div class="po-card po-kpi">
@@ -623,7 +649,7 @@
                                 @if ($returnPostedTotal > 0.0001)
                                     <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
                                 @endif
-                                <span class="modal-kpi">Sisa <strong class="mono">{{ rupiah($apOutstanding) }}</strong></span>
+                                <span class="modal-kpi">Sisa <strong class="mono">{{ $formatPaymentMoney($apOutstanding) }}</strong></span>
                             @else
                                 <span class="modal-kpi">Total PO <strong class="mono">{{ rupiah($poGrandTotal) }}</strong></span>
                                 <span class="modal-kpi">DP tercatat <strong class="mono">{{ rupiah($dpTotal) }}</strong></span>
@@ -799,7 +825,7 @@
                             @if ($returnPostedTotal > 0.0001)
                                 <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
                             @endif
-                            <span class="modal-kpi">Sisa <strong class="mono">{{ rupiah($apOutstanding) }}</strong></span>
+                            <span class="modal-kpi">Sisa <strong class="mono">{{ $formatPaymentMoney($apOutstanding) }}</strong></span>
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -913,10 +939,14 @@
                 const dpRemaining = {{ (float) $dpRemaining }};
                 const typeSelect = document.getElementById('typeSelectModal');
 
-                function fmtId(n) {
+                function fmtMoneyInput(n) {
+                    const value = Number(n || 0);
+                    const hasFraction = Math.abs(value - Math.round(value)) > 0.0001;
+
                     return new Intl.NumberFormat('id-ID', {
-                        maximumFractionDigits: 0
-                    }).format(Math.round(n || 0));
+                        minimumFractionDigits: hasFraction ? 2 : 0,
+                        maximumFractionDigits: 2
+                    }).format(value);
                 }
 
                 function detectMode() {
@@ -1039,7 +1069,7 @@
                 btnFill?.addEventListener('click', function() {
                     if (!amountInput) return;
                     const maxAmount = (typeSelect?.value || 'payment') === 'dp' ? dpRemaining : remaining;
-                    amountInput.value = fmtId(maxAmount);
+                    amountInput.value = fmtMoneyInput(maxAmount);
                     amountInput.focus();
                     amountInput.select?.();
                 });
@@ -1048,7 +1078,7 @@
                     const raw = (amountInput.value || '').toString().trim();
                     if (raw === '') return;
                     const n = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
-                    if (!isNaN(n)) amountInput.value = fmtId(n);
+                    if (!isNaN(n)) amountInput.value = fmtMoneyInput(n);
                 });
 
                 typeSelect?.addEventListener('change', syncTypeRules);
@@ -1069,7 +1099,7 @@
 
                 btnFillMaxApplyDp?.addEventListener('click', function() {
                     if (!applyDpAmount) return;
-                    applyDpAmount.value = fmtId(maxApplyDp);
+                    applyDpAmount.value = fmtMoneyInput(maxApplyDp);
                     applyDpAmount.focus();
                     applyDpAmount.select?.();
                 });
@@ -1078,7 +1108,7 @@
                     const raw = (applyDpAmount.value || '').toString().trim();
                     if (raw === '') return;
                     const n = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
-                    if (!isNaN(n)) applyDpAmount.value = fmtId(n);
+                    if (!isNaN(n)) applyDpAmount.value = fmtMoneyInput(n);
                 });
 
                 // =========================================================

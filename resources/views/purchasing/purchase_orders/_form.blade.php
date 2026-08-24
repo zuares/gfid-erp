@@ -24,6 +24,10 @@
     // === SUPPLIER ===
     // Saat create: tidak ada default supplier (user wajib pilih manual)
     $selectedSupplierId = old('supplier_id', $order?->supplier_id ?? request('supplier_id') ?? null);
+    $selectedSupplier = collect($suppliers ?? [])->firstWhere('id', (int) $selectedSupplierId);
+    $selectedSupplierLabel = $selectedSupplier
+        ? trim(($selectedSupplier->code ? $selectedSupplier->code . ' — ' : '') . $selectedSupplier->name)
+        : '';
 
     // === PAYMENT METHOD ===
     // Filter: exclude DP_APPLY (internal only)
@@ -185,6 +189,31 @@
         .po-supplier-select {
             font-size: .95rem;
             padding: .55rem .85rem;
+        }
+
+        .po-supplier-search-wrap {
+            position: relative;
+        }
+
+        .po-supplier-search {
+            min-height: 38px;
+            padding-left: 2.2rem !important;
+        }
+
+        .po-supplier-search-icon {
+            position: absolute;
+            z-index: 2;
+            top: 50%;
+            left: .8rem;
+            color: #94a3b8;
+            pointer-events: none;
+            transform: translateY(-50%);
+        }
+
+        .po-supplier-search-hint {
+            margin-top: .3rem;
+            color: #94a3b8;
+            font-size: .7rem;
         }
 
         .po-td-item .js-item-suggest-input,
@@ -1083,6 +1112,7 @@
             }
 
             .po-supplier-select,
+            .po-supplier-search,
             .po-date-wrap input {
                 min-height: 42px !important;
                 font-size: 14px !important;
@@ -1248,6 +1278,22 @@
         <div class="po-focal-fields">
             <div>
                 <label for="po-supplier" class="po-label mb-1">Supplier</label>
+                <div class="po-supplier-search-wrap mb-2">
+                    <i class="bi bi-search po-supplier-search-icon" aria-hidden="true"></i>
+                    <input type="search" id="po-supplier-search"
+                        class="form-control po-field po-supplier-search"
+                        list="po-supplier-suggestions"
+                        placeholder="Ketik kode atau nama supplier"
+                        value="{{ $selectedSupplierLabel }}"
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-label="Cari supplier">
+                    <datalist id="po-supplier-suggestions">
+                        @foreach ($suppliers as $sup)
+                            <option value="{{ trim(($sup->code ? $sup->code . ' — ' : '') . $sup->name) }}"></option>
+                        @endforeach
+                    </datalist>
+                </div>
                 <select name="supplier_id" id="po-supplier"
                     class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
                     required>
@@ -1262,6 +1308,7 @@
                 @error('supplier_id')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
+                <div class="po-supplier-search-hint">Ketik untuk mencari, atau pilih langsung dari daftar.</div>
                 @if (auth()->user()?->role === 'owner')
                     <div class="text-muted mt-1" style="font-size: .75rem;">
                         <i class="bi bi-info-circle me-1"></i>
@@ -1592,8 +1639,51 @@
             const canSeeMoney = @json($canSeeMoney);
 
             const supplierSelect = document.querySelector('#po-supplier');
+            const supplierSearch = document.querySelector('#po-supplier-search');
             const shippingDisplay = document.querySelector('.shipping-display');
             const shippingRaw = document.querySelector('.shipping-raw');
+
+            function supplierOptionLabel(option) {
+                return (option?.textContent || '').replace(/\s+/g, ' ').trim();
+            }
+
+            function syncSupplierSearchFromSelect() {
+                if (!supplierSelect || !supplierSearch) return;
+                supplierSearch.value = supplierOptionLabel(supplierSelect.selectedOptions?.[0]);
+            }
+
+            function selectSupplierFromSearch() {
+                if (!supplierSelect || !supplierSearch) return;
+
+                const typed = supplierSearch.value.trim().toLowerCase();
+                const options = Array.from(supplierSelect.options).filter(option => option.value);
+                const exact = options.find(option => supplierOptionLabel(option).toLowerCase() === typed);
+
+                if (exact) {
+                    if (supplierSelect.value !== exact.value) {
+                        supplierSelect.value = exact.value;
+                        supplierSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    return;
+                }
+
+                // Jangan kirim supplier lama ketika user sudah mengganti teks pencarian.
+                if (!typed || !options.some(option => supplierOptionLabel(option).toLowerCase() === typed)) {
+                    supplierSelect.value = '';
+                }
+            }
+
+            supplierSelect?.addEventListener('change', syncSupplierSearchFromSelect);
+            supplierSearch?.addEventListener('change', selectSupplierFromSearch);
+            supplierSearch?.addEventListener('blur', selectSupplierFromSearch);
+            supplierSearch?.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    selectSupplierFromSearch();
+                    if (supplierSelect?.value) supplierSearch.blur();
+                }
+            });
+            syncSupplierSearchFromSelect();
 
             // =========================
             // Helpers

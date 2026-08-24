@@ -309,15 +309,15 @@ class PurchaseOrderController extends Controller
         $data['created_by'] = (int) $request->user()->id;
         $data['status'] = 'draft';
 
-        // Auto-set payment_status berdasarkan mode payment method
-        $pm = PaymentMethod::find($data['payment_method_id'] ?? null);
-        $mode = strtolower((string) ($pm?->mode ?? 'credit'));
-        $data['payment_status'] = in_array($mode, ['cash', 'transfer'], true) ? 'paid' : 'unpaid';
+        // Status pembayaran harus mengikuti nominal pembayaran yang benar-benar
+        // tercatat, bukan hanya mode metode pembayaran yang dipilih.
+        $data['payment_status'] = 'unpaid';
 
         $order = $this->service->create($data);
 
         // auto-create payment from form (pay_now)
         $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: true);
+        $this->recalcPaymentStatus($order);
 
         // PR-D: Jika PO dibuat dari Purchase Request, simpan relasi + update status PR
         $successMsg = 'Purchase Order berhasil dibuat.';
@@ -635,18 +635,15 @@ class PurchaseOrderController extends Controller
         $data = $this->validateData($request, $purchase_order);
         $data['status'] = 'draft';
 
-        // Auto-set payment_status berdasarkan mode payment method
-        $pm = PaymentMethod::find($data['payment_method_id'] ?? null);
-        $mode = strtolower((string) ($pm?->mode ?? 'credit'));
-        // Jangan overwrite kalau sudah ada payment aktif (partial/paid)
-        if (!in_array($purchase_order->payment_status, ['partial', 'paid'], true)) {
-            $data['payment_status'] = in_array($mode, ['cash', 'transfer'], true) ? 'paid' : 'unpaid';
-        }
+        // Jangan menandai lunas hanya karena metode cash/transfer dipilih.
+        // Status akan dihitung ulang dari payment aktif setelah PO disimpan.
+        $data['payment_status'] = $purchase_order->payment_status;
 
         $order = $this->service->update($purchase_order, $data);
 
         // hanya buat payment dari form kalau belum ada payment aktif
         $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: false);
+        $this->recalcPaymentStatus($order);
 
         return redirect()
             ->route('purchasing.purchase_orders.show', $order->id)
@@ -1076,11 +1073,13 @@ class PurchaseOrderController extends Controller
             $cashAccountId = $cash?->id;
         }
 
-        $grand = (float) $order->grand_total;
-        $payNow = min($payNow, max(0, $grand));
+        $grand = round((float) $order->grand_total, 2);
+        $payNow = round($payNow, 2);
 
         $eps = 0.01;
-        $type = (abs($payNow - $grand) < $eps) ? 'payment' : 'dp';
+        // Nominal di atas total PO tetap dicatat sebagai DP agar selisihnya
+        // menjadi piutang supplier, bukan pelunasan AP yang kelebihan.
+        $type = ($payNow <= $grand + $eps && abs($payNow - $grand) < $eps) ? 'payment' : 'dp';
 
         DB::transaction(function () use ($request, $order, $cashAccountId, $payNow, $type) {
             PurchasePayment::create([
@@ -1101,18 +1100,32 @@ class PurchaseOrderController extends Controller
 
     protected function recalcPaymentStatus(PurchaseOrder $order): void
     {
-        $paid = method_exists($order, 'activePayments')
-        ? (float) $order->activePayments()->sum('amount')
-        : 0.0;
+        $paid = 0.0;
+        if (method_exists($order, 'activePayments')) {
+            $paid = (float) $order->activePayments()
+                ->whereIn('type', ['dp', 'payment'])
+                ->sum('amount');
+        }
 
-        $grand = (float) $order->grand_total;
+        $paid = round($paid, 2);
+        $grand = round((float) $order->grand_total, 2);
         $eps = 0.01;
 
         $status = 'unpaid';
-        if ($paid > $eps && $paid + $eps < $grand) {
+        if ($paid > $eps && $paid > $grand + $eps) {
+            $status = 'overpaid';
+        } elseif ($paid > $eps && $paid + $eps < $grand) {
             $status = 'partial';
         } elseif ($paid + $eps >= $grand && $grand > 0) {
             $status = 'paid';
+        }
+
+        // Pembayaran otomatis mengonfirmasi PO. Gunakan status approved yang
+        // sudah menjadi lifecycle non-draft pada modul purchase order ini.
+        if ($order->status === 'draft' && in_array($status, ['partial', 'paid', 'overpaid'], true)) {
+            $order->status = 'approved';
+            $order->approved_by = auth()->id();
+            $order->approved_at = now();
         }
 
         $order->paid_amount = round($paid, 2);
@@ -1318,6 +1331,7 @@ class PurchaseOrderController extends Controller
         if ($payStatus !== 'paid') {
             $blockers[] = match ($payStatus) {
                 'partial' => 'Pembayaran baru sebagian',
+                'overpaid' => 'Pembayaran melebihi nilai PO (piutang supplier)',
                 default   => 'Belum ada pembayaran',
             };
         }
