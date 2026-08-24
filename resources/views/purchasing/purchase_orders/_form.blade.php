@@ -208,11 +208,19 @@
         .po-supplier-combo {
             display: flex;
             align-items: stretch;
-            overflow: hidden;
+            position: relative;
+            overflow: visible;
             border: 1px solid rgba(148,163,184,.42);
             border-radius: 10px;
             background: var(--card, #fff);
             transition: border-color .12s, box-shadow .12s;
+        }
+
+        /* Dropdown supplier boleh melewati batas card tanpa terpotong section berikutnya. */
+        .po-supplier-card {
+            position: relative;
+            z-index: 20;
+            overflow: visible !important;
         }
 
         .po-supplier-combo:focus-within {
@@ -238,6 +246,72 @@
 
         .po-supplier-combo .po-supplier-select option {
             font-size: .9rem;
+        }
+
+        .po-supplier-suggest-dropdown {
+            position: absolute;
+            top: calc(100% + 5px);
+            left: 0;
+            right: 0;
+            z-index: 10050;
+            display: none;
+            max-height: 240px;
+            overflow-y: auto;
+            padding: .25rem;
+            border: 1px solid rgba(148,163,184,.35);
+            border-radius: 10px;
+            background: var(--card, #fff);
+            box-shadow: 0 10px 24px rgba(15,23,42,.14);
+        }
+
+        .po-supplier-suggest-option {
+            display: block;
+            width: 100%;
+            padding: .5rem .6rem;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: #334155;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .po-supplier-suggest-option:hover,
+        .po-supplier-suggest-option:focus {
+            outline: none;
+            background: rgba(59,130,246,.1);
+        }
+
+        .po-supplier-suggest-code {
+            font-size: .78rem;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .po-supplier-suggest-name {
+            margin-top: .1rem;
+            color: #64748b;
+            font-size: .72rem;
+            line-height: 1.25;
+        }
+
+        .po-supplier-suggest-empty {
+            padding: .65rem;
+            color: #94a3b8;
+            font-size: .76rem;
+        }
+
+        body[data-theme="dark"] .po-supplier-suggest-dropdown {
+            background: #1e293b;
+            border-color: rgba(51,65,85,.8);
+        }
+
+        body[data-theme="dark"] .po-supplier-suggest-option {
+            color: #e2e8f0;
+        }
+
+        body[data-theme="dark"] .po-supplier-suggest-name {
+            color: #94a3b8;
         }
 
         .po-supplier-search-icon {
@@ -1313,7 +1387,7 @@
 @endpush
 
 {{-- FOCAL: SUPPLIER + TANGGAL DOKUMEN --}}
-<div class="shp-table-card mb-3" data-order-type="{{ $orderType }}">
+<div class="shp-table-card po-supplier-card mb-3" data-order-type="{{ $orderType }}">
     <div class="shp-table-head">
         <div class="shp-table-title">Informasi PO</div>
     </div>
@@ -1327,17 +1401,24 @@
                         <i class="bi bi-search po-supplier-search-icon" aria-hidden="true"></i>
                         <input type="search" id="po-supplier-search"
                             class="form-control po-field po-supplier-search"
-                            list="po-supplier-suggestions"
                             placeholder="Ketik kode atau nama supplier"
                             value="{{ $selectedSupplierLabel }}"
                             autocomplete="off"
                             spellcheck="false"
                             aria-label="Cari supplier">
-                        <datalist id="po-supplier-suggestions">
+                        <div id="po-supplier-suggest-dropdown" class="po-supplier-suggest-dropdown" role="listbox">
                             @foreach ($suppliers as $sup)
-                                <option value="{{ trim(($sup->code ? $sup->code . ' — ' : '') . $sup->name) }}"></option>
+                                @php $supplierLabel = trim(($sup->code ? $sup->code . ' — ' : '') . $sup->name); @endphp
+                                <button type="button" class="po-supplier-suggest-option" role="option"
+                                    data-id="{{ $sup->id }}"
+                                    data-label="{{ $supplierLabel }}"
+                                    data-code="{{ $sup->code }}"
+                                    data-name="{{ $sup->name }}">
+                                    <div class="po-supplier-suggest-code">{{ $sup->code ?: 'Supplier' }}</div>
+                                    <div class="po-supplier-suggest-name">{{ $sup->name }}</div>
+                                </button>
                             @endforeach
-                        </datalist>
+                        </div>
                     </div>
                     <select name="supplier_id" id="po-supplier"
                         class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
@@ -1688,8 +1769,13 @@
 
             const supplierSelect = document.querySelector('#po-supplier');
             const supplierSearch = document.querySelector('#po-supplier-search');
+            const supplierDropdown = document.querySelector('#po-supplier-suggest-dropdown');
             const shippingDisplay = document.querySelector('.shipping-display');
             const shippingRaw = document.querySelector('.shipping-raw');
+
+            const supplierSuggestOptions = supplierDropdown
+                ? Array.from(supplierDropdown.querySelectorAll('.po-supplier-suggest-option'))
+                : [];
 
             function supplierOptionLabel(option) {
                 return (option?.textContent || '').replace(/\s+/g, ' ').trim();
@@ -1721,17 +1807,86 @@
                 }
             }
 
+            function hideSupplierSuggestions() {
+                if (supplierDropdown) supplierDropdown.style.display = 'none';
+            }
+
+            function renderSupplierSuggestions(query = '') {
+                if (!supplierDropdown) return;
+
+                const needle = query.trim().toLowerCase();
+                const matches = supplierSuggestOptions.filter(option => {
+                    const haystack = [
+                        option.dataset.code || '',
+                        option.dataset.name || '',
+                        option.dataset.label || '',
+                    ].join(' ').toLowerCase();
+                    return !needle || haystack.includes(needle);
+                });
+
+                supplierSuggestOptions.forEach(option => {
+                    option.style.display = matches.includes(option) ? '' : 'none';
+                });
+
+                let empty = supplierDropdown.querySelector('.po-supplier-suggest-empty');
+                if (!matches.length) {
+                    if (!empty) {
+                        empty = document.createElement('div');
+                        empty.className = 'po-supplier-suggest-empty';
+                        empty.textContent = 'Supplier tidak ditemukan';
+                        supplierDropdown.appendChild(empty);
+                    }
+                } else if (empty) {
+                    empty.remove();
+                }
+
+                supplierDropdown.style.display = 'block';
+            }
+
+            function chooseSupplierSuggestion(option) {
+                if (!supplierSelect || !supplierSearch || !option) return;
+
+                supplierSelect.value = option.dataset.id || '';
+                supplierSearch.value = option.dataset.label || '';
+                supplierSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                hideSupplierSuggestions();
+            }
+
             supplierSelect?.addEventListener('change', syncSupplierSearchFromSelect);
+            supplierSearch?.addEventListener('input', function () {
+                supplierSelect.value = '';
+                renderSupplierSuggestions(this.value);
+            });
             supplierSearch?.addEventListener('change', selectSupplierFromSearch);
-            supplierSearch?.addEventListener('blur', selectSupplierFromSearch);
+            supplierSearch?.addEventListener('blur', function () {
+                setTimeout(() => {
+                    selectSupplierFromSearch();
+                    hideSupplierSuggestions();
+                }, 120);
+            });
             supplierSearch?.addEventListener('focus', function () {
-                requestAnimationFrame(() => this.select());
+                requestAnimationFrame(() => {
+                    this.select();
+                    renderSupplierSuggestions('');
+                });
             });
             supplierSearch?.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
                     event.preventDefault();
                     selectSupplierFromSearch();
+                    hideSupplierSuggestions();
                     if (supplierSelect?.value) supplierSearch.blur();
+                }
+            });
+            supplierDropdown?.addEventListener('mousedown', function (event) {
+                const option = event.target.closest('.po-supplier-suggest-option');
+                if (!option) return;
+                event.preventDefault();
+                chooseSupplierSuggestion(option);
+            });
+            document.addEventListener('mousedown', function (event) {
+                if (!supplierDropdown?.contains(event.target) && event.target !== supplierSearch) {
+                    hideSupplierSuggestions();
                 }
             });
             syncSupplierSearchFromSelect();
