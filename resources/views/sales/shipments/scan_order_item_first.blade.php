@@ -44,6 +44,14 @@
     .sif-order-group-section { display: grid; gap: .35rem; }
     .sif-order-group-heading { display: flex; align-items: center; gap: .4rem; padding: .15rem .1rem; color: #475569; font-size: .68rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
     .sif-order-group-heading b { min-width: 1.25rem; padding: .1rem .3rem; border-radius: 999px; background: #e2e8f0; color: #334155; text-align: center; font-size: .68rem; }
+    .sif-order-filters { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .65rem; }
+    .sif-order-filter { display: inline-flex; align-items: center; gap: .4rem; min-height: 30px; padding: .22rem .55rem; border: 1px solid rgba(148,163,184,.28); border-radius: 7px; background: #fff; color: #64748b; font-size: .72rem; font-weight: 850; cursor: pointer; }
+    .sif-order-filter b { min-width: 1.2rem; padding: .08rem .28rem; border-radius: 999px; background: #e2e8f0; color: #334155; text-align: center; font-size: .66rem; }
+    .sif-order-filter:hover { border-color: rgba(37,99,235,.35); color: #1d4ed8; }
+    .sif-order-filter.is-active { border-color: #2563eb; background: #2563eb; color: #fff; }
+    .sif-order-filter.is-active b { background: rgba(255,255,255,.2); color: #fff; }
+    .sif-order-filter:disabled { cursor: not-allowed; opacity: .45; }
+    .sif-order-index { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 1.45rem; width: 1.45rem; height: 1.45rem; border-radius: 6px; background: #f1f5f9; color: #64748b; font-size: .7rem; font-weight: 900; }
     .sif-pill-kpi { border-color: rgba(37,99,235,.28); background: #eff6ff; color: #1d4ed8; }
     .sif-input-row { display: flex; align-items: stretch; gap: .45rem; }
     .sif-input-row .sif-input { min-width: 0; flex: 1; }
@@ -101,8 +109,7 @@
         return 'Lainnya';
     };
     $orderGroups = collect(['SPX', 'JY', 'Lainnya'])
-        ->mapWithKeys(fn ($group) => [$group => $orders->filter(fn ($order) => $orderGroup($order->order_no) === $group)->count()])
-        ->filter(fn ($total) => $total > 0);
+        ->mapWithKeys(fn ($group) => [$group => $orders->filter(fn ($order) => $orderGroup($order->order_no) === $group)->count()]);
 @endphp
 
 <div class="sif-page">
@@ -158,12 +165,25 @@
                 </div>
             </div>
             <div class="sif-body">
+                <div id="sifOrderFilters" class="sif-order-filters" role="group" aria-label="Filter grup order">
+                    <button type="button" class="sif-order-filter is-active" data-group="all" aria-pressed="true">
+                        Semua <b data-filter-count="all">{{ $orders->count() }}</b>
+                    </button>
+                    @foreach ($orderGroups as $group => $groupTotal)
+                        <button type="button" class="sif-order-filter" data-group="{{ $group }}" aria-pressed="false" @disabled($groupTotal === 0)>
+                            {{ $group }} <b data-filter-count="{{ $group }}">{{ $groupTotal }}</b>
+                        </button>
+                    @endforeach
+                </div>
                 <div id="sifOrderList" class="sif-list">
-                    @forelse ($orderGroups as $group => $groupTotal)
+                    @php $orderNumber = 0; @endphp
+                    @forelse ($orderGroups->filter(fn ($total) => $total > 0) as $group => $groupTotal)
                         <div class="sif-order-group-section">
                             <div class="sif-order-group-heading"><span>{{ $group }}</span><b>{{ $groupTotal }}</b></div>
                             @foreach ($orders->filter(fn ($order) => $orderGroup($order->order_no) === $group) as $order)
+                                @php $orderNumber++; @endphp
                                 <div class="sif-order">
+                                    <span class="sif-order-index">{{ $orderNumber }}</span>
                                     <span class="sif-order-no">{{ $order->order_no }}</span>
                                     <span class="sif-order-status">Tercatat</span>
                                 </div>
@@ -186,6 +206,7 @@
     const input = document.getElementById('sifScanInput');
     const list = document.getElementById('sifOrderList');
     const count = document.getElementById('sifOrderTotal');
+    const filterButtons = Array.from(document.querySelectorAll('#sifOrderFilters [data-group]'));
     const confirmBtn = document.getElementById('sifConfirmBtn');
     const toast = document.getElementById('sifToast');
     const cameraBtn = document.getElementById('sifCameraBtn');
@@ -201,6 +222,7 @@
     let submitting = false;
     let cameraLibraryPromise = null;
     let orderAudioContext = null;
+    let activeGroup = 'all';
 
     function showToast(message, error = false) {
         if (!toast) return;
@@ -281,26 +303,52 @@
         return 'Lainnya';
     }
 
+    function renderOrderFilters() {
+        const groups = { SPX: 0, JY: 0, Lainnya: 0 };
+        orders.forEach(order => { groups[getOrderGroup(order)] += 1; });
+        filterButtons.forEach(button => {
+            const group = button.dataset.group;
+            const total = group === 'all' ? orders.length : groups[group] || 0;
+            const badge = button.querySelector('[data-filter-count]');
+            if (badge) badge.textContent = total;
+            button.disabled = group !== 'all' && total === 0;
+            button.classList.toggle('is-active', activeGroup === group);
+            button.setAttribute('aria-pressed', activeGroup === group ? 'true' : 'false');
+        });
+    }
+
     function renderOrders() {
         if (!list) return;
-        if (!orders.length) {
-            list.innerHTML = '<div class="sif-empty">Belum ada nomor order yang discan.</div>';
+        const visibleOrders = activeGroup === 'all'
+            ? orders
+            : orders.filter(order => getOrderGroup(order) === activeGroup);
+
+        if (!visibleOrders.length) {
+            list.innerHTML = activeGroup === 'all'
+                ? '<div class="sif-empty">Belum ada nomor order yang discan.</div>'
+                : `<div class="sif-empty">Belum ada order grup ${activeGroup}.</div>`;
         } else {
             const groups = { SPX: [], JY: [], Lainnya: [] };
-            orders.forEach(order => { groups[getOrderGroup(order)].push(order); });
+            visibleOrders.forEach(order => { groups[getOrderGroup(order)].push(order); });
+            let orderNumber = 0;
             list.innerHTML = Object.entries(groups)
                 .filter(([, groupOrders]) => groupOrders.length > 0)
                 .map(([group, groupOrders]) => `
                     <div class="sif-order-group-section">
                         <div class="sif-order-group-heading"><span>${group}</span><b>${groupOrders.length}</b></div>
-                        ${groupOrders.map(order => `
+                        ${groupOrders.map(order => {
+                            orderNumber += 1;
+                            return `
                             <div class="sif-order">
+                                <span class="sif-order-index">${orderNumber}</span>
                                 <span class="sif-order-no">${String(order).replace(/[&<>"']/g, '')}</span>
                                 <span class="sif-order-status">Tercatat</span>
-                            </div>`).join('')}
+                            </div>`;
+                        }).join('')}
                     </div>`).join('');
         }
         if (count) count.textContent = orders.length;
+        renderOrderFilters();
         if (confirmBtn) {
             confirmBtn.setAttribute('aria-disabled', orders.length ? 'false' : 'true');
             confirmBtn.classList.toggle('is-disabled', !orders.length);
@@ -432,6 +480,14 @@
     cameraClose?.addEventListener('click', closeCamera);
     window.addEventListener('pagehide', stopCamera);
 
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            if (this.disabled) return;
+            activeGroup = this.dataset.group || 'all';
+            renderOrders();
+        });
+    });
+
     confirmBtn?.addEventListener('click', function (event) {
         unlockOrderAudio();
         if (this.getAttribute('aria-disabled') === 'true') {
@@ -440,6 +496,8 @@
             showToast('Scan minimal satu nomor order terlebih dahulu.', true);
         }
     });
+
+    renderOrders();
 })();
 </script>
 @endpush
