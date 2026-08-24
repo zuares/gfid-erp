@@ -21,7 +21,21 @@
     .srif-meta strong { color: #111827; }
     .srif-scan-title { margin: 0; font-size: .9rem; font-weight: 750; }
     .srif-help { margin: .2rem 0 .65rem; color: #64748b; font-size: .75rem; }
-    .srif-input { width: 100%; min-height: 62px; border: 1px solid rgba(148,163,184,.4) !important; border-radius: 9px !important; padding: .7rem .85rem; color: #111827; font-size: 1.2rem; font-weight: 750; text-transform: uppercase; box-shadow: none !important; }
+    .srif-input-row { display: flex; align-items: stretch; gap: .45rem; }
+    .srif-input-row .srif-input { min-width: 0; flex: 1; }
+    .srif-camera-btn { flex: 0 0 auto; min-width: 48px; min-height: 62px; border: 1px solid #334155; border-radius: 9px; padding: .35rem .7rem; color: #fff; background: #334155; font-size: .9rem; cursor: pointer; }
+    .srif-camera-btn:hover { background: #1f2937; border-color: #1f2937; }
+    .srif-camera-btn:disabled { opacity: .65; cursor: wait; }
+    .srif-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
+    .srif-camera-panel[hidden] { display: none !important; }
+    .srif-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
+    .srif-camera-title { font-size: .74rem; font-weight: 900; }
+    .srif-camera-close { border: 0; border-radius: 6px; padding: .22rem .45rem; color: #64748b; background: transparent; font-size: .7rem; font-weight: 800; cursor: pointer; }
+    .srif-camera-close:hover { color: #0f172a; background: #e2e8f0; }
+    .srif-camera-reader { min-height: 200px; background: #0f172a; }
+    .srif-camera-reader video { display: block; width: 100% !important; max-height: 360px; object-fit: cover; }
+    .srif-camera-status { padding: .45rem .65rem; color: #64748b; background: #fff; font-size: .68rem; line-height: 1.4; }
+    .srif-camera-status.error { color: #b91c1c; background: #fef2f2; }
     .srif-input::placeholder { color: #94a3b8; font-size: .9rem; font-weight: 500; text-transform: none; }
     .srif-actions { display: flex; justify-content: flex-end; gap: .45rem; flex-wrap: wrap; margin-top: .7rem; }
     .srif-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: .4rem .85rem; border: 1px solid rgba(148,163,184,.45); border-radius: 8px; background: #fff; color: #475569; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-decoration: none; cursor: pointer; }
@@ -58,6 +72,7 @@
         .srif-stepper { grid-template-columns: 1fr; }
         .srif-summary { grid-template-columns: 1fr; }
         .srif-topbar { align-items: flex-start; flex-direction: column; }
+        .srif-camera-btn { min-width: 46px; padding-inline: .45rem; }
     }
 </style>
 @endpush
@@ -113,7 +128,20 @@
             <div class="srif-body">
                 <h2 class="srif-scan-title" id="scanTitle">Scan semua item retur</h2>
                 <p class="srif-help" id="scanHelp">Scan barcode atau kode item satu per satu. Item belum ditautkan ke order.</p>
-                <input type="text" id="scanInput" class="form-control srif-input" placeholder="Scan barcode / kode item" inputmode="text" autocomplete="off" autofocus>
+                <div class="srif-input-row">
+                    <input type="text" id="scanInput" class="form-control srif-input" placeholder="Scan barcode / kode item" inputmode="text" autocomplete="off" autofocus>
+                    <button type="button" id="srifCameraBtn" class="srif-camera-btn" aria-label="Buka kamera untuk scan barcode" title="Scan dengan kamera">
+                        <i class="bi bi-camera-video" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div id="srifCameraPanel" class="srif-camera-panel" hidden>
+                    <div class="srif-camera-head">
+                        <span class="srif-camera-title" id="srifCameraTitle"><i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode item ke kamera</span>
+                        <button type="button" id="srifCameraClose" class="srif-camera-close">Tutup</button>
+                    </div>
+                    <div id="srifCameraReader" class="srif-camera-reader"></div>
+                    <div id="srifCameraStatus" class="srif-camera-status">Meminta izin kamera...</div>
+                </div>
                 <div class="srif-actions">
                     <button type="button" class="srif-btn" id="backItemBtn" hidden>Kembali Scan Item</button>
                     <button type="button" class="srif-btn srif-btn-primary" id="nextBtn">Next: Scan Order</button>
@@ -204,6 +232,12 @@
         busy: false,
     };
     const $ = id => document.getElementById(id);
+    const cameraBtn = $('srifCameraBtn');
+    const cameraPanel = $('srifCameraPanel');
+    const cameraClose = $('srifCameraClose');
+    const cameraReader = $('srifCameraReader');
+    const cameraStatus = $('srifCameraStatus');
+    const cameraTitle = $('srifCameraTitle');
     const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
     const normalize = value => String(value ?? '').trim().toUpperCase();
     const formatScanTime = value => {
@@ -212,6 +246,13 @@
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' });
     };
     let fallbackAudioContext = null;
+    let camera = null;
+    let cameraLoading = false;
+    let cameraLibraryPromise = null;
+    let cameraDecoding = false;
+    let nativeCameraStream = null;
+    let nativeCameraFrame = null;
+    let nativeCameraDetecting = false;
 
     function saveWorkflowState() {
         if (!isDraft) return;
@@ -297,6 +338,148 @@
         window.__srifToast = setTimeout(() => node.classList.remove('show'), 2400);
     }
 
+    /* Kamera barcode: gunakan BarcodeDetector native bila tersedia, lalu fallback ke html5-qrcode. */
+    function setCameraStatus(message, error = false) {
+        if (!cameraStatus) return;
+        cameraStatus.textContent = message;
+        cameraStatus.classList.toggle('error', error);
+    }
+
+    function loadCameraLibrary() {
+        if (window.Html5Qrcode) return Promise.resolve();
+        if (cameraLibraryPromise) return cameraLibraryPromise;
+        cameraLibraryPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+            script.async = true;
+            script.onload = () => window.Html5Qrcode ? resolve() : reject(new Error('Library kamera tidak tersedia.'));
+            script.onerror = () => reject(new Error('Library kamera gagal dimuat.'));
+            document.head.appendChild(script);
+        });
+        return cameraLibraryPromise;
+    }
+
+    async function stopCamera() {
+        nativeCameraDetecting = false;
+        if (nativeCameraFrame) cancelAnimationFrame(nativeCameraFrame);
+        nativeCameraFrame = null;
+        if (nativeCameraStream) {
+            nativeCameraStream.getTracks().forEach(track => track.stop());
+            nativeCameraStream = null;
+        }
+        if (camera) {
+            const activeCamera = camera;
+            camera = null;
+            try { await activeCamera.stop(); } catch (error) {}
+            try { activeCamera.clear(); } catch (error) {}
+        }
+    }
+
+    async function closeCamera() {
+        await stopCamera();
+        if (cameraPanel) cameraPanel.hidden = true;
+        if (cameraReader) cameraReader.innerHTML = '';
+        focusScanInput();
+    }
+
+    async function handleDetected(decodedText) {
+        if (cameraDecoding || state.busy || state.stage === 'confirm') return;
+        const code = normalize(decodedText);
+        if (!code) return;
+        cameraDecoding = true;
+        const stage = state.stage;
+        await closeCamera();
+        if (stage === 'item') scanItem(code);
+        else if (stage === 'order') scanOrder(code);
+    }
+
+    async function enableCameraAutoFocus(video = cameraReader?.querySelector('video')) {
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const capabilities = track?.getCapabilities?.();
+        if (!track || !Array.isArray(capabilities?.focusMode) || !capabilities.focusMode.includes('continuous')) return;
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (error) {}
+    }
+
+    async function startNativeCamera() {
+        const Detector = window.BarcodeDetector;
+        if (typeof Detector !== 'function' || typeof Detector.getSupportedFormats !== 'function') return false;
+        let supportedFormats = [];
+        try { supportedFormats = await Detector.getSupportedFormats(); } catch (error) { return false; }
+        if (!Array.isArray(supportedFormats)) return false;
+        const wantedFormats = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code', 'data_matrix'];
+        const formats = wantedFormats.filter(format => supportedFormats.includes(format));
+        if (!formats.length) return false;
+
+        nativeCameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.srcObject = nativeCameraStream;
+        cameraReader.innerHTML = '';
+        cameraReader.appendChild(video);
+        await video.play();
+        await enableCameraAutoFocus(video);
+
+        const detector = new Detector({ formats });
+        nativeCameraDetecting = true;
+        const detect = async () => {
+            if (!nativeCameraDetecting) return;
+            try {
+                if (video.readyState >= 2) {
+                    const results = await detector.detect(video);
+                    const value = results?.[0]?.rawValue;
+                    if (value) {
+                        nativeCameraDetecting = false;
+                        await handleDetected(value);
+                        return;
+                    }
+                }
+            } catch (error) {}
+            if (nativeCameraDetecting) nativeCameraFrame = requestAnimationFrame(detect);
+        };
+        nativeCameraFrame = requestAnimationFrame(detect);
+        return true;
+    }
+
+    async function openCamera() {
+        if (!isDraft || !cameraBtn || !cameraPanel || cameraLoading || camera) return;
+        unlockScanAudio();
+        cameraPanel.hidden = false;
+        cameraLoading = true;
+        cameraDecoding = false;
+        cameraBtn.disabled = true;
+        setCameraStatus('Memuat kamera dan meminta izin akses...');
+        try {
+            if (!navigator.mediaDevices?.getUserMedia) throw new Error('Browser ini tidak mendukung akses kamera. Gunakan Chrome atau Safari versi terbaru.');
+            if (await startNativeCamera()) {
+                setCameraStatus('Scanner native aktif. Arahkan barcode ke area kamera.');
+                return;
+            }
+            await loadCameraLibrary();
+            camera = new window.Html5Qrcode('srifCameraReader');
+            const formatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'ITF', 'UPC_A', 'UPC_E', 'QR_CODE', 'DATA_MATRIX'];
+            const supportedFormats = window.Html5QrcodeSupportedFormats || {};
+            const formatsToSupport = formatNames.map(name => supportedFormats[name]).filter(value => Number.isInteger(value));
+            const cameraConfig = { fps: 12, aspectRatio: 1.777778, disableFlip: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } };
+            if (formatsToSupport.length) cameraConfig.formatsToSupport = formatsToSupport;
+            await camera.start({ facingMode: 'environment' }, cameraConfig, handleDetected, () => {});
+            await enableCameraAutoFocus();
+            setCameraStatus('Deteksi otomatis aktif. Arahkan barcode batang atau QR ke area kamera.');
+        } catch (error) {
+            await stopCamera();
+            setCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
+            toast('Kamera tidak dapat dibuka. Pastikan izin kamera aktif dan gunakan HTTPS.', true);
+        } finally {
+            cameraLoading = false;
+            cameraBtn.disabled = false;
+        }
+    }
+
     function render() {
         const qty = state.lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
         $('sumItems').textContent = new Set(state.lines.map(line => line.item_id)).size.toLocaleString('id-ID');
@@ -349,12 +532,14 @@
             input.placeholder = 'Scan barcode / kode item';
             next.textContent = 'Next: Scan Order';
             next.disabled = qty === 0;
+            if (cameraTitle) cameraTitle.innerHTML = '<i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode item ke kamera';
         } else if (state.stage === 'order') {
             $('scanTitle').textContent = 'Scan semua order / resi';
             $('scanHelp').textContent = 'Scan seluruh nomor order yang berkaitan. Order hanya dicatat dan tidak mengubah item yang sudah discan.';
             input.placeholder = 'Scan nomor order / resi';
             next.textContent = 'Next: Konfirmasi';
             next.disabled = state.orders.length === 0;
+            if (cameraTitle) cameraTitle.innerHTML = '<i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode order ke kamera';
         }
         input.disabled = state.stage === 'confirm' || state.busy;
         next.hidden = state.stage === 'confirm';
@@ -541,6 +726,9 @@
     $('confirmBtn')?.addEventListener('click', event => {
         if ($('confirmBtn').getAttribute('aria-disabled') === 'true') event.preventDefault();
     });
+    cameraBtn?.addEventListener('click', openCamera);
+    cameraClose?.addEventListener('click', closeCamera);
+    window.addEventListener('pagehide', stopCamera);
     ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
         document.addEventListener(eventName, unlockScanAudio, { once: true, passive: true });
     });

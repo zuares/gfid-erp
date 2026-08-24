@@ -179,9 +179,9 @@
     .code-link{ display:inline-block; color:#334155!important; font-size:.8rem; font-weight:700; }
     .code-link:hover{ color:#0f172a!important; }
     .shipment-inline{ display:flex; align-items:center; gap:.45rem; min-width:0; white-space:nowrap; }
-    .shipment-date{ color:#64748b; font-size:.7rem; }
+    .shipment-timestamps{ display:flex; align-items:center; flex-wrap:wrap; gap:.18rem .45rem; margin-top:.18rem; color:#64748b; font-size:.7rem; }
+    .shipment-timestamps span + span::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .shipment-store{ color:#475569; font-size:.72rem; }
-    .shipment-date::before,
     .shipment-store::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .mode-badge{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.2rem .5rem; font-size:.68rem; font-weight:800; white-space:nowrap; }
     .mode-badge::before{ content:''; width:6px; height:6px; border-radius:999px; background:currentColor; }
@@ -224,7 +224,7 @@
     body[data-theme="dark"] .ship-topbar .kpi{ background:rgba(15,23,42,.96); }
     body[data-theme="dark"] .ship-topbar .kpi .val{ color:#e5e7eb; }
     body[data-theme="dark"] .shipment-store,
-    body[data-theme="dark"] .shipment-date,
+    body[data-theme="dark"] .shipment-timestamps,
     body[data-theme="dark"] .package-sub{ color:#94a3b8; }
     body[data-theme="dark"] .row-draft{ background:rgba(30,41,59,.55); }
     body[data-theme="dark"] .code-link:hover{ color:#fff!important; }
@@ -256,9 +256,11 @@
         .list-footer .pagination{ margin-top:.6rem; }
         .action-label{ display:inline; }
         .shipment-inline{ display:block; white-space:normal; }
-        .shipment-date,
+        .shipment-timestamps,
         .shipment-store{ display:block; margin-top:.15rem; }
-        .shipment-date::before,
+        .shipment-timestamps span{ display:block; }
+        .shipment-timestamps span + span{ margin-top:.12rem; }
+        .shipment-timestamps span + span::before,
         .shipment-store::before{ display:none; }
         .package-summary{ display:block; white-space:normal; }
         .package-sub{ display:block; margin-top:.12rem; }
@@ -633,9 +635,14 @@
                                                     {{ $shipment->code }}
                                                 </a>
 
-                                                <span class="shipment-date">
-                                                    {{ $fmtDate($shipment->date, 'd M Y') }} · {{ $fmtDate($shipment->created_at, 'H:i') }} WIB
-                                                </span>
+                                                <div class="shipment-timestamps" aria-label="Tanggal shipment">
+                                                    <span>Dibuat {{ $fmtDate($shipment->created_at, 'd M Y H:i') }} WIB</span>
+                                                    @if($shipment->posted_at)
+                                                        <span>Posted {{ $fmtDate($shipment->posted_at, 'd M Y H:i') }} WIB</span>
+                                                    @elseif($shipment->updated_at)
+                                                        <span>Update {{ $fmtDate($shipment->updated_at, 'd M Y H:i') }} WIB</span>
+                                                    @endif
+                                                </div>
                                                 @if($shipment->store)
                                                     <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
                                                 @endif

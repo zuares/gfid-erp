@@ -370,6 +370,22 @@
         text-transform: none;
     }
 
+    .sr-scan-input-row { display: flex; align-items: stretch; gap: .45rem; }
+    .sr-scan-input-row .sr-scan-input { min-width: 0; flex: 1; }
+    .sr-camera-btn { flex: 0 0 auto; min-width: 48px; min-height: 64px; border: 1px solid var(--sr-accent); border-radius: 8px; padding: .35rem .7rem; color: #fff; background: var(--sr-accent); font-size: .9rem; cursor: pointer; }
+    .sr-camera-btn:hover { border-color: var(--sr-accent-2); background: var(--sr-accent-2); }
+    .sr-camera-btn:disabled { opacity: .65; cursor: wait; }
+    .sr-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
+    .sr-camera-panel[hidden] { display: none !important; }
+    .sr-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
+    .sr-camera-title { font-size: .74rem; font-weight: 900; }
+    .sr-camera-close { border: 0; border-radius: 6px; padding: .22rem .45rem; color: #64748b; background: transparent; font-size: .7rem; font-weight: 800; cursor: pointer; }
+    .sr-camera-close:hover { color: #0f172a; background: #e2e8f0; }
+    .sr-camera-reader { min-height: 200px; background: #0f172a; }
+    .sr-camera-reader video { display: block; width: 100% !important; max-height: 360px; object-fit: cover; }
+    .sr-camera-status { padding: .45rem .65rem; color: #64748b; background: #fff; font-size: .68rem; line-height: 1.4; }
+    .sr-camera-status.error { color: #b91c1c; background: #fef2f2; }
+
     .sr-summary {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1278,7 +1294,20 @@
                             <span class="sr-mode" id="modeBadge">SCAN ORDER</span>
                             <span class="sr-current" id="currentLabel">Belum ada pesanan aktif</span>
                         </div>
-                        <input type="text" id="scanInput" class="form-control sr-scan-input" placeholder="Scan nomor pesanan" inputmode="text" autocomplete="off" autofocus>
+                        <div class="sr-scan-input-row">
+                            <input type="text" id="scanInput" class="form-control sr-scan-input" placeholder="Scan nomor pesanan" inputmode="text" autocomplete="off" autofocus>
+                            <button type="button" id="srCameraBtn" class="sr-camera-btn" aria-label="Buka kamera untuk scan barcode" title="Scan dengan kamera">
+                                <i class="bi bi-camera-video" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div id="srCameraPanel" class="sr-camera-panel" hidden>
+                            <div class="sr-camera-head">
+                                <span class="sr-camera-title" id="srCameraTitle"><i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode ke kamera</span>
+                                <button type="button" id="srCameraClose" class="sr-camera-close">Tutup</button>
+                            </div>
+                            <div id="srCameraReader" class="sr-camera-reader"></div>
+                            <div id="srCameraStatus" class="sr-camera-status">Meminta izin kamera...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1350,11 +1379,24 @@
     const sumItems = document.getElementById('sumItems');
     const sumQty = document.getElementById('sumQty');
     const toastEl = document.getElementById('toast');
+    const cameraBtn = document.getElementById('srCameraBtn');
+    const cameraPanel = document.getElementById('srCameraPanel');
+    const cameraClose = document.getElementById('srCameraClose');
+    const cameraReader = document.getElementById('srCameraReader');
+    const cameraStatus = document.getElementById('srCameraStatus');
+    const cameraTitle = document.getElementById('srCameraTitle');
     let toastTimer = null;
     let scrollTarget = null;
     let lastScannedLineId = null;
     let orderScanSequence = 0;
     let audioCtx = null;
+    let camera = null;
+    let cameraLoading = false;
+    let cameraLibraryPromise = null;
+    let cameraDecoding = false;
+    let nativeCameraStream = null;
+    let nativeCameraFrame = null;
+    let nativeCameraDetecting = false;
 
     function normalize(value) { return String(value || '').trim().toUpperCase(); }
     function formatScanTime(value) {
@@ -1494,9 +1536,142 @@
             focusScan();
         }
     }
+    function setCameraStatus(message, error = false) {
+        if (!cameraStatus) return;
+        cameraStatus.textContent = message;
+        cameraStatus.classList.toggle('error', error);
+    }
+    function loadCameraLibrary() {
+        if (window.Html5Qrcode) return Promise.resolve();
+        if (cameraLibraryPromise) return cameraLibraryPromise;
+        cameraLibraryPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+            script.async = true;
+            script.onload = () => window.Html5Qrcode ? resolve() : reject(new Error('Library kamera tidak tersedia.'));
+            script.onerror = () => reject(new Error('Library kamera gagal dimuat.'));
+            document.head.appendChild(script);
+        });
+        return cameraLibraryPromise;
+    }
+    async function stopCamera() {
+        nativeCameraDetecting = false;
+        if (nativeCameraFrame) cancelAnimationFrame(nativeCameraFrame);
+        nativeCameraFrame = null;
+        if (nativeCameraStream) {
+            nativeCameraStream.getTracks().forEach(track => track.stop());
+            nativeCameraStream = null;
+        }
+        if (camera) {
+            const activeCamera = camera;
+            camera = null;
+            try { await activeCamera.stop(); } catch (error) {}
+            try { activeCamera.clear(); } catch (error) {}
+        }
+    }
+    async function closeCamera() {
+        await stopCamera();
+        if (cameraPanel) cameraPanel.hidden = true;
+        if (cameraReader) cameraReader.innerHTML = '';
+        focusScan({ preventScroll: true });
+    }
+    async function handleCameraDetected(decodedText) {
+        if (cameraDecoding || state.mode === 'confirm') return;
+        const code = normalize(decodedText);
+        if (!code) return;
+        cameraDecoding = true;
+        const mode = state.mode;
+        await closeCamera();
+        if (mode === 'order') startOrder(code);
+        else scanItem(code);
+    }
+    async function enableCameraAutoFocus(video = cameraReader?.querySelector('video')) {
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const capabilities = track?.getCapabilities?.();
+        if (!track || !Array.isArray(capabilities?.focusMode) || !capabilities.focusMode.includes('continuous')) return;
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (error) {}
+    }
+    async function startNativeCamera() {
+        const Detector = window.BarcodeDetector;
+        if (typeof Detector !== 'function' || typeof Detector.getSupportedFormats !== 'function') return false;
+        let supportedFormats = [];
+        try { supportedFormats = await Detector.getSupportedFormats(); } catch (error) { return false; }
+        if (!Array.isArray(supportedFormats)) return false;
+        const wantedFormats = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code', 'data_matrix'];
+        const formats = wantedFormats.filter(format => supportedFormats.includes(format));
+        if (!formats.length) return false;
+        nativeCameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.srcObject = nativeCameraStream;
+        cameraReader.innerHTML = '';
+        cameraReader.appendChild(video);
+        await video.play();
+        await enableCameraAutoFocus(video);
+        const detector = new Detector({ formats });
+        nativeCameraDetecting = true;
+        const detect = async () => {
+            if (!nativeCameraDetecting) return;
+            try {
+                if (video.readyState >= 2) {
+                    const results = await detector.detect(video);
+                    const value = results?.[0]?.rawValue;
+                    if (value) {
+                        nativeCameraDetecting = false;
+                        await handleCameraDetected(value);
+                        return;
+                    }
+                }
+            } catch (error) {}
+            if (nativeCameraDetecting) nativeCameraFrame = requestAnimationFrame(detect);
+        };
+        nativeCameraFrame = requestAnimationFrame(detect);
+        return true;
+    }
+    async function openCamera() {
+        if (!isDraft || !cameraBtn || !cameraPanel || cameraLoading || camera) return;
+        unlockScanAudio();
+        cameraPanel.hidden = false;
+        cameraLoading = true;
+        cameraDecoding = false;
+        cameraBtn.disabled = true;
+        setCameraStatus('Memuat kamera dan meminta izin akses...');
+        try {
+            if (!navigator.mediaDevices?.getUserMedia) throw new Error('Browser ini tidak mendukung akses kamera. Gunakan Chrome atau Safari versi terbaru.');
+            if (await startNativeCamera()) {
+                setCameraStatus('Scanner native aktif. Arahkan barcode ke area kamera.');
+                return;
+            }
+            await loadCameraLibrary();
+            camera = new window.Html5Qrcode('srCameraReader');
+            const formatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'ITF', 'UPC_A', 'UPC_E', 'QR_CODE', 'DATA_MATRIX'];
+            const supportedFormats = window.Html5QrcodeSupportedFormats || {};
+            const formatsToSupport = formatNames.map(name => supportedFormats[name]).filter(value => Number.isInteger(value));
+            const cameraConfig = { fps: 12, aspectRatio: 1.777778, disableFlip: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } };
+            if (formatsToSupport.length) cameraConfig.formatsToSupport = formatsToSupport;
+            await camera.start({ facingMode: 'environment' }, cameraConfig, handleCameraDetected, () => {});
+            await enableCameraAutoFocus();
+            setCameraStatus('Deteksi otomatis aktif. Arahkan barcode batang atau QR ke area kamera.');
+        } catch (error) {
+            await stopCamera();
+            setCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
+            alertError('Kamera tidak dapat dibuka. Pastikan izin kamera aktif dan gunakan HTTPS.', 'errorNetwork');
+        } finally {
+            cameraLoading = false;
+            cameraBtn.disabled = false;
+        }
+    }
     function setMode(mode) {
         state.mode = mode;
         if (modeBadge) modeBadge.textContent = mode === 'order' ? 'SCAN ORDER' : 'SCAN ITEM';
+        if (cameraTitle) cameraTitle.innerHTML = '<i class="bi bi-upc-scan" aria-hidden="true"></i> Arahkan barcode ' + (mode === 'order' ? 'order' : 'item') + ' ke kamera';
+        if (cameraPanel && !cameraPanel.hidden) closeCamera();
         if (scanInput) {
             scanInput.placeholder = mode === 'order' ? 'Scan nomor pesanan' : 'Scan kode item retur';
             scanInput.value = '';
@@ -2152,6 +2327,8 @@
 
     if (isDraft) {
         setFlow(initialScanFlow);
+        cameraBtn?.addEventListener('click', openCamera);
+        cameraClose?.addEventListener('click', closeCamera);
         scanInput?.addEventListener('input', function () { this.value = this.value.toUpperCase(); });
         scanInput?.addEventListener('keydown', function (event) {
             if (event.key !== 'Enter') return;
@@ -2210,6 +2387,7 @@
         window.addEventListener('focus', refocusScanner);
         document.addEventListener('visibilitychange', refocusScanner);
     }
+    window.addEventListener('pagehide', stopCamera);
 })();
 </script>
 @endpush
