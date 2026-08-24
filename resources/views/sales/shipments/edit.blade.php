@@ -1219,26 +1219,26 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 #scanForm { position: relative; }
 .shp-scan-input-row { display: flex; align-items: stretch; gap: .45rem; }
 .shp-scan-input-row .shp-scan-input { min-width: 0; flex: 1; }
-.shp-camera-btn { flex: 0 0 auto; width: 48px; min-height: 52px; border: 1px solid #2563eb; border-radius: 8px; color: #fff; background: #2563eb; font-size: 1rem; cursor: pointer; }
+.shp-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 54px; border: 1px solid #2563eb; border-radius: 8px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
 .shp-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
 .shp-camera-btn:disabled { opacity: .65; cursor: wait; }
-.shp-camera-panel { margin-top: .5rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 8px; background: #fff; }
+.shp-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
 .shp-camera-panel[hidden] { display: none !important; }
-.shp-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .45rem .6rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
-.shp-camera-title { font-size: .72rem; font-weight: 850; }
-.shp-camera-close { border: 0; border-radius: 5px; padding: .2rem .42rem; color: #64748b; background: transparent; font-size: .68rem; font-weight: 800; cursor: pointer; }
+.shp-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .65rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
+.shp-camera-title { font-size: .74rem; font-weight: 900; }
+.shp-camera-close { border: 0; border-radius: 6px; padding: .22rem .45rem; color: #64748b; background: transparent; font-size: .7rem; font-weight: 800; cursor: pointer; }
 .shp-camera-close:hover { color: #0f172a; background: #e2e8f0; }
-.shp-camera-reader { min-height: 190px; background: #0f172a; }
-.shp-camera-reader video { display: block; width: 100% !important; max-height: 330px; object-fit: cover; }
+.shp-camera-reader { min-height: 200px; background: #0f172a; }
+.shp-camera-reader video { display: block; width: 100% !important; max-height: 360px; object-fit: cover; }
 .shp-camera-reader img { max-width: 100%; }
-.shp-camera-status { padding: .42rem .6rem; color: #64748b; background: #fff; font-size: .67rem; line-height: 1.4; }
+.shp-camera-status { padding: .45rem .65rem; color: #64748b; background: #fff; font-size: .68rem; line-height: 1.4; }
 .shp-camera-status.error { color: #b91c1c; background: #fef2f2; }
 body[data-theme="dark"] .shp-camera-panel { border-color: rgba(51,65,85,.8); background: #0f172a; }
 body[data-theme="dark"] .shp-camera-head { color: #e2e8f0; background: #1e293b; border-bottom-color: rgba(51,65,85,.8); }
 body[data-theme="dark"] .shp-camera-close { color: #cbd5e1; }
 body[data-theme="dark"] .shp-camera-status { color: #cbd5e1; background: #0f172a; }
 @media (max-width: 640px) {
-    .shp-camera-btn { width: 48px; min-height: 58px; }
+    .shp-camera-btn { width: 46px; min-width: 46px; min-height: 54px; padding-inline: .35rem; }
 }
 .shp-suggest {
     display: none;
@@ -2806,6 +2806,14 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 const msg = 'Yang discan adalah nomor pesanan/resi, bukan kode item. Gunakan Scan Item.';
                 showScanError(msg);
                 showToast('err', msg);
+                focusScan();
+                return;
+            }
+
+            const confirmed = window.confirm(
+                `Konfirmasi scan item?\n\nKode: ${code}\n\nItem akan ditambahkan ke shipment.`
+            );
+            if (!confirmed) {
                 focusScan();
                 return;
             }

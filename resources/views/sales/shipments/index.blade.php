@@ -151,30 +151,20 @@
     .ship-topbar{
         position:sticky;
         top:0;
-        z-index:100;
-        padding:.7rem .85rem;
-        margin-bottom:.75rem;
-        border-radius:0 0 10px 10px;
-        box-shadow:0 4px 16px rgba(15,23,42,.04);
+        z-index:300;
+        padding:.45rem .75rem;
+        margin-inline:-.75rem;
+        margin-bottom:.65rem;
+        border-radius:0;
+        box-shadow:none;
     }
-    .ship-heading{ min-width:250px; }
-    .ship-eyebrow{
-        margin-bottom:.15rem;
-        color:#94a3b8;
-        font-size:.62rem;
-        font-weight:800;
-        letter-spacing:.1em;
-        text-transform:uppercase;
-    }
-    .ship-topbar .title{ font-size:1.12rem; font-weight:850; color:#0f172a; }
-    .ship-topbar .sub{ margin-top:.12rem; }
-    .ship-topbar .kpis{ margin-top:.5rem; }
-    .ship-topbar .kpi{ background:#f8fafc; }
-    .ship-topbar .kpi .val{ color:#0f172a; font-weight:850; }
-    .ship-topbar .kpi.kpi-draft .val{ color:#475569; }
-    .ship-topbar .kpi.kpi-submitted .val{ color:#1d4ed8; }
-    .ship-topbar .kpi.kpi-posted .val{ color:#15803d; }
-    .header-actions .btn-ship-primary{ min-height:36px; padding-inline:1rem; font-weight:800; }
+    .ship-heading{ min-width:0; }
+    .ship-topbar .title{ font-size:1rem; font-weight:750; color:inherit; }
+    .ship-topbar .sub{ margin-top:0; }
+    .ship-topbar .kpis{ margin-top:.35rem; }
+    .ship-topbar .kpi{ background:transparent; }
+    .ship-topbar .kpi .val{ color:var(--shp-accent); font-weight:650; }
+    .header-actions .btn-ship-primary{ font-weight:600; }
     .filter-bar{ align-items:flex-start; padding:.7rem; }
     .filter-heading{ padding-top:.35rem; color:#0f172a; }
     .filter-heading i{ margin-right:.25rem; color:#2563eb; }
@@ -186,8 +176,8 @@
     .list-toolbar-title{ color:#0f172a; font-size:.86rem; font-weight:850; }
     .list-toolbar-sub{ margin-left:.35rem; color:#94a3b8; font-size:.72rem; }
     .list-count{ display:inline-flex; align-items:center; min-height:28px; padding:.15rem .55rem; border:1px solid rgba(37,99,235,.18); border-radius:999px; background:#eff6ff; color:#1d4ed8; font-size:.7rem; font-weight:800; white-space:nowrap; }
-    .code-link{ display:inline-block; color:#1d4ed8!important; font-size:.8rem; font-weight:850; }
-    .code-link:hover{ color:#1e40af!important; }
+    .code-link{ display:inline-block; color:#334155!important; font-size:.8rem; font-weight:700; }
+    .code-link:hover{ color:#0f172a!important; }
     .shipment-inline{ display:flex; align-items:center; gap:.45rem; min-width:0; white-space:nowrap; }
     .shipment-date{ color:#64748b; font-size:.7rem; }
     .shipment-store{ color:#475569; font-size:.72rem; }
@@ -195,8 +185,8 @@
     .shipment-store::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .mode-badge{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.2rem .5rem; font-size:.68rem; font-weight:800; white-space:nowrap; }
     .mode-badge::before{ content:''; width:6px; height:6px; border-radius:999px; background:currentColor; }
-    .mode-item{ color:#3b6fb6; background:#f4f8fd; border:1px solid #dbe7f5; }
-    .mode-order{ color:#7659a8; background:#f8f6fc; border:1px solid #e8e0f3; }
+    .mode-item{ color:#475569; background:#f8fafc; border:1px solid #e2e8f0; }
+    .mode-order{ color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; }
     .package-summary{ display:flex; align-items:baseline; gap:.3rem; white-space:nowrap; }
     .package-main{ color:#0f172a; font-size:.78rem; font-weight:850; }
     .package-sub{ color:#64748b; font-size:.7rem; }
@@ -213,12 +203,12 @@
     .action-icon .action-label{ display:none; }
     .ship-row-action .action-icon{ transition:transform .12s ease, background .12s ease, border-color .12s ease; }
     .ship-row-action .action-icon:hover{ transform:translateY(-1px); }
-    .ship-row-action .btn-ship-outline.action-icon{ color:#64748b!important; background:#f8fafc!important; border-color:#dbe2ea!important; }
-    .ship-row-action .btn-ship-outline.action-icon:hover{ color:#334155!important; background:#eef2f7!important; border-color:#cbd5e1!important; }
+    .ship-row-action .btn-ship-outline.action-icon{ color:#475569!important; background:transparent!important; border-color:rgba(148,163,184,.35)!important; }
+    .ship-row-action .btn-ship-outline.action-icon:hover{ color:#111827!important; background:rgba(148,163,184,.08)!important; border-color:rgba(148,163,184,.5)!important; }
     .ship-row-action .btn-outline-danger.action-icon{ color:#b45353!important; background:#fffafa!important; border-color:#f1d0d0!important; }
     .ship-row-action .btn-outline-danger.action-icon:hover{ color:#991b1b!important; background:#fef2f2!important; border-color:#e8b4b4!important; }
-    .ship-row-action .btn-ship-primary{ color:#fff!important; background:#2563eb!important; border-color:#2563eb!important; }
-    .ship-row-action .btn-ship-primary:hover{ background:#1d4ed8!important; border-color:#1d4ed8!important; }
+    .ship-row-action .btn-ship-primary{ color:#fff!important; background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; }
+    .ship-row-action .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; }
     .action-label{ margin-left:.22rem; }
     .empty-icon{ display:grid; place-items:center; width:42px; height:42px; margin:0 auto .65rem; border-radius:12px; background:#eff6ff; color:#2563eb; font-size:1.1rem; }
     .empty-title{ color:#0f172a; font-size:.9rem; font-weight:850; }
@@ -228,14 +218,16 @@
     body[data-theme="dark"] .ship-topbar .title,
     body[data-theme="dark"] .filter-heading,
     body[data-theme="dark"] .list-toolbar-title,
+    body[data-theme="dark"] .code-link,
     body[data-theme="dark"] .package-main,
     body[data-theme="dark"] .empty-title{ color:#f1f5f9; }
-    body[data-theme="dark"] .ship-topbar .kpi{ background:#0f172a; }
-    body[data-theme="dark"] .ship-topbar .kpi .val{ color:#e2e8f0; }
+    body[data-theme="dark"] .ship-topbar .kpi{ background:rgba(15,23,42,.96); }
+    body[data-theme="dark"] .ship-topbar .kpi .val{ color:#e5e7eb; }
     body[data-theme="dark"] .shipment-store,
     body[data-theme="dark"] .shipment-date,
     body[data-theme="dark"] .package-sub{ color:#94a3b8; }
     body[data-theme="dark"] .row-draft{ background:rgba(30,41,59,.55); }
+    body[data-theme="dark"] .code-link:hover{ color:#fff!important; }
 
     @media (max-width: 768px) {
         .page-wrap{ padding:.5rem .5rem 4rem; }
@@ -257,7 +249,7 @@
         .filter-select{ width:100%; min-height:40px; }
         .shipment-filter-form .btn{ min-height:40px; }
         .kpis{ display:none; }
-        .ship-topbar .kpis{ display:flex; }
+        .ship-topbar .kpis{ display:none; }
         .list-toolbar{ align-items:flex-start; }
         .list-toolbar-sub{ display:block; margin:.15rem 0 0; }
         .list-footer{ display:block; }
@@ -509,7 +501,6 @@
 
     <div class="ship-topbar">
         <div class="ship-heading">
-            <div class="ship-eyebrow">Operasional gudang</div>
             <div class="title">Daftar Shipment</div>
             <div class="sub">Pilih shipment untuk melanjutkan scan atau melihat detail.</div>
 
@@ -580,13 +571,6 @@
                     @endif
                 </div>
             @else
-                <div class="list-toolbar">
-                    <div>
-                        <span class="list-toolbar-title">Shipment terbaru</span>
-                        <span class="list-toolbar-sub">Klik kode atau aksi untuk membuka shipment.</span>
-                    </div>
-                    <span class="list-count">{{ number_format($shipments->total(), 0, ',', '.') }} data</span>
-                </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle table-list">
                         <thead>

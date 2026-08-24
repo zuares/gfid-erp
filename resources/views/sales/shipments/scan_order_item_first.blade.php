@@ -528,6 +528,14 @@
     async function submitOrder(orderNo) {
         if (!orderNo || submitting) return;
 
+        const confirmed = window.confirm(
+            `Konfirmasi scan nomor order/resi?\n\n${orderNo}\n\nNomor ini akan disimpan dan dimapping ke item shipment.`
+        );
+        if (!confirmed) {
+            input?.focus();
+            return;
+        }
+
         submitting = true;
         input.disabled = true;
         try {
