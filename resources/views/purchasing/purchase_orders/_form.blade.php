@@ -193,11 +193,51 @@
 
         .po-supplier-search-wrap {
             position: relative;
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .po-supplier-search {
             min-height: 38px;
             padding-left: 2.2rem !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .po-supplier-combo {
+            display: flex;
+            align-items: stretch;
+            overflow: hidden;
+            border: 1px solid rgba(148,163,184,.42);
+            border-radius: 10px;
+            background: var(--card, #fff);
+            transition: border-color .12s, box-shadow .12s;
+        }
+
+        .po-supplier-combo:focus-within {
+            border-color: rgba(59,130,246,.75);
+            box-shadow: 0 0 0 .2rem rgba(59,130,246,.12);
+        }
+
+        .po-supplier-combo.is-invalid {
+            border-color: var(--bs-danger, #dc3545);
+        }
+
+        .po-supplier-combo .po-supplier-select {
+            flex: 0 0 50px;
+            width: 50px;
+            min-height: 38px;
+            padding: .35rem 1.25rem .35rem .35rem;
+            border: 0;
+            border-left: 1px solid rgba(148,163,184,.25);
+            border-radius: 0;
+            font-size: 0;
+            cursor: pointer;
+        }
+
+        .po-supplier-combo .po-supplier-select option {
+            font-size: .9rem;
         }
 
         .po-supplier-search-icon {
@@ -1111,11 +1151,15 @@
                 min-width: 0 !important;
             }
 
-            .po-supplier-select,
             .po-supplier-search,
             .po-date-wrap input {
                 min-height: 42px !important;
                 font-size: 14px !important;
+            }
+
+            .po-supplier-combo .po-supplier-select {
+                min-height: 42px !important;
+                font-size: 0 !important;
             }
 
             .po-lines-table tbody tr {
@@ -1278,37 +1322,41 @@
         <div class="po-focal-fields">
             <div>
                 <label for="po-supplier" class="po-label mb-1">Supplier</label>
-                <div class="po-supplier-search-wrap mb-2">
-                    <i class="bi bi-search po-supplier-search-icon" aria-hidden="true"></i>
-                    <input type="search" id="po-supplier-search"
-                        class="form-control po-field po-supplier-search"
-                        list="po-supplier-suggestions"
-                        placeholder="Ketik kode atau nama supplier"
-                        value="{{ $selectedSupplierLabel }}"
-                        autocomplete="off"
-                        spellcheck="false"
-                        aria-label="Cari supplier">
-                    <datalist id="po-supplier-suggestions">
+                <div class="po-supplier-combo @error('supplier_id') is-invalid @enderror">
+                    <div class="po-supplier-search-wrap">
+                        <i class="bi bi-search po-supplier-search-icon" aria-hidden="true"></i>
+                        <input type="search" id="po-supplier-search"
+                            class="form-control po-field po-supplier-search"
+                            list="po-supplier-suggestions"
+                            placeholder="Ketik kode atau nama supplier"
+                            value="{{ $selectedSupplierLabel }}"
+                            autocomplete="off"
+                            spellcheck="false"
+                            aria-label="Cari supplier">
+                        <datalist id="po-supplier-suggestions">
+                            @foreach ($suppliers as $sup)
+                                <option value="{{ trim(($sup->code ? $sup->code . ' — ' : '') . $sup->name) }}"></option>
+                            @endforeach
+                        </datalist>
+                    </div>
+                    <select name="supplier_id" id="po-supplier"
+                        class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
+                        required
+                        title="Buka daftar supplier"
+                        aria-label="Pilih supplier dari daftar">
+                        <option value="">— Pilih Supplier —</option>
                         @foreach ($suppliers as $sup)
-                            <option value="{{ trim(($sup->code ? $sup->code . ' — ' : '') . $sup->name) }}"></option>
+                            <option value="{{ $sup->id }}"
+                                @selected((string) $selectedSupplierId === (string) $sup->id)>
+                                {{ $sup->code }} — {{ $sup->name }}
+                            </option>
                         @endforeach
-                    </datalist>
+                    </select>
                 </div>
-                <select name="supplier_id" id="po-supplier"
-                    class="form-select po-field po-supplier-select @error('supplier_id') is-invalid @enderror"
-                    required>
-                    <option value="">— Pilih Supplier —</option>
-                    @foreach ($suppliers as $sup)
-                        <option value="{{ $sup->id }}"
-                            @selected((string) $selectedSupplierId === (string) $sup->id)>
-                            {{ $sup->code }} — {{ $sup->name }}
-                        </option>
-                    @endforeach
-                </select>
                 @error('supplier_id')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
-                <div class="po-supplier-search-hint">Ketik untuk mencari, atau pilih langsung dari daftar.</div>
+                <div class="po-supplier-search-hint">Ketik untuk mencari atau buka daftar supplier di sisi kanan.</div>
                 @if (auth()->user()?->role === 'owner')
                     <div class="text-muted mt-1" style="font-size: .75rem;">
                         <i class="bi bi-info-circle me-1"></i>
@@ -1676,6 +1724,9 @@
             supplierSelect?.addEventListener('change', syncSupplierSearchFromSelect);
             supplierSearch?.addEventListener('change', selectSupplierFromSearch);
             supplierSearch?.addEventListener('blur', selectSupplierFromSearch);
+            supplierSearch?.addEventListener('focus', function () {
+                requestAnimationFrame(() => this.select());
+            });
             supplierSearch?.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
                     event.preventDefault();
