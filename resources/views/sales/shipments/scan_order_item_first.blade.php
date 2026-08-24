@@ -41,6 +41,10 @@
     .sif-order-no { flex: 1; min-width: 0; overflow: hidden; color: #0f172a; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .86rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
     .sif-order-status { color: #166534; font-size: .7rem; font-weight: 800; }
     .sif-empty { padding: 1rem; color: #64748b; text-align: center; font-size: .78rem; }
+    .sif-order-group-section { display: grid; gap: .35rem; }
+    .sif-order-group-heading { display: flex; align-items: center; gap: .4rem; padding: .15rem .1rem; color: #475569; font-size: .68rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+    .sif-order-group-heading b { min-width: 1.25rem; padding: .1rem .3rem; border-radius: 999px; background: #e2e8f0; color: #334155; text-align: center; font-size: .68rem; }
+    .sif-pill-kpi { border-color: rgba(37,99,235,.28); background: #eff6ff; color: #1d4ed8; }
     .sif-input-row { display: flex; align-items: stretch; gap: .45rem; }
     .sif-input-row .sif-input { min-width: 0; flex: 1; }
     .sif-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 54px; border: 1px solid #2563eb; border-radius: 8px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
@@ -90,6 +94,15 @@
     $orders = ($shipment->orderScans ?? collect())->sortBy('id')->values();
     $totalQty = (int) $lines->sum('qty_scanned');
     $totalLines = (int) $lines->count();
+    $orderGroup = static function ($orderNo): string {
+        $value = strtoupper(trim((string) $orderNo));
+        if (str_starts_with($value, 'SPX')) return 'SPX';
+        if (str_starts_with($value, 'JY')) return 'JY';
+        return 'Lainnya';
+    };
+    $orderGroups = collect(['SPX', 'JY', 'Lainnya'])
+        ->mapWithKeys(fn ($group) => [$group => $orders->filter(fn ($order) => $orderGroup($order->order_no) === $group)->count()])
+        ->filter(fn ($total) => $total > 0);
 @endphp
 
 <div class="sif-page">
@@ -100,6 +113,7 @@
         <span class="sif-spacer"></span>
         <span class="sif-pill">{{ $totalLines }} SKU</span>
         <span class="sif-pill">{{ number_format($totalQty, 0, ',', '.') }} Qty</span>
+        <span class="sif-pill sif-pill-kpi">Order <b id="sifOrderTotal">{{ $orders->count() }}</b></span>
         <a href="{{ route('sales.shipments.confirm_orders', $shipment) }}"
            id="sifConfirmBtn"
            class="sif-btn sif-btn-primary"
@@ -113,7 +127,6 @@
                     <div class="sif-title">Scan No Order</div>
                     <div class="sif-sub">Item sudah discan. Scan nomor order sekarang untuk menghubungkan order dengan item shipment.</div>
                 </div>
-                <span class="sif-pill" id="sifOrderCount">{{ $orders->count() }} order</span>
             </div>
             <div class="sif-body">
                 <div class="sif-scan-box">
@@ -146,10 +159,15 @@
             </div>
             <div class="sif-body">
                 <div id="sifOrderList" class="sif-list">
-                    @forelse ($orders as $order)
-                        <div class="sif-order">
-                            <span class="sif-order-no">{{ $order->order_no }}</span>
-                            <span class="sif-order-status">Tercatat</span>
+                    @forelse ($orderGroups as $group => $groupTotal)
+                        <div class="sif-order-group-section">
+                            <div class="sif-order-group-heading"><span>{{ $group }}</span><b>{{ $groupTotal }}</b></div>
+                            @foreach ($orders->filter(fn ($order) => $orderGroup($order->order_no) === $group) as $order)
+                                <div class="sif-order">
+                                    <span class="sif-order-no">{{ $order->order_no }}</span>
+                                    <span class="sif-order-status">Tercatat</span>
+                                </div>
+                            @endforeach
                         </div>
                     @empty
                         <div class="sif-empty">Belum ada nomor order yang discan.</div>
@@ -167,7 +185,7 @@
 (function () {
     const input = document.getElementById('sifScanInput');
     const list = document.getElementById('sifOrderList');
-    const count = document.getElementById('sifOrderCount');
+    const count = document.getElementById('sifOrderTotal');
     const confirmBtn = document.getElementById('sifConfirmBtn');
     const toast = document.getElementById('sifToast');
     const cameraBtn = document.getElementById('sifCameraBtn');
@@ -256,18 +274,33 @@
         });
     }
 
+    function getOrderGroup(orderNo) {
+        const value = String(orderNo || '').trim().toUpperCase();
+        if (value.startsWith('SPX')) return 'SPX';
+        if (value.startsWith('JY')) return 'JY';
+        return 'Lainnya';
+    }
+
     function renderOrders() {
         if (!list) return;
         if (!orders.length) {
             list.innerHTML = '<div class="sif-empty">Belum ada nomor order yang discan.</div>';
         } else {
-            list.innerHTML = orders.map(order => `
-                <div class="sif-order">
-                    <span class="sif-order-no">${String(order).replace(/[&<>"']/g, '')}</span>
-                    <span class="sif-order-status">Tercatat</span>
-                </div>`).join('');
+            const groups = { SPX: [], JY: [], Lainnya: [] };
+            orders.forEach(order => { groups[getOrderGroup(order)].push(order); });
+            list.innerHTML = Object.entries(groups)
+                .filter(([, groupOrders]) => groupOrders.length > 0)
+                .map(([group, groupOrders]) => `
+                    <div class="sif-order-group-section">
+                        <div class="sif-order-group-heading"><span>${group}</span><b>${groupOrders.length}</b></div>
+                        ${groupOrders.map(order => `
+                            <div class="sif-order">
+                                <span class="sif-order-no">${String(order).replace(/[&<>"']/g, '')}</span>
+                                <span class="sif-order-status">Tercatat</span>
+                            </div>`).join('')}
+                    </div>`).join('');
         }
-        if (count) count.textContent = orders.length + ' order';
+        if (count) count.textContent = orders.length;
         if (confirmBtn) {
             confirmBtn.setAttribute('aria-disabled', orders.length ? 'false' : 'true');
             confirmBtn.classList.toggle('is-disabled', !orders.length);
