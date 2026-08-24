@@ -1222,20 +1222,19 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 .shp-camera-btn { flex: 0 0 auto; width: 48px; min-height: 52px; border: 1px solid #2563eb; border-radius: 8px; color: #fff; background: #2563eb; font-size: 1rem; cursor: pointer; }
 .shp-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
 .shp-camera-btn:disabled { opacity: .65; cursor: wait; }
-.shp-camera-panel { margin-top: .5rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 8px; background: #fff; }
+body.shp-camera-open { overflow: hidden !important; }
+.shp-camera-panel { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; margin: 0; overflow: hidden; border: 0; border-radius: 0; background: #020617; color: #fff; }
 .shp-camera-panel[hidden] { display: none !important; }
-.shp-camera-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .45rem .6rem; color: #334155; background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,.16); }
-.shp-camera-title { font-size: .72rem; font-weight: 850; }
-.shp-camera-close { border: 0; border-radius: 5px; padding: .2rem .42rem; color: #64748b; background: transparent; font-size: .68rem; font-weight: 800; cursor: pointer; }
-.shp-camera-close:hover { color: #0f172a; background: #e2e8f0; }
-.shp-camera-reader { min-height: 190px; background: #0f172a; }
-.shp-camera-reader video { display: block; width: 100% !important; max-height: 330px; object-fit: cover; }
-.shp-camera-status { padding: .42rem .6rem; color: #64748b; background: #fff; font-size: .67rem; line-height: 1.4; }
-.shp-camera-status.error { color: #b91c1c; background: #fef2f2; }
-body[data-theme="dark"] .shp-camera-panel { border-color: rgba(51,65,85,.8); background: #0f172a; }
-body[data-theme="dark"] .shp-camera-head { color: #e2e8f0; background: #1e293b; border-bottom-color: rgba(51,65,85,.8); }
-body[data-theme="dark"] .shp-camera-close { color: #cbd5e1; }
-body[data-theme="dark"] .shp-camera-status { color: #cbd5e1; background: #0f172a; }
+.shp-camera-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: .5rem; min-height: 58px; padding: max(.7rem, env(safe-area-inset-top)) .85rem .7rem; color: #fff; background: rgba(2,6,23,.9); border-bottom: 1px solid rgba(148,163,184,.2); }
+.shp-camera-title { color: #fff; font-size: .82rem; font-weight: 900; }
+.shp-camera-close { border: 1px solid rgba(255,255,255,.22); border-radius: 7px; padding: .35rem .6rem; color: #fff; background: rgba(255,255,255,.08); font-size: .72rem; font-weight: 800; cursor: pointer; }
+.shp-camera-close:hover { color: #fff; background: rgba(255,255,255,.18); }
+.shp-camera-reader { position: relative; display: flex; flex: 1 1 auto; align-items: center; justify-content: center; min-height: 0; width: 100%; overflow: hidden; background: #000; }
+.shp-camera-reader video { display: block; width: 100% !important; height: 100% !important; max-height: none; object-fit: cover; }
+.shp-camera-reader img { max-width: 100%; }
+.shp-camera-reader #qr-shaded-region { border: 2px solid #22c55e !important; border-radius: 12px !important; box-shadow: 0 0 0 9999px rgba(2,6,23,.2), 0 0 22px rgba(34,197,94,.55) !important; }
+.shp-camera-status { display: flex; flex: 0 0 auto; align-items: center; min-height: 52px; padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom)); color: #cbd5e1; background: rgba(2,6,23,.94); font-size: .74rem; line-height: 1.4; }
+.shp-camera-status.error { color: #fecaca; background: rgba(127,29,29,.94); }
 @media (max-width: 640px) {
     .shp-camera-btn { width: 48px; min-height: 58px; }
 }
@@ -2144,6 +2143,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     async function closeItemCamera() {
         await stopItemCamera();
         if (scanCameraPanel) scanCameraPanel.hidden = true;
+        document.body.classList.remove('shp-camera-open');
         if (scanCameraReader) scanCameraReader.innerHTML = '';
         scheduleFocusScan({ force: true });
     }
@@ -2152,6 +2152,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         if (!scanCameraBtn || !scanCameraPanel || itemCameraLoading || itemCamera) return;
 
         scanCameraPanel.hidden = false;
+        document.body.classList.add('shp-camera-open');
         itemCameraLoading = true;
         itemCameraDecoding = false;
         scanCameraBtn.disabled = true;
@@ -2164,9 +2165,29 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
 
             await loadItemCameraLibrary();
             itemCamera = new window.Html5Qrcode('scanCameraReader');
+            const formatNames = [
+                'CODE_128', 'CODE_39', 'CODE_93', 'CODABAR',
+                'EAN_13', 'EAN_8', 'ITF', 'UPC_A', 'UPC_E',
+                'QR_CODE', 'DATA_MATRIX'
+            ];
+            const supportedFormats = window.Html5QrcodeSupportedFormats || {};
+            const formatsToSupport = formatNames
+                .map(name => supportedFormats[name])
+                .filter(value => Number.isInteger(value));
+            const cameraConfig = {
+                fps: 12,
+                qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                    width: Math.max(180, Math.min(Math.floor(viewfinderWidth * .92), 760)),
+                    height: Math.max(110, Math.min(Math.floor(viewfinderHeight * .38), 280)),
+                }),
+                aspectRatio: 1.777778,
+                disableFlip: false,
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            };
+            if (formatsToSupport.length) cameraConfig.formatsToSupport = formatsToSupport;
             await itemCamera.start(
                 { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 280, height: 150 }, aspectRatio: 1.777778 },
+                cameraConfig,
                 async (decodedText) => {
                     if (itemCameraDecoding) return;
                     const code = String(decodedText || '').trim().toUpperCase();
@@ -2179,7 +2200,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 },
                 () => {}
             );
-            setItemCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke dalam kotak.');
+            setItemCameraStatus('Kamera aktif. Arahkan barcode batang atau QR ke kotak hijau.');
         } catch (error) {
             await stopItemCamera();
             setItemCameraStatus(error.message || 'Kamera tidak dapat dibuka.', true);
