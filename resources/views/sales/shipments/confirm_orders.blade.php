@@ -83,6 +83,26 @@
 }
 .sd-title { color:#0f172a; font-size:.9rem; }
 .sd-order-no { color:#0f172a; }
+.sd-tabs { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.35rem; margin-bottom:.65rem; padding:.3rem; border:1px solid rgba(148,163,184,.2); border-radius:9px; background:var(--card,#fff); }
+.sd-tab-btn { display:inline-flex; align-items:center; justify-content:center; gap:.35rem; min-height:38px; border:0; border-radius:7px; color:#64748b; background:transparent; font-size:.76rem; font-weight:850; cursor:pointer; }
+.sd-tab-btn:hover { color:#1d4ed8; background:#eff6ff; }
+.sd-tab-btn.active { color:#fff; background:#2563eb; box-shadow:0 3px 9px rgba(37,99,235,.22); }
+.sd-tab-panel[hidden] { display:none!important; }
+.sd-item-list { display:grid; gap:.45rem; }
+.sd-item-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; padding:.6rem .65rem; border:1px solid rgba(148,163,184,.18); border-radius:8px; }
+.sd-item-code { color:#0f172a; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.8rem; font-weight:900; }
+.sd-item-name { margin-top:.1rem; color:#64748b; font-size:.74rem; }
+.sd-item-map { margin-top:.25rem; color:#2563eb; font-size:.68rem; font-weight:800; }
+.sd-item-qty { min-width:48px; padding:.22rem .45rem; border-radius:999px; color:#334155; background:rgba(148,163,184,.12); font-size:.76rem; font-weight:900; text-align:center; }
+.sd-rekon-summary { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:.5rem; margin-bottom:.7rem; }
+.sd-rekon-stat { padding:.65rem; border:1px solid rgba(148,163,184,.18); border-radius:8px; background:rgba(248,250,252,.72); }
+.sd-rekon-stat-label { color:#64748b; font-size:.68rem; }
+.sd-rekon-stat-value { margin-top:.15rem; color:#0f172a; font-size:1.1rem; font-weight:900; }
+.sd-rekon-message { padding:.7rem; border:1px solid rgba(37,99,235,.18); border-radius:8px; color:#1e40af; background:#eff6ff; font-size:.78rem; line-height:1.45; }
+@media(max-width:600px){
+  .sd-tabs{gap:.2rem;padding:.22rem}.sd-tab-btn{min-height:36px;font-size:.7rem}.sd-tab-btn i{display:none}
+  .sd-rekon-summary{grid-template-columns:1fr 1fr}.sd-rekon-stat:last-child{grid-column:1 / -1}
+}
 </style>
 @endpush
 
@@ -98,6 +118,10 @@
     $totalLines = (int) $lines->count();
     $pendingOrders = $orderScans->where('status', 'pending')->count();
     $isItemFirst = ($shipment->scan_mode ?? 'item_first') === 'item_first';
+    $mappedLines = $lines->filter(fn ($line) => !empty($line->shipment_order_scan_id))->values();
+    $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
+    $mappedQty = (int) $mappedLines->sum('qty_scanned');
+    $unmappedQty = (int) $unmappedLines->sum('qty_scanned');
 @endphp
 
 <div class="sd-topbar">
@@ -171,6 +195,21 @@
                 </table>
             </div>
         </div>
+    @endif
+
+    @if($isItemFirst)
+        <div class="sd-tabs" role="tablist" aria-label="Ringkasan shipment">
+            <button type="button" class="sd-tab-btn active" data-sd-tab="orders" role="tab" aria-selected="true">
+                <i class="bi bi-receipt" aria-hidden="true"></i> Order
+            </button>
+            <button type="button" class="sd-tab-btn" data-sd-tab="items" role="tab" aria-selected="false">
+                <i class="bi bi-box-seam" aria-hidden="true"></i> Items
+            </button>
+            <button type="button" class="sd-tab-btn" data-sd-tab="rekon" role="tab" aria-selected="false">
+                <i class="bi bi-diagram-3" aria-hidden="true"></i> Rekonsiliasi
+            </button>
+        </div>
+        <div id="sd-tab-orders" class="sd-tab-panel" role="tabpanel">
     @endif
 
     <div class="sd-card">
@@ -252,6 +291,74 @@
                 @endif
             </div>
     </div>
+
+    @if($isItemFirst)
+        </div>
+
+        <div id="sd-tab-items" class="sd-tab-panel" role="tabpanel" hidden>
+            <div class="sd-card">
+                <div class="sd-head">
+                    <div>
+                        <div class="sd-title">Items Shipment</div>
+                        <div class="sd-muted">Daftar item yang sudah discan dan hasil mapping order.</div>
+                    </div>
+                    <span class="sd-pill">{{ number_format($totalLines, 0, ',', '.') }} SKU</span>
+                </div>
+                <div class="sd-body">
+                    <div class="sd-item-list">
+                        @forelse($lines as $line)
+                            @php
+                                $lineOrder = $line->shipment_order_scan_id
+                                    ? $orderScans->firstWhere('id', $line->shipment_order_scan_id)
+                                    : null;
+                            @endphp
+                            <div class="sd-item-row">
+                                <div>
+                                    <div class="sd-item-code">{{ $line->item?->code ?? '-' }}</div>
+                                    <div class="sd-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
+                                    <div class="sd-item-map">
+                                        {{ $lineOrder ? 'Order: ' . $lineOrder->order_no : 'Belum terhubung ke order' }}
+                                    </div>
+                                </div>
+                                <span class="sd-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</span>
+                            </div>
+                        @empty
+                            <div class="sd-empty">Belum ada item yang discan.</div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sd-tab-rekon" class="sd-tab-panel" role="tabpanel" hidden>
+            <div class="sd-card">
+                <div class="sd-head">
+                    <div>
+                        <div class="sd-title">Rekonsiliasi</div>
+                        <div class="sd-muted">Ringkasan hubungan order dan item sebelum shipment dikirim.</div>
+                    </div>
+                    <span class="sd-pill">Otomatis</span>
+                </div>
+                <div class="sd-body">
+                    <div class="sd-rekon-summary">
+                        <div class="sd-rekon-stat"><div class="sd-rekon-stat-label">Order</div><div class="sd-rekon-stat-value">{{ number_format($orderScans->count(), 0, ',', '.') }}</div></div>
+                        <div class="sd-rekon-stat"><div class="sd-rekon-stat-label">Item ter-mapping</div><div class="sd-rekon-stat-value">{{ number_format($mappedQty, 0, ',', '.') }} qty</div></div>
+                        <div class="sd-rekon-stat"><div class="sd-rekon-stat-label">Belum ter-mapping</div><div class="sd-rekon-stat-value">{{ number_format($unmappedQty, 0, ',', '.') }} qty</div></div>
+                    </div>
+                    @if($orderScans->isEmpty())
+                        <div class="sd-rekon-message">Belum ada order yang tercatat. Scan nomor order terlebih dahulu agar item dapat dipetakan.</div>
+                        <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-primary mt-3">Scan No Order</a>
+                    @elseif($unmappedLines->isNotEmpty())
+                        <div class="sd-rekon-message">Sebagian item belum memiliki order. Buka rekonsiliasi untuk memeriksa mapping sebelum submit.</div>
+                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary mt-3">Buka Rekonsiliasi</a>
+                    @else
+                        <div class="sd-rekon-message">Semua item sudah terhubung ke order. Mapping siap direview sebelum submit.</div>
+                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary mt-3">Review Rekonsiliasi</a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
 
 <script>
@@ -271,6 +378,22 @@
         });
 
         if (orderSearchEmpty) orderSearchEmpty.hidden = visibleCount > 0;
+    });
+
+    var tabButtons = document.querySelectorAll('[data-sd-tab]');
+    var tabPanels = document.querySelectorAll('.sd-tab-panel');
+    tabButtons.forEach(function(button){
+        button.addEventListener('click', function(){
+            var target = button.dataset.sdTab;
+            tabButtons.forEach(function(tab){
+                var active = tab === button;
+                tab.classList.toggle('active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            tabPanels.forEach(function(panel){
+                panel.hidden = panel.id !== 'sd-tab-' + target;
+            });
+        });
     });
 
 })();
