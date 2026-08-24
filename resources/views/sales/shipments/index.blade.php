@@ -188,17 +188,24 @@
     .list-count{ display:inline-flex; align-items:center; min-height:28px; padding:.15rem .55rem; border:1px solid rgba(37,99,235,.18); border-radius:999px; background:#eff6ff; color:#1d4ed8; font-size:.7rem; font-weight:800; white-space:nowrap; }
     .code-link{ display:inline-block; color:#1d4ed8!important; font-size:.8rem; font-weight:850; }
     .code-link:hover{ color:#1e40af!important; }
-    .shipment-date{ margin-top:.18rem; color:#64748b; font-size:.7rem; }
-    .shipment-store{ margin-top:.18rem; color:#475569; font-size:.72rem; }
+    .shipment-inline{ display:flex; align-items:center; gap:.45rem; min-width:0; white-space:nowrap; }
+    .shipment-date{ color:#64748b; font-size:.7rem; }
+    .shipment-store{ color:#475569; font-size:.72rem; }
+    .shipment-date::before,
+    .shipment-store::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .mode-badge{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.2rem .5rem; font-size:.68rem; font-weight:800; white-space:nowrap; }
     .mode-badge::before{ content:''; width:6px; height:6px; border-radius:999px; background:currentColor; }
     .mode-item{ color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; }
     .mode-order{ color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; }
-    .package-summary{ display:grid; gap:.12rem; }
+    .package-summary{ display:flex; align-items:baseline; gap:.3rem; white-space:nowrap; }
     .package-main{ color:#0f172a; font-size:.78rem; font-weight:850; }
     .package-sub{ color:#64748b; font-size:.7rem; }
+    .package-sub::before{ content:'·'; margin-right:.3rem; color:#cbd5e1; }
     .row-draft{ background:rgba(239,246,255,.22); }
     .row-draft:hover{ background:rgba(239,246,255,.58)!important; }
+    .ship-row-action{ white-space:nowrap; }
+    .ship-row-action .btn{ width:auto!important; white-space:nowrap; }
+    .ship-row-action .d-flex{ flex-wrap:nowrap!important; }
     .ship-row-action .btn-ship-primary{ color:#fff!important; background:#2563eb!important; border-color:#2563eb!important; }
     .ship-row-action .btn-ship-primary:hover{ background:#1d4ed8!important; border-color:#1d4ed8!important; }
     .action-label{ margin-left:.22rem; }
@@ -245,6 +252,14 @@
         .list-footer{ display:block; }
         .list-footer .pagination{ margin-top:.6rem; }
         .action-label{ display:inline; }
+        .shipment-inline{ display:block; white-space:normal; }
+        .shipment-date,
+        .shipment-store{ display:block; margin-top:.15rem; }
+        .shipment-date::before,
+        .shipment-store::before{ display:none; }
+        .package-summary{ display:block; white-space:normal; }
+        .package-sub{ display:block; margin-top:.12rem; }
+        .package-sub::before{ display:none; }
         .table-responsive{ max-height:62vh; overflow:auto; }
         .table-list thead{ display:none; }
         .table-list,
@@ -616,16 +631,16 @@
 
                                     <td>
                                         <div class="ship-row-main">
-                                            <div>
+                                            <div class="shipment-inline">
                                                 <a class="code-link" href="{{ $actionRoute }}">
                                                     {{ $shipment->code }}
                                                 </a>
 
-                                                <div class="shipment-date">
+                                                <span class="shipment-date">
                                                     {{ $fmtDate($shipment->date, 'd M Y') }} · {{ $fmtDate($shipment->created_at, 'H:i') }} WIB
-                                                </div>
+                                                </span>
                                                 @if($shipment->store)
-                                                    <div class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</div>
+                                                    <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
                                                 @endif
 
                                                 <div class="ship-row-meta d-md-none">
@@ -704,7 +719,7 @@
                                                 @endif
                                             </div>
                                         @else
-                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill w-100">
+                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill">
                                                 <i class="bi {{ $uiStatus === 'draft' ? 'bi-play-fill' : 'bi-arrow-right' }}" aria-hidden="true"></i>
                                                 {{ $actionLabel }}
                                             </a>
