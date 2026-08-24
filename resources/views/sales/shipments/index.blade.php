@@ -195,19 +195,19 @@
     .shipment-store::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .mode-badge{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.2rem .5rem; font-size:.68rem; font-weight:800; white-space:nowrap; }
     .mode-badge::before{ content:''; width:6px; height:6px; border-radius:999px; background:currentColor; }
-    .mode-item{ color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; }
-    .mode-order{ color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; }
+    .mode-item{ color:#3b6fb6; background:#f4f8fd; border:1px solid #dbe7f5; }
+    .mode-order{ color:#7659a8; background:#f8f6fc; border:1px solid #e8e0f3; }
     .package-summary{ display:flex; align-items:baseline; gap:.3rem; white-space:nowrap; }
     .package-main{ color:#0f172a; font-size:.78rem; font-weight:850; }
     .package-sub{ color:#64748b; font-size:.7rem; }
     .package-sub::before{ content:'·'; margin-right:.3rem; color:#cbd5e1; }
-    .row-draft{ background:rgba(239,246,255,.22); }
-    .row-draft:hover{ background:rgba(239,246,255,.58)!important; }
+    .row-draft{ background:rgba(248,250,252,.68); }
+    .row-draft:hover{ background:rgba(241,245,249,.9)!important; }
     .ship-row-action{ white-space:nowrap; }
     .ship-row-action .btn{ width:auto!important; white-space:nowrap; }
     .ship-row-action .d-flex{ flex-wrap:nowrap!important; }
     .shipment-row-clickable{ cursor:pointer; }
-    .shipment-row-clickable:hover{ background:rgba(239,246,255,.72)!important; }
+    .shipment-row-clickable:hover{ background:rgba(241,245,249,.82)!important; }
     .action-icon{ display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:0!important; border-radius:8px!important; }
     .action-icon i{ margin:0!important; font-size:.86rem; }
     .action-icon .action-label{ display:none; }
@@ -229,7 +229,7 @@
     body[data-theme="dark"] .shipment-store,
     body[data-theme="dark"] .shipment-date,
     body[data-theme="dark"] .package-sub{ color:#94a3b8; }
-    body[data-theme="dark"] .row-draft{ background:rgba(30,64,175,.12); }
+    body[data-theme="dark"] .row-draft{ background:rgba(30,41,59,.55); }
 
     @media (max-width: 768px) {
         .page-wrap{ padding:.5rem .5rem 4rem; }
