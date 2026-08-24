@@ -1890,6 +1890,9 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     let itemCameraLoading = false;
     let itemCameraLibrary = null;
     let itemCameraDecoding = false;
+    let nativeItemCameraStream = null;
+    let nativeItemCameraFrame = null;
+    let nativeItemCameraDetecting = false;
     const pickingLines = new Map(@json($pickingLinesPayload));
 
     const FMT = new Intl.NumberFormat('id-ID');
@@ -2135,15 +2138,22 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     }
 
     async function stopItemCamera() {
-        if (!itemCamera) return;
-        const activeCamera = itemCamera;
-        itemCamera = null;
-        try { await activeCamera.stop(); } catch (error) {}
-        try { activeCamera.clear(); } catch (error) {}
+        nativeItemCameraDetecting = false;
+        if (nativeItemCameraFrame) cancelAnimationFrame(nativeItemCameraFrame);
+        nativeItemCameraFrame = null;
+        if (nativeItemCameraStream) {
+            nativeItemCameraStream.getTracks().forEach(track => track.stop());
+            nativeItemCameraStream = null;
+        }
+        if (itemCamera) {
+            const activeCamera = itemCamera;
+            itemCamera = null;
+            try { await activeCamera.stop(); } catch (error) {}
+            try { activeCamera.clear(); } catch (error) {}
+        }
     }
 
-    async function enableItemAutoFocus() {
-        const video = scanCameraReader?.querySelector('video');
+    async function enableItemAutoFocus(video = scanCameraReader?.querySelector('video')) {
         const track = video?.srcObject?.getVideoTracks?.()[0];
         const capabilities = track?.getCapabilities?.();
         if (!track || !Array.isArray(capabilities?.focusMode) || !capabilities.focusMode.includes('continuous')) return;
@@ -2155,6 +2165,68 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         if (scanCameraPanel) scanCameraPanel.hidden = true;
         if (scanCameraReader) scanCameraReader.innerHTML = '';
         scheduleFocusScan({ force: true });
+    }
+
+    async function handleItemDetected(decodedText) {
+        if (itemCameraDecoding) return;
+        const code = String(decodedText || '').trim().toUpperCase();
+        if (!code) return;
+        itemCameraDecoding = true;
+        await closeItemCamera();
+        scanInput.value = code;
+        if (typeof scanForm.requestSubmit === 'function') scanForm.requestSubmit();
+        else scanForm.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+
+    async function startNativeItemCamera() {
+        const Detector = window.BarcodeDetector;
+        if (typeof Detector !== 'function' || typeof Detector.getSupportedFormats !== 'function') return false;
+
+        let supportedFormats = [];
+        try { supportedFormats = await Detector.getSupportedFormats(); } catch (error) { return false; }
+        if (!Array.isArray(supportedFormats)) return false;
+        const wantedFormats = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code', 'data_matrix'];
+        const formats = wantedFormats.filter(format => supportedFormats.includes(format));
+        if (!formats.length) return false;
+
+        nativeItemCameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+            },
+        });
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.srcObject = nativeItemCameraStream;
+        scanCameraReader.innerHTML = '';
+        scanCameraReader.appendChild(video);
+        await video.play();
+        await enableItemAutoFocus(video);
+
+        const detector = new Detector({ formats });
+        nativeItemCameraDetecting = true;
+        const detect = async () => {
+            if (!nativeItemCameraDetecting) return;
+            try {
+                if (video.readyState >= 2) {
+                    const results = await detector.detect(video);
+                    const value = results?.[0]?.rawValue;
+                    if (value) {
+                        nativeItemCameraDetecting = false;
+                        await handleItemDetected(value);
+                        return;
+                    }
+                }
+            } catch (error) {}
+            if (nativeItemCameraDetecting) nativeItemCameraFrame = requestAnimationFrame(detect);
+        };
+        nativeItemCameraFrame = requestAnimationFrame(detect);
+        return true;
     }
 
     async function openItemCamera() {
@@ -2169,6 +2241,11 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         try {
             if (!navigator.mediaDevices?.getUserMedia) {
                 throw new Error('Browser ini tidak mendukung akses kamera. Gunakan Chrome atau Safari versi terbaru.');
+            }
+
+            if (await startNativeItemCamera()) {
+                setItemCameraStatus('Scanner native aktif. Arahkan barcode ke area kamera.');
+                return;
             }
 
             await loadItemCameraLibrary();
@@ -2192,16 +2269,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
             await itemCamera.start(
                 { facingMode: 'environment' },
                 cameraConfig,
-                async (decodedText) => {
-                    if (itemCameraDecoding) return;
-                    const code = String(decodedText || '').trim().toUpperCase();
-                    if (!code) return;
-                    itemCameraDecoding = true;
-                    await closeItemCamera();
-                    scanInput.value = code;
-                    if (typeof scanForm.requestSubmit === 'function') scanForm.requestSubmit();
-                    else scanForm.dispatchEvent(new Event('submit', { cancelable: true }));
-                },
+                handleItemDetected,
                 () => {}
             );
             await enableItemAutoFocus();

@@ -223,6 +223,9 @@
     let cameraLibraryPromise = null;
     let orderAudioContext = null;
     let activeGroup = 'all';
+    let nativeCameraStream = null;
+    let nativeCameraFrame = null;
+    let nativeCameraDetecting = false;
 
     function showToast(message, error = false) {
         if (!toast) return;
@@ -303,8 +306,7 @@
         return 'Lainnya';
     }
 
-    async function enableOrderAutoFocus() {
-        const video = cameraReader?.querySelector('video');
+    async function enableOrderAutoFocus(video = cameraReader?.querySelector('video')) {
         const track = video?.srcObject?.getVideoTracks?.()[0];
         const capabilities = track?.getCapabilities?.();
         if (!track || !Array.isArray(capabilities?.focusMode) || !capabilities.focusMode.includes('continuous')) return;
@@ -386,11 +388,19 @@
     }
 
     async function stopCamera() {
-        if (!camera) return;
-        const activeCamera = camera;
-        camera = null;
-        try { await activeCamera.stop(); } catch (error) {}
-        try { activeCamera.clear(); } catch (error) {}
+        nativeCameraDetecting = false;
+        if (nativeCameraFrame) cancelAnimationFrame(nativeCameraFrame);
+        nativeCameraFrame = null;
+        if (nativeCameraStream) {
+            nativeCameraStream.getTracks().forEach(track => track.stop());
+            nativeCameraStream = null;
+        }
+        if (camera) {
+            const activeCamera = camera;
+            camera = null;
+            try { await activeCamera.stop(); } catch (error) {}
+            try { activeCamera.clear(); } catch (error) {}
+        }
     }
 
     async function closeCamera() {
@@ -398,6 +408,65 @@
         if (cameraPanel) cameraPanel.hidden = true;
         if (cameraReader) cameraReader.innerHTML = '';
         if (input) input.focus();
+    }
+
+    async function handleOrderDetected(decodedText) {
+        if (submitting) return;
+        const orderNo = String(decodedText || '').trim().toUpperCase();
+        if (!orderNo) return;
+        await closeCamera();
+        await submitOrder(orderNo);
+    }
+
+    async function startNativeOrderCamera() {
+        const Detector = window.BarcodeDetector;
+        if (typeof Detector !== 'function' || typeof Detector.getSupportedFormats !== 'function') return false;
+
+        let supportedFormats = [];
+        try { supportedFormats = await Detector.getSupportedFormats(); } catch (error) { return false; }
+        if (!Array.isArray(supportedFormats)) return false;
+        const wantedFormats = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code', 'data_matrix'];
+        const formats = wantedFormats.filter(format => supportedFormats.includes(format));
+        if (!formats.length) return false;
+
+        nativeCameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+            },
+        });
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.srcObject = nativeCameraStream;
+        cameraReader.innerHTML = '';
+        cameraReader.appendChild(video);
+        await video.play();
+        await enableOrderAutoFocus(video);
+
+        const detector = new Detector({ formats });
+        nativeCameraDetecting = true;
+        const detect = async () => {
+            if (!nativeCameraDetecting) return;
+            try {
+                if (video.readyState >= 2) {
+                    const results = await detector.detect(video);
+                    const value = results?.[0]?.rawValue;
+                    if (value) {
+                        nativeCameraDetecting = false;
+                        await handleOrderDetected(value);
+                        return;
+                    }
+                }
+            } catch (error) {}
+            if (nativeCameraDetecting) nativeCameraFrame = requestAnimationFrame(detect);
+        };
+        nativeCameraFrame = requestAnimationFrame(detect);
+        return true;
     }
 
     async function openCamera() {
@@ -412,6 +481,11 @@
         try {
             if (!navigator.mediaDevices?.getUserMedia) {
                 throw new Error('Browser ini tidak mendukung akses kamera. Gunakan Chrome atau Safari versi terbaru.');
+            }
+
+            if (await startNativeOrderCamera()) {
+                setCameraStatus('Scanner native aktif. Arahkan barcode ke area kamera.');
+                return;
             }
 
             await loadCameraLibrary();
@@ -435,13 +509,7 @@
             await camera.start(
                 { facingMode: 'environment' },
                 cameraConfig,
-                async (decodedText) => {
-                    if (submitting) return;
-                    const orderNo = String(decodedText || '').trim().toUpperCase();
-                    if (!orderNo) return;
-                    await closeCamera();
-                    await submitOrder(orderNo);
-                },
+                handleOrderDetected,
                 () => {}
             );
             await enableOrderAutoFocus();
