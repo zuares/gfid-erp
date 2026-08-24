@@ -31,6 +31,7 @@ class GrnFromDraftPoTest extends TestCase
     protected User $owner;
     protected User $admin;
     protected Warehouse $warehouse;
+    protected Warehouse $rtsWarehouse;
     protected Supplier $supplier;
     protected Supplier $supplierOther;
     protected Item $item;
@@ -47,6 +48,7 @@ class GrnFromDraftPoTest extends TestCase
         // firstOrCreate: kode master (warehouse/supplier/COA) mungkin sudah
         // di-seed oleh migration — jangan bikin duplikat (UNIQUE constraint).
         $this->warehouse = Warehouse::firstOrCreate(['code' => 'GRNTWH'], ['name' => 'GRN Test WH']);
+        $this->rtsWarehouse = Warehouse::firstOrCreate(['code' => 'WH-RTS'], ['name' => 'Gudang RTS']);
         $this->supplier = Supplier::firstOrCreate(['code' => 'GRNSA'], ['name' => 'GRN Supplier A']);
         $this->supplierOther = Supplier::firstOrCreate(['code' => 'GRNSB'], ['name' => 'GRN Supplier B']);
 
@@ -442,6 +444,12 @@ class GrnFromDraftPoTest extends TestCase
         );
         $this->assertEqualsWithDelta(
             1,
+            (float) InventoryStock::where('warehouse_id', $this->rtsWarehouse->id)
+                ->where('item_id', $finishedGood->id)->value('qty'),
+            0.001
+        );
+        $this->assertEqualsWithDelta(
+            0,
             (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
                 ->where('item_id', $finishedGood->id)->value('qty'),
             0.001

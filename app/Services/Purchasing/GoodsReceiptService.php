@@ -13,6 +13,7 @@ use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
+use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Purchasing\PurchaseOrderService;
@@ -387,7 +388,7 @@ class GoodsReceiptService
                 }
 
                 $this->inventory->stockIn(
-                    warehouseId: (int) $grn->warehouse_id,
+                    warehouseId: $this->resolveStockWarehouseId($line, (int) $grn->warehouse_id),
                     itemId: (int) $line->item_id,
                     qty: (float) $line->qty_received,
                     date: $grn->date,
@@ -678,6 +679,29 @@ class GoodsReceiptService
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         }, 3);
+    }
+
+    /**
+     * FG dari GRN langsung ditempatkan di WH-RTS.
+     * Item selain FG tetap mengikuti gudang tujuan pada GRN.
+     */
+    protected function resolveStockWarehouseId(PurchaseReceiptLine $line, int $defaultWarehouseId): int
+    {
+        if (!$line->item?->isFinishedGood()) {
+            return $defaultWarehouseId;
+        }
+
+        $rtsWarehouseId = (int) Warehouse::query()
+            ->where('code', 'WH-RTS')
+            ->value('id');
+
+        if ($rtsWarehouseId <= 0) {
+            throw ValidationException::withMessages([
+                'grn' => 'Gudang WH-RTS belum tersedia. Buat/aktifkan gudang WH-RTS sebelum posting GRN FG.',
+            ]);
+        }
+
+        return $rtsWarehouseId;
     }
 
     /**
