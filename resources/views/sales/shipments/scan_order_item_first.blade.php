@@ -5,13 +5,12 @@
 
 @push('head')
 <style>
-    .sif-page { max-width: 960px; margin: 0 auto; padding: 0 .75rem 2rem; color: #0f172a; }
+    .sif-page { max-width: 1100px; margin: 0 auto; padding: 0 .75rem 4rem; color: #0f172a; }
     .sif-topbar {
         position: sticky; top: 0; z-index: 300;
         display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
-        margin: 0 -.75rem; padding: .55rem .8rem;
-        background: rgba(248,250,252,.94); border-bottom: 1px solid rgba(148,163,184,.18);
-        backdrop-filter: blur(10px);
+        margin: 0 -.75rem; padding: .45rem .75rem;
+        background: var(--card, #fff); border-bottom: 1px solid rgba(148,163,184,.18);
     }
     .sif-code { font-size: .95rem; font-weight: 900; letter-spacing: .03em; }
     .sif-spacer { flex: 1; min-width: .35rem; }
@@ -26,15 +25,15 @@
     .sif-btn-primary:hover { color: #fff !important; background: #1d4ed8; border-color: #1d4ed8; }
     .sif-btn-primary[aria-disabled="true"] { color: #fff !important; background: #64748b; border-color: #64748b; opacity: .7; pointer-events: none; }
     .sif-pill { display: inline-flex; align-items: center; gap: .25rem; min-height: 30px; padding: .2rem .55rem; border: 1px solid rgba(37,99,235,.18); border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: .7rem; font-weight: 800; }
-    .sif-shell { display: grid; gap: .65rem; margin-top: .65rem; }
-    .sif-card { overflow: hidden; border: 1px solid rgba(148,163,184,.18); border-radius: 10px; background: #fff; }
-    .sif-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; padding: .8rem .9rem; border-bottom: 1px solid rgba(148,163,184,.12); }
+    .sif-shell { display: grid; gap: .55rem; margin-top: .55rem; }
+    .sif-card { overflow: hidden; border: 1px solid rgba(148,163,184,.18); border-radius: 8px; background: var(--card, #fff); box-shadow: none; }
+    .sif-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; padding: .65rem .75rem; border-bottom: 1px solid rgba(148,163,184,.12); }
     .sif-title { font-size: .9rem; font-weight: 900; }
     .sif-sub { margin-top: .2rem; color: #64748b; font-size: .76rem; line-height: 1.4; }
-    .sif-body { padding: .8rem .9rem; }
-    .sif-scan-box { padding: .8rem; border: 1px solid rgba(37,99,235,.18); border-radius: 9px; background: #eff6ff; }
+    .sif-body { padding: .75rem; }
+    .sif-scan-box { padding: .75rem; border: 1px solid rgba(37,99,235,.18); border-radius: 8px; background: rgba(37,99,235,.06); }
     .sif-label { display: block; margin-bottom: .35rem; color: #1e40af; font-size: .7rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
-    .sif-input { width: 100%; min-height: 58px; border: 2px solid rgba(37,99,235,.28); border-radius: 9px; padding: .65rem .8rem; color: #0f172a; background: #fff; font-size: 1.2rem; font-weight: 850; letter-spacing: .03em; text-transform: uppercase; }
+    .sif-input { width: 100%; min-height: 54px; border: 1.5px solid rgba(148,163,184,.35); border-radius: 8px; padding: .5rem .7rem; color: #0f172a; background: #fff; font-size: 1.25rem; font-weight: 850; letter-spacing: .03em; text-transform: uppercase; }
     .sif-input:focus { outline: 0; border-color: #2563eb; box-shadow: 0 0 0 .2rem rgba(37,99,235,.14); }
     .sif-hint { margin-top: .35rem; color: #64748b; font-size: .72rem; }
     .sif-list { display: grid; gap: .4rem; }
@@ -44,7 +43,7 @@
     .sif-empty { padding: 1rem; color: #64748b; text-align: center; font-size: .78rem; }
     .sif-input-row { display: flex; align-items: stretch; gap: .45rem; }
     .sif-input-row .sif-input { min-width: 0; flex: 1; }
-    .sif-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 58px; border: 1px solid #2563eb; border-radius: 9px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
+    .sif-camera-btn { flex: 0 0 auto; min-width: 46px; min-height: 54px; border: 1px solid #2563eb; border-radius: 8px; padding: .35rem .7rem; color: #fff; background: #2563eb; font-size: .76rem; font-weight: 900; cursor: pointer; }
     .sif-camera-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
     .sif-camera-btn:disabled { opacity: .65; cursor: wait; }
     .sif-camera-panel { margin-top: .6rem; overflow: hidden; border: 1px solid rgba(148,163,184,.24); border-radius: 9px; background: #fff; }
@@ -74,13 +73,13 @@
     .sif-toast.show { display: block; }
     .sif-toast.error { background: #991b1b; }
     @media (max-width: 640px) {
-        .sif-page { padding: 0 .45rem 1.5rem; }
-        .sif-topbar { margin: 0 -.45rem; padding: .5rem .55rem; }
-        .sif-topbar { --sif-topbar-height: 7.2rem; }
+        .sif-page { padding: 0 .5rem 5rem; }
+        .sif-topbar { margin: 0 -.5rem; padding: .5rem; }
+        .sif-topbar { --sif-topbar-height: 6.6rem; }
         .sif-topbar .sif-btn-primary { width: 100%; order: 5; }
         .sif-card-head, .sif-body { padding: .7rem; }
-        .sif-input { min-height: 62px; font-size: 1.08rem; }
-        .sif-camera-btn { width: 46px; min-width: 46px; min-height: 62px; padding-inline: .35rem; }
+        .sif-input { min-height: 54px; font-size: 1.25rem; }
+        .sif-camera-btn { width: 46px; min-width: 46px; min-height: 54px; padding-inline: .35rem; }
     }
 </style>
 @endpush
