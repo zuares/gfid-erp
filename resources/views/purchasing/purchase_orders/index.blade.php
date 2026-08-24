@@ -397,10 +397,8 @@
                 default => 'Belum bayar',
             };
 
-            $actionRoute = $uiStatus === 'draft'
-                ? route('purchasing.purchase_orders.edit', $order->id)
-                : route('purchasing.purchase_orders.show', $order->id);
-            $actionLabel = $uiStatus === 'draft' ? 'Lanjutkan' : 'Detail';
+            // Klik baris selalu membuka detail; edit hanya lewat tombol pensil.
+            $actionRoute = route('purchasing.purchase_orders.show', $order->id);
         @endphp
 
         <tr class="po-row" data-href="{{ $actionRoute }}" style="cursor: pointer;">
@@ -480,9 +478,6 @@
 
             <td class="text-end ship-row-action mobile-hide">
                 <div class="d-inline-flex gap-1 justify-content-end">
-                    <a href="{{ route('purchasing.purchase_orders.show', $order->id) }}" class="btn btn-sm btn-ship-outline btn-pill">
-                        Detail
-                    </a>
                     @if ($uiStatus === 'draft')
                         <a href="{{ route('purchasing.purchase_orders.edit', $order->id) }}" class="btn btn-sm btn-ship-outline btn-pill px-2" title="Edit">
                             <i class="bi bi-pencil"></i>

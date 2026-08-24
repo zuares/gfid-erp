@@ -10,10 +10,13 @@
 .po-code{font-weight:900;font-size:1.05rem;color:#111827;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .po-supplier{font-size:.8rem;color:#64748b;margin-left:.25rem}
 .po-spacer{flex:1}
-.po-document-date-row{display:flex;align-items:center;gap:.45rem;margin-bottom:.65rem;padding:.55rem .75rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;background:var(--card,#fff);color:#64748b;font-size:.78rem}
-.po-document-date-row i{color:#94a3b8}
-.po-document-date-row strong{color:#334155;font-weight:800}
-.po-document-date-label{font-size:.7rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#94a3b8}
+.po-document-date-row{display:flex;align-items:center;gap:.65rem;margin-bottom:.7rem;padding:.8rem 1rem;border:1px solid rgba(37,99,235,.2);border-left:4px solid #2563eb;border-radius:9px;background:linear-gradient(90deg,rgba(239,246,255,.92),rgba(255,255,255,.96));color:#64748b;font-size:.78rem;box-shadow:0 3px 12px rgba(37,99,235,.07)}
+.po-document-date-row i{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:7px;background:#dbeafe;color:#2563eb;font-size:1rem}
+.po-document-date-row strong{color:#1e3a8a;font-size:1rem;font-weight:900;letter-spacing:-.01em}
+.po-document-date-label{font-size:.68rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#64748b}
+body[data-theme="dark"] .po-document-date-row{border-color:rgba(96,165,250,.35);background:linear-gradient(90deg,rgba(30,58,138,.24),rgba(15,23,42,.92));box-shadow:0 3px 12px rgba(2,6,23,.25)}
+body[data-theme="dark"] .po-document-date-row i{background:rgba(59,130,246,.2);color:#93c5fd}
+body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
 .po-btn,.po-pill{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;border-radius:7px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#475569;text-decoration:none;font-size:.76rem;padding:.28rem .6rem;min-height:34px}
 .po-btn{font-weight:800; cursor:pointer;}
 .po-btn:hover{background:rgba(148,163,184,.09);color:#111827;text-decoration:none}
