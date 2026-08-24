@@ -9,6 +9,8 @@
 .po-topbar{position:sticky;top:0;z-index:250;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.55rem .75rem;background:var(--card,#fff);border-bottom:1px solid rgba(148,163,184,.18)}
 .po-code{font-weight:900;font-size:1.05rem;color:#111827;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .po-supplier{font-size:.8rem;color:#64748b;margin-left:.25rem}
+.po-detail-date{display:inline-flex;align-items:center;gap:.3rem;color:#64748b;font-size:.76rem;font-weight:700;white-space:nowrap}
+.po-detail-date i{color:#94a3b8;font-size:.78rem}
 .po-spacer{flex:1}
 .po-btn,.po-pill{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;border-radius:7px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#475569;text-decoration:none;font-size:.76rem;padding:.28rem .6rem;min-height:34px}
 .po-btn{font-weight:800; cursor:pointer;}
@@ -210,6 +212,10 @@
     
     <span class="po-code">{{ $order->code }}</span>
     <span class="po-supplier d-none d-md-inline">{{ optional($order->supplier)->name ?? 'Purchase Order' }}</span>
+    <span class="po-detail-date" title="Tanggal dokumen PO">
+        <i class="bi bi-calendar3" aria-hidden="true"></i>
+        <span>{{ id_day($order->date) }}</span>
+    </span>
     
     <span class="po-pill po-status {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
     @if ($canSeeMoney)
