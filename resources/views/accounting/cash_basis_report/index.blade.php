@@ -192,28 +192,28 @@
 
             <x-gf.panel title="Penerimaan Per Sumber" subtitle="Hanya transaksi penerimaan yang sudah Tercatat.">
                 <div class="cbr-list">
-                    @forelse ($receiptBySource as $row)
-                        <div class="cbr-row">
-                            <div>
-                                <div class="cbr-row-title">{{ $row->name }}</div>
-                                <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                    @if ($receiptBySource->isEmpty() && ($payoutByMarketplace ?? collect())->isEmpty())
+                        <div class="cbr-empty">Belum ada penerimaan tercatat pada periode ini.</div>
+                    @else
+                        @foreach ($receiptBySource as $row)
+                            <div class="cbr-row">
+                                <div>
+                                    <div class="cbr-row-title">{{ $row->name }}</div>
+                                    <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                                </div>
+                                <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
                             </div>
-                            <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
-                        </div>
-                    @endforelse
-                    @forelse ($payoutByMarketplace ?? [] as $row)
-                        <div class="cbr-row">
-                            <div>
-                                <div class="cbr-row-title">🛒 {{ $row->marketplace_name }}</div>
-                                <div class="cbr-row-meta">Marketplace · {{ $fmt($row->total_docs) }} transaksi</div>
+                        @endforeach
+                        @foreach ($payoutByMarketplace ?? [] as $row)
+                            <div class="cbr-row">
+                                <div>
+                                    <div class="cbr-row-title">🛒 {{ $row->marketplace_name }}</div>
+                                    <div class="cbr-row-meta">Marketplace · {{ $fmt($row->total_docs) }} transaksi</div>
+                                </div>
+                                <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
                             </div>
-                            <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
-                        </div>
-                    @empty
-                        @if($receiptBySource->isEmpty())
-                            <div class="cbr-empty">Belum ada penerimaan tercatat pada periode ini.</div>
-                        @endif
-                    @endforelse
+                        @endforeach
+                    @endif
                 </div>
             </x-gf.panel>
 
