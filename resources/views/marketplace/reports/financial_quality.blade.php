@@ -7,7 +7,7 @@
     $statusLabels = [
         'ready' => 'Siap masuk laporan',
         'incomplete' => 'Data belum lengkap',
-        'not_applicable' => 'Belum masuk proses keuangan',
+        'not_applicable' => 'Belum relevan untuk keuangan',
         'unknown' => 'Belum diperiksa',
     ];
     $settlementLabels = [
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <i class="bi bi-2-circle"></i>
                 <div>
                     <p id="audit-title" class="fq-refresh-title">2. Periksa data keuangan</p>
-                    <p class="fq-refresh-note">{{ $storeId ? 'Toko terpilih' : 'Semua toko' }} · Pemeriksaan membaca payout, item, dan HPP.</p>
+                    <p class="fq-refresh-note">{{ $storeId ? 'Toko terpilih' : 'Semua toko' }} · Pemeriksaan membaca payout, item, dan HPP. Order belum selesai tidak memblokir audit finansial.</p>
                 </div>
             </div>
             <div class="fq-refresh-actions">
@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="fq-queue-head">
                 <div>
                     <div class="fq-queue-heading"><i class="bi bi-list-check text-primary"></i><h2 class="fq-queue-title">Data yang perlu diperbaiki</h2></div>
-                    <p class="fq-queue-subtitle">Buka detail order untuk melihat penyebab dan langkah perbaikannya.</p>
+                    <p class="fq-queue-subtitle">Hanya order selesai yang perlu ditindaklanjuti. Order belum selesai atau batal tidak memblokir laporan.</p>
                 </div>
                 <span class="fq-queue-total">{{ $fmt($orders->total()) }} hasil · halaman {{ $orders->currentPage() }}</span>
             </div>
@@ -518,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <ul class="fq-help-list">
                     <li><strong>Siap masuk laporan</strong><br>Order memiliki payout lengkap, item terhubung, dan HPP tersedia.</li>
                     <li><strong>Data belum lengkap</strong><br>Order belum dapat dihitung ke profit sampai masalahnya diperbaiki.</li>
-                    <li><strong>Belum masuk proses keuangan</strong><br>Order belum selesai sehingga payout final belum wajib tersedia.</li>
+                    <li><strong>Belum relevan untuk keuangan</strong><br>Order belum selesai atau batal sehingga payout final belum wajib tersedia.</li>
                 </ul>
             </details>
         </aside>

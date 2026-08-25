@@ -64,7 +64,7 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ->assertSee('Payout belum tersedia');
     }
 
-    public function test_default_queue_lists_settlement_issues_even_when_order_quality_is_not_applicable(): void
+    public function test_default_queue_lists_settlement_issues_for_completed_order(): void
     {
         $store = $this->store();
         $order = MarketplaceOrder::create([
@@ -72,7 +72,7 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             'external_order_id' => 'UI-QUEUE-SETTLEMENT-001',
             'channel_order_id' => 'UI-QUEUE-SETTLEMENT-001',
             'order_date' => now(),
-            'order_status' => 'SHIPPED',
+            'order_status' => 'COMPLETED',
             'financial_data_status' => 'not_applicable',
         ]);
 
@@ -88,6 +88,32 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ->get(route('marketplace.reports.financial-quality'))
             ->assertOk()
             ->assertSee('UI-QUEUE-SETTLEMENT-001');
+    }
+
+    public function test_default_queue_excludes_non_completed_orders_from_active_issues(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-PENDING-001',
+            'channel_order_id' => 'UI-PENDING-001',
+            'order_date' => now(),
+            'order_status' => 'SHIPPED',
+            'financial_data_status' => 'unknown',
+        ]);
+
+        \App\Models\MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'data_status' => 'incomplete',
+            'raw_json' => [],
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality'))
+            ->assertOk()
+            ->assertDontSee('UI-PENDING-001');
     }
 
     public function test_default_queue_excludes_cancelled_orders_from_active_issues(): void

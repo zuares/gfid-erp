@@ -26,11 +26,13 @@ class MarketplaceFinancialQualityController extends Controller
         $settlementStatus = trim((string) $request->input('settlement_status', ''));
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
-        // Saat halaman dibuka tanpa filter, tampilkan seluruh queue yang perlu
-        // diperbaiki. Sebelumnya default `incomplete` hanya memeriksa quality
-        // order, sehingga settlement incomplete pada order not_applicable tidak
-        // pernah masuk ke list.
-        $defaultIssueQueue = $statusInput === null && $settlementStatus === '';
+        // Saat halaman dibuka tanpa filter operasional, tampilkan hanya queue
+        // finansial yang aktif. Order non-COMPLETED belum memiliki payout final
+        // yang wajib tersedia dan tidak boleh tampil sebagai issue closing.
+        $defaultIssueQueue = $statusInput === null
+            && $settlementStatus === ''
+            && $orderStatus === ''
+            && $search === '';
         $status = $statusInput === null ? '' : (string) $statusInput;
         $allowedStatuses = [
             MarketplaceFinancialDataQualityService::ORDER_UNKNOWN,
@@ -75,9 +77,9 @@ class MarketplaceFinancialQualityController extends Controller
         $orderQuery = fn () => $applyExplicitOrderFilters(MarketplaceOrder::query());
         $settlementQuery = fn () => MarketplaceOrderSettlement::query()
             ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
-            ->whereHas('order', fn ($order) => $order->whereNotIn(
+            ->whereHas('order', fn ($order) => $order->whereIn(
                 'order_status',
-                MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES
+                MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES
             ))
             ->when($settlementStatus === 'missing', fn ($query) => $query->whereRaw('1 = 0'))
             ->when(in_array($settlementStatus, ['complete', 'incomplete', 'unknown'], true), function ($query) use ($settlementStatus) {
@@ -98,7 +100,7 @@ class MarketplaceFinancialQualityController extends Controller
             ->pluck('total', 'status');
 
         $qualityIssueCount = $orderQuery()
-            ->whereNotIn('order_status', MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES)
+            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->where(function ($query) {
                 $query
                     ->whereNull('financial_data_status')
@@ -115,7 +117,7 @@ class MarketplaceFinancialQualityController extends Controller
             ->pluck('total', 'status');
 
         $issueBreakdown = $orderQuery()
-            ->whereNotIn('order_status', MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES)
+            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE)
             ->selectRaw('COALESCE(financial_issue_reason, ?) AS reason, COUNT(*) AS total', ['unknown_reason'])
             ->groupBy('financial_issue_reason')
@@ -125,9 +127,9 @@ class MarketplaceFinancialQualityController extends Controller
         $orders = $orderQuery()
             ->with(['store.channel', 'settlement', 'items'])
             ->when($defaultIssueQueue, fn ($query) => $query->where(function ($issueQuery) {
-                $issueQuery->whereNotIn(
+                $issueQuery->whereIn(
                     'order_status',
-                    MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES
+                    MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES
                 )->where(function ($activeIssue) {
                     $activeIssue
                         ->where(function ($orderQuality) {

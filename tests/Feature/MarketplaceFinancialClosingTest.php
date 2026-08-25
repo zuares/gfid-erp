@@ -32,10 +32,10 @@ class MarketplaceFinancialClosingTest extends TestCase
         $this->actingAs($owner)
             ->get(route('marketplace.reports.financial-closing', $filters))
             ->assertOk()
-            ->assertSee('Closing & Audit Keuangan', false)
+            ->assertSee('Tutup periode keuangan', false)
             ->assertSee('Posting accounting')
-            ->assertSee('BLOCKED')
-            ->assertSee('Closing & Audit', false);
+            ->assertSee('Periode belum siap dikunci')
+            ->assertSee('Langkah 3 dari 3');
 
         $this->actingAs($owner)
             ->post(route('marketplace.reports.financial-statement.post', $filters))
