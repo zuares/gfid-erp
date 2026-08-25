@@ -35,7 +35,7 @@
             ← Kembali
         </a>
         <h5 class="mb-0 fw-black">Tambah Penerimaan Marketplace</h5>
-        <div class="text-muted" style="font-size:.8rem">Jurnal: Dr Bank / Cr 1303 Saldo Marketplace</div>
+        <div class="text-muted" style="font-size:.8rem">Jurnal: Dr Bank / Cr 1302 Piutang Marketplace</div>
     </div>
 
     @if($errors->any())

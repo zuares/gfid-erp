@@ -16,7 +16,7 @@ class MarketplacePayoutBulkPostingTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'BULK-POST-1']);
         $bank = $this->createAccount('1101', 'Bank Test', true);
-        $balanceAccount = $this->createAccount('1303', 'Saldo Marketplace');
+        $receivableAccount = $this->createAccount('1302', 'Piutang Marketplace');
 
         $included = $this->createPayout($bank, '2026-08-10', 'Shopee', 'draft');
         $outsideDate = $this->createPayout($bank, '2026-07-10', 'Shopee', 'draft');
@@ -35,7 +35,7 @@ class MarketplacePayoutBulkPostingTest extends TestCase
         $this->assertNotNull($included->fresh()->journal_id);
         $this->assertDatabaseHas('journal_lines', [
             'journal_id' => $included->fresh()->journal_id,
-            'account_id' => $balanceAccount->id,
+            'account_id' => $receivableAccount->id,
             'credit'     => 100000,
         ]);
         $this->assertSame('draft', $outsideDate->fresh()->status);
@@ -46,7 +46,7 @@ class MarketplacePayoutBulkPostingTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'BULK-POST-2']);
         $bank = $this->createAccount('1102', 'Bank Test 2', true);
-        $this->createAccount('1303', 'Saldo Marketplace');
+        $this->createAccount('1302', 'Piutang Marketplace');
 
         $draft = $this->createPayout($bank, '2026-08-10', 'Shopee', 'draft');
         $posted = $this->createPayout($bank, '2026-08-11', 'Shopee', 'posted');

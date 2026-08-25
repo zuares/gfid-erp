@@ -53,6 +53,15 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->assertSame('marketplace_financial_statement', $journal->source_type);
         $this->assertSame(305.0, (float) $journal->lines()->sum('debit'));
         $this->assertSame(305.0, (float) $journal->lines()->sum('credit'));
+        $this->assertDatabaseHas('journal_lines', [
+            'journal_id' => $journal->id,
+            'account_id' => Account::where('code', '1302')->value('id'),
+            'debit' => 235,
+        ]);
+        $this->assertDatabaseMissing('journal_lines', [
+            'journal_id' => $journal->id,
+            'account_id' => Account::where('code', '1303')->value('id'),
+        ]);
         $this->assertDatabaseCount('journals', 1);
 
         // Same scope is a no-op: no second posting or journal is created.
