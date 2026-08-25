@@ -76,7 +76,7 @@ class ShopeeWalletPayoutImportTest extends TestCase
                 && ($body['create_time_from'] ?? null) === $from->timestamp
                 && ($body['create_time_to'] ?? null) === $to->timestamp
                 && ($body['money_flow'] ?? null) === 'MONEY_OUT'
-                && ($body['transaction_type'] ?? null) === '202'
+                && ($body['transaction_type'] ?? null) === '201'
                 && ($body['transaction_tab_type'] ?? null) === 'wallet_withdrawals';
         });
     }

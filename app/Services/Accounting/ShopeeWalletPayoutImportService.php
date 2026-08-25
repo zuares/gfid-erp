@@ -11,17 +11,21 @@ use RuntimeException;
 
 class ShopeeWalletPayoutImportService
 {
-    private const COMPLETED_WITHDRAWAL = '202';
-    private const COMPLETED_WITHDRAWAL_LABELS = [
+    // Nominal pencairan biasanya berada pada event withdrawal_created (201).
+    // withdrawal_completed (202) dapat hadir sebagai marker dengan amount 0.
+    private const PAYOUT_WITHDRAWAL_REQUEST = '201';
+    private const PAYOUT_WITHDRAWAL_LABELS = [
+        '201',
         '202',
+        'withdrawal_created',
         'withdrawal_completed',
+        'withdrawal-created',
         'withdrawal-completed',
     ];
     private const KNOWN_NON_WITHDRAWAL_LABELS = [
-        '101', '102', '201', '203',
+        '101', '102', '203',
         'escrow_verified_add', 'escrow_verified_minus',
-        'withdrawal_created', 'withdrawal_cancelled',
-        'withdrawal-created', 'withdrawal-cancelled',
+        'withdrawal_cancelled', 'withdrawal-cancelled',
         '450', 'paid_ads_charge', 'paid-ads-charge',
     ];
 
@@ -34,8 +38,9 @@ class ShopeeWalletPayoutImportService
      *
      * get_wallet_transaction_list mengembalikan semua mutasi wallet. Karena
      * tabel ini adalah jurnal penerimaan bank, request dibatasi ke
-     * WITHDRAWAL_COMPLETED (202) agar order income, ads charge, dan adjustment
-     * tidak ikut tercatat sebagai penerimaan bank.
+     * WITHDRAWAL_CREATED (201) karena event ini membawa nominal yang dipotong
+     * dari wallet. Event WITHDRAWAL_COMPLETED (202) hanya dipakai jika Shopee
+     * mengembalikan nominal non-zero pada event tersebut.
      */
     public function import(
         Store $store,
@@ -60,7 +65,7 @@ class ShopeeWalletPayoutImportService
                 $from->timestamp,
                 $to->timestamp,
                 'MONEY_OUT',
-                self::COMPLETED_WITHDRAWAL,
+                self::PAYOUT_WITHDRAWAL_REQUEST,
                 null,
                 'wallet_withdrawals'
             );
@@ -164,7 +169,7 @@ class ShopeeWalletPayoutImportService
                         'bank_account_id'         => $bankAccountId,
                         'reference'               => $transactionId,
                         'external_transaction_id' => $transactionId,
-                        'transaction_type'       => (string) data_get($row, 'transaction_type', self::COMPLETED_WITHDRAWAL),
+                        'transaction_type'       => (string) data_get($row, 'transaction_type', self::PAYOUT_WITHDRAWAL_REQUEST),
                         'transaction_created_at'  => $date,
                         'source_payload'          => $row,
                         'description'             => 'Pencairan saldo Shopee'
@@ -215,7 +220,7 @@ class ShopeeWalletPayoutImportService
     {
         $normalized = strtolower(trim($transactionType));
 
-        if ($normalized === '' || in_array($normalized, self::COMPLETED_WITHDRAWAL_LABELS, true)) {
+        if ($normalized === '' || in_array($normalized, self::PAYOUT_WITHDRAWAL_LABELS, true)) {
             return true;
         }
 

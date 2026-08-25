@@ -201,7 +201,7 @@
                 @csrf
                 <div class="modal-body">
                     <div class="alert alert-info py-2" style="font-size:.8rem">
-                        Hanya transaksi <strong>Withdrawal Completed</strong> yang diimpor sebagai Draft.
+                        Hanya transaksi pencairan wallet Shopee yang diimpor sebagai Draft.
                         Biaya iklan, order income, dan adjustment tidak ikut masuk.
                     </div>
 

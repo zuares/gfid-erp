@@ -4,7 +4,7 @@
       {
         "transaction_id": 987654321,
         "status": "COMPLETED",
-        "transaction_type": "withdrawal_completed",
+        "transaction_type": "withdrawal_created",
         "amount": -125000,
         "current_balance": 875000,
         "create_time": 1787220000,
