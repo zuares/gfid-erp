@@ -86,11 +86,6 @@
         min-width: 190px;
     }
 
-    .po-unit-cell {
-        min-width: 100px;
-        vertical-align: top;
-    }
-
     .po-item-line {
         display: flex;
         align-items: baseline;
@@ -103,14 +98,6 @@
         margin-top: .2rem;
     }
 
-    .po-name {
-        flex: 1 1 auto;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
     .po-item-code {
         flex: 0 1 auto;
         min-width: 0;
@@ -120,14 +107,6 @@
         font-size: .76rem;
         font-weight: 800;
         text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .po-item-qty {
-        flex: 0 0 auto;
-        color: #64748b;
-        font-size: .72rem;
-        font-variant-numeric: tabular-nums;
         white-space: nowrap;
     }
 
@@ -157,11 +136,6 @@
     body[data-theme="dark"] .po-item-code,
     body[data-theme="dark"] .po-unit-value {
         color: #e2e8f0;
-    }
-
-    body[data-theme="dark"] .po-item-qty,
-    body[data-theme="dark"] .po-name {
-        color: #94a3b8;
     }
 
     .po-mobile-status.is-approved,
@@ -194,20 +168,15 @@
     }
 
     .po-date-filter {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: .55rem;
-        margin-bottom: 1rem;
-        padding: .35rem .5rem .35rem .7rem;
-        background: var(--card, #fff);
-        border: 1px solid rgba(148, 163, 184, .18);
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, .025);
-    }
-
-    body[data-theme="dark"] .po-date-filter {
-        background: rgba(15, 23, 42, .98);
-        border-color: rgba(51, 65, 85, .6);
+        flex: 0 1 auto;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
     }
 
     .po-date-filter-label {
@@ -221,6 +190,10 @@
         letter-spacing: .06em;
         text-transform: uppercase;
         white-space: nowrap;
+    }
+
+    .po-date-filter-label label {
+        margin: 0;
     }
 
     .po-date-filter-label i {
@@ -278,10 +251,6 @@
         margin-left: 0;
     }
 
-    .po-date-filter-controls {
-        flex: 0 1 auto;
-    }
-
     .po-date-range-shell .flatpickr-input {
         flex: 1 1 auto;
         min-width: 0;
@@ -314,7 +283,6 @@
         }
 
         .po-date-filter {
-            display: flex;
             width: 100%;
             align-items: center;
             gap: .45rem;
@@ -379,38 +347,38 @@
                         @endforeach
                     </select>
 
-                    @if ($canSeeMoney)
+                @if ($canSeeMoney)
                         <select name="pay_status" class="form-select form-select-sm po-filter-auto" style="max-width:130px;">
                             @foreach ($payStatusOptions as $value => $label)
                                 <option value="{{ $value }}" @selected(request('pay_status') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
                     @endif
-                </div>
-            </div>
 
-            <div class="po-date-filter">
-                <div class="po-date-filter-label">
-                    <i class="bi bi-calendar3"></i>
-                    <label for="po-date-range">Tanggal PO</label>
-                </div>
+                    <div class="po-date-filter">
+                        <div class="po-date-filter-label">
+                            <i class="bi bi-calendar3"></i>
+                            <label for="po-date-range">Tanggal PO</label>
+                        </div>
 
-                <div class="po-date-filter-controls">
-                    <input type="hidden" name="from_date" id="po-from-date" value="{{ request('from_date') }}" data-gf-date="off">
-                    <input type="hidden" name="to_date" id="po-to-date" value="{{ request('to_date') }}" data-gf-date="off">
+                        <div class="po-date-filter-controls">
+                            <input type="hidden" name="from_date" id="po-from-date" value="{{ request('from_date') }}" data-gf-date="off">
+                            <input type="hidden" name="to_date" id="po-to-date" value="{{ request('to_date') }}" data-gf-date="off">
 
-                    <div class="po-date-range-shell">
-                        <i class="bi bi-calendar3" aria-hidden="true"></i>
-                        <input type="text" id="po-date-range" class="po-date-range-input"
-                               placeholder="Pilih tanggal" autocomplete="off" readonly
-                               data-gf-date="off" aria-label="Pilih rentang tanggal PO">
+                            <div class="po-date-range-shell">
+                                <i class="bi bi-calendar3" aria-hidden="true"></i>
+                                <input type="text" id="po-date-range" class="po-date-range-input"
+                                       placeholder="Pilih tanggal" autocomplete="off" readonly
+                                       data-gf-date="off" aria-label="Pilih rentang tanggal PO">
+                            </div>
+
+                            @if ($hasPoFilters)
+                                <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-sm btn-ship-outline po-reset-all-filters">
+                                    <i class="bi bi-x-lg me-1"></i>Reset Filter
+                                </a>
+                            @endif
+                        </div>
                     </div>
-
-                    @if ($hasPoFilters)
-                        <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-sm btn-ship-outline po-reset-all-filters">
-                            <i class="bi bi-x-lg me-1"></i>Reset Filter
-                        </a>
-                    @endif
                 </div>
             </div>
         </form>
@@ -443,9 +411,6 @@
             </th>
             <th class="mobile-hide" style="width: 210px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                 Item
-            </th>
-            <th class="mobile-hide" style="width: 110px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
-                Satuan Beli
             </th>
             @if ($canSeeMoney)
                 <th class="text-end" style="width: 130px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
@@ -517,11 +482,10 @@
                         </div>
 
                         <div class="po-mobile-items">
-                            <span class="po-mobile-items-label">Item &amp; satuan</span>
+                            <span class="po-mobile-items-label">Kode item</span>
                             @forelse ($visibleOrderLines as $line)
                                 <div class="po-item-line">
                                     <span class="po-item-code">{{ $line->item?->code ?? 'Item #' . ($line->item_id ?? '-') }}</span>
-                                    <span class="po-item-qty">{{ decimal_id($line->qty, 2) }} {{ $line->effectivePurchaseUnit() }}</span>
                                 </div>
                             @empty
                                 <span class="text-muted" style="font-size:.72rem;">Belum ada item</span>
@@ -550,28 +514,14 @@
 
             <td class="po-item-cell mobile-hide">
                 @forelse ($visibleOrderLines as $line)
-                    <div class="po-item-line" title="{{ $line->item?->name ?? '' }}">
+                    <div class="po-item-line">
                         <span class="po-item-code">{{ $line->item?->code ?? 'Item #' . ($line->item_id ?? '-') }}</span>
-                        <span class="po-name">{{ $line->item?->name ?? '-' }}</span>
                     </div>
                 @empty
                     <span class="text-muted" style="font-size:.74rem;">Belum ada item</span>
                 @endforelse
                 @if ($remainingOrderLines > 0)
                     <div class="po-item-more">+{{ $remainingOrderLines }} item lainnya</div>
-                @endif
-            </td>
-
-            <td class="po-unit-cell mobile-hide">
-                @forelse ($visibleOrderLines as $line)
-                    <div class="po-item-line">
-                        <span class="po-item-qty">{{ decimal_id($line->qty, 2) }} {{ $line->effectivePurchaseUnit() }}</span>
-                    </div>
-                @empty
-                    <span class="text-muted" style="font-size:.74rem;">—</span>
-                @endforelse
-                @if ($remainingOrderLines > 0)
-                    <div class="po-item-more">+{{ $remainingOrderLines }} lainnya</div>
                 @endif
             </td>
 
