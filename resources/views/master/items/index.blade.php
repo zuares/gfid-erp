@@ -25,24 +25,24 @@
 
 @push('head')
 <style>
-    .item-page { max-width: 1280px; margin: 0 auto; padding: 16px 12px 32px; color: #0f172a; }
-    .item-hero, .item-card { border: 1px solid #e2e8f0; border-radius: 22px; background: #fff; box-shadow: 0 14px 36px rgba(15,23,42,.06); }
-    .item-hero { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px; margin-bottom:14px; }
+    .item-page { max-width: 1040px; margin: 0 auto; padding: .75rem .75rem 4rem; color: #0f172a; }
+    .item-hero, .item-card { border: 1px solid rgba(148,163,184,.18); border-radius: 8px; background: #fff; box-shadow: none; }
+    .item-hero { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.45rem .75rem; margin-inline:-.75rem; margin-bottom:.65rem; border-width:0 0 1px; }
     .item-hero-main { display:flex; align-items:center; gap:13px; min-width:0; }
-    .item-icon { width:48px; height:48px; flex:0 0 48px; display:inline-flex; align-items:center; justify-content:center; border-radius:16px; color:#fff; background:linear-gradient(135deg,#0f172a,#475569); font-size:1.25rem; box-shadow:0 12px 25px rgba(15,23,42,.16); }
-    .item-eyebrow { display:inline-flex; align-items:center; gap:6px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:4px 9px; font-size:.68rem; font-weight:800; margin-bottom:6px; }
-    .item-title { margin:0; font-size:1.35rem; line-height:1.1; letter-spacing:-.04em; font-weight:900; }
-    .item-subtitle { margin-top:4px; color:#64748b; font-size:.82rem; font-weight:600; }
+    .item-icon { display:none; }
+    .item-eyebrow { display:block; color:#64748b; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; margin-bottom:1px; }
+    .item-title { margin:0; font-size:1rem; line-height:1.2; letter-spacing:0; font-weight:750; }
+    .item-subtitle { margin-top:1px; color:#64748b; font-size:.78rem; font-weight:500; }
     .item-actions, .item-row-actions { display:flex; flex-wrap:wrap; gap:7px; align-items:center; justify-content:flex-end; }
-    .item-actions .btn, .item-row-actions .btn, .item-card .btn { border-radius:999px; font-weight:800; display:inline-flex; align-items:center; gap:6px; }
+    .item-actions .btn, .item-row-actions .btn, .item-card .btn { border-radius:7px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
     .item-primary { color:#fff!important; background:linear-gradient(135deg,#0f172a,#334155)!important; border-color:transparent!important; }
     .item-soft { color:#334155!important; background:#fff!important; border:1px solid #cbd5e1!important; }
     .item-soft:hover { background:#f8fafc!important; }
-    .item-kpis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
-    .item-kpi { min-width:0; padding:13px; border:1px solid #e2e8f0; border-radius:17px; background:linear-gradient(180deg,#fff,#f8fafc); }
-    .item-kpi-label { color:#64748b; font-size:.67rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .item-kpi-value { margin-top:5px; color:#0f172a; font-size:1.2rem; font-weight:900; letter-spacing:-.04em; }
-    .item-kpi-note { color:#94a3b8; font-size:.7rem; margin-top:1px; }
+    .item-kpis { display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; margin-bottom:0; }
+    .item-kpi { display:inline-flex; align-items:baseline; gap:.45rem; min-width:0; padding:.2rem .48rem; border:1px solid rgba(148,163,184,.28); border-radius:7px; background:transparent; }
+    .item-kpi-label { color:#94a3b8; font-size:.66rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .item-kpi-value { margin-top:0; color:#334155; font-size:.72rem; font-weight:650; letter-spacing:0; }
+    .item-kpi-note { display:none; }
     .item-card { overflow:hidden; }
     .item-filter { display:grid; grid-template-columns:minmax(220px,1.5fr) repeat(4,minmax(130px,1fr)) auto; gap:9px; align-items:end; padding:14px; border-bottom:1px solid #eef2f7; }
     .item-label { display:block; margin-bottom:5px; color:#475569; font-size:.68rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
@@ -104,19 +104,18 @@
     body[data-theme="dark"] .item-table tbody td { border-color:#334155; }
     body[data-theme="dark"] .item-table tbody tr:hover { background:#111827; }
     body[data-theme="dark"] .item-filter .form-control, body[data-theme="dark"] .item-filter .form-select, body[data-theme="dark"] .modal-content { background:#0f172a; border-color:#475569; color:#f8fafc; }
-    @media (max-width:1100px) { .item-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } .item-filter { grid-template-columns:repeat(3,minmax(0,1fr)); } .item-filter-search { grid-column:1 / -1; } }
+    @media (max-width:1100px) { .item-filter { grid-template-columns:repeat(3,minmax(0,1fr)); } .item-filter-search { grid-column:1 / -1; } }
     @media (max-width:700px) {
-        .item-page { padding:8px 6px 22px; }
-        .item-hero { align-items:flex-start; flex-direction:column; padding:13px; border-radius:17px; }
-        .item-icon { width:40px; height:40px; flex-basis:40px; border-radius:13px; }
-        .item-title { font-size:1.15rem; }
+        .item-page { padding: .5rem .5rem 4rem; }
+        .item-hero { align-items:flex-start; flex-direction:column; margin-inline:-.5rem; padding:.5rem .65rem; }
+        .item-title { font-size:1.05rem; }
+        .item-subtitle { font-size:.74rem; }
         .item-actions, .item-actions .btn { width:100%; }
         .item-actions { display:grid; grid-template-columns:1fr 1fr; }
         .item-actions .btn { justify-content:center; }
-        .item-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
-        .item-kpi { padding:10px; border-radius:13px; }
-        .item-kpi-value { font-size:1.05rem; }
-        .item-kpi-note { display:none; }
+        .item-kpis { width:100%; gap:.25rem; }
+        .item-kpi { flex:1 1 auto; justify-content:space-between; }
+        .item-kpi:nth-child(n+5) { display:none; }
         .item-filter { grid-template-columns:1fr; padding:11px; }
         .item-filter-search { grid-column:auto; }
         .item-filter-actions, .item-filter-actions .btn { width:100%; }
@@ -144,6 +143,14 @@
                 <div class="item-eyebrow"><i class="bi bi-database-check"></i> Master Data</div>
                 <h1 class="item-title">Master Item</h1>
                 <div class="item-subtitle">Kelola item, satuan stok, satuan pembelian, HPP, dan metode pasok.</div>
+                <div class="item-kpis">
+                    <div class="item-kpi"><div class="item-kpi-label">Total Item</div><div class="item-kpi-value">{{ $fmt($stats['total']) }}</div></div>
+                    <div class="item-kpi"><div class="item-kpi-label">Aktif</div><div class="item-kpi-value">{{ $fmt($stats['active']) }}</div></div>
+                    <div class="item-kpi"><div class="item-kpi-label">Bisa Dibeli</div><div class="item-kpi-value">{{ $fmt($stats['can_buy']) }}</div></div>
+                    <div class="item-kpi"><div class="item-kpi-label">Bisa Dibuat</div><div class="item-kpi-value">{{ $fmt($stats['can_make']) }}</div></div>
+                    <div class="item-kpi"><div class="item-kpi-label">Hybrid</div><div class="item-kpi-value">{{ $fmt($stats['hybrid']) }}</div></div>
+                    <div class="item-kpi"><div class="item-kpi-label">HPP Kosong</div><div class="item-kpi-value">{{ $fmt($stats['missing_hpp']) }}</div></div>
+                </div>
             </div>
         </div>
         <div class="item-actions">
@@ -163,15 +170,6 @@
     @if($errors->any())
         <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.8rem;">{{ $errors->first() }}</div>
     @endif
-
-    <div class="item-kpis">
-        <div class="item-kpi"><div class="item-kpi-label">Total Item</div><div class="item-kpi-value">{{ $fmt($stats['total']) }}</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Aktif</div><div class="item-kpi-value">{{ $fmt($stats['active']) }}</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Bisa Dibeli</div><div class="item-kpi-value">{{ $fmt($stats['can_buy']) }}</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Bisa Dibuat</div><div class="item-kpi-value">{{ $fmt($stats['can_make']) }}</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">Hybrid</div><div class="item-kpi-value">{{ $fmt($stats['hybrid']) }}</div></div>
-        <div class="item-kpi"><div class="item-kpi-label">HPP Kosong</div><div class="item-kpi-value">{{ $fmt($stats['missing_hpp']) }}</div></div>
-    </div>
 
     <div class="item-card">
         <form method="GET" action="{{ route('master.items.index') }}" class="item-filter">
