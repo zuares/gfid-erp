@@ -139,7 +139,11 @@ $isOwnerStrict = (bool) (auth()->user()?->isOwner());
                     <div class="sp-meta-grid">
                         <div class="sp-meta-card">
                             <div class="sp-meta-label">Tanggal Ambil</div>
-                            <input type="date" id="modal_pickup_date" class="form-control form-control-sm">
+                            <input type="date" id="modal_pickup_date" class="form-control form-control-sm"
+                                required aria-describedby="modal-pickup-date-error">
+                            <div id="modal-pickup-date-error" class="invalid-feedback">
+                                Tanggal ambil jahit wajib dipilih.
+                            </div>
                         </div>
                         <div class="sp-meta-card">
                             <div class="sp-meta-label">WIP Tujuan</div>
@@ -178,21 +182,21 @@ $isOwnerStrict = (bool) (auth()->user()?->isOwner());
             </div>
 
             <div class="modal-footer py-2 d-flex justify-content-between align-items-center gap-1">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x-lg"></i>
                     <span class="d-none d-sm-inline ms-1">Batal</span>
                 </button>
                 <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-step-back" style="display:none">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-step-back" style="display:none">
                         <i class="bi bi-arrow-left"></i>
                         <span class="d-none d-sm-inline ms-1">Kembali</span>
                     </button>
-                    <button class="btn btn-sm btn-outline-primary" id="btn-simpan-cetak" style="display:none"
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-simpan-cetak" style="display:none"
                         @disabled(!$isOwner) title="{{ !$isOwner ? 'Hanya owner yang dapat menyimpan' : '' }}">
                         <i class="bi bi-printer"></i>
                         <span class="d-none d-sm-inline ms-1">Simpan & Cetak</span>
                     </button>
-                    <button class="btn btn-sm btn-primary" id="btn-confirm-submit" disabled style="color:#fff !important"
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-confirm-submit" disabled style="color:#fff !important"
                         title="{{ !$isOwner ? 'Hanya owner yang dapat menyimpan' : '' }}">
                         <i class="bi bi-arrow-right" id="btn-confirm-icon"></i>
                         <span class="ms-1" id="btn-confirm-label">Lanjut</span>
@@ -250,11 +254,28 @@ document.addEventListener('DOMContentLoaded', function () {
     const modal = new bootstrap.Modal(modalEl);
     const formDateInput = form.querySelector('input[name="date"]');
 
-    if (modalPickupDate && formDateInput) {
-        modalPickupDate.value = formDateInput.value || new Date().toISOString().slice(0, 10);
-        modalPickupDate.addEventListener('change', () => {
-            formDateInput.value = modalPickupDate.value;
+    function syncAndValidatePickupDate() {
+        const date = modalPickupDate?.value || '';
+        const valid = /^\d{4}-\d{2}-\d{2}$/.test(date);
+
+        modalPickupDate?.classList.toggle('is-invalid', !valid);
+        if (!valid) {
+            modalPickupDate?.focus();
+            return false;
+        }
+
+        if (formDateInput) {
+            formDateInput.value = date;
             formDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        return true;
+    }
+
+    if (modalPickupDate && formDateInput) {
+        modalPickupDate.value = formDateInput.value || '';
+        modalPickupDate.addEventListener('change', () => {
+            syncAndValidatePickupDate();
         });
     }
 
@@ -302,7 +323,8 @@ document.addEventListener('DOMContentLoaded', function () {
         selectedLines = lines;
 
         if (modalPickupDate && formDateInput) {
-            modalPickupDate.value = formDateInput.value || new Date().toISOString().slice(0, 10);
+            modalPickupDate.value = formDateInput.value || '';
+            modalPickupDate.classList.remove('is-invalid');
         }
 
         phaseConfirm.style.display = '';
@@ -500,6 +522,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ── aggregate & submit ── */
     function submitForm() {
+        if (!syncAndValidatePickupDate()) return;
+
         const agg = new Map();
         const bundlePayload = [];
         activeSupplyItems.forEach(line => {
@@ -556,6 +580,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ── tombol utama (Lanjut / Simpan) ── */
     confirmBtn.addEventListener('click', function () {
+        if (!syncAndValidatePickupDate()) return;
         if (!operatorSelect.value) return;
 
         if (phase === 'confirm') {
@@ -576,6 +601,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ── tombol Simpan & Cetak → preview popup dulu ── */
     if (simpanCetakBtn) {
         simpanCetakBtn.addEventListener('click', function () {
+            if (!syncAndValidatePickupDate()) return;
             openPreviewWindow();
         });
     }

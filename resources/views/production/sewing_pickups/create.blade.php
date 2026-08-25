@@ -272,6 +272,27 @@
                 <input type="hidden" name="print_after_save" id="print_after_save" value="0">
                 <input type="hidden" name="paper_width" id="paper_width" value="50mm">
 
+                <div class="card mb-3">
+                    <div class="card-section">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4 col-12">
+                                <label for="pickup-date" class="field-label">Tanggal Ambil Jahit</label>
+                                <input type="date" name="date" id="pickup-date"
+                                    class="form-control form-control-sm field-input-sm"
+                                    value="{{ old('date', now()->toDateString()) }}" required>
+                                @error('date')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-md-8 col-12">
+                                <div class="small text-muted">
+                                    Pilih tanggal pengambilan bundle dari WIP Cutting. Default: hari ini.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- LIST BUNDLE + FILTER + MOBILE CARD --}}
                 @include('production.sewing_pickups._bundle_picker', [
                     'bundles' => $bundles,

@@ -237,7 +237,7 @@ class SewingPickupController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date_format:Y-m-d'],
             'warehouse_id' => ['required', 'exists:warehouses,id'], // gudang sewing (WIP-SEW)
             'operator_id' => ['required', 'exists:employees,id'],
             'notes' => ['nullable', 'string'],
@@ -247,6 +247,8 @@ class SewingPickupController extends Controller
             'lines.*.bundle_id' => ['required', 'exists:cutting_job_bundles,id'],
             'lines.*.qty_bundle' => ['nullable', 'numeric', 'min:0'],
         ], [
+            'date.required' => 'Tanggal ambil jahit wajib dipilih.',
+            'date.date_format' => 'Format tanggal ambil jahit tidak valid.',
             'lines.required' => 'Minimal satu baris bundle harus diisi.',
             'lines.*.bundle_id.required' => 'Bundle tidak valid.',
             'lines.*.qty_bundle.required' => 'Qty pickup wajib diisi.',

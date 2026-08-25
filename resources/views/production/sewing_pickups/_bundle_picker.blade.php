@@ -883,8 +883,6 @@
         <div class="card-section">
 
             <div class="bundle-picker-control-panel">
-                <input type="hidden" name="date" value="{{ old('date', now()->format('Y-m-d')) }}">
-
                 {{-- DESKTOP: toggle hanya baris yang ada pickup --}}
                 <div class="filter-header">
                     <div class="selection-toggle-row d-none d-md-flex">
