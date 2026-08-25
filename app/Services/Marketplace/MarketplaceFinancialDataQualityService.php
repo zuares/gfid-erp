@@ -17,6 +17,8 @@ class MarketplaceFinancialDataQualityService
     public const ORDER_READY = 'ready';
     public const ORDER_NOT_APPLICABLE = 'not_applicable';
 
+    public const NON_APPLICABLE_ORDER_STATUSES = ['CANCELLED', 'BATAL', 'IN_CANCEL'];
+
     // Final income/settlement hanya dianggap sebagai fakta finansial setelah
     // order COMPLETED. Status fulfillment sebelumnya belum memiliki payout
     // final yang wajib masuk laporan keuangan.
@@ -198,7 +200,7 @@ class MarketplaceFinancialDataQualityService
     {
         $order->loadMissing(['settlement', 'items']);
 
-        if (in_array(strtoupper((string) $order->order_status), ['CANCELLED', 'BATAL', 'IN_CANCEL'], true)) {
+        if (in_array(strtoupper((string) $order->order_status), self::NON_APPLICABLE_ORDER_STATUSES, true)) {
             return ['status' => self::ORDER_NOT_APPLICABLE, 'reason' => null];
         }
 

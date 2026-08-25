@@ -75,6 +75,10 @@ class MarketplaceFinancialQualityController extends Controller
         $orderQuery = fn () => $applyExplicitOrderFilters(MarketplaceOrder::query());
         $settlementQuery = fn () => MarketplaceOrderSettlement::query()
             ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->whereHas('order', fn ($order) => $order->whereNotIn(
+                'order_status',
+                MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES
+            ))
             ->when($settlementStatus === 'missing', fn ($query) => $query->whereRaw('1 = 0'))
             ->when(in_array($settlementStatus, ['complete', 'incomplete', 'unknown'], true), function ($query) use ($settlementStatus) {
                 if ($settlementStatus === 'unknown') {
@@ -93,12 +97,25 @@ class MarketplaceFinancialQualityController extends Controller
             ->groupBy('financial_data_status')
             ->pluck('total', 'status');
 
+        $qualityIssueCount = $orderQuery()
+            ->whereNotIn('order_status', MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES)
+            ->where(function ($query) {
+                $query
+                    ->whereNull('financial_data_status')
+                    ->orWhereIn('financial_data_status', [
+                        MarketplaceFinancialDataQualityService::ORDER_UNKNOWN,
+                        MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
+                    ]);
+            })
+            ->count();
+
         $settlementCounts = $settlementQuery()
             ->selectRaw('COALESCE(data_status, ?) AS status, COUNT(*) AS total', ['unknown'])
             ->groupBy('data_status')
             ->pluck('total', 'status');
 
         $issueBreakdown = $orderQuery()
+            ->whereNotIn('order_status', MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES)
             ->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE)
             ->selectRaw('COALESCE(financial_issue_reason, ?) AS reason, COUNT(*) AS total', ['unknown_reason'])
             ->groupBy('financial_issue_reason')
@@ -108,27 +125,32 @@ class MarketplaceFinancialQualityController extends Controller
         $orders = $orderQuery()
             ->with(['store.channel', 'settlement', 'items'])
             ->when($defaultIssueQueue, fn ($query) => $query->where(function ($issueQuery) {
-                $issueQuery
-                    ->where(function ($orderQuality) {
-                        $orderQuality
-                            ->whereNull('financial_data_status')
-                            ->orWhereIn('financial_data_status', [
-                                MarketplaceFinancialDataQualityService::ORDER_UNKNOWN,
-                                MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
-                            ]);
-                    })
-                    ->orWhere(function ($missingSettlement) {
-                        $missingSettlement
-                            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
-                            ->doesntHave('settlement');
-                    })
-                    ->orWhereHas('settlement', function ($settlement) {
-                        $settlement->whereNull('data_status')
-                            ->orWhereIn('data_status', [
-                                MarketplaceFinancialDataQualityService::SETTLEMENT_UNKNOWN,
-                                MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
-                            ]);
-                    });
+                $issueQuery->whereNotIn(
+                    'order_status',
+                    MarketplaceFinancialDataQualityService::NON_APPLICABLE_ORDER_STATUSES
+                )->where(function ($activeIssue) {
+                    $activeIssue
+                        ->where(function ($orderQuality) {
+                            $orderQuality
+                                ->whereNull('financial_data_status')
+                                ->orWhereIn('financial_data_status', [
+                                    MarketplaceFinancialDataQualityService::ORDER_UNKNOWN,
+                                    MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
+                                ]);
+                        })
+                        ->orWhere(function ($missingSettlement) {
+                            $missingSettlement
+                                ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
+                                ->doesntHave('settlement');
+                        })
+                        ->orWhereHas('settlement', function ($settlement) {
+                            $settlement->whereNull('data_status')
+                                ->orWhereIn('data_status', [
+                                    MarketplaceFinancialDataQualityService::SETTLEMENT_UNKNOWN,
+                                    MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+                                ]);
+                        });
+                });
             }))
             ->latest('financial_checked_at')
             ->latest('id')
@@ -146,6 +168,7 @@ class MarketplaceFinancialQualityController extends Controller
             'status' => $status,
             'defaultIssueQueue' => $defaultIssueQueue,
             'orderCounts' => $orderCounts,
+            'qualityIssueCount' => $qualityIssueCount,
             'settlementCounts' => $settlementCounts,
             'issueBreakdown' => $issueBreakdown,
             'orders' => $orders,

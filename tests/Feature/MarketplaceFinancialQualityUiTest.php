@@ -90,6 +90,33 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ->assertSee('UI-QUEUE-SETTLEMENT-001');
     }
 
+    public function test_default_queue_excludes_cancelled_orders_from_active_issues(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-CANCELLED-001',
+            'channel_order_id' => 'UI-CANCELLED-001',
+            'order_date' => now(),
+            'order_status' => 'CANCELLED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'settlement_data_incomplete',
+        ]);
+
+        \App\Models\MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'data_status' => 'incomplete',
+            'raw_json' => [],
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality'))
+            ->assertOk()
+            ->assertDontSee('UI-CANCELLED-001');
+    }
+
     public function test_operational_filters_search_status_settlement_and_date(): void
     {
         $store = $this->store();

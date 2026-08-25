@@ -55,7 +55,7 @@
     ];
     $result = session('quality_result');
     $resultQueued = (bool) ($result['queued'] ?? false);
-    $qualityIssues = (int) ($orderCounts['incomplete'] ?? 0) + (int) ($orderCounts['unknown'] ?? 0);
+    $qualityIssues = (int) ($qualityIssueCount ?? ((int) ($orderCounts['incomplete'] ?? 0) + (int) ($orderCounts['unknown'] ?? 0)));
     $settlementIssues = (int) ($settlementCounts['incomplete'] ?? 0) + (int) ($settlementCounts['unknown'] ?? 0);
     $hasIssues = $qualityIssues > 0 || $settlementIssues > 0;
     $auditedOrders = collect($orderCounts)->sum(fn ($value) => (int) $value);
