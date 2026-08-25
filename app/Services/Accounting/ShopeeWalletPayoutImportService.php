@@ -48,6 +48,7 @@ class ShopeeWalletPayoutImportService
         $skipped = 0;
         $skippedExisting = 0;
         $skippedInvalid = 0;
+        $skippedInvalidReasons = [];
         $pageNo = 0;
         $pageSize = 100;
 
@@ -75,11 +76,24 @@ class ShopeeWalletPayoutImportService
             if (! is_array($rows)) {
                 $rows = [];
             }
+            $rows = $this->normalizeTransactionRows($rows);
 
             foreach ($rows as $row) {
-                $transactionId = (string) data_get($row, 'transaction_id', '');
-                $amount = abs((float) data_get($row, 'amount', 0));
-                $transactionType = (string) data_get($row, 'transaction_type', '');
+                $transactionId = (string) (
+                    data_get($row, 'transaction_id')
+                    ?? data_get($row, 'withdraw_id')
+                    ?? data_get($row, 'withdrawal_id')
+                    ?? data_get($row, 'root_withdrawal_id', '')
+                );
+                $amountRaw = data_get($row, 'amount')
+                    ?? data_get($row, 'transaction_amount')
+                    ?? data_get($row, 'withdrawal_amount')
+                    ?? data_get($row, 'net_amount', 0);
+                $amount = abs((float) str_replace(',', '', (string) $amountRaw));
+                $transactionType = (string) (
+                    data_get($row, 'transaction_type')
+                    ?? data_get($row, 'type', '')
+                );
                 $createdTime = (int) data_get($row, 'create_time', 0);
 
                 // Tanpa ID dan nominal, record tidak aman untuk dijadikan
@@ -87,10 +101,18 @@ class ShopeeWalletPayoutImportService
                 // Guard tipe lokal tetap dipakai walaupun filter sudah dikirim
                 // ke Shopee, karena fixture/cache/API proxy bisa mengembalikan
                 // record tambahan.
-                if ($transactionId === '' || $amount <= 0
-                    || ! $this->isCompletedWithdrawalType($transactionType)) {
+                $invalidReason = match (true) {
+                    ! is_array($row) => 'invalid_shape',
+                    $transactionId === '' => 'missing_transaction_id',
+                    $amount <= 0 => 'missing_or_zero_amount',
+                    ! $this->isCompletedWithdrawalType($transactionType) => 'non_withdrawal_type',
+                    default => null,
+                };
+
+                if ($invalidReason !== null) {
                     $skipped++;
                     $skippedInvalid++;
+                    $skippedInvalidReasons[$invalidReason] = ($skippedInvalidReasons[$invalidReason] ?? 0) + 1;
                     continue;
                 }
 
@@ -167,7 +189,26 @@ class ShopeeWalletPayoutImportService
             $more = (bool) data_get($result, 'response.more', data_get($result, 'more', false));
         } while ($more && count($rows) > 0);
 
-        return compact('created', 'skipped', 'skippedExisting', 'skippedInvalid');
+        return compact('created', 'skipped', 'skippedExisting', 'skippedInvalid', 'skippedInvalidReasons');
+    }
+
+    private function normalizeTransactionRows(array $rows): array
+    {
+        if (isset($rows['transaction_list']) && is_array($rows['transaction_list'])) {
+            return $rows['transaction_list'];
+        }
+
+        // Be tolerant if Shopee returns one transaction object instead of an
+        // array, which can happen in mocked/proxied responses.
+        if (! array_is_list($rows) && (
+            array_key_exists('transaction_id', $rows)
+            || array_key_exists('withdraw_id', $rows)
+            || array_key_exists('amount', $rows)
+        )) {
+            return [$rows];
+        }
+
+        return $rows;
     }
 
     private function isCompletedWithdrawalType(string $transactionType): bool

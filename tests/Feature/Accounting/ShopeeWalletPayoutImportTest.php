@@ -44,6 +44,7 @@ class ShopeeWalletPayoutImportTest extends TestCase
             'skipped' => 1,
             'skippedExisting' => 0,
             'skippedInvalid' => 1,
+            'skippedInvalidReasons' => ['non_withdrawal_type' => 1],
         ], $first);
         $this->assertDatabaseHas('marketplace_payouts', [
             'store_id'                => $store->id,
@@ -61,6 +62,7 @@ class ShopeeWalletPayoutImportTest extends TestCase
             'skipped' => 2,
             'skippedExisting' => 1,
             'skippedInvalid' => 1,
+            'skippedInvalidReasons' => ['non_withdrawal_type' => 1],
         ], $second);
         $this->assertDatabaseCount('marketplace_payouts', 1);
 

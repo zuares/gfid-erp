@@ -120,9 +120,14 @@ class MarketplacePayoutController extends Controller
                 ->with('message', 'Import Shopee gagal: ' . $e->getMessage());
         }
 
+        $reasonText = collect($result['skippedInvalidReasons'] ?? [])
+            ->map(fn ($count, $reason) => "{$reason}: {$count}")
+            ->implode(', ');
+
         return back()->with('status', 'ok')
             ->with('message', "Import Shopee selesai: {$result['created']} draft baru, {$result['skipped']} dilewati "
-                . "(sudah ada: {$result['skippedExisting']}, tidak valid: {$result['skippedInvalid']}).");
+                . "(sudah ada: {$result['skippedExisting']}, tidak valid: {$result['skippedInvalid']}"
+                . ($reasonText !== '' ? "; {$reasonText}" : '') . ').');
     }
 
     public function create()
