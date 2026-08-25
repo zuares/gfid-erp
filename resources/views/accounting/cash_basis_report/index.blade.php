@@ -4,11 +4,6 @@
 
 @php
     $fmt = fn($n) => number_format((float) $n, 0, ',', '.');
-    $statusLabels = [
-        'draft' => 'Draft',
-        'posted' => 'Tercatat',
-        'void' => 'Dibatalkan',
-    ];
 @endphp
 
 @push('head')
@@ -76,6 +71,7 @@
         .cbr-status-draft { color: #b45309; background: #fef3c7; border-color: #fde68a; }
         .cbr-status-posted { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
         .cbr-status-void { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
+        .cbr-status-out { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
         .cbr-mobile-list { display: none; }
         @media (max-width: 768px) {
             .gf-master-header { padding: 12px 14px; border-radius: 14px; }
@@ -105,18 +101,18 @@
 @section('content')
     <x-gf.page
         eyebrow="Accounting"
-        title="Laporan Cash Basis"
-        description="Ringkasan awam untuk saldo kas/bank dan pengeluaran yang sudah tercatat.">
+        title="Laporan Arus Kas (Basis Kas)"
+        description="Metode langsung: hanya penerimaan dan pengeluaran kas yang sudah posted.">
         <x-slot:actions>
             <div class="cbr-actions">
                 <a href="{{ route('accounting.cash-receipts.index') }}" class="cbr-btn cbr-btn-primary">Cash Receipts</a>
                 <a href="{{ route('accounting.cash-expenses.index') }}" class="cbr-btn cbr-btn-primary">Cash Expenses</a>
-                <a href="{{ route('accounting.accounts.index') }}" class="cbr-btn">Accounts</a>
+                <a href="{{ route('accounting.accounts.index') }}" class="cbr-btn">Ledger</a>
             </div>
         </x-slot:actions>
 
         <div class="cbr-page">
-            <x-gf.panel title="Filter Periode" subtitle="Default mengikuti bulan berjalan.">
+            <x-gf.panel title="Periode Laporan" subtitle="Laporan menggunakan basis kas dan hanya menghitung transaksi posted.">
                 <form class="cbr-filter" method="GET" action="{{ route('accounting.cash-basis-report.index') }}">
                     <div>
                         <label class="cbr-filter-label" for="from">Dari Tanggal</label>
@@ -135,268 +131,162 @@
 
             <div class="cbr-kpi-grid">
                 <div class="cbr-kpi">
-                    <div class="cbr-kpi-label">Saldo Kas/Bank</div>
+                    <div class="cbr-kpi-label">Saldo Awal Periode</div>
+                    <div class="cbr-kpi-value {{ $openingCashTotal < 0 ? 'neg' : 'pos' }}">Rp {{ $fmt($openingCashTotal) }}</div>
+                    <div class="cbr-kpi-note">sebelum {{ $from }}</div>
+                </div>
+                <div class="cbr-kpi">
+                    <div class="cbr-kpi-label">Kas Masuk</div>
+                    <div class="cbr-kpi-value pos">Rp {{ $fmt($cashInTotal) }}</div>
+                    <div class="cbr-kpi-note">penerimaan dan marketplace</div>
+                </div>
+                <div class="cbr-kpi">
+                    <div class="cbr-kpi-label">Kas Keluar</div>
+                    <div class="cbr-kpi-value {{ $cashOutTotal < 0 ? 'neg' : '' }}">Rp {{ $fmt($cashOutTotal) }}</div>
+                    <div class="cbr-kpi-note">operasional dan pembayaran PO</div>
+                </div>
+                <div class="cbr-kpi">
+                    <div class="cbr-kpi-label">Saldo Akhir Periode</div>
                     <div class="cbr-kpi-value {{ $cashTotal < 0 ? 'neg' : 'pos' }}">Rp {{ $fmt($cashTotal) }}</div>
-                    <div class="cbr-kpi-note">saldo aktif semua kas/bank</div>
-                </div>
-                <div class="cbr-kpi">
-                    <div class="cbr-kpi-label">Penerimaan Tercatat</div>
-                    <div class="cbr-kpi-value pos">Rp {{ $fmt($postedReceiptTotal ?? 0) }}</div>
-                    <div class="cbr-kpi-note">{{ $fmt($postedReceiptCount ?? 0) }} transaksi posted</div>
-                </div>
-                <div class="cbr-kpi">
-                    <div class="cbr-kpi-label">Kas Keluar Tercatat</div>
-                    <div class="cbr-kpi-value">Rp {{ $fmt($postedExpenseTotal) }}</div>
-                    <div class="cbr-kpi-note">{{ $fmt($postedExpenseCount) }} transaksi posted · operasional + pembayaran PO</div>
-                </div>
-                <div class="cbr-kpi">
-                    <div class="cbr-kpi-label">Draft</div>
-                    <div class="cbr-kpi-value">Rp {{ $fmt(($draftExpenseTotal ?? 0) + ($draftReceiptTotal ?? 0)) }}</div>
-                    <div class="cbr-kpi-note">{{ $fmt(($draftExpenseCount ?? 0) + ($draftReceiptCount ?? 0)) }} belum masuk jurnal</div>
+                    <div class="cbr-kpi-note">arus bersih {{ $cashNetFlow < 0 ? 'negatif' : 'positif' }}</div>
                 </div>
             </div>
 
-            <div class="cbr-grid-2">
-                <x-gf.panel title="Saldo Kas / Bank" subtitle="Klik Accounts untuk lihat ledger lebih detail.">
-                    <div class="cbr-list">
-                        @forelse ($cashAccounts as $account)
-                            <div class="cbr-row">
-                                <div>
-                                    <div class="cbr-row-title">{{ $account->name }}</div>
-                                    <div class="cbr-row-meta">{{ $account->code }}</div>
-                                </div>
-                                <div class="cbr-row-num {{ (float) $account->balance < 0 ? 'neg' : '' }}">Rp {{ $fmt($account->balance) }}</div>
-                            </div>
-                        @empty
-                            <div class="cbr-empty">Belum ada akun kas/bank aktif.</div>
-                        @endforelse
+            <x-gf.panel title="Ringkasan Arus Kas" subtitle="Kas masuk dan kas keluar selama periode yang dipilih.">
+                <div class="cbr-grid-2">
+                    <div class="cbr-table-wrap">
+                        <table class="table align-middle mb-0 gf-clean-table">
+                            <thead>
+                                <tr>
+                                    <th>Kas Masuk</th>
+                                    <th class="text-end">Nominal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($cashInRows as $row)
+                                    <tr>
+                                        <td>
+                                            <div class="cbr-row-title">{{ $row->name }}</div>
+                                            <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                                        </td>
+                                        <td class="text-end fw-bold">Rp {{ $fmt($row->total_amount) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="2" class="cbr-empty">Belum ada kas masuk.</td></tr>
+                                @endforelse
+                            </tbody>
+                            <tfoot>
+                                <tr><th>Total Kas Masuk</th><th class="text-end">Rp {{ $fmt($cashInTotal) }}</th></tr>
+                            </tfoot>
+                        </table>
                     </div>
-                </x-gf.panel>
-
-                <x-gf.panel title="Pengeluaran Per Kategori" subtitle="Hanya transaksi yang sudah Tercatat.">
-                    <div class="cbr-list">
-                        @forelse ($expenseByCategory as $row)
-                            <div class="cbr-row">
-                                <div>
-                                    <div class="cbr-row-title">{{ $row->name }}</div>
-                                    <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
-                                </div>
-                                <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
-                            </div>
-                        @empty
-                            <div class="cbr-empty">Belum ada pengeluaran tercatat pada periode ini.</div>
-                        @endforelse
+                    <div class="cbr-table-wrap">
+                        <table class="table align-middle mb-0 gf-clean-table">
+                            <thead>
+                                <tr>
+                                    <th>Kas Keluar</th>
+                                    <th class="text-end">Nominal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($cashOutRows as $row)
+                                    <tr>
+                                        <td>
+                                            <div class="cbr-row-title">{{ $row->name }}</div>
+                                            <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                                        </td>
+                                        <td class="text-end fw-bold">Rp {{ $fmt($row->total_amount) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="2" class="cbr-empty">Belum ada kas keluar.</td></tr>
+                                @endforelse
+                            </tbody>
+                            <tfoot>
+                                <tr><th>Total Kas Keluar</th><th class="text-end">Rp {{ $fmt($cashOutTotal) }}</th></tr>
+                            </tfoot>
+                        </table>
                     </div>
-                </x-gf.panel>
-            </div>
-
-            <x-gf.panel title="Penerimaan Per Sumber" subtitle="Hanya transaksi penerimaan yang sudah Tercatat.">
-                <div class="cbr-list">
-                    @if ($receiptBySource->isEmpty() && ($payoutByMarketplace ?? collect())->isEmpty())
-                        <div class="cbr-empty">Belum ada penerimaan tercatat pada periode ini.</div>
-                    @else
-                        @foreach ($receiptBySource as $row)
-                            <div class="cbr-row">
-                                <div>
-                                    <div class="cbr-row-title">{{ $row->name }}</div>
-                                    <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
-                                </div>
-                                <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
-                            </div>
-                        @endforeach
-                        @foreach ($payoutByMarketplace ?? [] as $row)
-                            <div class="cbr-row">
-                                <div>
-                                    <div class="cbr-row-title">🛒 {{ $row->marketplace_name }}</div>
-                                    <div class="cbr-row-meta">Marketplace · {{ $fmt($row->total_docs) }} transaksi</div>
-                                </div>
-                                <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
-                            </div>
-                        @endforeach
-                    @endif
+                </div>
+                <div class="cbr-row" style="margin-top:1rem">
+                    <div>
+                        <div class="cbr-row-title">Arus Kas Bersih</div>
+                        <div class="cbr-row-meta">Kas masuk dikurangi kas keluar</div>
+                    </div>
+                    <div class="cbr-row-num {{ $cashNetFlow < 0 ? 'neg' : '' }}">Rp {{ $fmt($cashNetFlow) }}</div>
                 </div>
             </x-gf.panel>
 
-            <x-gf.panel title="Pengeluaran Per Kas / Bank" subtitle="Melihat sumber uang yang paling sering dipakai.">
+            <x-gf.panel title="Saldo Kas / Bank" subtitle="Saldo akhir per akun kas dan bank pada tanggal {{ $to }}.">
                 <div class="cbr-list">
-                    @forelse ($expenseByCash as $row)
+                    @forelse ($cashAccounts as $account)
                         <div class="cbr-row">
                             <div>
-                                <div class="cbr-row-title">{{ $row->name }}</div>
-                                <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                                <div class="cbr-row-title">{{ $account->name }}</div>
+                                <div class="cbr-row-meta">{{ $account->code }}</div>
                             </div>
-                            <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
+                            <div class="cbr-row-num {{ (float) $account->balance < 0 ? 'neg' : '' }}">Rp {{ $fmt($account->balance) }}</div>
                         </div>
                     @empty
-                        <div class="cbr-empty">Belum ada kas/bank yang dipakai pada periode ini.</div>
+                        <div class="cbr-empty">Belum ada akun kas/bank aktif.</div>
                     @endforelse
                 </div>
             </x-gf.panel>
 
-            <x-gf.panel title="Pembayaran Pembelian Per Kas / Bank" subtitle="DP dan pelunasan PO yang benar-benar mengurangi kas/bank.">
-                <div class="cbr-list">
-                    @forelse ($purchasePaymentByCash as $row)
-                        <div class="cbr-row">
-                            <div>
-                                <div class="cbr-row-title">{{ $row->name }}</div>
-                                <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
-                            </div>
-                            <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
-                        </div>
-                    @empty
-                        <div class="cbr-empty">Belum ada pembayaran pembelian pada periode ini.</div>
-                    @endforelse
-                </div>
-            </x-gf.panel>
-
-            <x-gf.panel title="Penerimaan Terakhir" subtitle="Kas masuk + marketplace. Klik untuk buka detail.">
-                @if ($recentReceipts->isEmpty())
-                    <div class="cbr-empty">Belum ada penerimaan pada periode ini.</div>
+            <x-gf.panel title="Transaksi Kas Terakhir" subtitle="Hanya transaksi posted; klik baris untuk membuka detail.">
+                @if ($recentCashTransactions->isEmpty())
+                    <div class="cbr-empty">Belum ada transaksi kas pada periode ini.</div>
                 @else
                     <div class="cbr-table-wrap">
                         <table class="table table-hover align-middle mb-0 gf-clean-table">
                             <thead>
                                 <tr>
                                     <th>Tanggal</th>
+                                    <th>Arah</th>
                                     <th>Keterangan</th>
-                                    <th>Sumber</th>
-                                    <th>Terima Ke</th>
-                                    <th>Status</th>
+                                    <th>Kategori / Sumber</th>
+                                    <th>Kas / Bank</th>
                                     <th class="text-end">Nominal</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($recentReceipts as $r)
-                                    <tr class="cbr-click-row" data-href="{{ $r->_route }}" tabindex="0">
-                                        <td>{{ \Illuminate\Support\Carbon::parse($r->date)->format('Y-m-d') }}</td>
+                                @foreach ($recentCashTransactions as $transaction)
+                                    <tr class="cbr-click-row" data-href="{{ $transaction->_route }}" tabindex="0">
+                                        <td>{{ optional($transaction->date)->format('Y-m-d') }}</td>
                                         <td>
-                                            <div class="cbr-row-title">{{ $r->description ?: 'Penerimaan' }}</div>
-                                            <div class="cbr-row-meta">
-                                                #{{ $r->id }}{{ $r->reference ? ' · ' . $r->reference : '' }}
-                                                @if($r->_type === 'marketplace_payout')
-                                                    <span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:.1rem .35rem;font-size:.7rem;font-weight:800;margin-left:.25rem">MP</span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td>{{ $r->source_name }}</td>
-                                        <td>{{ $r->bank_name }}</td>
-                                        <td>
-                                            <span class="cbr-status cbr-status-{{ $r->status }}">
-                                                {{ $statusLabels[$r->status] ?? ucfirst((string) $r->status) }}
+                                            <span class="cbr-status {{ $transaction->direction === 'in' ? 'cbr-status-posted' : 'cbr-status-out' }}">
+                                                {{ $transaction->direction === 'in' ? 'Masuk' : 'Keluar' }}
                                             </span>
                                         </td>
-                                        <td class="text-end fw-bold">Rp {{ $fmt($r->amount) }}</td>
+                                        <td>{{ $transaction->description }}</td>
+                                        <td>{{ $transaction->category }}</td>
+                                        <td>{{ $transaction->cash_account }}</td>
+                                        <td class="text-end fw-bold {{ $transaction->direction === 'in' ? 'text-success' : 'text-danger' }}">
+                                            {{ $transaction->direction === 'in' ? '+' : '-' }} Rp {{ $fmt($transaction->amount) }}
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-
                     <div class="cbr-mobile-list">
-                        @foreach ($recentReceipts as $r)
-                            <div class="cbr-mobile-card" data-href="{{ $r->_route }}" tabindex="0" role="link">
+                        @foreach ($recentCashTransactions as $transaction)
+                            <div class="cbr-mobile-card" data-href="{{ $transaction->_route }}" tabindex="0" role="link">
                                 <div class="d-flex justify-content-between gap-2">
                                     <div>
-                                        <div class="cbr-row-title">{{ $r->description ?: 'Penerimaan' }}</div>
-                                        <div class="cbr-row-meta">{{ \Illuminate\Support\Carbon::parse($r->date)->format('Y-m-d') }} · {{ $r->source_name }}</div>
+                                        <div class="cbr-row-title">{{ $transaction->description }}</div>
+                                        <div class="cbr-row-meta">
+                                            {{ optional($transaction->date)->format('Y-m-d') }} · {{ $transaction->category }}
+                                        </div>
                                     </div>
-                                    <div class="cbr-row-num">Rp {{ $fmt($r->amount) }}</div>
+                                    <div class="cbr-row-num {{ $transaction->direction === 'in' ? '' : 'neg' }}">
+                                        {{ $transaction->direction === 'in' ? '+' : '-' }} Rp {{ $fmt($transaction->amount) }}
+                                    </div>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center gap-2">
-                                    <span class="cbr-status cbr-status-{{ $r->status }}">
-                                        {{ $statusLabels[$r->status] ?? ucfirst((string) $r->status) }}
-                                    </span>
-                                    <span class="cbr-row-meta">{{ $r->bank_name }}</span>
-                                </div>
+                                <div class="cbr-row-meta">{{ $transaction->cash_account }}</div>
                             </div>
                         @endforeach
                     </div>
                 @endif
-            </x-gf.panel>
-
-            <x-gf.panel title="Transaksi Terakhir" subtitle="Klik baris untuk buka detail dan posting jika masih draft.">
-                @if ($recentExpenses->isEmpty())
-                    <div class="cbr-empty">Belum ada transaksi pada periode ini.</div>
-                @else
-                    <div class="cbr-table-wrap">
-                        <table class="table table-hover align-middle mb-0 gf-clean-table">
-                            <thead>
-                                <tr>
-                                    <th>Tanggal</th>
-                                    <th>Keterangan</th>
-                                    <th>Kategori</th>
-                                    <th>Bayar Dari</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Nominal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($recentExpenses as $expense)
-                                    <tr class="cbr-click-row" data-href="{{ route('accounting.cash-expenses.show', $expense) }}" tabindex="0">
-                                        <td>{{ \Illuminate\Support\Carbon::parse($expense->date)->format('Y-m-d') }}</td>
-                                        <td>
-                                            <div class="cbr-row-title">{{ $expense->description ?: 'Pengeluaran' }}</div>
-                                            <div class="cbr-row-meta">ID #{{ $expense->id }}{{ $expense->reference ? ' · Ref: ' . $expense->reference : '' }}</div>
-                                        </td>
-                                        <td>{{ $expense->expenseAccount?->name ?? '-' }}</td>
-                                        <td>{{ $expense->cashAccount?->name ?? '-' }}</td>
-                                        <td>
-                                            <span class="cbr-status cbr-status-{{ $expense->status }}">
-                                                {{ $statusLabels[$expense->status] ?? ucfirst((string) $expense->status) }}
-                                            </span>
-                                        </td>
-                                        <td class="text-end fw-bold">Rp {{ $fmt($expense->amount) }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="cbr-mobile-list">
-                        @foreach ($recentExpenses as $expense)
-                            <div class="cbr-mobile-card" data-href="{{ route('accounting.cash-expenses.show', $expense) }}" tabindex="0" role="link">
-                                <div class="d-flex justify-content-between gap-2">
-                                    <div>
-                                        <div class="cbr-row-title">{{ $expense->description ?: 'Pengeluaran' }}</div>
-                                        <div class="cbr-row-meta">{{ \Illuminate\Support\Carbon::parse($expense->date)->format('Y-m-d') }} · {{ $expense->expenseAccount?->name ?? '-' }}</div>
-                                    </div>
-                                    <div class="cbr-row-num">Rp {{ $fmt($expense->amount) }}</div>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center gap-2">
-                                    <span class="cbr-status cbr-status-{{ $expense->status }}">
-                                        {{ $statusLabels[$expense->status] ?? ucfirst((string) $expense->status) }}
-                                    </span>
-                                    <span class="cbr-row-meta">{{ $expense->cashAccount?->name ?? '-' }}</span>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </x-gf.panel>
-
-            <x-gf.panel title="Pembayaran PO Terakhir" subtitle="Pembayaran aktual; tidak menggunakan total PO sebagai kas keluar.">
-                <div class="cbr-list">
-                    @forelse ($recentPurchasePayments as $payment)
-                        <div class="cbr-row">
-                            <div>
-                                <div class="cbr-row-title">
-                                    <a href="{{ route('purchasing.purchase_orders.show', $payment->purchaseOrder) }}">
-                                        {{ $payment->purchaseOrder?->code ?? 'PO #' . $payment->purchase_order_id }}
-                                    </a>
-                                </div>
-                                <div class="cbr-row-meta">
-                                    {{ $payment->purchaseOrder?->supplier?->name ?? '-' }}
-                                    · {{ optional($payment->date)->format('Y-m-d') }}
-                                    · {{ $payment->type === 'dp' ? 'DP' : 'Pelunasan' }}
-                                    · {{ $payment->cashAccount?->name ?? '-' }}
-                                </div>
-                            </div>
-                            <div class="cbr-row-num">Rp {{ $fmt($payment->amount) }}</div>
-                        </div>
-                    @empty
-                        <div class="cbr-empty">Belum ada pembayaran PO pada periode ini.</div>
-                    @endforelse
-                </div>
             </x-gf.panel>
         </div>
     </x-gf.page>

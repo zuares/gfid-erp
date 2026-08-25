@@ -36,19 +36,33 @@ class CashBasisReportController extends Controller
             ->get();
 
         $cashAccountIds = $cashAccounts->pluck('id')->all();
-        $cashBalances = empty($cashAccountIds)
+        $cashOpeningBalances = empty($cashAccountIds)
             ? collect()
             : DB::table('journal_lines as jl')
                 ->join('journals as j', 'j.id', '=', 'jl.journal_id')
                 ->whereIn('jl.account_id', $cashAccountIds)
                 ->whereNull('j.voided_at')
                 ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+                ->whereDate('j.date', '<', $from)
                 ->groupBy('jl.account_id')
                 ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
                 ->pluck('balance', 'account_id');
 
-        $cashAccounts->each(function ($account) use ($cashBalances) {
-            $account->balance = (float) ($cashBalances[$account->id] ?? 0);
+        $cashEndingBalances = empty($cashAccountIds)
+            ? collect()
+            : DB::table('journal_lines as jl')
+                ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+                ->whereIn('jl.account_id', $cashAccountIds)
+                ->whereNull('j.voided_at')
+                ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+                ->whereDate('j.date', '<=', $to)
+                ->groupBy('jl.account_id')
+                ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
+                ->pluck('balance', 'account_id');
+
+        $cashAccounts->each(function ($account) use ($cashOpeningBalances, $cashEndingBalances) {
+            $account->opening_balance = (float) ($cashOpeningBalances[$account->id] ?? 0);
+            $account->balance = (float) ($cashEndingBalances[$account->id] ?? 0);
         });
 
         $postedExpenseBase = CashExpense::query()
@@ -83,58 +97,12 @@ class CashBasisReportController extends Controller
         $postedReceiptTotal = (float) (clone $postedReceiptBase)->sum('amount');
         $postedReceiptCount = (int) (clone $postedReceiptBase)->count();
 
-        $draftReceiptTotal = (float) CashReceipt::query()
-            ->where('status', 'draft')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->sum('amount');
-
-        $draftReceiptCount = (int) CashReceipt::query()
-            ->where('status', 'draft')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->count();
-
-        $draftExpenseTotal = (float) CashExpense::query()
-            ->where('status', 'draft')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->sum('amount');
-
-        $draftExpenseCount = (int) CashExpense::query()
-            ->where('status', 'draft')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->count();
-
-        $voidExpenseCount = (int) CashExpense::query()
-            ->where('status', 'void')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->count();
-
         $expenseByCategory = (clone $postedExpenseBase)
             ->withoutEagerLoads()
             ->join('accounts as a', 'a.id', '=', 'cash_expenses.expense_account_id')
             ->groupBy('a.id', 'a.code', 'a.name')
             ->orderByDesc(DB::raw('SUM(cash_expenses.amount)'))
             ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(cash_expenses.amount), 0) as total_amount')
-            ->get();
-
-        $expenseByCash = (clone $postedExpenseBase)
-            ->withoutEagerLoads()
-            ->join('accounts as a', 'a.id', '=', 'cash_expenses.cash_account_id')
-            ->groupBy('a.id', 'a.code', 'a.name')
-            ->orderByDesc(DB::raw('SUM(cash_expenses.amount)'))
-            ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(cash_expenses.amount), 0) as total_amount')
-            ->get();
-
-        $purchasePaymentByCash = (clone $postedPurchasePaymentBase)
-            ->withoutEagerLoads()
-            ->join('accounts as a', 'a.id', '=', 'purchase_payments.cash_account_id')
-            ->groupBy('a.id', 'a.code', 'a.name')
-            ->orderByDesc(DB::raw('SUM(purchase_payments.amount)'))
-            ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(purchase_payments.amount), 0) as total_amount')
             ->get();
 
         $receiptBySource = (clone $postedReceiptBase)
@@ -155,18 +123,6 @@ class CashBasisReportController extends Controller
         $postedPayoutTotal = (float) (clone $postedPayoutBase)->sum('amount');
         $postedPayoutCount = (int) (clone $postedPayoutBase)->count();
 
-        $draftPayoutTotal  = (float) MarketplacePayout::query()
-            ->where('status', 'draft')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->sum('amount');
-
-        $draftPayoutCount  = (int) MarketplacePayout::query()
-            ->where('status', 'draft')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->count();
-
         // Grouped by marketplace_name for breakdown panel
         $payoutByMarketplace = (clone $postedPayoutBase)
             ->withoutEagerLoads()
@@ -177,6 +133,7 @@ class CashBasisReportController extends Controller
 
         $recentExpenses = CashExpense::query()
             ->with(['expenseAccount', 'cashAccount'])
+            ->where('status', 'posted')
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
             ->orderByDesc('date')
@@ -193,6 +150,7 @@ class CashBasisReportController extends Controller
         // Merge CashReceipts + MarketplacePayouts, sorted by date desc, limit 10
         $recentCashReceipts = CashReceipt::query()
             ->with(['sourceAccount', 'cashAccount'])
+            ->where('status', 'posted')
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
             ->orderByDesc('date')
@@ -214,6 +172,7 @@ class CashBasisReportController extends Controller
 
         $recentPayouts = MarketplacePayout::query()
             ->with(['bankAccount'])
+            ->where('status', 'posted')
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
             ->orderByDesc('date')
@@ -239,32 +198,86 @@ class CashBasisReportController extends Controller
             ->take(10)
             ->values();
 
+        $cashInRows = $receiptBySource
+            ->map(fn ($row) => (object) [
+                'name' => $row->name,
+                'code' => $row->code,
+                'total_docs' => $row->total_docs,
+                'total_amount' => $row->total_amount,
+            ])
+            ->concat($payoutByMarketplace->map(fn ($row) => (object) [
+                'name' => '🛒 ' . $row->marketplace_name,
+                'code' => 'Marketplace',
+                'total_docs' => $row->total_docs,
+                'total_amount' => $row->total_amount,
+            ]))
+            ->values();
+
+        $cashOutRows = $expenseByCategory
+            ->map(fn ($row) => (object) [
+                'name' => $row->name,
+                'code' => $row->code,
+                'total_docs' => $row->total_docs,
+                'total_amount' => $row->total_amount,
+            ])
+            ->when($postedPurchasePaymentTotal > 0, fn ($rows) => $rows->push((object) [
+                'name' => 'Pembayaran Pembelian / PO',
+                'code' => 'Purchasing',
+                'total_docs' => $postedPurchasePaymentCount,
+                'total_amount' => $postedPurchasePaymentTotal,
+            ]))
+            ->values();
+
+        $recentCashTransactions = collect()
+            ->concat($recentExpenses->map(fn ($expense) => (object) [
+                '_route' => route('accounting.cash-expenses.show', $expense),
+                'date' => $expense->date,
+                'id' => $expense->id,
+                'direction' => 'out',
+                'description' => $expense->description ?: 'Pengeluaran operasional',
+                'category' => $expense->expenseAccount?->name ?? '-',
+                'cash_account' => $expense->cashAccount?->name ?? '-',
+                'amount' => $expense->amount,
+            ]))
+            ->concat($recentReceipts->map(fn ($receipt) => (object) [
+                '_route' => $receipt->_route,
+                'date' => $receipt->date,
+                'id' => $receipt->id,
+                'direction' => 'in',
+                'description' => $receipt->description ?: 'Penerimaan kas',
+                'category' => $receipt->source_name,
+                'cash_account' => $receipt->bank_name,
+                'amount' => $receipt->amount,
+            ]))
+            ->concat($recentPurchasePayments->map(fn ($payment) => (object) [
+                '_route' => route('purchasing.purchase_orders.show', $payment->purchaseOrder),
+                'date' => $payment->date,
+                'id' => $payment->id,
+                'direction' => 'out',
+                'description' => $payment->purchaseOrder?->code ?? 'Pembayaran PO',
+                'category' => $payment->purchaseOrder?->supplier?->name ?? 'Pembelian',
+                'cash_account' => $payment->cashAccount?->name ?? '-',
+                'amount' => $payment->amount,
+            ]))
+            ->sortByDesc(fn ($transaction) => optional($transaction->date)->format('Y-m-d') . str_pad($transaction->id, 8, '0', STR_PAD_LEFT))
+            ->take(20)
+            ->values();
+
+        $cashInTotal = $postedReceiptTotal + $postedPayoutTotal;
+        $cashOutTotal = $postedExpenseTotal + $postedPurchasePaymentTotal;
+
         return view('accounting.cash_basis_report.index', [
             'from'                => $from,
             'to'                  => $to,
             'cashAccounts'        => $cashAccounts,
-            'cashTotal'           => (float) $cashAccounts->sum('balance'),
-            'postedReceiptTotal'  => $postedReceiptTotal + $postedPayoutTotal,
-            'postedReceiptCount'  => $postedReceiptCount + $postedPayoutCount,
-            'draftReceiptTotal'   => $draftReceiptTotal + $draftPayoutTotal,
-            'draftReceiptCount'   => $draftReceiptCount + $draftPayoutCount,
-            'postedExpenseTotal'  => $postedExpenseTotal + $postedPurchasePaymentTotal,
-            'postedExpenseCount'  => $postedExpenseCount + $postedPurchasePaymentCount,
-            'postedOperationalExpenseTotal' => $postedExpenseTotal,
-            'postedOperationalExpenseCount' => $postedExpenseCount,
-            'postedPurchasePaymentTotal' => $postedPurchasePaymentTotal,
-            'postedPurchasePaymentCount' => $postedPurchasePaymentCount,
-            'draftExpenseTotal'   => $draftExpenseTotal,
-            'draftExpenseCount'   => $draftExpenseCount,
-            'voidExpenseCount'    => $voidExpenseCount,
-            'expenseByCategory'   => $expenseByCategory,
-            'expenseByCash'       => $expenseByCash,
-            'purchasePaymentByCash' => $purchasePaymentByCash,
-            'receiptBySource'     => $receiptBySource,
-            'payoutByMarketplace' => $payoutByMarketplace,
-            'recentExpenses'      => $recentExpenses,
-            'recentPurchasePayments' => $recentPurchasePayments,
-            'recentReceipts'      => $recentReceipts,
+            'openingCashTotal' => (float) $cashAccounts->sum('opening_balance'),
+            'cashTotal' => (float) $cashAccounts->sum('balance'),
+            'cashInTotal' => $cashInTotal,
+            'cashOutTotal' => $cashOutTotal,
+            'cashNetFlow' => $cashInTotal - $cashOutTotal,
+            'cashInRows' => $cashInRows,
+            'cashOutRows' => $cashOutRows,
+            'recentCashTransactions' => $recentCashTransactions,
         ]);
     }
 }
