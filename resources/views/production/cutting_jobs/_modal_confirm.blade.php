@@ -95,18 +95,14 @@
                         <span>Total qty bundles (pcs)</span>
                         <span class="fw-semibold mono" id="summary-bundle-pcs">0.00</span>
                     </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Tanggal cutting</span>
+                        <span class="fw-semibold" id="summary-cutting-date">-</span>
+                    </div>
                 </div>
 
                 {{-- FORM INFO JOB LAINNYA --}}
                 <div class="row g-3 cutting-modal-section cutting-modal-section-meta">
-                    <div class="col-md-4 col-6">
-                        <label class="form-label small">Tanggal</label>
-                        @php
-                            $defaultDate = isset($isEdit) && $isEdit && isset($job) ? $job->date : now()->toDateString();
-                        @endphp
-                        <input type="date" name="date" class="form-control form-control-sm"
-                            value="{{ old('date', $defaultDate) }}">
-                    </div>
                     <div class="col-md-4 col-6">
                         <label class="form-label small">Warehouse</label>
                         {{-- Disabled select untuk tampilan, hidden input untuk kirim ke backend --}}
@@ -309,6 +305,7 @@
             const summaryLotCount = document.getElementById('summary-lot-count');
             const summaryLotBalance = document.getElementById('summary-lot-balance');
             const summaryBundlePcs = document.getElementById('summary-bundle-pcs');
+            const summaryCuttingDate = document.getElementById('summary-cutting-date');
             const summaryBundleRows = document.getElementById('summary-bundle-rows');
             const summaryBundleAggRows = document.getElementById('summary-bundle-agg-rows');
 
@@ -403,6 +400,9 @@
                 summaryLotCount.textContent = String(lotCount);
                 summaryLotBalance.textContent = balance.toFixed(2) + ' kg';
                 summaryBundlePcs.textContent = totalPcs.toFixed(2);
+
+                const cuttingDate = document.getElementById('cutting-date')?.value || '-';
+                if (summaryCuttingDate) summaryCuttingDate.textContent = cuttingDate;
 
                 const details = collectBundleDetails();
 

@@ -17,6 +17,13 @@
     } else {
         $selectedOperatorId = old('operator_id', $defaultOperatorId);
     }
+
+    $selectedDate = old(
+        'date',
+        isset($isEdit) && $isEdit && isset($job) && $job->date
+            ? $job->date->format('Y-m-d')
+            : now()->toDateString()
+    );
 @endphp
 
 @push('head')
@@ -830,6 +837,11 @@
         <div class="cutting-stepbar">
             <div class="cutting-stepbar-text">
                 Isi item hasil cutting dan qty bundle.
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <label for="cutting-date" class="small fw-semibold mb-0 text-nowrap">Tanggal Cutting</label>
+                <input type="date" name="date" id="cutting-date" class="form-control form-control-sm"
+                    value="{{ $selectedDate }}" required style="min-width: 150px;">
             </div>
             <button type="button" class="btn btn-outline-secondary btn-sm btn-pill-sm" data-bs-toggle="modal"
                 data-bs-target="#cuttingInfoModal">
