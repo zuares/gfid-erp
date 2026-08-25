@@ -30,8 +30,8 @@ class PurchaseRequestController extends Controller
                 'requestedBy:id,name',
                 'convertedToPo:id,code',           // PR-E: link PO di tabel
                 'purchaseOrders:id,code,purchase_request_id',
-                'lines:id,purchase_request_id,item_id,supplier_id,qty,unit_price,notes',
-                'lines.item:id,code,name,unit',
+                'lines:id,purchase_request_id,item_id,supplier_id,qty,purchase_unit,stock_unit,conversion_factor,unit_price,notes',
+                'lines.item:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor',
                 'lines.supplier:id,code,name',
             ])
             ->withCount('lines')
@@ -134,7 +134,7 @@ class PurchaseRequestController extends Controller
 
         $pr = null;
 
-        DB::transaction(function () use ($data, $request, &$pr) {
+        DB::transaction(function () use ($data, $request, $items, &$pr) {
             $pr = PurchaseRequest::create([
                 'code'         => CodeGenerator::make('PR'),
                 'date'         => $data['date'],
@@ -145,10 +145,14 @@ class PurchaseRequestController extends Controller
             ]);
 
             foreach ($data['lines'] as $line) {
+                $item = $items->firstWhere('id', (int) ($line['item_id'] ?? 0));
                 PurchaseRequestLine::create([
                     'purchase_request_id' => $pr->id,
                     'item_id'             => $line['item_id'] ?? null,
                     'qty'                 => (float) to_num($line['qty'] ?? 0),
+                    'purchase_unit'      => $item?->purchaseUnit(),
+                    'stock_unit'         => $item?->stockUnit(),
+                    'conversion_factor'  => $item?->purchaseConversionFactor(),
                     'unit_price'          => isset($line['unit_price']) && $line['unit_price'] !== ''
                                                 ? (float) to_num($line['unit_price'])
                                                 : null,
@@ -274,7 +278,7 @@ class PurchaseRequestController extends Controller
             $data['lines'] = $this->applyDefaultPurchaseRequestLinePrices($data['lines'], $items);
         }
 
-        DB::transaction(function () use ($data, $purchase_request) {
+        DB::transaction(function () use ($data, $purchase_request, $items) {
             $purchase_request->update([
                 'date'        => $data['date'],
                 'supplier_id' => $data['supplier_id'] ?? null,
@@ -285,10 +289,14 @@ class PurchaseRequestController extends Controller
             $purchase_request->lines()->delete();
 
             foreach ($data['lines'] as $line) {
+                $item = $items->firstWhere('id', (int) ($line['item_id'] ?? 0));
                 PurchaseRequestLine::create([
                     'purchase_request_id' => $purchase_request->id,
                     'item_id'             => $line['item_id'] ?? null,
                     'qty'                 => (float) to_num($line['qty'] ?? 0),
+                    'purchase_unit'      => $item?->purchaseUnit(),
+                    'stock_unit'         => $item?->stockUnit(),
+                    'conversion_factor'  => $item?->purchaseConversionFactor(),
                     'unit_price'          => isset($line['unit_price']) && $line['unit_price'] !== ''
                                                 ? (float) to_num($line['unit_price'])
                                                 : null,
@@ -320,7 +328,7 @@ class PurchaseRequestController extends Controller
                 ->with('error', 'PR ini belum siap diproses atau sudah pernah dibagi ke PO.');
         }
 
-        $purchase_request->load(['lines.item:id,code,name,unit,item_category_id', 'supplier:id,code,name']);
+        $purchase_request->load(['lines.item:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor,item_category_id', 'supplier:id,code,name']);
         $suppliers = Supplier::query()
             ->where('active', true)
             ->orderBy('name')
@@ -699,6 +707,9 @@ class PurchaseRequestController extends Controller
             'code',
             'name',
             'unit',
+            'stock_unit',
+            'purchase_unit',
+            'purchase_conversion_factor',
             'item_category_id',
             'last_purchase_price',
         ];

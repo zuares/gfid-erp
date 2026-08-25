@@ -253,11 +253,38 @@
                     <input id="item-name" type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $item?->name) }}" required>
                     @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-lg-3 col-md-4">
-                    <label class="form-label" for="item-unit">Satuan <span class="item-required">*</span></label>
-                    <input id="item-unit" type="text" name="unit" class="form-control @error('unit') is-invalid @enderror" value="{{ old('unit', $item?->unit ?? 'pcs') }}" required>
-                    @error('unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                <input id="item-unit" type="hidden" name="unit" value="{{ old('unit', $item?->stock_unit ?? $item?->unit ?? 'pcs') }}">
+            </div>
+        </div>
+
+        <div class="item-form-section">
+            <div class="item-section-head">
+                <div class="item-section-icon"><i class="bi bi-arrow-left-right"></i></div>
+                <h2 class="item-section-title">Satuan & konversi pembelian</h2>
+            </div>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label" for="item-stock-unit">Satuan stok utama</label>
+                    <input id="item-stock-unit" type="text" name="stock_unit" class="form-control @error('stock_unit') is-invalid @enderror" value="{{ old('stock_unit', $item?->stock_unit ?? $item?->unit ?? 'pcs') }}" maxlength="20" required>
+                    @error('stock_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="item-purchase-unit">Satuan pembelian</label>
+                    <input id="item-purchase-unit" type="text" name="purchase_unit" class="form-control @error('purchase_unit') is-invalid @enderror" value="{{ old('purchase_unit', $item?->purchase_unit ?? $item?->unit ?? 'pcs') }}" maxlength="20" required>
+                    @error('purchase_unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="item-purchase-conversion">Isi per satuan pembelian</label>
+                    <input id="item-purchase-conversion" type="number" name="purchase_conversion_factor" class="form-control @error('purchase_conversion_factor') is-invalid @enderror" value="{{ old('purchase_conversion_factor', $item?->purchase_conversion_factor ?? 1) }}" min="0.000001" step="0.000001" required>
+                    @error('purchase_conversion_factor')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="item-same-purchase-unit" name="same_purchase_unit" value="1" @checked(old('same_purchase_unit', $item && $item->stockUnit() === $item->purchaseUnit()))>
+                    <label class="form-check-label" for="item-same-purchase-unit">Satuan pembelian sama dengan stok</label>
+                </div>
+                <div class="small fw-semibold text-primary" data-unit-preview>1 pcs = 1 pcs</div>
             </div>
         </div>
 
@@ -696,6 +723,30 @@ document.addEventListener('DOMContentLoaded', function () {
         || normalizeItemCode(skuInput.value) === normalizeItemCode(codeInput?.value)
     ));
     let lastAutoSku = skuAutoSync ? String(skuInput?.value || '').trim() : '';
+    const stockUnitInput = document.getElementById('item-stock-unit');
+    const purchaseUnitInput = document.getElementById('item-purchase-unit');
+    const conversionInput = document.getElementById('item-purchase-conversion');
+    const legacyUnitInput = document.getElementById('item-unit');
+    const samePurchaseUnitInput = document.getElementById('item-same-purchase-unit');
+    const unitPreview = document.querySelector('[data-unit-preview]');
+
+    function refreshUnitConversion() {
+        if (!stockUnitInput || !purchaseUnitInput || !conversionInput) return;
+        const stock = String(stockUnitInput.value || 'pcs').trim() || 'pcs';
+        if (samePurchaseUnitInput?.checked) {
+            purchaseUnitInput.value = stock;
+            conversionInput.value = '1';
+            purchaseUnitInput.readOnly = true;
+            conversionInput.readOnly = true;
+        } else {
+            purchaseUnitInput.readOnly = false;
+            conversionInput.readOnly = false;
+        }
+        if (legacyUnitInput) legacyUnitInput.value = stock;
+        const purchase = String(purchaseUnitInput.value || stock).trim() || stock;
+        const factor = String(conversionInput.value || '1').trim() || '1';
+        if (unitPreview) unitPreview.textContent = `1 ${purchase} = ${factor} ${stock}`;
+    }
 
     function normalizeItemCode(value) {
         return String(value || '').trim().toUpperCase().replace(/\s+/g, '-');
@@ -1421,6 +1472,11 @@ document.addEventListener('DOMContentLoaded', function () {
     refreshStatus();
     refreshSupplierPicker();
     syncSkuFromCode();
+    stockUnitInput?.addEventListener('input', refreshUnitConversion);
+    purchaseUnitInput?.addEventListener('input', refreshUnitConversion);
+    conversionInput?.addEventListener('input', refreshUnitConversion);
+    samePurchaseUnitInput?.addEventListener('change', refreshUnitConversion);
+    refreshUnitConversion();
 });
 </script>
 @endpush

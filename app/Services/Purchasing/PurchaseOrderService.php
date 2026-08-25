@@ -425,6 +425,10 @@ class PurchaseOrderService
             if (!$item) {
                 continue;
             }
+
+            $purchaseUnit = $item->purchaseUnit();
+            $stockUnit = $item->stockUnit();
+            $conversionFactor = $item->purchaseConversionFactor();
             $lineTotal = round(max(0, ($qty * $unitPrice) - $discount), 2);
 
             // Alokasi/expense account: pertahankan yang lama untuk referenced, hitung untuk baru.
@@ -486,6 +490,9 @@ class PurchaseOrderService
                     'item_id' => $itemId,
                     'lot_id' => !empty($row['lot_id']) ? (int) $row['lot_id'] : null,
                     'qty' => round($qty, 4),
+                    'purchase_unit' => $purchaseUnit,
+                    'stock_unit' => $stockUnit,
+                    'conversion_factor' => round($conversionFactor, 6),
                     'unit_price' => round($unitPrice, 4),
                     'discount' => round($discount, 2),
                     'line_total' => $lineTotal,
@@ -566,6 +573,10 @@ class PurchaseOrderService
             ->select(array_values(array_filter([
                 'id',
                 'type',
+                'unit',
+                'stock_unit',
+                'purchase_unit',
+                'purchase_conversion_factor',
                 $hasItemDefaultAlloc ? 'default_allocation' : null,
                 $hasItemDefaultExpAcc ? 'default_expense_account_id' : null,
             ])))
@@ -641,6 +652,9 @@ class PurchaseOrderService
                 'item_id' => (int) $itemId,
                 'lot_id' => $lotId ? (int) $lotId : null,
                 'qty' => round($qty, 4),
+                'purchase_unit' => $item->purchaseUnit(),
+                'stock_unit' => $item->stockUnit(),
+                'conversion_factor' => round($item->purchaseConversionFactor(), 6),
                 'unit_price' => round($unitPrice, 4),
                 'discount' => round($discount, 2),
                 'line_total' => $lineTotal,

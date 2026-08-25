@@ -13,7 +13,7 @@
                 <span class="pr-item-name">{{ $line->item?->name ?? 'Barang tidak ditemukan' }}</span>
                 <span class="pr-item-code">{{ $line->item?->code }}</span>
             </div>
-            <span class="pr-item-qty">{{ number_format($line->qty, 2, ',', '.') }} {{ $line->item?->unit }}</span>
+            <span class="pr-item-qty">{{ number_format($line->qty, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</span>
         </div>
     @endforeach
 
@@ -25,7 +25,7 @@
                         <span class="pr-item-name">{{ $line->item?->name ?? 'Barang tidak ditemukan' }}</span>
                         <span class="pr-item-code">{{ $line->item?->code }}</span>
                     </div>
-                    <span class="pr-item-qty">{{ number_format($line->qty, 2, ',', '.') }} {{ $line->item?->unit }}</span>
+                    <span class="pr-item-qty">{{ number_format($line->qty, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</span>
                 </div>
             @endforeach
         </div>

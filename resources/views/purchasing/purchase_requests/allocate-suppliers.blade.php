@@ -72,7 +72,7 @@
                                     <div class="item-code">{{ $line->item?->code ?? '-' }}</div>
                                 </td>
                                 <td class="text-end qty-cell">
-                                    {{ number_format($line->qty, 2, ',', '.') }} {{ $line->item?->unit }}
+                                    {{ number_format($line->qty, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}
                                 </td>
                                 <td>
                                     <select name="suppliers[{{ $line->id }}]" class="form-select form-select-sm supplier-select" required>

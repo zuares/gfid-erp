@@ -250,6 +250,10 @@ class PurchaseReturnController extends Controller
                         'item_id' => (int) $ln->item_id,
                         'lot_id' => $ln->lot_id ? (int) $ln->lot_id : null,
                         'qty' => 0,
+                        'purchase_unit' => $ln->effectivePurchaseUnit(),
+                        'stock_unit' => $ln->effectiveStockUnit(),
+                        'conversion_factor' => $ln->effectiveConversionFactor(),
+                        'stock_qty' => 0,
                         'allocated_qty' => 0,
                         'unit_price' => (float) $ln->unit_price,
                         'line_total' => 0,
@@ -483,8 +487,8 @@ class PurchaseReturnController extends Controller
 
                 if (!$keep) {
                     if ($line) {
-                        if ($isHpp && $oldQty > 0.0001) {
-                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, $oldQty, 'purchase_return', $purchase_return->id, $line->id);
+                        if ($isHpp && $line->stockQty() > 0.0001) {
+                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, $line->stockQty(), 'purchase_return', $purchase_return->id, $line->id);
                         }
                         $line->allocated_qty = 0;
                         $line->save();
@@ -507,14 +511,18 @@ class PurchaseReturnController extends Controller
                     $line->purchase_return_id = (int) $purchase_return->id;
                 }
 
-                $diffQty = $qty - $oldQty;
+                $oldStockQty = $line?->stockQty() ?? 0.0;
 
                 $unit = (float) ($line->unit_price ?? $grnLine->unit_price ?? 0);
                 $line->item_id = (int) $grnLine->item_id;
                 $line->lot_id = $grnLine->lot_id ? (int) $grnLine->lot_id : null;
                 $line->unit_price = $unit;
                 $line->qty = $qty;
-                $line->allocated_qty = $isHpp ? $qty : 0;
+                $line->purchase_unit = $grnLine->effectivePurchaseUnit();
+                $line->stock_unit = $grnLine->effectiveStockUnit();
+                $line->conversion_factor = $grnLine->effectiveConversionFactor();
+                $line->stock_qty = round($qty * $line->effectiveConversionFactor(), 6);
+                $line->allocated_qty = $isHpp ? $line->stock_qty : 0;
                 $line->line_total = round($qty * $unit, 2);
                 $line->notes = $row['notes'] ?? null;
                 $line->reason_code = $reason;
@@ -529,17 +537,18 @@ class PurchaseReturnController extends Controller
                 
                 $line->save();
 
-                if ($isHpp && abs($diffQty) > 0.0001) {
+                $diffStockQty = (float) $line->stock_qty - (float) $oldStockQty;
+                if ($isHpp && abs($diffStockQty) > 0.0001) {
                     try {
-                        if ($diffQty > 0) {
-                            $this->inventory->reserveStock($warehouseId, (int) $grnLine->item_id, $diffQty, 'purchase_return', $purchase_return->id, $line->id);
+                        if ($diffStockQty > 0) {
+                            $this->inventory->reserveStock($warehouseId, (int) $grnLine->item_id, $diffStockQty, 'purchase_return', $purchase_return->id, $line->id);
                         } else {
-                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, abs($diffQty), 'purchase_return', $purchase_return->id, $line->id);
+                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, abs($diffStockQty), 'purchase_return', $purchase_return->id, $line->id);
                         }
                     } catch (\RuntimeException $e) {
                         $itemName = $grnLine->item?->name ?? 'Item #' . $grnLine->item_id;
                         throw ValidationException::withMessages([
-                            "lines.{$grnLineId}.qty" => "Stok tersedia tidak mencukupi untuk dialokasikan ke retur. Item {$itemName}, Diminta: {$diffQty}. " . $e->getMessage(),
+                            "lines.{$grnLineId}.qty" => "Stok tersedia tidak mencukupi untuk dialokasikan ke retur. Item {$itemName}, Diminta: {$diffStockQty} {$line->effectiveStockUnit()}. " . $e->getMessage(),
                         ]);
                     }
                 }
@@ -661,7 +670,7 @@ class PurchaseReturnController extends Controller
 
             if ($this->isHppLine($purchase_return, $ln)) {
                 $allocated = (float) $ln->allocated_qty;
-                if (abs($qty - $allocated) > 0.0001) {
+                if (abs($ln->stockQty() - $allocated) > 0.0001) {
                     throw ValidationException::withMessages([
                         'lines' => "Inkonsistensi alokasi stok. Qty retur: {$qty}, Alokasi saat ini: {$allocated}. Mohon simpan ulang draf.",
                     ]);
@@ -687,7 +696,7 @@ class PurchaseReturnController extends Controller
             }
 
             $itemId = (int) $ln->item_id;
-            $stockRequired[$itemId] = (float) ($stockRequired[$itemId] ?? 0) + $qty;
+            $stockRequired[$itemId] = (float) ($stockRequired[$itemId] ?? 0) + $ln->stockQty();
         }
 
         if ($stockRequired) {
@@ -714,7 +723,7 @@ class PurchaseReturnController extends Controller
                 && (int) ($line->lot_id ?? 0) > 0
                 && $this->isHppLine($purchase_return, $line))
             ->groupBy('lot_id')
-            ->map(fn($lines) => (float) $lines->sum('qty'));
+            ->map(fn($lines) => (float) $lines->sum(fn ($line) => $line->stockQty()));
 
         if ($lotRequired->isNotEmpty()) {
             $lotStocks = DB::table('lots')
@@ -781,7 +790,7 @@ class PurchaseReturnController extends Controller
             $expAccMap = $this->expenseAccountMapFromOrderLines($purchase_return);
 
             foreach ($purchase_return->lines as $ln) {
-                $qty = (float) $ln->qty;
+                $qty = $ln->stockQty();
                 if ($qty <= 0.0001) {
                     continue;
                 }
@@ -808,7 +817,7 @@ class PurchaseReturnController extends Controller
             // 1) STOCK OUT (INV ONLY)
             // =====================================================
             foreach ($purchase_return->lines as $ln) {
-                $qty = (float) $ln->qty;
+                $qty = $ln->stockQty();
                 if ($qty <= 0.0001) {
                     continue;
                 }
@@ -820,14 +829,14 @@ class PurchaseReturnController extends Controller
                 $this->inventory->consumeAllocationAndStockOut(
                     warehouseId: $warehouseId,
                     itemId: (int) $ln->item_id,
-                    qty: (float) $ln->qty,
+                    qty: $qty,
                     date: $purchase_return->date,
                     sourceType: 'purchase_return',
                     sourceId: (int) $purchase_return->id,
                     notes: "Return {$purchase_return->code} (GRN {$purchase_return->grn->code}) line {$ln->id}",
                     allowNegative: false,
                     lotId: $ln->lot_id ? (int) $ln->lot_id : null,
-                    unitCostOverride: $ln->unit_price !== null ? (float) $ln->unit_price : null,
+                    unitCostOverride: $ln->unit_price !== null ? (float) $ln->unit_price / max(0.000001, $ln->effectiveConversionFactor()) : null,
                     affectLotCost: true,
                     strictNonNegative: true,
                     sourceLineId: (int) $ln->id,
@@ -1014,7 +1023,7 @@ class PurchaseReturnController extends Controller
 
             // 1) balikkan stok hanya untuk INV lines
             foreach ($purchase_return->lines as $ln) {
-                $qty = (float) $ln->qty;
+                $qty = $ln->stockQty();
                 if ($qty <= 0.0001) {
                     continue;
                 }
@@ -1032,7 +1041,7 @@ class PurchaseReturnController extends Controller
                     sourceId: (int) $purchase_return->id,
                     notes: "VOID Return {$purchase_return->code} line {$ln->id}",
                     lotId: $ln->lot_id ? (int) $ln->lot_id : null,
-                    unitCost: (float) $ln->unit_price,
+                    unitCost: (float) $ln->unit_price / max(0.000001, $ln->effectiveConversionFactor()),
                 );
             }
 

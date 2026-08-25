@@ -17,6 +17,9 @@ class Item extends Model
         'sku',
         'name',
         'unit',
+        'stock_unit',
+        'purchase_unit',
+        'purchase_conversion_factor',
         'type', // material / finished_good
         'item_type_option_id',
         'item_category_id', // sementara masih dipakai (keluarga produk / legacy)
@@ -60,6 +63,7 @@ class Item extends Model
         'last_purchase_price' => 'decimal:2',
         'hpp' => 'decimal:2',
         'base_unit_cost' => 'decimal:2',
+        'purchase_conversion_factor' => 'decimal:6',
 
         'active' => 'boolean',
         'affects_hpp' => 'boolean',
@@ -71,6 +75,27 @@ class Item extends Model
         'consumption_cutting' => 'decimal:4',
         'consumption_cutting_basis_qty' => 'decimal:4',
     ];
+
+    public function stockUnit(): string
+    {
+        return trim((string) ($this->stock_unit ?: $this->unit ?: 'pcs'));
+    }
+
+    public function purchaseUnit(): string
+    {
+        return trim((string) ($this->purchase_unit ?: $this->stockUnit()));
+    }
+
+    public function purchaseConversionFactor(): float
+    {
+        $factor = (float) ($this->purchase_conversion_factor ?? 1);
+        return $factor > 0 ? $factor : 1.0;
+    }
+
+    public function stockQtyFromPurchase(float $qty): float
+    {
+        return round($qty * $this->purchaseConversionFactor(), 6);
+    }
 
     public static function productionSourceLabels(): array
     {

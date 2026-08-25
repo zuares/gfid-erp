@@ -4,6 +4,7 @@ namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
 use App\Models\Account;
+use App\Models\Item;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
@@ -82,7 +83,22 @@ class ReplacementReceiptService
             $receiptLine->lot_id = null; // MVP no lot override
             $receiptLine->qty_received = $qty;
             $receiptLine->qty_reject = 0;
-            $receiptLine->unit = $returnLine->item?->uom ?? 'PCS';
+            $replacementItem = Item::query()
+                ->select(['id', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor'])
+                ->find((int) $returnLine->replacement_item_id);
+            $sameItem = (int) $returnLine->replacement_item_id === (int) $returnLine->item_id;
+            $receiptLine->purchase_unit = $sameItem
+                ? $returnLine->effectivePurchaseUnit()
+                : ($replacementItem?->purchaseUnit() ?? 'pcs');
+            $receiptLine->stock_unit = $sameItem
+                ? $returnLine->effectiveStockUnit()
+                : ($replacementItem?->stockUnit() ?? 'pcs');
+            $receiptLine->conversion_factor = $sameItem
+                ? $returnLine->effectiveConversionFactor()
+                : ($replacementItem?->purchaseConversionFactor() ?? 1);
+            $receiptLine->stock_qty_received = round($qty * (float) $receiptLine->conversion_factor, 6);
+            $receiptLine->stock_qty_reject = 0;
+            $receiptLine->unit = $receiptLine->purchase_unit;
             $receiptLine->unit_price = $returnLine->unit_price;
             $receiptLine->line_total = round($qty * (float) $returnLine->unit_price, 2);
             $receiptLine->save();

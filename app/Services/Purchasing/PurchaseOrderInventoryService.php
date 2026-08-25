@@ -69,7 +69,7 @@ class PurchaseOrderInventoryService
 
         // ── 4. Ambil HPP lines dengan qty > 0 ───────────────────────────
         $lines = $po->lines()
-            ->with('item:id,code,name,unit')
+            ->with('item:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor')
             ->where('allocation', 'hpp')
             ->where('qty', '>', 0)
             ->get();
@@ -84,8 +84,10 @@ class PurchaseOrderInventoryService
         $lotIds      = [];
 
         foreach ($lines as $line) {
-            $qty       = round((float) $line->qty, 4);
-            $unitPrice = round((float) $line->unit_price, 4);
+            $purchaseQty = round((float) $line->qty, 4);
+            $factor = max(0.000001, (float) ($line->conversion_factor ?: $line->item?->purchaseConversionFactor() ?: 1));
+            $qty       = round($purchaseQty * $factor, 6);
+            $unitPrice = round((float) $line->unit_price / $factor, 4);
             $itemId    = (int) $line->item_id;
             $itemCode  = $line->item->code ?? "item#{$itemId}";
 
@@ -122,8 +124,8 @@ class PurchaseOrderInventoryService
                 $po->code,
                 $warehouseCode,
                 $itemCode,
-                $qty,
-                $line->item->unit ?? 'pcs',
+                $purchaseQty,
+                $line->effectivePurchaseUnit(),
                 number_format($unitPrice, 0, ',', '.'),
             );
 

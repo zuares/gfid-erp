@@ -14,15 +14,35 @@ class PurchaseRequestLine extends Model
         'purchase_order_id',
         'converted_at',
         'qty',
+        'purchase_unit',
+        'stock_unit',
+        'conversion_factor',
         'unit_price',
         'notes',
     ];
 
     protected $casts = [
         'qty'        => 'float',
+        'conversion_factor' => 'decimal:6',
         'unit_price' => 'float',
         'converted_at' => 'datetime',
     ];
+
+    public function effectivePurchaseUnit(): string
+    {
+        return trim((string) ($this->purchase_unit ?: $this->item?->purchaseUnit() ?: 'pcs'));
+    }
+
+    public function effectiveStockUnit(): string
+    {
+        return trim((string) ($this->stock_unit ?: $this->item?->stockUnit() ?: 'pcs'));
+    }
+
+    public function effectiveConversionFactor(): float
+    {
+        $factor = (float) ($this->conversion_factor ?? $this->item?->purchaseConversionFactor() ?? 1);
+        return $factor > 0 ? $factor : 1.0;
+    }
 
     // =========================================================
     // RELATIONSHIPS

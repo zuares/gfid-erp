@@ -145,6 +145,20 @@
             background: rgba(239,68,68,.1);
         }
 
+        .line-unit-hint {
+            margin-top: .2rem;
+            color: var(--muted, #64748b);
+            font-size: .68rem;
+            font-weight: 700;
+        }
+
+        .line-conversion-hint {
+            margin-top: .08rem;
+            color: #2563eb;
+            font-size: .64rem;
+            line-height: 1.25;
+        }
+
         .po-card {
             background: var(--card);
             border: 1px solid var(--line);
@@ -1510,6 +1524,11 @@
                         $priceDisplay =
                             $priceRaw === '' || $priceRaw === null ? '' : number_format((float) $priceRaw, 0, ',', '.');
 
+                        $purchaseUnit = $line['purchase_unit'] ?? ($line['item']['purchase_unit'] ?? ($line['item']['unit'] ?? 'pcs'));
+                        $stockUnit = $line['stock_unit'] ?? ($line['item']['stock_unit'] ?? ($line['item']['unit'] ?? 'pcs'));
+                        $conversionFactor = (float) ($line['conversion_factor'] ?? ($line['item']['purchase_conversion_factor'] ?? 1));
+                        $conversionFactor = $conversionFactor > 0 ? $conversionFactor : 1;
+
                         // ✅ NEW: allocation + expense account (hidden, auto)
                         // fallback: hpp
                         $alloc = old(
@@ -1546,6 +1565,9 @@
                             </div>
 
                             <input type="hidden" name="lines[{{ $i }}][allocation]" class="line-alloc-raw" value="{{ $alloc }}">
+                            <input type="hidden" name="lines[{{ $i }}][purchase_unit]" class="line-purchase-unit-raw" value="{{ $purchaseUnit }}">
+                            <input type="hidden" name="lines[{{ $i }}][stock_unit]" class="line-stock-unit-raw" value="{{ $stockUnit }}">
+                            <input type="hidden" name="lines[{{ $i }}][conversion_factor]" class="line-conversion-raw" value="{{ $conversionFactor }}">
                             <div class="line-expacc-text mt-1" style="{{ $expAcc ? '' : 'display:none;' }}">
                                 @php
                                     $selectedAcc = collect($expenseAccounts)->firstWhere('id', $expAcc);
@@ -1583,6 +1605,12 @@
                                 inputmode="decimal" placeholder="Qty" value="{{ $qtyDisplay }}" autocomplete="off">
                             <input type="hidden" name="lines[{{ $i }}][qty]" class="line-qty-raw"
                                 value="{{ $qtyRaw }}">
+                            <div class="line-unit-hint" data-line-unit-hint>{{ $purchaseUnit }}</div>
+                            @if($conversionFactor != 1)
+                                <div class="line-conversion-hint" data-line-conversion-hint>1 {{ $purchaseUnit }} = {{ decimal_id($conversionFactor, 6) }} {{ $stockUnit }}</div>
+                            @else
+                                <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
+                            @endif
                             @error("lines.$i.qty")
                                 <div class="text-danger small">{{ $message }}</div>
                             @enderror
@@ -1591,7 +1619,7 @@
                         @if ($canSeeMoney)
                             <td data-label="Harga" class="po-td-price">
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
-                                    inputmode="numeric" placeholder="Harga" value="{{ $priceDisplay }}" autocomplete="off">
+                                    inputmode="numeric" placeholder="Harga / {{ $purchaseUnit }}" value="{{ $priceDisplay }}" autocomplete="off">
                                 <input type="hidden" name="lines[{{ $i }}][unit_price]" class="line-price-raw"
                                     value="{{ $priceRaw }}">
                                 @error("lines.$i.unit_price")
@@ -1621,6 +1649,9 @@
                                 <i class="bi bi-box-seam"></i><span data-line-accounting-text>HPP</span>
                             </div>
                             <input type="hidden" name="lines[0][allocation]" class="line-alloc-raw" value="hpp">
+                            <input type="hidden" name="lines[0][purchase_unit]" class="line-purchase-unit-raw" value="pcs">
+                            <input type="hidden" name="lines[0][stock_unit]" class="line-stock-unit-raw" value="pcs">
+                            <input type="hidden" name="lines[0][conversion_factor]" class="line-conversion-raw" value="1">
                             <div class="line-expacc-text mt-1" style="display:none;">
                                 <span class="text-muted" style="font-size: .68rem;">Biaya: <span class="expacc-label-text fw-semibold"></span>
                                     <a href="javascript:void(0)" class="btn-edit-expacc ms-1 text-decoration-none" title="Ubah Akun Biaya"><i class="bi bi-pencil-fill"></i></a>
@@ -1645,12 +1676,14 @@
                             <input type="text" class="form-control po-field po-num-display line-qty-display"
                                 inputmode="decimal" placeholder="Qty" value="" autocomplete="off">
                             <input type="hidden" name="lines[0][qty]" class="line-qty-raw" value="">
+                            <div class="line-unit-hint" data-line-unit-hint>pcs</div>
+                            <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
                         </td>
 
                         @if ($canSeeMoney)
                             <td data-label="Harga" class="po-td-price">
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
-                                    inputmode="numeric" placeholder="Harga" value="" autocomplete="off">
+                                    inputmode="numeric" placeholder="Harga / pcs" value="" autocomplete="off">
                                 <input type="hidden" name="lines[0][unit_price]" class="line-price-raw" value="">
                             </td>
 
@@ -2106,6 +2139,31 @@
                 const meta = await fetchItemMeta(itemId);
                 if (!meta) return;
 
+                const purchaseUnit = meta.purchase_unit || meta.unit || 'pcs';
+                const stockUnit = meta.stock_unit || meta.unit || 'pcs';
+                const conversionFactor = Number(meta.purchase_conversion_factor || 1) > 0
+                    ? Number(meta.purchase_conversion_factor)
+                    : 1;
+                const purchaseUnitRaw = tr.querySelector('.line-purchase-unit-raw');
+                const stockUnitRaw = tr.querySelector('.line-stock-unit-raw');
+                const conversionRaw = tr.querySelector('.line-conversion-raw');
+                if (purchaseUnitRaw) purchaseUnitRaw.value = purchaseUnit;
+                if (stockUnitRaw) stockUnitRaw.value = stockUnit;
+                if (conversionRaw) conversionRaw.value = String(conversionFactor);
+                const unitHint = tr.querySelector('[data-line-unit-hint]');
+                const conversionHint = tr.querySelector('[data-line-conversion-hint]');
+                const priceDisplay = tr.querySelector('.line-price-display');
+                if (unitHint) unitHint.textContent = purchaseUnit;
+                if (conversionHint) {
+                    conversionHint.textContent = conversionFactor !== 1
+                        ? `1 ${purchaseUnit} = ${conversionFactor} ${stockUnit}`
+                        : '';
+                    conversionHint.style.display = conversionFactor !== 1 ? '' : 'none';
+                }
+                if (priceDisplay && priceDisplay.dataset.userEdited !== '1') {
+                    priceDisplay.placeholder = `Harga / ${purchaseUnit}`;
+                }
+
                 const alloc = (meta.default_allocation === 'expense') ? 'expense' : 'hpp';
                 allocRaw.value = alloc;
 
@@ -2166,6 +2224,17 @@
                 newRow.querySelectorAll('.line-qty-display, .line-price-display').forEach(inp => inp.value = '');
                 newRow.querySelectorAll('.line-price-display').forEach(inp => inp.dataset.userEdited = '0');
                 newRow.querySelectorAll('.line-qty-raw, .line-price-raw').forEach(inp => inp.value = '');
+                newRow.querySelector('.line-purchase-unit-raw')?.setAttribute('value', 'pcs');
+                newRow.querySelector('.line-stock-unit-raw')?.setAttribute('value', 'pcs');
+                if (newRow.querySelector('.line-purchase-unit-raw')) newRow.querySelector('.line-purchase-unit-raw').value = 'pcs';
+                if (newRow.querySelector('.line-stock-unit-raw')) newRow.querySelector('.line-stock-unit-raw').value = 'pcs';
+                if (newRow.querySelector('.line-conversion-raw')) newRow.querySelector('.line-conversion-raw').value = '1';
+                if (newRow.querySelector('[data-line-unit-hint]')) newRow.querySelector('[data-line-unit-hint]').textContent = 'pcs';
+                if (newRow.querySelector('[data-line-conversion-hint]')) {
+                    newRow.querySelector('[data-line-conversion-hint]').textContent = '';
+                    newRow.querySelector('[data-line-conversion-hint]').style.display = 'none';
+                }
+                if (newRow.querySelector('.line-price-display')) newRow.querySelector('.line-price-display').placeholder = 'Harga / pcs';
 
                 // ✅ reset mapping hidden
                 newRow.querySelectorAll('.line-alloc-raw').forEach(inp => {

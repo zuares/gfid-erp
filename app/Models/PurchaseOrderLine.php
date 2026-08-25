@@ -14,6 +14,9 @@ class PurchaseOrderLine extends Model
         'item_id',
         'lot_id',
         'qty',
+        'purchase_unit',
+        'stock_unit',
+        'conversion_factor',
         'unit_price',
         'discount',
         'line_total',
@@ -24,10 +27,27 @@ class PurchaseOrderLine extends Model
 
     protected $casts = [
         'qty' => 'decimal:2',
+        'conversion_factor' => 'decimal:6',
         'unit_price' => 'decimal:2',
         'discount' => 'decimal:2',
         'line_total' => 'decimal:2',
     ];
+
+    public function effectivePurchaseUnit(): string
+    {
+        return trim((string) ($this->purchase_unit ?: $this->item?->purchaseUnit() ?: $this->item?->unit ?: 'pcs'));
+    }
+
+    public function effectiveStockUnit(): string
+    {
+        return trim((string) ($this->stock_unit ?: $this->item?->stockUnit() ?: $this->item?->unit ?: 'pcs'));
+    }
+
+    public function effectiveConversionFactor(): float
+    {
+        $factor = (float) ($this->conversion_factor ?? $this->item?->purchaseConversionFactor() ?? 1);
+        return $factor > 0 ? $factor : 1.0;
+    }
 
     /* ==========================
      *  RELATIONSHIPS

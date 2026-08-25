@@ -441,15 +441,23 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
                                             {{-- MOBILE EXTRA INFO --}}
                                             <div class="d-md-none mt-1">
                                                 @if($canSeeMoney)
-                                                    <div style="font-size:.8rem;color:#475569;">{{ angka($line->unit_price) }} x {{ decimal_id($line->qty, 2) }} = <b>{{ angka($line->subtotal) }}</b></div>
+                                                    <div style="font-size:.8rem;color:#475569;">{{ angka($line->unit_price) }} / {{ $line->effectivePurchaseUnit() }} × {{ decimal_id($line->qty, 2) }} = <b>{{ angka($line->subtotal) }}</b></div>
                                                 @else
-                                                    <div style="font-size:.8rem;color:#475569;">Qty: <b>{{ decimal_id($line->qty, 2) }}</b> pcs</div>
+                                        <div style="font-size:.8rem;color:#475569;">Qty: <b>{{ decimal_id($line->qty, 2) }}</b> {{ $line->effectivePurchaseUnit() }}
+                                            @if($line->effectiveConversionFactor() != 1)
+                                                <span class="text-primary">({{ decimal_id((float) $line->qty * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }})</span>
+                                            @endif
+                                        </div>
                                                 @endif
                                             </div>
                                         </td>
                                         <td class="po-r po-hide-mobile">
                                             <div class="po-code-cell">{{ decimal_id($line->qty, 2) }}</div>
-                                            <div class="po-name">Pcs</div>
+                                            <div class="po-name">{{ $line->effectivePurchaseUnit() }}
+                                                @if($line->effectiveConversionFactor() != 1)
+                                                    · stok {{ decimal_id((float) $line->qty * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }}
+                                                @endif
+                                            </div>
                                         </td>
                                         @if($canSeeMoney)
                                             <td class="po-r po-hide-mobile">

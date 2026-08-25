@@ -98,7 +98,7 @@ class ItemController extends Controller
         }
 
         $items = Item::query()
-            ->select(['id', 'code', 'name', 'type', 'unit'])
+            ->select(['id', 'code', 'name', 'type', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor'])
             ->when($excludeId > 0, fn ($q) => $q->where('id', '<>', $excludeId))
             ->where(function ($q) use ($query) {
                 $q->whereRaw('UPPER(code) LIKE ?', [$query . '%'])
@@ -116,6 +116,9 @@ class ItemController extends Controller
                 'name' => (string) $item->name,
                 'type' => (string) ($item->type ?? 'material'),
                 'unit' => (string) ($item->unit ?? 'pcs'),
+                'stock_unit' => $item->stockUnit(),
+                'purchase_unit' => $item->purchaseUnit(),
+                'purchase_conversion_factor' => $item->purchaseConversionFactor(),
             ])->values(),
         ]);
     }
@@ -320,6 +323,9 @@ class ItemController extends Controller
                 'sku' => empty($data['sku']) ? $data['code'] : $data['sku'],
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
+                'stock_unit' => $data['stock_unit'],
+                'purchase_unit' => $data['purchase_unit'],
+                'purchase_conversion_factor' => $data['purchase_conversion_factor'],
                 'type' => $data['type'] ?? 'material',
                 'item_type_option_id' => $data['item_type_option_id'] ?? null,
                 'item_category_id' => $data['item_category_id'] ?? null,
@@ -405,6 +411,9 @@ class ItemController extends Controller
                 'sku' => empty($data['sku']) ? $data['code'] : $data['sku'],
                 'name' => $data['name'],
                 'unit' => $data['unit'] ?? 'pcs',
+                'stock_unit' => $data['stock_unit'],
+                'purchase_unit' => $data['purchase_unit'],
+                'purchase_conversion_factor' => $data['purchase_conversion_factor'],
                 'type' => $data['type'] ?? 'material',
                 'item_type_option_id' => $data['item_type_option_id'] ?? null,
                 'item_category_id' => $data['item_category_id'] ?? null,
@@ -674,6 +683,23 @@ class ItemController extends Controller
             'code' => $this->normalizeItemCode($request->input('code')),
         ]);
 
+        // `unit` is the legacy field. Accept it as the stock unit so older
+        // forms/imports remain compatible while the new fields become the
+        // canonical source for purchasing.
+        $stockUnit = trim((string) ($request->input('stock_unit') ?: $request->input('unit') ?: 'pcs'));
+        $purchaseUnit = trim((string) ($request->input('purchase_unit') ?: $stockUnit));
+        $samePurchaseUnit = $request->boolean('same_purchase_unit')
+            || strcasecmp($stockUnit, $purchaseUnit) === 0;
+
+        $request->merge([
+            'unit' => $stockUnit,
+            'stock_unit' => $stockUnit,
+            'purchase_unit' => $purchaseUnit,
+            'purchase_conversion_factor' => $samePurchaseUnit
+                ? 1
+                : $request->input('purchase_conversion_factor'),
+        ]);
+
         $normalizedCode = $request->input('code');
         if ($normalizedCode !== '') {
             $duplicateCodeQuery = Item::query()
@@ -701,6 +727,9 @@ class ItemController extends Controller
             'sku' => ['nullable', 'string', 'max:100'],
 
             'unit' => ['required', 'string', 'max:20'],
+            'stock_unit' => ['required', 'string', 'max:20'],
+            'purchase_unit' => ['required', 'string', 'max:20'],
+            'purchase_conversion_factor' => ['required', 'numeric', 'gt:0', 'max:1000000'],
 
             'type' => [
                 'required',
@@ -1208,7 +1237,7 @@ class ItemController extends Controller
     public function meta(Request $request)
     {
         $id = (int) $request->get('item_id');
-        $item = \App\Models\Item::select('id', 'default_allocation', 'default_expense_account_id')
+        $item = \App\Models\Item::select('id', 'default_allocation', 'default_expense_account_id', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor')
             ->where('id', $id)
             ->first();
 
@@ -1220,6 +1249,9 @@ class ItemController extends Controller
             'ok' => true,
             'default_allocation' => $item->default_allocation ?: 'hpp',
             'default_expense_account_id' => $item->default_expense_account_id,
+            'stock_unit' => $item->stockUnit(),
+            'purchase_unit' => $item->purchaseUnit(),
+            'purchase_conversion_factor' => $item->purchaseConversionFactor(),
         ]);
     }
 }

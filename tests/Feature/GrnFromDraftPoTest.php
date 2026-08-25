@@ -345,6 +345,40 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertSame('fully_received', $po->fresh()->received_status);
     }
 
+    public function test_purchase_dozen_is_converted_to_stock_pieces(): void
+    {
+        $this->item->forceFill([
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'lusin',
+            'purchase_conversion_factor' => 12,
+        ])->save();
+
+        $po = $this->makeDraftPo(2, 120000);
+        $poLine = $po->lines()->first();
+
+        $this->assertSame('lusin', $poLine->purchase_unit);
+        $this->assertSame('pcs', $poLine->stock_unit);
+        $this->assertEqualsWithDelta(12, (float) $poLine->conversion_factor, 0.0001);
+        $this->assertEqualsWithDelta(240000, (float) $po->subtotal, 0.01);
+
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 2));
+        $grnLine = $grn->lines()->first();
+        $this->assertEqualsWithDelta(24, (float) $grnLine->stock_qty_received, 0.0001);
+
+        $this->grnService->post($grn);
+
+        $stock = InventoryStock::where('warehouse_id', $this->warehouse->id)
+            ->where('item_id', $this->item->id)->first();
+        $this->assertNotNull($stock);
+        $this->assertEqualsWithDelta(24, (float) $stock->qty, 0.0001);
+
+        $invJournal = Journal::where('source_type', 'grn_inv')
+            ->where('source_id', $grn->id)->whereNull('voided_at')->first();
+        $this->assertNotNull($invJournal);
+        $this->assertEqualsWithDelta(240000, (float) $invJournal->lines()->sum('debit'), 0.01);
+    }
+
     public function test_mixed_raw_material_and_atk_po_splits_stock_and_expense(): void
     {
         $expenseAccount = Account::where('code', '6104')->firstOrFail();

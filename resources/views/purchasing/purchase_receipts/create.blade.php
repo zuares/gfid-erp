@@ -604,12 +604,15 @@
                             @if ($canSeeMoney)
                                 <input type="hidden" name="unit_price[]" value="{{ $line->unit_price }}">
                             @endif
-                            <input type="hidden" name="unit[]" value="{{ $line->item?->unit ?? '' }}">
+                            <input type="hidden" name="unit[]" value="{{ $line->effectivePurchaseUnit() }}">
                         </td>
 
                         {{-- Qty PO --}}
                         <td class="text-end mono text-muted" style="font-size:.82rem;" data-label="Qty PO">
-                            {{ number_format($qtyPo, 2, ',', '.') }}
+                            {{ number_format($qtyPo, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}
+                            @if($line->effectiveConversionFactor() != 1)
+                                <small class="d-block text-primary">{{ decimal_id((float) $qtyPo * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }} stok</small>
+                            @endif
                         </td>
 
                         {{-- Sisa --}}
@@ -645,7 +648,7 @@
 
                         {{-- Unit --}}
                         <td class="text-center mono text-muted" style="font-size:.8rem;" data-label="Unit">
-                            {{ $line->item?->unit ?? '-' }}
+                            {{ $line->effectivePurchaseUnit() }}
                         </td>
                     </tr>
 

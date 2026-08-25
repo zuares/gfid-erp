@@ -65,7 +65,7 @@
             <div>
                 <div class="item-detail-code">Master Item · {{ $item->code }}</div>
                 <h1 class="item-detail-title">{{ $item->name }}</h1>
-                <div class="item-detail-subtitle">{{ $item->sku ?: 'SKU mengikuti kode' }} · {{ $item->unit ?: 'pcs' }}</div>
+                <div class="item-detail-subtitle">{{ $item->sku ?: 'SKU mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}</div>
             </div>
         </div>
         <div class="item-detail-actions">
@@ -134,7 +134,8 @@
             <div class="item-detail-info">
                 <div><div class="item-detail-label">Kode</div><div class="item-detail-value">{{ $item->code }}</div></div>
                 <div><div class="item-detail-label">SKU</div><div class="item-detail-value">{{ $item->sku ?: 'Mengikuti kode' }}</div></div>
-                <div><div class="item-detail-label">Satuan</div><div class="item-detail-value">{{ $item->unit ?: '-' }}</div></div>
+                <div><div class="item-detail-label">Satuan stok</div><div class="item-detail-value">{{ $item->stockUnit() }}</div></div>
+                <div><div class="item-detail-label">Satuan pembelian</div><div class="item-detail-value">{{ $item->purchaseUnit() }} = {{ decimal_id($item->purchaseConversionFactor(), 6) }} {{ $item->stockUnit() }}</div></div>
                 <div><div class="item-detail-label">Kategori</div><div class="item-detail-value">{{ $item->category?->code ?? '-' }}{{ $item->category ? ' · '.$item->category->name : '' }}</div></div>
                 <div><div class="item-detail-label">Harga beli terakhir</div><div class="item-detail-value">{{ (float) $item->last_purchase_price > 0 ? 'Rp '.number_format((float) $item->last_purchase_price, 0, ',', '.') : 'Belum ada' }}</div></div>
                 <div><div class="item-detail-label">Perlakuan pembelian</div><div class="item-detail-value">{{ $item->purchaseTreatment?->name ?? ($item->default_allocation === 'expense' ? 'Langsung biaya' : 'Masuk stok / aset') }}</div></div>

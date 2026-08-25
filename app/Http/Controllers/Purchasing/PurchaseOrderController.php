@@ -154,7 +154,7 @@ class PurchaseOrderController extends Controller
 
         $itemQuery = Item::query()
             ->select([
-                'id', 'code', 'name', 'item_category_id', 'type', 'active',
+                'id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor', 'item_category_id', 'type', 'active',
                 'default_allocation', 'default_expense_account_id',
             ])
             ->where('active', 1)
@@ -206,6 +206,10 @@ class PurchaseOrderController extends Controller
                             'id'                         => $item->id,
                             'code'                       => $item->code,
                             'name'                       => $item->name,
+                            'unit'                       => $item->unit,
+                            'stock_unit'                 => $item->stockUnit(),
+                            'purchase_unit'              => $item->purchaseUnit(),
+                            'purchase_conversion_factor'=> $item->purchaseConversionFactor(),
                             'default_allocation'         => $item->default_allocation ?? 'hpp',
                             'default_expense_account_id' => $item->default_expense_account_id ?? null,
                         ] : null,

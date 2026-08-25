@@ -168,9 +168,9 @@ class GoodsReceiptService
         if (!empty($poLineIds)) {
                 $poLines = PurchaseOrderLine::query()
                     ->whereIn('id', $poLineIds)
-                    ->with('item:id,default_allocation,default_expense_account_id')
+                    ->with('item:id,unit,stock_unit,purchase_unit,purchase_conversion_factor,default_allocation,default_expense_account_id')
                     ->lockForUpdate()
-                    ->get(['id', 'purchase_order_id', 'item_id', 'qty', 'unit_price', 'allocation', 'expense_account_id'])
+                    ->get(['id', 'purchase_order_id', 'item_id', 'qty', 'unit_price', 'purchase_unit', 'stock_unit', 'conversion_factor', 'allocation', 'expense_account_id'])
                     ->keyBy('id');
 
             // qty terpakai per PO line dari GRN lain (draft + posted) — cegah over-receipt.
@@ -220,6 +220,10 @@ class GoodsReceiptService
                 // Paksa item mengikuti PO line (jangan percaya request).
                 $row['item_id'] = (int) $poLine->item_id;
 
+                $row['purchase_unit'] = $poLine->effectivePurchaseUnit();
+                $row['stock_unit'] = $poLine->effectiveStockUnit();
+                $row['conversion_factor'] = $poLine->effectiveConversionFactor();
+
                 // Outstanding check
                 $ordered = (float) $poLine->qty;
                 $already = (float) ($alreadyByLine[$poLineId] ?? 0);
@@ -247,6 +251,21 @@ class GoodsReceiptService
                     // sebagai baris ad-hoc, namun tidak ada enrichment PO.
                 }
             }
+
+            if (empty($row['purchase_unit']) || empty($row['stock_unit']) || empty($row['conversion_factor'])) {
+                $item = Item::query()
+                    ->select(['id', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor'])
+                    ->find((int) ($row['item_id'] ?? 0));
+                if ($item) {
+                    $row['purchase_unit'] = $row['purchase_unit'] ?? $item->purchaseUnit();
+                    $row['stock_unit'] = $row['stock_unit'] ?? $item->stockUnit();
+                    $row['conversion_factor'] = (float) ($row['conversion_factor'] ?? $item->purchaseConversionFactor());
+                }
+            }
+            $factor = (float) ($row['conversion_factor'] ?? 1);
+            $factor = $factor > 0 ? $factor : 1;
+            $row['stock_qty_received'] = round($this->num($row['qty_received'] ?? 0) * $factor, 6);
+            $row['stock_qty_reject'] = round($this->num($row['qty_reject'] ?? 0) * $factor, 6);
 
             $out[] = $row;
         }
@@ -390,17 +409,18 @@ class GoodsReceiptService
                 $this->inventory->stockIn(
                     warehouseId: $this->resolveStockWarehouseId($line, (int) $grn->warehouse_id),
                     itemId: (int) $line->item_id,
-                    qty: (float) $line->qty_received,
+                    qty: (float) ($line->stock_qty_received ?? $line->qty_received),
                     date: $grn->date,
                     sourceType: 'purchase_receipt',
                     sourceId: (int) $grn->id,
                     notes: "GRN {$grn->code} line {$line->id}",
                     lotId: (int) $lot->id,
-                    unitCost: (float) $line->unit_price,
+                    unitCost: (float) $line->unit_price / max(0.000001, (float) ($line->conversion_factor ?: 1)),
                 );
 
                 // update last price + moving average HPP
-                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price, (float) $line->qty_received);
+                $factor = max(0.000001, (float) ($line->conversion_factor ?: 1));
+                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price / $factor, (float) ($line->stock_qty_received ?? $line->qty_received));
             }
 
             // ==========================
@@ -824,6 +844,15 @@ class GoodsReceiptService
 
             $unitPrice = $this->num($row['unit_price'] ?? 0);
             $unit = $row['unit'] ?? null;
+            $item = Item::query()
+                ->select(['id', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor', 'default_allocation', 'default_expense_account_id'])
+                ->find($itemId);
+            $purchaseUnit = trim((string) ($row['purchase_unit'] ?? $unit ?? $item?->purchaseUnit() ?? 'pcs'));
+            $stockUnit = trim((string) ($row['stock_unit'] ?? $item?->stockUnit() ?? 'pcs'));
+            $conversionFactor = $this->num($row['conversion_factor'] ?? $item?->purchaseConversionFactor() ?? 1);
+            $conversionFactor = $conversionFactor > 0 ? $conversionFactor : 1;
+            $stockQtyReceived = round($qtyReceived * $conversionFactor, 6);
+            $stockQtyReject = round($qtyReject * $conversionFactor, 6);
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
@@ -836,9 +865,6 @@ class GoodsReceiptService
 
             $lineTotal = round(max(0, $qtyReceived) * $unitPrice, 2);
 
-            $item = Item::query()
-                ->select(['id', 'default_allocation', 'default_expense_account_id'])
-                ->find($itemId);
             $allocation = (($row['allocation'] ?? $item?->default_allocation ?? 'hpp') === 'expense')
                 ? 'expense'
                 : 'hpp';
@@ -857,7 +883,12 @@ class GoodsReceiptService
                 'lot_id' => $lotId,
                 'qty_received' => $qtyReceived,
                 'qty_reject' => $qtyReject,
-                'unit' => $unit,
+                'stock_qty_received' => $stockQtyReceived,
+                'stock_qty_reject' => $stockQtyReject,
+                'unit' => $purchaseUnit,
+                'purchase_unit' => $purchaseUnit,
+                'stock_unit' => $stockUnit,
+                'conversion_factor' => $conversionFactor,
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
                 'notes' => $notes,
@@ -982,7 +1013,7 @@ class GoodsReceiptService
         $lines = $query
             ->orderBy('pr.date')
             ->orderBy('pr.id')
-            ->select('prl.qty_received', 'prl.unit_price')
+            ->select('prl.qty_received', 'prl.unit_price', 'prl.stock_qty_received', 'prl.conversion_factor')
             ->get();
 
         if ($lines->isEmpty()) {
@@ -996,8 +1027,9 @@ class GoodsReceiptService
         $runningHpp = 0.0;
 
         foreach ($lines as $line) {
-            $qty   = (float) $line->qty_received;
-            $price = (float) $line->unit_price;
+            $factor = max(0.000001, (float) ($line->conversion_factor ?: 1));
+            $qty   = (float) ($line->stock_qty_received ?? $line->qty_received);
+            $price = (float) $line->unit_price / $factor;
 
             $newQty = $runningQty + $qty;
             $runningHpp = $newQty > 0

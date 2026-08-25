@@ -223,7 +223,10 @@
                 <div class="pr-item-code mono">{{ $line->item?->code }}</div>
               </td>
               <td class="text-end mono" data-label="Qty">
-                {{ number_format($line->qty, 2, ',', '.') }} {{ $line->item?->unit }}
+                {{ number_format($line->qty, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}
+                @if ($line->effectiveConversionFactor() != 1)
+                  <div class="small text-muted">= {{ number_format($line->qty * $line->effectiveConversionFactor(), 2, ',', '.') }} {{ $line->effectiveStockUnit() }}</div>
+                @endif
               </td>
               @if ($canSeeMoney)
                 <td class="text-end mono" data-label="Harga">
