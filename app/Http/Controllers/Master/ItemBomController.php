@@ -706,9 +706,18 @@ class ItemBomController extends Controller
         ]);
     }
 
-    public function duplicateForm()
+    public function duplicateForm(Request $request)
     {
-        return view('master.item_boms.duplicate');
+        $sourceItem = null;
+
+        if ($request->filled('from_item_id')) {
+            $sourceItem = Item::query()
+                ->whereKey((int) $request->input('from_item_id'))
+                ->where('type', 'finished_good')
+                ->first(['id', 'code', 'name']);
+        }
+
+        return view('master.item_boms.duplicate', compact('sourceItem'));
     }
 
     public function duplicate(Request $request)

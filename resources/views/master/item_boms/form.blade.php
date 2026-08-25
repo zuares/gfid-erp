@@ -463,6 +463,11 @@
 
       <div class="rowx">
         <button class="btnx primary" type="submit"><i class="bi bi-check2"></i> Simpan</button>
+        @if($isEdit)
+          <a class="btnx" href="{{ route('master.item_boms.duplicate_form', ['from_item_id' => $bom->item_id]) }}">
+            <i class="bi bi-files"></i> Duplikat BOM
+          </a>
+        @endif
         <a class="btnx ghost" href="{{ route('master.item_boms.index') }}"><i class="bi bi-arrow-left"></i> Kembali</a>
       </div>
     </div>

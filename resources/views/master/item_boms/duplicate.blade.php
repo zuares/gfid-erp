@@ -425,6 +425,10 @@
 @endpush
 
 @section('content')
+@php
+  $sourceItem = $sourceItem ?? null;
+  $selectedSourceId = (int) old('from_item_id', $sourceItem?->id);
+@endphp
 <div class="gf-category-page">
   <div class="cardx gf-category-head">
     <div style="font-size:20px;font-weight:900"><i class="bi bi-files"></i> Duplicate BOM</div>
@@ -441,7 +445,11 @@
 
       <div class="mb-2">
         <div class="small">SKU Sumber (punya BOM)</div>
-        <select id="from_item_id" name="from_item_id" style="width:100%"></select>
+        <select id="from_item_id" name="from_item_id" style="width:100%">
+          @if($sourceItem && $selectedSourceId === (int) $sourceItem->id)
+            <option value="{{ $sourceItem->id }}" selected>{{ $sourceItem->code }} — {{ $sourceItem->name }}</option>
+          @endif
+        </select>
       </div>
 
       <div class="mb-2">
