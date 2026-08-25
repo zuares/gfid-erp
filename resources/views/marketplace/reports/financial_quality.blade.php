@@ -174,6 +174,8 @@
     .fq-status-missing { color: #b42318; background: #fef3f2; border-color: #f5c4c0; }
     .fq-valid { color: #16704c; font-weight: 750; }
     .fq-invalid { color: #a15c00; font-weight: 750; }
+    .fq-issue-main { display: block; color: var(--fq-ink); font-weight: 650; }
+    .fq-issue-missing { display: block; margin-top: .24rem; color: var(--fq-muted); }
     .fq-action { color: var(--fq-brand); font-weight: 750; text-decoration: none; white-space: nowrap; }
     .fq-action:hover { color: var(--fq-brand-dark); }
     .fq-empty { padding: 3rem 1rem !important; text-align: center; }
@@ -470,7 +472,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td><span class="fq-status {{ $statusClasses[$qualityStatus] ?? 'fq-status-unknown' }}">{{ $statusLabels[$qualityStatus] ?? 'Unknown' }}</span></td>
                             <td><span class="fq-status {{ $settlementStatusRow === 'complete' ? 'fq-status-ready' : ($settlementStatusRow === 'missing' ? 'fq-status-missing' : 'fq-status-incomplete') }}">{{ $settlementLabels[$settlementStatusRow] ?? 'Payout belum diperiksa' }}</span></td>
                             <td><span class="{{ $validItems === $itemCount && $itemCount > 0 ? 'fq-valid' : 'fq-invalid' }}">{{ $itemCount > 0 ? $validItems . '/' . $itemCount . ' siap' : 'Belum ada item' }}</span></td>
-                            <td class="fq-muted"><span class="d-block">{{ $issueText ?: 'Tidak ada masalah utama' }}</span>@if ($missingText)<span>Data kurang: {{ $missingText }}{{ $missingCount > 2 ? '…' : '' }}</span>@endif</td>
+                            <td class="fq-muted"><span class="fq-issue-main">{{ $issueText ?: 'Tidak ada masalah utama' }}</span>@if ($missingText)<span class="fq-issue-missing"><i class="bi bi-info-circle me-1"></i>Data kurang: {{ $missingText }}{{ $missingCount > 2 ? '…' : '' }}</span>@endif</td>
                             <td class="text-end"><a href="{{ route('marketplace.orders.show', $order) }}" class="fq-action">Buka perbaikan <i class="bi bi-arrow-up-right ms-1"></i></a></td>
                         </tr>
                     @empty
