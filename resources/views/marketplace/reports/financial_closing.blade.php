@@ -8,6 +8,7 @@
     $summary = $audit['statement']['summary'];
     $closing = $audit['closing'];
     $isClosed = $closing?->status === 'closed';
+    $hasData = (int) ($summary['order_count'] ?? 0) > 0;
     $failedChecks = collect($audit['checks'])->where('pass', false)->count();
     $checkCount = count($audit['checks']);
     $qualityCheck = collect($audit['checks'])->firstWhere('key', 'quality');
@@ -110,7 +111,11 @@
         </div>
         <div class="mfc-header-actions">
             <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.financial-statement', $filters) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Lihat laporan keuangan</a>
-            <a class="btn btn-primary" href="{{ $postingUrl }}" title="Periksa draft lalu posting settlement ke jurnal umum"><i class="bi bi-journal-plus me-1"></i>Posting settlement</a>
+            @if (!$isClosed && ($qualityCheck['pass'] ?? false) && $hasData)
+                <a class="btn btn-primary" href="{{ $postingUrl }}" title="Periksa draft lalu posting settlement ke jurnal umum"><i class="bi bi-journal-plus me-1"></i>Posting settlement</a>
+            @else
+                <a class="btn btn-outline-primary" href="{{ $statementUrl }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Lihat detail periode</a>
+            @endif
         </div>
     </header>
 
@@ -119,6 +124,9 @@
     @endif
     @if ($errors->has('closing'))
         <div class="alert alert-danger d-flex gap-2 align-items-start"><i class="bi bi-exclamation-triangle-fill mt-1"></i><div>{{ $errors->first('closing') }}</div></div>
+    @endif
+    @if ($errors->has('posting'))
+        <div class="alert alert-warning d-flex gap-2 align-items-start"><i class="bi bi-info-circle-fill mt-1"></i><div>{{ $errors->first('posting') }} Pilih periode lain atau tunggu order dan settlement selesai sebelum posting.</div></div>
     @endif
 
     <section class="card mfc-scope mb-3" aria-labelledby="scope-title">
@@ -209,16 +217,16 @@
                         @php
                             $fixUrl = match ($check['key']) {
                                 'quality' => $qualityFixUrl,
-                                'posting' => $audit['checks'][0]['pass'] ? $postingUrl : $qualityFixUrl,
+                                'posting' => ($qualityCheck['pass'] ?? false) && $hasData ? $postingUrl : $statementUrl,
                                 'reconciliation' => $statementUrl,
                                 'journal' => route('accounting.journals.index', ['from' => $filters['date_from'], 'to' => $filters['date_to']]),
-                                'has_data' => $qualityFixUrl,
+                                'has_data' => $statementUrl,
                                 default => $statementUrl,
                             };
                             $actionLabel = match ($check['key']) {
                                 'quality' => 'Buka pemeriksaan data',
                                 'reconciliation' => 'Buka laporan keuangan',
-                                'posting' => 'Tinjau posting accounting',
+                                'posting' => ($qualityCheck['pass'] ?? false) && $hasData ? 'Tinjau posting accounting' : 'Lihat detail periode',
                                 'journal' => 'Buka jurnal accounting',
                                 'has_data' => 'Periksa data periode',
                                 default => 'Buka halaman terkait',

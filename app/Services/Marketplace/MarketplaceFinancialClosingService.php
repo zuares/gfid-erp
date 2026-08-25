@@ -45,7 +45,9 @@ class MarketplaceFinancialClosingService
                 'label' => 'Quality gate',
                 'pass' => $qualityPass,
                 'detail' => $qualityPass
-                    ? 'Semua order eligible sudah ready; order yang belum COMPLETED tidak dihitung sebagai fakta finansial.'
+                    ? ($hasData
+                        ? 'Semua order eligible sudah ready; order yang belum COMPLETED tidak dihitung sebagai fakta finansial.'
+                        : 'Belum ada order COMPLETED dengan settlement lengkap pada periode ini.')
                     : sprintf('%d incomplete dan %d unknown masih ditemukan.', $statement['quality']['incomplete'] ?? 0, $statement['quality']['unknown'] ?? 0),
             ],
             [

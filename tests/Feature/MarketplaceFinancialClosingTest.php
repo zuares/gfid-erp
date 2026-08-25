@@ -154,7 +154,7 @@ class MarketplaceFinancialClosingTest extends TestCase
             ->get(route('marketplace.reports.financial-closing', $this->filters($store, '2026-08-01', '2026-08-31')));
 
         $response->assertOk()
-            ->assertSee('Semua order eligible sudah ready; order yang belum COMPLETED tidak dihitung sebagai fakta finansial.')
+            ->assertSee('Belum ada order COMPLETED dengan settlement lengkap pada periode ini.')
             ->assertDontSee('0 incomplete dan 1 unknown masih ditemukan.');
     }
 
