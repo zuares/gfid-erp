@@ -341,12 +341,12 @@
                 <tr>
                   <th style="width:4%" class="text-center">#</th>
                   <th style="width:34%">Item</th>
-                  <th style="width:12%" class="text-end">Qty In</th>
-                  <th style="width:12%" class="text-end">Reject</th>
+                  <th style="width:12%" class="text-end">Diterima<br><small class="text-muted">satuan stok</small></th>
+                  <th style="width:12%" class="text-end">Reject<br><small class="text-muted">satuan stok</small></th>
                   @if ($canSeeMoney)
                     <th style="width:16%" class="text-end">Harga</th>
                   @endif
-                  <th style="width:10%">Unit</th>
+                  <th style="width:10%">Satuan stok</th>
                   <th style="width:18%">Catatan</th>
                   <th style="width:4%"></th>
                 </tr>
@@ -358,6 +358,8 @@
                   $oldItemIds = old('item_id', []);
                   $oldQtyReceived = old('qty_received', []);
                   $oldQtyReject = old('qty_reject', []);
+                  $oldStockQtyReceived = old('stock_qty_received', []);
+                  $oldStockQtyReject = old('stock_qty_reject', []);
                   $oldUnitPrice = old('unit_price', []);
                   $oldUnits = old('unit', []);
                   $oldLineNotes = old('line_notes', []);
@@ -395,14 +397,16 @@
                       </td>
 
                       <td>
-                        <input type="text" name="qty_received[]"
+                        <input type="hidden" name="qty_received[]" class="js-purchase-qty" value="{{ $oldQtyReceived[$i] ?? 0 }}">
+                        <input type="text" name="stock_qty_received[]"
                                class="form-control form-control-sm text-end mono js-qty"
-                               value="{{ $oldQtyReceived[$i] ?? 0 }}">
+                               value="{{ $oldStockQtyReceived[$i] ?? ($oldQtyReceived[$i] ?? 0) }}">
                       </td>
                       <td>
-                        <input type="text" name="qty_reject[]"
+                        <input type="hidden" name="qty_reject[]" class="js-purchase-reject" value="{{ $oldQtyReject[$i] ?? 0 }}">
+                        <input type="text" name="stock_qty_reject[]"
                                class="form-control form-control-sm text-end mono js-reject"
-                               value="{{ $oldQtyReject[$i] ?? 0 }}">
+                               value="{{ $oldStockQtyReject[$i] ?? ($oldQtyReject[$i] ?? 0) }}">
                       </td>
                       @if ($canSeeMoney)
                         <td>
@@ -414,7 +418,7 @@
                       <td>
                         <input type="text" name="unit[]"
                                class="form-control form-control-sm mono"
-                               value="{{ $oldUnits[$i] ?? '' }}" placeholder="kg/pcs/m">
+                               value="{{ $oldUnits[$i] ?? '' }}" placeholder="pcs/kg/m">
                       </td>
                       <td>
                         <input type="text" name="line_notes[]"
@@ -459,14 +463,21 @@
                       </td>
 
                       <td>
-                        <input type="text" name="qty_received[]"
+                        @php
+                          $lineFactor = $line->effectiveConversionFactor();
+                          $lineStockUnit = $line->effectiveStockUnit();
+                          $linePurchaseUnit = $line->effectivePurchaseUnit();
+                        @endphp
+                        <input type="hidden" name="qty_received[]" class="js-purchase-qty" value="{{ (float) $line->qty_received }}">
+                        <input type="text" name="stock_qty_received[]"
                                class="form-control form-control-sm text-end mono js-qty"
-                               value="{{ (float) $line->qty_received }}">
+                               value="{{ $line->stockQtyReceived() }}" data-factor="{{ $lineFactor }}">
                       </td>
                       <td>
-                        <input type="text" name="qty_reject[]"
+                        <input type="hidden" name="qty_reject[]" class="js-purchase-reject" value="{{ (float) $line->qty_reject }}">
+                        <input type="text" name="stock_qty_reject[]"
                                class="form-control form-control-sm text-end mono js-reject"
-                               value="{{ (float) $line->qty_reject }}">
+                               value="{{ $line->stockQtyReject() }}" data-factor="{{ $lineFactor }}">
                       </td>
                       @if ($canSeeMoney)
                         @php
@@ -484,7 +495,8 @@
                       <td>
                         <input type="text" name="unit[]"
                                class="form-control form-control-sm mono"
-                               value="{{ $line->unit }}" placeholder="kg/pcs/m">
+                               value="{{ $lineStockUnit }}" placeholder="pcs/kg/m">
+                        <div class="small text-muted mt-1">Beli: {{ $linePurchaseUnit }} × {{ decimal_id($lineFactor, 4) }}</div>
                       </td>
                       <td>
                         <input type="text" name="line_notes[]"
@@ -514,8 +526,14 @@
                           :skipSubmitValidation="true"
                         />
                       </td>
-                      <td><input type="text" name="qty_received[]" class="form-control form-control-sm text-end mono js-qty" value="0"></td>
-                      <td><input type="text" name="qty_reject[]" class="form-control form-control-sm text-end mono js-reject" value="0"></td>
+                      <td>
+                        <input type="hidden" name="qty_received[]" class="js-purchase-qty" value="0">
+                        <input type="text" name="stock_qty_received[]" class="form-control form-control-sm text-end mono js-qty" value="0">
+                      </td>
+                      <td>
+                        <input type="hidden" name="qty_reject[]" class="js-purchase-reject" value="0">
+                        <input type="text" name="stock_qty_reject[]" class="form-control form-control-sm text-end mono js-reject" value="0">
+                      </td>
                       @if ($canSeeMoney)
                         <td><input type="text" name="unit_price[]" class="form-control form-control-sm text-end mono js-price" value="0"></td>
                       @endif
@@ -531,7 +549,7 @@
 
               <tfoot class="table-light">
                 <tr class="fw-semibold">
-                  <td colspan="2" class="text-end">Total</td>
+                  <td colspan="2" class="text-end">Total stok</td>
                   <td class="text-end mono" id="js-total-qty">0</td>
                   <td class="text-end mono" id="js-total-reject">0</td>
                   @if ($canSeeMoney)
@@ -585,22 +603,46 @@
     return parts[1] === '00' ? parts[0] : parts[0] + ',' + parts[1];
   }
 
+  function formatUnitTotals(totals){
+    return Object.entries(totals)
+      .filter(([, qty]) => qty > 0.000001)
+      .map(([unit, qty]) => `${fmtId(qty)} ${unit}`)
+      .join(' · ') || '0';
+  }
+
+  function syncPurchaseQty(tr){
+    const factor = Math.max(0.000001, toNum(tr.querySelector('.js-qty')?.dataset.factor || 1));
+    const qty = Math.max(0, toNum(tr.querySelector('.js-qty')?.value));
+    const rej = Math.max(0, toNum(tr.querySelector('.js-reject')?.value));
+    const receivedPurchase = tr.querySelector('.js-purchase-qty');
+    const rejectPurchase = tr.querySelector('.js-purchase-reject');
+    const receivedStock = tr.querySelector('.js-stock-hidden-received');
+    const rejectStock = tr.querySelector('.js-stock-hidden-reject');
+    if (receivedPurchase) receivedPurchase.value = (qty / factor).toFixed(6);
+    if (rejectPurchase) rejectPurchase.value = (rej / factor).toFixed(6);
+    if (receivedStock) receivedStock.value = qty;
+    if (rejectStock) rejectStock.value = rej;
+  }
+
   function recalc(){
     const body = document.getElementById('grn-lines-body');
     if (!body) return;
 
     let subtotal = 0;
-    let tQty = 0;
-    let tRej = 0;
+    const tQty = {};
+    const tRej = {};
 
     body.querySelectorAll('tr.js-line').forEach(tr => {
       const qty = toNum(tr.querySelector('.js-qty')?.value);
       const rej = toNum(tr.querySelector('.js-reject')?.value);
       const price = toNum(tr.querySelector('.js-price')?.value);
+      const factor = Math.max(0.000001, toNum(tr.querySelector('.js-qty')?.dataset.factor || 1));
 
-      tQty += qty;
-      tRej += rej;
-      subtotal += Math.max(0, qty) * price;
+      const unit = (tr.querySelector('[name="unit[]"]')?.value || 'pcs').trim() || 'pcs';
+      tQty[unit] = (tQty[unit] || 0) + qty;
+      tRej[unit] = (tRej[unit] || 0) + rej;
+      syncPurchaseQty(tr);
+      subtotal += (Math.max(0, qty) / factor) * price;
     });
 
     const discount = toNum(document.querySelector('[name="discount"]')?.value);
@@ -615,8 +657,8 @@
     const totalQtyEl = document.getElementById('js-total-qty');
     const totalRejectEl = document.getElementById('js-total-reject');
     const totalAmountEl = document.getElementById('js-total-amount');
-    if (totalQtyEl) totalQtyEl.textContent = fmtId(tQty);
-    if (totalRejectEl) totalRejectEl.textContent = fmtId(tRej);
+    if (totalQtyEl) totalQtyEl.textContent = formatUnitTotals(tQty);
+    if (totalRejectEl) totalRejectEl.textContent = formatUnitTotals(tRej);
     if (totalAmountEl) totalAmountEl.textContent = fmtId(subtotal);
 
     // summary
@@ -653,7 +695,7 @@
     // reset inputs
     clone.querySelectorAll('input').forEach(inp => {
       const name = inp.getAttribute('name') || '';
-      if (name === 'qty_received[]' || name === 'qty_reject[]' || name === 'unit_price[]'){
+      if (name === 'qty_received[]' || name === 'qty_reject[]' || name === 'stock_qty_received[]' || name === 'stock_qty_reject[]' || name === 'unit_price[]'){
         inp.value = '0';
       } else if (name === 'unit[]' || name === 'line_notes[]'){
         inp.value = '';
@@ -714,7 +756,7 @@
         if (!tr) return;
         tr.querySelectorAll('input').forEach(inp => {
           const name = inp.getAttribute('name') || '';
-          if (name === 'qty_received[]' || name === 'qty_reject[]' || name === 'unit_price[]'){
+          if (name === 'qty_received[]' || name === 'qty_reject[]' || name === 'stock_qty_received[]' || name === 'stock_qty_reject[]' || name === 'unit_price[]'){
             inp.value = '0';
           } else if (name === 'unit[]' || name === 'line_notes[]'){
             inp.value = '';
@@ -739,7 +781,7 @@
     // live recalc
     document.addEventListener('input', function(e){
       const name = e.target?.getAttribute?.('name') || '';
-      if (name === 'qty_received[]' || name === 'qty_reject[]' || name === 'unit_price[]'
+      if (name === 'qty_received[]' || name === 'qty_reject[]' || name === 'stock_qty_received[]' || name === 'stock_qty_reject[]' || name === 'unit_price[]'
           || name === 'discount' || name === 'tax_percent' || name === 'shipping_cost'){
         recalc();
       }

@@ -76,13 +76,13 @@
         <td class="text-end mobile-hide">
             <div class="fw-semibold mono" style="color:#16a34a;">Rp {{ number_format($receipt->grand_total ?? 0, 0, ',', '.') }}</div>
             <div class="muted mono mt-1">
-                {{ rtrim(rtrim(number_format($receipt->total_qty ?? 0, 2, ',', '.'), '0'), ',') }} Qty
+                {{ rtrim(rtrim(number_format($receipt->total_stock_qty ?? 0, 2, ',', '.'), '0'), ',') }} stok
             </div>
         </td>
 
         <td class="text-end mobile-hide">
-            @if(($receipt->total_reject ?? 0) > 0)
-                <div class="mono fw-semibold" style="color:#dc2626;">{{ rtrim(rtrim(number_format($receipt->total_reject, 2, ',', '.'), '0'), ',') }}</div>
+            @if(($receipt->total_stock_reject ?? 0) > 0)
+                <div class="mono fw-semibold" style="color:#dc2626;">{{ rtrim(rtrim(number_format($receipt->total_stock_reject, 2, ',', '.'), '0'), ',') }} stok</div>
                 <div class="muted mono mt-1" style="color:#ef4444;">Rp {{ number_format($receipt->total_reject_rp ?? 0, 0, ',', '.') }}</div>
             @else
                 <span class="text-muted">-</span>

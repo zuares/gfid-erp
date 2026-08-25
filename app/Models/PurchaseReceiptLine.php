@@ -63,6 +63,15 @@ class PurchaseReceiptLine extends Model
         return round((float) $this->qty_received * $this->effectiveConversionFactor(), 6);
     }
 
+    public function stockQtyReject(): float
+    {
+        if ($this->stock_qty_reject !== null) {
+            return (float) $this->stock_qty_reject;
+        }
+
+        return round((float) $this->qty_reject * $this->effectiveConversionFactor(), 6);
+    }
+
     public function stockUnitPrice(): float
     {
         return (float) $this->unit_price / max(0.000001, $this->effectiveConversionFactor());

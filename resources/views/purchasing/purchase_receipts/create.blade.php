@@ -145,6 +145,14 @@
         padding-block: .4rem;
         white-space: nowrap;
     }
+    .th-sub {
+        display: block;
+        color: #2563eb;
+        font-size: .62rem;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-transform: none;
+    }
     .table-sm td { padding-block: .35rem; vertical-align: middle; border-bottom: 1px solid rgba(148,163,184,.14); }
     .table-sm tr:last-child td { border-bottom: none; }
 
@@ -568,8 +576,8 @@
                             <th>Item</th>
                             <th class="text-end">Qty PO</th>
                             <th class="text-end">Sisa</th>
-                            <th class="text-end" style="width:125px;">Diterima</th>
-                            <th class="text-end" style="width:125px;">Reject</th>
+                            <th class="text-end" style="width:125px;">Diterima <small class="th-sub">stok</small></th>
+                            <th class="text-end" style="width:125px;">Reject <small class="th-sub">stok</small></th>
                             @if ($canSeeMoney)
                                 <th class="text-end col-harga">Harga</th>
                             @endif
@@ -605,6 +613,8 @@
                     <tr data-line-index="{{ $idx }}"
                         data-qty-po="{{ $qtyPo }}"
                         data-qty-remaining="{{ $qtyRemaining }}"
+                        data-qty-stock-po="{{ (float) $qtyPo * $line->effectiveConversionFactor() }}"
+                        data-qty-stock-remaining="{{ (float) $qtyRemaining * $line->effectiveConversionFactor() }}"
                         data-purchase-unit="{{ $line->effectivePurchaseUnit() }}"
                         data-stock-unit="{{ $line->effectiveStockUnit() }}"
                         data-conversion-factor="{{ $line->effectiveConversionFactor() }}"
@@ -669,6 +679,8 @@
                             @if ($canSeeMoney)
                                 <input type="hidden" name="unit_price[]" value="{{ $line->unit_price }}">
                             @endif
+                            <input type="hidden" name="qty_received[]" data-purchase-hidden="received" value="{{ old('qty_received.' . $idx, '') }}">
+                            <input type="hidden" name="qty_reject[]" data-purchase-hidden="reject" value="{{ old('qty_reject.' . $idx, '') }}">
                             <input type="hidden" name="unit[]" value="{{ $line->effectivePurchaseUnit() }}">
                         </td>
 
@@ -693,26 +705,26 @@
                         {{-- Qty Diterima --}}
                         <td class="text-end" data-label="Diterima">
                             <div class="qty-cell">
-                                <input type="text" inputmode="decimal" name="qty_received[]"
-                                       class="form-control form-control-sm qty-input qty-received-input @error('qty_received.' . $idx) is-invalid @enderror"
-                                       value="{{ old('qty_received.' . $idx, '') }}"
+                                <input type="text" inputmode="decimal" name="stock_qty_received[]"
+                                       class="form-control form-control-sm qty-input qty-received-input @error('qty_received.' . $idx) is-invalid @enderror @error('stock_qty_received.' . $idx) is-invalid @enderror"
+                                       value="{{ old('stock_qty_received.' . $idx, '') }}"
                                        placeholder="0,00" autocomplete="off"
                                        @if ($hasDraftGrn) disabled @endif>
-                                <span class="qty-unit">{{ $line->effectivePurchaseUnit() }}</span>
-                                <span class="qty-stock-preview" data-stock-preview="received">Stok: 0 {{ $line->effectiveStockUnit() }}</span>
+                                <span class="qty-unit">{{ $line->effectiveStockUnit() }}</span>
+                                <span class="qty-stock-preview" data-stock-preview="received">Beli: 0 {{ $line->effectivePurchaseUnit() }}</span>
                             </div>
                         </td>
 
                         {{-- Qty Reject --}}
                         <td class="text-end" data-label="Reject">
                             <div class="qty-cell">
-                                <input type="text" inputmode="decimal" name="qty_reject[]"
-                                       class="form-control form-control-sm qty-input qty-reject-input"
-                                       value="{{ old('qty_reject.' . $idx, '') }}"
+                                <input type="text" inputmode="decimal" name="stock_qty_reject[]"
+                                       class="form-control form-control-sm qty-input qty-reject-input @error('qty_reject.' . $idx) is-invalid @enderror @error('stock_qty_reject.' . $idx) is-invalid @enderror"
+                                       value="{{ old('stock_qty_reject.' . $idx, '') }}"
                                        placeholder="0,00" autocomplete="off"
                                        @if ($hasDraftGrn) disabled @endif>
-                                <span class="qty-unit">{{ $line->effectivePurchaseUnit() }}</span>
-                                <span class="qty-stock-preview" data-stock-preview="reject">Stok: 0 {{ $line->effectiveStockUnit() }}</span>
+                                <span class="qty-unit">{{ $line->effectiveStockUnit() }}</span>
+                                <span class="qty-stock-preview" data-stock-preview="reject">Beli: 0 {{ $line->effectivePurchaseUnit() }}</span>
                             </div>
                         </td>
 
@@ -855,8 +867,23 @@
     }
 
     function getLimit(row) {
-        const rem = parseNum(row.dataset.qtyRemaining);
-        return rem > 0 ? rem : parseNum(row.dataset.qtyPo);
+        const rem = parseNum(row.dataset.qtyStockRemaining);
+        return rem > 0 ? rem : parseNum(row.dataset.qtyStockPo);
+    }
+
+    function updateHiddenPurchaseQty(row) {
+        const factor = getConversionFactor(row);
+        const rec = parseNum(row.querySelector('.qty-received-input')?.value || 0);
+        const rej = parseNum(row.querySelector('.qty-reject-input')?.value || 0);
+        const recHidden = row.querySelector('[data-purchase-hidden="received"]');
+        const rejHidden = row.querySelector('[data-purchase-hidden="reject"]');
+        const recStockHidden = row.querySelector('[data-stock-hidden="received"]');
+        const rejStockHidden = row.querySelector('[data-stock-hidden="reject"]');
+
+        if (recHidden) recHidden.value = (rec / factor).toFixed(6);
+        if (rejHidden) rejHidden.value = (rej / factor).toFixed(6);
+        if (recStockHidden) recStockHidden.value = rec.toFixed(6);
+        if (rejStockHidden) rejStockHidden.value = rej.toFixed(6);
     }
 
     function updateRowStockPreview(row) {
@@ -867,8 +894,10 @@
         const recPreview = row.querySelector('[data-stock-preview="received"]');
         const rejPreview = row.querySelector('[data-stock-preview="reject"]');
 
-        if (recPreview) recPreview.textContent = `Stok: ${fmtId(rec * factor)} ${stockUnit}`;
-        if (rejPreview) rejPreview.textContent = `Stok: ${fmtId(rej * factor)} ${stockUnit}`;
+        const purchaseUnit = getPurchaseUnit(row);
+        if (recPreview) recPreview.textContent = `Beli: ${fmtId(rec / factor)} ${purchaseUnit}`;
+        if (rejPreview) rejPreview.textContent = `Beli: ${fmtId(rej / factor)} ${purchaseUnit}`;
+        updateHiddenPurchaseQty(row);
     }
 
     /* ── validation ── */
@@ -903,7 +932,7 @@
             const net = parseNum(inpRec.value || 0) - parseNum(inpRej.value || 0);
             if (net > 0) {
                 const unit = getStockUnit(row);
-                totals[unit] = (totals[unit] || 0) + (net * getConversionFactor(row));
+                totals[unit] = (totals[unit] || 0) + net;
             }
         });
         const fmted = formatUnitTotals(totals);
@@ -1056,15 +1085,16 @@
             lines.push({
                 code: row.querySelector('.item-code')?.textContent?.trim() ?? '-',
                 name: row.querySelector('.item-name')?.childNodes?.[0]?.textContent?.trim() ?? '',
-                qtyPo: parseNum(row.dataset.qtyPo),
-                sisa:  parseNum(row.dataset.qtyRemaining),
+                qtyPo: parseNum(row.dataset.qtyStockPo),
+                sisa:  parseNum(row.dataset.qtyStockRemaining),
                 rec, rej,
-                unit: getPurchaseUnit(row),
+                unit: getStockUnit(row),
+                purchaseUnit: getPurchaseUnit(row),
                 stockUnit: getStockUnit(row),
                 factor,
-                sisaStock: parseNum(row.dataset.qtyRemaining) * factor,
-                stockRec: rec * factor,
-                stockRej: rej * factor,
+                sisaPurchase: parseNum(row.dataset.qtyRemaining),
+                stockRec: rec,
+                stockRej: rej,
             });
         });
         return { lines, allValid };
@@ -1102,7 +1132,7 @@
             h += `<tr>
                 <td class="mono text-muted">${i+1}</td>
                 <td><div class="fw-bold mono">${l.code}</div><div class="text-muted small">${l.name || ''}</div></td>
-                <td class="text-end mono"><div>${fmtId(l.sisa)} ${l.unit}</div><small class="text-muted">${fmtId(l.sisaStock)} ${l.stockUnit}</small></td>
+                <td class="text-end mono"><div>${fmtId(l.sisa)} ${l.unit}</div><small class="text-muted">${fmtId(l.sisaPurchase)} ${l.purchaseUnit} PO</small></td>
                 <td class="text-end mono fw-bold">${fmtId(l.rec)} ${l.unit}</td>
                 <td class="text-end mono"><span class="confirm-stock">${fmtId(l.stockRec)} ${l.stockUnit}</span></td>
                 <td class="text-end mono">${fmtId(l.rej)} ${l.unit}</td>

@@ -577,6 +577,14 @@
           </div>
 
           <div style="padding:.5rem 0;">
+            @php
+              $receivedByStockUnit = $receipt->lines
+                ->groupBy(fn ($line) => $line->effectiveStockUnit())
+                ->map(fn ($lines) => $lines->sum(fn ($line) => $line->stockQtyReceived()));
+              $rejectByStockUnit = $receipt->lines
+                ->groupBy(fn ($line) => $line->effectiveStockUnit())
+                ->map(fn ($lines) => $lines->sum(fn ($line) => $line->stockQtyReject()));
+            @endphp
             <div class="grn-detail-wrapper">
               <table class="table table-sm mb-0 align-middle">
                 <thead class="table-light sticky-top">
@@ -584,8 +592,8 @@
                     <th style="width:4%;" class="text-center"><span class="th-full">No</span><span class="th-abbr">#</span></th>
                     <th style="width:22%"><span class="th-full">Item</span><span class="th-abbr">Item</span></th>
                     <th style="width:16%"><span class="th-full">LOT</span><span class="th-abbr">LOT</span></th>
-                    <th style="width:9%" class="text-end"><span class="th-full">Qty In</span><span class="th-abbr">Qty</span></th>
-                    <th style="width:9%" class="text-end"><span class="th-full">Qty Reject</span><span class="th-abbr">Rej</span></th>
+                    <th style="width:9%" class="text-end"><span class="th-full">Masuk stok</span><span class="th-abbr">Qty</span></th>
+                    <th style="width:9%" class="text-end"><span class="th-full">Reject stok</span><span class="th-abbr">Rej</span></th>
                     @if ($canSeeMoney)
                       <th style="width:12%" class="text-end"><span class="th-full">Harga/Unit</span><span class="th-abbr">Harga</span></th>
                       <th style="width:12%" class="text-end"><span class="th-full">Total</span><span class="th-abbr">Total</span></th>
@@ -624,13 +632,15 @@
                       </td>
 
                       <td class="text-end mono">
-                        <span class="val-full">{{ decimal_id($line->qty_received, 2) }}</span>
-                        <span class="val-mobile">{{ decimal_id($line->qty_received, 0) }}</span>
+                        <span class="val-full">{{ decimal_id($line->stockQtyReceived(), 2) }} {{ $line->effectiveStockUnit() }}</span>
+                        <span class="val-mobile">{{ decimal_id($line->stockQtyReceived(), 0) }}</span>
+                        <small class="d-block text-muted">Beli: {{ decimal_id($line->qty_received, 4) }} {{ $line->effectivePurchaseUnit() }}</small>
                       </td>
 
                       <td class="text-end mono">
-                        <span class="val-full">{{ decimal_id($line->qty_reject, 2) }}</span>
-                        <span class="val-mobile">{{ decimal_id($line->qty_reject, 0) }}</span>
+                        <span class="val-full">{{ decimal_id($line->stockQtyReject(), 2) }} {{ $line->effectiveStockUnit() }}</span>
+                        <span class="val-mobile">{{ decimal_id($line->stockQtyReject(), 0) }}</span>
+                        <small class="d-block text-muted">Beli: {{ decimal_id($line->qty_reject, 4) }} {{ $line->effectivePurchaseUnit() }}</small>
                       </td>
 
                       @if ($canSeeMoney)
@@ -645,7 +655,12 @@
                         </td>
                       @endif
 
-                      <td class="mono">{{ $line->unit ?: ($line->item->unit ?? '-') }}</td>
+                      <td class="mono">
+                        {{ $line->effectiveStockUnit() }}
+                        @if ($line->effectiveConversionFactor() != 1)
+                          <small class="d-block text-muted">{{ decimal_id($line->effectiveConversionFactor(), 2) }} / {{ $line->effectivePurchaseUnit() }}</small>
+                        @endif
+                      </td>
                       <td>{{ $line->notes ?: '-' }}</td>
                     </tr>
                   @empty
@@ -658,14 +673,30 @@
                 @if ($receipt->lines->count())
                   <tfoot class="table-light">
                     <tr class="fw-semibold">
-                      <td colspan="3" class="text-end">Total</td>
+                      <td colspan="3" class="text-end">Total stok</td>
                       <td class="text-end mono">
-                        <span class="val-full">{{ decimal_id($receipt->lines->sum('qty_received'), 2) }}</span>
-                        <span class="val-mobile">{{ decimal_id($receipt->lines->sum('qty_received'), 0) }}</span>
+                        <span class="val-full">
+                          @foreach ($receivedByStockUnit as $unit => $qty)
+                            {{ decimal_id($qty, 2) }} {{ $unit }}@if (!$loop->last) · @endif
+                          @endforeach
+                        </span>
+                        <span class="val-mobile">
+                          @foreach ($receivedByStockUnit as $unit => $qty)
+                            {{ decimal_id($qty, 0) }} {{ $unit }}@if (!$loop->last) · @endif
+                          @endforeach
+                        </span>
                       </td>
                       <td class="text-end mono">
-                        <span class="val-full">{{ decimal_id($receipt->lines->sum('qty_reject'), 2) }}</span>
-                        <span class="val-mobile">{{ decimal_id($receipt->lines->sum('qty_reject'), 0) }}</span>
+                        <span class="val-full">
+                          @foreach ($rejectByStockUnit as $unit => $qty)
+                            {{ decimal_id($qty, 2) }} {{ $unit }}@if (!$loop->last) · @endif
+                          @endforeach
+                        </span>
+                        <span class="val-mobile">
+                          @foreach ($rejectByStockUnit as $unit => $qty)
+                            {{ decimal_id($qty, 0) }} {{ $unit }}@if (!$loop->last) · @endif
+                          @endforeach
+                        </span>
                       </td>
                       @if ($canSeeMoney)
                         <td class="text-end"></td>

@@ -151,8 +151,8 @@
                     @if (($summary->closed_count ?? 0) > 0)
                         <span class="kpi"><span class="lbl">Closed</span><span class="val mono">{{ $summary->closed_count }}</span></span>
                     @endif
-                    <span class="kpi"><span class="lbl">Penerimaan</span><span class="val mono">{{ rtrim(rtrim(number_format($summary->total_qty_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span></span>
-                    <span class="kpi"><span class="lbl" style="color:#ef4444;">Reject</span><span class="val mono" style="color:#dc2626;">{{ rtrim(rtrim(number_format($summary->total_reject_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span></span>
+                    <span class="kpi"><span class="lbl">Penerimaan (stok)</span><span class="val mono">{{ rtrim(rtrim(number_format($summary->total_qty_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span></span>
+                    <span class="kpi"><span class="lbl" style="color:#ef4444;">Reject (stok)</span><span class="val mono" style="color:#dc2626;">{{ rtrim(rtrim(number_format($summary->total_reject_sum ?? 0, 2, ',', '.'), '0'), ',') }}</span></span>
                     <span class="kpi"><span class="lbl" style="color:#ef4444;">Reject Rp</span><span class="val mono" style="color:#dc2626;">Rp {{ number_format($summary->total_reject_rp_sum ?? 0, 0, ',', '.') }}</span></span>
                     <span class="kpi"><span class="lbl">Nilai</span><span class="val mono">Rp {{ number_format($summary->grand_total_sum ?? 0, 0, ',', '.') }}</span></span>
                 </div>

@@ -381,6 +381,40 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertEqualsWithDelta(240000, (float) $invJournal->lines()->sum('debit'), 0.01);
     }
 
+    public function test_grn_accepts_stock_unit_reject_when_purchase_unit_is_dozen(): void
+    {
+        $this->item->forceFill([
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'lusin',
+            'purchase_conversion_factor' => 12,
+        ])->save();
+
+        $po = $this->makeDraftPo(3, 120000);
+        $payload = $this->makeGrnPayload($po, 0);
+        $payload['lines'][0]['qty_received'] = 35 / 12;
+        $payload['lines'][0]['qty_reject'] = 1 / 12;
+        $payload['lines'][0]['stock_qty_received'] = 35;
+        $payload['lines'][0]['stock_qty_reject'] = 1;
+
+        $grn = $this->grnService->create($payload);
+        $line = $grn->lines()->firstOrFail();
+
+        $this->assertEqualsWithDelta(35, (float) $line->stock_qty_received, 0.000001);
+        $this->assertEqualsWithDelta(1, (float) $line->stock_qty_reject, 0.000001);
+        $this->assertEqualsWithDelta(35 / 12, (float) $line->qty_received, 0.000001);
+        $this->assertEqualsWithDelta(1 / 12, (float) $line->qty_reject, 0.000001);
+
+        $this->grnService->post($grn);
+
+        $this->assertEqualsWithDelta(
+            35,
+            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+                ->where('item_id', $this->item->id)->value('qty'),
+            0.000001
+        );
+    }
+
     public function test_mixed_raw_material_and_atk_po_splits_stock_and_expense(): void
     {
         $expenseAccount = Account::where('code', '6104')->firstOrFail();

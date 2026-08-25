@@ -32,9 +32,11 @@ class PurchaseReceiptController extends Controller
         // ✅ biar tahu ada return (tanpa N+1)
             ->withCount(['returns as return_count'])
             ->withSum('returns as return_total_sum', 'total') // ✅ kolomnya total (bukan amount)
-            ->withSum('lines as total_qty', 'qty_received') // ✅ untuk total qty per row
-            ->withSum('lines as total_reject', 'qty_reject') // ✅ untuk total reject per row
             ->addSelect([
+                'total_stock_qty' => \App\Models\PurchaseReceiptLine::selectRaw('SUM(COALESCE(stock_qty_received, qty_received * COALESCE(conversion_factor, 1)))')
+                    ->whereColumn('purchase_receipt_id', 'purchase_receipts.id'),
+                'total_stock_reject' => \App\Models\PurchaseReceiptLine::selectRaw('SUM(COALESCE(stock_qty_reject, qty_reject * COALESCE(conversion_factor, 1)))')
+                    ->whereColumn('purchase_receipt_id', 'purchase_receipts.id'),
                 'total_reject_rp' => \App\Models\PurchaseReceiptLine::selectRaw('SUM(qty_reject * unit_price)')
                     ->whereColumn('purchase_receipt_id', 'purchase_receipts.id')
             ])
@@ -95,12 +97,12 @@ class PurchaseReceiptController extends Controller
             $summary->total_qty_sum = \App\Models\PurchaseReceiptLine::whereIn(
                 'purchase_receipt_id',
                 (clone $summaryQuery)->select('purchase_receipts.id')
-            )->sum('qty_received');
+            )->selectRaw('SUM(COALESCE(stock_qty_received, qty_received * COALESCE(conversion_factor, 1))) as sum')->value('sum');
             
             $summary->total_reject_sum = \App\Models\PurchaseReceiptLine::whereIn(
                 'purchase_receipt_id',
                 (clone $summaryQuery)->select('purchase_receipts.id')
-            )->sum('qty_reject');
+            )->selectRaw('SUM(COALESCE(stock_qty_reject, qty_reject * COALESCE(conversion_factor, 1))) as sum')->value('sum');
             
             $summary->total_reject_rp_sum = \App\Models\PurchaseReceiptLine::whereIn(
                 'purchase_receipt_id',
@@ -352,7 +354,7 @@ class PurchaseReceiptController extends Controller
 
     /**
      * Halaman cetak barcode GRN.
-     * Default jumlah label per item = qty diterima, tapi bisa disesuaikan sebelum cetak.
+     * Default jumlah label per item = qty masuk dalam satuan stok, tapi bisa disesuaikan sebelum cetak.
      */
     public function barcode(PurchaseReceipt $purchase_receipt)
     {
@@ -364,7 +366,7 @@ class PurchaseReceiptController extends Controller
                 'id'   => $l->item->id,
                 'code' => $l->item->code,
                 'name' => $l->item->name,
-                'qty'  => max(1, (int) round((float) ($l->qty_received ?? 0))),
+                'qty'  => max(1, (int) round($l->stockQtyReceived())),
             ])
             ->values();
 
@@ -520,7 +522,8 @@ class PurchaseReceiptController extends Controller
      * - edit: requireSelected=false (ambil semua baris yang qty>0)
      *
      * Input yang dipakai:
-     * - po_line_id[], item_id[], qty_received[], qty_reject[], unit_price[], unit[], line_notes[], selected[index]
+     * - po_line_id[], item_id[], stock_qty_received[], stock_qty_reject[],
+     *   qty_received[], qty_reject[], unit_price[], unit[], line_notes[], selected[index]
      */
     protected function buildLinesFromRequest(Request $request, bool $requireSelected, ?PurchaseReceipt $existingReceipt = null): array
     {
@@ -551,11 +554,12 @@ class PurchaseReceiptController extends Controller
             $ids = collect($poLineIds)->filter()->map(fn($v) => (int) $v)->unique()->values();
             if ($ids->count()) {
                 $poLines = PurchaseOrderLine::whereIn('id', $ids)
-                    ->get(['id', 'qty', 'unit_price', 'conversion_factor']);
+                    ->with('item:id,purchase_conversion_factor')
+                    ->get(['id', 'qty', 'item_id', 'unit_price', 'conversion_factor']);
                 $poQtyMap   = $poLines->pluck('qty', 'id')->toArray();
                 $poPriceMap = $poLines->pluck('unit_price', 'id')->toArray();
                 $poFactorMap = $poLines->mapWithKeys(fn ($line) => [
-                    (int) $line->id => max(0.000001, (float) ($line->conversion_factor ?: 1)),
+                    (int) $line->id => max(0.000001, (float) ($line->conversion_factor ?: $line->item?->purchase_conversion_factor ?: 1)),
                 ])->toArray();
 
                 // ✅ Cumulative: total qty_received + qty_reject dari GRN lain untuk po_line_id ini

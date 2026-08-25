@@ -201,7 +201,7 @@ body[data-theme="dark"] .qty-btn { color:#cbd5e1; background:rgba(51,65,85,.5); 
             <div class="shp-table-head">
                 <div class="shp-table-title">
                     Daftar Barang
-                    <small>Jumlah label default = qty diterima. Sesuaikan bila perlu.</small>
+                    <small>Jumlah label mengikuti barang yang masuk ke stok.</small>
                 </div>
             </div>
 
