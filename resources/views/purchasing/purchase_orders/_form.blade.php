@@ -1734,7 +1734,7 @@
                                         data-stock-unit="{{ $unitOption['stock'] }}"
                                         data-conversion-factor="{{ $unitOption['factor'] }}"
                                         @selected(strcasecmp($unitOption['unit'], (string) $purchaseUnit) === 0)>
-                                        {{ $unitOption['unit'] }} · 1 = {{ decimal_id($unitOption['factor'], 6) }} {{ $unitOption['stock'] }}
+                                        {{ $unitOption['unit'] }}
                                     </option>
                                 @endforeach
                             </select>
@@ -1811,13 +1811,13 @@
                         <td data-label="Satuan Beli" class="po-td-unit">
                             <select class="line-unit-select" data-line-unit-select aria-label="Satuan beli">
                                 <option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">
-                                    pcs · 1 = 1 pcs
+                                    pcs
                                 </option>
                             </select>
                         </td>
 
                         <td data-label="Konversi Stok" class="po-td-stock">
-                            <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
+                            <div class="line-conversion-hint" data-line-conversion-hint>1 pcs</div>
                             <div class="line-stock-hint" data-line-stock-hint></div>
                         </td>
 
@@ -2310,10 +2310,8 @@
                 if (stockUnitRaw) stockUnitRaw.value = stockUnit;
                 if (conversionRaw) conversionRaw.value = String(conversionFactor);
                 if (conversionHint) {
-                    conversionHint.textContent = conversionFactor !== 1
-                        ? `1 ${purchaseUnit} = ${formatUnitFactor(conversionFactor)} ${stockUnit}`
-                        : '';
-                    conversionHint.style.display = conversionFactor !== 1 ? '' : 'none';
+                    conversionHint.textContent = `${formatUnitFactor(conversionFactor)} ${stockUnit}`;
+                    conversionHint.style.display = '';
                 }
                 if (priceDisplay && priceDisplay.dataset.userEdited !== '1') {
                     priceDisplay.placeholder = `Harga / ${purchaseUnit}`;
@@ -2348,7 +2346,7 @@
                         data-purchase-unit="${option.unit.replace(/"/g, '&quot;')}"
                         data-stock-unit="${option.stock.replace(/"/g, '&quot;')}"
                         data-conversion-factor="${option.factor}">
-                        ${option.unit} · 1 = ${formatUnitFactor(option.factor)} ${option.stock}
+                        ${option.unit}
                     </option>
                 `).join('');
 
@@ -2458,13 +2456,13 @@
                 if (newRow.querySelector('.line-conversion-raw')) newRow.querySelector('.line-conversion-raw').value = '1';
                 const newUnitSelect = newRow.querySelector('[data-line-unit-select]');
                 if (newUnitSelect) {
-                    newUnitSelect.innerHTML = '<option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">pcs · 1 = 1 pcs</option>';
+                    newUnitSelect.innerHTML = '<option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">pcs</option>';
                     newUnitSelect.value = 'pcs';
                     setLineUnitSnapshot(newRow, newUnitSelect.selectedOptions[0]);
                 }
                 if (newRow.querySelector('[data-line-conversion-hint]')) {
-                    newRow.querySelector('[data-line-conversion-hint]').textContent = '';
-                    newRow.querySelector('[data-line-conversion-hint]').style.display = 'none';
+                    newRow.querySelector('[data-line-conversion-hint]').textContent = '1 pcs';
+                    newRow.querySelector('[data-line-conversion-hint]').style.display = '';
                 }
                 if (newRow.querySelector('[data-line-stock-hint]')) {
                     newRow.querySelector('[data-line-stock-hint]').textContent = '';
@@ -2553,7 +2551,7 @@
                         .value = '');
                     const rowUnitSelect = row.querySelector('[data-line-unit-select]');
                     if (rowUnitSelect) {
-                        rowUnitSelect.innerHTML = '<option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">pcs · 1 = 1 pcs</option>';
+                        rowUnitSelect.innerHTML = '<option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">pcs</option>';
                         rowUnitSelect.value = 'pcs';
                         setLineUnitSnapshot(row, rowUnitSelect.selectedOptions[0]);
                     }
