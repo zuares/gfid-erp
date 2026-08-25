@@ -6,6 +6,7 @@ use App\Helpers\CodeGenerator;
 use App\Models\Account;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
 use App\Models\SupplierPrice;
 use App\Services\Accounting\JournalService;
 use Illuminate\Support\Facades\DB;
@@ -429,17 +430,27 @@ class PurchaseOrderService
                 continue;
             }
 
-            $purchaseUnit = $item->purchaseUnit();
-            $stockUnit = $item->stockUnit();
-            $conversionFactor = $item->purchaseConversionFactor();
+            // Line yang sudah dipakai GRN wajib mempertahankan snapshot satuannya.
+            // Baris baru boleh memakai pilihan satuan dari form.
+            $referenced = $referencedByItem[$itemId] ?? [];
+            $isReferencedItem = !empty($referenced) && !in_array($itemId, $consumedReferenced, true);
+            if ($isReferencedItem) {
+                $snapshotLine = $referenced[0];
+                $purchaseUnit = trim((string) ($snapshotLine->purchase_unit ?: $item->purchaseUnit())) ?: $item->purchaseUnit();
+                $stockUnit = trim((string) ($snapshotLine->stock_unit ?: $item->stockUnit())) ?: $item->stockUnit();
+                $conversionFactor = (float) ($snapshotLine->conversion_factor ?? $item->purchaseConversionFactor());
+                $conversionFactor = $conversionFactor > 0 ? $conversionFactor : 1;
+            } else {
+                $unitSnapshot = $this->resolveLineUnitSnapshot($item, $row);
+                $purchaseUnit = $unitSnapshot['purchase_unit'];
+                $stockUnit = $unitSnapshot['stock_unit'];
+                $conversionFactor = $unitSnapshot['conversion_factor'];
+            }
             $stockQty = round($qty * $conversionFactor, 6);
             $stockUnitPrice = $unitPrice / max(0.000001, $conversionFactor);
             $lineTotal = round(max(0, ($stockQty * $stockUnitPrice) - $discount), 2);
 
             // Alokasi/expense account: pertahankan yang lama untuk referenced, hitung untuk baru.
-            $referenced = $referencedByItem[$itemId] ?? [];
-            $isReferencedItem = !empty($referenced) && !in_array($itemId, $consumedReferenced, true);
-
             if ($isReferencedItem) {
                 /** @var PurchaseOrderLine $keep */
                 $keep = $referenced[0];
@@ -527,6 +538,63 @@ class PurchaseOrderService
     // INTERNAL HELPERS
     // ======================================================================
 
+    /**
+     * Resolve the unit snapshot stored on a PO line.
+     *
+     * A line may use either the item's configured purchase unit or its stock
+     * unit. If the conversion fields are empty/invalid, the stock unit with a
+     * factor of 1 is the safe fallback. The snapshot is intentionally stored
+     * on the PO line so later master-item edits do not rewrite old documents.
+     */
+    protected function resolveLineUnitSnapshot(Item $item, array $row): array
+    {
+        $masterPurchaseUnit = trim($item->purchaseUnit()) ?: 'pcs';
+        $masterStockUnit = trim($item->stockUnit()) ?: $masterPurchaseUnit;
+        $masterFactor = $item->purchaseConversionFactor();
+        $masterFactor = $masterFactor > 0 ? $masterFactor : 1.0;
+
+        $requestedUnit = trim((string) ($row['purchase_unit'] ?? ''));
+        $requestedStock = trim((string) ($row['stock_unit'] ?? ''));
+        $requestedFactor = (float) ($row['conversion_factor'] ?? 0);
+
+        // Pilihan satuan stok selalu berarti 1:1, walaupun nilai hidden factor
+        // dari browser lama masih membawa faktor pembelian sebelumnya.
+        if ($requestedUnit !== '' && strcasecmp($requestedUnit, $masterStockUnit) === 0) {
+            return [
+                'purchase_unit' => $masterStockUnit,
+                'stock_unit' => $masterStockUnit,
+                'conversion_factor' => 1.0,
+            ];
+        }
+
+        // Pilihan default dari master item memakai konfigurasi master terbaru.
+        if ($requestedUnit === '' || strcasecmp($requestedUnit, $masterPurchaseUnit) === 0) {
+            return [
+                'purchase_unit' => $masterPurchaseUnit,
+                'stock_unit' => $masterStockUnit,
+                'conversion_factor' => $masterFactor,
+            ];
+        }
+
+        // Pertahankan snapshot lama yang masih konsisten dengan satuan stok
+        // item. Ini penting saat PO lama diedit setelah master diubah.
+        if ($requestedStock !== ''
+            && strcasecmp($requestedStock, $masterStockUnit) === 0
+            && $requestedFactor > 0) {
+            return [
+                'purchase_unit' => $requestedUnit,
+                'stock_unit' => $masterStockUnit,
+                'conversion_factor' => $requestedFactor,
+            ];
+        }
+
+        return [
+            'purchase_unit' => $masterPurchaseUnit,
+            'stock_unit' => $masterStockUnit,
+            'conversion_factor' => $masterFactor,
+        ];
+    }
+
     protected function onlyHeaderFields(array $payload): array
     {
         $allowed = [
@@ -612,7 +680,10 @@ class PurchaseOrderService
                 continue;
             }
 
-            $conversionFactor = $item->purchaseConversionFactor();
+            $unitSnapshot = $this->resolveLineUnitSnapshot($item, $row);
+            $purchaseUnit = $unitSnapshot['purchase_unit'];
+            $stockUnit = $unitSnapshot['stock_unit'];
+            $conversionFactor = $unitSnapshot['conversion_factor'];
 
             // Allocation (hpp/expense) - auto dari master item, line override kalau ada
             $allocation = 'hpp';
@@ -661,9 +732,9 @@ class PurchaseOrderService
                 'item_id' => (int) $itemId,
                 'lot_id' => $lotId ? (int) $lotId : null,
                 'qty' => round($qty, 4),
-                'purchase_unit' => $item->purchaseUnit(),
-                'stock_unit' => $item->stockUnit(),
-                'conversion_factor' => round($item->purchaseConversionFactor(), 6),
+                'purchase_unit' => $purchaseUnit,
+                'stock_unit' => $stockUnit,
+                'conversion_factor' => round($conversionFactor, 6),
                 'unit_price' => round($unitPrice, 4),
                 'discount' => round($discount, 2),
                 'line_total' => $lineTotal,

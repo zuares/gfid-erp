@@ -9,6 +9,60 @@
 @push('head')
     @include('production.dashboard.partials._gf-styles')
     <style>
+        :root {
+            --cbr-accent: #334155;
+            --cbr-accent-2: #1f2937;
+            --cbr-border: rgba(148, 163, 184, .18);
+            --cbr-muted: #64748b;
+        }
+        .cbr-shell { max-width: 1040px; margin-inline: auto; padding: .75rem .75rem 4rem; }
+        .cbr-shell .ship-topbar {
+            display: flex; justify-content: space-between; align-items: center; gap: .6rem;
+            flex-wrap: wrap; padding: .45rem .75rem; margin-inline: -.75rem; margin-bottom: .65rem;
+            background: var(--card, #fff); border-bottom: 1px solid var(--cbr-border);
+        }
+        .cbr-shell .ship-heading { min-width: 0; }
+        .cbr-shell .ship-topbar .title { margin: 0; color: #0f172a; font-size: 1rem; font-weight: 750; }
+        .cbr-shell .ship-topbar .sub { color: var(--cbr-muted); font-size: .78rem; }
+        .cbr-shell .header-actions { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+        .cbr-shell .btn-pill { border-radius: 7px; padding-inline: .78rem; box-shadow: none !important; font-weight: 600; }
+        .cbr-shell .btn-ship-primary {
+            color: #fff !important; background: var(--cbr-accent) !important; border-color: var(--cbr-accent) !important;
+        }
+        .cbr-shell .btn-ship-primary:hover {
+            color: #fff !important; background: var(--cbr-accent-2) !important; border-color: var(--cbr-accent-2) !important;
+        }
+        .cbr-shell .btn-ship-outline {
+            color: #475569 !important; background: transparent !important; border: 1px solid rgba(148,163,184,.35) !important;
+        }
+        .cbr-shell .btn-ship-outline:hover { color: #111827 !important; background: rgba(148,163,184,.08) !important; }
+        .cbr-filter-bar {
+            background: var(--card, #fff); border: 1px solid var(--cbr-border); border-radius: 10px;
+            padding: .7rem; margin-bottom: .85rem; box-shadow: 0 2px 8px rgba(15,23,42,.025);
+        }
+        .cbr-filter-main {
+            display: grid; grid-template-columns: auto minmax(250px, 1fr) auto auto;
+            align-items: center; gap: .45rem;
+        }
+        .cbr-filter-heading { color: #0f172a; font-size: .82rem; font-weight: 800; white-space: nowrap; }
+        .cbr-filter-heading i { margin-right: .25rem; color: #2563eb; }
+        .cbr-date-control { min-width: 0; }
+        .cbr-date-control .date-section {
+            width: 100%; min-width: 0; height: 36px !important; border: 1px solid rgba(37,99,235,.32) !important;
+            border-radius: 9px !important; background: #f8fafc; box-shadow: 0 2px 8px rgba(37,99,235,.08);
+        }
+        .cbr-date-control .rts-date-picker.flatpickr-input {
+            width: 100% !important; min-width: 120px !important; height: 36px !important;
+            color: #334155; font-size: .82rem !important; font-weight: 650;
+        }
+        .cbr-filter-summary { margin-top: .45rem; color: var(--cbr-muted); font-size: .74rem; }
+        .cbr-filter-summary strong { color: var(--cbr-accent); }
+        body[data-theme="dark"] .cbr-shell .ship-topbar .title,
+        body[data-theme="dark"] .cbr-filter-heading { color: #f1f5f9; }
+        body[data-theme="dark"] .cbr-shell .ship-topbar,
+        body[data-theme="dark"] .cbr-filter-bar { background: rgba(15,23,42,.98); border-color: rgba(51,65,85,.65); }
+        body[data-theme="dark"] .cbr-date-control .date-section { background: #1e293b; border-color: rgba(96,165,250,.55) !important; }
+        body[data-theme="dark"] .cbr-date-control .rts-date-picker.flatpickr-input { color: #e2e8f0; }
         .cbr-page { display: grid; gap: 1rem; }
         .cbr-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
         .cbr-btn {
@@ -74,15 +128,15 @@
         .cbr-status-out { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
         .cbr-mobile-list { display: none; }
         @media (max-width: 768px) {
-            .gf-master-header { padding: 12px 14px; border-radius: 14px; }
-            .gf-master-title { font-size: 18px; }
-            .gf-master-desc { font-size: 11.5px; }
-            .gf-master-actions { flex: 1 1 100%; }
-            .cbr-actions { justify-content: stretch; }
-            .cbr-actions .cbr-btn { flex: 1 1 auto; }
-            .cbr-filter { grid-template-columns: 1fr 1fr; }
-            .cbr-filter-actions { grid-column: 1 / -1; }
-            .cbr-filter-actions .cbr-btn { flex: 1 1 0; }
+            .cbr-shell { padding: .5rem .5rem 4rem; }
+            .cbr-shell .ship-topbar { margin-inline: -.5rem; padding: .5rem .65rem; }
+            .cbr-shell .ship-topbar .ship-heading { width: 100%; }
+            .cbr-shell .header-actions { width: 100%; justify-content: flex-start; }
+            .cbr-shell .header-actions .btn { flex: 1; }
+            .cbr-filter-main { grid-template-columns: 1fr; }
+            .cbr-filter-heading { padding-bottom: .15rem; }
+            .cbr-date-control { width: 100%; }
+            .cbr-filter-main .btn { width: 100%; min-height: 40px; }
             .cbr-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
             .cbr-kpi { padding: .7rem .75rem; }
             .cbr-kpi-value { font-size: 1.02rem; }
@@ -99,35 +153,51 @@
 @endpush
 
 @section('content')
-    <x-gf.page
-        eyebrow="Accounting"
-        title="Laporan Arus Kas (Basis Kas)"
-        description="Metode langsung: hanya penerimaan dan pengeluaran kas yang sudah posted.">
-        <x-slot:actions>
-            <div class="cbr-actions">
-                <a href="{{ route('accounting.cash-receipts.index') }}" class="cbr-btn cbr-btn-primary">Cash Receipts</a>
-                <a href="{{ route('accounting.cash-expenses.index') }}" class="cbr-btn cbr-btn-primary">Cash Expenses</a>
-                <a href="{{ route('accounting.accounts.index') }}" class="cbr-btn">Ledger</a>
+    <div class="cbr-shell">
+        <div class="ship-topbar">
+            <div class="ship-heading">
+                <div class="title">Laporan Arus Kas (Basis Kas)</div>
+                <div class="sub">Metode langsung: hanya penerimaan dan pengeluaran kas yang sudah posted.</div>
             </div>
-        </x-slot:actions>
+            <div class="header-actions">
+                <a href="{{ route('accounting.cash-receipts.index') }}" class="btn btn-sm btn-ship-primary btn-pill">
+                    <i class="bi bi-arrow-down-left" aria-hidden="true"></i> Cash Receipts
+                </a>
+                <a href="{{ route('accounting.cash-expenses.index') }}" class="btn btn-sm btn-ship-primary btn-pill">
+                    <i class="bi bi-arrow-up-right" aria-hidden="true"></i> Cash Expenses
+                </a>
+                <a href="{{ route('accounting.accounts.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
+                    <i class="bi bi-journal-text" aria-hidden="true"></i> Ledger
+                </a>
+            </div>
+        </div>
+
+        <form id="cbr-filter-form" method="GET" action="{{ route('accounting.cash-basis-report.index') }}">
+            <div class="cbr-filter-bar">
+                <div class="cbr-filter-main">
+                    <div class="cbr-filter-heading"><i class="bi bi-funnel" aria-hidden="true"></i> Filter Periode</div>
+                    <div class="cbr-date-control">
+                        <x-date-range-picker
+                            :date-from="$from"
+                            :date-to="$to"
+                            period="all"
+                            form-id="cbr-filter-form"
+                            name-from="from"
+                            name-to="to"
+                            :show-presets="false"
+                        />
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-ship-primary btn-pill">Terapkan</button>
+                    <a href="{{ route('accounting.cash-basis-report.index') }}" class="btn btn-sm btn-ship-outline btn-pill">Reset</a>
+                </div>
+                <div class="cbr-filter-summary">
+                    Periode aktif: <strong>{{ $from }}</strong> sampai <strong>{{ $to }}</strong>
+                    · hanya transaksi posted yang masuk laporan.
+                </div>
+            </div>
+        </form>
 
         <div class="cbr-page">
-            <x-gf.panel title="Periode Laporan" subtitle="Laporan menggunakan basis kas dan hanya menghitung transaksi posted.">
-                <form class="cbr-filter" method="GET" action="{{ route('accounting.cash-basis-report.index') }}">
-                    <div>
-                        <label class="cbr-filter-label" for="from">Dari Tanggal</label>
-                        <input id="from" type="text" name="from" class="form-control" value="{{ $from }}" data-gf-date>
-                    </div>
-                    <div>
-                        <label class="cbr-filter-label" for="to">Sampai</label>
-                        <input id="to" type="text" name="to" class="form-control" value="{{ $to }}" data-gf-date>
-                    </div>
-                    <div class="cbr-filter-actions">
-                        <button class="cbr-btn" type="submit">Filter</button>
-                        <a href="{{ route('accounting.cash-basis-report.index') }}" class="cbr-btn">Reset</a>
-                    </div>
-                </form>
-            </x-gf.panel>
 
             <div class="cbr-kpi-grid">
                 <div class="cbr-kpi">
@@ -289,7 +359,7 @@
                 @endif
             </x-gf.panel>
         </div>
-    </x-gf.page>
+    </div>
 @endsection
 
 @push('scripts')

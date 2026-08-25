@@ -1055,20 +1055,6 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     if (!cashSelectCash.value && cashSelectCash.options.length > 1) cashSelectCash.selectedIndex = 1;
                 }
 
-                function autoPickBankJago() {
-                    if (!cashSelectBank) return;
-                    if (cashSelectBank.value) return;
-
-                    const opts = Array.from(cashSelectBank.options);
-                    const jago = opts.find(o => (o.dataset.code || '') === '1111' || (o.textContent || '').includes(
-                        '1111'));
-                    if (jago) {
-                        cashSelectBank.value = jago.value;
-                        return;
-                    }
-                    if (cashSelectBank.options.length > 1) cashSelectBank.selectedIndex = 1;
-                }
-
                 function validateCashBank() {
                     const mode = detectMode();
                     if (mode === 'credit') {
@@ -1121,7 +1107,6 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
                     if (mode === 'transfer') {
                         showOnly('bank');
-                        autoPickBankJago();
                         applyAllValidations();
                         return;
                     }

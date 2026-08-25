@@ -79,4 +79,40 @@ class PurchaseUnitConversionTest extends TestCase
         $this->assertEqualsWithDelta(240000, $line->calculatedLineTotal(), 0.01);
         $this->assertEqualsWithDelta(240000, (float) $po->subtotal, 0.01);
     }
+
+    public function test_po_can_select_stock_unit_and_falls_back_when_conversion_is_missing(): void
+    {
+        $supplier = Supplier::create(['code' => 'STOCK-SUP', 'name' => 'Stock supplier']);
+        $item = Item::create([
+            'code' => 'BOX-UNIT',
+            'name' => 'Box item',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'box',
+            'purchase_conversion_factor' => 12,
+            'type' => 'material',
+        ]);
+
+        /** @var PurchaseOrderService $service */
+        $service = app(PurchaseOrderService::class);
+        $po = $service->create([
+            'date' => now()->toDateString(),
+            'supplier_id' => $supplier->id,
+            'lines' => [[
+                'item_id' => $item->id,
+                'qty' => 3,
+                'purchase_unit' => 'pcs',
+                'stock_unit' => 'pcs',
+                'conversion_factor' => 12,
+                'unit_price' => 1000,
+            ]],
+        ]);
+
+        $line = $po->lines()->firstOrFail();
+
+        $this->assertSame('pcs', $line->purchase_unit);
+        $this->assertSame('pcs', $line->stock_unit);
+        $this->assertEqualsWithDelta(1, (float) $line->conversion_factor, 0.000001);
+        $this->assertEqualsWithDelta(3000, (float) $po->subtotal, 0.01);
+    }
 }

@@ -295,7 +295,7 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="item-purchase-conversion">Isi per satuan pembelian</label>
-                    <input id="item-purchase-conversion" type="number" name="purchase_conversion_factor" class="form-control @error('purchase_conversion_factor') is-invalid @enderror" value="{{ $purchaseFactorValue }}" min="0.000001" step="0.000001" required>
+                    <input id="item-purchase-conversion" type="number" name="purchase_conversion_factor" class="form-control @error('purchase_conversion_factor') is-invalid @enderror" value="{{ $purchaseFactorValue }}" min="0.000001" step="0.000001" placeholder="1">
                     @error('purchase_conversion_factor')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
@@ -305,6 +305,7 @@
                     <label class="form-check-label" for="item-same-purchase-unit">Satuan pembelian sama dengan stok</label>
                 </div>
                 <div class="small fw-semibold text-primary" data-unit-preview>1 pcs = 1 pcs</div>
+                <div class="small text-muted">Kosongkan isi konversi jika satuan pembelian sama dengan satuan stok; sistem memakai 1:1.</div>
             </div>
         </div>
 

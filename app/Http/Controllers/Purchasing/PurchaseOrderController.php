@@ -144,9 +144,6 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        $order->payment_method_id = $paymentMethods->firstWhere('mode', 'transfer')?->id
-            ?? $paymentMethods->first()?->id;
-
         $suppliers = Supplier::query()
             ->where('type', 'supplier')
             ->where('active', 1)
@@ -990,7 +987,7 @@ class PurchaseOrderController extends Controller
             // PO lama dan integrasi existing tetap kompatibel.
             'order_type' => ['nullable', 'in:material,finished_good,packing,asset,service,jasa,lainnya'],
 
-            'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
+            'payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
 
             'tax_percent' => ['nullable', 'string'],
             'discount' => ['nullable', 'string'],
@@ -999,6 +996,9 @@ class PurchaseOrderController extends Controller
             'lines' => ['array'],
             'lines.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
             'lines.*.qty' => ['nullable', 'string'],
+            'lines.*.purchase_unit' => ['nullable', 'string', 'max:20'],
+            'lines.*.stock_unit' => ['nullable', 'string', 'max:20'],
+            'lines.*.conversion_factor' => ['nullable', 'numeric', 'gt:0', 'max:1000000'],
             'lines.*.unit_price' => ['nullable', 'string'],
             'lines.*.discount' => ['nullable', 'string'],
 
@@ -1032,23 +1032,7 @@ class PurchaseOrderController extends Controller
             $this->stripMoneyFromNonOwnerPayload($data, $existingOrder);
         }
 
-        // Auto default payment_method_id kalau kosong
-        if (empty($data['payment_method_id'])) {
-            $transferId = PaymentMethod::query()
-                ->where('is_active', 1)
-                ->where('mode', 'transfer')
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->value('id');
-
-            $data['payment_method_id'] = $transferId ?: PaymentMethod::query()
-                ->where('is_active', 1)
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->value('id');
-        }
-
-        $data['payment_method_id'] = !empty($data['payment_method_id']) ? (int) $data['payment_method_id'] : null;
+        $data['payment_method_id'] = (int) $data['payment_method_id'];
 
         return $data;
     }

@@ -690,6 +690,10 @@ class ItemController extends Controller
         $purchaseUnit = trim((string) ($request->input('purchase_unit') ?: $stockUnit));
         $samePurchaseUnit = $request->boolean('same_purchase_unit')
             || strcasecmp($stockUnit, $purchaseUnit) === 0;
+        $conversionInput = $request->input('purchase_conversion_factor');
+        $conversionInput = ($conversionInput === null || trim((string) $conversionInput) === '')
+            ? 1
+            : $conversionInput;
 
         $request->merge([
             'unit' => $stockUnit,
@@ -697,7 +701,7 @@ class ItemController extends Controller
             'purchase_unit' => $purchaseUnit,
             'purchase_conversion_factor' => $samePurchaseUnit
                 ? 1
-                : $request->input('purchase_conversion_factor'),
+                : $conversionInput,
         ]);
 
         $normalizedCode = $request->input('code');

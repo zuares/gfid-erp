@@ -32,10 +32,8 @@
     // === PAYMENT METHOD ===
     // Filter: exclude DP_APPLY (internal only)
     $visiblePaymentMethods = ($paymentMethods ?? collect())->filter(fn($pm) => $pm->code !== 'DP_APPLY')->values();
-    $defaultPaymentMethodId = $visiblePaymentMethods->firstWhere('mode', 'transfer')?->id
-        ?? $visiblePaymentMethods->first()?->id
-        ?? null;
-    $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? $defaultPaymentMethodId);
+    // PO baru wajib dipilih manual; jangan mengarahkan user ke metode tertentu.
+    $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? null);
     // Label singkat untuk tiap mode
     $pmModeLabel = ['cash' => 'Tunai', 'transfer' => 'Transfer (TF)', 'credit' => 'Hutang / Tempo'];
 
@@ -161,6 +159,26 @@
             white-space: nowrap;
         }
 
+        .line-unit-select {
+            width: 100%;
+            min-width: 0;
+            min-height: 32px;
+            padding: .26rem 1.65rem .26rem .45rem;
+            border: 1px solid rgba(148,163,184,.34);
+            border-radius: 7px;
+            background-color: var(--card, #fff);
+            color: var(--text, #1e293b);
+            font-size: .72rem;
+            font-weight: 750;
+            line-height: 1.2;
+        }
+
+        .line-unit-select:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 .18rem rgba(37,99,235,.12);
+            outline: none;
+        }
+
         .line-conversion-hint {
             max-width: 100%;
             margin-top: .12rem;
@@ -172,9 +190,33 @@
             white-space: nowrap;
         }
 
+        .line-stock-hint,
+        .line-stock-price-hint {
+            max-width: 100%;
+            margin-top: .12rem;
+            overflow: hidden;
+            color: #15803d;
+            font-size: .61rem;
+            line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .line-stock-price-hint {
+            color: #64748b;
+        }
+
         body[data-theme="dark"] .line-unit-hint {
             border-color: rgba(100,116,139,.42);
             background: rgba(30,41,59,.72);
+        }
+
+        body[data-theme="dark"] .line-stock-hint {
+            color: #86efac;
+        }
+
+        body[data-theme="dark"] .line-stock-price-hint {
+            color: #94a3b8;
         }
 
         .po-card {
@@ -805,7 +847,7 @@
             .po-lines-table tbody tr {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                grid-template-areas: "header header" "item item" "qty price" "total total" "action action";
+                grid-template-areas: "header header" "item item" "qty unit" "stock stock" "price total" "action action";
                 gap: .25rem .5rem;
                 max-width: 620px;
                 margin: 0 auto .7rem auto;
@@ -846,8 +888,20 @@
                 grid-area: qty
             }
 
+            .po-td-unit {
+                grid-area: unit;
+            }
+
+            .po-td-stock {
+                grid-area: stock;
+            }
+
             .po-td-price {
                 grid-area: price
+            }
+
+            .po-lines-no-money tbody tr {
+                grid-template-areas: "header header" "item item" "qty unit" "stock stock" "action action";
             }
 
             .po-td-total {
@@ -1048,10 +1102,13 @@
             .po-td-action { grid-column: 4; grid-row: 1; position: static !important; display: flex !important; align-items: center; justify-content: flex-end; padding: 0 !important; }
             .po-td-action .btn { min-height: 32px; min-width: 32px; padding: .1rem .4rem; border-radius: 999px !important; font-weight: 800; font-size: .82rem; }
             .po-td-qty    { grid-column: 2; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
+            .po-td-unit   { grid-column: 2; grid-row: 2; display: block !important; min-width: 0; margin-top: .28rem; }
+            .po-td-stock  { grid-column: 1 / 4; grid-row: 3; display: block !important; min-width: 0; padding-top: .18rem !important; }
             .po-td-price  { grid-column: 3; grid-row: 1; display: block !important; width: auto !important; margin: 0 !important; }
             .po-td-total  { display: none !important; }
             .po-lines-no-money .po-td-qty { grid-column: 2; }
             .po-lines-no-money .po-td-action { grid-column: 3; }
+            .po-lines-no-money .po-td-stock { grid-column: 1 / 3; }
             .po-lines-table tbody td[data-label]::before { display: none !important; }
             .po-num-display { text-align: left; font-weight: 800; }
 
@@ -1296,6 +1353,13 @@
                 padding-inline: .32rem;
             }
 
+            .line-unit-select {
+                min-height: 40px;
+                padding: .35rem 1.35rem .35rem .45rem;
+                border-radius: 10px;
+                font-size: 12px;
+            }
+
             .line-conversion-hint {
                 font-size: .57rem;
             }
@@ -1524,13 +1588,15 @@
             <thead>
                 <tr>
                     <th class="po-col-no text-center">No</th>
-                    <th style="width:40%">Item</th>
-                    <th class="text-end" style="width:15%">Qty</th>
+                    <th style="width:34%">Item</th>
+                    <th class="text-end" style="width:10%">Qty</th>
+                    <th style="width:13%">Satuan Beli</th>
+                    <th style="width:16%">Konversi Stok</th>
                     @if ($canSeeMoney)
-                        <th class="text-end" style="width:20%">Harga</th>
-                        <th class="text-end" style="width:15%">Total</th>
+                        <th class="text-end" style="width:15%">Harga</th>
+                        <th class="text-end" style="width:11%">Total</th>
                     @endif
-                    <th style="width:5%"></th>
+                    <th style="width:4%"></th>
                 </tr>
             </thead>
 
@@ -1555,6 +1621,29 @@
                         $stockUnit = $line['stock_unit'] ?? ($line['item']['stock_unit'] ?? ($line['item']['unit'] ?? 'pcs'));
                         $conversionFactor = (float) ($line['conversion_factor'] ?? ($line['item']['purchase_conversion_factor'] ?? 1));
                         $conversionFactor = $conversionFactor > 0 ? $conversionFactor : 1;
+
+                        // Pilihan satuan berasal dari master item atau satuan stok.
+                        // Snapshot lama tetap ditampilkan agar edit PO tidak mengubah histori
+                        // hanya karena konfigurasi master item berubah.
+                        $masterPurchaseUnit = trim((string) ($line['item']['purchase_unit'] ?? ($line['item']['unit'] ?? 'pcs'))) ?: 'pcs';
+                        $masterStockUnit = trim((string) ($line['item']['stock_unit'] ?? ($line['item']['unit'] ?? 'pcs'))) ?: 'pcs';
+                        $masterConversionFactor = (float) ($line['item']['purchase_conversion_factor'] ?? 1);
+                        $masterConversionFactor = $masterConversionFactor > 0 ? $masterConversionFactor : 1;
+                        $unitOptions = [];
+                        $pushUnitOption = function (string $unit, string $stock, float $factor) use (&$unitOptions): void {
+                            $unit = trim($unit) ?: 'pcs';
+                            $stock = trim($stock) ?: $unit;
+                            $factor = $factor > 0 ? $factor : 1;
+                            foreach ($unitOptions as $option) {
+                                if (strcasecmp($option['unit'], $unit) === 0) {
+                                    return;
+                                }
+                            }
+                            $unitOptions[] = ['unit' => $unit, 'stock' => $stock, 'factor' => $factor];
+                        };
+                        $pushUnitOption((string) $purchaseUnit, (string) $stockUnit, $conversionFactor);
+                        $pushUnitOption($masterPurchaseUnit, $masterStockUnit, $masterConversionFactor);
+                        $pushUnitOption($masterStockUnit, $masterStockUnit, 1);
 
                         // ✅ NEW: allocation + expense account (hidden, auto)
                         // fallback: hpp
@@ -1632,15 +1721,32 @@
                                 inputmode="decimal" placeholder="Qty" value="{{ $qtyDisplay }}" autocomplete="off">
                             <input type="hidden" name="lines[{{ $i }}][qty]" class="line-qty-raw"
                                 value="{{ $qtyRaw }}">
-                            <div class="line-unit-hint" data-line-unit-hint>{{ $purchaseUnit }}</div>
+                            @error("lines.$i.qty")
+                                <div class="text-danger small">{{ $message }}</div>
+                            @enderror
+                        </td>
+
+                        <td data-label="Satuan Beli" class="po-td-unit">
+                            <select class="line-unit-select" data-line-unit-select aria-label="Satuan beli">
+                                @foreach ($unitOptions as $unitOption)
+                                    <option value="{{ $unitOption['unit'] }}"
+                                        data-purchase-unit="{{ $unitOption['unit'] }}"
+                                        data-stock-unit="{{ $unitOption['stock'] }}"
+                                        data-conversion-factor="{{ $unitOption['factor'] }}"
+                                        @selected(strcasecmp($unitOption['unit'], (string) $purchaseUnit) === 0)>
+                                        {{ $unitOption['unit'] }} · 1 = {{ decimal_id($unitOption['factor'], 6) }} {{ $unitOption['stock'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </td>
+
+                        <td data-label="Konversi Stok" class="po-td-stock">
                             @if($conversionFactor != 1)
                                 <div class="line-conversion-hint" data-line-conversion-hint>1 {{ $purchaseUnit }} = {{ decimal_id($conversionFactor, 6) }} {{ $stockUnit }}</div>
                             @else
                                 <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
                             @endif
-                            @error("lines.$i.qty")
-                                <div class="text-danger small">{{ $message }}</div>
-                            @enderror
+                            <div class="line-stock-hint" data-line-stock-hint></div>
                         </td>
 
                         @if ($canSeeMoney)
@@ -1649,6 +1755,7 @@
                                     inputmode="numeric" placeholder="Harga / {{ $purchaseUnit }}" value="{{ $priceDisplay }}" autocomplete="off">
                                 <input type="hidden" name="lines[{{ $i }}][unit_price]" class="line-price-raw"
                                     value="{{ $priceRaw }}">
+                                <div class="line-stock-price-hint" data-line-stock-price-hint></div>
                                 @error("lines.$i.unit_price")
                                     <div class="text-danger small">{{ $message }}</div>
                                 @enderror
@@ -1703,8 +1810,19 @@
                             <input type="text" class="form-control po-field po-num-display line-qty-display"
                                 inputmode="decimal" placeholder="Qty" value="" autocomplete="off">
                             <input type="hidden" name="lines[0][qty]" class="line-qty-raw" value="">
-                            <div class="line-unit-hint" data-line-unit-hint>pcs</div>
+                        </td>
+
+                        <td data-label="Satuan Beli" class="po-td-unit">
+                            <select class="line-unit-select" data-line-unit-select aria-label="Satuan beli">
+                                <option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">
+                                    pcs · 1 = 1 pcs
+                                </option>
+                            </select>
+                        </td>
+
+                        <td data-label="Konversi Stok" class="po-td-stock">
                             <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
+                            <div class="line-stock-hint" data-line-stock-hint></div>
                         </td>
 
                         @if ($canSeeMoney)
@@ -1712,6 +1830,7 @@
                                 <input type="text" class="form-control po-field po-num-display line-price-display"
                                     inputmode="numeric" placeholder="Harga / pcs" value="" autocomplete="off">
                                 <input type="hidden" name="lines[0][unit_price]" class="line-price-raw" value="">
+                                <div class="line-stock-price-hint" data-line-stock-price-hint></div>
                             </td>
 
                             <td class="text-end align-middle line-total po-td-total mono" data-label="Nilai"></td>
@@ -1738,7 +1857,7 @@
         <div class="po-lines-summary">
             <span class="mono po-total-live" id="po-live-lines" style="color:var(--primary); font-size:1.05rem;">0</span> item
             <span class="mx-2">·</span>
-            <span class="mono po-total-live" id="po-live-qty" style="color:var(--primary); font-size:1.05rem;">0</span> qty
+            <span class="mono po-total-live" id="po-live-qty" style="color:var(--primary); font-size:1.05rem;">0</span> qty beli
         </div>
     </div>
 
@@ -1761,7 +1880,8 @@
                 <div>
                     <div class="po-label">Tipe Pembayaran</div>
                     <select name="payment_method_id" id="po-payment-method"
-                        class="form-select po-field @error('payment_method_id') is-invalid @enderror">
+                        class="form-select po-field @error('payment_method_id') is-invalid @enderror" required>
+                        <option value="">— Pilih Pembayaran —</option>
                         @foreach ($visiblePaymentMethods as $pm)
                             <option value="{{ $pm->id }}" data-mode="{{ $pm->mode }}"
                                 @selected((string) $selectedPaymentMethodId === (string) $pm->id)>
@@ -1772,6 +1892,7 @@
                     @error('payment_method_id')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
+                    <div class="small text-muted mt-1">Jika memilih Transfer, bank dipilih saat pembayaran.</div>
                 </div>
 
                 @if ($canSeeMoney)
@@ -2014,14 +2135,34 @@
                 const qtyRaw = tr.querySelector('.line-qty-raw');
                 const priceRaw = tr.querySelector('.line-price-raw');
                 const totalCell = tr.querySelector('.line-total');
+                const conversionRaw = tr.querySelector('.line-conversion-raw');
+                const purchaseUnitRaw = tr.querySelector('.line-purchase-unit-raw');
+                const stockUnitRaw = tr.querySelector('.line-stock-unit-raw');
+                const stockHint = tr.querySelector('[data-line-stock-hint]');
+                const stockPriceHint = tr.querySelector('[data-line-stock-price-hint]');
 
                 const qty = parseFloat(qtyRaw?.value || '0') || 0;
                 const price = parseFloat(priceRaw?.value || '0') || 0;
+                const factorValue = parseFloat(conversionRaw?.value || '1') || 1;
+                const factor = factorValue > 0 ? factorValue : 1;
+                const stockUnit = stockUnitRaw?.value || 'pcs';
+                const stockQty = qty * factor;
+                const stockUnitPrice = price / factor;
 
-                let total = qty * price;
+                let total = stockQty * stockUnitPrice;
                 if (total < 0) total = 0;
 
                 if (totalCell) totalCell.textContent = fmtIntId(total);
+                if (stockHint) {
+                    stockHint.textContent = stockQty > 0.0001
+                        ? `Stok: ${fmtQtyId(stockQty)} ${stockUnit}`
+                        : '';
+                }
+                if (stockPriceHint) {
+                    stockPriceHint.textContent = price > 0.0001
+                        ? `Harga stok: Rp ${fmtIntId(stockUnitPrice)} / ${stockUnit}`
+                        : '';
+                }
                 return total;
             }
 
@@ -2147,6 +2288,82 @@
                 return json;
             }
 
+            function formatUnitFactor(value) {
+                const n = Number(value);
+                if (!Number.isFinite(n) || n <= 0) return '1';
+                return new Intl.NumberFormat('id-ID', {
+                    maximumFractionDigits: 6,
+                }).format(n);
+            }
+
+            function setLineUnitSnapshot(tr, option) {
+                if (!tr || !option) return;
+
+                const purchaseUnit = option.dataset.purchaseUnit || option.value || 'pcs';
+                const stockUnit = option.dataset.stockUnit || purchaseUnit;
+                const conversionFactor = Number(option.dataset.conversionFactor || 1) > 0
+                    ? Number(option.dataset.conversionFactor)
+                    : 1;
+                const purchaseUnitRaw = tr.querySelector('.line-purchase-unit-raw');
+                const stockUnitRaw = tr.querySelector('.line-stock-unit-raw');
+                const conversionRaw = tr.querySelector('.line-conversion-raw');
+                const conversionHint = tr.querySelector('[data-line-conversion-hint]');
+                const priceDisplay = tr.querySelector('.line-price-display');
+
+                if (purchaseUnitRaw) purchaseUnitRaw.value = purchaseUnit;
+                if (stockUnitRaw) stockUnitRaw.value = stockUnit;
+                if (conversionRaw) conversionRaw.value = String(conversionFactor);
+                if (conversionHint) {
+                    conversionHint.textContent = conversionFactor !== 1
+                        ? `1 ${purchaseUnit} = ${formatUnitFactor(conversionFactor)} ${stockUnit}`
+                        : '';
+                    conversionHint.style.display = conversionFactor !== 1 ? '' : 'none';
+                }
+                if (priceDisplay && priceDisplay.dataset.userEdited !== '1') {
+                    priceDisplay.placeholder = `Harga / ${purchaseUnit}`;
+                }
+            }
+
+            function setLineUnitOptions(tr, {
+                purchaseUnit = 'pcs',
+                stockUnit = 'pcs',
+                conversionFactor = 1,
+                preferredUnit = purchaseUnit,
+            } = {}) {
+                const select = tr?.querySelector('[data-line-unit-select]');
+                if (!select) return;
+
+                const options = [];
+                const addOption = (unit, stock, factor) => {
+                    unit = (unit || 'pcs').toString().trim() || 'pcs';
+                    stock = (stock || unit).toString().trim() || unit;
+                    factor = Number(factor) > 0 ? Number(factor) : 1;
+                    if (options.some(option => option.unit.toLowerCase() === unit.toLowerCase())) return;
+                    options.push({ unit, stock, factor });
+                };
+
+                addOption(purchaseUnit, stockUnit, conversionFactor);
+                if (purchaseUnit.toLowerCase() !== stockUnit.toLowerCase()) {
+                    addOption(stockUnit, stockUnit, 1);
+                }
+
+                select.innerHTML = options.map(option => `
+                    <option value="${option.unit.replace(/"/g, '&quot;')}"
+                        data-purchase-unit="${option.unit.replace(/"/g, '&quot;')}"
+                        data-stock-unit="${option.stock.replace(/"/g, '&quot;')}"
+                        data-conversion-factor="${option.factor}">
+                        ${option.unit} · 1 = ${formatUnitFactor(option.factor)} ${option.stock}
+                    </option>
+                `).join('');
+
+                const preferred = options.find(option => option.unit.toLowerCase() === (preferredUnit || '').toString().toLowerCase())
+                    || options[0];
+                if (preferred) {
+                    select.value = preferred.unit;
+                    setLineUnitSnapshot(tr, select.selectedOptions[0]);
+                }
+            }
+
             async function applyItemMetaToRow(tr, {
                 force = false
             } = {}) {
@@ -2171,25 +2388,12 @@
                 const conversionFactor = Number(meta.purchase_conversion_factor || 1) > 0
                     ? Number(meta.purchase_conversion_factor)
                     : 1;
-                const purchaseUnitRaw = tr.querySelector('.line-purchase-unit-raw');
-                const stockUnitRaw = tr.querySelector('.line-stock-unit-raw');
-                const conversionRaw = tr.querySelector('.line-conversion-raw');
-                if (purchaseUnitRaw) purchaseUnitRaw.value = purchaseUnit;
-                if (stockUnitRaw) stockUnitRaw.value = stockUnit;
-                if (conversionRaw) conversionRaw.value = String(conversionFactor);
-                const unitHint = tr.querySelector('[data-line-unit-hint]');
-                const conversionHint = tr.querySelector('[data-line-conversion-hint]');
-                const priceDisplay = tr.querySelector('.line-price-display');
-                if (unitHint) unitHint.textContent = purchaseUnit;
-                if (conversionHint) {
-                    conversionHint.textContent = conversionFactor !== 1
-                        ? `1 ${purchaseUnit} = ${conversionFactor} ${stockUnit}`
-                        : '';
-                    conversionHint.style.display = conversionFactor !== 1 ? '' : 'none';
-                }
-                if (priceDisplay && priceDisplay.dataset.userEdited !== '1') {
-                    priceDisplay.placeholder = `Harga / ${purchaseUnit}`;
-                }
+                setLineUnitOptions(tr, {
+                    purchaseUnit,
+                    stockUnit,
+                    conversionFactor,
+                    preferredUnit: purchaseUnit,
+                });
 
                 const alloc = (meta.default_allocation === 'expense') ? 'expense' : 'hpp';
                 allocRaw.value = alloc;
@@ -2256,10 +2460,21 @@
                 if (newRow.querySelector('.line-purchase-unit-raw')) newRow.querySelector('.line-purchase-unit-raw').value = 'pcs';
                 if (newRow.querySelector('.line-stock-unit-raw')) newRow.querySelector('.line-stock-unit-raw').value = 'pcs';
                 if (newRow.querySelector('.line-conversion-raw')) newRow.querySelector('.line-conversion-raw').value = '1';
-                if (newRow.querySelector('[data-line-unit-hint]')) newRow.querySelector('[data-line-unit-hint]').textContent = 'pcs';
+                const newUnitSelect = newRow.querySelector('[data-line-unit-select]');
+                if (newUnitSelect) {
+                    newUnitSelect.innerHTML = '<option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">pcs · 1 = 1 pcs</option>';
+                    newUnitSelect.value = 'pcs';
+                    setLineUnitSnapshot(newRow, newUnitSelect.selectedOptions[0]);
+                }
                 if (newRow.querySelector('[data-line-conversion-hint]')) {
                     newRow.querySelector('[data-line-conversion-hint]').textContent = '';
                     newRow.querySelector('[data-line-conversion-hint]').style.display = 'none';
+                }
+                if (newRow.querySelector('[data-line-stock-hint]')) {
+                    newRow.querySelector('[data-line-stock-hint]').textContent = '';
+                }
+                if (newRow.querySelector('[data-line-stock-price-hint]')) {
+                    newRow.querySelector('[data-line-stock-price-hint]').textContent = '';
                 }
                 if (newRow.querySelector('.line-price-display')) newRow.querySelector('.line-price-display').placeholder = 'Harga / pcs';
 
@@ -2340,6 +2555,12 @@
                     row.querySelectorAll('.js-item-suggest-input').forEach(inp => inp.value = '');
                     row.querySelectorAll('.js-item-suggest-id, .js-item-suggest-category').forEach(h => h
                         .value = '');
+                    const rowUnitSelect = row.querySelector('[data-line-unit-select]');
+                    if (rowUnitSelect) {
+                        rowUnitSelect.innerHTML = '<option value="pcs" data-purchase-unit="pcs" data-stock-unit="pcs" data-conversion-factor="1">pcs · 1 = 1 pcs</option>';
+                        rowUnitSelect.value = 'pcs';
+                        setLineUnitSnapshot(row, rowUnitSelect.selectedOptions[0]);
+                    }
 
                     // ✅ reset mapping
                     row.querySelectorAll('.line-alloc-raw').forEach(inp => inp.value = 'hpp');
@@ -2382,6 +2603,7 @@
 
                 const isItem  = el.classList.contains('js-item-suggest-input');
                 const isQty   = el.classList.contains('line-qty-display');
+                const isUnit  = el.classList.contains('line-unit-select');
                 const isPrice = el.classList.contains('line-price-display');
 
                 if (e.key === 'Enter') {
@@ -2400,13 +2622,15 @@
                     return;
                 }
 
-                if (!isItem && !isQty && !isPrice) return;
+                if (!isItem && !isQty && !isUnit && !isPrice) return;
 
                 if (e.key === 'Tab') {
                     e.preventDefault();
                     if (isItem) {
                         tr.querySelector('.line-qty-display')?.focus();
                     } else if (isQty) {
+                        tr.querySelector('.line-unit-select')?.focus();
+                    } else if (isUnit) {
                         if (canSeeMoney) {
                             tr.querySelector('.line-price-display')?.focus();
                         } else {
@@ -2505,6 +2729,15 @@
 
             // ✅ item picked -> apply meta mapping + last price
             tableBody.addEventListener('change', async function(e) {
+                if (e.target.matches('[data-line-unit-select]')) {
+                    const tr = e.target.closest('tr');
+                    if (tr) {
+                        setLineUnitSnapshot(tr, e.target.selectedOptions[0]);
+                        recalcAll();
+                    }
+                    return;
+                }
+
                 if (!e.target.classList.contains('js-item-suggest-id')) return;
                 const tr = e.target.closest('tr');
                 if (!tr) return;
