@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\MarketplaceController;
+use App\Http\Controllers\MarketplaceFinanceController;
 use App\Models\Channel;
 use App\Models\MarketplaceChannel;
 use App\Models\MarketplaceOrder;
@@ -1451,5 +1452,147 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         $cairPayload = app(MarketplaceController::class)->settlements($cairRequest)->getData(true);
         $this->assertSame(0, $cairPayload['paginator']['total']);
+    }
+
+    public function test_tab_belum_cair_mencakup_order_tanpa_settlement_dan_estimasi_nol_tetap_valid(): void
+    {
+        $store = $this->createStore();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-TAB-PENDING',
+            'channel_order_id' => 'ORDER-TAB-PENDING',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'tab' => 'belum_cair',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $this->assertSame(1, $payload['paginator']['total']);
+        $this->assertSame($order->channel_order_id, $payload['paginator']['data'][0]['channel_order_id']);
+        $this->assertSame('manual_24', $payload['paginator']['data'][0]['income_estimation_source']);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 0,
+            'settlement_time' => null,
+            'raw_json' => [
+                '_income_detail' => ['estimated_escrow_amount' => 0],
+            ],
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $row = $payload['paginator']['data'][0];
+        $this->assertSame(0.0, (float) $row['estimated_escrow_amount']);
+        $this->assertSame(0.0, (float) $row['final_income']);
+        $this->assertTrue($row['is_estimated_income']);
+        $this->assertSame('estimated_escrow', $row['income_estimation_source']);
+
+        $highOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-TAB-HIGH',
+            'channel_order_id' => 'ORDER-TAB-HIGH',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $highOrder->id,
+            'channel_order_id' => $highOrder->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 0,
+            'settlement_time' => null,
+            'raw_json' => [
+                '_income_detail' => ['estimated_escrow_amount' => 99999],
+            ],
+        ]);
+
+        $sortRequest = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'tab' => 'semua',
+            'sort_by' => 'final_income',
+            'sort_dir' => 'desc',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+        $sorted = app(MarketplaceController::class)->settlements($sortRequest)->getData(true);
+        $this->assertSame('ORDER-TAB-HIGH', $sorted['paginator']['data'][0]['channel_order_id']);
+    }
+
+    public function test_income_products_memakai_estimasi_shopee_dan_mencakup_pending_tanpa_settlement(): void
+    {
+        $store = $this->createStore();
+        $estimatedOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-PRODUCT-EST',
+            'channel_order_id' => 'ORDER-PRODUCT-EST',
+            'order_status' => 'SHIPPED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $estimatedOrder->id,
+            'marketplace_order_id' => $estimatedOrder->id,
+            'item_name' => 'Produk Estimasi',
+            'variant_name' => 'Default',
+            'item_sku' => 'SKU-EST',
+            'qty' => 1,
+            'price' => 100000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $estimatedOrder->id,
+            'channel_order_id' => $estimatedOrder->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 0,
+            'settlement_time' => null,
+            'raw_json' => [
+                '_income_detail' => ['estimated_escrow_amount' => 54321],
+            ],
+        ]);
+
+        $missingOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-PRODUCT-MISSING',
+            'channel_order_id' => 'ORDER-PRODUCT-MISSING',
+            'order_status' => 'SHIPPED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 200000,
+            'total_paid_customer' => 200000,
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $missingOrder->id,
+            'marketplace_order_id' => $missingOrder->id,
+            'item_name' => 'Produk Pending',
+            'variant_name' => 'Default',
+            'item_sku' => 'SKU-PENDING',
+            'qty' => 1,
+            'price' => 200000,
+        ]);
+
+        $request = Request::create('/marketplace/penghasilan/produk', 'GET', [
+            'store_id' => $store->id,
+        ]);
+        $payload = app(MarketplaceFinanceController::class)->incomeProducts($request)->getData(true);
+
+        $this->assertSame(2, $payload['meta']['total_unsettled_order_count']);
+        $this->assertEqualsWithDelta(206321.0, (float) $payload['meta']['total_income_belum_cair'], 0.01);
     }
 }

@@ -156,6 +156,54 @@ class MarketplaceFinanceController extends Controller
         }
 
         $settlements = $settlementQuery->get();
+
+        // Tab Produk harus tetap mencakup order pending yang belum sempat
+        // mempunyai row settlement. Row sintetis ini hanya untuk agregasi UI;
+        // tidak disimpan ke database dan tidak dianggap sebagai dana cair.
+        $pendingOrdersQuery = MarketplaceOrder::with([
+            'store:id,name,channel_id',
+            'store.channel:id,code,name',
+            'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
+        ])
+            ->whereDoesntHave('settlement')
+            ->whereNotIn('order_status', ['UNPAID', 'CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+
+        if ($request->filled('store_id')) {
+            $pendingOrdersQuery->where('store_id', $request->store_id);
+        }
+        if ($request->filled('order_date_from')) {
+            $pendingOrdersQuery->whereDate('ordered_at', '>=', $request->order_date_from);
+        }
+        if ($request->filled('order_date_to')) {
+            $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->order_date_to);
+        }
+        if ($request->filled('settlement_date_from')) {
+            $pendingOrdersQuery->whereDate('ordered_at', '>=', $request->settlement_date_from);
+        }
+        if ($request->filled('settlement_date_to')) {
+            $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->settlement_date_to);
+        }
+
+        $pendingSettlements = $pendingOrdersQuery->get()->map(function (MarketplaceOrder $order) {
+            $settlement = new MarketplaceOrderSettlement([
+                'store_id' => $order->store_id,
+                'order_id' => $order->id,
+                'channel_order_id' => $order->channel_order_id,
+                'buyer_payment_amount' => $order->total_paid_customer
+                    ?? $order->subtotal_items
+                    ?? $order->total_amount
+                    ?? 0,
+                'final_income' => 0,
+                'settlement_time' => null,
+                'raw_json' => [],
+            ]);
+            $settlement->setRelation('store', $order->store);
+            $settlement->setRelation('order', $order);
+
+            return $settlement;
+        });
+
+        $settlements = $settlements->concat($pendingSettlements);
         $rows = [];
         $totalOrderCount = 0;
         $totalMapped = 0;
@@ -177,6 +225,7 @@ class MarketplaceFinanceController extends Controller
             $sellerDiscountOrder = (float) data_get($settlement->raw_json, 'seller_discount', 0);
             $grossOrder = (float) ($order->subtotal_items ?? $settlement->buyer_payment_amount ?? 0) - $sellerDiscountOrder;
             $finalIncome = (float) ($settlement->final_income ?? 0);
+            $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($settlement);
             $cogsOrder = (float) $order->items->sum(fn ($item) => (float) ($item->hpp_snapshot ?? 0) * (int) ($item->qty ?? 0));
             $status = strtoupper($order->order_status ?? '');
             $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
@@ -199,6 +248,10 @@ class MarketplaceFinanceController extends Controller
                 $estimatedNetIncomeOrder = $finalIncome;
                 if ($isCancelledOrReturned || $isReturning) {
                     $estimatedNetIncomeOrder = 0;
+                } elseif (! $isSettled && $estimatedEscrowAmount !== null) {
+                    // Untuk pending, estimasi resmi Shopee mengalahkan fallback
+                    // 24%, termasuk ketika nilainya memang 0.
+                    $estimatedNetIncomeOrder = $estimatedEscrowAmount;
                 } elseif ($estimatedNetIncomeOrder <= 0) {
                     $estimatedNetIncomeOrder = max($grossAfterVoucherTokoOrder * 0.76, 0);
                 }
@@ -372,5 +425,45 @@ class MarketplaceFinanceController extends Controller
                 'top_margin_list' => $topMarginList,
             ],
         ]);
+    }
+
+    /**
+     * Return the pending payout estimate when the field was explicitly supplied.
+     * Null means the income-detail field was not available, while 0 is a valid
+     * estimate and must not trigger the legacy 24% fallback.
+     */
+    private function settlementEstimatedEscrowAmount(MarketplaceOrderSettlement $settlement): ?float
+    {
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $hasNestedValue = array_key_exists('estimated_escrow_amount', (array) data_get($raw, '_income_detail', []));
+        $hasTopLevelValue = array_key_exists('estimated_escrow_amount', $raw);
+
+        if (! $hasNestedValue && ! $hasTopLevelValue) {
+            return null;
+        }
+
+        $value = $hasNestedValue
+            ? data_get($raw, '_income_detail.estimated_escrow_amount')
+            : data_get($raw, 'estimated_escrow_amount');
+
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return null;
+        }
+
+        return max(0.0, (float) $value);
+    }
+
+    private function settlementVoucherTokoAmount(MarketplaceOrderSettlement $settlement): float
+    {
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+
+        foreach (['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher'] as $key) {
+            $value = data_get($raw, $key);
+            if ($value !== null && $value !== '') {
+                return abs((float) $value);
+            }
+        }
+
+        return abs((float) $settlement->seller_voucher);
     }
 }

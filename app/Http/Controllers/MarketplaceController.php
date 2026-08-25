@@ -3430,7 +3430,8 @@ class MarketplaceController extends Controller
         $sortBy = $request->input('sort_by', 'settlement_time');
         $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
         $settlementStatus = strtolower((string) $request->input('settlement_status', ''));
-        $includeMissingPending = $settlementStatus === 'belum_cair';
+        $includeMissingPending = $settlementStatus === 'belum_cair'
+            || $request->input('tab') === 'belum_cair';
 
         if ($sortBy === 'ordered_at') {
             $query->orderBy(
@@ -3439,9 +3440,9 @@ class MarketplaceController extends Controller
                     ->limit(1),
                 $sortDir
             );
-        } else if (in_array($sortBy, ['settlement_time', 'final_income', 'buyer_payment_amount'])) {
+        } else if (in_array($sortBy, ['settlement_time', 'buyer_payment_amount'])) {
             $query->orderBy($sortBy, $sortDir);
-        } else {
+        } else if ($sortBy !== 'final_income') {
             $query->latest('settlement_time');
         }
 
@@ -3642,6 +3643,18 @@ class MarketplaceController extends Controller
                 if ($request->filled('settlement_date_to')) {
                     $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->settlement_date_to);
                 }
+            } elseif ($request->input('tab') === 'belum_cair' && $request->filled('sub_tab')) {
+                if ($request->sub_tab === 'shipped') {
+                    $pendingOrdersQuery->whereIn('order_status', ['SHIPPED', 'DIKIRIM']);
+                } elseif ($request->sub_tab === 'to_confirm') {
+                    $pendingOrdersQuery->whereIn('order_status', ['TO_CONFIRM_RECEIVE', 'COMPLETED', 'SELESAI']);
+                } elseif ($request->sub_tab === 'returning') {
+                    $pendingOrdersQuery->whereIn('order_status', ['TO_RETURN']);
+                } elseif ($request->sub_tab === 'return') {
+                    // Return orders are intentionally excluded above because
+                    // they are not pending income.
+                    $pendingOrdersQuery->whereRaw('1 = 0');
+                }
             }
             if ($request->filled('search')) {
                 $search = $request->search;
@@ -3715,6 +3728,7 @@ class MarketplaceController extends Controller
             $netIncome = (float) $s->final_income;
             $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($s);
             $isEstimatedIncome = false;
+            $incomeEstimationSource = null;
             $status = strtoupper($s->order?->order_status ?? '');
             $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
             $isReturning = in_array($status, ['TO_RETURN', 'RETURNING']);
@@ -3725,15 +3739,17 @@ class MarketplaceController extends Controller
             } elseif ($isReturning) {
                 $netIncome = 0;
                 // cogs tetap terisi
-            } elseif (! $s->settlement_time && $estimatedEscrowAmount > 0) {
+            } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
                 // Untuk pending, prioritaskan angka dari Shopee. Rumus 24% hanya
                 // fallback bila income detail belum berhasil disinkronkan.
                 $netIncome = $estimatedEscrowAmount;
                 $isEstimatedIncome = true;
+                $incomeEstimationSource = 'estimated_escrow';
             } elseif ($netIncome <= 0 && $grossAfterVoucherToko > 0) {
                 $estimatedFee = round($grossAfterVoucherToko * 0.24);
                 $netIncome = max($grossAfterVoucherToko - $estimatedFee - $affiliateDisplay, 0);
                 $isEstimatedIncome = true;
+                $incomeEstimationSource = 'manual_24';
             }
             $grossProfit = $netIncome - $cogs;
 
@@ -3780,8 +3796,9 @@ class MarketplaceController extends Controller
                 'escrow_tax'            => (float) $s->escrow_tax,
                 'ad_cost'               => (float) $s->ad_cost,
                 'final_income'          => (float) $netIncome,
-                'estimated_escrow_amount' => $estimatedEscrowAmount > 0 ? $estimatedEscrowAmount : null,
+                'estimated_escrow_amount' => $estimatedEscrowAmount !== null ? $estimatedEscrowAmount : null,
                 'is_estimated_income'   => $isEstimatedIncome,
+                'income_estimation_source' => $incomeEstimationSource,
                 'cogs'                  => (float) $cogs,
                 'gross_profit'          => (float) $grossProfit,
                 'gross_after_voucher'   => $grossAfterVoucherTotal,
@@ -3804,14 +3821,14 @@ class MarketplaceController extends Controller
             ];
         };
 
-        if ($includeMissingPending) {
+        if ($includeMissingPending || $sortBy === 'final_income') {
             $allRows = $query->get()->concat($pendingRows);
             $sortValue = function ($s) use ($sortBy) {
                 if ($sortBy === 'ordered_at') {
                     return $s->order?->ordered_at?->timestamp ?? 0;
                 }
                 if ($sortBy === 'final_income') {
-                    return (float) $s->final_income;
+                    return $this->settlementSortIncome($s);
                 }
                 if ($sortBy === 'buyer_payment_amount') {
                     return (float) $s->buyer_payment_amount;
@@ -3838,7 +3855,7 @@ class MarketplaceController extends Controller
         }
 
         if ($request->input('page', 1) == 1) {
-            if ($includeMissingPending) {
+            if ($includeMissingPending || $sortBy === 'final_income') {
                 $metaRows = $metaRowsForSettlement;
             } else {
                 $metaQuery->with('order.items:id,marketplace_order_id,hpp_snapshot,qty');
@@ -3948,7 +3965,7 @@ class MarketplaceController extends Controller
 
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
-                } elseif (! $s->settlement_time && $estimatedEscrowAmount > 0) {
+                } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
                     $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
                     $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
@@ -4122,13 +4139,64 @@ class MarketplaceController extends Controller
         return (float) $s->buyer_payment_amount;
     }
 
-    private function settlementEstimatedEscrowAmount(MarketplaceOrderSettlement $s): float
+    private function settlementEstimatedEscrowAmount(MarketplaceOrderSettlement $s): ?float
     {
         $raw = is_array($s->raw_json) ? $s->raw_json : [];
-        $value = data_get($raw, '_income_detail.estimated_escrow_amount')
-            ?? data_get($raw, 'estimated_escrow_amount');
+        $hasNestedValue = array_key_exists('estimated_escrow_amount', (array) data_get($raw, '_income_detail', []));
+        $hasTopLevelValue = array_key_exists('estimated_escrow_amount', $raw);
 
-        return $value === null || $value === '' ? 0.0 : max(0.0, (float) $value);
+        if (! $hasNestedValue && ! $hasTopLevelValue) {
+            return null;
+        }
+
+        $value = $hasNestedValue
+            ? data_get($raw, '_income_detail.estimated_escrow_amount')
+            : data_get($raw, 'estimated_escrow_amount');
+
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return null;
+        }
+
+        return max(0.0, (float) $value);
+    }
+
+    /**
+     * Nilai yang sama dengan angka Hasil Akhir yang ditampilkan di tabel.
+     * Sorting pending tidak boleh memakai final_income mentah karena estimasi
+     * Shopee sengaja disimpan di raw_json agar tidak mengubah histori cair.
+     */
+    private function settlementSortIncome(MarketplaceOrderSettlement $s): float
+    {
+        $status = strtoupper($s->order?->order_status ?? '');
+        if (in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND', 'TO_RETURN', 'RETURNING'])) {
+            return 0.0;
+        }
+
+        $estimated = $this->settlementEstimatedEscrowAmount($s);
+        if (! $s->settlement_time && $estimated !== null) {
+            return $estimated;
+        }
+
+        $finalIncome = (float) $s->final_income;
+        if (! $s->settlement_time && $finalIncome <= 0) {
+            $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
+            $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+            $voucherToko = $this->settlementVoucherTokoAmount($s);
+            $grossAfterVoucherToko = max($grossAmount - $voucherToko, 0);
+            $affiliate = (float) (
+                data_get($s->raw_json, 'affiliate_commission')
+                ?? data_get($s->raw_json, 'affiliate_commission_amount')
+                ?? data_get($s->raw_json, 'affiliate_fee')
+                ?? data_get($s->raw_json, 'affiliate_commission_fee')
+                ?? data_get($s->raw_json, 'seller_affiliate_fee')
+                ?? $s->activity_fee
+                ?? 0
+            );
+
+            return max($grossAfterVoucherToko - round($grossAfterVoucherToko * 0.24) - $affiliate, 0);
+        }
+
+        return $finalIncome;
     }
 
     private function settlementVoucherTokoAmount(MarketplaceOrderSettlement $s): float

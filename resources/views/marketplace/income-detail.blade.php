@@ -2075,10 +2075,10 @@
                     { label: 'Produk', value: totalProducts.toLocaleString('id-ID'), pct: `${mappedRate.toFixed(1)}% map`, sub: 'SKU yang masuk analisa' },
                     { label: 'Qty', value: totalQty.toLocaleString('id-ID'), pct: totalProducts > 0 ? (totalQty / totalProducts).toFixed(1) : '0.0', sub: 'Total item terjual' },
                     { label: 'Order', value: totalOrders.toLocaleString('id-ID'), pct: totalOrders > 0 ? (totalQty / totalOrders).toFixed(1) : '0.0', sub: 'Order penyumbang SKU' },
-                    { label: 'Net Toko', value: fmtRp(totalNetToko), pct: `avg ${fmtRp(avgNetToko)}`, sub: 'Setelah voucher toko', color: totalNetToko < 0 ? '#dc2626' : '#2563eb' },
+                    { label: 'Net', value: fmtRp(totalNetToko), pct: `avg ${fmtRp(avgNetToko)}`, sub: 'Setelah voucher toko', color: totalNetToko < 0 ? '#dc2626' : '#2563eb' },
                     { label: 'Net Cair', value: fmtRp(totalNetCair), pct: `${settledOrderCount.toLocaleString('id-ID')} order`, sub: `qty ${totalQtyCair.toLocaleString('id-ID')} • estimasi bila kosong • avg ${fmtRp(avgNetCair)}`, color: totalNetCair < 0 ? '#dc2626' : '#16a34a' },
                     { label: 'Net Belum Cair', value: fmtRp(totalNetBelumCair), pct: `${unsettledOrderCount.toLocaleString('id-ID')} order`, sub: `qty ${totalQtyBelumCair.toLocaleString('id-ID')} • avg ${fmtRp(avgNetBelumCair)}`, color: totalNetBelumCair < 0 ? '#dc2626' : '#f59e0b' },
-                    { label: 'Buyer Paid', value: fmtRp(totalBuyerPaid), pct: `avg ${fmtRp(avgBuyerPaid)}`, sub: 'Bayar pembeli', color: '#0f766e' },
+                    { label: 'Pembayaran Pembeli', value: fmtRp(totalBuyerPaid), pct: `avg ${fmtRp(avgBuyerPaid)}`, sub: 'Bayar pembeli', color: '#0f766e' },
                     { label: 'COGS', value: fmtRp(totalCogs, '-'), pct: `${totalCogsQty.toLocaleString('id-ID')} qty`, sub: `avg ${fmtRp(avgCogs)} • modal barang`, color: '#b45309' },
                     { label: 'Profit', value: fmtRp(totalProfit), pct: `${profitMargin.toFixed(1)}%`, sub: `${totalOrders.toLocaleString('id-ID')} order • avg ${fmtRp(avgProfit)}`, color: totalProfit < 0 ? '#dc2626' : '#16a34a' },
                     { label: 'Profit / Order', value: fmtRp(avgProfitPerOrder), pct: `${totalOrders.toLocaleString('id-ID')} order`, sub: 'Rata-rata profit per order', color: avgProfitPerOrder < 0 ? '#dc2626' : '#16a34a' },
@@ -2206,7 +2206,7 @@
 
         return `
             <div class="income-breakdown-summary">
-                <div class="income-breakdown-pill"><span class="label">Buyer Paid</span><span class="value">${fmtRp(buyerPaid)}</span></div>
+                <div class="income-breakdown-pill"><span class="label">Pembayaran Pembeli</span><span class="value">${fmtRp(buyerPaid)}</span></div>
                 <div class="income-breakdown-pill"><span class="label">Gross Sales</span><span class="value">${fmtRp(gross)}</span></div>
                 <div class="income-breakdown-pill"><span class="label">Voucher Platform</span><span class="value" style="color:#b91c1c">-${fmtRp(voucherPlatform)}</span></div>
                 <div class="income-breakdown-pill"><span class="label">Voucher Toko</span><span class="value" style="color:#b91c1c">-${fmtRp(voucherToko)}</span></div>
@@ -2410,15 +2410,18 @@
                 const adjustmentTotal = Number(s.adjustment_total ?? 0);
                 let feePercent = s.fee_percent !== undefined && s.fee_percent !== null ? Number(s.fee_percent) : null;
                 let net = Number(s.final_income || 0);
-                const estimatedEscrowAmount = Number(s.estimated_escrow_amount || 0);
+                const hasEstimatedEscrowAmount = s.estimated_escrow_amount !== null
+                    && s.estimated_escrow_amount !== undefined
+                    && s.estimated_escrow_amount !== '';
+                const estimatedEscrowAmount = hasEstimatedEscrowAmount ? Number(s.estimated_escrow_amount) : 0;
                 const statusMeta = getOrderStatusMeta(s.order?.order_status || s.order_status);
                 const orderDateText = s.order?.ordered_at ? fmtShortDate(s.order.ordered_at) : '—';
                 const settlementDateText = s.settlement_time ? fmtShortDate(s.settlement_time) : 'Belum cair';
                 const itemCount = Array.isArray(s.order?.items) ? s.order.items.length : 0;
                 const grossPercent = gross > 0 ? ((grossAfterVoucherToko / gross) * 100).toFixed(1) : '0.0';
                 const buyerPercent = gross > 0 ? ((buyerPaid / gross) * 100).toFixed(1) : '0.0';
-                const netCairValue = Number(s.final_income || 0);
-                const finalPercent = gross > 0 ? ((netCairValue / gross) * 100).toFixed(1) : '0.0';
+                let netCairValue = Number(s.final_income || 0);
+                let finalPercent = gross > 0 ? ((netCairValue / gross) * 100).toFixed(1) : '0.0';
                 const cogsValue = Number(s.cogs || 0);
                 const cogsPercent = gross > 0 ? ((cogsValue / gross) * 100).toFixed(1) : '0.0';
                 const profitValue = Number(s.gross_profit || 0);
@@ -2429,6 +2432,14 @@
                 const isReturning = s.order?.order_status === 'TO_RETURN' || s.order?.order_status === 'RETURNING';
 
                 const shouldEstimatePendingIncome = currentTab !== 'semua';
+                const incomeEstimationSource = s.income_estimation_source
+                    || (s.is_estimated_income ? (hasEstimatedEscrowAmount ? 'estimated_escrow' : 'manual_24') : null);
+                const incomeSourceLabel = incomeEstimationSource === 'estimated_escrow'
+                    ? 'EST. SHOPEE'
+                    : (incomeEstimationSource === 'manual_24' ? 'EST. 24%' : 'CAIR');
+                const incomeSourceTitle = incomeEstimationSource === 'estimated_escrow'
+                    ? 'Estimasi dari estimated_escrow_amount Shopee'
+                    : (incomeEstimationSource === 'manual_24' ? 'Estimasi fallback manual 24%' : 'Nilai pencairan final');
 
                 if (isCancelledOrReturned) {
                     net = 0;
@@ -2440,7 +2451,7 @@
                     s.final_income = 0;
                     s.gross_profit = 0 - (Number(s.cogs) || 0);
                 } else if (!s.settlement_time && shouldEstimatePendingIncome) {
-                    if (estimatedEscrowAmount > 0) {
+                    if (hasEstimatedEscrowAmount && Number.isFinite(estimatedEscrowAmount)) {
                         // Nilai pending dari Shopee menjadi sumber utama.
                         net = estimatedEscrowAmount;
                     } else {
@@ -2452,6 +2463,8 @@
                         net = Math.max(grossAfterVoucherToko - sellerBurdenTotal, 0);
                     }
                     s.final_income = net;
+                    netCairValue = net;
+                    finalPercent = gross > 0 ? ((netCairValue / gross) * 100).toFixed(1) : '0.0';
                     s.gross_profit = net - (Number(s.cogs) || 0);
                 } else if (!isCompleted && currentTab === 'semua') {
                     net = Number(s.final_income || 0);
@@ -2554,7 +2567,7 @@
                     <td>
                         <div class="income-money-stack">
                             <div class="income-money-line">
-                                <span class="${s.is_estimated_income ? 'text-warning' : 'text-muted'} income-money-label">${s.is_estimated_income ? 'EST. CAIR' : 'CAIR'}</span>
+                                <span title="${incomeSourceTitle}" class="${s.is_estimated_income ? 'text-warning' : 'text-muted'} income-money-label">${incomeSourceLabel}</span>
                                 <span class="${s.is_estimated_income ? 'text-warning' : 'text-success'} income-money-value">${fmtRp(netCairValue)} <span style="font-size:.52rem; color:#10b981; font-weight:800;">(${finalPercent}%)</span></span>
                             </div>
                             <div class="income-money-line">
@@ -2739,9 +2752,9 @@
                                 <th class="product-sticky-head" style="min-width:220px;">Produk</th>
                                 <th class="product-sticky-head text-end" style="min-width:88px;">Order</th>
                                 <th class="product-sticky-head text-end" style="min-width:72px;">Qty</th>
-                                <th class="product-sticky-head text-end" style="min-width:120px;">Net Toko</th>
+                                <th class="product-sticky-head text-end" style="min-width:120px;">Net</th>
                                 <th class="product-sticky-head text-end" style="min-width:120px;">Net Cair</th>
-                                <th class="product-sticky-head text-end" style="min-width:120px;">Buyer Paid</th>
+                                <th class="product-sticky-head text-end" style="min-width:120px;">Pembayaran Pembeli</th>
                                 <th class="product-sticky-head text-end" style="min-width:110px;">COGS</th>
                                 <th class="product-sticky-head text-end" style="min-width:120px;">Profit</th>
                             </tr>
