@@ -539,7 +539,7 @@ class PurchaseOrderController extends Controller
         if ($purchase_order->status !== 'draft') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diedit.');
+                ->with('error', 'PO yang sudah diproses, ditutup, atau dibatalkan tidak bisa diedit.');
         }
 
         // ✅ RECEIVING LOCK: admin gudang (tanpa hak harga) tidak boleh mengedit PO
@@ -635,7 +635,7 @@ class PurchaseOrderController extends Controller
         if ($purchase_order->status !== 'draft') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang sudah di-approve/cancel tidak bisa diubah.');
+                ->with('error', 'PO yang sudah diproses, ditutup, atau dibatalkan tidak bisa diubah.');
         }
 
         // ✅ RECEIVING LOCK: user tanpa hak harga tidak boleh update PO terkunci.
@@ -688,67 +688,8 @@ class PurchaseOrderController extends Controller
     }
 
     // ======================================================================
-    // APPROVE / CANCEL
+    // LIFECYCLE / CANCEL
     // ======================================================================
-
-    public function approve(PurchaseOrder $purchase_order)
-    {
-        abort_unless(
-            in_array(auth()->user()?->role, ['owner', 'admin'], true) || auth()->user()?->isDeveloper(),
-            403, 'Hanya owner atau admin yang bisa approve PO.'
-        );
-
-        if ($purchase_order->status !== 'draft') {
-            return redirect()
-                ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang bukan draft tidak bisa di-approve.');
-        }
-
-        $this->service->approve($purchase_order, (int) auth()->id());
-
-        return redirect()
-            ->route('purchasing.purchase_orders.show', $purchase_order->id)
-            ->with('success', 'PO berhasil di-approve.');
-    }
-
-    public function unapprove(PurchaseOrder $purchase_order)
-    {
-        abort_unless(
-            in_array(auth()->user()?->role, ['owner', 'admin'], true) || auth()->user()?->isDeveloper(),
-            403, 'Hanya owner atau admin yang bisa unapprove PO.'
-        );
-
-        if ($purchase_order->status !== 'approved') {
-            return redirect()
-                ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'Hanya PO yang berstatus approved yang bisa di-unapprove.');
-        }
-
-        if ($purchase_order->purchaseReceipts()->exists()) {
-            return redirect()
-                ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang sudah memiliki GRN tidak bisa di-unapprove. Hapus GRN terlebih dahulu.');
-        }
-
-        if ($purchase_order->activePayments()->exists()) {
-            return redirect()
-                ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang sudah memiliki pembayaran aktif tidak bisa dikembalikan ke Draft. Void pembayaran terlebih dahulu.');
-        }
-
-        // Bersihkan lock stale setelah seluruh GRN Draft dihapus.
-        if ($purchase_order->isLocked() && !$this->service->maybeUnlock($purchase_order)) {
-            return redirect()
-                ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'Lock PO belum bisa dilepas karena masih ada jejak GRN, pembayaran, atau retur.');
-        }
-
-        $this->service->unapprove($purchase_order);
-
-        return redirect()
-            ->route('purchasing.purchase_orders.show', $purchase_order->id)
-            ->with('success', 'PO berhasil dikembalikan ke status Draft.');
-    }
 
     /**
      * Kirim ringkasan PO ke supplier melalui WhatsApp.

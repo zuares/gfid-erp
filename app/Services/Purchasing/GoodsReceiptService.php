@@ -154,7 +154,12 @@ class GoodsReceiptService
      * - qty_received + qty_reject tidak boleh melebihi outstanding PO line.
      * - unit_price DISETEL server-side dari PO line (harga dari request diabaikan).
      */
-    protected function validateAndEnrichLinesFromPo(array $linesData, ?PurchaseOrder $po, ?int $poId): array
+    protected function validateAndEnrichLinesFromPo(
+        array $linesData,
+        ?PurchaseOrder $po,
+        ?int $poId,
+        ?int $excludeReceiptId = null,
+    ): array
     {
         // Kumpulkan po_line_id yang direferensikan
         $poLineIds = collect($linesData)
@@ -174,13 +179,19 @@ class GoodsReceiptService
                     ->keyBy('id');
 
             // qty terpakai per PO line dari GRN lain (draft + posted) — cegah over-receipt.
-            $alreadyByLine = DB::table('purchase_receipt_lines as prl')
+            $alreadyQuery = DB::table('purchase_receipt_lines as prl')
                 ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
                 ->whereIn('prl.purchase_order_line_id', $poLineIds)
-                ->whereIn('pr.status', ['draft', 'posted'])
+                ->whereIn('pr.status', ['draft', 'posted']);
+
+            if ($excludeReceiptId) {
+                $alreadyQuery->where('pr.id', '!=', $excludeReceiptId);
+            }
+
+            $alreadyByLine = $alreadyQuery
                 ->groupBy('prl.purchase_order_line_id')
-                ->selectRaw('prl.purchase_order_line_id as line_id, SUM(prl.qty_received + prl.qty_reject) as used')
-                ->pluck('used', 'line_id')
+                ->selectRaw('prl.purchase_order_line_id as line_id, SUM(COALESCE(prl.stock_qty_received, prl.qty_received * COALESCE(prl.conversion_factor, 1)) + COALESCE(prl.stock_qty_reject, prl.qty_reject * COALESCE(prl.conversion_factor, 1))) as used_stock')
+                ->pluck('used_stock', 'line_id')
                 ->map(fn ($v) => (float) $v)
                 ->toArray();
         }
@@ -226,12 +237,15 @@ class GoodsReceiptService
 
                 // Outstanding check
                 $ordered = (float) $poLine->qty;
+                $factor = max(0.000001, (float) $poLine->effectiveConversionFactor());
                 $already = (float) ($alreadyByLine[$poLineId] ?? 0);
-                $remaining = max(0.0, round($ordered - $already, 4));
-                $req = $this->num($row['qty_received'] ?? 0) + $this->num($row['qty_reject'] ?? 0);
+                $remaining = max(0.0, round(($ordered * $factor) - $already, 6));
+                $req = array_key_exists('stock_qty_received', $row) || array_key_exists('stock_qty_reject', $row)
+                    ? $this->num($row['stock_qty_received'] ?? 0) + $this->num($row['stock_qty_reject'] ?? 0)
+                    : ($this->num($row['qty_received'] ?? 0) + $this->num($row['qty_reject'] ?? 0)) * $factor;
                 if ($ordered > 0 && $req > $remaining + 0.0001) {
                     throw ValidationException::withMessages([
-                        "lines.$i" => "Qty penerimaan melebihi sisa PO. Dipesan: {$ordered}, sudah: {$already}, sisa: {$remaining}.",
+                        "lines.$i" => "Qty penerimaan melebihi sisa PO. Sisa stok: {$remaining}.",
                     ]);
                 }
 
@@ -264,8 +278,12 @@ class GoodsReceiptService
             }
             $factor = (float) ($row['conversion_factor'] ?? 1);
             $factor = $factor > 0 ? $factor : 1;
-            $row['stock_qty_received'] = round($this->num($row['qty_received'] ?? 0) * $factor, 6);
-            $row['stock_qty_reject'] = round($this->num($row['qty_reject'] ?? 0) * $factor, 6);
+            $row['stock_qty_received'] = array_key_exists('stock_qty_received', $row)
+                ? round(max(0, $this->num($row['stock_qty_received'])), 6)
+                : round($this->num($row['qty_received'] ?? 0) * $factor, 6);
+            $row['stock_qty_reject'] = array_key_exists('stock_qty_reject', $row)
+                ? round(max(0, $this->num($row['stock_qty_reject'])), 6)
+                : round($this->num($row['qty_reject'] ?? 0) * $factor, 6);
 
             $out[] = $row;
         }
@@ -276,12 +294,55 @@ class GoodsReceiptService
     public function update(PurchaseReceipt $grn, array $payload): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn, $payload) {
+            $grn = PurchaseReceipt::query()
+                ->whereKey($grn->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if ($grn->status !== 'draft') {
                 throw new \RuntimeException("Goods Receipt sudah {$grn->status}, tidak bisa diubah.");
             }
 
             $linesData = $payload['lines'] ?? [];
             unset($payload['lines'], $payload['code']);
+
+            $oldPurchaseOrderId = $grn->purchase_order_id ? (int) $grn->purchase_order_id : null;
+            $targetPurchaseOrderId = !empty($payload['purchase_order_id'])
+                ? (int) $payload['purchase_order_id']
+                : null;
+
+            // Jangan pindahkan atau melepas referensi PO dari GRN draft yang
+            // sudah mengunci PO. Ini mencegah PO lama tertinggal dalam status
+            // locked tanpa GRN aktif yang merujuk ke sana.
+            if ($oldPurchaseOrderId && $oldPurchaseOrderId !== $targetPurchaseOrderId) {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'PO pada GRN draft tidak dapat diganti atau dikosongkan. Hapus draft ini lalu buat ulang dari PO yang benar.',
+                ]);
+            }
+
+            $po = null;
+            if ($targetPurchaseOrderId) {
+                $po = PurchaseOrder::query()
+                    ->whereKey($targetPurchaseOrderId)
+                    ->lockForUpdate()
+                    ->first();
+
+                $this->assertPoReceivable(
+                    $po,
+                    (int) ($payload['supplier_id'] ?? 0),
+                    $targetPurchaseOrderId
+                );
+            }
+
+            // Gunakan enrichment yang sama dengan create agar edit tidak dapat
+            // mengganti item, harga PO, unit, konversi, allocation, atau
+            // outstanding qty melalui request mentah.
+            $linesData = $this->validateAndEnrichLinesFromPo(
+                is_array($linesData) ? $linesData : [],
+                $po,
+                $targetPurchaseOrderId,
+                (int) $grn->id,
+            );
 
             $allowedFields = [
                 'date',
@@ -314,6 +375,15 @@ class GoodsReceiptService
             // subtotal header = total semua line (jujur)
             $this->recalcTotals($grn, $subtotalAll);
 
+            if ($po && !$po->isLocked()) {
+                $this->purchaseOrders->lockForReceiving(
+                    $po,
+                    (int) $grn->id,
+                    (int) ($grn->created_by ?? (auth()->id() ?? 0)) ?: null,
+                    "Dikunci oleh GRN {$grn->code}."
+                );
+            }
+
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
     }
@@ -339,7 +409,12 @@ class GoodsReceiptService
 
             // Auto-fill harga dari PO line jika unit_price = 0
             // (terjadi ketika admin buat GRN — tidak bisa input harga)
-            $this->backfillPricesFromPoLines($grn);
+            // Replacement receipt sudah membawa harga dari return line.
+            // Jangan timpa dengan harga PO line asal, karena item pengganti
+            // dapat berbeda dari item pada PO.
+            if (!$grn->is_replacement) {
+                $this->backfillPricesFromPoLines($grn);
+            }
             $grn->refresh();
             $grn->loadMissing(['lines.item', 'supplier']);
 
@@ -440,7 +515,10 @@ class GoodsReceiptService
                         "Dikunci saat posting GRN {$grn->code}."
                     );
                 }
-                $this->syncReceivedStatus((int) $grn->purchase_order_id);
+                // GRN replacement bukan penerimaan baru atas PO asal.
+                if (!$grn->is_replacement) {
+                    $this->syncReceivedStatus((int) $grn->purchase_order_id);
+                }
             }
 
             // ==========================
@@ -453,15 +531,12 @@ class GoodsReceiptService
                 $apCode = JournalService::CODE_SUPPLIER_CLAIM;
             }
 
-            $advanceCode = '1151';
-
             $inventoryAccountId = (int) (Account::where('code', $inventoryCode)->value('id') ?? 0);
             $apAccountId = (int) (Account::where('code', $apCode)->value('id') ?? 0);
-            $advanceAccountId = (int) (Account::where('code', $advanceCode)->value('id') ?? 0);
 
-            if ($inventoryAccountId <= 0 || $apAccountId <= 0 || $advanceAccountId <= 0) {
+            if ($inventoryAccountId <= 0 || $apAccountId <= 0) {
                 throw ValidationException::withMessages([
-                    'grn' => "Akun tidak lengkap. Pastikan ada COA: Inventory {$inventoryCode}, AP {$apCode}, Uang Muka {$advanceCode}.",
+                    'grn' => "Akun tidak lengkap. Pastikan ada COA: Inventory {$inventoryCode} dan AP {$apCode}.",
                 ]);
             }
 
@@ -778,7 +853,7 @@ class GoodsReceiptService
             $grn->save();
 
             // Sync received_status di PO terkait
-            if ($grn->purchase_order_id) {
+            if ($grn->purchase_order_id && !$grn->is_replacement) {
                 $this->syncReceivedStatus((int) $grn->purchase_order_id);
             }
 
@@ -803,6 +878,11 @@ class GoodsReceiptService
 
             foreach ($affectedItemIds as $itemId) {
                 $this->recomputeHppFromHistory($itemId, excludeGrnId: (int) $grn->id);
+                $this->recomputeSupplierLastPrice(
+                    (int) $grn->supplier_id,
+                    $itemId,
+                    excludeGrnId: (int) $grn->id,
+                );
             }
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
@@ -853,8 +933,12 @@ class GoodsReceiptService
             $stockUnit = trim((string) ($row['stock_unit'] ?? $item?->stockUnit() ?? 'pcs'));
             $conversionFactor = $this->num($row['conversion_factor'] ?? $item?->purchaseConversionFactor() ?? 1);
             $conversionFactor = $conversionFactor > 0 ? $conversionFactor : 1;
-            $stockQtyReceived = round($qtyReceived * $conversionFactor, 6);
-            $stockQtyReject = round($qtyReject * $conversionFactor, 6);
+            $stockQtyReceived = array_key_exists('stock_qty_received', $row)
+                ? round(max(0, $this->num($row['stock_qty_received'])), 6)
+                : round($qtyReceived * $conversionFactor, 6);
+            $stockQtyReject = array_key_exists('stock_qty_reject', $row)
+                ? round(max(0, $this->num($row['stock_qty_reject'])), 6)
+                : round($qtyReject * $conversionFactor, 6);
             $notes = $row['notes'] ?? null;
             $lotId = $row['lot_id'] ?? null;
 
@@ -1001,13 +1085,20 @@ class GoodsReceiptService
      */
     protected function recomputeHppFromHistory(int $itemId, ?int $excludeGrnId = null): void
     {
-        // Ambil semua purchase receipt lines yang sudah posted, urut tanggal
+        // Ambil hanya line yang benar-benar masuk stok. Line expense tetap
+        // tercatat di GRN/jurnal, tetapi tidak boleh ikut moving average HPP.
         $query = DB::table('purchase_receipt_lines as prl')
             ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+            ->leftJoin('purchase_order_lines as pol', 'pol.id', '=', 'prl.purchase_order_line_id')
+            ->leftJoin('items as it', 'it.id', '=', 'prl.item_id')
             ->where('pr.status', 'posted')
             ->where('prl.item_id', $itemId)
             ->whereRaw('CAST(prl.qty_received AS REAL) > 0')
-            ->whereRaw('CAST(prl.unit_price AS REAL) > 0');
+            ->whereRaw('CAST(prl.unit_price AS REAL) > 0')
+            ->where(function ($q) {
+                $q->where('pr.is_replacement', true)
+                    ->orWhereRaw("COALESCE(prl.allocation, pol.allocation, it.default_allocation, 'hpp') <> 'expense'");
+            });
 
         if ($excludeGrnId) {
             $query->where('pr.id', '!=', $excludeGrnId);
@@ -1022,6 +1113,7 @@ class GoodsReceiptService
         if ($lines->isEmpty()) {
             // Tidak ada riwayat beli → reset ke 0
             Item::where('id', $itemId)->update(['hpp' => 0]);
+            ItemCostSnapshot::where('item_id', $itemId)->active()->update(['is_active' => 0]);
             return;
         }
 
@@ -1063,6 +1155,33 @@ class GoodsReceiptService
             'is_active' => 1,
             'created_by' => auth()->id() ?? null,
         ]);
+    }
+
+    /**
+     * Kembalikan harga supplier ke GRN posted terakhir setelah unpost.
+     * Harga dari GRN yang sudah di-unpost tidak boleh menjadi auto-suggest.
+     */
+    protected function recomputeSupplierLastPrice(int $supplierId, int $itemId, ?int $excludeGrnId = null): void
+    {
+        $query = DB::table('purchase_receipt_lines as prl')
+            ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+            ->where('pr.supplier_id', $supplierId)
+            ->where('prl.item_id', $itemId)
+            ->where('pr.status', 'posted')
+            ->whereRaw('CAST(prl.unit_price AS REAL) > 0')
+            ->orderByDesc('pr.date')
+            ->orderByDesc('pr.id');
+
+        if ($excludeGrnId) {
+            $query->where('pr.id', '!=', $excludeGrnId);
+        }
+
+        $lastPrice = (float) ($query->value('prl.unit_price') ?? 0);
+
+        SupplierPrice::updateOrCreate(
+            ['supplier_id' => $supplierId, 'item_id' => $itemId],
+            ['last_price' => round(max(0, $lastPrice), 2)]
+        );
     }
 
     /**
@@ -1416,6 +1535,10 @@ class GoodsReceiptService
             ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
             ->where('pr.purchase_order_id', $purchaseOrderId)
             ->where('pr.status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('pr.is_replacement')
+                    ->orWhere('pr.is_replacement', false);
+            })
             ->whereIn('prl.purchase_order_line_id', $poLineIds)
             ->selectRaw('prl.purchase_order_line_id, SUM(prl.qty_received) as total_received')
             ->groupBy('prl.purchase_order_line_id')

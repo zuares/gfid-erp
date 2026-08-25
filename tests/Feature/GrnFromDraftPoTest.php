@@ -131,7 +131,9 @@ class GrnFromDraftPoTest extends TestCase
 
         $grnResponse->assertOk()
             ->assertSee('name="warehouse_id"', false)
-            ->assertSee('Pilih sesuai lokasi fisik', false)
+            ->assertSee('Total Masuk Stok', false)
+            ->assertSee('Masuk stok', false)
+            ->assertDontSee('Pilih sesuai lokasi fisik', false)
             ->assertDontSee('name="order_type"', false);
     }
 

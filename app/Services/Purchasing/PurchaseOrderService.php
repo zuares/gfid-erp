@@ -166,68 +166,8 @@ class PurchaseOrderService
     }
 
     // ======================================================================
-    // APPROVE / CANCEL
+    // LIFECYCLE / CANCEL
     // ======================================================================
-
-    /**
-     * Approve PO + post EXPENSE lines (allocation=expense) ke jurnal:
-     * Dr expense_account_id, Cr AP (2101).
-     * Inventory/HPP lines tetap menunggu GRN.
-     */
-    public function approve(PurchaseOrder $order, int $approvedBy): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order, $approvedBy) {
-
-            $order->load(['lines', 'supplier', 'paymentMethod']);
-
-            if ($order->status !== 'draft') {
-                return $order->fresh(['supplier', 'lines', 'paymentMethod']);
-            }
-
-            // feature flags
-            $hasLineAllocation = Schema::hasColumn('purchase_order_lines', 'allocation');
-            $hasLineExpenseAcc = Schema::hasColumn('purchase_order_lines', 'expense_account_id');
-
-            // ✅ VALIDASI: expense line wajib punya akun biaya (biar GRN bisa jurnal expense)
-            if ($hasLineAllocation && $hasLineExpenseAcc) {
-                $bad = $order->lines
-                    ->where('allocation', 'expense')
-                    ->first(function ($ln) {
-                        return empty($ln->expense_account_id);
-                    });
-
-                if ($bad) {
-                    throw ValidationException::withMessages([
-                        'lines' => 'Ada item Expense tapi akun biaya belum ter-set. Set default_expense_account_id pada master item / pilih akun biaya di baris PO.',
-                    ]);
-                }
-
-                foreach ($order->lines->where('allocation', 'expense') as $line) {
-                    $this->assertExpenseAccount((int) $line->expense_account_id);
-                }
-            }
-
-            // ✅ APPROVE ORDER
-            $order->status = 'approved';
-            $order->approved_by = $approvedBy;
-            $order->approved_at = now();
-            $order->save();
-
-            return $order->fresh(['supplier', 'lines', 'paymentMethod']);
-        });
-    }
-
-    public function unapprove(PurchaseOrder $order): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order) {
-            $order->status = 'draft';
-            $order->approved_by = null;
-            $order->approved_at = null;
-            $order->save();
-
-            return $order->fresh(['supplier', 'lines', 'paymentMethod']);
-        });
-    }
 
     public function cancel(PurchaseOrder $order, int $cancelledBy): PurchaseOrder
     {

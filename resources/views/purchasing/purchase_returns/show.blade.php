@@ -474,7 +474,7 @@
       </div>
       <div class="modal-body" style="background: #ffffff;">
         <div class="pr-alert pr-alert-info" style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 0.5rem 0.75rem; font-size: 0.85rem;">
-            <i class="bi bi-info-circle me-1"></i> Masukkan Qty pengganti. GRN akan otomatis dibuat.
+            <i class="bi bi-info-circle me-1"></i> Masukkan Qty pengganti. GRN akan dibuat dan langsung diposting agar stok serta status replacement otomatis diperbarui.
         </div>
         
         <div class="pr-formbar mb-4">

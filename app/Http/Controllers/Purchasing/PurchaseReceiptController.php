@@ -528,6 +528,8 @@ class PurchaseReceiptController extends Controller
         $itemIds = $request->input('item_id', []);
         $qtyReceived = $request->input('qty_received', []);
         $qtyReject = $request->input('qty_reject', []);
+        $stockQtyReceived = $request->input('stock_qty_received', []);
+        $stockQtyReject = $request->input('stock_qty_reject', []);
         $unitPrices = $request->input('unit_price', []);
         $units = $request->input('unit', []);
         $lineNotes = $request->input('line_notes', []);
@@ -542,15 +544,19 @@ class PurchaseReceiptController extends Controller
         // Preload PO qty + harga untuk validasi (hindari N+1)
         $poQtyMap = [];
         $poPriceMap = [];
+        $poFactorMap = [];
         $cumulativeReceivedMap = []; // total qty sudah diterima dari GRN lain (cumulative)
 
         if (is_array($poLineIds) && count($poLineIds) > 0) {
             $ids = collect($poLineIds)->filter()->map(fn($v) => (int) $v)->unique()->values();
             if ($ids->count()) {
                 $poLines = PurchaseOrderLine::whereIn('id', $ids)
-                    ->get(['id', 'qty', 'unit_price']);
+                    ->get(['id', 'qty', 'unit_price', 'conversion_factor']);
                 $poQtyMap   = $poLines->pluck('qty', 'id')->toArray();
                 $poPriceMap = $poLines->pluck('unit_price', 'id')->toArray();
+                $poFactorMap = $poLines->mapWithKeys(fn ($line) => [
+                    (int) $line->id => max(0.000001, (float) ($line->conversion_factor ?: 1)),
+                ])->toArray();
 
                 // ✅ Cumulative: total qty_received + qty_reject dari GRN lain untuk po_line_id ini
                 $cumulativeQuery = \DB::table('purchase_receipt_lines as prl')
@@ -565,12 +571,19 @@ class PurchaseReceiptController extends Controller
 
                 $cumulativeReceivedMap = $cumulativeQuery
                     ->groupBy('prl.purchase_order_line_id')
-                    ->selectRaw('prl.purchase_order_line_id, SUM(prl.qty_received + prl.qty_reject) as total_received')
-                    ->pluck('total_received', 'purchase_order_line_id')
+                    ->selectRaw('prl.purchase_order_line_id, SUM(COALESCE(prl.stock_qty_received, prl.qty_received * COALESCE(prl.conversion_factor, 1)) + COALESCE(prl.stock_qty_reject, prl.qty_reject * COALESCE(prl.conversion_factor, 1))) as total_received_stock')
+                    ->pluck('total_received_stock', 'purchase_order_line_id')
                     ->map(fn($v) => (float) $v)
                     ->toArray();
             }
         }
+
+        $itemFactorMap = Item::query()
+            ->whereIn('id', collect($itemIds)->filter()->map(fn ($v) => (int) $v)->unique()->values())
+            ->get(['id', 'purchase_conversion_factor'])
+            ->mapWithKeys(fn ($item) => [
+                (int) $item->id => max(0.000001, (float) ($item->purchase_conversion_factor ?: 1)),
+            ])->toArray();
 
         $existingPriceByItem = [];
         if ($existingReceipt) {
@@ -604,15 +617,34 @@ class PurchaseReceiptController extends Controller
                 $anySelected = true;
             }
 
-            $qtyRec = $this->num($qtyReceived[$i] ?? 0);
-            $qtyRej = $this->num($qtyReject[$i] ?? 0);
+            $poLineId = $poLineIds[$i] ?? null;
+            $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
+            $conversionFactor = $poLineId
+                ? ($poFactorMap[$poLineId] ?? 1)
+                : ($itemFactorMap[$itemId] ?? 1);
+
+            $stockRecInput = array_key_exists($i, $stockQtyReceived)
+                ? max(0, $this->num($stockQtyReceived[$i]))
+                : null;
+            $stockRejInput = array_key_exists($i, $stockQtyReject)
+                ? max(0, $this->num($stockQtyReject[$i]))
+                : null;
+
+            if ($stockRecInput !== null || $stockRejInput !== null) {
+                $stockRecInput = $stockRecInput ?? 0;
+                $stockRejInput = $stockRejInput ?? 0;
+                $qtyRec = round($stockRecInput / $conversionFactor, 6);
+                $qtyRej = round($stockRejInput / $conversionFactor, 6);
+            } else {
+                $qtyRec = $this->num($qtyReceived[$i] ?? 0);
+                $qtyRej = $this->num($qtyReject[$i] ?? 0);
+                $stockRecInput = round($qtyRec * $conversionFactor, 6);
+                $stockRejInput = round($qtyRej * $conversionFactor, 6);
+            }
 
             if ($qtyRec <= 0 && $qtyRej <= 0) {
                 continue;
             }
-
-            $poLineId = $poLineIds[$i] ?? null;
-            $poLineId = ($poLineId === null || $poLineId === '') ? null : (int) $poLineId;
 
             // ✅ HARGA SERVER-SIDE (defense-in-depth level Controller):
             // - Jika baris terkait PO line → harga SELALU dari PO (abaikan request, semua role).
@@ -630,15 +662,18 @@ class PurchaseReceiptController extends Controller
 
             if ($poLineId) {
                 $poQty           = (float) ($poQtyMap[$poLineId] ?? 0);
+                $poStockQty      = $poQty * $conversionFactor;
                 $alreadyReceived = (float) ($cumulativeReceivedMap[$poLineId] ?? 0);
-                $remaining       = max(0, round($poQty - $alreadyReceived, 4));
+                $remaining       = max(0, round($poStockQty - $alreadyReceived, 6));
 
-                if ($poQty > 0 && ($qtyRec + $qtyRej) > $remaining + 0.0001) {
+                if ($poQty > 0 && ($stockRecInput + $stockRejInput) > $remaining + 0.0001) {
                     $msg = $alreadyReceived > 0
-                        ? "Qty melebihi sisa PO. PO: {$poQty}, sudah diterima: {$alreadyReceived}, sisa: {$remaining}."
-                        : "Qty diterima + reject tidak boleh melebihi Qty PO ({$poQty}).";
+                        ? "Qty melebihi sisa PO. Sisa stok: {$remaining}."
+                        : "Qty diterima + reject tidak boleh melebihi Qty PO ({$poStockQty} stok).";
                     $errors["qty_received.$i"] = $msg;
                     $errors["qty_reject.$i"]   = $msg;
+                    $errors["stock_qty_received.$i"] = $msg;
+                    $errors["stock_qty_reject.$i"]   = $msg;
                 }
             }
 
@@ -647,6 +682,9 @@ class PurchaseReceiptController extends Controller
                 'item_id' => $itemId,
                 'qty_received' => $qtyRec,
                 'qty_reject' => $qtyRej,
+                'stock_qty_received' => $stockRecInput,
+                'stock_qty_reject' => $stockRejInput,
+                'conversion_factor' => $conversionFactor,
                 'unit_price' => $unitPrice,
                 'unit' => $units[$i] ?? null,
                 'notes' => $lineNotes[$i] ?? null,

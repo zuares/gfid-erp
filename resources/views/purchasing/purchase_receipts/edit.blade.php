@@ -200,6 +200,9 @@
     <form id="grn-edit-form" action="{{ route('purchasing.purchase_receipts.update', $purchase_receipt->id) }}" method="POST">
       @csrf
       @method('PUT')
+      @if ($purchase_receipt->purchase_order_id)
+        <input type="hidden" name="purchase_order_id" value="{{ $purchase_receipt->purchase_order_id }}">
+      @endif
 
       {{-- TOP: Info + Ringkasan (mirip show) --}}
       <div class="row g-3 mb-3">

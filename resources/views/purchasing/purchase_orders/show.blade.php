@@ -121,7 +121,6 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $poTaxBase = max(0, $calculatedSubtotal - $poDiscount);
         $calculatedTax = round($poTaxBase * $poTaxPercent / 100, 2);
         $calculatedGrandTotal = round($poTaxBase + $calculatedTax + (float) ($order->shipping_cost ?? 0), 2);
-        $poHasPrice  = $calculatedGrandTotal > 0;
 
         // Status PO
         $status = (string) ($order->status ?? 'draft');
@@ -257,19 +256,6 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
     <span class="po-spacer"></span>
 
     {{-- PRIMARY ACTIONS --}}
-    @if ($status === 'draft')
-        @if ($user && ($user->isOwner() || $user->isDeveloper()))
-            @if ($poHasPrice)
-                <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve PO ini? Setelah di-approve, PO tidak bisa diedit lagi.');">
-                    @csrf
-                    <button type="submit" class="po-btn po-primary" title="Approve PO">Approve</button>
-                </form>
-            @else
-                <button type="button" class="po-btn po-primary" style="opacity:.5;cursor:not-allowed;" title="{{ $canSeeMoney ? 'Harga belum diisi, edit PO terlebih dahulu.' : 'Dokumen belum lengkap, hubungi owner.' }}">Approve</button>
-            @endif
-        @endif
-    @endif
-    
     @if ($canSeeMoney && $canOpenPayment)
         @php $paymentButtonLabel = $canPaySettlement ? 'Bayar PO' : 'Bayar DP'; @endphp
         <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="{{ $paymentButtonLabel }}">
@@ -330,18 +316,6 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                         </a>
                     </li>
                 @endif
-            @endif
-            @if ($status === 'approved' && $user && ($user->isOwner() || $isAdmin || $user->isDeveloper()) && $grnCount === 0 && !$hasActivePayments)
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <form action="{{ route('purchasing.purchase_orders.unapprove', $order->id) }}" method="POST"
-                          onsubmit="return confirm('Kembalikan PO ini ke Draft untuk koreksi qty? Lock stale akan dilepas jika sudah tidak ada GRN, pembayaran, atau retur.');">
-                        @csrf
-                        <button type="submit" class="dropdown-item py-2 text-warning-emphasis">
-                            <i class="bi bi-pencil-square me-2"></i> Koreksi PO / Kembalikan ke Draft
-                        </button>
-                    </form>
-                </li>
             @endif
             @if ($status === 'draft' && $user && in_array($user->role, ['owner','admin']))
                 <li><hr class="dropdown-divider"></li>

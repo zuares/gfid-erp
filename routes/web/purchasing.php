@@ -92,14 +92,28 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->name('purchase_orders.payments.apply_dp');
 
             // GRN
+            // Draft GRN boleh dibuat oleh user purchasing; perubahan, hapus,
+            // posting, dan unposting adalah aksi yang mengubah stok/jurnal.
             Route::resource('purchase-receipts', PurchaseReceiptController::class)
-                ->names('purchase_receipts');
+                ->names('purchase_receipts')
+                ->except(['edit', 'update', 'destroy']);
 
-            Route::post('purchase-receipts/{purchase_receipt}/post', [PurchaseReceiptController::class, 'post'])
-                ->name('purchase_receipts.post');
+            Route::middleware('role:owner,admin')->group(function () {
+                Route::get('purchase-receipts/{purchase_receipt}/edit', [PurchaseReceiptController::class, 'edit'])
+                    ->name('purchase_receipts.edit');
 
-            Route::post('purchase-receipts/{purchase_receipt}/unpost', [PurchaseReceiptController::class, 'unpost'])
-                ->name('purchase_receipts.unpost');
+                Route::match(['put', 'patch'], 'purchase-receipts/{purchase_receipt}', [PurchaseReceiptController::class, 'update'])
+                    ->name('purchase_receipts.update');
+
+                Route::delete('purchase-receipts/{purchase_receipt}', [PurchaseReceiptController::class, 'destroy'])
+                    ->name('purchase_receipts.destroy');
+
+                Route::post('purchase-receipts/{purchase_receipt}/post', [PurchaseReceiptController::class, 'post'])
+                    ->name('purchase_receipts.post');
+
+                Route::post('purchase-receipts/{purchase_receipt}/unpost', [PurchaseReceiptController::class, 'unpost'])
+                    ->name('purchase_receipts.unpost');
+            });
 
             // ✅ CETAK BARCODE (qty label default = qty diterima, bisa disesuaikan)
             Route::get('purchase-receipts/{purchase_receipt}/barcode', [PurchaseReceiptController::class, 'barcode'])
@@ -126,16 +140,6 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             // Create GRN from PO
             Route::get('purchase-orders/{purchase_order}/create-grn', [PurchaseReceiptController::class, 'createFromOrder'])
                 ->name('purchase_receipts.create_from_order');
-        });
-
-        // OWNER + ADMIN actions
-        Route::middleware('role:owner,admin')->group(function () {
-
-            Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
-                ->name('purchase_orders.approve');
-
-            Route::post('purchase-orders/{purchase_order}/unapprove', [PurchaseOrderController::class, 'unapprove'])
-                ->name('purchase_orders.unapprove');
         });
 
         Route::middleware('role:owner,admin')->group(function () {

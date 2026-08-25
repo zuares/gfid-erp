@@ -26,6 +26,7 @@ class PurchaseReturnController extends Controller
         protected JournalService $journal,
         protected \App\Services\Inventory\InventoryService $inventory,
         protected \App\Services\Purchasing\ReplacementReceiptService $replacementReceiptService,
+        protected \App\Services\Purchasing\GoodsReceiptService $goodsReceiptService,
     ) {}
 
     public function index(Request $request)
@@ -1342,7 +1343,7 @@ class PurchaseReturnController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                return $this->replacementReceiptService->createFromReturn(
+                $receipt = $this->replacementReceiptService->createFromReturn(
                     $lockedReturn, 
                     $data['lines'], 
                     $data['received_at'], 
@@ -1350,10 +1351,15 @@ class PurchaseReturnController extends Controller
                     $data['notes'] ?? null, 
                     $data['document_number'] ?? null
                 );
+
+                // Penerimaan pengganti adalah transaksi penerimaan final:
+                // langsung posting agar stok dan status replacement berubah
+                // atomik. Jika posting gagal, seluruh pembuatan GRN rollback.
+                return $this->goodsReceiptService->post($receipt);
             });
 
             return redirect()->route('purchasing.purchase_receipts.show', $receipt->id)
-                ->with('success', 'Barang pengganti berhasil diterima dan Draft Penerimaan (GRN) telah dibuat. Silakan periksa dan Posting.');
+                ->with('success', 'Barang pengganti berhasil diterima. GRN langsung diposting dan stok sudah diperbarui.');
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         } catch (\Exception $e) {

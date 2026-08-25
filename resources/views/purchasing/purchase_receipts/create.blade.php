@@ -179,6 +179,69 @@
         font-size: .85rem;
     }
 
+    .qty-cell {
+        min-width: 112px;
+    }
+    .qty-unit {
+        display: block;
+        margin-top: .12rem;
+        color: var(--muted);
+        font-size: .68rem;
+        font-weight: 700;
+        line-height: 1;
+        text-align: right;
+    }
+    .qty-stock-preview {
+        display: block;
+        margin-top: .18rem;
+        color: #2563eb;
+        font-size: .66rem;
+        line-height: 1.1;
+        text-align: right;
+        white-space: nowrap;
+    }
+    .unit-stack,
+    .qty-stack {
+        display: flex;
+        flex-direction: column;
+        gap: .12rem;
+        line-height: 1.15;
+    }
+    .unit-stack small,
+    .qty-stack small {
+        color: var(--muted);
+        font-size: .68rem;
+    }
+    .confirm-kpis {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .55rem;
+        margin-bottom: .75rem;
+    }
+    .confirm-kpi {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: .55rem .7rem;
+        background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
+    }
+    .confirm-kpi-label {
+        color: var(--muted);
+        font-size: .68rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+    .confirm-kpi-value {
+        display: block;
+        margin-top: .12rem;
+        font-size: .92rem;
+        font-weight: 800;
+    }
+    .confirm-stock {
+        color: #2563eb;
+        font-size: .7rem;
+        white-space: nowrap;
+    }
+
     .row-hidden-by-filter { display: none !important; }
     .filter-empty-msg { text-align:center; color:var(--muted); padding: 1.5rem; font-size:.88rem; }
 
@@ -254,6 +317,8 @@
         #grnLinesBody td[data-label="Diterima"]::before,
         #grnLinesBody td[data-label="Reject"]::before { font-weight: 700; color: #334155; }
         .qty-input { width: 132px; height: 44px; font-size: 1.05rem; }
+        .qty-cell { min-width: 150px; }
+        .qty-unit, .qty-stock-preview { font-size: .75rem; }
 
         /* Checkbox pilih lebih besar + label di kiri */
         td[data-label="Pilih"] { justify-content: flex-start; gap: .55rem; }
@@ -448,9 +513,6 @@
                             @endforeach
                         </select>
                         @error('warehouse_id')<div class="invalid-feedback small">{{ $message }}</div>@enderror
-                        <div class="text-muted mt-1" style="font-size:.7rem;">
-                            Pilih sesuai lokasi fisik. Jika beda gudang, buat GRN terpisah.
-                        </div>
                     </div>
 
                     <div class="col-12 col-sm-4">
@@ -470,9 +532,9 @@
                     </div>
 
                     <div class="col-12 col-sm-4">
-                        <div class="field-lbl">Total Qty Bersih</div>
+                        <div class="field-lbl">Total Masuk Stok</div>
                         <div class="form-control form-control-sm bg-light-subtle mono fw-bold">
-                            <span id="totalReceivedDisplay">0,00</span>
+                            <span id="totalReceivedDisplay">—</span>
                         </div>
                     </div>
 
@@ -506,12 +568,12 @@
                             <th>Item</th>
                             <th class="text-end">Qty PO</th>
                             <th class="text-end">Sisa</th>
-                            <th class="text-end" style="width:100px;">Diterima</th>
-                            <th class="text-end" style="width:100px;">Reject</th>
+                            <th class="text-end" style="width:125px;">Diterima</th>
+                            <th class="text-end" style="width:125px;">Reject</th>
                             @if ($canSeeMoney)
                                 <th class="text-end col-harga">Harga</th>
                             @endif
-                            <th class="text-center" style="width:60px;">Unit</th>
+                            <th class="text-center" style="width:90px;">Satuan</th>
                         </tr>
                     </thead>
                     <tbody id="grnLinesBody">
@@ -543,6 +605,9 @@
                     <tr data-line-index="{{ $idx }}"
                         data-qty-po="{{ $qtyPo }}"
                         data-qty-remaining="{{ $qtyRemaining }}"
+                        data-purchase-unit="{{ $line->effectivePurchaseUnit() }}"
+                        data-stock-unit="{{ $line->effectiveStockUnit() }}"
+                        data-conversion-factor="{{ $line->effectiveConversionFactor() }}"
                         data-po-id="{{ $poId }}"
                         data-po-code="{{ $poCode }}"
                         data-supplier-id="{{ $supId }}"
@@ -609,35 +674,46 @@
 
                         {{-- Qty PO --}}
                         <td class="text-end mono text-muted" style="font-size:.82rem;" data-label="Qty PO">
-                            {{ number_format($qtyPo, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}
-                            @if($line->effectiveConversionFactor() != 1)
-                                <small class="d-block text-primary">{{ decimal_id((float) $qtyPo * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }} stok</small>
-                            @endif
+                            <div class="qty-stack">
+                                <span>{{ number_format($qtyPo, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</span>
+                                <small>{{ decimal_id((float) $qtyPo * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }} stok</small>
+                            </div>
                         </td>
 
                         {{-- Sisa --}}
                         <td class="text-end mono" data-label="Sisa"
                             style="font-weight:{{ $isPartial ? '700' : '400' }};
                                    color:{{ $isPartial ? 'rgba(234,179,8,1)' : 'inherit' }};">
-                            {{ number_format($qtyRemaining, 2, ',', '.') }}
+                            <div class="qty-stack">
+                                <span>{{ number_format($qtyRemaining, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</span>
+                                <small>{{ decimal_id((float) $qtyRemaining * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }} stok</small>
+                            </div>
                         </td>
 
                         {{-- Qty Diterima --}}
                         <td class="text-end" data-label="Diterima">
-                            <input type="text" inputmode="decimal" name="qty_received[]"
-                                   class="form-control form-control-sm qty-input qty-received-input @error('qty_received.' . $idx) is-invalid @enderror"
-                                   value="{{ old('qty_received.' . $idx, '') }}"
-                                   placeholder="0,00" autocomplete="off"
-                                   @if ($hasDraftGrn) disabled @endif>
+                            <div class="qty-cell">
+                                <input type="text" inputmode="decimal" name="qty_received[]"
+                                       class="form-control form-control-sm qty-input qty-received-input @error('qty_received.' . $idx) is-invalid @enderror"
+                                       value="{{ old('qty_received.' . $idx, '') }}"
+                                       placeholder="0,00" autocomplete="off"
+                                       @if ($hasDraftGrn) disabled @endif>
+                                <span class="qty-unit">{{ $line->effectivePurchaseUnit() }}</span>
+                                <span class="qty-stock-preview" data-stock-preview="received">Stok: 0 {{ $line->effectiveStockUnit() }}</span>
+                            </div>
                         </td>
 
                         {{-- Qty Reject --}}
                         <td class="text-end" data-label="Reject">
-                            <input type="text" inputmode="decimal" name="qty_reject[]"
-                                   class="form-control form-control-sm qty-input qty-reject-input"
-                                   value="{{ old('qty_reject.' . $idx, '') }}"
-                                   placeholder="0,00" autocomplete="off"
-                                   @if ($hasDraftGrn) disabled @endif>
+                            <div class="qty-cell">
+                                <input type="text" inputmode="decimal" name="qty_reject[]"
+                                       class="form-control form-control-sm qty-input qty-reject-input"
+                                       value="{{ old('qty_reject.' . $idx, '') }}"
+                                       placeholder="0,00" autocomplete="off"
+                                       @if ($hasDraftGrn) disabled @endif>
+                                <span class="qty-unit">{{ $line->effectivePurchaseUnit() }}</span>
+                                <span class="qty-stock-preview" data-stock-preview="reject">Stok: 0 {{ $line->effectiveStockUnit() }}</span>
+                            </div>
                         </td>
 
                         @if ($canSeeMoney)
@@ -648,7 +724,10 @@
 
                         {{-- Unit --}}
                         <td class="text-center mono text-muted" style="font-size:.8rem;" data-label="Unit">
-                            {{ $line->effectivePurchaseUnit() }}
+                            <div class="unit-stack">
+                                <span>Beli: {{ $line->effectivePurchaseUnit() }}</span>
+                                <small>Stok: {{ $line->effectiveStockUnit() }}</small>
+                            </div>
                         </td>
                     </tr>
 
@@ -679,7 +758,7 @@
 
             <div class="card-footer grn-actions d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="text-muted small" id="footer-total">
-                    Total qty bersih: <span class="mono fw-bold" id="footerTotalAlt">0,00</span>
+                    Total masuk stok: <span class="mono fw-bold" id="footerTotalAlt">—</span>
                 </div>
                 <div class="d-flex gap-2 grn-actions-btns">
                     @if ($hasOrder)
@@ -704,20 +783,18 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:16px; overflow:hidden;">
             <div class="modal-header border-bottom">
-                <h6 class="modal-title fw-bold">Konfirmasi Penerimaan Barang</h6>
+                <h6 class="modal-title fw-bold">Konfirmasi GRN</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted small mb-3">Periksa kembali sebelum menyimpan.</p>
                 <div id="confirmSummary"></div>
             </div>
-            <div class="modal-footer border-top justify-content-between">
-                <span class="text-muted small">Klik <strong>Ya, Buat Draft</strong> jika sudah sesuai.</span>
+            <div class="modal-footer border-top justify-content-end">
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-shp-outline"
-                            data-bs-dismiss="modal">Koreksi</button>
+                            data-bs-dismiss="modal">Kembali</button>
                     <button type="button" id="btnConfirm" class="btn btn-shp-primary">
-                        Ya, Buat Draft
+                        Buat Draft
                     </button>
                 </div>
             </div>
@@ -749,6 +826,26 @@
         catch { return (n || 0).toFixed(2); }
     }
 
+    function getPurchaseUnit(row) {
+        return row?.dataset.purchaseUnit || 'pcs';
+    }
+
+    function getStockUnit(row) {
+        return row?.dataset.stockUnit || getPurchaseUnit(row);
+    }
+
+    function getConversionFactor(row) {
+        const factor = parseNum(row?.dataset.conversionFactor || 1);
+        return factor > 0 ? factor : 1;
+    }
+
+    function formatUnitTotals(totals) {
+        return Object.entries(totals)
+            .filter(([, qty]) => qty > 0.000001)
+            .map(([unit, qty]) => `${fmtId(qty)} ${unit}`)
+            .join(' · ') || '—';
+    }
+
     function rows() {
         return Array.from(document.querySelectorAll('#grnLinesBody tr[data-line-index]'));
     }
@@ -760,6 +857,18 @@
     function getLimit(row) {
         const rem = parseNum(row.dataset.qtyRemaining);
         return rem > 0 ? rem : parseNum(row.dataset.qtyPo);
+    }
+
+    function updateRowStockPreview(row) {
+        const factor = getConversionFactor(row);
+        const stockUnit = getStockUnit(row);
+        const rec = parseNum(row.querySelector('.qty-received-input')?.value || 0);
+        const rej = parseNum(row.querySelector('.qty-reject-input')?.value || 0);
+        const recPreview = row.querySelector('[data-stock-preview="received"]');
+        const rejPreview = row.querySelector('[data-stock-preview="reject"]');
+
+        if (recPreview) recPreview.textContent = `Stok: ${fmtId(rec * factor)} ${stockUnit}`;
+        if (rejPreview) rejPreview.textContent = `Stok: ${fmtId(rej * factor)} ${stockUnit}`;
     }
 
     /* ── validation ── */
@@ -784,16 +893,20 @@
 
     /* ── total recalc ── */
     function recalcTotal() {
-        let total = 0;
+        const totals = {};
         rows().forEach(row => {
             const cb     = row.querySelector('.line-check');
             const inpRec = row.querySelector('.qty-received-input');
             const inpRej = row.querySelector('.qty-reject-input');
+            updateRowStockPreview(row);
             if (!cb || !cb.checked || !inpRec || !inpRej) return;
             const net = parseNum(inpRec.value || 0) - parseNum(inpRej.value || 0);
-            if (net > 0) total += net;
+            if (net > 0) {
+                const unit = getStockUnit(row);
+                totals[unit] = (totals[unit] || 0) + (net * getConversionFactor(row));
+            }
         });
-        const fmted = fmtId(total);
+        const fmted = formatUnitTotals(totals);
         const d1 = document.getElementById('totalReceivedDisplay');
         const d2 = document.getElementById('footerTotalAlt');
         if (d1) d1.textContent = fmted;
@@ -868,6 +981,7 @@
             inpRej.classList.remove('is-invalid');
         }
         validateRow(row);
+        updateRowStockPreview(row);
         recalcTotal();
     }
 
@@ -886,6 +1000,7 @@
         if (rec >= 0 && rec <= lim && inpRej)
             inpRej.value = (lim - rec).toFixed(2);
         validateRow(row);
+        updateRowStockPreview(row);
         recalcTotal();
     }
 
@@ -898,6 +1013,7 @@
         if (rej >= 0 && rej <= lim && inpRec)
             inpRec.value = (lim - rej).toFixed(2);
         validateRow(row);
+        updateRowStockPreview(row);
         recalcTotal();
     }
 
@@ -936,13 +1052,19 @@
             const rec = parseNum(inpRec.value || 0);
             const rej = parseNum(inpRej.value || 0);
             if (rec <= 0 && rej <= 0) return;
+            const factor = getConversionFactor(row);
             lines.push({
                 code: row.querySelector('.item-code')?.textContent?.trim() ?? '-',
                 name: row.querySelector('.item-name')?.childNodes?.[0]?.textContent?.trim() ?? '',
                 qtyPo: parseNum(row.dataset.qtyPo),
                 sisa:  parseNum(row.dataset.qtyRemaining),
                 rec, rej,
-                unit: row.querySelector('td[data-label="Unit"]')?.textContent?.trim() ?? '',
+                unit: getPurchaseUnit(row),
+                stockUnit: getStockUnit(row),
+                factor,
+                sisaStock: parseNum(row.dataset.qtyRemaining) * factor,
+                stockRec: rec * factor,
+                stockRej: rej * factor,
             });
         });
         return { lines, allValid };
@@ -952,22 +1074,38 @@
         if (!lines.length)
             return '<div class="alert alert-warning small mb-0">Tidak ada item dengan qty yang diisi.</div>';
 
-        let h = `<div class="table-responsive"><table class="table table-sm align-middle mb-0">
+        const totals = {};
+        lines.forEach(l => {
+            const net = l.stockRec - l.stockRej;
+            if (net > 0) totals[l.stockUnit] = (totals[l.stockUnit] || 0) + net;
+        });
+
+        let h = `<div class="confirm-kpis">
+            <div class="confirm-kpi">
+                <span class="confirm-kpi-label">Item dipilih</span>
+                <span class="confirm-kpi-value">${lines.length}</span>
+            </div>
+            <div class="confirm-kpi">
+                <span class="confirm-kpi-label">Masuk stok</span>
+                <span class="confirm-kpi-value confirm-stock">${formatUnitTotals(totals)}</span>
+            </div>
+        </div>
+        <div class="table-responsive"><table class="table table-sm align-middle mb-0">
             <thead><tr>
                 <th>#</th><th>Item</th>
                 <th class="text-end">Sisa</th>
                 <th class="text-end">Diterima</th>
+                <th class="text-end">Masuk stok</th>
                 <th class="text-end">Reject</th>
-                <th class="text-center">Unit</th>
             </tr></thead><tbody>`;
         lines.forEach((l, i) => {
             h += `<tr>
                 <td class="mono text-muted">${i+1}</td>
                 <td><div class="fw-bold mono">${l.code}</div><div class="text-muted small">${l.name || ''}</div></td>
-                <td class="text-end mono">${fmtId(l.sisa)}</td>
-                <td class="text-end mono fw-bold">${fmtId(l.rec)}</td>
-                <td class="text-end mono">${fmtId(l.rej)}</td>
-                <td class="text-center mono text-muted">${l.unit || '-'}</td>
+                <td class="text-end mono"><div>${fmtId(l.sisa)} ${l.unit}</div><small class="text-muted">${fmtId(l.sisaStock)} ${l.stockUnit}</small></td>
+                <td class="text-end mono fw-bold">${fmtId(l.rec)} ${l.unit}</td>
+                <td class="text-end mono"><span class="confirm-stock">${fmtId(l.stockRec)} ${l.stockUnit}</span></td>
+                <td class="text-end mono">${fmtId(l.rej)} ${l.unit}</td>
             </tr>`;
         });
         h += '</tbody></table></div>';
