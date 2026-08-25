@@ -194,14 +194,14 @@
     }
 
     .po-date-filter {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: .7rem;
+        gap: .55rem;
         margin-bottom: 1rem;
-        padding: .6rem .75rem;
+        padding: .35rem .5rem .35rem .7rem;
         background: var(--card, #fff);
         border: 1px solid rgba(148, 163, 184, .18);
-        border-radius: 10px;
+        border-radius: 8px;
         box-shadow: 0 2px 8px rgba(15, 23, 42, .025);
     }
 
@@ -231,12 +231,58 @@
     .po-date-filter-controls {
         display: flex;
         align-items: center;
-        gap: .55rem;
-        flex: 1 1 auto;
+        gap: .4rem;
         min-width: 0;
     }
 
-    .po-date-filter-controls .date-section {
+    .po-date-range-shell {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        min-width: 220px;
+        height: 34px;
+        padding: 0 .55rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        border-radius: 7px;
+        background: transparent;
+    }
+
+    .po-date-range-shell i {
+        color: #94a3b8;
+        font-size: .82rem;
+    }
+
+    .po-date-range-input {
+        width: 100%;
+        min-width: 0;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text, #334155);
+        font-size: .78rem;
+        font-weight: 650;
+        cursor: pointer;
+    }
+
+    .po-date-range-input:focus {
+        box-shadow: none;
+    }
+
+    body[data-theme="dark"] .po-date-range-input {
+        color: #e2e8f0;
+    }
+
+    .po-date-filter .po-reset-all-filters {
+        margin-left: 0;
+    }
+
+    .po-date-filter-controls {
+        flex: 0 1 auto;
+    }
+
+    .po-date-range-shell .flatpickr-input {
         flex: 1 1 auto;
         min-width: 0;
     }
@@ -268,56 +314,25 @@
         }
 
         .po-date-filter {
-            align-items: stretch;
-            flex-direction: column;
-            gap: .4rem;
-            padding: .6rem;
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: .45rem;
+            padding: .45rem .55rem;
         }
 
         .po-date-filter-label {
-            min-height: 22px;
             font-size: .68rem;
             letter-spacing: .04em;
         }
 
         .po-date-filter-controls {
-            flex-direction: column;
-            align-items: stretch;
-            gap: .45rem;
+            flex: 1 1 auto;
         }
 
-        .po-date-filter-controls .date-section {
-            width: 100% !important;
-            border-radius: 9px;
-        }
-
-        .po-date-filter-controls .ds-presets {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .po-date-filter-controls .ds-preset-btn {
-            min-height: 38px;
-            height: 38px !important;
-            padding-inline: .2rem;
-            font-size: .68rem !important;
-        }
-
-        .po-date-filter-controls .rts-date-picker.flatpickr-input {
-            min-height: 40px;
-            height: 40px !important;
-            font-size: .8rem !important;
-        }
-
-        .po-date-filter-controls .ds-clear {
-            min-height: 36px;
-            height: 36px;
-        }
-
-        .po-reset-all-filters {
-            width: 100%;
-            margin-left: 0;
-            min-height: 40px;
+        .po-date-range-shell {
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .po-mobile-items {
@@ -377,18 +392,19 @@
             <div class="po-date-filter">
                 <div class="po-date-filter-label">
                     <i class="bi bi-calendar3"></i>
-                    <span>Tanggal PO</span>
+                    <label for="po-date-range">Tanggal PO</label>
                 </div>
 
                 <div class="po-date-filter-controls">
-                    <x-date-range-picker
-                        :date-from="request('from_date')"
-                        :date-to="request('to_date')"
-                        :period="request('period', 'all')"
-                        form-id="po-filter-form"
-                        name-from="from_date"
-                        name-to="to_date"
-                    />
+                    <input type="hidden" name="from_date" id="po-from-date" value="{{ request('from_date') }}" data-gf-date="off">
+                    <input type="hidden" name="to_date" id="po-to-date" value="{{ request('to_date') }}" data-gf-date="off">
+
+                    <div class="po-date-range-shell">
+                        <i class="bi bi-calendar3" aria-hidden="true"></i>
+                        <input type="text" id="po-date-range" class="po-date-range-input"
+                               placeholder="Pilih tanggal" autocomplete="off" readonly
+                               data-gf-date="off" aria-label="Pilih rentang tanggal PO">
+                    </div>
 
                     @if ($hasPoFilters)
                         <a href="{{ route('purchasing.purchase_orders.index') }}" class="btn btn-sm btn-ship-outline po-reset-all-filters">
@@ -611,6 +627,62 @@ document.addEventListener('DOMContentLoaded', function () {
     form.querySelectorAll('select.po-filter-auto').forEach(function (el) {
         el.addEventListener('change', function () { form.submit(); });
     });
+
+    const rangeInput = document.getElementById('po-date-range');
+    const fromInput = document.getElementById('po-from-date');
+    const toInput = document.getElementById('po-to-date');
+
+    if (rangeInput && fromInput && toInput && window.flatpickr) {
+        const formatDisplayDate = date => new Intl.DateTimeFormat('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        }).format(date).replace(/\./g, '');
+
+        const formatRange = dates => {
+            if (dates.length === 2) {
+                return `${formatDisplayDate(dates[0])} – ${formatDisplayDate(dates[1])}`;
+            }
+
+            return dates.length === 1 ? formatDisplayDate(dates[0]) : '';
+        };
+
+        const syncDisplay = (dates, picker) => {
+            picker.input.value = formatRange(dates);
+        };
+
+        flatpickr(rangeInput, {
+            mode: 'range',
+            dateFormat: 'Y-m-d',
+            locale: (window.flatpickr.l10ns && window.flatpickr.l10ns.id) ? 'id' : { firstDayOfWeek: 1 },
+            allowInput: false,
+            defaultDate: [fromInput.value, toInput.value].filter(Boolean),
+            onReady: function (selectedDates, _dateString, picker) {
+                syncDisplay(selectedDates, picker);
+            },
+            onChange: function (selectedDates, _dateString, picker) {
+                syncDisplay(selectedDates, picker);
+
+                if (selectedDates.length === 1) {
+                    fromInput.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    toInput.value = '';
+                } else if (selectedDates.length === 2) {
+                    fromInput.value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    toInput.value = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
+                }
+            },
+            onClose: function (selectedDates) {
+                if (selectedDates.length === 1) {
+                    const date = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    fromInput.value = date;
+                    toInput.value = date;
+                    form.submit();
+                } else if (selectedDates.length === 2) {
+                    form.submit();
+                }
+            },
+        });
+    }
 });
 </script>
 @endpush
