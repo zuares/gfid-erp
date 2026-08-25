@@ -1166,7 +1166,7 @@
         const health = [
             ['Completion rate', Number(current.completion_rate || 0), false, `${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai`],
             ['Cancellation', Number(current.cancel_rate || 0), true, `${Number(current.cancelled_count || 0).toLocaleString('id-ID')} dibatalkan`],
-            ['Data readiness', readyRate, false, `${Number(quality.ready || 0).toLocaleString('id-ID')} siap profit`],
+            ['Data readiness', readyRate, false, `${Number(quality.ready || 0).toLocaleString('id-ID')} siap profit · ${Number(quality.waiting || 0).toLocaleString('id-ID')} menunggu selesai`],
             ['Profit margin', Math.max(0, Number(current.profit_margin || 0)), false, `${Number(current.profit_margin || 0).toFixed(1)}% operasional`],
         ];
         $('anHealthList').innerHTML = health.map(([label,value,inverse,note]) => `<div class="an-health-row"><span>${label}<small>${note}</small></span><div class="an-health-track"><span class="${healthClass(value,inverse)}" style="width:${Math.min(100, Math.max(0, inverse ? 100 - value : value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');

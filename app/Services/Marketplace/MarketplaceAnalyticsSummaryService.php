@@ -1324,19 +1324,34 @@ class MarketplaceAnalyticsSummaryService
 
     private function qualitySummary(array $filters): array
     {
-        $rows = $this->applyDateAndStoreFilters(DB::table('marketplace_orders as mo'), $filters, 'mo')
+        $eligibleRows = $this->applyDateAndStoreFilters(DB::table('marketplace_orders as mo'), $filters, 'mo')
+            ->whereIn('mo.order_status', self::financialEligibleStatuses())
             ->selectRaw("COALESCE(mo.financial_data_status, 'unknown') AS status, COUNT(*) AS total")
             ->groupBy('mo.financial_data_status')
             ->get()
             ->keyBy('status');
 
+        $waiting = $this->applyDateAndStoreFilters(DB::table('marketplace_orders as mo'), $filters, 'mo')
+            ->where(function ($query) {
+                $query
+                    ->whereNull('mo.order_status')
+                    ->orWhereNotIn('mo.order_status', self::financialEligibleStatuses());
+            })
+            ->count();
+
         return [
-            'total' => (int) $rows->sum('total'),
-            'ready' => (int) ($rows->get('ready')?->total ?? 0),
-            'incomplete' => (int) ($rows->get('incomplete')?->total ?? 0),
-            'unknown' => (int) ($rows->get('unknown')?->total ?? 0),
-            'not_applicable' => (int) ($rows->get('not_applicable')?->total ?? 0),
+            'total' => (int) $eligibleRows->sum('total'),
+            'ready' => (int) ($eligibleRows->get('ready')?->total ?? 0),
+            'incomplete' => (int) ($eligibleRows->get('incomplete')?->total ?? 0),
+            'unknown' => (int) ($eligibleRows->get('unknown')?->total ?? 0),
+            'not_applicable' => (int) ($eligibleRows->get('not_applicable')?->total ?? 0),
+            'waiting' => (int) $waiting,
         ];
+    }
+
+    private static function financialEligibleStatuses(): array
+    {
+        return MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES;
     }
 
     private function applyDateAndStoreFilters($query, array $filters, string $alias)

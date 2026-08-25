@@ -490,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="fq-summary-list">
                     <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot ready"></i>Siap masuk laporan</span><strong class="fq-summary-value">{{ $fmt($orderCounts['ready'] ?? 0) }}</strong></div>
                     <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot warning"></i>Data belum lengkap</span><strong class="fq-summary-value">{{ $fmt($orderCounts['incomplete'] ?? 0) }}</strong></div>
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Belum masuk proses keuangan</span><strong class="fq-summary-value">{{ $fmt($orderCounts['not_applicable'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Menunggu order selesai</span><strong class="fq-summary-value">{{ $fmt($waitingOrderCount ?? 0) }}</strong></div>
                     <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Belum diperiksa</span><strong class="fq-summary-value">{{ $fmt($orderCounts['unknown'] ?? 0) }}</strong></div>
                 </div>
                 <div class="fq-progress"><div class="fq-progress-bar" style="width: {{ $auditedOrders > 0 ? min(100, (($orderCounts['ready'] ?? 0) / $auditedOrders) * 100) : 0 }}%"></div></div>
