@@ -20,12 +20,17 @@ class MarketplaceFinancialQualityController extends Controller
 
         $storeId = $request->integer('store_id') ?: null;
         $statusInput = $request->input('status');
-        $status = $statusInput === null ? 'incomplete' : (string) $statusInput;
         $search = trim((string) $request->input('q', ''));
         $orderStatus = trim((string) $request->input('order_status', ''));
         $settlementStatus = trim((string) $request->input('settlement_status', ''));
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
+        // Saat halaman dibuka tanpa filter, tampilkan seluruh queue yang perlu
+        // diperbaiki. Sebelumnya default `incomplete` hanya memeriksa quality
+        // order, sehingga settlement incomplete pada order not_applicable tidak
+        // pernah masuk ke list.
+        $defaultIssueQueue = $statusInput === null && $settlementStatus === '';
+        $status = $statusInput === null ? '' : (string) $statusInput;
         $allowedStatuses = [
             MarketplaceFinancialDataQualityService::ORDER_UNKNOWN,
             MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
@@ -70,7 +75,30 @@ class MarketplaceFinancialQualityController extends Controller
 
         $orders = $orderQuery()
             ->with(['store.channel', 'settlement', 'items'])
-            ->when($status !== '', fn ($query) => $query->where('financial_data_status', $status))
+            ->when($defaultIssueQueue, fn ($query) => $query->where(function ($issueQuery) {
+                $issueQuery
+                    ->where(function ($orderQuality) {
+                        $orderQuality
+                            ->whereNull('financial_data_status')
+                            ->orWhereIn('financial_data_status', [
+                                MarketplaceFinancialDataQualityService::ORDER_UNKNOWN,
+                                MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
+                            ]);
+                    })
+                    ->orWhere(function ($missingSettlement) {
+                        $missingSettlement
+                            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
+                            ->doesntHave('settlement');
+                    })
+                    ->orWhereHas('settlement', function ($settlement) {
+                        $settlement->whereNull('data_status')
+                            ->orWhereIn('data_status', [
+                                MarketplaceFinancialDataQualityService::SETTLEMENT_UNKNOWN,
+                                MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+                            ]);
+                    });
+            }))
+            ->when(! $defaultIssueQueue && $status !== '', fn ($query) => $query->where('financial_data_status', $status))
             ->when($settlementStatus === 'missing', fn ($query) => $query->doesntHave('settlement'))
             ->when(in_array($settlementStatus, ['complete', 'incomplete', 'unknown'], true), fn ($query) => $query->whereHas('settlement', function ($settlement) use ($settlementStatus) {
                 if ($settlementStatus === 'unknown') {
@@ -93,6 +121,7 @@ class MarketplaceFinancialQualityController extends Controller
             'stores' => $stores,
             'storeId' => $storeId,
             'status' => $status,
+            'defaultIssueQueue' => $defaultIssueQueue,
             'orderCounts' => $orderCounts,
             'settlementCounts' => $settlementCounts,
             'issueBreakdown' => $issueBreakdown,

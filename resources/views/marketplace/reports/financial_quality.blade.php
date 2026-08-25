@@ -95,7 +95,7 @@
         'unknown' => 'fin-unknown',
     ];
     $result = session('quality_result');
-    $hasFilters = filled($search) || filled($storeId) || filled($orderStatus) || filled($settlementStatus) || filled($dateFrom) || filled($dateTo) || $status !== 'incomplete';
+    $hasFilters = filled($search) || filled($storeId) || filled($orderStatus) || filled($settlementStatus) || filled($dateFrom) || filled($dateTo) || ($status !== '' && ! $defaultIssueQueue);
 @endphp
 
 @section('content')

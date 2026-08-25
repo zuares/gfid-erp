@@ -62,6 +62,32 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ->assertSee('settlement missing');
     }
 
+    public function test_default_queue_lists_settlement_issues_even_when_order_quality_is_not_applicable(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-QUEUE-SETTLEMENT-001',
+            'channel_order_id' => 'UI-QUEUE-SETTLEMENT-001',
+            'order_date' => now(),
+            'order_status' => 'SHIPPED',
+            'financial_data_status' => 'not_applicable',
+        ]);
+
+        \App\Models\MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'data_status' => 'incomplete',
+            'raw_json' => [],
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality'))
+            ->assertOk()
+            ->assertSee('UI-QUEUE-SETTLEMENT-001');
+    }
+
     public function test_operational_filters_search_status_settlement_and_date(): void
     {
         $store = $this->store();
