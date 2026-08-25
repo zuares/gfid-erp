@@ -45,6 +45,8 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
 
     // ✅ Marketplace Payouts
+    Route::post('marketplace-payouts/bulk-post', [MarketplacePayoutController::class, 'bulkPost'])
+        ->name('marketplace-payouts.bulk-post');
     Route::resource('marketplace-payouts', MarketplacePayoutController::class);
     Route::post('marketplace-payouts/import/shopee', [MarketplacePayoutController::class, 'importShopee'])
         ->name('marketplace-payouts.import-shopee');

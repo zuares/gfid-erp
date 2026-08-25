@@ -56,6 +56,7 @@ class MarketplacePayoutController extends Controller
 
         $payouts = $q->paginate(25)->withQueryString();
         $bankAccounts = $this->bankAccountOptions();
+        $allDraftCount = MarketplacePayout::query()->where('status', 'draft')->count();
         $shopeeStores = Store::query()
             ->with('channel')
             ->where('is_active', true)
@@ -66,7 +67,7 @@ class MarketplacePayoutController extends Controller
             ->distinct()->orderBy('marketplace_name')->pluck('marketplace_name');
 
         return view('accounting.marketplace_payouts.index', compact(
-            'payouts', 'summary', 'bankAccounts', 'marketplaceNames', 'shopeeStores'
+            'payouts', 'summary', 'bankAccounts', 'marketplaceNames', 'shopeeStores', 'allDraftCount'
         ));
     }
 
@@ -280,6 +281,76 @@ class MarketplacePayoutController extends Controller
             ->route('accounting.marketplace-payouts.show', $marketplacePayout)
             ->with('status', 'ok')
             ->with('message', 'Penerimaan berhasil di-POST (Dr Bank / Cr Piutang Marketplace).');
+    }
+
+    public function bulkPost(Request $request, MarketplacePayoutService $service)
+    {
+        $data = $request->validate([
+            'scope'       => ['required', 'in:all,unposted'],
+            'marketplace' => ['nullable', 'string', 'max:100'],
+            'from'        => ['nullable', 'date'],
+            'to'          => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $query = MarketplacePayout::query()->orderBy('id');
+        if ($data['scope'] === 'unposted') {
+            $query->where('status', 'draft');
+
+            if (! empty($data['marketplace'])) {
+                $query->where('marketplace_name', $data['marketplace']);
+            }
+            if (! empty($data['from'])) {
+                $query->whereDate('date', '>=', $data['from']);
+            }
+            if (! empty($data['to'])) {
+                $query->whereDate('date', '<=', $data['to']);
+            }
+        }
+
+        $stats = [
+            'posted'        => 0,
+            'alreadyPosted' => 0,
+            'skippedVoid'   => 0,
+            'failed'        => 0,
+            'errors'        => [],
+        ];
+
+        $query->chunkById(100, function ($payouts) use ($service, &$stats) {
+            foreach ($payouts as $payout) {
+                if ($payout->status === 'posted') {
+                    $stats['alreadyPosted']++;
+                    continue;
+                }
+
+                if ($payout->status !== 'draft') {
+                    $stats['skippedVoid']++;
+                    continue;
+                }
+
+                try {
+                    $service->post($payout);
+                    $stats['posted']++;
+                } catch (Throwable $e) {
+                    report($e);
+                    $stats['failed']++;
+                    $stats['errors'][] = "#{$payout->id}: {$e->getMessage()}";
+                }
+            }
+        });
+
+        $scopeLabel = $data['scope'] === 'all'
+            ? 'semua data'
+            : 'data yang belum posting sesuai filter';
+        $errorText = $stats['errors'] !== []
+            ? ' Gagal: ' . implode(' | ', array_slice($stats['errors'], 0, 3))
+                . (count($stats['errors']) > 3 ? ' dan lainnya.' : '.')
+            : '';
+
+        return back()
+            ->with('status', $stats['failed'] > 0 ? 'error' : 'ok')
+            ->with('message', "Posting {$scopeLabel} selesai: {$stats['posted']} berhasil, "
+                . "{$stats['alreadyPosted']} sudah posted, {$stats['skippedVoid']} dilewati, "
+                . "{$stats['failed']} gagal." . $errorText);
     }
 
     public function void(Request $request, MarketplacePayout $marketplacePayout, MarketplacePayoutService $service)

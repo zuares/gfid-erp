@@ -65,6 +65,12 @@
         .mp-table-title { display: flex; align-items: center; gap: .55rem; color: #0f172a; font-size: .86rem; font-weight: 900; }
         .mp-count { display: inline-flex; align-items: center; min-height: 22px; padding: .1rem .45rem; border-radius: 6px; background: #eff6ff; color: #1d4ed8; font-size: .68rem; font-weight: 900; }
         .mp-sort-note { color: #94a3b8; font-size: .7rem; }
+        .mp-bulk-menu { min-width: 270px; padding: .4rem; border: 1px solid #dbe4ee; border-radius: 10px; box-shadow: 0 12px 30px rgba(15,23,42,.12); }
+        .mp-bulk-menu .dropdown-item { display: flex; align-items: flex-start; gap: .55rem; padding: .6rem .65rem; border-radius: 7px; color: #334155; font-size: .76rem; white-space: normal; }
+        .mp-bulk-menu .dropdown-item:hover { background: #eff6ff; color: #1d4ed8; }
+        .mp-bulk-menu .dropdown-item i { margin-top: .1rem; font-size: .9rem; }
+        .mp-bulk-menu small { display: block; margin-top: .12rem; color: #94a3b8; font-size: .67rem; }
+        .mp-bulk-menu .dropdown-divider { margin: .3rem 0; }
         .mp-table-wrap { max-height: calc(100vh - 425px); min-height: 220px; overflow: auto; }
         .mp-table { min-width: 940px; margin: 0; }
         .mp-table th { position: sticky; top: 0; z-index: 2; padding: .7rem 1rem; border-bottom: 1px solid #dbe4ee; background: #f8fafc; color: #64748b; font-size: .65rem; font-weight: 950; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
@@ -121,6 +127,56 @@
             .mp-table-toolbar { align-items: flex-start; flex-direction: column; }
             .mp-sort-note { display: none; }
         }
+
+        /* Shipments-aligned compact operations layout */
+        .mp-page { max-width: 1040px; margin-inline: auto; padding: .75rem .75rem 4rem; gap: .65rem; }
+        .mp-hero { align-items: center; padding: .45rem .75rem; margin-inline: -.75rem; border: 0; border-bottom: 1px solid rgba(148,163,184,.18); border-radius: 0; background: var(--card, #fff); box-shadow: none; }
+        .mp-hero-title { margin: 0; font-size: 1rem; font-weight: 750; letter-spacing: 0; }
+        .mp-hero-subtitle { margin-top: 0; font-size: .78rem; }
+        .mp-actions { gap: .45rem; }
+        .mp-actions .mp-btn { min-height: 32px; padding: .38rem .78rem; border-radius: 7px; font-size: .74rem; box-shadow: none; }
+        .mp-kpi-grid { display: flex; flex-wrap: wrap; gap: .32rem; margin-top: .35rem; }
+        .mp-kpi { display: inline-flex; align-items: baseline; gap: .45rem; position: static; overflow: visible; min-width: 0; padding: .2rem .48rem; border: 1px solid rgba(148,163,184,.28); border-radius: 7px; background: transparent; box-shadow: none; }
+        .mp-kpi::after, .mp-kpi-note { display: none; }
+        .mp-kpi-head { display: inline-flex; position: static; }
+        .mp-kpi-label { color: #94a3b8; font-size: .66rem; font-weight: 650; letter-spacing: 0; text-transform: none; }
+        .mp-kpi-icon { display: none; }
+        .mp-kpi-value { margin: 0; color: #334155; font-size: .72rem; font-weight: 650; letter-spacing: 0; line-height: 1; }
+        .mp-filter-bar { padding: .7rem; margin-bottom: 0; border: 1px solid rgba(148,163,184,.18); border-radius: 10px; background: var(--card, #fff); box-shadow: 0 2px 8px rgba(15,23,42,.025); }
+        .mp-filter { display: grid; grid-template-columns: minmax(62px,.4fr) minmax(120px,.8fr) minmax(130px,.9fr) minmax(130px,.9fr) minmax(130px,.9fr) auto; gap: .45rem; align-items: center; padding: 0; }
+        .mp-filter-heading { display: flex; align-items: center; gap: .25rem; color: #0f172a; font-size: .78rem; font-weight: 800; }
+        .mp-filter-heading i { color: #2563eb; }
+        .mp-filter label { display: none; }
+        .mp-filter .form-control, .mp-filter .form-select { min-height: 36px; border-radius: 8px; font-size: .78rem; }
+        .mp-filter-actions { justify-content: flex-end; }
+        .mp-filter-actions .mp-btn { min-height: 32px; padding: .38rem .75rem; border-radius: 7px; font-size: .74rem; box-shadow: none; }
+        .mp-panel { border-radius: 8px; box-shadow: none; }
+        .mp-table-toolbar { padding: .7rem .8rem; }
+        .mp-table-wrap { max-height: 60vh; }
+        .mp-table th { padding: .75rem 1rem; }
+        .mp-table td { padding: .55rem .85rem; font-size: .78rem; }
+        body[data-theme="dark"] .mp-hero,
+        body[data-theme="dark"] .mp-filter-bar,
+        body[data-theme="dark"] .mp-panel { background: var(--card, #0f172a); border-color: rgba(51,65,85,.75); }
+        body[data-theme="dark"] .mp-hero-title,
+        body[data-theme="dark"] .mp-filter-heading,
+        body[data-theme="dark"] .mp-kpi-value,
+        body[data-theme="dark"] .mp-store-name { color: #f1f5f9; }
+
+        @media (max-width: 768px) {
+            .mp-page { padding: .5rem .5rem 4rem; }
+            .mp-hero { align-items: flex-start; margin-inline: -.5rem; padding: .5rem .65rem; }
+            .mp-actions { width: 100%; justify-content: flex-start; }
+            .mp-actions .mp-btn { flex: 1; }
+            .mp-kpi-grid { margin-top: .45rem; }
+            .mp-kpi { flex: 1; justify-content: space-between; }
+            .mp-filter-bar { padding: .65rem; }
+            .mp-filter { grid-template-columns: 1fr; }
+            .mp-filter-heading { padding-bottom: .1rem; }
+            .mp-filter label { display: block; }
+            .mp-filter-actions { justify-content: stretch; }
+            .mp-filter-actions .mp-btn { flex: 1; }
+        }
     </style>
 @endpush
 
@@ -130,10 +186,26 @@
     {{-- Header --}}
     <div class="mp-hero">
         <div>
-            <div class="mp-eyebrow">Finance operations / cash settlement</div>
             <h1 class="mp-hero-title">Penerimaan Marketplace</h1>
-            <div class="mp-hero-subtitle">Kelola pencairan marketplace, akun penerima, dan status posting jurnal dalam satu workspace.</div>
-            <div class="mp-hero-meta"><i class="bi bi-circle-fill"></i> Ledger aktif · {{ now()->format('d M Y, H:i') }}</div>
+            <div class="mp-hero-subtitle">Pencatatan disbursement / settlement dari marketplace.</div>
+            <div class="mp-kpi-grid">
+                <div class="mp-kpi mp-kpi-blue">
+                    <div class="mp-kpi-head"><div class="mp-kpi-label">Semua</div><span class="mp-kpi-icon"><i class="bi bi-files"></i></span></div>
+                    <div class="mp-kpi-value">{{ $summary['total_docs'] }}</div>
+                </div>
+                <div class="mp-kpi mp-kpi-green">
+                    <div class="mp-kpi-head"><div class="mp-kpi-label">Nilai</div><span class="mp-kpi-icon"><i class="bi bi-cash-stack"></i></span></div>
+                    <div class="mp-kpi-value">Rp {{ $fmt($summary['total_amount']) }}</div>
+                </div>
+                <div class="mp-kpi mp-kpi-green">
+                    <div class="mp-kpi-head"><div class="mp-kpi-label">Posted</div><span class="mp-kpi-icon"><i class="bi bi-journal-check"></i></span></div>
+                    <div class="mp-kpi-value">Rp {{ $fmt($summary['posted_amount']) }}</div>
+                </div>
+                <div class="mp-kpi mp-kpi-amber">
+                    <div class="mp-kpi-head"><div class="mp-kpi-label">Draft / batal</div><span class="mp-kpi-icon"><i class="bi bi-hourglass-split"></i></span></div>
+                    <div class="mp-kpi-value">{{ $summary['draft_docs'] }} / {{ $summary['void_docs'] }}</div>
+                </div>
+            </div>
         </div>
         <div class="mp-actions">
             @if($shopeeStores->isNotEmpty())
@@ -157,42 +229,10 @@
         </div>
     @endif
 
-    {{-- KPI --}}
-    <div class="mp-kpi-grid">
-        <div class="mp-kpi mp-kpi-blue">
-            <div class="mp-kpi-head"><div class="mp-kpi-label">Total dokumen</div><span class="mp-kpi-icon"><i class="bi bi-files"></i></span></div>
-            <div class="mp-kpi-value">{{ $summary['total_docs'] }}</div>
-            <div class="mp-kpi-note">Seluruh penerimaan tercatat</div>
-        </div>
-        <div class="mp-kpi mp-kpi-green">
-            <div class="mp-kpi-head"><div class="mp-kpi-label">Total nilai</div><span class="mp-kpi-icon"><i class="bi bi-cash-stack"></i></span></div>
-            <div class="mp-kpi-value">Rp {{ $fmt($summary['total_amount']) }}</div>
-            <div class="mp-kpi-note">Nilai seluruh marketplace</div>
-        </div>
-        <div class="mp-kpi mp-kpi-green">
-            <div class="mp-kpi-head"><div class="mp-kpi-label">Sudah diposting</div><span class="mp-kpi-icon"><i class="bi bi-journal-check"></i></span></div>
-            <div class="mp-kpi-value">Rp {{ $fmt($summary['posted_amount']) }}</div>
-            <div class="mp-kpi-note">Sudah masuk ke jurnal</div>
-        </div>
-        <div class="mp-kpi mp-kpi-amber">
-            <div class="mp-kpi-head"><div class="mp-kpi-label">Draft / batal</div><span class="mp-kpi-icon"><i class="bi bi-hourglass-split"></i></span></div>
-            <div class="mp-kpi-value">{{ $summary['draft_docs'] }} / {{ $summary['void_docs'] }}</div>
-            <div class="mp-kpi-note">Perlu review / dibatalkan</div>
-        </div>
-    </div>
-
     {{-- Filter --}}
-    <div class="mp-panel">
-        <div class="mp-panel-head">
-            <div>
-                <div class="mp-panel-title"><i class="bi bi-sliders2 me-1"></i> Filter data</div>
-                <div class="mp-panel-subtitle">Persempit daftar berdasarkan status, channel, atau periode pencairan.</div>
-            </div>
-            @if(request()->hasAny(['status','marketplace','from','to']))
-                <a href="{{ route('accounting.marketplace-payouts.index') }}" class="mp-btn"><i class="bi bi-arrow-counterclockwise"></i> Reset filter</a>
-            @endif
-        </div>
+    <div class="mp-filter-bar">
         <form method="GET" class="mp-filter">
+            <div class="mp-filter-heading"><i class="bi bi-funnel"></i><span>Filter</span></div>
             <div>
                 <label for="mp-status">Status</label>
                 <select id="mp-status" name="status" class="form-select">
@@ -220,7 +260,10 @@
                 <input id="mp-to" type="date" name="to" class="form-control" value="{{ request('to') }}">
             </div>
             <div class="mp-filter-actions">
-                <button type="submit" class="mp-btn mp-btn-primary"><i class="bi bi-funnel"></i> Terapkan</button>
+                <button type="submit" class="mp-btn mp-btn-primary">Terapkan</button>
+                @if(request()->hasAny(['status','marketplace','from','to']))
+                    <a href="{{ route('accounting.marketplace-payouts.index') }}" class="mp-btn">Reset</a>
+                @endif
             </div>
         </form>
     </div>
@@ -229,7 +272,37 @@
     <div class="mp-panel mp-table-panel">
         <div class="mp-table-toolbar">
             <div class="mp-table-title"><i class="bi bi-list-check"></i> Daftar penerimaan <span class="mp-count">{{ $payouts->total() }}</span></div>
-            <div class="mp-sort-note"><i class="bi bi-sort-down me-1"></i> Terbaru ditampilkan lebih dulu</div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="mp-sort-note"><i class="bi bi-sort-down me-1"></i> Terbaru lebih dulu</div>
+                <div class="dropdown">
+                    <button type="button" class="mp-btn mp-btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" @disabled($allDraftCount === 0)>
+                        <i class="bi bi-journal-arrow-up"></i> Posting massal
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end mp-bulk-menu">
+                        <div class="px-2 py-1 text-muted" style="font-size:.67rem; font-weight:800;">Pilih aksi posting</div>
+                        <form method="POST" action="{{ route('accounting.marketplace-payouts.bulk-post') }}" onsubmit="return confirm('Posting semua {{ $allDraftCount }} draft marketplace? Jurnal akan dibuat untuk setiap draft yang valid.')">
+                            @csrf
+                            <input type="hidden" name="scope" value="all">
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-collection-play"></i>
+                                <span><strong>Posting semua draft</strong><small>{{ number_format($allDraftCount, 0, ',', '.') }} draft di seluruh data</small></span>
+                            </button>
+                        </form>
+                        <div class="dropdown-divider"></div>
+                        <form method="POST" action="{{ route('accounting.marketplace-payouts.bulk-post') }}" onsubmit="return confirm('Posting {{ $summary['draft_docs'] }} data yang belum posting sesuai filter aktif?')">
+                            @csrf
+                            <input type="hidden" name="scope" value="unposted">
+                            <input type="hidden" name="marketplace" value="{{ request('marketplace') }}">
+                            <input type="hidden" name="from" value="{{ request('from') }}">
+                            <input type="hidden" name="to" value="{{ request('to') }}">
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-funnel"></i>
+                                <span><strong>Posting yang belum posting</strong><small>{{ number_format($summary['draft_docs'], 0, ',', '.') }} draft sesuai filter marketplace / tanggal</small></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="mp-table-wrap">
             <table class="table mp-table mb-0">
