@@ -132,6 +132,31 @@ class MarketplaceFinancialClosingTest extends TestCase
         $this->assertDatabaseCount('marketplace_financial_closings', 0);
     }
 
+    public function test_closing_quality_gate_ignores_non_completed_orders(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-CLOSING-PENDING-' . uniqid(),
+        ]);
+        $store = $this->seedAccountsAndStore();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'CLOSING-PENDING-001',
+            'channel_order_id' => 'CLOSING-PENDING-001',
+            'order_date' => '2026-08-04 10:00:00',
+            'ordered_at' => '2026-08-04 10:00:00',
+            'order_status' => 'SHIPPED',
+            'financial_data_status' => 'unknown',
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->get(route('marketplace.reports.financial-closing', $this->filters($store, '2026-08-01', '2026-08-31')));
+
+        $response->assertOk()
+            ->assertSee('Semua order eligible sudah ready; order yang belum COMPLETED tidak dihitung sebagai fakta finansial.')
+            ->assertDontSee('0 incomplete dan 1 unknown masih ditemukan.');
+    }
+
     public function test_non_owner_cannot_access_or_close_period(): void
     {
         $admin = User::factory()->create([

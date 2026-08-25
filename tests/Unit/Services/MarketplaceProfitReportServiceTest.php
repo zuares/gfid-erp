@@ -99,6 +99,31 @@ class MarketplaceProfitReportServiceTest extends TestCase
         $this->assertSame('settlement_missing', $report['quality']['issues'][0]['reason']);
     }
 
+    public function test_non_completed_orders_are_excluded_from_financial_quality_counts(): void
+    {
+        $store = $this->store();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'PROFIT-PENDING-001',
+            'channel_order_id' => 'PROFIT-PENDING-001',
+            'order_date' => '2026-08-04 10:00:00',
+            'ordered_at' => '2026-08-04 10:00:00',
+            'order_status' => 'SHIPPED',
+            'financial_data_status' => 'unknown',
+        ]);
+
+        $report = app(MarketplaceProfitReportService::class)->report([
+            'store_id' => $store->id,
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
+
+        $this->assertSame(0, $report['quality']['total']);
+        $this->assertSame(0, $report['quality']['unknown']);
+        $this->assertSame(0, $report['summary']['order_count']);
+    }
+
     private function store(): Store
     {
         $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);

@@ -30,12 +30,14 @@ class MarketplaceProfitReportService
         $filters = $this->normalizeFilters($filters);
 
         $qualityCounts = $this->filteredOrders($filters)
+            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->selectRaw('COALESCE(financial_data_status, ?) AS status, COUNT(*) AS total', ['unknown'])
             ->groupBy('financial_data_status')
             ->pluck('total', 'status')
             ->map(fn ($value) => (int) $value);
 
         $issueBreakdown = $this->filteredOrders($filters)
+            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->where(function (Builder $query) {
                 $query->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE)
                     ->orWhereNull('financial_data_status');
@@ -52,6 +54,7 @@ class MarketplaceProfitReportService
             ->all();
 
         $ordersQuery = $this->filteredOrders($filters)
+            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
             ->whereHas('settlement', function (Builder $query) {
                 $query->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE);
