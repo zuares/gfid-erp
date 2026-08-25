@@ -210,7 +210,7 @@
                     <div class="alert alert-info py-2" style="font-size:.8rem">
                         Pilih satu atau beberapa toko. Setiap toko memakai akun bank tujuannya sendiri.
                         Hanya transaksi pencairan wallet Shopee yang diimpor sebagai Draft.
-                        Periode maksimal 31 hari dan otomatis dipecah menjadi request 15 hari.
+                        Periode panjang otomatis dipecah menjadi request maksimal 15 hari ke Shopee.
                     </div>
 
                     <div class="mb-3">

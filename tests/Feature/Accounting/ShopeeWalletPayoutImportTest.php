@@ -132,7 +132,7 @@ class ShopeeWalletPayoutImportTest extends TestCase
         });
 
         $importer = app(ShopeeWalletPayoutImportService::class);
-        $from = now()->subDays(30)->startOfDay();
+        $from = now()->subDays(31)->startOfDay();
         $to = now()->endOfDay();
 
         $result = $importer->import($store, $from, $to, $bank->id);

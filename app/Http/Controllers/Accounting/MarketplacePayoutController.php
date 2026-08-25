@@ -89,15 +89,8 @@ class MarketplacePayoutController extends Controller
                 ->with('message', 'Pilih minimal satu toko Shopee.');
         }
 
-        // UI mengizinkan maksimal 31 tanggal kalender. Service akan memecah
-        // periode ini menjadi request Shopee maksimal 15 tanggal kalender.
         $fromDate = Carbon::parse($data['from'])->startOfDay();
         $toDate = Carbon::parse($data['to'])->startOfDay();
-
-        if ($fromDate->diffInDays($toDate) > 30) {
-            return back()->with('status', 'error')
-                ->with('message', 'Periode import Shopee maksimal 31 hari.');
-        }
 
         $from = $fromDate;
         $to = $toDate->copy()->endOfDay();
