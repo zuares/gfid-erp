@@ -73,6 +73,11 @@
             <dt>Akun Bank</dt>
             <dd>{{ $p->bankAccount?->code }} – {{ $p->bankAccount?->name }}</dd>
 
+            @if($p->store)
+                <dt>Toko</dt>
+                <dd>{{ $p->store->name }} <span class="text-muted">({{ ucfirst($p->source ?: 'manual') }})</span></dd>
+            @endif
+
             <dt>Referensi</dt>
             <dd>{{ $p->reference ?: '-' }}</dd>
 

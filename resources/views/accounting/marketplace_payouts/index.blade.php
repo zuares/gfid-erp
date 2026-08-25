@@ -65,10 +65,17 @@
             <h5 class="mb-0 fw-black">Penerimaan Marketplace</h5>
             <div class="text-muted" style="font-size:.8rem">Pencatatan disbursement / settlement dari marketplace</div>
         </div>
-        <a href="{{ route('accounting.marketplace-payouts.create') }}" class="mp-btn mp-btn-primary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Tambah Penerimaan
-        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            @if($shopeeStores->isNotEmpty())
+                <button type="button" class="mp-btn" data-bs-toggle="modal" data-bs-target="#importShopeeModal">
+                    Import Shopee
+                </button>
+            @endif
+            <a href="{{ route('accounting.marketplace-payouts.create') }}" class="mp-btn mp-btn-primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                Tambah Penerimaan
+            </a>
+        </div>
     </div>
 
     {{-- Flash --}}
@@ -181,4 +188,60 @@
     {{ $payouts->withQueryString()->links() }}
 
 </div>
+
+@if($shopeeStores->isNotEmpty())
+<div class="modal fade" id="importShopeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">Import Pencairan Shopee</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ route('accounting.marketplace-payouts.import-shopee') }}">
+                @csrf
+                <div class="modal-body">
+                    <div class="alert alert-info py-2" style="font-size:.8rem">
+                        Hanya transaksi <strong>Withdrawal Completed</strong> yang diimpor sebagai Draft.
+                        Biaya iklan, order income, dan adjustment tidak ikut masuk.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size:.8rem">Toko Shopee</label>
+                        <select name="store_id" class="form-select" required>
+                            @foreach($shopeeStores as $store)
+                                <option value="{{ $store->id }}">{{ $store->name }}{{ $store->code ? ' • '.$store->code : '' }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold" style="font-size:.8rem">Dari</label>
+                            <input type="date" name="from" class="form-control" value="{{ now()->subDays(14)->format('Y-m-d') }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold" style="font-size:.8rem">Sampai</label>
+                            <input type="date" name="to" class="form-control" value="{{ now()->format('Y-m-d') }}" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label fw-bold" style="font-size:.8rem">Akun Bank Tujuan</label>
+                        <select name="bank_account_id" class="form-select" required>
+                            <option value="">-- Pilih Akun --</option>
+                            @foreach($bankAccounts as $acc)
+                                <option value="{{ $acc->id }}">{{ $acc->code }} – {{ $acc->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="mp-btn" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="mp-btn mp-btn-primary">Ambil dari Shopee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 @endsection

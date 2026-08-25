@@ -46,6 +46,8 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
 
     // ✅ Marketplace Payouts
     Route::resource('marketplace-payouts', MarketplacePayoutController::class);
+    Route::post('marketplace-payouts/import/shopee', [MarketplacePayoutController::class, 'importShopee'])
+        ->name('marketplace-payouts.import-shopee');
     Route::post('marketplace-payouts/{marketplacePayout}/post', [MarketplacePayoutController::class, 'post'])->name('marketplace-payouts.post');
     Route::post('marketplace-payouts/{marketplacePayout}/void', [MarketplacePayoutController::class, 'void'])->name('marketplace-payouts.void');
 

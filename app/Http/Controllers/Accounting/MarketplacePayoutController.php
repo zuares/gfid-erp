@@ -5,16 +5,20 @@ namespace App\Http\Controllers\Accounting;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\MarketplacePayout;
+use App\Models\Store;
 use App\Services\Accounting\MarketplacePayoutService;
+use App\Services\Accounting\ShopeeWalletPayoutImportService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class MarketplacePayoutController extends Controller
 {
     public function index(Request $request)
     {
         $q = MarketplacePayout::query()
-            ->with(['bankAccount', 'journal'])
+            ->with(['bankAccount', 'journal', 'store'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -52,12 +56,65 @@ class MarketplacePayoutController extends Controller
 
         $payouts = $q->paginate(25)->withQueryString();
         $bankAccounts = $this->bankAccountOptions();
+        $shopeeStores = Store::query()
+            ->with('channel')
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($query) => $query->whereIn('code', ['shopee', 'SHP', 'SHOPEE']))
+            ->orderBy('name')
+            ->get();
         $marketplaceNames = MarketplacePayout::select('marketplace_name')
             ->distinct()->orderBy('marketplace_name')->pluck('marketplace_name');
 
         return view('accounting.marketplace_payouts.index', compact(
-            'payouts', 'summary', 'bankAccounts', 'marketplaceNames'
+            'payouts', 'summary', 'bankAccounts', 'marketplaceNames', 'shopeeStores'
         ));
+    }
+
+    public function importShopee(Request $request, ShopeeWalletPayoutImportService $importer)
+    {
+        $data = $request->validate([
+            'store_id'        => ['required', 'integer', 'exists:stores,id'],
+            'bank_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'from'            => ['required', 'date'],
+            'to'              => ['required', 'date', 'after_or_equal:from'],
+        ]);
+
+        if (! $this->isBankAccount((int) $data['bank_account_id'])) {
+            return back()->with('status', 'error')
+                ->with('message', 'Akun tujuan harus akun kas/bank yang aktif.');
+        }
+
+        $from = Carbon::parse($data['from'])->startOfDay();
+        $to = Carbon::parse($data['to'])->endOfDay();
+
+        if ($from->diffInDays($to) > 14) {
+            return back()->with('status', 'error')
+                ->with('message', 'Periode import Shopee maksimal 15 hari.');
+        }
+
+        $store = Store::with('channel')
+            ->whereKey((int) $data['store_id'])
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($query) => $query->whereIn('code', ['shopee', 'SHP', 'SHOPEE']))
+            ->firstOrFail();
+
+        try {
+            $result = $importer->import(
+                $store,
+                $from,
+                $to,
+                (int) $data['bank_account_id'],
+                Auth::id()
+            );
+        } catch (Throwable $e) {
+            report($e);
+
+            return back()->with('status', 'error')
+                ->with('message', 'Import Shopee gagal: ' . $e->getMessage());
+        }
+
+        return back()->with('status', 'ok')
+            ->with('message', "Import Shopee selesai: {$result['created']} draft baru, {$result['skipped']} dilewati (sudah ada/tidak valid).");
     }
 
     public function create()
@@ -98,7 +155,7 @@ class MarketplacePayoutController extends Controller
 
     public function show(MarketplacePayout $marketplacePayout)
     {
-        $marketplacePayout->load(['bankAccount', 'journal.lines.account']);
+        $marketplacePayout->load(['bankAccount', 'store', 'journal.lines.account']);
 
         return view('accounting.marketplace_payouts.show', compact('marketplacePayout'));
     }

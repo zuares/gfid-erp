@@ -405,6 +405,46 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
+    /**
+     * Ambil mutasi wallet toko local dari Shopee.
+     *
+     * Page number di endpoint ini menggunakan offset (mulai dari 0), bukan
+     * cursor seperti beberapa endpoint order Shopee.
+     */
+    public function getWalletTransactionList(
+        Store $store,
+        int $pageNo = 0,
+        int $pageSize = 100,
+        ?int $createTimeFrom = null,
+        ?int $createTimeTo = null,
+        ?string $moneyFlow = null,
+        ?string $transactionType = null,
+        ?string $walletType = null
+    ): array {
+        $params = [
+            'page_no'   => max(0, $pageNo),
+            'page_size' => min(100, max(1, $pageSize)),
+        ];
+
+        if ($createTimeFrom !== null) {
+            $params['create_time_from'] = $createTimeFrom;
+        }
+        if ($createTimeTo !== null) {
+            $params['create_time_to'] = $createTimeTo;
+        }
+        if ($moneyFlow !== null && $moneyFlow !== '') {
+            $params['money_flow'] = $moneyFlow;
+        }
+        if ($transactionType !== null && $transactionType !== '') {
+            $params['transaction_type'] = $transactionType;
+        }
+        if ($walletType !== null && $walletType !== '') {
+            $params['wallet_type'] = $walletType;
+        }
+
+        return $this->post($store, '/api/v2/payment/get_wallet_transaction_list', $params);
+    }
+
     // ─── Ads API ──────────────────────────────────────────────────────────────
 
     /**
