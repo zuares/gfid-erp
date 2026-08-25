@@ -45,7 +45,7 @@
     // === STATUS ===
     $statusOptions = [
         'draft' => 'Draft',
-        'approved' => 'Approved',
+        'approved' => 'Posted',
         'cancelled' => 'Cancelled',
     ];
     $statusValue = old('status', $order?->status ?? 'draft');

@@ -19,7 +19,7 @@
     $statusOptions = [
         '' => 'Semua Status',
         'draft' => 'Draft',
-        'approved' => 'Approved',
+        'approved' => 'Posted',
         'cancelled' => 'Cancelled',
     ];
 
@@ -336,7 +336,7 @@
         <x-slot name="kpis">
             <span class="kpi"><span class="lbl">Total PO</span><span class="val mono">{{ $summary->total_orders ?? 0 }}</span></span>
             <span class="kpi"><span class="lbl">Draft</span><span class="val mono">{{ $summary->draft_count ?? 0 }}</span></span>
-            <span class="kpi"><span class="lbl">Approved</span><span class="val mono">{{ $summary->approved_count ?? 0 }}</span></span>
+            <span class="kpi"><span class="lbl">Posted</span><span class="val mono">{{ $summary->approved_count ?? 0 }}</span></span>
             @if ($canSeeMoney)
                 <span class="kpi" style="background: rgba(22, 163, 74, 0.05); border-color: rgba(22, 163, 74, 0.2);"><span class="lbl" style="color:#15803d;">Total Nilai</span><span class="val mono" style="color:#16a34a;">Rp {{ number_format($summary->total_grand_total ?? 0, 0, ',', '.') }}</span></span>
             @endif
@@ -469,7 +469,7 @@
                 default => 'st-draft',
             };
             $statusLabel = match ((string) $uiStatus) {
-                'approved' => 'Approved',
+                'approved' => 'Posted',
                 'cancelled' => 'Cancelled',
                 default => 'Draft',
             };

@@ -235,7 +235,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
            default => 'draft'
        };
        $statusLabel = match($status) {
-           'approved' => 'APPROVED',
+           'approved' => 'POSTED',
            'closed' => 'CLOSED',
            'cancelled' => 'CANCELLED',
            default => 'DRAFT'

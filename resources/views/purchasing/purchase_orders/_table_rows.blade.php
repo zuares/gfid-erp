@@ -111,6 +111,12 @@
             'closed' => 'status-badge status-badge-closed',
             default => 'status-badge status-badge-draft',
         };
+        $statusLabel = match ((string) $order->status) {
+            'approved' => 'Posted',
+            'closed' => 'Closed',
+            'cancelled' => 'Cancelled',
+            default => 'Draft',
+        };
     @endphp
 
     <tr class="index-table-row">
@@ -163,7 +169,7 @@
         {{-- STATUS --}}
         <td>
             <span class="{{ $statusClass }}">
-                {{ ucfirst($order->status) }}
+                {{ $statusLabel }}
             </span>
         </td>
 
