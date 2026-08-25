@@ -11,8 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class MarketplacePayoutService
 {
+    private const MARKETPLACE_BALANCE_ACCOUNT_CODE = '1303';
+
     /**
-     * POST: Dr Bank / Cr 1302 Piutang Marketplace
+     * POST pencairan wallet: Dr Bank / Cr 1303 Saldo Marketplace.
      */
     public function post(MarketplacePayout $payout): MarketplacePayout
     {
@@ -33,10 +35,12 @@ class MarketplacePayoutService
                 throw ValidationException::withMessages(['amount' => 'Amount harus > 0.']);
             }
 
-            $piutangAccount = Account::where('code', '1302')->where('is_active', true)->first();
-            if (! $piutangAccount) {
+            $marketplaceBalanceAccount = Account::where('code', self::MARKETPLACE_BALANCE_ACCOUNT_CODE)
+                ->where('is_active', true)
+                ->first();
+            if (! $marketplaceBalanceAccount) {
                 throw ValidationException::withMessages([
-                    'account' => 'Akun 1302 Piutang Marketplace tidak ditemukan.',
+                    'account' => 'Akun 1303 Saldo Marketplace tidak ditemukan.',
                 ]);
             }
 
@@ -61,10 +65,10 @@ class MarketplacePayoutService
                 'credit'     => 0,
             ]);
 
-            // Cr 1302 Piutang Marketplace
+            // Cr 1303 Saldo Marketplace
             JournalLine::create([
                 'journal_id' => $journal->id,
-                'account_id' => $piutangAccount->id,
+                'account_id' => $marketplaceBalanceAccount->id,
                 'debit'      => 0,
                 'credit'     => $locked->amount,
             ]);

@@ -90,6 +90,8 @@
         .mp-status-draft { color: #a16207; background: #fefce8; border-color: #fde68a; }
         .mp-status-posted { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
         .mp-status-void { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+        .mp-journal-link { display: inline-block; margin-top: .22rem; color: #64748b; font-size: .68rem; font-weight: 650; text-decoration: none; }
+        .mp-journal-link:hover { color: #1d4ed8; text-decoration: underline; }
         .mp-row-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #dbe4ee; border-radius: 8px; color: #64748b; text-decoration: none; }
         .mp-row-action:hover { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
         .mp-empty { padding: 3.5rem 1rem !important; color: #64748b; text-align: center; }
@@ -150,11 +152,22 @@
         .mp-filter .form-control, .mp-filter .form-select { min-height: 36px; border-radius: 8px; font-size: .78rem; }
         .mp-filter-actions { justify-content: flex-end; }
         .mp-filter-actions .mp-btn { min-height: 32px; padding: .38rem .75rem; border-radius: 7px; font-size: .74rem; box-shadow: none; }
+        .mp-btn-primary { background: #334155; border-color: #334155; box-shadow: none; }
+        .mp-btn-primary:hover { background: #1f2937; border-color: #1f2937; }
         .mp-panel { border-radius: 8px; box-shadow: none; }
         .mp-table-toolbar { padding: .7rem .8rem; }
         .mp-table-wrap { max-height: 60vh; }
-        .mp-table th { padding: .75rem 1rem; }
-        .mp-table td { padding: .55rem .85rem; font-size: .78rem; }
+        .mp-table th { padding: .75rem 1rem; border-bottom-width: 1px; background: var(--card, #fff); font-size: .64rem; letter-spacing: .04em; }
+        .mp-table td { padding: .55rem .85rem; border-top-color: rgba(148,163,184,.16); font-size: .78rem; }
+        .mp-date-main { font-weight: 650; }
+        .mp-store-name { font-weight: 600; }
+        .mp-reference { max-width: none; padding: .2rem .5rem; border: 1px solid rgba(148,163,184,.25); border-radius: 6px; background: rgba(148,163,184,.12); color: #334155; font-family: inherit; font-size: .68rem; font-weight: 650; letter-spacing: .01em; }
+        .mp-status { border-radius: 7px; padding: .16rem .48rem; font-size: .68rem; font-weight: 600; }
+        .mp-status::before { width: 7px; height: 7px; }
+        .mp-row-action { width: 32px; height: 32px; border-radius: 8px; }
+        body[data-theme="dark"] .mp-table th { background: var(--card, #0f172a); color: #9ca3af; border-bottom-color: rgba(30,64,175,.6); }
+        body[data-theme="dark"] .mp-table td { border-top-color: rgba(51,65,85,.85); }
+        body[data-theme="dark"] .mp-reference { background: rgba(51,65,85,.55); border-color: rgba(71,85,105,.8); color: #cbd5e1; }
         body[data-theme="dark"] .mp-hero,
         body[data-theme="dark"] .mp-filter-bar,
         body[data-theme="dark"] .mp-panel { background: var(--card, #0f172a); border-color: rgba(51,65,85,.75); }
@@ -313,7 +326,7 @@
                         <th>Referensi</th>
                         <th>Akun Bank</th>
                         <th class="text-end">Jumlah</th>
-                        <th>Status</th>
+                        <th>Status / jurnal</th>
                         <th class="text-end">Detail</th>
                     </tr>
                 </thead>
@@ -341,6 +354,11 @@
                                 <span class="mp-status mp-status-{{ $p->status }}">
                                     {{ $statusLabels[$p->status] ?? $p->status }}
                                 </span>
+                                @if($p->journal_id)
+                                    <a href="{{ route('accounting.journals.show', $p->journal_id) }}" class="mp-journal-link" onclick="event.stopPropagation()">
+                                        <i class="bi bi-link-45deg"></i> Jurnal #{{ $p->journal_id }}
+                                    </a>
+                                @endif
                             </td>
                             <td class="text-end"><a href="{{ route('accounting.marketplace-payouts.show', $p) }}" class="mp-row-action" aria-label="Buka detail"><i class="bi bi-arrow-up-right"></i></a></td>
                         </tr>
