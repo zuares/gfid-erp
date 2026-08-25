@@ -73,15 +73,20 @@ class MarketplacePayoutController extends Controller
     public function importShopee(Request $request, ShopeeWalletPayoutImportService $importer)
     {
         $data = $request->validate([
-            'store_id'        => ['required', 'integer', 'exists:stores,id'],
-            'bank_account_id' => ['required', 'integer', 'exists:accounts,id'],
-            'from'            => ['required', 'date'],
-            'to'              => ['required', 'date', 'after_or_equal:from'],
+            'stores'                    => ['nullable', 'array'],
+            'stores.*'                  => ['array'],
+            'stores.*.enabled'         => ['nullable', 'boolean'],
+            'stores.*.bank_account_id'  => ['nullable', 'integer', 'exists:accounts,id'],
+            'from'                      => ['required', 'date'],
+            'to'                        => ['required', 'date', 'after_or_equal:from'],
         ]);
 
-        if (! $this->isBankAccount((int) $data['bank_account_id'])) {
+        $selectedStores = collect($data['stores'] ?? [])
+            ->filter(fn (array $store) => (bool) ($store['enabled'] ?? false));
+
+        if ($selectedStores->isEmpty()) {
             return back()->with('status', 'error')
-                ->with('message', 'Akun tujuan harus akun kas/bank yang aktif.');
+                ->with('message', 'Pilih minimal satu toko Shopee.');
         }
 
         // Batas Shopee adalah 15 tanggal kalender. Bandingkan kedua tanggal
@@ -99,35 +104,74 @@ class MarketplacePayoutController extends Controller
         $from = $fromDate;
         $to = $toDate->copy()->endOfDay();
 
-        $store = Store::with('channel')
-            ->whereKey((int) $data['store_id'])
+        $stores = Store::with('channel')
+            ->whereIn('id', array_map('intval', array_keys($selectedStores->all())))
             ->where('is_active', true)
             ->whereHas('channel', fn ($query) => $query->whereIn('code', ['shopee', 'SHP', 'SHOPEE']))
-            ->firstOrFail();
+            ->get()
+            ->keyBy('id');
 
-        try {
-            $result = $importer->import(
-                $store,
-                $from,
-                $to,
-                (int) $data['bank_account_id'],
-                Auth::id()
-            );
-        } catch (Throwable $e) {
-            report($e);
+        $totals = [
+            'stores'                => 0,
+            'created'               => 0,
+            'skipped'               => 0,
+            'skippedExisting'       => 0,
+            'bankConflicts'         => 0,
+            'skippedInvalid'        => 0,
+            'skippedInvalidReasons' => [],
+            'errors'                => [],
+        ];
 
-            return back()->with('status', 'error')
-                ->with('message', 'Import Shopee gagal: ' . $e->getMessage());
+        foreach ($selectedStores as $storeId => $storeData) {
+            $store = $stores->get((int) $storeId);
+
+            if (! $store) {
+                $totals['errors'][] = "Toko #{$storeId} tidak aktif atau bukan toko Shopee.";
+                continue;
+            }
+
+            $bankAccountId = (int) ($storeData['bank_account_id'] ?? 0);
+            if (! $bankAccountId || ! $this->isBankAccount($bankAccountId)) {
+                $totals['errors'][] = "{$store->name}: akun tujuan harus akun kas/bank yang aktif.";
+                continue;
+            }
+
+            try {
+                $result = $importer->import($store, $from, $to, $bankAccountId, Auth::id());
+                $totals['stores']++;
+                $totals['created'] += $result['created'];
+                $totals['skipped'] += $result['skipped'];
+                $totals['skippedExisting'] += $result['skippedExisting'];
+                $totals['bankConflicts'] += $result['bankConflicts'] ?? 0;
+                $totals['skippedInvalid'] += $result['skippedInvalid'];
+
+                foreach ($result['skippedInvalidReasons'] ?? [] as $reason => $count) {
+                    $totals['skippedInvalidReasons'][$reason] =
+                        ($totals['skippedInvalidReasons'][$reason] ?? 0) + $count;
+                }
+            } catch (Throwable $e) {
+                report($e);
+                $totals['errors'][] = "{$store->name}: {$e->getMessage()}";
+            }
         }
 
-        $reasonText = collect($result['skippedInvalidReasons'] ?? [])
+        if ($totals['stores'] === 0 && $totals['errors'] !== []) {
+            return back()->with('status', 'error')
+                ->with('message', 'Import Shopee gagal: ' . implode(' | ', $totals['errors']));
+        }
+
+        $reasonText = collect($totals['skippedInvalidReasons'])
             ->map(fn ($count, $reason) => "{$reason}: {$count}")
             ->implode(', ');
+        $errorText = $totals['errors'] !== []
+            ? '; gagal: ' . implode(' | ', $totals['errors'])
+            : '';
 
-        return back()->with('status', 'ok')
-            ->with('message', "Import Shopee selesai: {$result['created']} draft baru, {$result['skipped']} dilewati "
-                . "(sudah ada: {$result['skippedExisting']}, tidak valid: {$result['skippedInvalid']}"
-                . ($reasonText !== '' ? "; {$reasonText}" : '') . ').');
+        return back()->with('status', $totals['errors'] === [] ? 'ok' : 'error')
+            ->with('message', "Import Shopee selesai untuk {$totals['stores']} toko: {$totals['created']} draft baru, "
+                . "{$totals['skipped']} dilewati (sudah ada: {$totals['skippedExisting']}, "
+                . "konflik akun bank: {$totals['bankConflicts']}, tidak valid: {$totals['skippedInvalid']}"
+                . ($reasonText !== '' ? "; {$reasonText}" : '') . "{$errorText}).");
     }
 
     public function create()

@@ -150,6 +150,7 @@
                     <tr>
                         <th>Tanggal</th>
                         <th>Marketplace</th>
+                        <th>Toko</th>
                         <th>Referensi</th>
                         <th>Akun Bank</th>
                         <th class="text-end">Jumlah</th>
@@ -165,6 +166,12 @@
                                 </div>
                             </td>
                             <td style="font-weight:850">{{ $p->marketplace_name }}</td>
+                            <td>
+                                <div style="font-weight:800">{{ $p->store?->name ?? '-' }}</div>
+                                @if($p->store?->code)
+                                    <div style="color:#94a3b8; font-size:.74rem">{{ $p->store->code }}</div>
+                                @endif
+                            </td>
                             <td style="color:#64748b; font-size:.82rem">{{ $p->reference ?: '-' }}</td>
                             <td>
                                 <div style="font-weight:760">{{ $p->bankAccount?->name ?? '-' }}</div>
@@ -178,7 +185,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="mp-empty">Belum ada penerimaan marketplace.</td></tr>
+                        <tr><td colspan="7" class="mp-empty">Belum ada penerimaan marketplace.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -191,7 +198,7 @@
 
 @if($shopeeStores->isNotEmpty())
 <div class="modal fade" id="importShopeeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h6 class="modal-title fw-bold">Import Pencairan Shopee</h6>
@@ -201,17 +208,64 @@
                 @csrf
                 <div class="modal-body">
                     <div class="alert alert-info py-2" style="font-size:.8rem">
+                        Pilih satu atau beberapa toko. Setiap toko memakai akun bank tujuannya sendiri.
                         Hanya transaksi pencairan wallet Shopee yang diimpor sebagai Draft.
-                        Biaya iklan, order income, dan adjustment tidak ikut masuk.
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size:.8rem">Toko Shopee</label>
-                        <select name="store_id" class="form-select" required>
-                            @foreach($shopeeStores as $store)
-                                <option value="{{ $store->id }}">{{ $store->name }}{{ $store->code ? ' • '.$store->code : '' }}</option>
-                            @endforeach
-                        </select>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label fw-bold mb-0" style="font-size:.8rem">Toko Shopee</label>
+                            <button type="button" class="btn btn-link btn-sm p-0" id="selectAllShopeeStores">
+                                Pilih semua toko
+                            </button>
+                        </div>
+                        <div class="table-responsive border rounded">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:42px"></th>
+                                        <th>Toko</th>
+                                        <th style="min-width:220px">Akun Bank Tujuan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($shopeeStores as $store)
+                                        <tr>
+                                            <td>
+                                                <input
+                                                    class="form-check-input shopee-store-toggle"
+                                                    type="checkbox"
+                                                    name="stores[{{ $store->id }}][enabled]"
+                                                    value="1"
+                                                    @checked($loop->first)
+                                                >
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold">{{ $store->name }}</div>
+                                                @if($store->code)
+                                                    <div class="text-muted" style="font-size:.72rem">{{ $store->code }}</div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <select
+                                                    name="stores[{{ $store->id }}][bank_account_id]"
+                                                    class="form-select form-select-sm shopee-store-bank"
+                                                >
+                                                    <option value="">-- Pilih Akun --</option>
+                                                    @foreach($bankAccounts as $acc)
+                                                        <option value="{{ $acc->id }}">{{ $acc->code }} – {{ $acc->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-muted mt-2" style="font-size:.74rem">
+                            Transaksi yang sama pada toko yang sama tetap tidak dibuat dua kali. Jika akun bank berbeda,
+                            transaksi akan dilewati dan dilaporkan sebagai konflik akun bank.
+                        </div>
                     </div>
 
                     <div class="row g-2 mb-3">
@@ -225,15 +279,6 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label class="form-label fw-bold" style="font-size:.8rem">Akun Bank Tujuan</label>
-                        <select name="bank_account_id" class="form-select" required>
-                            <option value="">-- Pilih Akun --</option>
-                            @foreach($bankAccounts as $acc)
-                                <option value="{{ $acc->id }}">{{ $acc->code }} – {{ $acc->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="mp-btn" data-bs-dismiss="modal">Batal</button>
@@ -244,4 +289,37 @@
     </div>
 </div>
 @endif
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modal = document.getElementById('importShopeeModal');
+            if (!modal) return;
+
+            const syncStoreRow = function (checkbox) {
+                const bankSelect = checkbox.closest('tr')?.querySelector('.shopee-store-bank');
+                if (bankSelect) bankSelect.disabled = !checkbox.checked;
+            };
+
+            const toggles = Array.from(modal.querySelectorAll('.shopee-store-toggle'));
+            toggles.forEach(function (checkbox) {
+                syncStoreRow(checkbox);
+                checkbox.addEventListener('change', function () {
+                    syncStoreRow(checkbox);
+                });
+            });
+
+            document.getElementById('selectAllShopeeStores')?.addEventListener('click', function () {
+                const shouldSelectAll = toggles.some(function (checkbox) {
+                    return !checkbox.checked;
+                });
+
+                toggles.forEach(function (checkbox) {
+                    checkbox.checked = shouldSelectAll;
+                    syncStoreRow(checkbox);
+                });
+            });
+        });
+    </script>
+@endpush
 @endsection

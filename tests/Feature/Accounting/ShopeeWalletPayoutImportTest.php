@@ -43,6 +43,7 @@ class ShopeeWalletPayoutImportTest extends TestCase
             'created' => 1,
             'skipped' => 1,
             'skippedExisting' => 0,
+            'bankConflicts' => 0,
             'skippedInvalid' => 1,
             'skippedInvalidReasons' => ['non_withdrawal_type' => 1],
         ], $first);
@@ -61,10 +62,38 @@ class ShopeeWalletPayoutImportTest extends TestCase
             'created' => 0,
             'skipped' => 2,
             'skippedExisting' => 1,
+            'bankConflicts' => 0,
             'skippedInvalid' => 1,
             'skippedInvalidReasons' => ['non_withdrawal_type' => 1],
         ], $second);
         $this->assertDatabaseCount('marketplace_payouts', 1);
+
+        $otherBank = Account::create([
+            'code'      => '1102',
+            'name'      => 'Bank Test Lain',
+            'type'      => 'asset',
+            'is_cash'   => true,
+            'is_active' => true,
+        ]);
+
+        $third = $importer->import($store, $from, $to, $otherBank->id);
+
+        $this->assertSame([
+            'created' => 0,
+            'skipped' => 2,
+            'skippedExisting' => 1,
+            'bankConflicts' => 1,
+            'skippedInvalid' => 1,
+            'skippedInvalidReasons' => ['non_withdrawal_type' => 1],
+        ], $third);
+        $this->assertDatabaseHas('marketplace_payouts', [
+            'external_transaction_id' => '987654321',
+            'bank_account_id' => $bank->id,
+        ]);
+        $this->assertDatabaseMissing('marketplace_payouts', [
+            'external_transaction_id' => '987654321',
+            'bank_account_id' => $otherBank->id,
+        ]);
 
         Http::assertSent(function ($request) use ($from, $to) {
             $body = $request->data();

@@ -52,6 +52,7 @@ class ShopeeWalletPayoutImportService
         $created = 0;
         $skipped = 0;
         $skippedExisting = 0;
+        $bankConflicts = 0;
         $skippedInvalid = 0;
         $skippedInvalidReasons = [];
         $pageNo = 0;
@@ -121,14 +122,17 @@ class ShopeeWalletPayoutImportService
                     continue;
                 }
 
-                $exists = MarketplacePayout::query()
+                $existing = MarketplacePayout::query()
                     ->where('store_id', $store->id)
                     ->where('external_transaction_id', $transactionId)
-                    ->exists();
+                    ->first(['id', 'bank_account_id']);
 
-                if ($exists) {
+                if ($existing) {
                     $skipped++;
                     $skippedExisting++;
+                    if ((int) $existing->bank_account_id !== $bankAccountId) {
+                        $bankConflicts++;
+                    }
                     continue;
                 }
 
@@ -136,7 +140,7 @@ class ShopeeWalletPayoutImportService
                     ? Carbon::createFromTimestamp($createdTime, config('app.timezone'))
                     : $from->copy();
 
-                $wasCreated = DB::transaction(function () use (
+                $importResult = DB::transaction(function () use (
                     $store,
                     $bankAccountId,
                     $createdBy,
@@ -144,17 +148,20 @@ class ShopeeWalletPayoutImportService
                     $transactionId,
                     $amount,
                     $date
-                ): bool {
+                ): array {
                     // Cek ulang di dalam transaksi untuk mengurangi risiko
                     // duplikasi jika dua user menekan import bersamaan.
                     $alreadyImported = MarketplacePayout::query()
                         ->where('store_id', $store->id)
                         ->where('external_transaction_id', $transactionId)
                         ->lockForUpdate()
-                        ->exists();
+                        ->first(['id', 'bank_account_id']);
 
                     if ($alreadyImported) {
-                        return false;
+                        return [
+                            'created'       => false,
+                            'bank_conflict' => (int) $alreadyImported->bank_account_id !== $bankAccountId,
+                        ];
                     }
 
                     $reason = trim((string) data_get($row, 'reason', ''));
@@ -179,14 +186,17 @@ class ShopeeWalletPayoutImportService
                         'notes'                   => "Diimpor dari wallet Shopee; status {$status}.",
                     ]);
 
-                    return true;
+                    return ['created' => true, 'bank_conflict' => false];
                 });
 
-                if ($wasCreated) {
+                if ($importResult['created']) {
                     $created++;
                 } else {
                     $skipped++;
                     $skippedExisting++;
+                    if ($importResult['bank_conflict']) {
+                        $bankConflicts++;
+                    }
                 }
             }
 
@@ -194,7 +204,14 @@ class ShopeeWalletPayoutImportService
             $more = (bool) data_get($result, 'response.more', data_get($result, 'more', false));
         } while ($more && count($rows) > 0);
 
-        return compact('created', 'skipped', 'skippedExisting', 'skippedInvalid', 'skippedInvalidReasons');
+        return compact(
+            'created',
+            'skipped',
+            'skippedExisting',
+            'bankConflicts',
+            'skippedInvalid',
+            'skippedInvalidReasons'
+        );
     }
 
     private function normalizeTransactionRows(array $rows): array
