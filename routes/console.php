@@ -117,6 +117,12 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
     ->name('sync-settlements')
     ->withoutOverlapping();
 
+// Ambil estimated_escrow_amount untuk order pending setelah sync settlement nominal.
+Schedule::call(fn () => Artisan::call('marketplace:sync-income-details'))
+    ->cron('15 */4 * * *')
+    ->name('sync-income-details')
+    ->withoutOverlapping();
+
 // Isi tanggal dana cair lewat GetEscrowList setelah settlement nominal
 // selesai. Jalur terpisah supaya endpoint release yang bermasalah tidak menggagalkan
 // sync settlement utama; lock per toko tetap sama agar tidak overlap.

@@ -1604,4 +1604,75 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(0, $result['errors']);
         $this->assertStringContainsString('tidak tersedia', $result['message']);
     }
+
+    public function test_income_detail_pending_menyimpan_estimated_escrow_tanpa_menimpa_final_income(): void
+    {
+        $order = $this->createOrder(['order_status' => 'SHIPPED']);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('getIncomeDetail')
+                ->once()
+                ->withArgs(fn ($store, $dateFrom, $dateTo, $status, $pageSize, $cursor) =>
+                    $store->id === $this->store->id
+                    && $status === 2
+                    && $pageSize === 100
+                    && $cursor === '')
+                ->andReturn([
+                    'response' => [
+                        'income_detail' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'estimated_escrow_amount' => 54321,
+                        ]],
+                        'more' => false,
+                    ],
+                ]);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncIncomeDetails($this->store);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(0, $result['errors']);
+
+        $settlement = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->firstOrFail();
+        $this->assertSame(0.0, (float) $settlement->final_income);
+        $this->assertNull($settlement->settlement_time);
+        $this->assertSame(54321.0, (float) data_get($settlement->raw_json, '_income_detail.estimated_escrow_amount'));
+    }
+
+    public function test_income_detail_pending_tidak_mengubah_settlement_yang_sudah_cair(): void
+    {
+        $order = $this->createOrder(['order_status' => 'COMPLETED']);
+        $releaseTime = now()->subHour();
+        MarketplaceOrderSettlement::create([
+            'store_id' => $this->store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 77777,
+            'settlement_time' => $releaseTime,
+            'raw_json' => ['existing' => true],
+        ]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('getIncomeDetail')
+                ->once()
+                ->andReturn([
+                    'response' => [
+                        'income_detail' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'estimated_escrow_amount' => 12345,
+                        ]],
+                        'more' => false,
+                    ],
+                ]);
+        });
+
+        app(MarketplaceSyncService::class)->syncIncomeDetails($this->store);
+
+        $settlement = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->firstOrFail();
+        $this->assertSame(77777.0, (float) $settlement->final_income);
+        $this->assertEqualsWithDelta($releaseTime->timestamp, $settlement->settlement_time->timestamp, 1);
+        $this->assertTrue((bool) data_get($settlement->raw_json, 'existing'));
+        $this->assertNull(data_get($settlement->raw_json, '_income_detail.estimated_escrow_amount'));
+    }
 }

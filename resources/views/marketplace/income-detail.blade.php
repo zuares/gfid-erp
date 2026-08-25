@@ -2410,6 +2410,7 @@
                 const adjustmentTotal = Number(s.adjustment_total ?? 0);
                 let feePercent = s.fee_percent !== undefined && s.fee_percent !== null ? Number(s.fee_percent) : null;
                 let net = Number(s.final_income || 0);
+                const estimatedEscrowAmount = Number(s.estimated_escrow_amount || 0);
                 const statusMeta = getOrderStatusMeta(s.order?.order_status || s.order_status);
                 const orderDateText = s.order?.ordered_at ? fmtShortDate(s.order.ordered_at) : '—';
                 const settlementDateText = s.settlement_time ? fmtShortDate(s.settlement_time) : 'Belum cair';
@@ -2438,12 +2439,18 @@
                     net = 0;
                     s.final_income = 0;
                     s.gross_profit = 0 - (Number(s.cogs) || 0);
-                } else if (!isCompleted && shouldEstimatePendingIncome) {
-                    marketplaceFeePercent = 24.0;
-                    marketplaceFeeAfterAffiliate = Math.round(grossAfterVoucherToko * 0.24);
-                    sellerBurdenTotal = marketplaceFeeAfterAffiliate + affiliateCommission;
-                    feePercent = grossAfterVoucherToko > 0 ? (sellerBurdenTotal / grossAfterVoucherToko) * 100 : 0;
-                    net = Math.max(grossAfterVoucherToko - sellerBurdenTotal, 0);
+                } else if (!s.settlement_time && shouldEstimatePendingIncome) {
+                    if (estimatedEscrowAmount > 0) {
+                        // Nilai pending dari Shopee menjadi sumber utama.
+                        net = estimatedEscrowAmount;
+                    } else {
+                        // Fallback sementara bila income detail belum tersedia.
+                        marketplaceFeePercent = 24.0;
+                        marketplaceFeeAfterAffiliate = Math.round(grossAfterVoucherToko * 0.24);
+                        sellerBurdenTotal = marketplaceFeeAfterAffiliate + affiliateCommission;
+                        feePercent = grossAfterVoucherToko > 0 ? (sellerBurdenTotal / grossAfterVoucherToko) * 100 : 0;
+                        net = Math.max(grossAfterVoucherToko - sellerBurdenTotal, 0);
+                    }
                     s.final_income = net;
                     s.gross_profit = net - (Number(s.cogs) || 0);
                 } else if (!isCompleted && currentTab === 'semua') {
@@ -2507,11 +2514,11 @@
                                 <span class="income-money-value text-muted">${fmtRp(gross)}</span>
                             </div>
                             <div class="income-money-line">
-                                <span class="income-money-label">Net Toko</span>
+                                <span class="income-money-label">Net</span>
                                 <span class="income-money-value" style="color:#2563eb; font-weight:800;">${fmtRp(grossAfterVoucherToko)} <span style="font-size:.52rem; color:#94a3b8; font-weight:800;">(${gross > 0 ? ((grossAfterVoucherToko/gross)*100).toFixed(1) : '0.0'}%)</span></span>
                             </div>
                             <div class="income-money-line">
-                                <span class="income-money-label">Buyer Paid</span>
+                                <span class="income-money-label">Pembayaran Pembeli</span>
                                 <span class="income-money-value text-muted">${fmtRp(buyerPaid)} <span style="font-size:.52rem; color:#94a3b8; font-weight:800;">(${gross > 0 ? ((buyerPaid/gross)*100).toFixed(1) : '0.0'}%)</span></span>
                             </div>
                         </div>

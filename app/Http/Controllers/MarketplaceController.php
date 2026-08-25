@@ -3713,6 +3713,7 @@ class MarketplaceController extends Controller
             $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
 
             $netIncome = (float) $s->final_income;
+            $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($s);
             $isEstimatedIncome = false;
             $status = strtoupper($s->order?->order_status ?? '');
             $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
@@ -3724,6 +3725,11 @@ class MarketplaceController extends Controller
             } elseif ($isReturning) {
                 $netIncome = 0;
                 // cogs tetap terisi
+            } elseif (! $s->settlement_time && $estimatedEscrowAmount > 0) {
+                // Untuk pending, prioritaskan angka dari Shopee. Rumus 24% hanya
+                // fallback bila income detail belum berhasil disinkronkan.
+                $netIncome = $estimatedEscrowAmount;
+                $isEstimatedIncome = true;
             } elseif ($netIncome <= 0 && $grossAfterVoucherToko > 0) {
                 $estimatedFee = round($grossAfterVoucherToko * 0.24);
                 $netIncome = max($grossAfterVoucherToko - $estimatedFee - $affiliateDisplay, 0);
@@ -3774,6 +3780,7 @@ class MarketplaceController extends Controller
                 'escrow_tax'            => (float) $s->escrow_tax,
                 'ad_cost'               => (float) $s->ad_cost,
                 'final_income'          => (float) $netIncome,
+                'estimated_escrow_amount' => $estimatedEscrowAmount > 0 ? $estimatedEscrowAmount : null,
                 'is_estimated_income'   => $isEstimatedIncome,
                 'cogs'                  => (float) $cogs,
                 'gross_profit'          => (float) $grossProfit,
@@ -3937,8 +3944,30 @@ class MarketplaceController extends Controller
                 }
                 $kpiCogs += $cogs;
 
+                $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($s);
+
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
+                } elseif (! $s->settlement_time && $estimatedEscrowAmount > 0) {
+                    $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
+                    $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+                    $tokoVoucher = $this->settlementVoucherTokoAmount($s);
+                    $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
+                    $affiliateCommission = (float) (
+                        data_get($s->raw_json, 'affiliate_commission')
+                        ?? data_get($s->raw_json, 'affiliate_commission_amount')
+                        ?? data_get($s->raw_json, 'affiliate_fee')
+                        ?? data_get($s->raw_json, 'affiliate_commission_fee')
+                        ?? data_get($s->raw_json, 'seller_affiliate_fee')
+                        ?? $s->activity_fee
+                        ?? 0
+                    );
+                    $impliedMarketplaceFee = max($grossAfterVT - $estimatedEscrowAmount - $affiliateCommission, 0);
+
+                    $kpiAffiliate += $affiliateCommission;
+                    $kpiMarketplace += $impliedMarketplaceFee;
+                    $sellerFeeTotal += $impliedMarketplaceFee + $affiliateCommission;
+                    $kpiNet += $estimatedEscrowAmount;
                 } elseif ((float) $s->final_income <= 0) {
                     $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
                     $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
@@ -4091,6 +4120,15 @@ class MarketplaceController extends Controller
         }
 
         return (float) $s->buyer_payment_amount;
+    }
+
+    private function settlementEstimatedEscrowAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+        $value = data_get($raw, '_income_detail.estimated_escrow_amount')
+            ?? data_get($raw, 'estimated_escrow_amount');
+
+        return $value === null || $value === '' ? 0.0 : max(0.0, (float) $value);
     }
 
     private function settlementVoucherTokoAmount(MarketplaceOrderSettlement $s): float

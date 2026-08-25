@@ -386,6 +386,31 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil rincian penghasilan Seller Center berdasarkan status payout.
+     *
+     * Untuk status pending/to-release, rentang tanggal diwajibkan oleh API
+     * tetapi diabaikan oleh Shopee; tetap dikirim agar kontrak request valid.
+     */
+    public function getIncomeDetail(
+        Store $store,
+        string $dateFrom,
+        string $dateTo,
+        int $incomeStatus = 2,
+        int $pageSize = 100,
+        string $cursor = ''
+    ): array {
+        $params = [
+            'date_from'     => $dateFrom,
+            'date_to'       => $dateTo,
+            'income_status' => $incomeStatus,
+            'page_size'     => min(100, max(1, $pageSize)),
+            'cursor'        => $cursor,
+        ];
+
+        return $this->post($store, '/api/v2/payment/get_income_detail', $params);
+    }
+
+    /**
      * GetEscrowList mengembalikan daftar escrow berdasarkan waktu pencairan.
      * Endpoint ini dipisahkan dari get_escrow_detail karena detail escrow tidak
      * selalu mengirim timestamp pencairan.

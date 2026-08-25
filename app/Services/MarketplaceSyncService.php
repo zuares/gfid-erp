@@ -1108,6 +1108,224 @@ class MarketplaceSyncService
     }
 
     /**
+     * Sinkronkan nilai estimasi payout dari Payment GetIncomeDetail.
+     *
+     * Fase ini sengaja terpisah dari sync escrow final: estimated_escrow_amount
+     * hanya disimpan di metadata raw_json dan tidak pernah menimpa final_income
+     * maupun settlement_time. Dengan begitu data pending bisa dipakai UI tanpa
+     * mengubah histori dana yang sudah cair.
+     *
+     * @return array{found:int, updated:int, created:int, unmatched:int, pages:int, errors:int, message:string}
+     */
+    public function syncIncomeDetails(
+        Store $store,
+        int $incomeStatus = 2,
+        int $pageSize = 100,
+        ?callable $progress = null,
+    ): array {
+        $channelCode = strtolower((string) ($store->channel?->code ?? ''));
+        if (! in_array($channelCode, ['shopee', 'shp'], true)) {
+            return [
+                'found' => 0, 'updated' => 0, 'created' => 0, 'unmatched' => 0,
+                'pages' => 0, 'errors' => 0,
+                'message' => "Channel {$channelCode} belum mendukung income detail.",
+            ];
+        }
+
+        $pageSize = min(100, max(1, $pageSize));
+        $dateFrom = now()->subDay()->toDateString();
+        $dateTo = now()->toDateString();
+        $cursor = '';
+        $pages = 0;
+        $found = 0;
+        $updated = 0;
+        $created = 0;
+        $unmatched = 0;
+        $maxPages = 100;
+
+        try {
+            do {
+                $pages++;
+                $response = $this->gateway->getIncomeDetail(
+                    $store,
+                    $dateFrom,
+                    $dateTo,
+                    $incomeStatus,
+                    $pageSize,
+                    $cursor,
+                );
+
+                if (! empty($response['error'])
+                    || (($response['code'] ?? null) !== null && (string) $response['code'] !== '0')) {
+                    $error = (string) ($response['error'] ?? $response['code'] ?? 'unknown');
+                    $message = (string) ($response['message'] ?? $error);
+                    Log::warning('[sync-income-details] Endpoint gagal', [
+                        'store_id' => $store->id,
+                        'income_status' => $incomeStatus,
+                        'error' => $error,
+                        'message' => $message,
+                    ]);
+
+                    return [
+                        'found' => $found, 'updated' => $updated, 'created' => $created,
+                        'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
+                        'message' => "Income detail gagal: {$message}",
+                    ];
+                }
+
+                $rows = $this->extractIncomeDetailRows($response);
+                $found += count($rows);
+
+                foreach ($rows as $row) {
+                    $orderSn = (string) ($row['order_sn'] ?? $row['order_id'] ?? $row['ordersn'] ?? '');
+                    $estimated = $this->decimalValue($row['estimated_escrow_amount'] ?? null);
+
+                    if ($orderSn === '' || $estimated === null) {
+                        continue;
+                    }
+
+                    $order = MarketplaceOrder::where('store_id', $store->id)
+                        ->where('channel_order_id', $orderSn)
+                        ->first();
+
+                    if (! $order) {
+                        $unmatched++;
+                        continue;
+                    }
+
+                    $settlement = MarketplaceOrderSettlement::where('store_id', $store->id)
+                        ->where('channel_order_id', $orderSn)
+                        ->first();
+
+                    // Jangan memasukkan kembali data pending ke settlement yang
+                    // sudah final/cair.
+                    if ($settlement?->settlement_time) {
+                        continue;
+                    }
+
+                    $wasCreated = false;
+                    if (! $settlement) {
+                        $settlement = new MarketplaceOrderSettlement([
+                            'store_id' => $store->id,
+                            'order_id' => $order->id,
+                            'channel_order_id' => $orderSn,
+                            'buyer_payment_amount' => $order->total_paid_customer
+                                ?? $order->subtotal_items
+                                ?? $order->total_amount
+                                ?? 0,
+                            'final_income' => 0,
+                            'settlement_time' => null,
+                            'synced_at' => null,
+                        ]);
+                        $wasCreated = true;
+                    }
+
+                    $rawJson = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+                    $rawJson['_income_detail'] = [
+                        'income_status' => $incomeStatus,
+                        'estimated_escrow_amount' => (float) $estimated,
+                        'synced_at' => now()->toISOString(),
+                        'raw' => $row,
+                    ];
+                    $settlement->raw_json = $rawJson;
+                    $settlement->save();
+
+                    $wasCreated ? $created++ : $updated++;
+                }
+
+                $nextCursor = (string) (
+                    data_get($response, 'response.next_cursor')
+                    ?? data_get($response, 'response.cursor')
+                    ?? data_get($response, 'next_cursor')
+                    ?? ''
+                );
+                $hasMore = data_get($response, 'response.more')
+                    ?? data_get($response, 'response.has_more')
+                    ?? data_get($response, 'more')
+                    ?? data_get($response, 'has_more')
+                    ?? ($nextCursor !== '');
+
+                if (! $hasMore || $nextCursor === '' || $nextCursor === $cursor) {
+                    break;
+                }
+
+                $cursor = $nextCursor;
+                $this->reportProgress($progress, [
+                    'status' => 'running',
+                    'phase' => 'income_detail_page',
+                    'percent' => min(99, $pages),
+                    'label' => "Mengambil income detail halaman {$pages}…",
+                    'store_id' => $store->id,
+                ]);
+            } while ($pages < $maxPages);
+        } catch (\Throwable $e) {
+            Log::warning('[sync-income-details] Exception non-blocking', [
+                'store_id' => $store->id,
+                'income_status' => $incomeStatus,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'found' => $found, 'updated' => $updated, 'created' => $created,
+                'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
+                'message' => 'Income detail gagal sementara: ' . $e->getMessage(),
+            ];
+        }
+
+        return [
+            'found' => $found,
+            'updated' => $updated,
+            'created' => $created,
+            'unmatched' => $unmatched,
+            'pages' => $pages,
+            'errors' => 0,
+            'message' => "Income detail: {$updated} diperbarui, {$created} dibuat, {$unmatched} tidak cocok.",
+        ];
+    }
+
+    /**
+     * Normalisasi beberapa bentuk response get_income_detail antar versi API.
+     * Hanya array yang berisi order identifier yang dianggap sebagai baris data.
+     */
+    private function extractIncomeDetailRows(array $response): array
+    {
+        $candidates = [
+            data_get($response, 'response.income_detail'),
+            data_get($response, 'response.income_details'),
+            data_get($response, 'response.income_detail_list'),
+            data_get($response, 'response.list'),
+            data_get($response, 'response.data'),
+            data_get($response, 'income_detail'),
+            data_get($response, 'income_details'),
+            data_get($response, 'income_detail_list'),
+            data_get($response, 'list'),
+            data_get($response, 'data'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate)) {
+                continue;
+            }
+
+            $rows = array_is_list($candidate) ? $candidate : [$candidate];
+            $rows = array_values(array_filter($rows, static fn ($row) => is_array($row)
+                && ! empty($row['order_sn'] ?? $row['order_id'] ?? $row['ordersn'])));
+
+            if ($rows !== []) {
+                return $rows;
+            }
+        }
+
+        $responseRows = data_get($response, 'response');
+        if (is_array($responseRows) && array_is_list($responseRows)) {
+            return array_values(array_filter($responseRows, static fn ($row) => is_array($row)
+                && ! empty($row['order_sn'] ?? $row['order_id'] ?? $row['ordersn'])));
+        }
+
+        return [];
+    }
+
+    /**
      * Backfill settlement secara synchronous untuk rentang panjang.
      *
      * Dipakai controller UI agar 1-3 bulan ke belakang bisa dijalankan langsung
