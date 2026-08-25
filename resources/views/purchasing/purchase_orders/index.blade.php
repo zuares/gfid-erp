@@ -89,6 +89,80 @@
         white-space: nowrap;
     }
 
+    .po-item-cell {
+        min-width: 190px;
+    }
+
+    .po-unit-cell {
+        min-width: 100px;
+        vertical-align: top;
+    }
+
+    .po-item-line {
+        display: flex;
+        align-items: baseline;
+        gap: .35rem;
+        min-width: 0;
+        line-height: 1.35;
+    }
+
+    .po-item-line + .po-item-line {
+        margin-top: .2rem;
+    }
+
+    .po-item-code {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        color: #334155;
+        font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        font-size: .76rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .po-item-qty {
+        flex: 0 0 auto;
+        color: #64748b;
+        font-size: .72rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .po-item-more {
+        color: #94a3b8;
+        font-size: .7rem;
+        font-weight: 700;
+    }
+
+    .po-mobile-items {
+        display: none;
+        margin-top: .45rem;
+        padding-top: .4rem;
+        border-top: 1px dashed rgba(148,163,184,.25);
+    }
+
+    .po-mobile-items-label {
+        display: block;
+        margin-bottom: .2rem;
+        color: #94a3b8;
+        font-size: .63rem;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    body[data-theme="dark"] .po-item-code,
+    body[data-theme="dark"] .po-unit-value {
+        color: #e2e8f0;
+    }
+
+    body[data-theme="dark"] .po-item-qty,
+    body[data-theme="dark"] .po-name {
+        color: #94a3b8;
+    }
+
     .po-mobile-status.is-approved,
     .po-mobile-status.is-received {
         color: #15803d;
@@ -244,6 +318,14 @@
             margin-left: 0;
             min-height: 40px;
         }
+
+        .po-mobile-items {
+            display: block;
+        }
+
+        .po-mobile-items .po-item-line {
+            max-width: 100%;
+        }
     }
 </style>
 @endpush
@@ -349,6 +431,12 @@
                     Supplier {{ $sortIcon('supplier_id') }}
                 </a>
             </th>
+            <th class="mobile-hide" style="width: 210px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
+                Item
+            </th>
+            <th class="mobile-hide" style="width: 110px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
+                Satuan Beli
+            </th>
             @if ($canSeeMoney)
                 <th class="text-end" style="width: 130px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                     <a href="{{ $sortUrl('grand_total') }}" class="th-sort {{ $sortCol === 'grand_total' ? 'active' : '' }}">
@@ -397,6 +485,10 @@
                 default => 'Belum bayar',
             };
 
+            $orderLines = $order->lines ?? collect();
+            $visibleOrderLines = $orderLines->take(2);
+            $remainingOrderLines = max(0, $orderLines->count() - $visibleOrderLines->count());
+
             // Klik baris selalu membuka detail; edit hanya lewat tombol pensil.
             $actionRoute = route('purchasing.purchase_orders.show', $order->id);
         @endphp
@@ -430,6 +522,21 @@
                             @endphp
                             {{ implode(' · ', $subParts) }}
                         </div>
+
+                        <div class="po-mobile-items">
+                            <span class="po-mobile-items-label">Item &amp; satuan</span>
+                            @forelse ($visibleOrderLines as $line)
+                                <div class="po-item-line">
+                                    <span class="po-item-code">{{ $line->item?->code ?? 'Item #' . ($line->item_id ?? '-') }}</span>
+                                    <span class="po-item-qty">{{ decimal_id($line->qty, 2) }} {{ $line->effectivePurchaseUnit() }}</span>
+                                </div>
+                            @empty
+                                <span class="text-muted" style="font-size:.72rem;">Belum ada item</span>
+                            @endforelse
+                            @if ($remainingOrderLines > 0)
+                                <span class="po-item-more">+{{ $remainingOrderLines }} item lainnya</span>
+                            @endif
+                        </div>
                     </div>
                     <div class="po-mobile-statuses d-md-none" aria-label="Ringkasan status PO">
                         <span class="po-mobile-status {{ $uiStatus === 'approved' ? 'is-approved' : ($uiStatus === 'cancelled' ? 'is-cancelled' : '') }}">
@@ -449,6 +556,33 @@
 
             <td>
                 <div class="supplier-name">{{ optional($order->supplier)->name ?? '—' }}</div>
+            </td>
+
+            <td class="po-item-cell mobile-hide">
+                @forelse ($visibleOrderLines as $line)
+                    <div class="po-item-line" title="{{ $line->item?->name ?? '' }}">
+                        <span class="po-item-code">{{ $line->item?->code ?? 'Item #' . ($line->item_id ?? '-') }}</span>
+                        <span class="po-name">{{ $line->item?->name ?? '-' }}</span>
+                    </div>
+                @empty
+                    <span class="text-muted" style="font-size:.74rem;">Belum ada item</span>
+                @endforelse
+                @if ($remainingOrderLines > 0)
+                    <div class="po-item-more">+{{ $remainingOrderLines }} item lainnya</div>
+                @endif
+            </td>
+
+            <td class="po-unit-cell mobile-hide">
+                @forelse ($visibleOrderLines as $line)
+                    <div class="po-item-line">
+                        <span class="po-item-qty">{{ decimal_id($line->qty, 2) }} {{ $line->effectivePurchaseUnit() }}</span>
+                    </div>
+                @empty
+                    <span class="text-muted" style="font-size:.74rem;">—</span>
+                @endforelse
+                @if ($remainingOrderLines > 0)
+                    <div class="po-item-more">+{{ $remainingOrderLines }} lainnya</div>
+                @endif
             </td>
 
             @if($canSeeMoney)

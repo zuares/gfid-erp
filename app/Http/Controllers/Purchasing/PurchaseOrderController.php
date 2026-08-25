@@ -45,6 +45,7 @@ class PurchaseOrderController extends Controller
                 'approvedBy',
                 'paymentMethod',
                 'purchaseReceipts',
+                'lines.item:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor',
             ]);
 
         if ($sortCol === 'supplier_id') {

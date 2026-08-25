@@ -57,6 +57,12 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
 .po-name{color:#64748b;font-size:.8rem;margin-top:.08rem}
 .po-r{text-align:right}
 .po-total td{font-weight:900;color:#111827;background:rgba(148,163,184,.04)}
+.po-unit-value{font-weight:800;color:#334155;white-space:nowrap}
+.po-unit-conversion{color:#64748b;font-size:.74rem;line-height:1.35;white-space:nowrap}
+.po-unit-conversion strong{color:#475569;font-weight:800}
+body[data-theme="dark"] .po-unit-value{color:#e2e8f0}
+body[data-theme="dark"] .po-unit-conversion{color:#94a3b8}
+body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 .po-tabs{display:flex;gap:.25rem;margin-bottom:.65rem;border-bottom:1px solid rgba(148,163,184,.18);flex-wrap:wrap}
 .po-tab{appearance:none;display:inline-flex;align-items:center;gap:.4rem;border:none;background:transparent;color:#64748b;font-weight:800;font-size:.82rem;padding:.55rem .8rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .po-tab:hover{color:#334155}
@@ -83,6 +89,11 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
   .po-table thead{display:none}
   .po-table tr{border:1px solid rgba(148,163,184,.16);border-radius:8px;margin-bottom:.45rem;padding:.55rem .6rem;background:var(--card,#fff)}
   .po-table td{border:0;padding:0}
+  .po-table td[data-label]{display:grid;grid-template-columns:7.2rem minmax(0,1fr);gap:.55rem;align-items:baseline;margin-top:.35rem}
+  .po-table td[data-label]::before{content:attr(data-label);color:#94a3b8;font-size:.64rem;font-weight:900;letter-spacing:.05em;text-transform:uppercase}
+  .po-table td[data-label] > *{min-width:0}
+  .po-table td.item-cell{display:block}
+  .po-table td.item-cell::before{display:none}
   .po-table td.po-r{text-align:left;margin-top:.35rem}
   .po-table td.progress-cell { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed rgba(148,163,184,.3); }
   .po-total{display:none!important}
@@ -187,7 +198,17 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
         // apply DP guard
         $canApplyDp = $canPay && $hasAp && $dpAvailable > 0.01 && $apOutstanding > 0.01;
         $maxApplyDp = max(0, round(min($dpAvailable, $apOutstanding), 2));
-        $totalQty = (float) ($order->lines?->sum('qty') ?? 0);
+        $linePurchaseUnits = ($order->lines ?? collect())
+            ->map(fn ($line) => $line->effectivePurchaseUnit())
+            ->filter()
+            ->unique()
+            ->values();
+        $totalQty = $linePurchaseUnits->count() === 1
+            ? (float) ($order->lines?->sum('qty') ?? 0)
+            : null;
+        $totalQtyUnit = $linePurchaseUnits->count() === 1
+            ? $linePurchaseUnits->first()
+            : ($linePurchaseUnits->isEmpty() ? null : 'beragam');
         $hasDiscount = (float) ($order->lines?->sum('discount') ?? 0) > 0.0001;
 
         // for JS/open modal routing
@@ -363,7 +384,16 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
     <div class="po-grid mt-2">
         <div class="po-card po-kpi">
             <div class="po-label">Item Batch</div>
-            <div class="po-value">{{ $order->lines->count() }} <span class="po-muted" style="font-size:.8rem;font-weight:500;">Tipe</span> <span class="po-muted mx-1 fw-normal" style="opacity:.4;">•</span> {{ decimal_id($totalQty, 2) }} <span class="po-muted" style="font-size:.8rem;font-weight:500;">Pcs</span></div>
+            <div class="po-value">
+                {{ $order->lines->count() }} <span class="po-muted" style="font-size:.8rem;font-weight:500;">Tipe</span>
+                @if ($totalQty !== null)
+                    <span class="po-muted mx-1 fw-normal" style="opacity:.4;">•</span>
+                    {{ decimal_id($totalQty, 2) }} <span class="po-muted" style="font-size:.8rem;font-weight:500;">{{ $totalQtyUnit }}</span>
+                @elseif ($totalQtyUnit)
+                    <span class="po-muted mx-1 fw-normal" style="opacity:.4;">•</span>
+                    <span class="po-muted" style="font-size:.8rem;font-weight:500;">Satuan {{ $totalQtyUnit }}</span>
+                @endif
+            </div>
         </div>
         @if ($canSeeMoney)
         <div class="po-card po-kpi">
@@ -415,6 +445,8 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
                                 <tr>
                                     <th>Item</th>
                                     <th class="po-r">Qty</th>
+                                    <th>Satuan Beli</th>
+                                    <th>Konversi Stok</th>
                                     @if($canSeeMoney)
                                         <th class="po-r po-hide-mobile">@ Harga</th>
                                         <th class="po-r po-hide-mobile">Subtotal</th>
@@ -431,7 +463,7 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
                                         $qtyOut = $line->qty - $rcv;
                                     @endphp
                                     <tr>
-                                        <td>
+                                        <td class="item-cell">
                                             <div class="po-code-cell">{{ $line->item->code ?? '-' }}</div>
                                             <div class="po-name">{{ $line->item->name ?? '-' }}</div>
                                             @if($line->expenseAccount)
@@ -442,22 +474,21 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
                                             <div class="d-md-none mt-1">
                                                 @if($canSeeMoney)
                                                     <div style="font-size:.8rem;color:#475569;">{{ angka($line->unit_price) }} / {{ $line->effectivePurchaseUnit() }} × {{ decimal_id($line->qty, 2) }} = <b>{{ angka($line->subtotal) }}</b></div>
-                                                @else
-                                        <div style="font-size:.8rem;color:#475569;">Qty: <b>{{ decimal_id($line->qty, 2) }}</b> {{ $line->effectivePurchaseUnit() }}
-                                            @if($line->effectiveConversionFactor() != 1)
-                                                <span class="text-primary">({{ decimal_id((float) $line->qty * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }})</span>
-                                            @endif
-                                        </div>
                                                 @endif
                                             </div>
                                         </td>
-                                        <td class="po-r po-hide-mobile">
+                                        <td class="po-r" data-label="Qty">
                                             <div class="po-code-cell">{{ decimal_id($line->qty, 2) }}</div>
-                                            <div class="po-name">{{ $line->effectivePurchaseUnit() }}
-                                                @if($line->effectiveConversionFactor() != 1)
-                                                    · stok {{ decimal_id((float) $line->qty * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }}
-                                                @endif
-                                            </div>
+                                        </td>
+                                        <td data-label="Satuan beli">
+                                            <span class="po-unit-value">{{ $line->effectivePurchaseUnit() }}</span>
+                                        </td>
+                                        <td data-label="Konversi stok">
+                                            @if($line->effectiveConversionFactor() != 1)
+                                                <span class="po-unit-conversion"><strong>{{ decimal_id($line->effectiveConversionFactor(), 2) }}</strong> {{ $line->effectiveStockUnit() }} / {{ $line->effectivePurchaseUnit() }}</span>
+                                            @else
+                                                <span class="po-unit-conversion">{{ $line->effectiveStockUnit() }}</span>
+                                            @endif
                                         </td>
                                         @if($canSeeMoney)
                                             <td class="po-r po-hide-mobile">
@@ -472,19 +503,19 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
                                             @if ($rcv > 0)
                                                 <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
                                                     <span style="color:#64748b;">Terima</span>
-                                                    <strong style="color:#15803d; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($rcv, 2) }}</strong>
+                                                    <strong style="color:#15803d; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($rcv, 2) }} {{ $line->effectivePurchaseUnit() }}</strong>
                                                 </div>
                                             @endif
                                             @if ($ret > 0)
                                                 <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
                                                     <span style="color:#64748b;">Retur</span>
-                                                    <strong style="color:#b91c1c; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($ret, 2) }}</strong>
+                                                    <strong style="color:#b91c1c; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($ret, 2) }} {{ $line->effectivePurchaseUnit() }}</strong>
                                                 </div>
                                             @endif
                                             @if ($qtyOut > 0)
                                                 <div class="d-flex justify-content-between" style="font-size:.78rem;">
                                                     <span style="color:#64748b;">Sisa</span>
-                                                    <strong style="color:#d97706; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($qtyOut, 2) }}</strong>
+                                                    <strong style="color:#d97706; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($qtyOut, 2) }} {{ $line->effectivePurchaseUnit() }}</strong>
                                                 </div>
                                             @endif
                                             @if ($rcv == 0 && $ret == 0 && $qtyOut == 0)
