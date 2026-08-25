@@ -12,6 +12,7 @@ use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\WhatsAppMessage;
+use App\Services\Accounting\JournalService;
 use App\Services\Purchasing\PurchaseOrderService;
 use App\Services\WhatsApp\WhatsAppMessageService;
 use App\Services\WhatsApp\PurchaseOrderWhatsAppMessageBuilder;
@@ -25,7 +26,8 @@ use Illuminate\Validation\ValidationException;
 class PurchaseOrderController extends Controller
 {
     public function __construct(
-        protected PurchaseOrderService $service
+        protected PurchaseOrderService $service,
+        protected JournalService $journalService
     ) {}
 
     /**
@@ -1082,7 +1084,7 @@ class PurchaseOrderController extends Controller
         $type = ($payNow <= $grand + $eps && abs($payNow - $grand) < $eps) ? 'payment' : 'dp';
 
         DB::transaction(function () use ($request, $order, $cashAccountId, $payNow, $type) {
-            PurchasePayment::create([
+            $payment = PurchasePayment::create([
                 'purchase_order_id' => $order->id,
                 'date' => $order->date,
                 'payment_method_id' => $order->payment_method_id,
@@ -1093,6 +1095,10 @@ class PurchaseOrderController extends Controller
                 'notes' => $type === 'dp' ? 'DP saat buat/ubah PO' : 'Lunas saat buat/ubah PO',
                 'created_by' => (int) $request->user()->id,
             ]);
+
+            $this->journalService->postPurchasePayment(
+                $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+            );
 
             $this->recalcPaymentStatus($order);
         });

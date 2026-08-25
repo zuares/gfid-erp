@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\CashExpense;
 use App\Models\CashReceipt;
 use App\Models\MarketplacePayout;
+use App\Models\PurchasePayment;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +59,20 @@ class CashBasisReportController extends Controller
 
         $postedExpenseTotal = (float) (clone $postedExpenseBase)->sum('amount');
         $postedExpenseCount = (int) (clone $postedExpenseBase)->count();
+
+        $postedPurchasePaymentBase = PurchasePayment::query()
+            ->with(['purchaseOrder.supplier', 'cashAccount', 'paymentMethod'])
+            ->whereNull('purchase_payments.voided_at')
+            ->whereIn('purchase_payments.type', ['dp', 'payment'])
+            ->whereNotNull('purchase_payments.cash_account_id')
+            ->whereDate('purchase_payments.date', '>=', $from)
+            ->whereDate('purchase_payments.date', '<=', $to)
+            ->whereHas('journal', fn ($q) => $q
+                ->whereNull('voided_at')
+                ->where('source_type', 'purchase_payment'));
+
+        $postedPurchasePaymentTotal = (float) (clone $postedPurchasePaymentBase)->sum('amount');
+        $postedPurchasePaymentCount = (int) (clone $postedPurchasePaymentBase)->count();
 
         $postedReceiptBase = CashReceipt::query()
             ->with(['sourceAccount', 'cashAccount'])
@@ -114,6 +129,14 @@ class CashBasisReportController extends Controller
             ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(cash_expenses.amount), 0) as total_amount')
             ->get();
 
+        $purchasePaymentByCash = (clone $postedPurchasePaymentBase)
+            ->withoutEagerLoads()
+            ->join('accounts as a', 'a.id', '=', 'purchase_payments.cash_account_id')
+            ->groupBy('a.id', 'a.code', 'a.name')
+            ->orderByDesc(DB::raw('SUM(purchase_payments.amount)'))
+            ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(purchase_payments.amount), 0) as total_amount')
+            ->get();
+
         $receiptBySource = (clone $postedReceiptBase)
             ->withoutEagerLoads()
             ->join('accounts as a', 'a.id', '=', 'cash_receipts.source_account_id')
@@ -156,6 +179,12 @@ class CashBasisReportController extends Controller
             ->with(['expenseAccount', 'cashAccount'])
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->limit(8)
+            ->get();
+
+        $recentPurchasePayments = (clone $postedPurchasePaymentBase)
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->limit(8)
@@ -219,16 +248,22 @@ class CashBasisReportController extends Controller
             'postedReceiptCount'  => $postedReceiptCount + $postedPayoutCount,
             'draftReceiptTotal'   => $draftReceiptTotal + $draftPayoutTotal,
             'draftReceiptCount'   => $draftReceiptCount + $draftPayoutCount,
-            'postedExpenseTotal'  => $postedExpenseTotal,
-            'postedExpenseCount'  => $postedExpenseCount,
+            'postedExpenseTotal'  => $postedExpenseTotal + $postedPurchasePaymentTotal,
+            'postedExpenseCount'  => $postedExpenseCount + $postedPurchasePaymentCount,
+            'postedOperationalExpenseTotal' => $postedExpenseTotal,
+            'postedOperationalExpenseCount' => $postedExpenseCount,
+            'postedPurchasePaymentTotal' => $postedPurchasePaymentTotal,
+            'postedPurchasePaymentCount' => $postedPurchasePaymentCount,
             'draftExpenseTotal'   => $draftExpenseTotal,
             'draftExpenseCount'   => $draftExpenseCount,
             'voidExpenseCount'    => $voidExpenseCount,
             'expenseByCategory'   => $expenseByCategory,
             'expenseByCash'       => $expenseByCash,
+            'purchasePaymentByCash' => $purchasePaymentByCash,
             'receiptBySource'     => $receiptBySource,
             'payoutByMarketplace' => $payoutByMarketplace,
             'recentExpenses'      => $recentExpenses,
+            'recentPurchasePayments' => $recentPurchasePayments,
             'recentReceipts'      => $recentReceipts,
         ]);
     }

@@ -33,6 +33,11 @@ class PurchasePayment extends Model
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
     }
 
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(Journal::class, 'journal_id');
+    }
+
     public function supplierInvoice(): BelongsTo
     {
         return $this->belongsTo(SupplierInvoice::class, 'supplier_invoice_id');

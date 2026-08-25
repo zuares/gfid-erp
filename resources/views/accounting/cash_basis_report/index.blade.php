@@ -145,9 +145,9 @@
                     <div class="cbr-kpi-note">{{ $fmt($postedReceiptCount ?? 0) }} transaksi posted</div>
                 </div>
                 <div class="cbr-kpi">
-                    <div class="cbr-kpi-label">Pengeluaran Tercatat</div>
+                    <div class="cbr-kpi-label">Kas Keluar Tercatat</div>
                     <div class="cbr-kpi-value">Rp {{ $fmt($postedExpenseTotal) }}</div>
-                    <div class="cbr-kpi-note">{{ $fmt($postedExpenseCount) }} transaksi posted</div>
+                    <div class="cbr-kpi-note">{{ $fmt($postedExpenseCount) }} transaksi posted · operasional + pembayaran PO</div>
                 </div>
                 <div class="cbr-kpi">
                     <div class="cbr-kpi-label">Draft</div>
@@ -229,6 +229,22 @@
                         </div>
                     @empty
                         <div class="cbr-empty">Belum ada kas/bank yang dipakai pada periode ini.</div>
+                    @endforelse
+                </div>
+            </x-gf.panel>
+
+            <x-gf.panel title="Pembayaran Pembelian Per Kas / Bank" subtitle="DP dan pelunasan PO yang benar-benar mengurangi kas/bank.">
+                <div class="cbr-list">
+                    @forelse ($purchasePaymentByCash as $row)
+                        <div class="cbr-row">
+                            <div>
+                                <div class="cbr-row-title">{{ $row->name }}</div>
+                                <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                            </div>
+                            <div class="cbr-row-num">Rp {{ $fmt($row->total_amount) }}</div>
+                        </div>
+                    @empty
+                        <div class="cbr-empty">Belum ada pembayaran pembelian pada periode ini.</div>
                     @endforelse
                 </div>
             </x-gf.panel>
@@ -356,6 +372,31 @@
                         @endforeach
                     </div>
                 @endif
+            </x-gf.panel>
+
+            <x-gf.panel title="Pembayaran PO Terakhir" subtitle="Pembayaran aktual; tidak menggunakan total PO sebagai kas keluar.">
+                <div class="cbr-list">
+                    @forelse ($recentPurchasePayments as $payment)
+                        <div class="cbr-row">
+                            <div>
+                                <div class="cbr-row-title">
+                                    <a href="{{ route('purchasing.purchase_orders.show', $payment->purchaseOrder) }}">
+                                        {{ $payment->purchaseOrder?->code ?? 'PO #' . $payment->purchase_order_id }}
+                                    </a>
+                                </div>
+                                <div class="cbr-row-meta">
+                                    {{ $payment->purchaseOrder?->supplier?->name ?? '-' }}
+                                    · {{ optional($payment->date)->format('Y-m-d') }}
+                                    · {{ $payment->type === 'dp' ? 'DP' : 'Pelunasan' }}
+                                    · {{ $payment->cashAccount?->name ?? '-' }}
+                                </div>
+                            </div>
+                            <div class="cbr-row-num">Rp {{ $fmt($payment->amount) }}</div>
+                        </div>
+                    @empty
+                        <div class="cbr-empty">Belum ada pembayaran PO pada periode ini.</div>
+                    @endforelse
+                </div>
             </x-gf.panel>
         </div>
     </x-gf.page>
