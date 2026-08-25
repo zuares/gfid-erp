@@ -143,6 +143,7 @@
             <div>
                 <div class="item-eyebrow"><i class="bi bi-database-check"></i> Master Data</div>
                 <h1 class="item-title">Master Item</h1>
+                <div class="item-subtitle">Kelola item, satuan stok, satuan pembelian, HPP, dan metode pasok.</div>
             </div>
         </div>
         <div class="item-actions">
@@ -256,7 +257,7 @@
                                 <td>
                                     <div><a class="item-code text-decoration-none" href="{{ route('master.items.show', $item) }}">{{ $item->code }}</a></div>
                                     <div class="item-name mt-1">{{ $item->name }}</div>
-                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}</div>
+                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}@if($item->purchaseConversionFactor() != 1) · 1 = {{ decimal_id($item->purchaseConversionFactor(), 6) }} {{ $item->stockUnit() }}@endif</div>
                                 </td>
                                 <td>
                                     <span class="item-type">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</span>
@@ -313,7 +314,7 @@
                                 <div class="item-mobile-card-title">
                                     <a class="item-code text-decoration-none" href="{{ route('master.items.show', $item) }}">{{ $item->code }}</a>
                                     <div class="item-name mt-1">{{ $item->name }}</div>
-                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}</div>
+                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}@if($item->purchaseConversionFactor() != 1) · 1 = {{ decimal_id($item->purchaseConversionFactor(), 6) }} {{ $item->stockUnit() }}@endif</div>
                                 </div>
                             </div>
                             <span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span>
