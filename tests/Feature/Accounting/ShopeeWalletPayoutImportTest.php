@@ -39,7 +39,12 @@ class ShopeeWalletPayoutImportTest extends TestCase
 
         $first = $importer->import($store, $from, $to, $bank->id);
 
-        $this->assertSame(['created' => 1, 'skipped' => 1], $first);
+        $this->assertSame([
+            'created' => 1,
+            'skipped' => 1,
+            'skippedExisting' => 0,
+            'skippedInvalid' => 1,
+        ], $first);
         $this->assertDatabaseHas('marketplace_payouts', [
             'store_id'                => $store->id,
             'external_transaction_id' => '987654321',
@@ -51,7 +56,12 @@ class ShopeeWalletPayoutImportTest extends TestCase
 
         $second = $importer->import($store, $from, $to, $bank->id);
 
-        $this->assertSame(['created' => 0, 'skipped' => 2], $second);
+        $this->assertSame([
+            'created' => 0,
+            'skipped' => 2,
+            'skippedExisting' => 1,
+            'skippedInvalid' => 1,
+        ], $second);
         $this->assertDatabaseCount('marketplace_payouts', 1);
 
         Http::assertSent(function ($request) use ($from, $to) {

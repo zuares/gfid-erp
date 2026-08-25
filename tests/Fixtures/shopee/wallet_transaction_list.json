@@ -4,7 +4,7 @@
       {
         "transaction_id": 987654321,
         "status": "COMPLETED",
-        "transaction_type": 202,
+        "transaction_type": "withdrawal_completed",
         "amount": -125000,
         "current_balance": 875000,
         "create_time": 1787220000,
@@ -15,7 +15,7 @@
       {
         "transaction_id": 987654322,
         "status": "COMPLETED",
-        "transaction_type": 450,
+        "transaction_type": "paid_ads_charge",
         "amount": -15000,
         "current_balance": 860000,
         "create_time": 1787223600,

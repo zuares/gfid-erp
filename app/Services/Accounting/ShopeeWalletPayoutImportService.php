@@ -12,6 +12,11 @@ use RuntimeException;
 class ShopeeWalletPayoutImportService
 {
     private const COMPLETED_WITHDRAWAL = '202';
+    private const COMPLETED_WITHDRAWAL_LABELS = [
+        '202',
+        'withdrawal_completed',
+        'withdrawal-completed',
+    ];
 
     public function __construct(private readonly ShopeeChannel $shopee)
     {
@@ -34,6 +39,8 @@ class ShopeeWalletPayoutImportService
     ): array {
         $created = 0;
         $skipped = 0;
+        $skippedExisting = 0;
+        $skippedInvalid = 0;
         $pageNo = 0;
         $pageSize = 100;
 
@@ -72,9 +79,14 @@ class ShopeeWalletPayoutImportService
                 // ke Shopee, karena fixture/cache/API proxy bisa mengembalikan
                 // record tambahan.
                 if ($transactionId === '' || $amount <= 0
-                    || ($transactionType !== '' && $transactionType !== self::COMPLETED_WITHDRAWAL)
+                    || ($transactionType !== '' && ! in_array(
+                        strtolower(trim($transactionType)),
+                        self::COMPLETED_WITHDRAWAL_LABELS,
+                        true
+                    ))
                     || ($createdTime > 0 && ($createdTime < $from->timestamp || $createdTime > $to->timestamp))) {
                     $skipped++;
+                    $skippedInvalid++;
                     continue;
                 }
 
@@ -85,6 +97,7 @@ class ShopeeWalletPayoutImportService
 
                 if ($exists) {
                     $skipped++;
+                    $skippedExisting++;
                     continue;
                 }
 
@@ -142,6 +155,7 @@ class ShopeeWalletPayoutImportService
                     $created++;
                 } else {
                     $skipped++;
+                    $skippedExisting++;
                 }
             }
 
@@ -149,6 +163,6 @@ class ShopeeWalletPayoutImportService
             $more = (bool) data_get($result, 'response.more', data_get($result, 'more', false));
         } while ($more && count($rows) > 0);
 
-        return compact('created', 'skipped');
+        return compact('created', 'skipped', 'skippedExisting', 'skippedInvalid');
     }
 }

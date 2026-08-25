@@ -121,7 +121,8 @@ class MarketplacePayoutController extends Controller
         }
 
         return back()->with('status', 'ok')
-            ->with('message', "Import Shopee selesai: {$result['created']} draft baru, {$result['skipped']} dilewati (sudah ada/tidak valid).");
+            ->with('message', "Import Shopee selesai: {$result['created']} draft baru, {$result['skipped']} dilewati "
+                . "(sudah ada: {$result['skippedExisting']}, tidak valid: {$result['skippedInvalid']}).");
     }
 
     public function create()
