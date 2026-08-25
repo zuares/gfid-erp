@@ -3,6 +3,8 @@
 namespace Tests\Unit\Services;
 
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceOrderSettlement;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
@@ -89,5 +91,57 @@ class MarketplaceFinancialDataQualityServiceTest extends TestCase
 
         $this->assertSame('complete', $assessment['status']);
         $this->assertSame([], $assessment['flags']['missing_financial_fields']);
+    }
+
+    public function test_non_numeric_financial_values_are_blocking(): void
+    {
+        $service = new MarketplaceFinancialDataQualityService();
+
+        $assessment = $service->assessSettlement([
+            'buyer_total_amount' => 'N/A',
+            'commission_fee' => 0,
+            'service_fee' => 0,
+            'transaction_fee' => 0,
+            'voucher_from_seller' => 0,
+            'seller_coin_cash_back' => 0,
+            'actual_shipping_fee' => 0,
+            'shopee_shipping_rebate' => 0,
+            'reverse_shipping_fee' => 0,
+            'order_ams_commission_fee' => 0,
+            'drc_adjustable_refund' => 0,
+            'escrow_tax' => 0,
+            'escrow_amount' => 'N/A',
+        ]);
+
+        $this->assertSame('incomplete', $assessment['status']);
+        $this->assertSame(['buyer_payment_amount', 'final_income'], $assessment['invalid_fields']);
+        $this->assertSame(
+            ['buyer_payment_amount', 'final_income'],
+            $assessment['flags']['blocking_missing_fields']
+        );
+    }
+
+    public function test_order_is_incomplete_when_settlement_link_does_not_match_order(): void
+    {
+        $order = new MarketplaceOrder([
+            'store_id' => 7,
+            'order_status' => 'COMPLETED',
+        ]);
+        $order->id = 10;
+        $order->setRelation('settlement', new MarketplaceOrderSettlement([
+            'store_id' => 8,
+            'order_id' => 10,
+        ]));
+        $order->setRelation('items', new Collection([
+            new MarketplaceOrderItem([
+                'data_status' => 'valid',
+                'hpp_snapshot' => 10,
+            ]),
+        ]));
+
+        $assessment = (new MarketplaceFinancialDataQualityService())->assessOrder($order);
+
+        $this->assertSame('incomplete', $assessment['status']);
+        $this->assertSame('settlement_link_incomplete', $assessment['reason']);
     }
 }

@@ -92,40 +92,71 @@ class MarketplaceFinancialDataQualityService
     /**
      * Assess raw settlement data without mutating it.
      *
-     * @return array{status:string, missing_fields:array<int,string>, flags:array<string,mixed>}
+     * @return array{status:string, missing_fields:array<int,string>, invalid_fields:array<int,string>, flags:array<string,mixed>}
      */
     public function assessSettlement(?array $raw): array
     {
         $raw = is_array($raw) ? $raw : [];
         $payload = is_array($raw['income'] ?? null) ? $raw['income'] : $raw;
         $missing = [];
+        $invalid = [];
 
         foreach (self::REQUIRED_FIELD_ALIASES as $field => $aliases) {
-            $present = false;
+            $hasValue = false;
+            $valid = false;
             foreach ($aliases as $alias) {
-                if (array_key_exists($alias, $payload) && $payload[$alias] !== null && $payload[$alias] !== '') {
-                    $present = true;
+                if (! array_key_exists($alias, $payload) || $payload[$alias] === null || $payload[$alias] === '') {
+                    continue;
+                }
+
+                $hasValue = true;
+                if ($this->isNumericValue($payload[$alias])) {
+                    $valid = true;
                     break;
                 }
             }
 
-            if (! $present) {
+            if ($valid) {
+                continue;
+            }
+
+            if ($hasValue) {
+                $invalid[] = $field;
+            } else {
                 $missing[] = $field;
             }
         }
 
-        $blockingMissing = array_values(array_diff($missing, self::NON_BLOCKING_MISSING_FIELDS));
+        $blockingMissing = array_values(array_unique(array_merge(
+            array_diff($missing, self::NON_BLOCKING_MISSING_FIELDS),
+            $invalid,
+        )));
 
         return [
             'status' => empty($blockingMissing) ? self::SETTLEMENT_COMPLETE : self::SETTLEMENT_INCOMPLETE,
             'missing_fields' => $missing,
+            'invalid_fields' => $invalid,
             'flags' => [
                 'source' => 'settlement_raw_json',
                 'missing_financial_fields' => $missing,
+                'invalid_financial_fields' => $invalid,
                 'blocking_missing_fields' => $blockingMissing,
                 'has_raw_payload' => ! empty($payload),
             ],
         ];
+    }
+
+    private function isNumericValue(mixed $value): bool
+    {
+        if (is_bool($value) || (! is_int($value) && ! is_float($value) && ! is_string($value))) {
+            return false;
+        }
+
+        if (is_float($value) && ! is_finite($value)) {
+            return false;
+        }
+
+        return is_numeric(is_string($value) ? trim($value) : $value);
     }
 
     public function refreshSettlement(MarketplaceOrderSettlement $settlement): array
@@ -179,7 +210,18 @@ class MarketplaceFinancialDataQualityService
             return ['status' => self::ORDER_INCOMPLETE, 'reason' => 'settlement_missing'];
         }
 
-        $settlementAssessment = $this->assessSettlement($order->settlement->raw_json);
+        $settlement = $order->settlement;
+        if (
+            ! $order->store_id
+            || ! $settlement->order_id
+            || ! $settlement->store_id
+            || (int) $settlement->order_id !== (int) $order->id
+            || (int) $settlement->store_id !== (int) $order->store_id
+        ) {
+            return ['status' => self::ORDER_INCOMPLETE, 'reason' => 'settlement_link_incomplete'];
+        }
+
+        $settlementAssessment = $this->assessSettlement($settlement->raw_json);
         if ($settlementAssessment['status'] !== self::SETTLEMENT_COMPLETE) {
             return ['status' => self::ORDER_INCOMPLETE, 'reason' => 'settlement_data_incomplete'];
         }

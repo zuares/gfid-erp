@@ -1,14 +1,51 @@
 @extends('layouts.app')
 
-@section('title', 'Marketplace • Financial Data Quality')
+@section('title', 'Marketplace • Pemeriksaan Data Keuangan')
 
 @php
     $fmt = fn ($n) => number_format((int) $n, 0, ',', '.');
     $statusLabels = [
-        'ready' => 'Ready',
-        'incomplete' => 'Incomplete',
-        'not_applicable' => 'Tidak berlaku',
-        'unknown' => 'Unknown',
+        'ready' => 'Siap masuk laporan',
+        'incomplete' => 'Data belum lengkap',
+        'not_applicable' => 'Belum masuk proses keuangan',
+        'unknown' => 'Belum diperiksa',
+    ];
+    $settlementLabels = [
+        'complete' => 'Payout lengkap',
+        'incomplete' => 'Payout belum lengkap',
+        'missing' => 'Payout belum tersedia',
+        'unknown' => 'Payout belum diperiksa',
+    ];
+    $issueLabels = [
+        'settlement_missing' => 'Payout belum tersedia',
+        'settlement_data_incomplete' => 'Data payout belum lengkap',
+        'order_items_missing' => 'Order belum memiliki item',
+        'item_mapping_or_hpp_incomplete' => 'Produk belum memiliki HPP',
+        'settlement_link_incomplete' => 'Link order dan payout tidak cocok',
+        'unknown_reason' => 'Masalah belum teridentifikasi',
+    ];
+    $fieldLabels = [
+        'buyer_payment_amount' => 'Nominal pembayaran',
+        'commission_fee' => 'Komisi marketplace',
+        'service_fee' => 'Biaya layanan',
+        'transaction_fee' => 'Biaya transaksi',
+        'seller_voucher' => 'Voucher seller',
+        'seller_coin_cash_back' => 'Cashback koin seller',
+        'actual_shipping_fee' => 'Ongkir aktual',
+        'shipping_fee_subsidy' => 'Subsidi ongkir',
+        'reverse_shipping_fee' => 'Ongkir retur',
+        'activity_fee' => 'Biaya aktivitas',
+        'drc_adjustable_refund' => 'Refund atau penyesuaian',
+        'escrow_tax' => 'Pajak payout',
+        'final_income' => 'Dana cair',
+    ];
+    $orderStatusLabels = [
+        'COMPLETED' => 'Selesai',
+        'SHIPPED' => 'Dikirim',
+        'READY_TO_SHIP' => 'Siap dikirim',
+        'UNPAID' => 'Belum dibayar',
+        'CANCELLED' => 'Dibatalkan',
+        'IN_CANCEL' => 'Proses pembatalan',
     ];
     $statusClasses = [
         'ready' => 'fq-status-ready',
@@ -17,6 +54,7 @@
         'unknown' => 'fq-status-unknown',
     ];
     $result = session('quality_result');
+    $resultQueued = (bool) ($result['queued'] ?? false);
     $qualityIssues = (int) ($orderCounts['incomplete'] ?? 0) + (int) ($orderCounts['unknown'] ?? 0);
     $settlementIssues = (int) ($settlementCounts['incomplete'] ?? 0) + (int) ($settlementCounts['unknown'] ?? 0);
     $hasIssues = $qualityIssues > 0 || $settlementIssues > 0;
@@ -78,7 +116,7 @@
     .fq-health-copy { margin: 0; color: inherit; opacity: .84; font-size: .72rem; line-height: 1.45; }
     .fq-health-copy strong { font-weight: 800; }
     .fq-health-time { color: inherit; opacity: .75; font-size: .68rem; white-space: nowrap; }
-    .fq-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; margin-bottom: .85rem; }
+    .fq-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; margin-bottom: .85rem; }
     .fq-kpi { position: relative; min-height: 98px; padding: .82rem .9rem; overflow: hidden; }
     .fq-kpi::after { position: absolute; right: -16px; bottom: -26px; width: 72px; height: 72px; border: 10px solid rgba(36,87,166,.06); border-radius: 50%; content: ''; }
     .fq-kpi-label { display: flex; align-items: center; gap: .35rem; color: var(--fq-muted); font-size: .7rem; font-weight: 700; }
@@ -95,7 +133,7 @@
     .fq-filter-helper { margin: .14rem 0 0; color: var(--fq-muted); font-size: .68rem; }
     .fq-filter-count { padding: .24rem .45rem; border: 1px solid #d8e4fa; border-radius: 999px; color: var(--fq-brand); background: #f5f8ff; font-size: .66rem; font-weight: 750; white-space: nowrap; }
     .fq-filter-body { padding: .85rem .9rem .9rem; }
-    .fq-filter-form { display: grid; grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(130px, 1fr)) minmax(135px, .8fr) minmax(135px, .8fr) auto; gap: .65rem; align-items: end; }
+    .fq-filter-form { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .65rem; align-items: end; }
     .fq-field { min-width: 0; }
     .fq-field-label { display: block; margin-bottom: .3rem; color: var(--fq-muted); font-size: .66rem; font-weight: 750; }
     .fq-field .form-control, .fq-field .form-select { height: 35px; min-width: 0; border-color: #d9dee8; border-radius: 7px; color: var(--fq-ink); font-size: .73rem; box-shadow: none; }
@@ -104,8 +142,9 @@
     .fq-range-control { position: relative; }
     .fq-range-control .fq-range-icon { position: absolute; top: 50%; right: .7rem; z-index: 1; color: var(--fq-brand); pointer-events: none; transform: translateY(-50%); }
     .fq-range-control .form-control { padding-right: 2.15rem; cursor: pointer; }
-    .fq-filter-actions { display: flex; align-items: center; gap: .4rem; height: 35px; }
-    .fq-refresh { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; padding: .7rem .9rem; border-top: 1px solid var(--fq-border); background: var(--fq-surface-soft); }
+    .fq-filter-actions { display: flex; grid-column: span 3; align-items: center; justify-content: flex-end; gap: .4rem; height: 35px; }
+    .fq-audit-card { margin-bottom: .85rem; overflow: hidden; }
+    .fq-refresh { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; padding: .85rem .9rem; background: var(--fq-surface-soft); }
     .fq-refresh-copy { display: flex; align-items: flex-start; gap: .55rem; }
     .fq-refresh-copy i { margin-top: .1rem; color: var(--fq-brand); }
     .fq-refresh-title { margin: 0 0 .1rem; color: var(--fq-ink); font-size: .73rem; font-weight: 760; }
@@ -119,7 +158,7 @@
     .fq-queue-subtitle { margin: .15rem 0 0; color: var(--fq-muted); font-size: .68rem; }
     .fq-queue-total { color: var(--fq-muted); font-size: .7rem; white-space: nowrap; }
     .fq-table-wrap { max-height: 660px; overflow: auto; }
-    .fq-table { min-width: 910px; margin: 0; font-size: .73rem; }
+    .fq-table { min-width: 840px; margin: 0; font-size: .73rem; }
     .fq-table thead th { position: sticky; top: 0; z-index: 2; padding: .58rem .65rem; border-bottom: 1px solid var(--fq-border); color: var(--fq-muted); background: #fbfcfe; font-size: .64rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap; }
     .fq-table tbody td { padding: .68rem .65rem; border-top: 1px solid #f0f2f5; vertical-align: middle; }
     .fq-table tbody tr:hover { background: #fbfdff; }
@@ -164,11 +203,19 @@
     .fq-issue-count { min-width: 25px; padding: .2rem .35rem; border-radius: 999px; color: #986000; background: #fff8e5; font-size: .64rem; font-weight: 780; text-align: center; }
     .fq-side-note { padding: .8rem .9rem; color: var(--fq-muted); background: var(--fq-surface-soft); font-size: .68rem; line-height: 1.55; }
     .fq-side-note strong { color: var(--fq-ink); }
+    .fq-help { padding: .8rem .9rem; color: var(--fq-muted); background: var(--fq-surface-soft); font-size: .68rem; line-height: 1.55; }
+    .fq-help summary { color: var(--fq-ink); cursor: pointer; font-weight: 780; list-style: none; }
+    .fq-help summary::-webkit-details-marker { display: none; }
+    .fq-help summary::after { float: right; color: var(--fq-brand); content: '+'; font-size: .9rem; line-height: 1; }
+    .fq-help[open] summary::after { content: '−'; }
+    .fq-help-list { display: grid; gap: .55rem; margin: .7rem 0 0; padding: 0; list-style: none; }
+    .fq-help-list li { padding-top: .55rem; border-top: 1px solid var(--fq-border); }
+    .fq-help-list strong { color: var(--fq-ink); }
     @media (max-width: 1180px) {
-        .fq-filter-form { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .fq-filter-form { grid-template-columns: repeat(6, minmax(0, 1fr)); }
         .fq-field-search { grid-column: span 2; }
-        .fq-field-range { grid-column: span 2; }
-        .fq-filter-actions { grid-column: span 2; }
+        .fq-field-range { grid-column: span 3; }
+        .fq-filter-actions { grid-column: span 3; }
     }
     @media (max-width: 900px) {
         .fq-header { display: block; }
@@ -177,6 +224,9 @@
         .fq-main-grid { grid-template-columns: 1fr; }
         .fq-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .fq-sidebar .fq-side-note { grid-column: 1 / -1; }
+        .fq-sidebar .fq-help { grid-column: 1 / -1; }
+        .fq-filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .fq-field-search, .fq-field-range, .fq-filter-actions { grid-column: span 2; }
     }
     @media (max-width: 640px) {
         .fq-page { padding: .8rem .55rem 3rem; }
@@ -190,6 +240,7 @@
         .fq-refresh { align-items: flex-start; flex-direction: column; }
         .fq-sidebar { grid-template-columns: 1fr; }
         .fq-sidebar .fq-side-note { grid-column: auto; }
+        .fq-sidebar .fq-help { grid-column: auto; }
     }
 </style>
 @endpush
@@ -244,27 +295,27 @@ document.addEventListener('DOMContentLoaded', function () {
     <nav class="fq-breadcrumb" aria-label="Breadcrumb">
         <a href="{{ route('marketplace.orders') }}">Marketplace</a>
         <i class="bi bi-chevron-right"></i>
-        <span>Financial data quality</span>
+        <span>Pemeriksaan data keuangan</span>
     </nav>
 
     <header class="fq-header">
         <div>
-            <div class="fq-eyebrow">Financial controls</div>
-            <h1 class="fq-title">Audit Kualitas Data Keuangan</h1>
-            <p class="fq-description">Pantau kelengkapan settlement, HPP, dan data order marketplace sebelum masuk laporan keuangan atau diposting ke GL.</p>
+            <div class="fq-eyebrow">Kontrol laporan marketplace</div>
+            <h1 class="fq-title">Pemeriksaan Data Keuangan Marketplace</h1>
+            <p class="fq-description">Pastikan payout, HPP, dan data order lengkap sebelum digunakan dalam laporan profit dan accounting.</p>
         </div>
         <div class="fq-actions">
-            <a href="{{ route('marketplace.reports.financial-statement') }}" class="btn btn-sm btn-outline-secondary fq-btn"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Financial statement</a>
-            <a href="{{ route('marketplace.reports.financial-closing') }}" class="btn btn-sm btn-outline-warning fq-btn"><i class="bi bi-lock-fill me-1"></i>Closing</a>
+            <a href="{{ route('marketplace.reports.financial-statement') }}" class="btn btn-sm btn-outline-secondary fq-btn"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Laporan keuangan</a>
+            <a href="{{ route('marketplace.reports.financial-closing') }}" class="btn btn-sm btn-outline-warning fq-btn"><i class="bi bi-lock-fill me-1"></i>Tutup periode</a>
         </div>
     </header>
 
     @if ($result)
-        <div class="fq-health {{ $result['dry_run'] ? 'fq-health-attention' : 'fq-health-good' }}" role="status">
+        <div class="fq-health {{ $resultQueued || ($result['dry_run'] ?? false) ? 'fq-health-attention' : 'fq-health-good' }}" role="status">
             <div class="fq-health-main">
-                <div class="fq-health-icon"><i class="bi {{ $result['dry_run'] ? 'bi-search' : 'bi-check-lg' }}"></i></div>
+                <div class="fq-health-icon"><i class="bi {{ $resultQueued ? 'bi-hourglass-split' : (($result['dry_run'] ?? false) ? 'bi-search' : 'bi-check-lg') }}"></i></div>
                 <div>
-                    <p class="fq-health-title">{{ $result['dry_run'] ? 'Audit dry-run selesai' : 'Audit status berhasil disimpan' }}</p>
+                    <p class="fq-health-title">{{ $resultQueued ? 'Audit masuk antrean' : (($result['dry_run'] ?? false) ? 'Audit dry-run selesai' : 'Audit status berhasil disimpan') }}</p>
                     <p class="fq-health-copy">{{ $result['message'] }}</p>
                 </div>
             </div>
@@ -276,7 +327,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="fq-health-icon"><i class="bi bi-exclamation-triangle"></i></div>
                 <div>
                     <p class="fq-health-title">Perlu ditinjau sebelum posting</p>
-                    <p class="fq-health-copy">Ditemukan <strong>{{ $fmt($qualityIssues) }} quality issue</strong> dan <strong>{{ $fmt($settlementIssues) }} settlement issue</strong>. Gunakan queue di bawah untuk menelusuri detailnya.</p>
+            <p class="fq-health-copy">Ditemukan <strong>{{ $fmt($qualityIssues) }} order belum lengkap</strong> dan <strong>{{ $fmt($settlementIssues) }} payout bermasalah</strong>. Buka daftar di bawah untuk memperbaikinya.</p>
                 </div>
             </div>
             @if ($lastCheckedAt)<span class="fq-health-time">Audit {{ date('d M Y H:i', strtotime($lastCheckedAt)) }}</span>@endif
@@ -287,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="fq-health-icon"><i class="bi bi-check2-circle"></i></div>
                 <div>
                     <p class="fq-health-title">Tidak ada issue yang terdeteksi</p>
-                    <p class="fq-health-copy">Data siap digunakan untuk proses laporan dan review accounting berikutnya.</p>
+            <p class="fq-health-copy">Tidak ada masalah pada data yang diperiksa. Data siap digunakan untuk laporan dan accounting.</p>
                 </div>
             </div>
             @if ($lastCheckedAt)<span class="fq-health-time">Audit {{ date('d M Y H:i', strtotime($lastCheckedAt)) }}</span>@endif
@@ -298,26 +349,21 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="alert alert-danger py-2 small">{{ $errors->first('store_id') }}</div>
     @endif
 
-    <section class="fq-kpis" aria-label="Quality overview">
+    <section class="fq-kpis" aria-label="Ringkasan pemeriksaan">
         <div class="fq-card fq-kpi">
-            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-inbox"></i></span>Queue perbaikan</span>
+            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-inbox"></i></span>Perlu diperbaiki</span>
             <strong class="fq-kpi-value">{{ $fmt($orders->total()) }}</strong>
-            <span class="fq-kpi-note">{{ $orders->total() ? 'Item yang perlu ditinjau' : 'Tidak ada queue aktif' }}</span>
+            <span class="fq-kpi-note">{{ $orders->total() ? 'Order dalam daftar tindakan' : 'Tidak ada tindakan aktif' }}</span>
         </div>
         <div class="fq-card fq-kpi">
-            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-check2-circle"></i></span>Order ready</span>
+            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-check2-circle"></i></span>Siap masuk laporan</span>
             <strong class="fq-kpi-value">{{ $fmt($orderCounts['ready'] ?? 0) }}</strong>
-            <span class="fq-kpi-note">Dari {{ $fmt($auditedOrders) }} order diaudit</span>
-        </div>
-        <div class="fq-card fq-kpi fq-kpi-warning">
-            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-file-earmark-excel"></i></span>Quality incomplete</span>
-            <strong class="fq-kpi-value">{{ $fmt($qualityIssues) }}</strong>
-            <span class="fq-kpi-note">Order belum siap untuk laporan</span>
+            <span class="fq-kpi-note">Dari {{ $fmt($auditedOrders) }} order diperiksa</span>
         </div>
         <div class="fq-card fq-kpi fq-kpi-danger">
-            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-wallet2"></i></span>Settlement issue</span>
+            <span class="fq-kpi-label"><span class="fq-kpi-icon"><i class="bi bi-wallet2"></i></span>Payout bermasalah</span>
             <strong class="fq-kpi-value">{{ $fmt($settlementIssues) }}</strong>
-            <span class="fq-kpi-note">Incomplete atau belum dikenali</span>
+            <span class="fq-kpi-note">Belum lengkap atau belum diperiksa</span>
         </div>
     </section>
 
@@ -326,8 +372,8 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="fq-filter-title-wrap">
                 <span class="fq-filter-icon"><i class="bi bi-sliders2"></i></span>
                 <div>
-                    <h2 id="filter-title" class="fq-filter-title">Filter operasional</h2>
-                    <p class="fq-filter-helper">Persempit queue berdasarkan toko, status order, kualitas, atau periode.</p>
+                    <h2 id="filter-title" class="fq-filter-title">1. Pilih data yang diperiksa</h2>
+                    <p class="fq-filter-helper">Pilih toko, status, atau periode untuk mempersempit daftar.</p>
                 </div>
             </div>
             @if ($activeFilterCount)<span class="fq-filter-count">{{ $activeFilterCount }} filter aktif</span>@endif
@@ -347,12 +393,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     <select id="fq-order-status" name="order_status" class="form-select"><option value="">Semua status</option>@foreach ($orderStatuses as $value)<option value="{{ $value }}" @selected($orderStatus === $value)>{{ $value }}</option>@endforeach</select>
                 </div>
                 <div class="fq-field">
-                    <label class="fq-field-label" for="fq-quality">Quality</label>
-                    <select id="fq-quality" name="status" class="form-select"><option value="">Semua kualitas</option>@foreach ($statusLabels as $value => $label)<option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>@endforeach</select>
+                    <label class="fq-field-label" for="fq-quality">Status data</label>
+                    <select id="fq-quality" name="status" class="form-select"><option value="">Semua status data</option>@foreach ($statusLabels as $value => $label)<option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>@endforeach</select>
                 </div>
                 <div class="fq-field">
-                    <label class="fq-field-label" for="fq-settlement">Settlement</label>
-                    <select id="fq-settlement" name="settlement_status" class="form-select"><option value="">Semua settlement</option><option value="complete" @selected($settlementStatus === 'complete')>Complete</option><option value="incomplete" @selected($settlementStatus === 'incomplete')>Incomplete</option><option value="missing" @selected($settlementStatus === 'missing')>Missing</option><option value="unknown" @selected($settlementStatus === 'unknown')>Unknown</option></select>
+                    <label class="fq-field-label" for="fq-settlement">Status payout</label>
+                    <select id="fq-settlement" name="settlement_status" class="form-select"><option value="">Semua status payout</option><option value="complete" @selected($settlementStatus === 'complete')>Payout lengkap</option><option value="incomplete" @selected($settlementStatus === 'incomplete')>Payout belum lengkap</option><option value="missing" @selected($settlementStatus === 'missing')>Payout belum tersedia</option><option value="unknown" @selected($settlementStatus === 'unknown')>Payout belum diperiksa</option></select>
                 </div>
                 <div class="fq-field fq-field-range">
                     <label class="fq-field-label" for="fq-date-range">Periode order</label>
@@ -369,20 +415,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </form>
         </div>
+    </section>
+
+    <section class="fq-card fq-audit-card" aria-labelledby="audit-title">
         <div class="fq-refresh">
             <div class="fq-refresh-copy">
-                <i class="bi bi-arrow-clockwise"></i>
+                <i class="bi bi-2-circle"></i>
                 <div>
-                    <p class="fq-refresh-title">Perbarui quality status</p>
-                    <p class="fq-refresh-note">{{ $storeId ? 'Toko terpilih' : 'Semua toko' }} · Order non-COMPLETED masuk kategori Tidak berlaku.</p>
+                    <p id="audit-title" class="fq-refresh-title">2. Periksa data keuangan</p>
+                    <p class="fq-refresh-note">{{ $storeId ? 'Toko terpilih' : 'Semua toko' }} · Pemeriksaan membaca payout, item, dan HPP.</p>
                 </div>
             </div>
             <div class="fq-refresh-actions">
                 <form method="POST" action="{{ route('marketplace.reports.financial-quality.refresh') }}" class="d-flex gap-2">
                     @csrf
                     <input type="hidden" name="store_id" value="{{ $storeId ?: 'all' }}">
-                    <button name="dry_run" value="1" class="btn btn-sm btn-outline-secondary fq-btn"><i class="bi bi-search me-1"></i>Audit dry-run</button>
-                    <button name="dry_run" value="0" class="btn btn-sm fq-btn fq-btn-primary"><i class="bi bi-check2 me-1"></i>Audit & simpan status</button>
+                    <button name="dry_run" value="1" class="btn btn-sm btn-outline-secondary fq-btn"><i class="bi bi-search me-1"></i>Cek tanpa menyimpan</button>
+                    <button name="dry_run" value="0" class="btn btn-sm fq-btn fq-btn-primary"><i class="bi bi-play-circle me-1"></i>Periksa dan simpan hasil</button>
                 </form>
             </div>
         </div>
@@ -392,35 +441,40 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="fq-card fq-queue-card">
             <div class="fq-queue-head">
                 <div>
-                    <div class="fq-queue-heading"><i class="bi bi-list-check text-primary"></i><h2 class="fq-queue-title">Queue perbaikan</h2></div>
-                    <p class="fq-queue-subtitle">Order dengan quality atau settlement yang perlu ditinjau.</p>
+                    <div class="fq-queue-heading"><i class="bi bi-list-check text-primary"></i><h2 class="fq-queue-title">Data yang perlu diperbaiki</h2></div>
+                    <p class="fq-queue-subtitle">Buka detail order untuk melihat penyebab dan langkah perbaikannya.</p>
                 </div>
                 <span class="fq-queue-total">{{ $fmt($orders->total()) }} hasil · halaman {{ $orders->currentPage() }}</span>
             </div>
             <div class="fq-table-wrap">
                 <table class="table fq-table">
-                    <thead><tr><th>Order</th><th>Toko</th><th>Order status</th><th>Quality</th><th>Settlement</th><th>Item / HPP</th><th>Issue</th><th></th></tr></thead>
+                    <thead><tr><th>Order</th><th>Toko</th><th>Status data</th><th>Payout</th><th>HPP produk</th><th>Masalah utama</th><th></th></tr></thead>
                     <tbody>
                     @forelse ($orders as $order)
                         @php
                             $qualityStatus = $order->financial_data_status ?: 'unknown';
                             $flags = $order->settlement?->data_quality_flags ?? [];
                             $missing = $flags['blocking_missing_fields'] ?? $flags['missing_financial_fields'] ?? [];
+                            $itemCount = $order->items->count();
                             $validItems = $order->items->filter(fn ($item) => ($item->data_status ?? null) === 'valid' && (float) ($item->hpp_snapshot ?? 0) > 0)->count();
                             $settlementStatusRow = $order->settlement?->data_status ?: ($order->settlement ? 'unknown' : 'missing');
+                            $orderStatusKey = strtoupper((string) $order->order_status);
+                            $issueReason = $order->financial_issue_reason ?: ($settlementStatusRow === 'missing' ? 'settlement_missing' : null);
+                            $issueText = $issueLabels[$issueReason] ?? ($issueReason ? str_replace('_', ' ', $issueReason) : null);
+                            $missingText = collect(is_array($missing) ? $missing : [])->map(fn ($field) => $fieldLabels[$field] ?? str_replace('_', ' ', $field))->take(2)->implode(', ');
+                            $missingCount = is_array($missing) ? count($missing) : 0;
                         @endphp
                         <tr>
-                            <td><div class="fq-order">{{ $order->channel_order_id ?: $order->external_order_id }}</div><div class="fq-muted">{{ optional($order->ordered_at)->format('d M Y H:i') ?: '-' }}</div></td>
+                            <td><div class="fq-order">{{ $order->channel_order_id ?: $order->external_order_id }}</div><div class="fq-muted">{{ $orderStatusLabels[$orderStatusKey] ?? ($order->order_status ?: 'Status belum tersedia') }} · {{ optional($order->ordered_at)->format('d M Y H:i') ?: '-' }}</div></td>
                             <td><div class="fq-store">{{ $order->store?->name ?: '-' }}</div><div class="fq-muted">{{ strtoupper($order->store?->channel?->code ?? '-') }}</div></td>
-                            <td><span class="fq-status {{ in_array(strtoupper((string) $order->order_status), ['COMPLETED'], true) ? 'fq-status-ready' : 'fq-status-neutral' }}">{{ $order->order_status ?: '-' }}</span></td>
                             <td><span class="fq-status {{ $statusClasses[$qualityStatus] ?? 'fq-status-unknown' }}">{{ $statusLabels[$qualityStatus] ?? 'Unknown' }}</span></td>
-                            <td><span class="fq-status {{ $settlementStatusRow === 'complete' ? 'fq-status-ready' : ($settlementStatusRow === 'missing' ? 'fq-status-missing' : 'fq-status-incomplete') }}">{{ $settlementStatusRow }}</span></td>
-                            <td><span class="{{ $validItems === $order->items->count() && $order->items->count() > 0 ? 'fq-valid' : 'fq-invalid' }}">{{ $validItems }}/{{ $order->items->count() }} valid</span></td>
-                            <td class="fq-muted">@if ($order->financial_issue_reason)<span class="d-block">{{ str_replace('_', ' ', $order->financial_issue_reason) }}</span>@endif @if (count($missing))<span>Missing: {{ implode(', ', array_slice($missing, 0, 2)) }}{{ count($missing) > 2 ? '…' : '' }}</span>@elseif (!$order->financial_issue_reason)<span>-</span>@endif</td>
-                            <td class="text-end"><a href="{{ route('marketplace.orders.show', $order) }}" class="fq-action">Detail <i class="bi bi-arrow-up-right ms-1"></i></a></td>
+                            <td><span class="fq-status {{ $settlementStatusRow === 'complete' ? 'fq-status-ready' : ($settlementStatusRow === 'missing' ? 'fq-status-missing' : 'fq-status-incomplete') }}">{{ $settlementLabels[$settlementStatusRow] ?? 'Payout belum diperiksa' }}</span></td>
+                            <td><span class="{{ $validItems === $itemCount && $itemCount > 0 ? 'fq-valid' : 'fq-invalid' }}">{{ $itemCount > 0 ? $validItems . '/' . $itemCount . ' siap' : 'Belum ada item' }}</span></td>
+                            <td class="fq-muted"><span class="d-block">{{ $issueText ?: 'Tidak ada masalah utama' }}</span>@if ($missingText)<span>Data kurang: {{ $missingText }}{{ $missingCount > 2 ? '…' : '' }}</span>@endif</td>
+                            <td class="text-end"><a href="{{ route('marketplace.orders.show', $order) }}" class="fq-action">Buka perbaikan <i class="bi bi-arrow-up-right ms-1"></i></a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="fq-empty"><div class="fq-empty-icon"><i class="bi bi-check2"></i></div><p class="fq-empty-title">Queue sudah bersih</p><p class="fq-empty-copy">Tidak ada order yang sesuai dengan filter saat ini. Jika Anda mengharapkan data settlement, jalankan audit status atau ubah filter settlement.</p></td></tr>
+                        <tr><td colspan="7" class="fq-empty"><div class="fq-empty-icon"><i class="bi bi-check2"></i></div><p class="fq-empty-title">Tidak ada data yang perlu diperbaiki</p><p class="fq-empty-copy">Semua data yang sesuai filter sudah siap, atau belum ada order pada periode ini.</p></td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -430,37 +484,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <aside class="fq-sidebar">
             <div class="fq-card">
-                <div class="fq-card-head"><h2 class="fq-card-title">Ringkasan quality</h2><span class="fq-card-meta">{{ $fmt($auditedOrders) }} order</span></div>
+                <div class="fq-card-head"><h2 class="fq-card-title">Ringkasan status data</h2><span class="fq-card-meta">{{ $fmt($auditedOrders) }} order</span></div>
                 <div class="fq-summary-list">
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot ready"></i>Ready</span><strong class="fq-summary-value">{{ $fmt($orderCounts['ready'] ?? 0) }}</strong></div>
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot warning"></i>Incomplete</span><strong class="fq-summary-value">{{ $fmt($orderCounts['incomplete'] ?? 0) }}</strong></div>
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Tidak berlaku</span><strong class="fq-summary-value">{{ $fmt($orderCounts['not_applicable'] ?? 0) }}</strong></div>
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Unknown</span><strong class="fq-summary-value">{{ $fmt($orderCounts['unknown'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot ready"></i>Siap masuk laporan</span><strong class="fq-summary-value">{{ $fmt($orderCounts['ready'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot warning"></i>Data belum lengkap</span><strong class="fq-summary-value">{{ $fmt($orderCounts['incomplete'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Belum masuk proses keuangan</span><strong class="fq-summary-value">{{ $fmt($orderCounts['not_applicable'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Belum diperiksa</span><strong class="fq-summary-value">{{ $fmt($orderCounts['unknown'] ?? 0) }}</strong></div>
                 </div>
                 <div class="fq-progress"><div class="fq-progress-bar" style="width: {{ $auditedOrders > 0 ? min(100, (($orderCounts['ready'] ?? 0) / $auditedOrders) * 100) : 0 }}%"></div></div>
                 <div class="fq-progress-note">{{ $auditedOrders > 0 ? $fmt(round((($orderCounts['ready'] ?? 0) / $auditedOrders) * 100)) . '% order siap' : 'Belum ada order diaudit' }}</div>
             </div>
 
             <div class="fq-card">
-                <div class="fq-card-head"><h2 class="fq-card-title">Ringkasan settlement</h2><span class="fq-card-meta">Data payout</span></div>
+                <div class="fq-card-head"><h2 class="fq-card-title">Ringkasan payout</h2><span class="fq-card-meta">Dana marketplace</span></div>
                 <div class="fq-summary-list">
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot ready"></i>Complete</span><strong class="fq-summary-value">{{ $fmt($settlementCounts['complete'] ?? 0) }}</strong></div>
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot danger"></i>Incomplete</span><strong class="fq-summary-value">{{ $fmt($settlementCounts['incomplete'] ?? 0) }}</strong></div>
-                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Unknown</span><strong class="fq-summary-value">{{ $fmt($settlementCounts['unknown'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot ready"></i>Payout lengkap</span><strong class="fq-summary-value">{{ $fmt($settlementCounts['complete'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot danger"></i>Payout belum lengkap</span><strong class="fq-summary-value">{{ $fmt($settlementCounts['incomplete'] ?? 0) }}</strong></div>
+                    <div class="fq-summary-row"><span class="fq-summary-label"><i class="fq-summary-dot"></i>Payout belum diperiksa</span><strong class="fq-summary-value">{{ $fmt($settlementCounts['unknown'] ?? 0) }}</strong></div>
                 </div>
                 <div class="fq-issues">
                     @forelse ($issueBreakdown->take(4) as $issue)
-                        <div class="fq-issue"><span class="fq-issue-name">{{ str_replace('_', ' ', $issue->reason) }}</span><span class="fq-issue-count">{{ $fmt($issue->total) }}</span></div>
+                        <div class="fq-issue"><span class="fq-issue-name">{{ $issueLabels[$issue->reason] ?? str_replace('_', ' ', $issue->reason) }}</span><span class="fq-issue-count">{{ $fmt($issue->total) }}</span></div>
                     @empty
-                        <div class="fq-muted">Tidak ada quality issue.</div>
+                        <div class="fq-muted">Belum ada masalah data.</div>
                     @endforelse
                 </div>
             </div>
 
-            <div class="fq-card fq-side-note">
-                <strong>Quality gate</strong><br>
-                Hanya order berstatus <strong>Ready</strong> yang dapat dipakai dalam laporan profit dan posting accounting. Settlement harus memiliki field finansial lengkap sebelum dianggap sebagai fakta payout.
-            </div>
+            <details class="fq-card fq-help">
+                <summary>Bagaimana status ini ditentukan?</summary>
+                <ul class="fq-help-list">
+                    <li><strong>Siap masuk laporan</strong><br>Order memiliki payout lengkap, item terhubung, dan HPP tersedia.</li>
+                    <li><strong>Data belum lengkap</strong><br>Order belum dapat dihitung ke profit sampai masalahnya diperbaiki.</li>
+                    <li><strong>Belum masuk proses keuangan</strong><br>Order belum selesai sehingga payout final belum wajib tersedia.</li>
+                </ul>
+            </details>
         </aside>
     </section>
 </div>

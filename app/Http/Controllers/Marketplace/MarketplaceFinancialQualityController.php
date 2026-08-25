@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\MarketplaceRefreshDataQualityJob;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
@@ -42,19 +43,50 @@ class MarketplaceFinancialQualityController extends Controller
             $status = 'incomplete';
         }
 
-        $orderQuery = fn () => MarketplaceOrder::query()
-            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
-            ->when($search, fn ($query) => $query->where(function ($nested) use ($search) {
-                $nested->where('channel_order_id', 'like', '%' . $search . '%')
-                    ->orWhere('external_order_id', 'like', '%' . $search . '%')
-                    ->orWhere('booking_sn', 'like', '%' . $search . '%')
-                    ->orWhere('buyer_username', 'like', '%' . $search . '%');
-            }))
-            ->when($orderStatus, fn ($query) => $query->where('order_status', $orderStatus))
-            ->when($dateFrom, fn ($query) => $query->whereDate('ordered_at', '>=', $dateFrom))
-            ->when($dateTo, fn ($query) => $query->whereDate('ordered_at', '<=', $dateTo));
+        $applyOrderScope = function ($query) use ($storeId, $search, $orderStatus, $dateFrom, $dateTo, $status) {
+            return $query
+                ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+                ->when($search, fn ($query) => $query->where(function ($nested) use ($search) {
+                    $nested->where('channel_order_id', 'like', '%' . $search . '%')
+                        ->orWhere('external_order_id', 'like', '%' . $search . '%')
+                        ->orWhere('booking_sn', 'like', '%' . $search . '%')
+                        ->orWhere('buyer_username', 'like', '%' . $search . '%');
+                }))
+                ->when($orderStatus, fn ($query) => $query->where('order_status', $orderStatus))
+                ->when($dateFrom, fn ($query) => $query->whereDate('ordered_at', '>=', $dateFrom))
+                ->when($dateTo, fn ($query) => $query->whereDate('ordered_at', '<=', $dateTo))
+                ->when($status !== '', fn ($query) => $query->where('financial_data_status', $status));
+        };
+
+        $applyExplicitOrderFilters = function ($query) use ($applyOrderScope, $settlementStatus) {
+            $query = $applyOrderScope($query);
+
+            return $query
+                ->when($settlementStatus === 'missing', fn ($query) => $query->doesntHave('settlement'))
+                ->when(in_array($settlementStatus, ['complete', 'incomplete', 'unknown'], true), function ($query) use ($settlementStatus) {
+                    if ($settlementStatus === 'unknown') {
+                        $query->whereHas('settlement', fn ($settlement) => $settlement->whereNull('data_status')->orWhere('data_status', 'unknown'));
+                    } else {
+                        $query->whereHas('settlement', fn ($settlement) => $settlement->where('data_status', $settlementStatus));
+                    }
+                });
+        };
+
+        $orderQuery = fn () => $applyExplicitOrderFilters(MarketplaceOrder::query());
         $settlementQuery = fn () => MarketplaceOrderSettlement::query()
-            ->when($storeId, fn ($query) => $query->where('store_id', $storeId));
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->when($settlementStatus === 'missing', fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(in_array($settlementStatus, ['complete', 'incomplete', 'unknown'], true), function ($query) use ($settlementStatus) {
+                if ($settlementStatus === 'unknown') {
+                    $query->whereNull('data_status')->orWhere('data_status', 'unknown');
+                } else {
+                    $query->where('data_status', $settlementStatus);
+                }
+            })
+            ->when(
+                $search || $orderStatus || $dateFrom || $dateTo || $status !== '',
+                fn ($query) => $query->whereHas('order', fn ($order) => $applyOrderScope($order))
+            );
 
         $orderCounts = $orderQuery()
             ->selectRaw('COALESCE(financial_data_status, ?) AS status, COUNT(*) AS total', ['unknown'])
@@ -98,15 +130,6 @@ class MarketplaceFinancialQualityController extends Controller
                             ]);
                     });
             }))
-            ->when(! $defaultIssueQueue && $status !== '', fn ($query) => $query->where('financial_data_status', $status))
-            ->when($settlementStatus === 'missing', fn ($query) => $query->doesntHave('settlement'))
-            ->when(in_array($settlementStatus, ['complete', 'incomplete', 'unknown'], true), fn ($query) => $query->whereHas('settlement', function ($settlement) use ($settlementStatus) {
-                if ($settlementStatus === 'unknown') {
-                    $settlement->whereNull('data_status')->orWhere('data_status', 'unknown');
-                } else {
-                    $settlement->where('data_status', $settlementStatus);
-                }
-            }))
             ->latest('financial_checked_at')
             ->latest('id')
             ->paginate(25)
@@ -140,7 +163,7 @@ class MarketplaceFinancialQualityController extends Controller
         ]);
     }
 
-    public function refresh(Request $request, MarketplaceFinancialDataQualityService $quality)
+    public function refresh(Request $request)
     {
         $data = $request->validate([
             'store_id' => ['required', 'string'],
@@ -153,52 +176,21 @@ class MarketplaceFinancialQualityController extends Controller
         }
 
         $dryRun = (bool) ($data['dry_run'] ?? false);
-        $counts = [
-            'orders' => 0,
-            'ready' => 0,
-            'incomplete' => 0,
-            'not_applicable' => 0,
-            'unknown' => 0,
-            'settlement_complete' => 0,
-            'settlement_incomplete' => 0,
-            'settlement_unknown' => 0,
-        ];
+        MarketplaceRefreshDataQualityJob::dispatch($storeId, $dryRun);
 
-        MarketplaceOrder::query()
-            ->with(['settlement', 'items'])
-            ->when($storeId !== 'all', fn ($query) => $query->where('store_id', (int) $storeId))
-            ->orderBy('id')
-            ->chunkById(200, function ($orders) use ($quality, $dryRun, &$counts) {
-                foreach ($orders as $order) {
-                    $counts['orders']++;
-
-                    if ($order->settlement) {
-                        $settlement = $quality->assessSettlement($order->settlement->raw_json);
-                        $counts['settlement_' . $settlement['status']]++;
-                    } else {
-                        $counts['settlement_incomplete']++;
-                    }
-
-                    $assessment = $dryRun
-                        ? $quality->assessOrder($order)
-                        : $quality->refreshOrder($order);
-
-                    $counts[$assessment['status']]++;
-                }
-            });
-
-        $message = ($dryRun ? 'Audit dry-run selesai.' : 'Status kualitas data berhasil disimpan.')
-            . " {$counts['orders']} order diperiksa; ready {$counts['ready']}, incomplete {$counts['incomplete']}, not applicable {$counts['not_applicable']}.";
+        $message = $dryRun
+            ? 'Audit dry-run masuk antrean dan akan memeriksa data tanpa menyimpan perubahan.'
+            : 'Refresh status kualitas masuk antrean dan akan diproses oleh worker marketplace-quality.';
 
         return redirect()
             ->route('marketplace.reports.financial-quality', [
                 'store_id' => $storeId === 'all' ? null : $storeId,
-                'status' => $dryRun ? 'incomplete' : 'incomplete',
+                'status' => 'incomplete',
             ])
             ->with('quality_result', [
                 'message' => $message,
                 'dry_run' => $dryRun,
-                'counts' => $counts,
+                'queued' => true,
             ]);
     }
 }

@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\MarketplaceRefreshDataQualityJob;
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class MarketplaceFinancialQualityUiTest extends TestCase
@@ -20,9 +22,9 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ->get(route('marketplace.reports.financial-quality'));
 
         $response->assertOk()
-            ->assertSee('Audit Kualitas Data Keuangan')
-            ->assertSee('Audit dry-run')
-            ->assertSee('Audit & simpan status', false)
+            ->assertSee('Pemeriksaan Data Keuangan Marketplace')
+            ->assertSee('Cek tanpa menyimpan')
+            ->assertSee('Periksa dan simpan hasil', false)
             ->assertSee(route('marketplace.reports.financial-quality'), false);
     }
 
@@ -59,7 +61,7 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('UI-LIST-001')
-            ->assertSee('settlement missing');
+            ->assertSee('Payout belum tersedia');
     }
 
     public function test_default_queue_lists_settlement_issues_even_when_order_quality_is_not_applicable(): void
@@ -147,6 +149,24 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ->assertSessionHas('quality_result');
 
         $this->assertSame('unknown', $order->fresh()->financial_data_status);
+    }
+
+    public function test_refresh_is_dispatched_to_marketplace_quality_queue(): void
+    {
+        Queue::fake();
+        $store = $this->store();
+
+        $this->actingAs($this->owner())
+            ->post(route('marketplace.reports.financial-quality.refresh'), [
+                'store_id' => (string) $store->id,
+                'dry_run' => '1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('quality_result.queued', true);
+
+        Queue::assertPushedOn('marketplace-quality', MarketplaceRefreshDataQualityJob::class, function ($job) use ($store) {
+            return $job->storeId === (string) $store->id && $job->dryRun === true;
+        });
     }
 
     public function test_owner_can_save_quality_status_from_ui(): void
