@@ -162,15 +162,15 @@
         .line-unit-select {
             width: 100%;
             min-width: 0;
-            min-height: 32px;
-            padding: .26rem 1.65rem .26rem .45rem;
-            border: 1px solid rgba(148,163,184,.34);
-            border-radius: 7px;
+            min-height: 38px;
+            padding: .375rem 1.9rem .375rem .75rem;
+            border: 1px solid var(--line, rgba(148,163,184,.34));
+            border-radius: 10px;
             background-color: var(--card, #fff);
             color: var(--text, #1e293b);
-            font-size: .72rem;
-            font-weight: 750;
-            line-height: 1.2;
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.5;
         }
 
         .line-unit-select:focus {
@@ -1741,11 +1741,7 @@
                         </td>
 
                         <td data-label="Konversi Stok" class="po-td-stock">
-                            @if($conversionFactor != 1)
-                                <div class="line-conversion-hint" data-line-conversion-hint>1 {{ $purchaseUnit }} = {{ decimal_id($conversionFactor, 6) }} {{ $stockUnit }}</div>
-                            @else
-                                <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
-                            @endif
+                            <div class="line-conversion-hint" data-line-conversion-hint>{{ decimal_id($conversionFactor, 6) }} {{ $stockUnit }}</div>
                             <div class="line-stock-hint" data-line-stock-hint></div>
                         </td>
 
