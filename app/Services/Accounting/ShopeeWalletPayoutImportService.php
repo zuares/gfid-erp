@@ -17,6 +17,13 @@ class ShopeeWalletPayoutImportService
         'withdrawal_completed',
         'withdrawal-completed',
     ];
+    private const KNOWN_NON_WITHDRAWAL_LABELS = [
+        '101', '102', '201', '203',
+        'escrow_verified_add', 'escrow_verified_minus',
+        'withdrawal_created', 'withdrawal_cancelled',
+        'withdrawal-created', 'withdrawal-cancelled',
+        '450', 'paid_ads_charge', 'paid-ads-charge',
+    ];
 
     public function __construct(private readonly ShopeeChannel $shopee)
     {
@@ -52,7 +59,9 @@ class ShopeeWalletPayoutImportService
                 $from->timestamp,
                 $to->timestamp,
                 'MONEY_OUT',
-                self::COMPLETED_WITHDRAWAL
+                self::COMPLETED_WITHDRAWAL,
+                null,
+                'wallet_withdrawals'
             );
 
             if (! empty($result['error'])) {
@@ -79,12 +88,7 @@ class ShopeeWalletPayoutImportService
                 // ke Shopee, karena fixture/cache/API proxy bisa mengembalikan
                 // record tambahan.
                 if ($transactionId === '' || $amount <= 0
-                    || ($transactionType !== '' && ! in_array(
-                        strtolower(trim($transactionType)),
-                        self::COMPLETED_WITHDRAWAL_LABELS,
-                        true
-                    ))
-                    || ($createdTime > 0 && ($createdTime < $from->timestamp || $createdTime > $to->timestamp))) {
+                    || ! $this->isCompletedWithdrawalType($transactionType)) {
                     $skipped++;
                     $skippedInvalid++;
                     continue;
@@ -164,5 +168,23 @@ class ShopeeWalletPayoutImportService
         } while ($more && count($rows) > 0);
 
         return compact('created', 'skipped', 'skippedExisting', 'skippedInvalid');
+    }
+
+    private function isCompletedWithdrawalType(string $transactionType): bool
+    {
+        $normalized = strtolower(trim($transactionType));
+
+        if ($normalized === '' || in_array($normalized, self::COMPLETED_WITHDRAWAL_LABELS, true)) {
+            return true;
+        }
+
+        if (in_array($normalized, self::KNOWN_NON_WITHDRAWAL_LABELS, true)) {
+            return false;
+        }
+
+        // Shopee sudah menerima filter transaction_type + transaction_tab_type.
+        // Untuk variasi label response baru, percayakan filter server daripada
+        // membuang payout yang valid hanya karena enum belum dikenal aplikasi.
+        return true;
     }
 }

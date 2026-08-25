@@ -419,7 +419,8 @@ class ShopeeChannel implements MarketplaceChannel
         ?int $createTimeTo = null,
         ?string $moneyFlow = null,
         ?string $transactionType = null,
-        ?string $walletType = null
+        ?string $walletType = null,
+        ?string $transactionTabType = null
     ): array {
         $params = [
             'page_no'   => max(0, $pageNo),
@@ -440,6 +441,9 @@ class ShopeeChannel implements MarketplaceChannel
         }
         if ($walletType !== null && $walletType !== '') {
             $params['wallet_type'] = $walletType;
+        }
+        if ($transactionTabType !== null && $transactionTabType !== '') {
+            $params['transaction_tab_type'] = $transactionTabType;
         }
 
         return $this->post($store, '/api/v2/payment/get_wallet_transaction_list', $params);
