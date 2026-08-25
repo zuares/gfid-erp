@@ -461,6 +461,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         $rcv = (float) $line->qty_received;
                                         $ret = (float) $line->qty_returned;
                                         $qtyOut = $line->qty - $rcv;
+                                        // Nilai tersimpan di purchase_order_lines.line_total.
+                                        // Fallback menjaga PO lama tetap menampilkan subtotal
+                                        // jika line_total belum terisi.
+                                        $lineSubtotal = (float) ($line->line_total ?? 0);
+                                        if (abs($lineSubtotal) < 0.0001) {
+                                            $lineSubtotal = max(0, ((float) $line->qty * (float) $line->unit_price) - (float) $line->discount);
+                                        }
                                     @endphp
                                     <tr>
                                         <td class="item-cell">
@@ -473,7 +480,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                             {{-- MOBILE EXTRA INFO --}}
                                             <div class="d-md-none mt-1">
                                                 @if($canSeeMoney)
-                                                    <div style="font-size:.8rem;color:#475569;">{{ angka($line->unit_price) }} / {{ $line->effectivePurchaseUnit() }} × {{ decimal_id($line->qty, 2) }} = <b>{{ angka($line->subtotal) }}</b></div>
+                                                    <div style="font-size:.8rem;color:#475569;">{{ angka($line->unit_price) }} / {{ $line->effectivePurchaseUnit() }} × {{ decimal_id($line->qty, 2) }} = <b>{{ angka($lineSubtotal) }}</b></div>
                                                 @endif
                                             </div>
                                         </td>
@@ -497,7 +504,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                                     <br><span class="text-danger" style="font-size:.7rem">Disc: -{{ angka($line->discount) }}</span>
                                                 @endif
                                             </td>
-                                            <td class="po-r po-hide-mobile">{{ angka($line->subtotal) }}</td>
+                                            <td class="po-r po-hide-mobile">{{ angka($lineSubtotal) }}</td>
                                         @endif
                                         <td class="progress-cell" style="min-width: 140px; vertical-align: top;">
                                             @if ($rcv > 0)
