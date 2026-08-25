@@ -158,6 +158,9 @@
     .item-status-switch strong { font-size:.78rem; }
     .item-form-footer { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:15px; }
     .item-form-footer .btn { border-radius:999px; font-weight:800; }
+    .item-form-actions { position:sticky; top:12px; z-index:25; display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; padding:9px 11px; border:1px solid #dbe3ee; border-radius:15px; background:rgba(255,255,255,.94); box-shadow:0 8px 20px rgba(15,23,42,.08); backdrop-filter:blur(12px); }
+    .item-form-actions-label { color:#64748b; font-size:.72rem; font-weight:800; }
+    .item-form-actions .btn { border-radius:999px; font-weight:800; }
     .item-form .btn-item-primary { color:#fff; background:linear-gradient(135deg,#0f172a,#334155); border-color:transparent; }
     .item-form .btn-item-outline { color:#334155; background:#fff; border:1px solid #cbd5e1; }
     .item-bom-menu { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 16px; border:1px solid #c7d2fe; border-radius:16px; background:linear-gradient(135deg,#eef2ff,#f8fafc); }
@@ -180,6 +183,7 @@
     body[data-theme="dark"] .item-accordion-title { color:#e2e8f0; }
     body[data-theme="dark"] .item-form .form-label { color:#cbd5e1; }
     body[data-theme="dark"] .item-form .form-control, body[data-theme="dark"] .item-form .form-select { color:#f8fafc; background:#0f172a; border-color:#475569; }
+    body[data-theme="dark"] .item-form-actions { border-color:#334155; background:rgba(15,23,42,.94); }
     body[data-theme="dark"] .item-bom-menu { background:#172554; border-color:#3730a3; }
     body[data-theme="dark"] .item-bom-menu-title { color:#e0e7ff; }
     @media(max-width:900px) { .item-supply-preset { grid-template-columns:repeat(2,minmax(0,1fr)); } }
@@ -196,6 +200,10 @@
         .item-form-footer { align-items:stretch; flex-direction:column-reverse; }
         .item-form-footer > * { width:100%; }
         .item-form-footer .btn { width:100%; justify-content:center; }
+        .item-form-actions { top:6px; align-items:stretch; flex-direction:column; }
+        .item-form-actions-label { width:100%; }
+        .item-form-actions > div:last-child { width:100%; }
+        .item-form-actions > div:last-child .btn { flex:1 1 0; justify-content:center; }
         .item-bom-menu { align-items:stretch; flex-direction:column; padding:12px; }
         .item-bom-menu .btn { width:100%; justify-content:center; }
     }
@@ -227,8 +235,20 @@
         @endpush
     @endif
 
+    <div class="item-form-actions" role="toolbar" aria-label="Aksi form item">
+        <span class="item-form-actions-label"><i class="bi bi-check2-circle me-1"></i>{{ $isEdit ? 'Perbarui data item' : 'Simpan item baru' }}</span>
+        <div class="d-flex gap-2">
+            <a href="{{ route('master.items.index') }}" class="btn btn-sm btn-item-outline px-3"><i class="bi bi-arrow-left me-1"></i>Batal</a>
+            <button type="submit" class="btn btn-sm btn-item-primary px-3"><i class="bi bi-check2 me-1"></i>{{ $isEdit ? 'Simpan Perubahan' : 'Simpan Item' }}</button>
+        </div>
+    </div>
+
     <div class="item-form-card">
         <div class="item-form-section">
+            @php
+                $purchaseFactorValue = old('purchase_conversion_factor', $item?->purchase_conversion_factor ?? 1);
+                $purchaseFactorValue = rtrim(rtrim(number_format((float) $purchaseFactorValue, 6, '.', ''), '0'), '.');
+            @endphp
             <div class="item-section-head">
                 <div class="item-section-icon"><i class="bi bi-box"></i></div>
                 <h2 class="item-section-title">Identitas item</h2>
@@ -275,7 +295,7 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="item-purchase-conversion">Isi per satuan pembelian</label>
-                    <input id="item-purchase-conversion" type="number" name="purchase_conversion_factor" class="form-control @error('purchase_conversion_factor') is-invalid @enderror" value="{{ old('purchase_conversion_factor', $item?->purchase_conversion_factor ?? 1) }}" min="0.000001" step="0.000001" required>
+                    <input id="item-purchase-conversion" type="number" name="purchase_conversion_factor" class="form-control @error('purchase_conversion_factor') is-invalid @enderror" value="{{ $purchaseFactorValue }}" min="0.000001" step="0.000001" required>
                     @error('purchase_conversion_factor')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
@@ -638,12 +658,6 @@
 
     @include('master.items._barcodes_form')
 
-    <div class="item-form-footer">
-        <div class="d-flex gap-2">
-            <a href="{{ route('master.items.index') }}" class="btn btn-item-outline px-4"><i class="bi bi-arrow-left"></i>Batal</a>
-            <button type="submit" class="btn btn-item-primary px-4"><i class="bi bi-check2"></i>{{ $isEdit ? 'Simpan Perubahan' : 'Simpan Item' }}</button>
-        </div>
-    </div>
 </div>
 
 @push('scripts')

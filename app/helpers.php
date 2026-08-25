@@ -13,7 +13,11 @@ if (!function_exists('rupiah')) {
 if (!function_exists('decimal_id')) {
     function decimal_id($value, $decimal = 2)
     {
-        return number_format($value, $decimal, ',', '.');
+        $formatted = number_format($value, $decimal, ',', '.');
+
+        return $decimal > 0
+            ? rtrim(rtrim($formatted, '0'), ',')
+            : $formatted;
     }
 }
 
