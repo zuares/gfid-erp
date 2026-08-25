@@ -30,7 +30,7 @@
 <div class="dash-sec"><i class="bi bi-clipboard-check"></i> Hasil & Perlu Perhatian</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
-        'label' => 'Barang jadi siap', 'icon' => 'bi-bag-check', 'color' => 'green',
+        'label' => 'Barang Jadi Siap', 'icon' => 'bi-bag-check', 'color' => 'green',
         'value' => $qty($d['fg_ready']) . ' pcs', 'small' => true,
         'sub' => 'Sudah selesai, siap kirim',
         'url' => $r('inventory.stocks.items'), 'cta' => 'Lihat stok',
@@ -41,7 +41,7 @@
         'sub' => 'Cacat / perlu perbaikan',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Bahan baku habis', 'icon' => 'bi-droplet-half', 'color' => $d['rm_low'] > 0 ? 'amber' : '',
+        'label' => 'Bahan Baku Habis', 'icon' => 'bi-droplet-half', 'color' => $d['rm_low'] > 0 ? 'amber' : '',
         'value' => number_format($d['rm_low'], 0, ',', '.'),
         'sub' => 'Bahan yang stoknya 0',
     ])

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Inventory\InventoryIntelligenceService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,10 @@ class DashboardController extends Controller
         'FG'       => 'FG',
         'RTS'      => 'WH-RTS',
     ];
+
+    public function __construct(private InventoryIntelligenceService $inventoryIntelligence)
+    {
+    }
 
     public function devRunAudit(): \Illuminate\Http\JsonResponse
     {
@@ -64,6 +69,35 @@ class DashboardController extends Controller
     {
         $sales7  = $this->mpSales(6);
         $salesTd = $this->mpSales(0);
+        $today = Carbon::today();
+
+        $salesTodayPreviousPeriod = $this->mpSalesRange(
+            $today->copy()->subDay(),
+            $today->copy()->subDay(),
+        );
+        $salesTodayPreviousMonth = $this->mpSalesRange(
+            $today->copy()->subMonthNoOverflow(),
+            $today->copy()->subMonthNoOverflow(),
+        );
+        $sales7PreviousPeriod = $this->mpSalesRange(
+            $today->copy()->subDays(13),
+            $today->copy()->subDays(7),
+        );
+        $sales7PreviousMonth = $this->mpSalesRange(
+            $today->copy()->subDays(6)->subMonthNoOverflow(),
+            $today->copy()->subMonthNoOverflow(),
+        );
+
+        // Read-only forecast dari Inventory Intelligence. Jika data stok belum
+        // lengkap, dashboard tetap tampil dan hanya menunjukkan saran 0.
+        $intelligenceRows = $this->safe(
+            fn () => $this->inventoryIntelligence->rows([]),
+            collect(),
+        );
+        $productionSuggestions = $intelligenceRows
+            ->filter(fn ($row) => (float) ($row->production_suggested_qty ?? 0) > 0);
+        $procurementSuggestions = $intelligenceRows
+            ->filter(fn ($row) => (float) ($row->procurement_suggested_qty ?? 0) > 0);
 
         // Fetch Ads Analytics for Executive Dashboard (Owner only)
         $adsHourly = [];
@@ -97,8 +131,12 @@ class DashboardController extends Controller
         return [
             'sales_today_count'   => $salesTd['count'],
             'sales_today_amount'  => $salesTd['amount'],
+            'sales_today_compare_period' => $this->salesComparison($salesTd, $salesTodayPreviousPeriod),
+            'sales_today_compare_month'  => $this->salesComparison($salesTd, $salesTodayPreviousMonth),
             'sales_7_count'       => $sales7['count'],
             'sales_7_amount'      => $sales7['amount'],
+            'sales_7_compare_period' => $this->salesComparison($sales7, $sales7PreviousPeriod),
+            'sales_7_compare_month'  => $this->salesComparison($sales7, $sales7PreviousMonth),
             'orders_todo'         => $this->mpUnshippedCount(),
             'orders_ready'        => $this->mpStatusCount(['READY_TO_SHIP']),
             'orders_shipped_7'    => $this->mpStatusCount(['SHIPPED'], 6),
@@ -106,6 +144,18 @@ class DashboardController extends Controller
             'fg_ready'            => $this->whQty([self::WH['FG'], self::WH['RTS']]),
             'stock_out_fg'        => $this->stockOutCount('finished_good'),
             'stock_out_rm'        => $this->stockOutCount('material'),
+            'production_suggestion_items' => $productionSuggestions->count(),
+            'production_suggestion_qty' => (float) $productionSuggestions->sum('production_suggested_qty'),
+            'production_suggestion_value' => (float) $productionSuggestions->reduce(
+                fn ($total, $row) => $total + ((float) ($row->production_suggested_qty ?? 0) * (float) ($row->unit_cost ?? 0)),
+                0,
+            ),
+            'procurement_suggestion_items' => $procurementSuggestions->count(),
+            'procurement_suggestion_qty' => (float) $procurementSuggestions->sum('procurement_suggested_qty'),
+            'procurement_suggestion_value' => (float) $procurementSuggestions->reduce(
+                fn ($total, $row) => $total + ((float) ($row->procurement_suggested_qty ?? 0) * (float) ($row->unit_cost ?? 0)),
+                0,
+            ),
             'po_unreceived'       => $this->poCount(['not_received', 'partially_received'], 'received_status'),
             'po_unpaid'           => $this->poCount(['unpaid', 'partial'], 'payment_status'),
             'reject_total'        => $this->whQty(['REJ-CUT', 'REJ-SEW', 'REJ-FIN', 'REJECT']),
@@ -171,16 +221,23 @@ class DashboardController extends Controller
     /** Penjualan marketplace n hari ke belakang (0 = hari ini). */
     private function mpSales(int $daysBack): array
     {
-        return $this->safe(function () use ($daysBack) {
+        return $this->mpSalesRange(
+            Carbon::today()->subDays($daysBack),
+            Carbon::today(),
+        );
+    }
+
+    /** Penjualan marketplace pada rentang tanggal inklusif. */
+    private function mpSalesRange(Carbon $from, Carbon $to): array
+    {
+        return $this->safe(function () use ($from, $to) {
             if (!Schema::hasTable('marketplace_orders')) {
                 return ['count' => 0, 'amount' => 0];
             }
-            $from = Carbon::today()->subDays($daysBack)->startOfDay();
-            $to   = Carbon::today()->endOfDay();
             $col  = $this->mpDateCol();
 
             $q = DB::table('marketplace_orders')
-                ->whereBetween($col, [$from, $to])
+                ->whereBetween($col, [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
                 ->where(fn ($w) => $w->where('order_status', '!=', 'CANCELLED')->orWhereNull('order_status'));
 
             $amountExpr = 'COALESCE(total_amount, total_paid_customer, 0)';
@@ -190,6 +247,31 @@ class DashboardController extends Controller
                 'amount' => (float) (clone $q)->sum(DB::raw($amountExpr)),
             ];
         }, ['count' => 0, 'amount' => 0]);
+    }
+
+    /** Perubahan omzet terhadap rentang pembanding yang setara. */
+    private function salesComparison(array $current, array $previous): array
+    {
+        $currentAmount = (float) ($current['amount'] ?? 0);
+        $previousAmount = (float) ($previous['amount'] ?? 0);
+
+        if ($previousAmount === 0.0) {
+            return [
+                'delta_pct' => null,
+                'label' => $currentAmount > 0 ? 'Baru' : '—',
+                'tone' => $currentAmount > 0 ? 'up' : 'muted',
+                'previous_amount' => $previousAmount,
+            ];
+        }
+
+        $delta = round((($currentAmount - $previousAmount) / abs($previousAmount)) * 100, 1);
+
+        return [
+            'delta_pct' => $delta,
+            'label' => ($delta >= 0 ? '↑ ' : '↓ ') . number_format(abs($delta), 1, ',', '.') . '%',
+            'tone' => $delta == 0.0 ? 'muted' : ($delta > 0 ? 'up' : 'down'),
+            'previous_amount' => $previousAmount,
+        ];
     }
 
     private function mpOrdersInPeriod(int $daysBack): int

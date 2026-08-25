@@ -42,13 +42,13 @@
         'url' => $r('marketplace.issues') ?? $r('marketplace.orders'), 'cta' => 'Perbaiki',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Barang jadi habis', 'icon' => 'bi-exclamation-octagon', 'color' => $d['stock_out_fg'] > 0 ? 'red' : '',
+        'label' => 'Barang Jadi Habis', 'icon' => 'bi-exclamation-octagon', 'color' => $d['stock_out_fg'] > 0 ? 'red' : '',
         'value' => number_format($d['stock_out_fg'], 0, ',', '.'),
         'sub' => 'Model kosong, bisa ganggu jualan',
         'url' => $r('inventory.stocks.items'), 'cta' => 'Cek stok',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Barang jadi siap', 'icon' => 'bi-bag-check', 'color' => 'green',
+        'label' => 'Barang Jadi Siap', 'icon' => 'bi-bag-check', 'color' => 'green',
         'value' => $qty($d['fg_ready']) . ' pcs', 'small' => true,
         'sub' => 'Stok siap jual',
         'url' => $r('inventory.stocks.items'), 'cta' => 'Lihat stok',

@@ -11,12 +11,20 @@
         'label' => 'Penjualan hari ini', 'icon' => 'bi-cart-check', 'color' => 'green',
         'value' => rupiah($d['sales_today_amount']),
         'sub' => $d['sales_today_count'] . ' pesanan masuk hari ini',
+        'comparisons' => [
+            ['label' => 'vs periode lalu', 'value' => $d['sales_today_compare_period']['label'], 'tone' => $d['sales_today_compare_period']['tone']],
+            ['label' => 'vs bulan lalu', 'value' => $d['sales_today_compare_month']['label'], 'tone' => $d['sales_today_compare_month']['tone']],
+        ],
         'url' => $r('marketplace.orders'), 'cta' => 'Lihat pesanan',
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Penjualan 7 hari', 'icon' => 'bi-calendar-week', 'color' => 'blue',
         'value' => rupiah($d['sales_7_amount']),
         'sub' => $d['sales_7_count'] . ' pesanan dalam sepekan',
+        'comparisons' => [
+            ['label' => 'vs periode lalu', 'value' => $d['sales_7_compare_period']['label'], 'tone' => $d['sales_7_compare_period']['tone']],
+            ['label' => 'vs bulan lalu', 'value' => $d['sales_7_compare_month']['label'], 'tone' => $d['sales_7_compare_month']['tone']],
+        ],
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Perlu diproses', 'icon' => 'bi-hourglass-split', 'color' => $d['orders_todo'] > 0 ? 'amber' : '',
@@ -31,11 +39,11 @@
     ])
 </div>
 
-{{-- ================= BARANG & PRODUKSI ================= --}}
-<div class="dash-sec"><i class="bi bi-box-seam"></i> Barang & Produksi</div>
+{{-- ================= BARANG JADI & PRODUKSI ================= --}}
+<div class="dash-sec"><i class="bi bi-box-seam"></i> Barang Jadi & Produksi</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
-        'label' => 'Barang jadi siap', 'icon' => 'bi-bag-check', 'color' => 'green',
+        'label' => 'Barang Jadi Siap', 'icon' => 'bi-bag-check', 'color' => 'green',
         'value' => $qty($d['fg_ready']) . ' pcs', 'small' => true,
         'sub' => 'Stok siap jual di gudang',
         'url' => $r('inventory.stocks.items'), 'cta' => 'Lihat stok',
@@ -47,14 +55,26 @@
         'url' => $r('production.dashboard'), 'cta' => 'Pantau produksi',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Barang jadi habis', 'icon' => 'bi-exclamation-octagon', 'color' => $d['stock_out_fg'] > 0 ? 'red' : '',
+        'label' => 'Barang Jadi Habis', 'icon' => 'bi-exclamation-octagon', 'color' => $d['stock_out_fg'] > 0 ? 'red' : '',
         'value' => number_format($d['stock_out_fg'], 0, ',', '.'),
         'sub' => 'Model yang stoknya 0',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Bahan baku habis', 'icon' => 'bi-droplet-half', 'color' => $d['stock_out_rm'] > 0 ? 'amber' : '',
+        'label' => 'Bahan Baku Habis', 'icon' => 'bi-droplet-half', 'color' => $d['stock_out_rm'] > 0 ? 'amber' : '',
         'value' => number_format($d['stock_out_rm'], 0, ',', '.'),
         'sub' => 'Bahan yang perlu dibeli',
+    ])
+    @include('dashboard.partials._kpi', [
+        'label' => 'Saran Pengadaan', 'icon' => 'bi-cart-plus', 'color' => $d['procurement_suggestion_items'] > 0 ? 'amber' : '',
+        'value' => $qty($d['procurement_suggestion_qty']) . ' pcs', 'small' => true,
+        'sub' => $d['procurement_suggestion_items'] . ' SKU · forecast 60 hari · ' . rupiah($d['procurement_suggestion_value']),
+        'url' => $r('inventory.intelligence', ['tab' => 'procurement']), 'cta' => 'Lihat saran',
+    ])
+    @include('dashboard.partials._kpi', [
+        'label' => 'Saran Produksi', 'icon' => 'bi-gear-wide-connected', 'color' => $d['production_suggestion_items'] > 0 ? 'violet' : '',
+        'value' => $qty($d['production_suggestion_qty']) . ' pcs', 'small' => true,
+        'sub' => $d['production_suggestion_items'] . ' SKU · forecast 30 hari · ' . rupiah($d['production_suggestion_value']),
+        'url' => $r('inventory.intelligence', ['tab' => 'forecast']), 'cta' => 'Lihat saran',
     ])
 </div>
 
