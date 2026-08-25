@@ -63,10 +63,17 @@ class ShopeeWalletPayoutImportService
             foreach ($rows as $row) {
                 $transactionId = (string) data_get($row, 'transaction_id', '');
                 $amount = abs((float) data_get($row, 'amount', 0));
+                $transactionType = (string) data_get($row, 'transaction_type', '');
+                $createdTime = (int) data_get($row, 'create_time', 0);
 
                 // Tanpa ID dan nominal, record tidak aman untuk dijadikan
                 // dokumen accounting dan harus dibiarkan untuk investigasi API.
-                if ($transactionId === '' || $amount <= 0) {
+                // Guard tipe lokal tetap dipakai walaupun filter sudah dikirim
+                // ke Shopee, karena fixture/cache/API proxy bisa mengembalikan
+                // record tambahan.
+                if ($transactionId === '' || $amount <= 0
+                    || ($transactionType !== '' && $transactionType !== self::COMPLETED_WITHDRAWAL)
+                    || ($createdTime > 0 && ($createdTime < $from->timestamp || $createdTime > $to->timestamp))) {
                     $skipped++;
                     continue;
                 }
@@ -81,7 +88,6 @@ class ShopeeWalletPayoutImportService
                     continue;
                 }
 
-                $createdTime = (int) data_get($row, 'create_time', 0);
                 $date = $createdTime > 0
                     ? Carbon::createFromTimestamp($createdTime, config('app.timezone'))
                     : $from->copy();

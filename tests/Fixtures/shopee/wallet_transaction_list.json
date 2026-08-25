@@ -1,0 +1,29 @@
+{
+  "response": {
+    "transaction_list": [
+      {
+        "transaction_id": 987654321,
+        "status": "COMPLETED",
+        "transaction_type": 202,
+        "amount": -125000,
+        "current_balance": 875000,
+        "create_time": 1787220000,
+        "order_sn": "",
+        "wallet_type": "seller_balance",
+        "reason": "Withdrawal to bank"
+      },
+      {
+        "transaction_id": 987654322,
+        "status": "COMPLETED",
+        "transaction_type": 450,
+        "amount": -15000,
+        "current_balance": 860000,
+        "create_time": 1787223600,
+        "order_sn": "",
+        "wallet_type": "seller_balance",
+        "reason": "Paid ads charge"
+      }
+    ],
+    "more": false
+  }
+}
