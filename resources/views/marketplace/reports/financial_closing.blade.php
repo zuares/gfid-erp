@@ -10,6 +10,8 @@
     $isClosed = $closing?->status === 'closed';
     $failedChecks = collect($audit['checks'])->where('pass', false)->count();
     $checkCount = count($audit['checks']);
+    $qualityCheck = collect($audit['checks'])->firstWhere('key', 'quality');
+    $postingCheck = collect($audit['checks'])->firstWhere('key', 'posting');
     $selectedStore = $filters['store_id']
         ? $stores->firstWhere('id', (int) $filters['store_id'])
         : null;
@@ -78,10 +80,15 @@
     .mfc-control-body { padding:1.1rem 1.2rem; }
     .mfc-consequence { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; color:#92400e; font-size:.8rem; padding:.75rem .85rem; }
     .mfc-closed-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; color:#1e40af; font-size:.8rem; padding:.75rem .85rem; }
+    .mfc-next-action { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.15rem; margin:0 0 1rem; border:1px solid #93c5fd; border-radius:16px; background:#eff6ff; }
+    .mfc-next-action-main { display:flex; align-items:flex-start; gap:.75rem; }
+    .mfc-next-action-icon { display:grid; place-items:center; width:2.2rem; height:2.2rem; border-radius:11px; background:#dbeafe; color:#1d4ed8; flex:0 0 auto; }
+    .mfc-next-action-title { font-size:.92rem; font-weight:800; margin:0; color:#1e3a8a; }
+    .mfc-next-action-copy { color:#475569; font-size:.79rem; margin:.2rem 0 0; }
     .mfc-audit-table th { color:#64748b; font-size:.7rem; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; }
     .mfc-audit-table td { font-size:.8rem; }
     @media (max-width: 992px) { .mfc-scope-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .mfc-scope-form .mfc-submit { grid-column:span 2; } }
-    @media (max-width: 576px) { .mfc-scope-form { grid-template-columns:1fr; } .mfc-scope-form .mfc-submit { grid-column:auto; } .mfc-status { align-items:flex-start; flex-direction:column; } .mfc-header-actions { justify-content:flex-start; } }
+    @media (max-width: 576px) { .mfc-scope-form { grid-template-columns:1fr; } .mfc-scope-form .mfc-submit { grid-column:auto; } .mfc-status, .mfc-next-action { align-items:flex-start; flex-direction:column; } .mfc-header-actions { justify-content:flex-start; } .mfc-next-action .btn { width:100%; } }
 </style>
 @endpush
 
@@ -99,11 +106,11 @@
         <div>
             <div class="mfc-eyebrow">Kontrol akhir laporan</div>
             <h1 class="mfc-title">Tutup periode keuangan</h1>
-            <p class="mfc-lead">Pastikan data, payout, posting accounting, dan jurnal sudah benar sebelum periode dikunci.</p>
+            <p class="mfc-lead">Ikuti checklist dari atas ke bawah: pastikan data dan payout benar, posting settlement ke jurnal, lalu kunci periode.</p>
         </div>
         <div class="mfc-header-actions">
             <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.financial-statement', $filters) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Lihat laporan keuangan</a>
-            <a class="btn btn-outline-primary" href="{{ route('marketplace.reports.financial-statement.posting-preview', $filters) }}"><i class="bi bi-journal-check me-1"></i>Tinjau posting</a>
+            <a class="btn btn-primary" href="{{ $postingUrl }}" title="Periksa draft lalu posting settlement ke jurnal umum"><i class="bi bi-journal-plus me-1"></i>Posting settlement</a>
         </div>
     </header>
 
@@ -169,6 +176,19 @@
         </div>
         <span class="mfc-status-badge">{{ $statusBadge }}</span>
     </section>
+
+    @if (!$isClosed && !($postingCheck['pass'] ?? false) && ($qualityCheck['pass'] ?? false) && $summary['order_count'] > 0)
+        <section class="mfc-next-action" aria-labelledby="next-action-title">
+            <div class="mfc-next-action-main">
+                <div class="mfc-next-action-icon"><i class="bi bi-arrow-right-circle"></i></div>
+                <div>
+                    <h2 id="next-action-title" class="mfc-next-action-title">Langkah berikutnya: posting settlement</h2>
+                    <p class="mfc-next-action-copy">Buka draft jurnal, periksa total debit dan credit, lalu pilih <strong>Post settlement ke jurnal</strong>. Setelah berhasil, kembali ke halaman ini untuk memastikan checklist lulus.</p>
+                </div>
+            </div>
+            <a class="btn btn-primary flex-shrink-0" href="{{ $postingUrl }}"><i class="bi bi-journal-plus me-1"></i>Mulai posting</a>
+        </section>
+    @endif
 
     <div class="row g-3 mb-4" aria-label="Ringkasan periode">
         <div class="col-sm-6 col-xl-3"><div class="card mfc-metric"><div class="mfc-metric-label">Order siap masuk laporan</div><div class="mfc-metric-value">{{ $fmt($summary['order_count']) }}</div><div class="mfc-metric-note">Dalam periode terpilih</div></div></div>

@@ -36,9 +36,9 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->actingAs($owner)
             ->get(route('marketplace.reports.financial-statement.posting-preview', $filters))
             ->assertOk()
-            ->assertSee('Review Posting Accounting')
+            ->assertSee('Posting settlement ke jurnal')
             ->assertSee('Dr = Cr Rp 305')
-            ->assertSee('Belum ada jurnal');
+            ->assertSee('Yang perlu dilakukan');
 
         $this->assertDatabaseCount('journals', 0);
 

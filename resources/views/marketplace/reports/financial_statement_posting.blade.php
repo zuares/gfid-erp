@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Marketplace • Review Posting')
+@section('title', 'Marketplace • Posting Settlement')
 
 @php
     $fmt = fn ($n) => number_format((float) $n, 0, ',', '.');
@@ -14,12 +14,13 @@
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
             <div class="text-uppercase text-muted small fw-semibold">Marketplace · Owner finance</div>
-            <h4 class="mb-1">Review Posting Accounting</h4>
-            <p class="text-muted mb-0">Periksa mapping COA dan total debit/kredit. Belum ada jurnal yang dibuat pada halaman ini.</p>
+            <h4 class="mb-1">Posting settlement ke jurnal</h4>
+            <p class="text-muted mb-0">Periksa draft jurnal terlebih dahulu, lalu simpan batch settlement ke jurnal umum.</p>
         </div>
         <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.financial-statement', $filters) }}"><i class="bi bi-arrow-left me-1"></i> Kembali</a>
     </div>
 
+    <div class="alert alert-info d-flex gap-2 align-items-start"><i class="bi bi-info-circle-fill mt-1"></i><div><strong>Yang perlu dilakukan:</strong> pastikan periode dan angka sudah benar, cek balance <strong>Dr = Cr</strong>, lalu klik <strong>Post settlement ke jurnal</strong>. Proses ini membuat satu batch jurnal dan aman diulang.</div></div>
     <div class="alert alert-warning"><i class="bi bi-shield-lock me-1"></i> Posting hanya memasukkan settlement marketplace. HPP (Rp {{ $fmt($preview['excluded_from_gl']['hpp']) }}) dan iklan (Rp {{ $fmt($preview['excluded_from_gl']['ad_cost']) }}) tetap menjadi metrik subledger sampai sumber kredit/asetnya ditetapkan.</div>
 
     <div class="row g-3 mb-4">
@@ -49,7 +50,7 @@
             @foreach ($filters as $key => $value)
                 <input type="hidden" name="{{ $key }}" value="{{ $value }}">
             @endforeach
-            <button class="btn btn-primary"><i class="bi bi-journal-plus me-1"></i> Post ke jurnal umum</button>
+            <button class="btn btn-primary"><i class="bi bi-journal-plus me-1"></i> Post settlement ke jurnal</button>
         </form>
     </div>
 </div>

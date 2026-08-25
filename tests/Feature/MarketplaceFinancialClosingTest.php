@@ -35,6 +35,7 @@ class MarketplaceFinancialClosingTest extends TestCase
             ->assertSee('Tutup periode keuangan', false)
             ->assertSee('Posting accounting')
             ->assertSee('Periode belum siap dikunci')
+            ->assertSee('Posting settlement')
             ->assertSee('Langkah 3 dari 3');
 
         $this->actingAs($owner)
