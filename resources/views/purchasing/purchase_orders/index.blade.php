@@ -16,13 +16,6 @@
         ? ($sortDir === 'asc' ? '↑' : '↓')
         : '↕';
 
-    $statusOptions = [
-        '' => 'Semua Status',
-        'draft' => 'Draft',
-        'approved' => 'Posted',
-        'cancelled' => 'Cancelled',
-    ];
-
     $payStatusOptions = [
         '' => 'Semua Bayar',
         'unpaid' => 'Unpaid',
@@ -108,6 +101,14 @@
 
     .po-item-line + .po-item-line {
         margin-top: .2rem;
+    }
+
+    .po-name {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .po-item-code {
@@ -336,7 +337,6 @@
         <x-slot name="kpis">
             <span class="kpi"><span class="lbl">Total PO</span><span class="val mono">{{ $summary->total_orders ?? 0 }}</span></span>
             <span class="kpi"><span class="lbl">Draft</span><span class="val mono">{{ $summary->draft_count ?? 0 }}</span></span>
-            <span class="kpi"><span class="lbl">Posted</span><span class="val mono">{{ $summary->approved_count ?? 0 }}</span></span>
             @if ($canSeeMoney)
                 <span class="kpi" style="background: rgba(22, 163, 74, 0.05); border-color: rgba(22, 163, 74, 0.2);"><span class="lbl" style="color:#15803d;">Total Nilai</span><span class="val mono" style="color:#16a34a;">Rp {{ number_format($summary->total_grand_total ?? 0, 0, ',', '.') }}</span></span>
             @endif
@@ -361,12 +361,6 @@
                         <option value="">Semua Supplier</option>
                         @foreach ($suppliers as $sup)
                             <option value="{{ $sup->id }}" @selected(request('supplier_id') == $sup->id)>{{ $sup->name }}</option>
-                        @endforeach
-                    </select>
-
-                    <select name="status" class="form-select form-select-sm po-filter-auto" style="max-width:130px;">
-                        @foreach ($statusOptions as $value => $label)
-                            <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
 
@@ -444,7 +438,6 @@
                     </a>
                 </th>
             @endif
-            <th style="width: 120px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status PO</th>
             <th style="width: 150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Status Pembayaran</th>
             <th style="width: 90px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
         </tr>
@@ -454,25 +447,9 @@
         @php
             $grnCount = $order->purchaseReceipts?->count() ?? 0;
             $ps = (string) ($order->payment_status ?? 'unpaid');
-            $payBadgeClass = $payBadge($ps);
             $rcv = $order->received_status ?? 'not_received';
-            $rcvClass = match($rcv) {
-                'fully_received' => 'badge-rcv badge-rcv-full',
-                'partial'        => 'badge-rcv badge-rcv-partial',
-                default          => 'badge-rcv badge-rcv-none',
-            };
-            
+
             $uiStatus = $order->status;
-            $statusClass = match ($uiStatus) {
-                'approved' => 'st-approved',
-                'cancelled' => 'st-cancelled',
-                default => 'st-draft',
-            };
-            $statusLabel = match ((string) $uiStatus) {
-                'approved' => 'Posted',
-                'cancelled' => 'Cancelled',
-                default => 'Draft',
-            };
             $rcvLabel = match($rcv) {
                 'fully_received' => 'Masuk Gudang',
                 'partial' => 'Masuk Sebagian',
@@ -538,10 +515,7 @@
                             @endif
                         </div>
                     </div>
-                    <div class="po-mobile-statuses d-md-none" aria-label="Ringkasan status PO">
-                        <span class="po-mobile-status {{ $uiStatus === 'approved' ? 'is-approved' : ($uiStatus === 'cancelled' ? 'is-cancelled' : '') }}">
-                            {{ $statusLabel }}
-                        </span>
+                    <div class="po-mobile-statuses d-md-none" aria-label="Ringkasan penerimaan dan pembayaran">
                         <span class="po-mobile-status {{ $rcv === 'fully_received' ? 'is-received' : ($rcv === 'partial' ? 'is-partial' : '') }}">
                             {{ $rcvLabel }}
                         </span>
@@ -590,17 +564,6 @@
                     <span class="fw-semibold mono">Rp {{ number_format($order->grand_total, 0, ',', '.') }}</span>
                 </td>
             @endif
-
-            <td class="mobile-hide">
-                @php
-                    $poBadgeStyle = match ($uiStatus) {
-                        'approved' => 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.2);',
-                        'cancelled' => 'background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);',
-                        default => 'background: rgba(100, 116, 139, 0.1); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2);',
-                    };
-                @endphp
-                <span class="badge py-1 px-2" style="font-weight: 600; font-size: .75rem; border-radius: 6px; {{ $poBadgeStyle }}">{{ $statusLabel }}</span>
-            </td>
 
             <td class="mobile-hide">
                 @if ($canSeeMoney)
