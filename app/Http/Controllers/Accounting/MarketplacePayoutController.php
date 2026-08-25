@@ -84,13 +84,20 @@ class MarketplacePayoutController extends Controller
                 ->with('message', 'Akun tujuan harus akun kas/bank yang aktif.');
         }
 
-        $from = Carbon::parse($data['from'])->startOfDay();
-        $to = Carbon::parse($data['to'])->endOfDay();
+        // Batas Shopee adalah 15 tanggal kalender. Bandingkan kedua tanggal
+        // pada awal hari; jika langsung membandingkan startOfDay dengan
+        // endOfDay, Carbon menghasilkan 14.9999 hari dan periode 15 hari
+        // keliru ditolak.
+        $fromDate = Carbon::parse($data['from'])->startOfDay();
+        $toDate = Carbon::parse($data['to'])->startOfDay();
 
-        if ($from->diffInDays($to) > 14) {
+        if ($fromDate->diffInDays($toDate) > 14) {
             return back()->with('status', 'error')
                 ->with('message', 'Periode import Shopee maksimal 15 hari.');
         }
+
+        $from = $fromDate;
+        $to = $toDate->copy()->endOfDay();
 
         $store = Store::with('channel')
             ->whereKey((int) $data['store_id'])
