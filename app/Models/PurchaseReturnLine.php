@@ -56,6 +56,16 @@ class PurchaseReturnLine extends Model
         return round((float) $this->qty * $this->effectiveConversionFactor(), 6);
     }
 
+    public function stockUnitPrice(): float
+    {
+        return (float) $this->unit_price / max(0.000001, $this->effectiveConversionFactor());
+    }
+
+    public function calculatedLineTotal(): float
+    {
+        return round($this->stockQty() * $this->stockUnitPrice(), 2);
+    }
+
     public function ret()
     {return $this->belongsTo(PurchaseReturn::class, 'purchase_return_id');}
     public function grnLine()

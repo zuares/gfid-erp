@@ -100,7 +100,8 @@ class ReplacementReceiptService
             $receiptLine->stock_qty_reject = 0;
             $receiptLine->unit = $receiptLine->purchase_unit;
             $receiptLine->unit_price = $returnLine->unit_price;
-            $receiptLine->line_total = round($qty * (float) $returnLine->unit_price, 2);
+            $stockUnitPrice = (float) $returnLine->unit_price / max(0.000001, (float) $receiptLine->conversion_factor);
+            $receiptLine->line_total = round((float) $receiptLine->stock_qty_received * $stockUnitPrice, 2);
             $receiptLine->save();
 
             $totalAmtReceived += $receiptLine->line_total;

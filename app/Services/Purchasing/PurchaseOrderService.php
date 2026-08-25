@@ -144,7 +144,10 @@ class PurchaseOrderService
     public function recalculate(PurchaseOrder $order): PurchaseOrder
     {
         return DB::transaction(function () use ($order) {
-            $subtotal = (float) $order->lines()->sum('line_total');
+            $subtotal = (float) $order->lines()
+                ->with('item')
+                ->get()
+                ->sum(fn (PurchaseOrderLine $line) => $line->calculatedLineTotal());
             $this->recalculateTotals($order, $subtotal);
 
             return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
@@ -429,7 +432,9 @@ class PurchaseOrderService
             $purchaseUnit = $item->purchaseUnit();
             $stockUnit = $item->stockUnit();
             $conversionFactor = $item->purchaseConversionFactor();
-            $lineTotal = round(max(0, ($qty * $unitPrice) - $discount), 2);
+            $stockQty = round($qty * $conversionFactor, 6);
+            $stockUnitPrice = $unitPrice / max(0.000001, $conversionFactor);
+            $lineTotal = round(max(0, ($stockQty * $stockUnitPrice) - $discount), 2);
 
             // Alokasi/expense account: pertahankan yang lama untuk referenced, hitung untuk baru.
             $referenced = $referencedByItem[$itemId] ?? [];
@@ -607,6 +612,8 @@ class PurchaseOrderService
                 continue;
             }
 
+            $conversionFactor = $item->purchaseConversionFactor();
+
             // Allocation (hpp/expense) - auto dari master item, line override kalau ada
             $allocation = 'hpp';
             if ($hasLineAllocation) {
@@ -645,7 +652,9 @@ class PurchaseOrderService
                 }
             }
 
-            $lineTotal = max(0, ($qty * $unitPrice) - $discount);
+            $stockQty = round($qty * $conversionFactor, 6);
+            $stockUnitPrice = $unitPrice / max(0.000001, $conversionFactor);
+            $lineTotal = max(0, ($stockQty * $stockUnitPrice) - $discount);
             $lineTotal = round($lineTotal, 2);
 
             $payload = [

@@ -466,7 +466,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         // jika line_total belum terisi.
                                         $lineSubtotal = (float) ($line->line_total ?? 0);
                                         if (abs($lineSubtotal) < 0.0001) {
-                                            $lineSubtotal = max(0, ((float) $line->qty * (float) $line->unit_price) - (float) $line->discount);
+                                            $lineSubtotal = max(0, $line->stockQty() * $line->stockUnitPrice() - (float) $line->discount);
                                         }
                                     @endphp
                                     <tr>

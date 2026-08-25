@@ -74,6 +74,9 @@ class PurchaseUnitConversionTest extends TestCase
         $this->assertSame('pcs', $line->stock_unit);
         $this->assertEqualsWithDelta(12, (float) $line->conversion_factor, 0.000001);
         $this->assertEqualsWithDelta(24, 2 * (float) $line->conversion_factor, 0.000001);
+        $this->assertEqualsWithDelta(24, $line->stockQty(), 0.000001);
+        $this->assertEqualsWithDelta(10000, $line->stockUnitPrice(), 0.000001);
+        $this->assertEqualsWithDelta(240000, $line->calculatedLineTotal(), 0.01);
         $this->assertEqualsWithDelta(240000, (float) $po->subtotal, 0.01);
     }
 }

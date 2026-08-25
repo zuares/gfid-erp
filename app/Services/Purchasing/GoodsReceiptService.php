@@ -409,18 +409,17 @@ class GoodsReceiptService
                 $this->inventory->stockIn(
                     warehouseId: $this->resolveStockWarehouseId($line, (int) $grn->warehouse_id),
                     itemId: (int) $line->item_id,
-                    qty: (float) ($line->stock_qty_received ?? $line->qty_received),
+                    qty: $line->stockQtyReceived(),
                     date: $grn->date,
                     sourceType: 'purchase_receipt',
                     sourceId: (int) $grn->id,
                     notes: "GRN {$grn->code} line {$line->id}",
                     lotId: (int) $lot->id,
-                    unitCost: (float) $line->unit_price / max(0.000001, (float) ($line->conversion_factor ?: 1)),
+                    unitCost: $line->stockUnitPrice(),
                 );
 
                 // update last price + moving average HPP
-                $factor = max(0.000001, (float) ($line->conversion_factor ?: 1));
-                $this->touchLastPrices($grn, (int) $line->item_id, (float) $line->unit_price / $factor, (float) ($line->stock_qty_received ?? $line->qty_received));
+                $this->touchLastPrices($grn, (int) $line->item_id, $line->stockUnitPrice(), $line->stockQtyReceived());
             }
 
             // ==========================
@@ -813,7 +812,10 @@ class GoodsReceiptService
     public function recalculate(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
-            $subtotal = (float) $grn->lines()->sum('line_total');
+            $subtotal = (float) $grn->lines()
+                ->with('item')
+                ->get()
+                ->sum(fn (PurchaseReceiptLine $line) => $line->calculatedLineTotal());
             $this->recalcTotals($grn, $subtotal);
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         });
@@ -863,7 +865,8 @@ class GoodsReceiptService
                 continue;
             }
 
-            $lineTotal = round(max(0, $qtyReceived) * $unitPrice, 2);
+            $stockUnitPrice = $unitPrice / max(0.000001, $conversionFactor);
+            $lineTotal = round($stockQtyReceived * $stockUnitPrice, 2);
 
             $allocation = (($row['allocation'] ?? $item?->default_allocation ?? 'hpp') === 'expense')
                 ? 'expense'
@@ -1476,20 +1479,40 @@ class GoodsReceiptService
 
         // Ambil harga PO sekaligus
         $poLineIds = $poLinked->pluck('purchase_order_line_id')->unique()->filter();
-        $poPrices  = PurchaseOrderLine::whereIn('id', $poLineIds)
-            ->pluck('unit_price', 'id');
+        $poLines = PurchaseOrderLine::with('item')
+            ->whereIn('id', $poLineIds)
+            ->get()
+            ->keyBy('id');
 
         foreach ($poLinked as $line) {
-            $poPrice = (float) ($poPrices[$line->purchase_order_line_id] ?? 0);
+            $poLine = $poLines->get($line->purchase_order_line_id);
+            $poPrice = (float) ($poLine?->unit_price ?? 0);
             if ($poPrice <= 0) {
                 continue; // PO belum ada harga → biarkan (guard grand_total>0 akan menahan post)
             }
 
-            $lineTotal = round($poPrice * (float) ($line->qty_received ?? 0), 2);
+            $factor = max(0.000001, (float) ($line->conversion_factor ?: $poLine?->effectiveConversionFactor() ?: 1));
+            $stockQtyReceived = (float) ($line->stock_qty_received ?? ((float) ($line->qty_received ?? 0) * $factor));
+            $stockQtyReject = (float) ($line->stock_qty_reject ?? ((float) ($line->qty_reject ?? 0) * $factor));
+            $stockUnitPrice = $poPrice / $factor;
+            $lineTotal = round($stockQtyReceived * $stockUnitPrice, 2);
 
-            if (abs((float) $line->unit_price - $poPrice) > 0.0001 || abs((float) $line->line_total - $lineTotal) > 0.0001) {
+            $needsUnitSnapshot = empty($line->purchase_unit)
+                || empty($line->stock_unit)
+                || abs((float) $line->conversion_factor - $factor) > 0.0001
+                || is_null($line->stock_qty_received)
+                || is_null($line->stock_qty_reject);
+
+            if ($needsUnitSnapshot
+                || abs((float) $line->unit_price - $poPrice) > 0.0001
+                || abs((float) $line->line_total - $lineTotal) > 0.0001) {
                 PurchaseReceiptLine::where('id', $line->id)->update([
                     'unit_price' => $poPrice,
+                    'purchase_unit' => $line->purchase_unit ?: $poLine?->effectivePurchaseUnit(),
+                    'stock_unit' => $line->stock_unit ?: $poLine?->effectiveStockUnit(),
+                    'conversion_factor' => $factor,
+                    'stock_qty_received' => round($stockQtyReceived, 6),
+                    'stock_qty_reject' => round($stockQtyReject, 6),
                     'line_total' => $lineTotal,
                     'updated_at' => now(),
                 ]);

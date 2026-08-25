@@ -49,6 +49,21 @@ class PurchaseOrderLine extends Model
         return $factor > 0 ? $factor : 1.0;
     }
 
+    public function stockQty(): float
+    {
+        return round((float) $this->qty * $this->effectiveConversionFactor(), 6);
+    }
+
+    public function stockUnitPrice(): float
+    {
+        return (float) $this->unit_price / max(0.000001, $this->effectiveConversionFactor());
+    }
+
+    public function calculatedLineTotal(): float
+    {
+        return round(max(0, $this->stockQty() * $this->stockUnitPrice() - (float) $this->discount), 2);
+    }
+
     /* ==========================
      *  RELATIONSHIPS
      * ==========================

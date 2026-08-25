@@ -63,6 +63,16 @@ class PurchaseReceiptLine extends Model
         return round((float) $this->qty_received * $this->effectiveConversionFactor(), 6);
     }
 
+    public function stockUnitPrice(): float
+    {
+        return (float) $this->unit_price / max(0.000001, $this->effectiveConversionFactor());
+    }
+
+    public function calculatedLineTotal(): float
+    {
+        return round($this->stockQtyReceived() * $this->stockUnitPrice(), 2);
+    }
+
     public function receipt()
     {
         return $this->belongsTo(PurchaseReceipt::class, 'purchase_receipt_id');

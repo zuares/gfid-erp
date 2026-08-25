@@ -863,7 +863,9 @@ class PurchaseOrderController extends Controller
             if ($qty === '') $qty = '0';
             
             $priceStr = $canSeeMoney ? number_format($line->unit_price, 0, ',', '.') : '***';
-            $subtotalStr = $canSeeMoney ? number_format($line->qty * $line->unit_price, 0, ',', '.') : '***';
+            $subtotalStr = $canSeeMoney
+                ? number_format($line->calculatedLineTotal(), 0, ',', '.')
+                : '***';
             
             $strItem = str_pad($itemName, 19);
             $strQty = str_pad($qty, 5, " ", STR_PAD_LEFT);

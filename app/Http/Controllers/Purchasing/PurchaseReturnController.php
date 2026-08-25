@@ -349,7 +349,11 @@ class PurchaseReturnController extends Controller
                 'is_inventory' => $isInventory,
                 'qty' => $qty,
                 'unit_price' => $unitPrice,
-                'line_total' => round($qty * $unitPrice, 2),
+                'line_total' => round(
+                    ($qty * $grnLine->effectiveConversionFactor())
+                    * ($unitPrice / max(0.000001, $grnLine->effectiveConversionFactor())),
+                    2
+                ),
                 'notes' => $line?->notes,
             ]);
         }
@@ -523,7 +527,10 @@ class PurchaseReturnController extends Controller
                 $line->conversion_factor = $grnLine->effectiveConversionFactor();
                 $line->stock_qty = round($qty * $line->effectiveConversionFactor(), 6);
                 $line->allocated_qty = $isHpp ? $line->stock_qty : 0;
-                $line->line_total = round($qty * $unit, 2);
+                $line->line_total = round(
+                    $line->stock_qty * ($unit / max(0.000001, $line->effectiveConversionFactor())),
+                    2
+                );
                 $line->notes = $row['notes'] ?? null;
                 $line->reason_code = $reason;
                 
