@@ -117,6 +117,7 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
         // GRN list
         $grnList = $order->purchaseReceipts ?? collect();
         $grnCount = $grnList->count();
+        $hasActivePayments = $order->activePayments()->exists();
 
         // Payment method "preferensi" PO
         $pm = $order->paymentMethod ?? null;
@@ -302,6 +303,18 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
                         </a>
                     </li>
                 @endif
+            @endif
+            @if ($status === 'approved' && $user && ($user->isOwner() || $isAdmin || $user->isDeveloper()) && $grnCount === 0 && !$hasActivePayments)
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{{ route('purchasing.purchase_orders.unapprove', $order->id) }}" method="POST"
+                          onsubmit="return confirm('Kembalikan PO ini ke Draft untuk koreksi qty? Lock stale akan dilepas jika sudah tidak ada GRN, pembayaran, atau retur.');">
+                        @csrf
+                        <button type="submit" class="dropdown-item py-2 text-warning-emphasis">
+                            <i class="bi bi-pencil-square me-2"></i> Koreksi PO / Kembalikan ke Draft
+                        </button>
+                    </form>
+                </li>
             @endif
             @if ($status === 'draft' && $user && in_array($user->role, ['owner','admin']))
                 <li><hr class="dropdown-divider"></li>

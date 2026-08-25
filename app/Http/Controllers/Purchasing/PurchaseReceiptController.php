@@ -10,6 +10,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\Purchasing\GoodsReceiptService;
+use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,7 +18,8 @@ use Illuminate\Validation\ValidationException;
 class PurchaseReceiptController extends Controller
 {
     public function __construct(
-        protected GoodsReceiptService $service
+        protected GoodsReceiptService $service,
+        protected PurchaseOrderService $purchaseOrderService
     ) {}
 
     /**
@@ -764,9 +766,18 @@ class PurchaseReceiptController extends Controller
 
 
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($purchase_receipt) {
+        $purchaseOrderId = (int) ($purchase_receipt->purchase_order_id ?? 0);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($purchase_receipt, $purchaseOrderId) {
             $purchase_receipt->lines()->delete();
             $purchase_receipt->delete();
+
+            if ($purchaseOrderId > 0) {
+                $purchaseOrder = PurchaseOrder::find($purchaseOrderId);
+                if ($purchaseOrder) {
+                    $this->purchaseOrderService->maybeUnlock($purchaseOrder);
+                }
+            }
         });
 
         if ($purchase_receipt->is_replacement && $purchase_receipt->purchase_return_id) {

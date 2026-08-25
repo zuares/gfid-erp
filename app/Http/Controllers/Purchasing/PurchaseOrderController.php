@@ -718,6 +718,19 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang sudah memiliki GRN tidak bisa di-unapprove. Hapus GRN terlebih dahulu.');
         }
 
+        if ($purchase_order->activePayments()->exists()) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'PO yang sudah memiliki pembayaran aktif tidak bisa dikembalikan ke Draft. Void pembayaran terlebih dahulu.');
+        }
+
+        // Bersihkan lock stale setelah seluruh GRN Draft dihapus.
+        if ($purchase_order->isLocked() && !$this->service->maybeUnlock($purchase_order)) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'Lock PO belum bisa dilepas karena masih ada jejak GRN, pembayaran, atau retur.');
+        }
+
         $this->service->unapprove($purchase_order);
 
         return redirect()
