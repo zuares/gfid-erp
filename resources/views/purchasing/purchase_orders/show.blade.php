@@ -115,7 +115,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $canSendWhatsapp = $user && ($user->isOwner() || $isAdmin || $user->isDeveloper());
         $supplierPhone = trim((string) ($order->supplier?->phone ?? ''));
         $canSeeMoney = $user?->canSeePurchasePrices() ?? false;
-        $poHasPrice  = (float) ($order->grand_total ?? 0) > 0;
+        $calculatedSubtotal = round((float) ($order->lines?->sum(fn ($line) => $line->calculatedLineTotal()) ?? 0), 2);
+        $poDiscount = round(max(0, (float) ($order->discount ?? 0)), 2);
+        $poTaxPercent = (float) ($order->tax_percent ?? 0);
+        $poTaxBase = max(0, $calculatedSubtotal - $poDiscount);
+        $calculatedTax = round($poTaxBase * $poTaxPercent / 100, 2);
+        $calculatedGrandTotal = round($poTaxBase + $calculatedTax + (float) ($order->shipping_cost ?? 0), 2);
+        $poHasPrice  = $calculatedGrandTotal > 0;
 
         // Status PO
         $status = (string) ($order->status ?? 'draft');
@@ -398,7 +404,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         @if ($canSeeMoney)
         <div class="po-card po-kpi">
             <div class="po-label">Total PO</div>
-            <div class="po-value">{{ rupiah($order->grand_total) }}</div>
+            <div class="po-value">{{ rupiah($calculatedGrandTotal) }}</div>
         </div>
         <div class="po-card po-kpi">
             <div class="po-label">Total GRN</div>
@@ -461,13 +467,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         $rcv = (float) $line->qty_received;
                                         $ret = (float) $line->qty_returned;
                                         $qtyOut = $line->qty - $rcv;
-                                        // Nilai tersimpan di purchase_order_lines.line_total.
-                                        // Fallback menjaga PO lama tetap menampilkan subtotal
-                                        // jika line_total belum terisi.
-                                        $lineSubtotal = (float) ($line->line_total ?? 0);
-                                        if (abs($lineSubtotal) < 0.0001) {
-                                            $lineSubtotal = max(0, $line->stockQty() * $line->stockUnitPrice() - (float) $line->discount);
-                                        }
+                                        // Selalu hitung dari snapshot baris agar detail
+                                        // konsisten dengan qty, harga, dan konversi stok.
+                                        $lineSubtotal = $line->calculatedLineTotal();
                                     @endphp
                                     <tr>
                                         <td class="item-cell">
@@ -533,6 +535,39 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+                @endif
+
+                @if ($canSeeMoney)
+                    <div class="d-flex justify-content-end mt-3">
+                        <div style="width:min(100%, 360px); border-top:1px solid var(--line); padding-top:.65rem;">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="po-muted">Subtotal Items</span>
+                                <strong>{{ rupiah($calculatedSubtotal) }}</strong>
+                            </div>
+                            @if ($poDiscount > 0)
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="po-muted">Diskon PO</span>
+                                    <strong class="text-danger">-{{ rupiah($poDiscount) }}</strong>
+                                </div>
+                            @endif
+                            @if ($poTaxPercent > 0)
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="po-muted">PPN ({{ decimal_id($poTaxPercent, 2) }}%)</span>
+                                    <strong>{{ rupiah($calculatedTax) }}</strong>
+                                </div>
+                            @endif
+                            @if ((float) ($order->shipping_cost ?? 0) > 0)
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="po-muted">Ongkir</span>
+                                    <strong>{{ rupiah($order->shipping_cost) }}</strong>
+                                </div>
+                            @endif
+                            <div class="d-flex justify-content-between pt-2 mt-2" style="border-top:1px dashed var(--line); font-size:1.05rem;">
+                                <strong>Grand Total</strong>
+                                <strong>{{ rupiah($calculatedGrandTotal) }}</strong>
+                            </div>
+                        </div>
                     </div>
                 @endif
             </div>

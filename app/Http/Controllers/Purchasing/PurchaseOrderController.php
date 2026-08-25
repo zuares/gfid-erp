@@ -354,6 +354,10 @@ class PurchaseOrderController extends Controller
      */
     public function show(PurchaseOrder $purchase_order)
     {
+        // Repair PO lama yang subtotal/grand total-nya belum tersinkron dengan
+        // snapshot qty, harga, dan konversi pada baris PO.
+        $purchase_order = $this->service->recalculate($purchase_order);
+
         $purchase_order->load([
             'supplier',
             'paymentMethod',

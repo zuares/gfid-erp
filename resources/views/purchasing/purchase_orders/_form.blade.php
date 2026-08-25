@@ -211,8 +211,8 @@
             display: flex;
             align-items: center;
             margin-top: 0;
-            font-size: .75rem;
-            font-weight: 700;
+            font-size: 1rem;
+            font-weight: 600;
         }
 
         body[data-theme="dark"] .line-unit-hint {
@@ -1375,7 +1375,8 @@
 
             .po-td-stock .line-stock-hint {
                 min-height: 0;
-                font-size: .68rem;
+                font-size: 14px;
+                font-weight: 800;
             }
 
             .line-expacc-text,

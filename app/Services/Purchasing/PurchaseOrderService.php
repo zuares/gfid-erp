@@ -145,10 +145,20 @@ class PurchaseOrderService
     public function recalculate(PurchaseOrder $order): PurchaseOrder
     {
         return DB::transaction(function () use ($order) {
-            $subtotal = (float) $order->lines()
-                ->with('item')
-                ->get()
-                ->sum(fn (PurchaseOrderLine $line) => $line->calculatedLineTotal());
+            $subtotal = 0.0;
+            $lines = $order->lines()->with('item')->get();
+            foreach ($lines as $line) {
+                $lineTotal = $line->calculatedLineTotal();
+                $subtotal += $lineTotal;
+
+                // Repair nilai turunan lama agar index, detail, dan laporan
+                // membaca subtotal baris yang sama.
+                if (abs((float) $line->line_total - $lineTotal) > 0.005) {
+                    $line->line_total = $lineTotal;
+                    $line->saveQuietly();
+                }
+            }
+            $subtotal = round($subtotal, 2);
             $this->recalculateTotals($order, $subtotal);
 
             return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
