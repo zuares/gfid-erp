@@ -206,6 +206,15 @@
             color: #64748b;
         }
 
+        .po-td-stock .line-stock-hint {
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            margin-top: 0;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+
         body[data-theme="dark"] .line-unit-hint {
             border-color: rgba(100,116,139,.42);
             background: rgba(30,41,59,.72);
@@ -1364,6 +1373,11 @@
                 font-size: .57rem;
             }
 
+            .po-td-stock .line-stock-hint {
+                min-height: 0;
+                font-size: .68rem;
+            }
+
             .line-expacc-text,
             .line-expacc-text > span {
                 font-size: .64rem !important;
@@ -1741,7 +1755,7 @@
                         </td>
 
                         <td data-label="Konversi Stok" class="po-td-stock">
-                            <div class="line-conversion-hint" data-line-conversion-hint>{{ decimal_id($conversionFactor, 6) }} {{ $stockUnit }}</div>
+                            <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
                             <div class="line-stock-hint" data-line-stock-hint></div>
                         </td>
 
@@ -1817,7 +1831,7 @@
                         </td>
 
                         <td data-label="Konversi Stok" class="po-td-stock">
-                            <div class="line-conversion-hint" data-line-conversion-hint>1 pcs</div>
+                            <div class="line-conversion-hint" data-line-conversion-hint style="display:none;"></div>
                             <div class="line-stock-hint" data-line-stock-hint></div>
                         </td>
 
@@ -2151,7 +2165,7 @@
                 if (totalCell) totalCell.textContent = fmtIntId(total);
                 if (stockHint) {
                     stockHint.textContent = stockQty > 0.0001
-                        ? `Stok: ${fmtQtyId(stockQty)} ${stockUnit}`
+                        ? `${fmtQtyId(stockQty)} ${stockUnit}`
                         : '';
                 }
                 if (stockPriceHint) {
@@ -2284,14 +2298,6 @@
                 return json;
             }
 
-            function formatUnitFactor(value) {
-                const n = Number(value);
-                if (!Number.isFinite(n) || n <= 0) return '1';
-                return new Intl.NumberFormat('id-ID', {
-                    maximumFractionDigits: 6,
-                }).format(n);
-            }
-
             function setLineUnitSnapshot(tr, option) {
                 if (!tr || !option) return;
 
@@ -2310,8 +2316,8 @@
                 if (stockUnitRaw) stockUnitRaw.value = stockUnit;
                 if (conversionRaw) conversionRaw.value = String(conversionFactor);
                 if (conversionHint) {
-                    conversionHint.textContent = `${formatUnitFactor(conversionFactor)} ${stockUnit}`;
-                    conversionHint.style.display = '';
+                    conversionHint.textContent = '';
+                    conversionHint.style.display = 'none';
                 }
                 if (priceDisplay && priceDisplay.dataset.userEdited !== '1') {
                     priceDisplay.placeholder = `Harga / ${purchaseUnit}`;
@@ -2461,8 +2467,8 @@
                     setLineUnitSnapshot(newRow, newUnitSelect.selectedOptions[0]);
                 }
                 if (newRow.querySelector('[data-line-conversion-hint]')) {
-                    newRow.querySelector('[data-line-conversion-hint]').textContent = '1 pcs';
-                    newRow.querySelector('[data-line-conversion-hint]').style.display = '';
+                    newRow.querySelector('[data-line-conversion-hint]').textContent = '';
+                    newRow.querySelector('[data-line-conversion-hint]').style.display = 'none';
                 }
                 if (newRow.querySelector('[data-line-stock-hint]')) {
                     newRow.querySelector('[data-line-stock-hint]').textContent = '';
