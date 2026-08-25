@@ -370,6 +370,12 @@ class PurchaseOrderController extends Controller
             },
         ]);
 
+        // Repair lock stale saat detail dibuka. Lock hanya dilepas jika tidak
+        // ada GRN, payment, atau retur yang tersisa sebagai jejak transaksi.
+        if ($purchase_order->isLocked()) {
+            $this->service->maybeUnlock($purchase_order);
+        }
+
         $paymentMethods = PaymentMethod::query()
             ->where('is_active', 1)
             ->orderByRaw("
