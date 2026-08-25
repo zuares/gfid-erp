@@ -49,6 +49,55 @@ class ShopeeWalletPayoutImportService
         int $bankAccountId,
         ?int $createdBy = null
     ): array {
+        $totals = [
+            'created'               => 0,
+            'skipped'               => 0,
+            'skippedExisting'       => 0,
+            'bankConflicts'         => 0,
+            'skippedInvalid'        => 0,
+            'skippedInvalidReasons' => [],
+        ];
+        $periodTo = $to->copy()->endOfDay();
+        $chunkFrom = $from->copy()->startOfDay();
+
+        // Shopee hanya menerima maksimal 15 tanggal kalender per request.
+        // Pecah periode yang lebih panjang agar pengguna tetap bisa import
+        // satu bulan tanpa terkena error dari API.
+        while ($chunkFrom->lte($periodTo)) {
+            $chunkTo = $chunkFrom->copy()->addDays(14)->endOfDay();
+            if ($chunkTo->gt($periodTo)) {
+                $chunkTo = $periodTo->copy();
+            }
+
+            $result = $this->importWindow(
+                $store,
+                $chunkFrom,
+                $chunkTo,
+                $bankAccountId,
+                $createdBy
+            );
+
+            foreach (['created', 'skipped', 'skippedExisting', 'bankConflicts', 'skippedInvalid'] as $key) {
+                $totals[$key] += $result[$key] ?? 0;
+            }
+            foreach ($result['skippedInvalidReasons'] ?? [] as $reason => $count) {
+                $totals['skippedInvalidReasons'][$reason] =
+                    ($totals['skippedInvalidReasons'][$reason] ?? 0) + $count;
+            }
+
+            $chunkFrom = $chunkTo->copy()->addSecond()->startOfDay();
+        }
+
+        return $totals;
+    }
+
+    private function importWindow(
+        Store $store,
+        Carbon $from,
+        Carbon $to,
+        int $bankAccountId,
+        ?int $createdBy = null
+    ): array {
         $created = 0;
         $skipped = 0;
         $skippedExisting = 0;

@@ -210,6 +210,7 @@
                     <div class="alert alert-info py-2" style="font-size:.8rem">
                         Pilih satu atau beberapa toko. Setiap toko memakai akun bank tujuannya sendiri.
                         Hanya transaksi pencairan wallet Shopee yang diimpor sebagai Draft.
+                        Periode maksimal 31 hari dan otomatis dipecah menjadi request 15 hari.
                     </div>
 
                     <div class="mb-3">
@@ -271,7 +272,7 @@
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label fw-bold" style="font-size:.8rem">Dari</label>
-                            <input type="date" name="from" class="form-control" value="{{ now()->subDays(14)->format('Y-m-d') }}" required>
+                            <input type="date" name="from" class="form-control" value="{{ now()->subDays(30)->format('Y-m-d') }}" required>
                         </div>
                         <div class="col-6">
                             <label class="form-label fw-bold" style="font-size:.8rem">Sampai</label>

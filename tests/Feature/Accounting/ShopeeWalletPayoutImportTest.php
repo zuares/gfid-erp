@@ -110,6 +110,52 @@ class ShopeeWalletPayoutImportTest extends TestCase
         });
     }
 
+    public function test_import_periode_satu_bulan_dipecah_maksimal_lima_belas_hari_per_request(): void
+    {
+        $store = $this->createShopeeStore();
+        $bank = Account::create([
+            'code'      => '1101',
+            'name'      => 'Bank Test',
+            'type'      => 'asset',
+            'is_cash'   => true,
+            'is_active' => true,
+        ]);
+        $fixturePath = base_path('tests/Fixtures/shopee/wallet_transaction_list.json');
+        $fixture = json_decode((string) file_get_contents($fixturePath), true, 512, JSON_THROW_ON_ERROR);
+        $emptyFixture = ['response' => ['transaction_list' => [], 'more' => false]];
+        $requestCount = 0;
+
+        Http::fake(function () use (&$requestCount, $fixture, $emptyFixture) {
+            $requestCount++;
+
+            return Http::response($requestCount === 1 ? $fixture : $emptyFixture, 200);
+        });
+
+        $importer = app(ShopeeWalletPayoutImportService::class);
+        $from = now()->subDays(30)->startOfDay();
+        $to = now()->endOfDay();
+
+        $result = $importer->import($store, $from, $to, $bank->id);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(1, $result['skippedInvalid']);
+        $this->assertSame(3, $requestCount);
+        $this->assertDatabaseCount('marketplace_payouts', 1);
+
+        $ranges = collect(Http::recorded())
+            ->map(fn (array $record) => [
+                $record[0]->data()['create_time_from'],
+                $record[0]->data()['create_time_to'],
+            ])
+            ->all();
+
+        $this->assertSame([
+            [$from->timestamp, $from->copy()->addDays(14)->endOfDay()->timestamp],
+            [$from->copy()->addDays(15)->startOfDay()->timestamp, $from->copy()->addDays(29)->endOfDay()->timestamp],
+            [$from->copy()->addDays(30)->startOfDay()->timestamp, $to->timestamp],
+        ], $ranges);
+    }
+
     private function createShopeeStore(): Store
     {
         $channel = Channel::firstOrCreate(['code' => 'shopee'], ['name' => 'Shopee']);
