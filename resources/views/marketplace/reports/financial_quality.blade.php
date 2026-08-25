@@ -31,6 +31,14 @@
         $status !== '' && ! $defaultIssueQueue,
     ])->filter()->count();
     $hasFilters = $activeFilterCount > 0;
+    $dateRangeValue = '';
+    if ($dateFrom && $dateTo) {
+        $dateRangeValue = date('d M Y', strtotime($dateFrom)) . ' – ' . date('d M Y', strtotime($dateTo));
+    } elseif ($dateFrom) {
+        $dateRangeValue = date('d M Y', strtotime($dateFrom)) . ' – …';
+    } elseif ($dateTo) {
+        $dateRangeValue = '… – ' . date('d M Y', strtotime($dateTo));
+    }
 @endphp
 
 @push('head')
@@ -92,6 +100,10 @@
     .fq-field-label { display: block; margin-bottom: .3rem; color: var(--fq-muted); font-size: .66rem; font-weight: 750; }
     .fq-field .form-control, .fq-field .form-select { height: 35px; min-width: 0; border-color: #d9dee8; border-radius: 7px; color: var(--fq-ink); font-size: .73rem; box-shadow: none; }
     .fq-field .form-control:focus, .fq-field .form-select:focus { border-color: #91afe0; box-shadow: 0 0 0 3px rgba(36,87,166,.1); }
+    .fq-field-range { grid-column: span 2; }
+    .fq-range-control { position: relative; }
+    .fq-range-control .fq-range-icon { position: absolute; top: 50%; right: .7rem; z-index: 1; color: var(--fq-brand); pointer-events: none; transform: translateY(-50%); }
+    .fq-range-control .form-control { padding-right: 2.15rem; cursor: pointer; }
     .fq-filter-actions { display: flex; align-items: center; gap: .4rem; height: 35px; }
     .fq-refresh { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; padding: .7rem .9rem; border-top: 1px solid var(--fq-border); background: var(--fq-surface-soft); }
     .fq-refresh-copy { display: flex; align-items: flex-start; gap: .55rem; }
@@ -155,6 +167,7 @@
     @media (max-width: 1180px) {
         .fq-filter-form { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .fq-field-search { grid-column: span 2; }
+        .fq-field-range { grid-column: span 2; }
         .fq-filter-actions { grid-column: span 2; }
     }
     @media (max-width: 900px) {
@@ -173,12 +186,57 @@
         .fq-kpi { min-height: 88px; padding: .68rem; }
         .fq-kpi-value { font-size: 1.15rem; }
         .fq-filter-form { grid-template-columns: 1fr 1fr; gap: .55rem; }
-        .fq-field-search, .fq-field-wide, .fq-filter-actions { grid-column: 1 / -1; }
+        .fq-field-search, .fq-field-range, .fq-field-wide, .fq-filter-actions { grid-column: 1 / -1; }
         .fq-refresh { align-items: flex-start; flex-direction: column; }
         .fq-sidebar { grid-template-columns: 1fr; }
         .fq-sidebar .fq-side-note { grid-column: auto; }
     }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const rangeInput = document.getElementById('fq-date-range');
+    const fromInput = document.getElementById('fq-date-from');
+    const toInput = document.getElementById('fq-date-to');
+
+    if (!rangeInput || !fromInput || !toInput || typeof window.flatpickr !== 'function') return;
+
+    const formatRange = function (dates) {
+        if (dates.length === 2) {
+            return window.flatpickr.formatDate(dates[0], 'd M Y') + ' – ' + window.flatpickr.formatDate(dates[1], 'd M Y');
+        }
+        return dates.length === 1 ? window.flatpickr.formatDate(dates[0], 'd M Y') + ' – …' : '';
+    };
+
+    window.flatpickr(rangeInput, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        defaultDate: [fromInput.value, toInput.value].filter(Boolean),
+        allowInput: false,
+        disableMobile: true,
+        locale: window.flatpickr.l10ns && window.flatpickr.l10ns.id ? window.flatpickr.l10ns.id : 'default',
+        onReady: function (selectedDates, _, instance) {
+            if (selectedDates.length) instance.input.value = formatRange(selectedDates);
+        },
+        onChange: function (selectedDates, _, instance) {
+            if (!selectedDates.length) {
+                fromInput.value = '';
+                toInput.value = '';
+                instance.input.value = '';
+                return;
+            }
+
+            fromInput.value = window.flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+            toInput.value = selectedDates.length === 2
+                ? window.flatpickr.formatDate(selectedDates[1], 'Y-m-d')
+                : '';
+            instance.input.value = formatRange(selectedDates);
+        },
+    });
+});
+</script>
 @endpush
 
 @section('content')
@@ -296,13 +354,14 @@
                     <label class="fq-field-label" for="fq-settlement">Settlement</label>
                     <select id="fq-settlement" name="settlement_status" class="form-select"><option value="">Semua settlement</option><option value="complete" @selected($settlementStatus === 'complete')>Complete</option><option value="incomplete" @selected($settlementStatus === 'incomplete')>Incomplete</option><option value="missing" @selected($settlementStatus === 'missing')>Missing</option><option value="unknown" @selected($settlementStatus === 'unknown')>Unknown</option></select>
                 </div>
-                <div class="fq-field fq-field-wide">
-                    <label class="fq-field-label" for="fq-date-from">Dari tanggal</label>
-                    <input id="fq-date-from" class="form-control" type="date" name="date_from" value="{{ $dateFrom }}">
-                </div>
-                <div class="fq-field fq-field-wide">
-                    <label class="fq-field-label" for="fq-date-to">Sampai tanggal</label>
-                    <input id="fq-date-to" class="form-control" type="date" name="date_to" value="{{ $dateTo }}">
+                <div class="fq-field fq-field-range">
+                    <label class="fq-field-label" for="fq-date-range">Periode order</label>
+                    <div class="fq-range-control">
+                        <input id="fq-date-range" class="form-control" type="text" value="{{ $dateRangeValue }}" placeholder="Pilih tanggal mulai – selesai" data-gf-date="off" autocomplete="off" aria-label="Pilih periode order">
+                        <i class="bi bi-calendar3 fq-range-icon"></i>
+                    </div>
+                    <input id="fq-date-from" type="hidden" name="date_from" value="{{ $dateFrom }}" data-gf-date="off">
+                    <input id="fq-date-to" type="hidden" name="date_to" value="{{ $dateTo }}" data-gf-date="off">
                 </div>
                 <div class="fq-filter-actions">
                     <button class="btn btn-sm fq-btn fq-btn-primary" type="submit"><i class="bi bi-search me-1"></i>Terapkan</button>
