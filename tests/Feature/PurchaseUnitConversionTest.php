@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
-use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;

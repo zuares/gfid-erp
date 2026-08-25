@@ -146,17 +146,35 @@
         }
 
         .line-unit-hint {
-            margin-top: .2rem;
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            margin-top: .22rem;
+            padding: .12rem .38rem;
+            border: 1px solid rgba(148,163,184,.28);
+            border-radius: 5px;
+            background: rgba(248,250,252,.78);
             color: var(--muted, #64748b);
-            font-size: .68rem;
-            font-weight: 700;
+            font-size: .64rem;
+            font-weight: 800;
+            line-height: 1.2;
+            white-space: nowrap;
         }
 
         .line-conversion-hint {
-            margin-top: .08rem;
+            max-width: 100%;
+            margin-top: .12rem;
+            overflow: hidden;
             color: #2563eb;
-            font-size: .64rem;
+            font-size: .61rem;
             line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        body[data-theme="dark"] .line-unit-hint {
+            border-color: rgba(100,116,139,.42);
+            background: rgba(30,41,59,.72);
         }
 
         .po-card {
@@ -1271,6 +1289,15 @@
                 text-overflow: ellipsis;
                 white-space: nowrap;
                 font-size: .6rem !important;
+            }
+
+            .line-unit-hint {
+                font-size: .6rem;
+                padding-inline: .32rem;
+            }
+
+            .line-conversion-hint {
+                font-size: .57rem;
             }
 
             .line-expacc-text,

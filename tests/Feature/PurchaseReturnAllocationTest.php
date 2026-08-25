@@ -128,6 +128,47 @@ class PurchaseReturnAllocationTest extends TestCase
         $this->assertEquals(5, $line->allocated_qty);
     }
 
+    public function test_return_reservation_uses_converted_stock_qty(): void
+    {
+        $this->item->forceFill([
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'lusin',
+            'purchase_conversion_factor' => 12,
+        ])->save();
+        $this->stock->update(['qty' => 30]);
+        $this->grnLine->forceFill([
+            'qty_received' => 2,
+            'purchase_unit' => 'lusin',
+            'stock_unit' => 'pcs',
+            'conversion_factor' => 12,
+            'stock_qty_received' => 24,
+        ])->save();
+
+        $this->post(route('purchasing.grn.returns.create', $this->grn->id));
+        $ret = PurchaseReturn::firstOrFail();
+        $line = $ret->lines()->where('item_id', $this->item->id)->firstOrFail();
+
+        $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
+            'lines' => [[
+                'id' => $line->id,
+                'purchase_receipt_line_id' => $this->grnLine->id,
+                'qty' => '2',
+                'reason_code' => 'defect',
+            ]],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $line->refresh();
+        $this->stock->refresh();
+
+        $this->assertEqualsWithDelta(24, (float) $line->stock_qty, 0.0001);
+        $this->assertEqualsWithDelta(24, (float) $line->allocated_qty, 0.0001);
+        $this->assertEqualsWithDelta(24, (float) $this->stock->allocated_qty, 0.0001);
+    }
+
     public function test_update_qty_down_releases_stock()
     {
         $this->post(route('purchasing.grn.returns.create', $this->grn->id));

@@ -123,7 +123,7 @@ class GrnFromDraftPoTest extends TestCase
 
         $poResponse->assertOk()
             ->assertSee('Pembelian', false)
-            ->assertSee('Campuran', false)
+            ->assertDontSee('Campuran', false)
             ->assertDontSee('Jenis PO', false)
             ->assertDontSee('po-type-pill', false);
 
