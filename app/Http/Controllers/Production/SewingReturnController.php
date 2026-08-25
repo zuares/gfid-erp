@@ -7,11 +7,13 @@ use App\Models\CuttingJobBundle;
 use App\Models\Employee;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\ItemRole;
 use App\Models\QcResult;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
 use App\Models\SewingPickupLineSupplyLine;
 use App\Models\SewingPickupSupplyLine;
+use App\Models\SewingRejectConversion;
 use App\Models\SewingReturn;
 use App\Models\SewingReturnLine;
 use App\Models\Warehouse;
@@ -23,6 +25,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -742,6 +746,18 @@ class SewingReturnController extends Controller
             ->groupBy('rw.source_finishing_job_line_id')
             ->selectRaw('rw.source_finishing_job_line_id, SUM(COALESCE(rw.qty_ok,0)) as qty_reworked');
 
+        $convertedSub = DB::table('sewing_reject_conversions')
+            ->where('status', 'posted')
+            ->whereNotNull('source_reject_return_line_id')
+            ->groupBy('source_reject_return_line_id')
+            ->selectRaw('source_reject_return_line_id, SUM(qty) as qty_converted');
+
+        $finishingConvertedSub = DB::table('sewing_reject_conversions')
+            ->where('status', 'posted')
+            ->whereNotNull('source_finishing_job_line_id')
+            ->groupBy('source_finishing_job_line_id')
+            ->selectRaw('source_finishing_job_line_id, SUM(qty) as qty_converted');
+
         $rows = DB::table('sewing_return_lines as rl')
             ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
             ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
@@ -754,6 +770,7 @@ class SewingReturnController extends Controller
                     ->where('st.warehouse_id', '=', $rejectWarehouseId);
             })
             ->leftJoinSub($reworkedSub, 'rw_sum', 'rw_sum.source_reject_return_line_id', '=', 'rl.id')
+            ->leftJoinSub($convertedSub, 'cv_sum', 'cv_sum.source_reject_return_line_id', '=', 'rl.id')
             ->where('rl.qty_reject', '>', 0)
             ->whereNull('r.voided_at')
             ->when($operatorId, fn($q) => $q->where('r.operator_id', $operatorId))
@@ -763,6 +780,7 @@ class SewingReturnController extends Controller
                 rl.notes as source_notes,
                 rl.qty_reject,
                 COALESCE(rw_sum.qty_reworked,0) as qty_reworked,
+                COALESCE(cv_sum.qty_converted,0) as qty_converted,
                 COALESCE(st.qty,0) as stock_rej_sew,
                 DATE(r.date) as reject_date,
                 r.code as reject_code,
@@ -785,7 +803,7 @@ class SewingReturnController extends Controller
 
         $normalRows = $rows->map(function ($r) {
             $remaining = min(
-                max((float) $r->qty_reject - (float) $r->qty_reworked, 0.0),
+                max((float) $r->qty_reject - (float) $r->qty_reworked - (float) $r->qty_converted, 0.0),
                 max((float) $r->stock_rej_sew, 0.0)
             );
 
@@ -839,6 +857,7 @@ class SewingReturnController extends Controller
                     ->where('st.warehouse_id', '=', $rejectWarehouseId);
             })
             ->leftJoinSub($finishingReworkedSub, 'frw_sum', 'frw_sum.source_finishing_job_line_id', '=', 'fl.id')
+            ->leftJoinSub($finishingConvertedSub, 'fcv_sum', 'fcv_sum.source_finishing_job_line_id', '=', 'fl.id')
             ->where('fl.qty_reject', '>', 0)
             ->where('fl.reject_cause', 'sewing')
             ->where('f.status', 'posted')
@@ -849,6 +868,7 @@ class SewingReturnController extends Controller
                 fl.reject_notes as source_notes,
                 fl.qty_reject,
                 COALESCE(frw_sum.qty_reworked,0) as qty_reworked,
+                COALESCE(fcv_sum.qty_converted,0) as qty_converted,
                 COALESCE(st.qty,0) as stock_rej_sew,
                 DATE(f.date) as reject_date,
                 f.code as reject_code,
@@ -865,13 +885,13 @@ class SewingReturnController extends Controller
                 MAX(sp.code) as pickup_code,
                 MAX(sp.date) as pickup_date
             ")
-            ->groupBy('fl.id', 'fl.reject_notes', 'fl.qty_reject', 'frw_sum.qty_reworked', 'st.qty', 'f.date', 'f.code', 'fl.sewing_operator_id', 'e.code', 'e.name', 'fl.bundle_id', 'fl.item_id', 'it.code', 'it.name', 'cat.name')
+            ->groupBy('fl.id', 'fl.reject_notes', 'fl.qty_reject', 'frw_sum.qty_reworked', 'fcv_sum.qty_converted', 'st.qty', 'f.date', 'f.code', 'fl.sewing_operator_id', 'e.code', 'e.name', 'fl.bundle_id', 'fl.item_id', 'it.code', 'it.name', 'cat.name')
             ->orderByDesc('f.date')
             ->orderByDesc('fl.id')
             ->get()
             ->map(function ($r) {
                 $remaining = min(
-                    max((float) $r->qty_reject - (float) $r->qty_reworked, 0.0),
+                    max((float) $r->qty_reject - (float) $r->qty_reworked - (float) $r->qty_converted, 0.0),
                     max((float) $r->stock_rej_sew, 0.0)
                 );
 
@@ -951,6 +971,7 @@ class SewingReturnController extends Controller
             'results.*.sewing_pickup_line_id' => ['required', 'integer', 'exists:sewing_pickup_lines,id'],
             'results.*.qty_ok' => ['nullable', 'numeric', 'min:0'],
             'results.*.qty_reject' => ['nullable', 'numeric', 'min:0'],
+            'results.*.qty_not_setor' => ['nullable', 'numeric', 'min:0'],
             'results.*.notes' => ['nullable', 'string', 'max:500'],
             'results.*.source_reject_return_line_id' => ['nullable', 'integer', 'exists:sewing_return_lines,id'],
             'results.*.source_finishing_job_line_id' => ['nullable', 'integer', 'exists:finishing_job_lines,id'],
@@ -1008,15 +1029,17 @@ class SewingReturnController extends Controller
                 ->map(function ($r) {
                     $ok = (float) ($r['qty_ok'] ?? 0);
                     $rj = (float) ($r['qty_reject'] ?? 0);
+                    $notSetor = (float) ($r['qty_not_setor'] ?? 0);
 
                     return [
                         'sewing_pickup_line_id' => (int) ($r['sewing_pickup_line_id'] ?? 0),
                         'qty_ok' => $ok,
                         'qty_reject' => $rj,
+                        'qty_not_setor' => $notSetor,
                         'notes' => trim((string) ($r['notes'] ?? '')),
                         'source_reject_return_line_id' => (int) ($r['source_reject_return_line_id'] ?? 0),
                         'source_finishing_job_line_id' => (int) ($r['source_finishing_job_line_id'] ?? 0),
-                        'total' => $ok + $rj,
+                        'total' => $ok + $rj + $notSetor,
                     ];
                 })
                 ->filter(fn($r) => (float) ($r['total'] ?? 0) > 0.000001)
@@ -1045,9 +1068,29 @@ class SewingReturnController extends Controller
                 ->filter(fn($r) => (int) ($r['source_reject_return_line_id'] ?? 0) > 0 || (int) ($r['source_finishing_job_line_id'] ?? 0) > 0)
                 ->values();
 
+            $notSetorRows = $rawResults
+                ->filter(fn($r) => (float) ($r['qty_not_setor'] ?? 0) > 0.000001)
+                ->values();
+
+            $returnRows = $rawResults
+                ->filter(fn($r) => (float) ($r['qty_ok'] ?? 0) + (float) ($r['qty_reject'] ?? 0) > 0.000001)
+                ->values();
+
             $normalRows = $rawResults
                 ->filter(fn($r) => (int) ($r['source_reject_return_line_id'] ?? 0) <= 0 && (int) ($r['source_finishing_job_line_id'] ?? 0) <= 0)
                 ->values();
+
+            if ($normalRows->contains(fn($r) => (float) ($r['qty_not_setor'] ?? 0) > 0.000001)) {
+                throw ValidationException::withMessages([
+                    'results' => 'Input Tidak Bisa Setor Barang Rusak hanya tersedia pada mode Setor Reject.',
+                ]);
+            }
+
+            if ($notSetorRows->isNotEmpty() && $notSetorRows->contains(fn($r) => (float) ($r['qty_reject'] ?? 0) > 0.000001)) {
+                throw ValidationException::withMessages([
+                    'results' => 'Qty tidak bisa setor tidak boleh diisi bersama qty reject.',
+                ]);
+            }
 
             if ($sewingQcFlowActive && $normalRows->contains(fn($r) => (float) ($r['qty_reject'] ?? 0) > 0.000001)) {
                 throw ValidationException::withMessages([
@@ -1113,13 +1156,21 @@ class SewingReturnController extends Controller
                     ->groupBy('rw.source_reject_return_line_id')
                     ->selectRaw('rw.source_reject_return_line_id, SUM(COALESCE(rw.qty_ok,0)) as qty_reworked');
 
+                $convertedSub = DB::table('sewing_reject_conversions')
+                    ->where('status', 'posted')
+                    ->whereNotNull('source_reject_return_line_id')
+                    ->whereIn('source_reject_return_line_id', $sourceLineIds)
+                    ->groupBy('source_reject_return_line_id')
+                    ->selectRaw('source_reject_return_line_id, SUM(qty) as qty_converted');
+
                 $rejectReworkDetails = DB::table('sewing_return_lines as rl')
                     ->join('sewing_returns as r', 'r.id', '=', 'rl.sewing_return_id')
                     ->join('sewing_pickup_lines as pl', 'pl.id', '=', 'rl.sewing_pickup_line_id')
                     ->leftJoinSub($reworkedSub, 'rw_sum', 'rw_sum.source_reject_return_line_id', '=', 'rl.id')
+                    ->leftJoinSub($convertedSub, 'cv_sum', 'cv_sum.source_reject_return_line_id', '=', 'rl.id')
                     ->when($sourceLineIds, fn($q) => $q->whereIn('rl.id', $sourceLineIds), fn($q) => $q->whereRaw('1=0'))
                     ->whereNull('r.voided_at')
-                    ->selectRaw('rl.id, rl.qty_reject, COALESCE(rw_sum.qty_reworked,0) as qty_reworked, pl.finished_item_id as item_id, pl.cutting_job_bundle_id as bundle_id')
+                    ->selectRaw('rl.id, rl.qty_reject, COALESCE(rw_sum.qty_reworked,0) as qty_reworked, COALESCE(cv_sum.qty_converted,0) as qty_converted, pl.finished_item_id as item_id, pl.cutting_job_bundle_id as bundle_id')
                     ->lockForUpdate()
                     ->get()
                     ->keyBy('id');
@@ -1134,11 +1185,19 @@ class SewingReturnController extends Controller
                         ->groupBy('rw.source_finishing_job_line_id')
                         ->selectRaw('rw.source_finishing_job_line_id, SUM(COALESCE(rw.qty_ok,0)) as qty_reworked');
 
+                    $finishingConvertedSub = DB::table('sewing_reject_conversions')
+                        ->where('status', 'posted')
+                        ->whereNotNull('source_finishing_job_line_id')
+                        ->whereIn('source_finishing_job_line_id', $sourceFinishingLineIds)
+                        ->groupBy('source_finishing_job_line_id')
+                        ->selectRaw('source_finishing_job_line_id, SUM(qty) as qty_converted');
+
                     $finishingDetails = DB::table('finishing_job_lines as fl')
                         ->leftJoinSub($finishingReworkedSub, 'frw_sum', 'frw_sum.source_finishing_job_line_id', '=', 'fl.id')
+                        ->leftJoinSub($finishingConvertedSub, 'fcv_sum', 'fcv_sum.source_finishing_job_line_id', '=', 'fl.id')
                         ->whereIn('fl.id', $sourceFinishingLineIds)
                         ->where('fl.reject_cause', 'sewing')
-                        ->selectRaw('fl.id, fl.qty_reject, COALESCE(frw_sum.qty_reworked,0) as qty_reworked, fl.item_id as item_id, fl.bundle_id as bundle_id')
+                        ->selectRaw('fl.id, fl.qty_reject, COALESCE(frw_sum.qty_reworked,0) as qty_reworked, COALESCE(fcv_sum.qty_converted,0) as qty_converted, fl.item_id as item_id, fl.bundle_id as bundle_id')
                         ->lockForUpdate()
                         ->get()
                         ->keyBy('id');
@@ -1198,9 +1257,15 @@ class SewingReturnController extends Controller
                     throw ValidationException::withMessages(['results' => 'Setor ulang reject hanya boleh mengisi kolom Di setor.']);
                 }
 
-                $remainingReject = max((float) $detail->qty_reject - (float) $detail->qty_reworked, 0.0);
-                if ((float) $r['qty_ok'] > $remainingReject + 0.000001) {
-                    throw ValidationException::withMessages(['results' => "Qty setor ulang melebihi sisa reject. Sisa: {$remainingReject}."]);
+                $remainingReject = max(
+                    (float) $detail->qty_reject
+                    - (float) ($detail->qty_reworked ?? 0)
+                    - (float) ($detail->qty_converted ?? 0),
+                    0.0
+                );
+                $requestedRejectResolution = (float) ($r['qty_ok'] ?? 0) + (float) ($r['qty_not_setor'] ?? 0);
+                if ($requestedRejectResolution > $remainingReject + 0.000001) {
+                    throw ValidationException::withMessages(['results' => "Qty penyelesaian reject melebihi sisa reject. Sisa: {$remainingReject}."]);
                 }
             }
 
@@ -1210,7 +1275,7 @@ class SewingReturnController extends Controller
                 ? (int) $rejectWarehouse->id
                 : (int) $wipSewWarehouse->id;
 
-            $sewingReturn = SewingReturn::create([
+            $sewingReturn = $returnRows->isNotEmpty() ? SewingReturn::create([
                 'code' => method_exists(SewingReturn::class, 'generateCode')
                 ? SewingReturn::generateCode($date)
                 : ('SR-' . Carbon::parse($date)->format('Ymd') . '-' . str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT)),
@@ -1224,10 +1289,10 @@ class SewingReturnController extends Controller
                 'status' => (new SewingReturn())->isFillable('status')
                     ? ($sewingQcFlowActive ? 'pending_qc' : 'posted')
                     : null,
-            ]);
+            ]) : null;
 
             // create lines + update pickup line counters
-            foreach ($rawResults as $r) {
+            foreach ($returnRows as $r) {
                 $pl = $pickupLines->get((int) $r['sewing_pickup_line_id']);
 
                 SewingReturnLine::create([
@@ -1254,7 +1319,7 @@ class SewingReturnController extends Controller
             // inventory + bundle tracker
             $okByBundle = [];
 
-            foreach ($rawResults as $r) {
+            foreach ($returnRows as $r) {
                 $pl = $pickupLines->get((int) $r['sewing_pickup_line_id']);
 
                 $bundleId = (int) $pl->cutting_job_bundle_id;
@@ -1267,7 +1332,7 @@ class SewingReturnController extends Controller
                 $sourceFinishingLineId = (int) ($r['source_finishing_job_line_id'] ?? 0);
 
                 // Semua return menunggu QC. Stok tetap di gudang asal sampai QC approve.
-                if ($sewingQcFlowActive) {
+                if (!$sewingReturn || $sewingQcFlowActive) {
                     continue;
                 }
 
@@ -1398,6 +1463,75 @@ class SewingReturnController extends Controller
                 }
             }
 
+            // Reject yang tidak bisa disetor ulang dikonversi ke item reject
+            // dan dipindahkan dari REJ-SEW ke WH-RTS, sama seperti aksi
+            // "Tidak Bisa" pada halaman Monitoring Reject Jahit.
+            foreach ($notSetorRows as $r) {
+                $sourceLineId = (int) ($r['source_reject_return_line_id'] ?? 0);
+                $sourceFinishingLineId = (int) ($r['source_finishing_job_line_id'] ?? 0);
+                $detailKey = $sourceFinishingLineId > 0 ? 'finishing:' . $sourceFinishingLineId : $sourceLineId;
+                $detail = $rejectReworkDetails->get($detailKey);
+                $qty = (float) ($r['qty_not_setor'] ?? 0);
+
+                if (!$detail || $qty <= 0.000001) {
+                    continue;
+                }
+
+                $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
+                if (!$whRts) {
+                    throw ValidationException::withMessages(['results' => 'Gudang WH-RTS belum ada.']);
+                }
+
+                $rejectItem = $this->resolveRejectItem((int) $detail->item_id);
+                $conversion = SewingRejectConversion::create([
+                    'code' => SewingRejectConversion::generateCode($date),
+                    'date' => $date,
+                    'status' => 'posted',
+                    'source_reject_return_line_id' => $sourceLineId > 0 ? $sourceLineId : null,
+                    'source_finishing_job_line_id' => $sourceFinishingLineId > 0 ? $sourceFinishingLineId : null,
+                    'item_id' => (int) $detail->item_id,
+                    'reject_item_id' => (int) $rejectItem->id,
+                    'cutting_job_bundle_id' => (int) ($detail->bundle_id ?? 0) ?: null,
+                    'qty' => $qty,
+                    'created_by_user_id' => auth()->id(),
+                    'notes' => trim((string) ($r['notes'] ?? '')) ?: 'Tidak bisa setor barang rusak',
+                ]);
+
+                $unitCost = (float) $this->inventory->getItemIncomingUnitCost(
+                    warehouseId: (int) $rejectWarehouse->id,
+                    itemId: (int) $detail->item_id,
+                );
+
+                $this->inventory->stockOut(
+                    warehouseId: (int) $rejectWarehouse->id,
+                    itemId: (int) $detail->item_id,
+                    qty: $qty,
+                    date: $date,
+                    sourceType: 'sewing_reject_convert',
+                    sourceId: (int) $conversion->id,
+                    notes: "Tidak bisa setor barang rusak {$conversion->code} OUT REJ-SEW",
+                    allowNegative: false,
+                    lotId: null,
+                    unitCostOverride: $unitCost > 0 ? $unitCost : null,
+                    affectLotCost: false,
+                    cuttingJobBundleId: (int) ($detail->bundle_id ?? 0) ?: null,
+                );
+
+                $this->inventory->stockIn(
+                    warehouseId: (int) $whRts->id,
+                    itemId: (int) $rejectItem->id,
+                    qty: $qty,
+                    date: $date,
+                    sourceType: 'sewing_reject_convert',
+                    sourceId: (int) $conversion->id,
+                    notes: "Tidak bisa setor barang rusak {$conversion->code} IN WH-RTS {$rejectItem->code}",
+                    lotId: null,
+                    unitCost: $unitCost > 0 ? $unitCost : null,
+                    affectLotCost: false,
+                    cuttingJobBundleId: (int) ($detail->bundle_id ?? 0) ?: null,
+                );
+            }
+
             // bundle: set "posisi terakhir"
             foreach ($okByBundle as $bundleId => $sumOk) {
                 $b = $bundlesMap->get($bundleId);
@@ -1434,25 +1568,35 @@ class SewingReturnController extends Controller
                 }
             }
 
-            if ($sewingReturn->isFillable('status') && empty($sewingReturn->status)) {
+            if ($sewingReturn && $sewingReturn->isFillable('status') && empty($sewingReturn->status)) {
                 $sewingReturn->status = ($sewingQcFlowActive && $normalRows->isNotEmpty()) ? 'pending_qc' : 'posted';
                 $sewingReturn->save();
             }
 
-            if ($sewingQcFlowActive && $normalRows->isNotEmpty()) {
-                $this->createPendingSewingQcResults($sewingReturn, $rawResults, $pickupLines, $bundlesMap, $date, $operatorId);
+            if ($sewingQcFlowActive && $sewingReturn && $normalRows->isNotEmpty()) {
+                $this->createPendingSewingQcResults($sewingReturn, $returnRows, $pickupLines, $bundlesMap, $date, $operatorId);
             }
 
             // ── DRY RUN: kumpulkan info lalu throw → transaction di-rollback ──
             if ($isDryRun) {
-                throw new \App\Exceptions\DryRunRollbackException($sewingReturn);
+                $dryRunReturn = $sewingReturn ?: new SewingReturn([
+                    'code' => 'REJECT-CONVERSION-DRY-RUN',
+                    'date' => $date,
+                ]);
+                throw new \App\Exceptions\DryRunRollbackException($dryRunReturn);
             }
 
             $postedSewingReturn = $sewingReturn;
 
+            if ($sewingReturn) {
+                return redirect()
+                    ->route('production.sewing.returns.show', $sewingReturn)
+                    ->with('success', 'Sewing Return berhasil disimpan.');
+            }
+
             return redirect()
-                ->route('production.sewing.returns.show', $sewingReturn)
-                ->with('success', 'Sewing Return berhasil disimpan.');
+                ->route('production.sewing.reject_returns.index')
+                ->with('status', 'Barang rusak berhasil dicatat sebagai tidak bisa setor.');
         });
 
         if ($postedSewingReturn && ($postedSewingReturn->status ?? null) !== 'pending_qc') {
@@ -1502,6 +1646,51 @@ class SewingReturnController extends Controller
                     'message' => 'Dry run selesai — validasi LOLOS, transaksi di-rollback. Data tidak tersimpan.',
                 ]);
         }
+    }
+
+    private function resolveRejectItem(int $sourceItemId): Item
+    {
+        $source = Item::query()
+            ->with('category')
+            ->findOrFail($sourceItemId);
+
+        $category = $source->category;
+        $categoryCode = $category?->code
+            ? Str::upper(Str::slug($category->code, '-'))
+            : Str::upper(Str::slug($category?->name ?: 'REJECT', '-'));
+
+        $rejectCode = trim($categoryCode, '-') . '-RJCT';
+        $rejectName = trim(($category?->name ?: $categoryCode) . ' Reject');
+
+        $attributes = [
+            'name' => $rejectName,
+            'unit' => $source->unit ?: 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $source->item_category_id,
+            'item_role' => 'finished_good',
+            'item_role_id' => ItemRole::idByCode(ItemRole::FG),
+            'production_source' => Item::PRODUCTION_IN_HOUSE,
+            'can_buy' => false,
+            'can_make' => true,
+            'default_supply_source' => Item::SUPPLY_MAKE,
+            'last_purchase_price' => 0,
+            'hpp' => 0,
+            'base_unit_cost' => 0,
+            'active' => true,
+            'affects_hpp' => false,
+            'default_allocation' => 'hpp',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+        ];
+
+        if (Schema::hasColumn('items', 'product_category_id')) {
+            $attributes['product_category_id'] = $source->product_category_id;
+        }
+
+        $columns = Schema::getColumnListing('items');
+        $attributes = collect($attributes)->only($columns)->all();
+
+        return Item::query()->firstOrCreate(['code' => $rejectCode], $attributes);
     }
 
     private function createPendingSewingQcResults(

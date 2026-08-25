@@ -1078,6 +1078,7 @@
                                 $oldRow = old("results.$idx", []);
                                 $okVal = $oldRow['qty_ok'] ?? '';
                                 $rjVal = $oldRow['qty_reject'] ?? '';
+                                $notSetorVal = $oldRow['qty_not_setor'] ?? '';
                                 $notes = $oldRow['notes'] ?? '';
                                 $showNotes = (float) ($rjVal ?: 0) > 0 || trim((string) $notes) !== '';
                                 $alreadyReturned = (float) ($line->qty_returned_ok ?? 0) + (float) ($line->qty_returned_reject ?? 0);
@@ -1193,17 +1194,29 @@
                                         </div>
 
                                         @if ($isRejectLine)
-                                            <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
                                             <div class="field">
-                                                <label>Sumber</label>
-                                                <div class="form-control form-control-sm mono" style="border-radius:8px; font-weight:900; text-align:center;">
-                                                    {{ $line->reject_code ?? 'REJ-SEW' }}
-                                                </div>
+                                                <label>Tidak Bisa Setor Barang Rusak</label>
+                                                <input type="number" step="1" min="0"
+                                                       inputmode="numeric"
+                                                       class="form-control form-control-sm qty rj num-input select-all-on-focus"
+                                                       name="results[{{ $idx }}][qty_not_setor]"
+                                                       value="{{ $notSetorVal }}" placeholder="0" {{ $isBlocked ? 'disabled' : '' }}>
                                             </div>
+                                            <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
                                         @else
                                             <input type="hidden" name="results[{{ $idx }}][qty_reject]" value="0">
+                                            <input type="hidden" name="results[{{ $idx }}][qty_not_setor]" value="0">
                                         @endif
                                     </div>
+
+                                    @if ($isRejectLine)
+                                        <div class="field">
+                                            <label>Sumber</label>
+                                            <div class="form-control form-control-sm mono" style="border-radius:8px; font-weight:900; text-align:center;">
+                                                {{ $line->reject_code ?? 'REJ-SEW' }}
+                                            </div>
+                                        </div>
+                                    @endif
 
                                     <div class="notes">
                                         <input type="text" class="form-control form-control-sm"
@@ -1342,7 +1355,8 @@ foreach ($lines as $l) {
                     <div class="mt-2" style="font-size:.90rem;font-weight:800;color:var(--muted);">
                         Operator: <span class="mono" id="m-op">SEMUA</span><br>
                         Tujuan: <span class="mono" id="m-dest">-</span><br>
-                        Total Setor: <span class="mono" id="m-ok">0,00</span>
+                        Total Setor Ulang: <span class="mono" id="m-ok">0,00</span><br>
+                        Tidak Bisa Setor Barang Rusak: <span class="mono" id="m-not-setor">0,00</span>
                     </div>
                 </div>
 
@@ -1415,6 +1429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mDest = document.getElementById('m-dest');
     const mOk = document.getElementById('m-ok');
     const mRj = document.getElementById('m-rj');
+    const mNotSetor = document.getElementById('m-not-setor');
     const mRows = document.getElementById('m-rows');
     const mItemsCount = document.getElementById('m-items-count');
     const mItems = document.getElementById('m-items');
@@ -1519,6 +1534,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return {
             ok: card.querySelector('input[name*="[qty_ok]"]'),
             rj: card.querySelector('input[name*="[qty_reject]"]'),
+            notSetor: card.querySelector('input[name*="[qty_not_setor]"]'),
             notesWrap: card.querySelector('.notes'),
             cb: card.querySelector('.row-check'),
         };
@@ -1543,19 +1559,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function clampCard(card, changed) {
         const maxSetor = maxSetorForCard(card);
-        const { ok, rj } = getEls(card);
+        const { ok, rj, notSetor } = getEls(card);
 
         let a = parseFloat(ok?.value || '0'); if (!Number.isFinite(a) || a < 0) a = 0;
         let b = parseFloat(rj?.value || '0'); if (!Number.isFinite(b) || b < 0) b = 0;
+        let c = parseFloat(notSetor?.value || '0'); if (!Number.isFinite(c) || c < 0) c = 0;
 
-        if (a + b > maxSetor) {
-            const diff = (a + b) - maxSetor;
+        if (a + b + c > maxSetor) {
+            const diff = (a + b + c) - maxSetor;
             if (changed === 'rj') b = Math.max(0, b - diff);
+            else if (changed === 'notSetor') c = Math.max(0, c - diff);
             else a = Math.max(0, a - diff);
         }
 
         if (ok) ok.value = (a <= 0) ? '' : String(a);
         if (rj) rj.value = (b <= 0) ? '' : String(b);
+        if (notSetor) notSetor.value = (c <= 0) ? '' : String(c);
     }
 
     function syncNotes(card) {
@@ -1567,19 +1586,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncCheck(card) {
-        const { ok, rj, cb } = getEls(card);
+        const { ok, rj, notSetor, cb } = getEls(card);
         const a = parseFloat(ok?.value || '0') || 0;
         const b = parseFloat(rj?.value || '0') || 0;
-        if (cb) cb.checked = ((a + b) > 0);
+        const c = parseFloat(notSetor?.value || '0') || 0;
+        if (cb) cb.checked = ((a + b + c) > 0);
     }
 
     function autoFillCard(card) {
         if (isSupplyBlocked(card)) return;
         const fill = maxSetorForCard(card);
 
-        const { ok, rj } = getEls(card);
+        const { ok, rj, notSetor } = getEls(card);
         if (ok) ok.value = (fill > 0) ? String(fill) : '';
         if (rj) rj.value = '';
+        if (notSetor) notSetor.value = '';
         clampCard(card, 'ok');
         syncNotes(card);
         syncCheck(card);
@@ -1612,10 +1633,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let total = 0;
         $$('.fin-item', listByOp).forEach(card => {
             if (card.style.display === 'none') return;
-            const { ok, rj } = getEls(card);
+            const { ok, rj, notSetor } = getEls(card);
             const a = parseFloat(ok?.value || '0') || 0;
             const b = parseFloat(rj?.value || '0') || 0;
-            total += (a + b);
+            const c = parseFloat(notSetor?.value || '0') || 0;
+            total += (a + b + c);
         });
 
         btnOpenModal.disabled = total <= 0;
@@ -1636,8 +1658,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ok = parseFloat(card.querySelector('input[name*="[qty_ok]"]')?.value || '0') || 0;
             const rj = parseFloat(card.querySelector('input[name*="[qty_reject]"]')?.value || '0') || 0;
+            const notSetor = parseFloat(card.querySelector('input[name*="[qty_not_setor]"]')?.value || '0') || 0;
 
-            if ((ok + rj) > 0) {
+            if ((ok + rj + notSetor) > 0) {
                 pickedRows++;
                 totalOk += ok;
             }
@@ -1702,7 +1725,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const changed = (t.name || '').includes('[qty_reject]') ? 'rj' : 'ok';
+        const changed = (t.name || '').includes('[qty_reject]')
+            ? 'rj'
+            : ((t.name || '').includes('[qty_not_setor]') ? 'notSetor' : 'ok');
         clampCard(card, changed);
         syncCheck(card);
         syncNotes(card);
@@ -1730,19 +1755,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const { ok, rj } = getEls(card);
+        const { ok, rj, notSetor } = getEls(card);
 
         // Uncheck: kosongkan nilai
         if (!t.checked) {
             if (ok) ok.value = '';
             if (rj) rj.value = '';
+            if (notSetor) notSetor.value = '';
             syncNotes(card);
         }
         // Check: TIDAK auto-fill — hanya fokus input qty_ok supaya keyboard muncul
         else {
             const a = parseFloat(ok?.value || '0') || 0;
             const b = parseFloat(rj?.value || '0') || 0;
-            if ((a + b) <= 0 && ok && !ok.disabled) {
+            const c = parseFloat(notSetor?.value || '0') || 0;
+            if ((a + b + c) <= 0 && ok && !ok.disabled) {
                 ok.focus();
                 setTimeout(() => { try { ok.select(); } catch (_) {} }, 50);
             }
@@ -1808,10 +1835,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btnUncheckAll?.addEventListener('click', () => {
         if (isAllMode() || !listByOp) return;
         $$('.fin-item', listByOp).forEach(card => {
-            const { cb, ok, rj } = getEls(card);
+            const { cb, ok, rj, notSetor } = getEls(card);
             if (cb) cb.checked = false;
             if (ok) ok.value = '';
             if (rj) rj.value = '';
+            if (notSetor) notSetor.value = '';
             syncNotes(card);
         });
         computeSubmitEnabled();
@@ -1845,20 +1873,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!mItems || !listByOp) return;
         mItems.innerHTML = '';
 
-        let rows = 0, okSum = 0, rjSum = 0;
+        let rows = 0, okSum = 0, rjSum = 0, notSetorSum = 0;
         const picked = [];
 
         $$('.fin-item', listByOp).forEach(card => {
-            const { ok, rj } = getEls(card);
+            const { ok, rj, notSetor } = getEls(card);
             const a = parseFloat(ok?.value || '0') || 0;
             const b = parseFloat(rj?.value || '0') || 0;
-            if ((a + b) <= 0) return;
+            const c = parseFloat(notSetor?.value || '0') || 0;
+            if ((a + b + c) <= 0) return;
 
             rows++;
             okSum += a;
             rjSum += b;
+            notSetorSum += c;
 
-            picked.push({ code: (card.dataset.code || '').toString(), ok: a, rj: b });
+            picked.push({ code: (card.dataset.code || '').toString(), ok: a, rj: b, notSetor: c });
         });
 
         picked.sort((x, y) => (x.code || '').localeCompare(y.code || ''));
@@ -1866,6 +1896,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mRows) mRows.textContent = rows.toLocaleString('id-ID');
         if (mOk) mOk.textContent = okSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         if (mRj) mRj.textContent = rjSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (mNotSetor) mNotSetor.textContent = notSetorSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         if (mItemsCount) mItemsCount.textContent = picked.length.toLocaleString('id-ID');
 
         if (picked.length === 0) {
@@ -1882,7 +1913,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="d-grid" style="grid-template-columns: 44px 1fr 120px; gap:.5rem; align-items:center;">
                     <div class="text-muted" style="font-weight:900;">${i+1}</div>
                     <div style="font-weight:900;" class="mono">${esc(it.code)}</div>
-                    <div class="text-end mono" style="font-weight:900;">${it.ok.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                    <div class="text-end mono" style="font-weight:900;">${it.ok.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})}${it.notSetor > 0 ? ` + ${it.notSetor.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})} rusak` : ''}</div>
                 </div>
             `;
             mItems.appendChild(row);
